@@ -1,0 +1,77 @@
+{
+  "commands":
+  [
+    {
+      "input_pattern": "^SELECT n\\.nspname as \"Schema\",\n  c\\.relname as \"Name\",\n  CASE c\\.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as \"Type\",\n  pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"Owner\",\n c2\\.relname as \"Table\"\nFROM pg_catalog\\.pg_class c\n     LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\n     LEFT JOIN pg_catalog\\.pg_index i ON i\\.indexrelid = c\\.oid\n     LEFT JOIN pg_catalog\\.pg_class c2 ON i\\.indrelid = c2\\.oid\nWHERE c\\.relkind IN \\('i','I',''\\)\n      AND n\\.nspname <> 'pg_catalog'\n      AND n\\.nspname <> 'information_schema'\n      AND n\\.nspname !~ '\\^pg_toast'\n  AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;$",
+      "output_pattern": "SELECT * FROM INFORMATION_SCHEMA.INDEXES",
+      "matcher_array": [],
+      "blurb": "This command is equivalent to the PSQL \\di meta-command."
+    },
+    {
+      "input_pattern": "^SELECT n\\.nspname AS \"Name\",\n  pg_catalog\\.pg_get_userbyid\\(n\\.nspowner\\) AS \"Owner\"\nFROM pg_catalog\\.pg_namespace n\nWHERE n\\.nspname !~ '\\^pg_' AND n\\.nspname <> 'information_schema'\nORDER BY 1;$",
+      "output_pattern": "SELECT * FROM INFORMATION_SCHEMA.SCHEMATA",
+      "matcher_array": [],
+      "blurb": "This command is equivalent to the PSQL \\dn meta-command."
+    },
+    {
+      "input_pattern": "^SELECT n\\.nspname as \"Schema\",\n  c\\.relname as \"Name\",\n  CASE c\\.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as \"Type\",\n  pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"Owner\"\nFROM pg_catalog\\.pg_class c\n     LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relkind IN \\('r','p',''\\)\n      AND n\\.nspname <> 'pg_catalog'\n      AND n\\.nspname <> 'information_schema'\n      AND n\\.nspname !~ '\\^pg_toast'\n  AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;$",
+      "output_pattern": "SELECT * FROM INFORMATION_SCHEMA.TABLES;",
+      "matcher_array": [],
+      "blurb": "This command is equivalent to the PSQL \\dt meta-command."
+    },
+    {
+      "input_pattern": "^SELECT c\\.oid::pg_catalog\\.regclass FROM pg_catalog\\.pg_class c, pg_catalog\\.pg_inherits i WHERE c\\.oid=i\\.inhrelid AND i\\.inhparent = '.*' ORDER BY c\\.relname;$",
+      "output_pattern": "select 1 as oid from UNNEST([]);",
+      "matcher_array": [],
+      "blurb": "This command is equivalent to the PSQL \\dt <param> meta-command. This command is split up among multiple parts, this being the fifth. The Spanner fetch does not require a similar step so we just hardcode it."
+    },
+    {
+      "input_pattern": "^SELECT n\\.nspname as \"Schema\",\n  c\\.relname as \"Name\",\n  CASE c\\.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as \"Type\",\n  pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"Owner\",\n c2\\.relname as \"Table\"\nFROM pg_catalog\\.pg_class c\n     LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\n     LEFT JOIN pg_catalog\\.pg_index i ON i\\.indexrelid = c\\.oid\n     LEFT JOIN pg_catalog\\.pg_class c2 ON i\\.indrelid = c2\\.oid\nWHERE c\\.relkind IN \\('i','I','s',''\\)\n      AND n\\.nspname !~ '\\^pg_toast'\n  AND c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<indexname>.*)\\)\\$'\n  AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;$",
+      "output_pattern": "SELECT * FROM INFORMATION_SCHEMA.INDEXES WHERE lower(INDEX_NAME) = lower('%s');",
+      "matcher_array": ["indexname"],
+      "blurb": "This command is equivalent to the PSQL \\di <param> meta-command."
+    },
+    {
+      "input_pattern": "^SELECT n\\.nspname AS \"Name\",\n  pg_catalog\\.pg_get_userbyid\\(n\\.nspowner\\) AS \"Owner\"\nFROM pg_catalog\\.pg_namespace n\nWHERE n\\.nspname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<schemaname>.*)\\)\\$'\nORDER BY 1;$",
+      "output_pattern": "SELECT * FROM INFORMATION_SCHEMA.SCHEMATA WHERE lower(SCHEMA_NAME) = lower('%s')",
+      "matcher_array": ["schemaname"],
+      "blurb": "This command is equivalent to the PSQL \\dn <param> meta-command."
+    },
+    {
+      "input_pattern": "^SELECT n\\.nspname as \"Schema\",\n  c\\.relname as \"Name\",\n  CASE c\\.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as \"Type\",\n  pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"Owner\"\nFROM pg_catalog\\.pg_class c\n     LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relkind IN \\('r','p','s',''\\)\n      AND n\\.nspname !~ '\\^pg_toast'\n  AND c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<tablename>.*)\\)\\$'\n  AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;$",
+      "output_pattern": "SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE lower(TABLE_NAME) = lower('%s');",
+      "matcher_array": ["tablename"],
+      "blurb": "This command is equivalent to the PSQL \\dt <param> meta-command."
+    },
+    {
+      "input_pattern": "^SELECT c\\.oid::pg_catalog\\.regclass FROM pg_catalog\\.pg_class c, pg_catalog\\.pg_inherits i WHERE c\\.oid=i\\.inhparent AND i\\.inhrelid = '.*' AND c\\.relkind != 'p' ORDER BY inhseqno;$",
+      "output_pattern": "select 1 as oid from UNNEST([]);",
+      "matcher_array": [],
+      "blurb": "This command is equivalent to the PSQL \\dt <param> meta-command. This command is split up among multiple parts, this being the fourth. The Spanner fetch does not require a similar step so we just hardcode it."
+    },
+    {
+      "input_pattern": "^SELECT relchecks, relkind, relhasindex, relhasrules, reltriggers <> 0, false, false, relhasoids, false as relispartition, '', ''\nFROM pg_catalog\\.pg_class WHERE oid = '.*';$",
+      "output_pattern": "SELECT 0 as relcheck, \"r\" as relkind, false as relhasindex, false as relhasrules, false as reltriggers, false, false, false as relhasoids, \"\", \"\";",
+      "matcher_array": [],
+      "blurb": "This command is equivalent to the PSQL \\dt <param> meta-command. This command is split up among multiple parts, this being the second. Here normally would fetch catalogue metadata, but due to Spanner structure, we expect it to be static, and thus just hardcode it."
+    },
+    {
+      "input_pattern": "^SELECT a\\.attname,\n  pg_catalog\\.format_type\\(a\\.atttypid, a\\.atttypmod\\),\n  \\(SELECT substring\\(pg_catalog\\.pg_get_expr\\(d\\.adbin, d\\.adrelid, true\\) for 128\\)\n   FROM pg_catalog\\.pg_attrdef d\n   WHERE d\\.adrelid = a\\.attrelid AND d\\.adnum = a\\.attnum AND a\\.atthasdef\\),\n  a\\.attnotnull,\n  NULL AS attcollation,\n  ''::pg_catalog\\.char AS attidentity,\n  ''::pg_catalog\\.char AS attgenerated\nFROM pg_catalog\\.pg_attribute a\nWHERE a\\.attrelid = '(?<tablename>.*)' AND a\\.attnum > 0 AND NOT a\\.attisdropped\nORDER BY a\\.attnum;$",
+      "output_pattern": "SELECT t.column_name as attname, t.spanner_type as format_type, \"\" as substring, t.is_nullable = \"NO\" as attnotnull, 1 as attnum, null as attcollation, null as indexdef, null as attfdwoptions FROM information_schema.columns AS t WHERE t.table_schema='' AND farm_fingerprint(t.table_name) = %s;",
+      "matcher_array": ["tablename"],
+      "blurb": "This command is equivalent to the PSQL \\dt <param> meta-command. This command is split up among multiple parts, this being the third. Here we fetch the actual schema."
+    },
+    {
+      "input_pattern": "^SELECT n\\.nspname as \"Schema\",\n  c\\.relname as \"Name\",\n  CASE c\\.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as \"Type\",\n  pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"Owner\"\nFROM pg_catalog\\.pg_class c\n     LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relkind IN \\('r','p','v','m','S','f',''\\)\n      AND n\\.nspname <> 'pg_catalog'\n      AND n\\.nspname <> 'information_schema'\n      AND n\\.nspname !~ '\\^pg_toast'\n  AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;$",
+      "output_pattern": "SELECT t.table_schema as Schema, t.table_name as Name, \"table\" as Type, \"me\" as Owner FROM information_schema.tables AS t WHERE t.table_schema = ''",
+      "matcher_array": [],
+      "blurb": "This command is equivalent to the PSQL \\d meta-command."
+    },
+    {
+      "input_pattern": "^SELECT c\\.oid,\n  n\\.nspname,\n  c\\.relname\nFROM pg_catalog\\.pg_class c\n     LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<tablename>.*)\\)\\$'\n  AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 2, 3;$",
+      "output_pattern": "SELECT farm_fingerprint(t.table_name) as oid, \"\" as nspname, t.table_name as relname FROM information_schema.tables AS t WHERE t.table_schema='' AND lower(t.table_name) = lower('%s');",
+      "matcher_array": ["tablename"],
+      "blurb": "This command is equivalent to the PSQL \\d <param> meta-command. This command is split up among multiple parts, this being the first. Here we just fetch basic metadata used to fetch the table schema in earnest in the next step."
+    }
+  ]
+}
