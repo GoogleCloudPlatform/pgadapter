@@ -100,9 +100,13 @@ The following options are optional:
   replaced by the output_pattern string, wherein capture groups are allowed and
   their order is specified via the matcher_array item. Match replacement must be
   defined via %s in the output_pattern string. Set matcher_array to [] if no
-  matches exist. User-specified patterns will precede internal matches. Escaped
-  and general regex syntax matches Java RegEx syntax; more information on the
-  Java RegEx syntax found here: 
+  matches exist. Alternatively, you may place the matching group names 
+  directly within the output_pattern string using matcher.replaceAll() rules
+  (that is to say, placing the item within braces, preceeeded by a dollar sign);
+  For this specific case, matcher_array must be left empty. User-specified 
+  patterns will precede internal matches. Escaped and general regex syntax 
+  matches Java RegEx syntax; more information on the Java RegEx syntax found 
+  here: 
   https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html
     * Example:
         { 
@@ -117,6 +121,11 @@ The following options are optional:
                 "input_pattern": "^ab(?<firstgroup>\\d)(?<secondgroup>\\d)$",
                 "output_pattern": "second number: %s, first number: %s",
                 "matcher_array": ["secondgroup", "firstgroup"] 
+              },
+              {
+                "input_pattern": "^cd(?<firstgroup>\\d)(?<secondgroup>\\d)$",
+                "output_pattern": "second number: ${secondgroup}, first number: ${firstgroup}",
+                "matcher_array": [] 
               }
             ]
         }
@@ -125,10 +134,12 @@ The following options are optional:
         Input queries:
         "SELECT * FROM users;"
         "ab12"
+        "cd34"
 
         Output queries:
         "SELECT 1;"
         "second number: 2, first number: 1"
+        "second number: 4, first number: 3"
 ```
 An example of a simple run string:
 

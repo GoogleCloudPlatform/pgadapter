@@ -126,7 +126,7 @@ public class PSQLTest {
             " WHERE" +
             " t.table_schema=''" +
             " AND" +
-            " lower(t.table_name) = lower('users');";
+            " LOWER(t.table_name) = LOWER('users');";
 
     PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
 
@@ -155,7 +155,7 @@ public class PSQLTest {
             " WHERE" +
             " t.table_schema=''" +
             " AND" +
-            " lower(t.table_name) = lower('bobby\\'; DROP TABLE USERS; SELECT\\'');";
+            " LOWER(t.table_name) = LOWER('bobby\\'; DROP TABLE USERS; SELECT\\'');";
 
     PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
 
@@ -266,7 +266,7 @@ public class PSQLTest {
   public void testDescribeTableAttributesTranslates() throws SQLException {
     // PSQL equivalent: \d <table> (4)
     String sql =
-        "SELECT c.oid::pg_catalog.regclass FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i WHERE c.oid=i.inhparent AND i.inhrelid = '-2264987671676060158' AND c.relkind != 'p' ORDER BY inhseqno;\n";
+        "SELECT c.oid::pg_catalog.regclass FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i WHERE c.oid=i.inhparent AND i.inhrelid = '-2264987671676060158' AND c.relkind != 'p' ORDER BY inhseqno;";
     String result =
         "select 1 as oid from UNNEST([]);";
 
@@ -279,7 +279,7 @@ public class PSQLTest {
   public void testDescribeMoreTableAttributesTranslates() throws SQLException {
     // PSQL equivalent: \d <table> (5)
     String sql =
-        "SELECT c.oid::pg_catalog.regclass FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i WHERE c.oid=i.inhrelid AND i.inhparent = '-2264987671676060158' ORDER BY c.relname;\n";
+        "SELECT c.oid::pg_catalog.regclass FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i WHERE c.oid=i.inhrelid AND i.inhparent = '-2264987671676060158' ORDER BY c.relname;";
     String result =
         "select 1 as oid from UNNEST([]);";
 
@@ -367,7 +367,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String result =
-        "SELECT * FROM INFORMATION_SCHEMA.TABLES;";
+        "SELECT * FROM information_schema.tables;";
 
     PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
 
@@ -390,7 +390,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String result =
-        "SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE lower(TABLE_NAME) = lower('users');";
+        "SELECT * FROM information_schema.tables WHERE LOWER(table_name) = LOWER('users');";
 
     PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
 
@@ -413,7 +413,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String result =
-        "SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE lower(TABLE_NAME) = lower('bobby\\'; DROP TABLE USERS; SELECT\\'');";
+        "SELECT * FROM information_schema.tables WHERE LOWER(table_name) = LOWER('bobby\\'; DROP TABLE USERS; SELECT\\'');";
 
     PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
 
@@ -440,7 +440,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String result =
-        "SELECT * FROM INFORMATION_SCHEMA.INDEXES";
+        "SELECT * FROM information_schema.indexes;";
 
     PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
 
@@ -466,7 +466,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String result =
-        "SELECT * FROM INFORMATION_SCHEMA.INDEXES WHERE lower(INDEX_NAME) = lower('index');";
+        "SELECT * FROM information_schema.indexes WHERE LOWER(index_name) = LOWER('index');";
 
     PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
 
@@ -492,7 +492,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String result =
-        "SELECT * FROM INFORMATION_SCHEMA.INDEXES WHERE lower(INDEX_NAME) = lower('bobby\\'; DROP TABLE USERS; SELECT\\'');";
+        "SELECT * FROM information_schema.indexes WHERE LOWER(index_name) = LOWER('bobby\\'; DROP TABLE USERS; SELECT\\'');";
 
     PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
 
@@ -509,7 +509,7 @@ public class PSQLTest {
             + "WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'\n"
             + "ORDER BY 1;";
     String result =
-        "SELECT * FROM INFORMATION_SCHEMA.SCHEMATA";
+        "SELECT * FROM information_schema.schemata;";
 
     PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
 
@@ -526,7 +526,7 @@ public class PSQLTest {
             + "WHERE n.nspname OPERATOR(pg_catalog.~) '^(schema)$'\n"
             + "ORDER BY 1;";
     String result =
-        "SELECT * FROM INFORMATION_SCHEMA.SCHEMATA WHERE lower(SCHEMA_NAME) = lower('schema')";
+        "SELECT * FROM information_schema.schemata WHERE LOWER(schema_name) = LOWER('schema');";
 
     PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
 
@@ -543,7 +543,126 @@ public class PSQLTest {
             + "WHERE n.nspname OPERATOR(pg_catalog.~) '^(bobby'; DROP TABLE USERS; SELECT')$'\n"
             + "ORDER BY 1;";
     String result =
-        "SELECT * FROM INFORMATION_SCHEMA.SCHEMATA WHERE lower(SCHEMA_NAME) = lower('bobby\\'; DROP TABLE USERS; SELECT\\'')";
+        "SELECT * FROM information_schema.schemata WHERE LOWER(schema_name) = LOWER('bobby\\'; DROP TABLE USERS; SELECT\\'');";
+
+    PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
+
+    Assert.assertEquals(psqlStatement.getSql(), result);
+  }
+
+  @Test
+  public void testTableSelectAutocomplete() throws SQLException {
+    // PSQL equivalent: SELECT <table>
+    String sql =
+        "SELECT pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c WHERE c.relkind IN ('r', 'S', 'v', 'm', 'f', 'p') AND substring(pg_catalog.quote_ident(c.relname),1,0)='user' AND pg_catalog.pg_table_is_visible(c.oid) AND c.relnamespace <> (SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = 'pg_catalog')\n"
+            + "UNION\n"
+            + "SELECT pg_catalog.quote_ident(n.nspname) || '.' FROM pg_catalog.pg_namespace n WHERE substring(pg_catalog.quote_ident(n.nspname) || '.',1,0)='' AND (SELECT pg_catalog.count(*) FROM pg_catalog.pg_namespace WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,0) = substring('',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) > 1\n"
+            + "UNION\n"
+            + "SELECT pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c, pg_catalog.pg_namespace n WHERE c.relnamespace = n.oid AND c.relkind IN ('r', 'S', 'v', 'm', 'f', 'p') AND substring(pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname),1,0)='' AND substring(pg_catalog.quote_ident(n.nspname) || '.',1,0) = substring('',1,pg_catalog.length(pg_catalog.quote_ident(n.nspname))+1) AND (SELECT pg_catalog.count(*) FROM pg_catalog.pg_namespace WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,0) = substring('',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) = 1\n"
+            + "LIMIT 1000";
+    String result =
+        "SELECT table_name AS quote_ident FROM information_schema.tables WHERE table_catalog = '' and table_schema = '' and STARTS_WITH(LOWER(table_name), LOWER('user')) LIMIT 1000;";
+
+    PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
+
+    Assert.assertEquals(psqlStatement.getSql(), result);
+  }
+
+  @Test
+  public void testTableInsertAutocomplete() throws SQLException {
+    // PSQL equivalent: INSERT INTO <table>
+    String sql =
+        "SELECT pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c WHERE c.relkind IN ('r', 'f', 'v', 'p') AND substring(pg_catalog.quote_ident(c.relname),1,4)='user' AND pg_catalog.pg_table_is_visible(c.oid) AND c.relnamespace <> (SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = 'pg_catalog')\n"
+            + "UNION\n"
+            + "SELECT pg_catalog.quote_ident(n.nspname) || '.' FROM pg_catalog.pg_namespace n WHERE substring(pg_catalog.quote_ident(n.nspname) || '.',1,4)='user' AND (SELECT pg_catalog.count(*) FROM pg_catalog.pg_namespace WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,4) = substring('user',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) > 1\n"
+            + "UNION\n"
+            + "SELECT pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c, pg_catalog.pg_namespace n WHERE c.relnamespace = n.oid AND c.relkind IN ('r', 'f', 'v', 'p') AND substring(pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname),1,4)='user' AND substring(pg_catalog.quote_ident(n.nspname) || '.',1,4) = substring('user',1,pg_catalog.length(pg_catalog.quote_ident(n.nspname))+1) AND (SELECT pg_catalog.count(*) FROM pg_catalog.pg_namespace WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,4) = substring('user',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) = 1\n"
+            + "LIMIT 1000";
+    String result =
+        "SELECT table_name AS quote_ident FROM information_schema.tables WHERE table_catalog = '' and table_schema = '' and STARTS_WITH(LOWER(table_name), LOWER('user')) LIMIT 1000;";
+
+    PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
+
+    Assert.assertEquals(psqlStatement.getSql(), result);
+  }
+
+  @Test
+  public void testTableAttributesAutocomplete() throws SQLException {
+    // PSQL equivalent: INSERT INTO table_name (<attribute>)
+    // PSQL equivalent: SELECT * FROM table_name WHERE <attribute>
+    String sql =
+        "SELECT pg_catalog.quote_ident(attname)   FROM pg_catalog.pg_attribute a, pg_catalog.pg_class c  WHERE c.oid = a.attrelid    AND a.attnum > 0    AND NOT a.attisdropped    AND substring(pg_catalog.quote_ident(attname),1,3)='age'    AND (pg_catalog.quote_ident(relname)='user'         OR '\"' || relname || '\"'='user')    AND pg_catalog.pg_table_is_visible(c.oid)\n"
+            + "LIMIT 1000";
+    String result =
+        "SELECT column_name AS quote_ident FROM information_schema.columns WHERE table_name = 'user' AND STARTS_WITH(LOWER(COLUMN_NAME), LOWER('age')) LIMIT 1000;";
+
+    PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
+
+    Assert.assertEquals(psqlStatement.getSql(), result);
+  }
+
+  @Test
+  public void testDescribeTableAutocomplete() throws SQLException {
+    // PSQL equivalent: \\d <table>
+    String sql =
+        "SELECT pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c WHERE substring(pg_catalog.quote_ident(c.relname),1,4)='user' AND pg_catalog.pg_table_is_visible(c.oid) AND c.relnamespace <> (SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = 'pg_catalog')\n"
+            + "UNION\n"
+            + "SELECT pg_catalog.quote_ident(n.nspname) || '.' FROM pg_catalog.pg_namespace n WHERE substring(pg_catalog.quote_ident(n.nspname) || '.',1,4)='user' AND (SELECT pg_catalog.count(*) FROM pg_catalog.pg_namespace WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,4) = substring('user',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) > 1\n"
+            + "UNION\n"
+            + "SELECT pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c, pg_catalog.pg_namespace n WHERE c.relnamespace = n.oid AND substring(pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname),1,4)='user' AND substring(pg_catalog.quote_ident(n.nspname) || '.',1,4) = substring('user',1,pg_catalog.length(pg_catalog.quote_ident(n.nspname))+1) AND (SELECT pg_catalog.count(*) FROM pg_catalog.pg_namespace WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,4) = substring('user',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) = 1\n"
+            + "LIMIT 1000";
+    String result =
+        "SELECT table_name AS quote_ident FROM information_schema.tables WHERE table_catalog = '' AND table_schema = '' AND STARTS_WITH(LOWER(table_name), LOWER('user')) LIMIT 1000;";
+
+    PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
+
+    Assert.assertEquals(psqlStatement.getSql(), result);
+  }
+
+  @Test
+  public void testDescribeTableMetadataAutocomplete() throws SQLException {
+    // PSQL equivalent: \\dt <table>
+    String sql =
+        "SELECT pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c WHERE c.relkind IN ('r', 'p') AND substring(pg_catalog.quote_ident(c.relname),1,4)='user' AND pg_catalog.pg_table_is_visible(c.oid) AND c.relnamespace <> (SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = 'pg_catalog')\n"
+            + "UNION\n"
+            + "SELECT pg_catalog.quote_ident(n.nspname) || '.' FROM pg_catalog.pg_namespace n WHERE substring(pg_catalog.quote_ident(n.nspname) || '.',1,4)='user' AND (SELECT pg_catalog.count(*) FROM pg_catalog.pg_namespace WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,4) = substring('user',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) > 1\n"
+            + "UNION\n"
+            + "SELECT pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c, pg_catalog.pg_namespace n WHERE c.relnamespace = n.oid AND c.relkind IN ('r', 'p') AND substring(pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname),1,4)='user' AND substring(pg_catalog.quote_ident(n.nspname) || '.',1,4) = substring('user',1,pg_catalog.length(pg_catalog.quote_ident(n.nspname))+1) AND (SELECT pg_catalog.count(*) FROM pg_catalog.pg_namespace WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,4) = substring('user',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) = 1\n"
+            + "LIMIT 1000";
+    String result =
+        "SELECT table_name AS quote_ident FROM INFORMATION_SCHEMA.TABLES WHERE STARTS_WITH(LOWER(table_name), LOWER('user')) LIMIT 1000;";
+
+    PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
+
+    Assert.assertEquals(psqlStatement.getSql(), result);
+  }
+
+  @Test
+  public void testDescribeIndexMetadataAutocomplete() throws SQLException {
+    // PSQL equivalent: \\di <index>
+    String sql =
+        "SELECT pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c WHERE c.relkind IN ('i', 'I') AND substring(pg_catalog.quote_ident(c.relname),1,5)='index' AND pg_catalog.pg_table_is_visible(c.oid) AND c.relnamespace <> (SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = 'pg_catalog')\n"
+            + "UNION\n"
+            + "SELECT pg_catalog.quote_ident(n.nspname) || '.' FROM pg_catalog.pg_namespace n WHERE substring(pg_catalog.quote_ident(n.nspname) || '.',1,5)='index' AND (SELECT pg_catalog.count(*) FROM pg_catalog.pg_namespace WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,5) = substring('index',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) > 1\n"
+            + "UNION\n"
+            + "SELECT pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c, pg_catalog.pg_namespace n WHERE c.relnamespace = n.oid AND c.relkind IN ('i', 'I') AND substring(pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname),1,5)='index' AND substring(pg_catalog.quote_ident(n.nspname) || '.',1,5) = substring('index',1,pg_catalog.length(pg_catalog.quote_ident(n.nspname))+1) AND (SELECT pg_catalog.count(*) FROM pg_catalog.pg_namespace WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,5) = substring('index',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) = 1\n"
+            + "LIMIT 1000";
+    String result =
+        "SELECT index_name AS quote_ident FROM INFORMATION_SCHEMA.INDEXES WHERE STARTS_WITH(LOWER(index_name), LOWER('index')) LIMIT 1000;";
+
+    PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
+
+    Assert.assertEquals(psqlStatement.getSql(), result);
+  }
+
+  @Test
+  public void testDescribeSchemaMetadataAutocomplete() throws SQLException {
+    // PSQL equivalent: \\dn <schema>
+    String sql =
+        "SELECT pg_catalog.quote_ident(nspname) FROM pg_catalog.pg_namespace  WHERE substring(pg_catalog.quote_ident(nspname),1,6)='schema'\n"
+            + "LIMIT 1000";
+    String result =
+        "SELECT schema_name AS quote_ident FROM INFORMATION_SCHEMA.SCHEMATA WHERE STARTS_WITH(LOWER(schema_name), LOWER('schema')) LIMIT 1000;";
 
     PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
 
@@ -583,6 +702,31 @@ public class PSQLTest {
 
     psqlStatement = new PSQLStatement(secondSQL, connectionHandler);
     Assert.assertEquals(psqlStatement.getSql(), expectedSecondResult);
+  }
+
+  @Test
+  public void testMatcherGroupInPlaceReplacements() throws Exception {
+    String inputJSON = ""
+        + "{"
+        + " \"commands\": "
+        + "   [ "
+        + "     {"
+        + "       \"input_pattern\": \"^SELECT (?<expression>.*) FROM (?<table>.*);$\", "
+        + "       \"output_pattern\": \"TABLE: ${table}, EXPRESSION: ${expression}\", "
+        + "       \"matcher_array\": []"
+        + "     }"
+        + "   ]"
+        + "}";
+
+    JSONParser parser = new JSONParser();
+    Mockito.when(server.getOptions()).thenReturn(options);
+    Mockito.when(options.getCommandMetadataJSON()).thenReturn((JSONObject) parser.parse(inputJSON));
+
+    String sql = "SELECT * FROM USERS;";
+    String expectedResult = "TABLE: USERS, EXPRESSION: *";
+
+    PSQLStatement psqlStatement = new PSQLStatement(sql, connectionHandler);
+    Assert.assertEquals(psqlStatement.getSql(), expectedResult);
   }
 
   @Test
