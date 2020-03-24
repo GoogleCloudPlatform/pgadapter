@@ -14,15 +14,15 @@ except for some cases concerning PSQL, wherein the query itself is translated.
 
 Simple query mode and extended query mode are supported, and any data type
 supported by Spanner is also supported. Items, tables and language not native to
-Spanner is not supported, unless otherwise specified.
+Spanner are not supported, unless otherwise specified.
 
 Though the majority of functionality inherent in most PostgreSQL clients
 (including PSQL and JDBC) are included out of the box, the following items are
 not supported:
-* Functions.
-* COPY protocol.
-* Prepared Statement DESCRIBE.
-* SSL.
+* Functions
+* COPY protocol
+* Prepared Statement DESCRIBE
+* SSL
 * PSQL meta-commands not included in this list (i.e.: these are supported):
   * `\d <table>` 
   * `\dt <table>`
@@ -66,7 +66,7 @@ The following options are optional:
 -a
   * Use authentication when connecting. Currently authentication is not strictly
     implemented in the proxy layer, as it is expected to be run locally, and
-    will ignore any connection not stemming from localhost. It is however a
+    will ignore any connection not stemming from localhost. However, it is a
     useful compatibility option if the PostgreSQL client is set to always 
     authenticate. Note that SSL is not included for the same reason that
     authentication logic is not: since all connections are local, sniffing
@@ -96,18 +96,18 @@ The following options are optional:
 
 -j <commandmetadatapath>
   * The full path for a file containing a JSON object to do SQL translation
-  based on RegEx replacement. Any item matching the input_pattern will be
-  replaced by the output_pattern string, wherein capture groups are allowed and
-  their order is specified via the matcher_array item. Match replacement must be
-  defined via %s in the output_pattern string. Set matcher_array to [] if no
-  matches exist. Alternatively, you may place the matching group names 
-  directly within the output_pattern string using matcher.replaceAll() rules
-  (that is to say, placing the item within braces, preceeeded by a dollar sign);
-  For this specific case, matcher_array must be left empty. User-specified 
-  patterns will precede internal matches. Escaped and general regex syntax 
-  matches Java RegEx syntax; more information on the Java RegEx syntax found 
-  here: 
-  https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html
+    based on RegEx replacement. Any item matching the input_pattern will be
+    replaced by the output_pattern string, wherein capture groups are allowed and
+    their order is specified via the matcher_array item. Match replacement must be
+    defined via %s in the output_pattern string. Set matcher_array to [] if no
+    matches exist. Alternatively, you may place the matching group names 
+    directly within the output_pattern string using matcher.replaceAll() rules
+    (that is to say, placing the item within braces, preceeeded by a dollar sign);
+    For this specific case, matcher_array must be left empty. User-specified 
+    patterns will precede internal matches. Escaped and general regex syntax 
+    matches Java RegEx syntax; more information on the Java RegEx syntax found 
+    here: 
+    https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html
     * Example:
         { 
           "commands": 
@@ -178,7 +178,7 @@ Wherein the first item is the JDBC connection string containing pertinent
 information regarding project id, instance id, database name, credentials file
 path; All other items map directly to previously mentioned CLI options.
 
-## Addendum
+## Support Level
 
 Please feel free to report issues and send pull requests, but note that this 
 application is not officially supported as part of the Cloud Spanner Product.
