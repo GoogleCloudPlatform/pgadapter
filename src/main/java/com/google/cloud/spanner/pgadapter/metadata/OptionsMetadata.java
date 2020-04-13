@@ -40,8 +40,8 @@ public class OptionsMetadata {
   private static final String OPTION_TEXT_FORMAT = "f";
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
-  private static final String OPTIONS_PSQL_MODE = "q";
-  private static final String OPTIONS_COMMAND_METADATA_FILE = "j";
+  private static final String OPTION_PSQL_MODE = "q";
+  private static final String OPTION_COMMAND_METADATA_FILE = "j";
   private static final String COMMAND_METADATA_FILE_DEFAULT = "metadata/command_metadata.json";
   private static final String CLI_ARGS =
       "gcpga -p <project> -i <instance> -d <database> -c <credentials_file>";
@@ -65,7 +65,7 @@ public class OptionsMetadata {
     this.textFormat = buildTextFormat(commandLine);
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
-    this.psqlMode = commandLine.hasOption(OPTIONS_PSQL_MODE);
+    this.psqlMode = commandLine.hasOption(OPTION_PSQL_MODE);
     this.commandMetadataJSON = buildCommandMetadataJSON(commandLine);
   }
 
@@ -149,8 +149,14 @@ public class OptionsMetadata {
    * command file.
    */
   private JSONObject buildCommandMetadataJSON(CommandLine commandLine) {
+    if(commandLine.hasOption(OPTION_COMMAND_METADATA_FILE) &&
+        !commandLine.hasOption(OPTION_PSQL_MODE)) {
+      throw new IllegalArgumentException(
+          "PSQL Mode must be toggled (-q) to specify command metadata file (-j).");
+    }
+
     File commandMetadataFile = new File(commandLine.getOptionValue(
-        OPTIONS_COMMAND_METADATA_FILE,
+        OPTION_COMMAND_METADATA_FILE,
         COMMAND_METADATA_FILE_DEFAULT));
     JSONParser parser = new JSONParser();
     try {
@@ -195,12 +201,12 @@ public class OptionsMetadata {
     options.addOption(OPTION_AUTHENTICATE, "authenticate", false,
         "Whether you wish the proxy to perform an authentication step."
     );
-    options.addOption(OPTIONS_PSQL_MODE, "psql-mode", false,
+    options.addOption(OPTION_PSQL_MODE, "psql-mode", false,
         "This option turns on PSQL mode. This mode allows better compatibility to PSQL, "
             + "with an added performance cost. This mode should not be used for production, and we "
             + "do not guarantee its functionality beyond the basics."
     );
-    options.addOption(OPTIONS_COMMAND_METADATA_FILE, "options-metadata", true,
+    options.addOption(OPTION_COMMAND_METADATA_FILE, "options-metadata", true,
         "The full path of the file containing the metadata specifications for psql-mode's "
             + "dynamic matcher. Each item in this matcher will create a runtime-generated command "
             + "which will translate incoming commands into whatever back-end SQL is desired.");
