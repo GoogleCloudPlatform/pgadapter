@@ -57,10 +57,14 @@ public class ProxyServer extends Thread {
   public void startServer() {
     synchronized (this.status) {
       Preconditions.checkState(this.status == ServerStatus.NEW);
-      logger.log(Level.INFO, "Server is starting on port {0}", this.options.getProxyPort());
+      logger.log(Level.INFO,
+          "Server is starting on port {0}",
+          String.valueOf(this.options.getProxyPort()));
       this.status = ServerStatus.STARTING;
       start();
-      logger.log(Level.INFO, "Server started on port {0}", this.options.getProxyPort());
+      logger.log(Level.INFO,
+          "Server started on port {0}",
+          String.valueOf(this.options.getProxyPort()));
     }
   }
 
@@ -72,13 +76,17 @@ public class ProxyServer extends Thread {
       Preconditions.checkState(status == ServerStatus.STARTED,
           "Server is not in state Started");
       try {
-        logger.log(Level.INFO, "Server on port {0} is stopping", this.options.getProxyPort());
+        logger.log(Level.INFO,
+            "Server on port {0} is stopping",
+            String.valueOf(this.options.getProxyPort()));
         this.status = ServerStatus.STOPPING;
         this.serverSocket.close();
-        logger.log(Level.INFO, "Server socket on port {0} closed", this.options.getProxyPort());
+        logger.log(Level.INFO,
+            "Server socket on port {0} closed",
+            String.valueOf(this.options.getProxyPort()));
       } catch (IOException e) {
         logger.log(Level.WARNING, "Closing server socket on port {0} failed: {1}",
-            new Object[]{this.options.getProxyPort(), e});
+            new Object[]{String.valueOf(this.options.getProxyPort()), e});
       }
     }
   }

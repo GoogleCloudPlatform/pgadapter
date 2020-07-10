@@ -180,30 +180,6 @@ public class ParserTest {
   }
 
   @Test
-  public void testTimestampParsingStringPart() {
-    // Timestamp parsing tests must be split between two tests since the string printing portion
-    // of the timestamp is dynamic (timezone specific), but the binary is not.
-    long originalStartTime = 904910400000L;
-
-    // The following lines are necessary as the print state for Timezone corrects for current
-    //  timezone. As such we do a quick correction here for the user's current timezone.
-    long currentZoneOffset = ZonedDateTime.now().getOffset().getTotalSeconds() * 1000L;
-    long originalZoneOffset = -14400000L;
-    long adjustedStartTime = originalStartTime + currentZoneOffset - originalZoneOffset;
-    Timestamp value = new Timestamp(adjustedStartTime);
-
-    byte[] stringResult = {'1', '9', '9', '8', '-', '0', '9', '-', '0', '4', ' ', '0', '8', ':',
-        '0', '0', ':', '0', '0', '.', '0'};
-
-    Parser parsedValue = new TimestampParser(value);
-
-    assertThat(parsedValue.parse(DataFormat.POSTGRESQL_TEXT),
-        is(equalTo(stringResult)));
-    assertThat(parsedValue.parse(DataFormat.SPANNER),
-        is(equalTo(stringResult)));
-  }
-
-  @Test
   public void testTimestampParsingBytePart() {
     Timestamp value = new Timestamp(904910400000L);
 

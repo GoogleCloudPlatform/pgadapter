@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.metadata;
 
 import com.google.cloud.spanner.pgadapter.Server;
+import com.google.cloud.spanner.pgadapter.utils.Credentials;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -120,6 +121,26 @@ public class OptionsMetadata {
   }
 
   /**
+   * Get credential file path from either command line or application default. If neither throw
+   * error.
+   *
+   * @param commandLine The parsed options for CLI
+   * @return The absolute path of the credentials file.
+   */
+  private String buildCredentialsFile(CommandLine commandLine) {
+    if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
+      String credentialsPath = Credentials.getApplicationDefaultCredentialsFilePath();
+      if (credentialsPath == null) {
+        throw new IllegalArgumentException(
+            "User must specify a valid credential file, "
+            + "or have application default credentials set-up.");
+      }
+      return credentialsPath;
+    }
+    return commandLine.getOptionValue(OPTION_CREDENTIALS_FILE);
+  }
+
+  /**
    * Takes user inputs and builds a JDBC connection string from them.
    *
    * @param commandLine The parsed options for CLI
@@ -135,7 +156,7 @@ public class OptionsMetadata {
         commandLine.getOptionValue(OPTION_PROJECT_ID),
         commandLine.getOptionValue(OPTION_INSTANCE_ID),
         commandLine.getOptionValue(OPTION_DATABASE_NAME),
-        commandLine.getOptionValue(OPTION_CREDENTIALS_FILE));
+        buildCredentialsFile(commandLine));
   }
 
   /**
@@ -193,8 +214,9 @@ public class OptionsMetadata {
         "The id of the Spanner instance within the GCP project.");
     options.addRequiredOption(OPTION_DATABASE_NAME, "database", true,
         "The name of the Spanner database within the GCP project.");
-    options.addRequiredOption(OPTION_CREDENTIALS_FILE, "credentials-file", true,
-        "The full path of the file location wherein lives the GCP credentials.");
+    options.addOption(OPTION_CREDENTIALS_FILE, "credentials-file", true,
+        "The full path of the file location wherein lives the GCP credentials."
+            + "If not specified, will try to read application default credentials.");
     options.addOption(OPTION_TEXT_FORMAT, "format", true,
         "The TextFormat that should be used as the format for the server"
             + " (default is POSTGRESQL).");
