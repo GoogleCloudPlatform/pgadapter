@@ -15,31 +15,33 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.PGWireProtocol;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
+import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
-import java.io.DataInputStream;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Creates a prepared statement.
  */
-public class ParseMessage extends WireMessage {
+public class ParseMessage extends ControlMessage {
+
+  protected static final char IDENTIFIER = 'P';
 
   private String name;
   private IntermediatePreparedStatement statement;
   private List<Integer> parameterDataTypes;
 
-  public ParseMessage(ConnectionHandler connection, DataInputStream input) throws Exception {
-    super(connection, input);
-    this.name = PGWireProtocol.readString(input);
-    String queryString = StatementParser.removeCommentsAndTrim(PGWireProtocol.readString(input));
+  public ParseMessage(ConnectionHandler connection) throws Exception {
+    super(connection);
+    this.name = this.readString();
+    String queryString = StatementParser.removeCommentsAndTrim(this.readString());
     this.parameterDataTypes = new ArrayList<>();
-    short numberOfParameters = input.readShort();
+    short numberOfParameters = this.inputStream.readShort();
     for (int i = 0; i < numberOfParameters; i++) {
-      this.parameterDataTypes.add(input.readInt());
+      this.parameterDataTypes.add(this.inputStream.readInt());
     }
     this.statement = new IntermediatePreparedStatement(
         queryString,
@@ -48,12 +50,33 @@ public class ParseMessage extends WireMessage {
   }
 
   @Override
-  public void send() throws Exception {
+  protected void sendPayload() throws Exception {
     if (!Strings.isNullOrEmpty(this.name) && this.connection.hasStatement(this.name)) {
       throw new IllegalStateException("Must close statement before reusing name.");
     }
     this.connection.registerStatement(this.name, this.statement);
-    this.connection.handleParse();
+    new ParseCompleteResponse(this.outputStream).send();
+  }
+
+  @Override
+  protected String getMessageName() {
+    return "Parse";
+  }
+
+  @Override
+  protected String getPayloadString() {
+    return new MessageFormat(
+        "Length: {0}, Name: {1},  SQL: {2}, Parameters: {3}")
+        .format(new Object[]{
+            this.length,
+            this.name,
+            this.statement.getSql(),
+            this.parameterDataTypes});
+  }
+
+  @Override
+  protected String getIdentifier() {
+    return String.valueOf(IDENTIFIER);
   }
 
   public IntermediatePreparedStatement getStatement() {

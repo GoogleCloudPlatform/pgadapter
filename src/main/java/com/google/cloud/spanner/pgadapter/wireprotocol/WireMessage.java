@@ -15,83 +15,32 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.PGWireProtocol;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.nio.charset.StandardCharsets;
+import java.text.MessageFormat;
+import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
- * Generic representation for a wire message, generally executed by calling commit.
+ * Generic representation for a wire message, generally executed by calling send.
  */
 public abstract class WireMessage {
 
+  private static final Logger logger = Logger.getLogger(WireMessage.class.getName());
+
   protected int length;
-  protected int remainder;
+  protected DataInputStream inputStream;
+  protected DataOutputStream outputStream;
   protected ConnectionHandler connection;
 
-  public WireMessage(ConnectionHandler connection, DataInputStream input) throws IOException {
-    this.length = input.readInt();
+  public WireMessage(ConnectionHandler connection, int length) {
     this.connection = connection;
-  }
-
-  /**
-   * Factory method to create the message from the specific command type char.
-   *
-   * @param connection The connection handler object setup with the ability to send/receive.
-   * @param input The data inut stream containing the remaining data.
-   * @return The constructed wire message given the input message.
-   * @throws Exception If construction or reading fails.
-   */
-  public static WireMessage create(ConnectionHandler connection, DataInputStream input)
-      throws Exception {
-    char nextMsg = (char) input.readUnsignedByte();
-    switch (nextMsg) {
-      case 'Q':
-        return new QueryMessage(connection, input);
-      case 'P':
-        return new ParseMessage(connection, input);
-      case 'B':
-        return new BindMessage(connection, input);
-      case 'D':
-        return new DescribeMessage(connection, input);
-      case 'E':
-        return new ExecuteMessage(connection, input);
-      case 'C':
-        return new CloseMessage(connection, input);
-      case 'S':
-        return new SyncMessage(connection, input);
-      case 'X':
-        return new TerminateMessage(connection, input);
-      case 'c':
-        return new CopyDoneMessage(connection, input);
-      case 'd':
-        return new CopyDataMessage(connection, input);
-      case 'f':
-        return new CopyFailMessage(connection, input);
-      case 'F':
-        return new FunctionCallMessage(connection, input);
-      case 'H':
-        return new FlushMessage(connection, input);
-      default:
-        throw new IllegalStateException("Unknown message");
-    }
-  }
-
-  /**
-   * Extract format codes from message (useful for both input and output format codes).
-   *
-   * @param input The data stream containing the user request.
-   * @return A list of format codes.
-   * @throws Exception If reading fails in any way.
-   */
-  static protected List<Short> getFormatCodes(DataInputStream input) throws Exception {
-    List<Short> formatCodes = new ArrayList<>();
-    short numberOfFormatCodes = input.readShort();
-    for (int i = 0; i < numberOfFormatCodes; i++) {
-      formatCodes.add(input.readShort());
-    }
-    return formatCodes;
+    this.inputStream = connection.getConnectionMetadata().getInputStream();
+    this.outputStream = connection.getConnectionMetadata().getOutputStream();
+    this.length = length;
   }
 
   /**
@@ -120,37 +69,130 @@ public abstract class WireMessage {
 
   /**
    * Once the message is ready, call this to send it across the wire.
+   * Effectively a template pattern.
    *
    * @throws Exception If the sending fails.
    */
-  public abstract void send() throws Exception;
+  public void send() throws Exception {
+    logger.log(Level.FINE, this.toString());
+    sendPayload();
+  }
 
   /**
-   * Read the remainder of the received message. To be called once metdata for the message is read.
+   * Override this method to include post-processing and metadata in the sending process. Template
+   * method for send.
+   *
+   * @throws Exception If any step in output message fails.
+   */
+  protected abstract void sendPayload() throws Exception;
+
+  /**
+   * Used for logging.
+   *
+   * @return The official name of the wire message.
+   */
+  protected abstract String getMessageName();
+
+  /**
+   * Used for logging.
+   *
+   * @return Payload metadata.
+   */
+  protected abstract String getPayloadString();
+
+  /**
+   * Used for logging.
+   *
+   * @return Message Identifier (int for Bootstrap, char otherwise).
+   */
+  protected abstract String getIdentifier();
+
+  @Override
+  public String toString() {
+    return new MessageFormat("> Received Message: ({0}) {1}, with Payload: '{'{2}'}'")
+        .format(new Object[]{
+            this.getIdentifier(),
+            this.getMessageName(),
+            this.getPayloadString()
+        });
+  }
+
+  /**
+   * Read the remainder of the received message. To be called once metadata for the message is read.
    * Metadata is designated as type, length, etc.
    *
-   * @param input The input stream containing the remainder of the message.
    * @return The remainder of the message in String format.
    * @throws Exception If reading fails in any way.
    */
-  protected String read(DataInputStream input) throws Exception {
-    return PGWireProtocol.readString(input, this.length - this.remainder);
+  protected String readAll() throws Exception {
+    return read(this.length - this.getHeaderLength());
   }
 
+  /**
+   * Reads a fixed-length string from the saved stream. The string still needs to be
+   * null-terminated, but the read is more efficient, as we can read the entire string in one go
+   * instead of continuously checking for a null-terminator.
+   *
+   * @param length The number of bytes to read.
+   * @return the string.
+   * @throws IOException if an error occurs while reading from the stream, or if no null-terminator
+   * is found at the end of the string.
+   */
+  public String read(int length) throws IOException {
+    byte[] buffer = new byte[length - 1];
+    this.inputStream.readFully(buffer);
+    byte zero = inputStream.readByte();
+    if (zero != (byte) 0) {
+      throw new IOException("String was not null-terminated");
+    }
+    return new String(buffer, StandardCharsets.UTF_8);
+  }
 
-  public enum PreparedType {
-    Portal,
-    Statement;
-
-    static PreparedType prepareType(char type) {
-      switch (type) {
-        case ('P'):
-          return PreparedType.Portal;
-        case ('S'):
-          return PreparedType.Statement;
-        default:
-          throw new IllegalArgumentException("Unknown Statement type!");
+  /**
+   * Reads a null-terminated string from a {@link DataInputStream}. Note that though existing
+   * solutions for this exist, they are either not keyed exactly for our use case, or would lead
+   * to a more combersome addition to this codebase. Also note the 128 byte length is chosen
+   * from profiling and determining that it exceeds the 90th percentile size for inbound messages.
+   *
+   * @return the string.
+   * @throws IOException if an error occurs while reading from the stream, or if no null-terminator
+   * is found before the end of the stream.
+   */
+  public String readString() throws IOException {
+    byte[] buffer = new byte[128];
+    int index = 0;
+    while (true) {
+      byte b = this.inputStream.readByte();
+      if (b == 0) {
+        break;
+      }
+      buffer[index] = b;
+      index++;
+      if (index == buffer.length) {
+        buffer = Arrays.copyOf(buffer, buffer.length * 2);
       }
     }
+    return new String(buffer, 0, index, StandardCharsets.UTF_8);
   }
+
+  /**
+   * How many bytes is taken by the payload header. Header is defined here as protocol definition +
+   *  length. Most common value here is four bytes, so we keep that as default.
+   * Effectively, this is how much of the message you "don't" want to read from the message's total
+   *  length with readAll.
+   *
+   * @return The remaining length to be processed once "header" information is processed.
+   */
+  protected int getHeaderLength() {
+    return 4;
+  }
+
+  /**
+   * Some messages may have some more context and require some order. This handles state machine
+   * setting for {@link ConnectionHandler}.
+   */
+  public void nextHandler() throws Exception {
+    this.connection.setMessageState(ControlMessage.create(this.connection));
+  }
+
 }

@@ -15,25 +15,30 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import java.io.DataInputStream;
+import com.google.cloud.spanner.pgadapter.wireoutput.NoDataResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ParameterDescriptionResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
+import java.text.MessageFormat;
 
 /**
  * Calls describe on a portal or prepared statement.
  */
-public class DescribeMessage extends WireMessage {
+public class DescribeMessage extends ControlMessage {
+
+  protected static final char IDENTIFIER = 'D';
 
   private PreparedType type;
   private String name;
   private IntermediateStatement statement;
 
-  public DescribeMessage(ConnectionHandler connection, DataInputStream input) throws Exception {
-    super(connection, input);
-    this.type = PreparedType.prepareType((char) input.readUnsignedByte());
-    this.remainder = 5;
-    this.name = this.read(input);
+  public DescribeMessage(ConnectionHandler connection) throws Exception {
+    super(connection);
+    this.type = PreparedType.prepareType((char) this.inputStream.readUnsignedByte());
+    this.name = this.readAll();
     if (this.type == PreparedType.Portal) {
       this.statement = this.connection.getPortal(this.name);
     } else {
@@ -42,19 +47,72 @@ public class DescribeMessage extends WireMessage {
   }
 
   @Override
-  public void send() throws Exception {
+  protected void sendPayload() throws Exception {
     if (this.type == PreparedType.Portal) {
-      this.connection.handleDescribePortal(
-          this.statement,
-          (DescribePortalMetadata) this.statement.describe());
+      this.handleDescribePortal();
     } else {
-      this.connection.handleDescribeStatement(
-          (DescribeStatementMetadata) this.statement.describe());
+      this.handleDescribeStatement();
     }
+  }
+
+  @Override
+  protected String getMessageName() {
+    return "Describe";
+  }
+
+  @Override
+  protected String getPayloadString() {
+    return new MessageFormat(
+        "Length: {0}, "
+            + "Type: {1}, "
+            + "Name: {2}")
+        .format(new Object[]{
+            this.length,
+            this.type.toString(),
+            this.name
+        });
+  }
+
+  @Override
+  protected String getIdentifier() {
+    return String.valueOf(IDENTIFIER);
   }
 
   public String getName() {
     return this.name;
+  }
+
+  @Override
+  protected int getHeaderLength() {
+    return 5;
+  }
+
+  /**
+   * Called when a describe message of type 'P' is received.
+   *
+   * @throws Exception if sending the message back to the client causes an error.
+   */
+  public void handleDescribePortal() throws Exception {
+    if (this.statement.hasException()) {
+      this.handleError(this.statement.getException());
+    } else {
+      new RowDescriptionResponse(this.outputStream,
+          this.statement,
+          ((DescribePortalMetadata) this.statement.describe()).getMetadata(),
+          this.connection.getServer().getOptions(),
+          QueryMode.EXTENDED).send();
+    }
+  }
+
+  /**
+   * Called when a describe message of type 'S' is received.
+   *
+   * @throws Exception if sending the message back to the client causes an error.
+   */
+  public void handleDescribeStatement() throws Exception {
+    new ParameterDescriptionResponse(this.outputStream,
+        ((DescribeStatementMetadata) this.statement.describe()).getMetadata()).send();
+    new NoDataResponse(this.outputStream).send();
   }
 
 }

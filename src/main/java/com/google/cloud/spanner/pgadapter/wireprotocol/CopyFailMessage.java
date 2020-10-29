@@ -15,7 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import java.io.DataInputStream;
+import java.text.MessageFormat;
 
 /**
  * Normally used to signal a copy command failed. Spanner does not currently support copies, so send
@@ -23,20 +23,36 @@ import java.io.DataInputStream;
  * this to be future proof, and to ensure the input stream is flushed of the command (in order to
  * continue receiving properly)
  */
-public class CopyFailMessage extends WireMessage {
+public class CopyFailMessage extends ControlMessage {
+
+  protected static final char IDENTIFIER = 'f';
 
   private String errorMessage;
 
-  public CopyFailMessage(ConnectionHandler connection, DataInputStream input) throws Exception {
-    super(connection, input);
-    this.remainder = 4;
-    this.errorMessage = this.read(input);
+  public CopyFailMessage(ConnectionHandler connection) throws Exception {
+    super(connection);
+    this.errorMessage = this.readAll();
   }
 
   @Override
-  public void send() throws Exception {
+  protected void sendPayload() throws Exception {
     throw new IllegalStateException(
         "Spanner does not currently support the copy functionality through the proxy.");
+  }
+
+  @Override
+  protected String getMessageName() {
+    return "Copy Fail";
+  }
+
+  @Override
+  protected String getPayloadString() {
+    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+  }
+
+  @Override
+  protected String getIdentifier() {
+    return String.valueOf(IDENTIFIER);
   }
 
   public String getErrorMessage() {

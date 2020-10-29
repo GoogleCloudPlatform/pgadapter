@@ -12,42 +12,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.google.cloud.spanner.pgadapter.wireprotocol;
+package com.google.cloud.spanner.pgadapter.wireoutput;
 
-import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /**
- * Handles a flush command from the user. JDBC does not require this step, so server-side this is a
- * noop.
+ * Signals the end of a connection.
  */
-public class FlushMessage extends ControlMessage {
+public class TerminateResponse extends WireOutput {
 
-  protected static final char IDENTIFIER = 'H';
-
-  public FlushMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+  public TerminateResponse(DataOutputStream output) {
+    super(output, 4);
   }
 
   @Override
-  protected void sendPayload() throws Exception {
-    new ReadyResponse(this.outputStream, Status.IDLE).send();
+  protected void sendPayload() throws IOException {
+    this.outputStream.flush();
+  }
+
+  @Override
+  public byte getIdentifier() {
+    return 'X';
   }
 
   @Override
   protected String getMessageName() {
-    return "Flush";
+    return "Terminate";
   }
 
   @Override
   protected String getPayloadString() {
     return new MessageFormat("Length: {0}").format(new Object[]{this.length});
-  }
-
-  @Override
-  protected String getIdentifier() {
-    return String.valueOf(IDENTIFIER);
   }
 }

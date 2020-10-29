@@ -12,39 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.google.cloud.spanner.pgadapter.wireprotocol;
+package com.google.cloud.spanner.pgadapter.wireoutput;
 
-import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import java.io.DataOutputStream;
 import java.text.MessageFormat;
 
 /**
- * Closes a connection.
+ * Signals that there are more rows available.
  */
-public class TerminateMessage extends ControlMessage {
+public class PortalSuspendedResponse extends WireOutput {
 
-  protected static final char IDENTIFIER = 'X';
-
-  public TerminateMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
+  public PortalSuspendedResponse(DataOutputStream output) {
+    super(output, 4);
   }
 
   @Override
   protected void sendPayload() throws Exception {
-    this.connection.handleTerminate();
+    // Do nothing
+  }
+
+  @Override
+  public byte getIdentifier() {
+    return 's';
   }
 
   @Override
   protected String getMessageName() {
-    return "Terminate";
+    return "Portal Suspended";
   }
 
   @Override
   protected String getPayloadString() {
     return new MessageFormat("Length: {0}").format(new Object[]{this.length});
-  }
-
-  @Override
-  protected String getIdentifier() {
-    return String.valueOf(IDENTIFIER);
   }
 }

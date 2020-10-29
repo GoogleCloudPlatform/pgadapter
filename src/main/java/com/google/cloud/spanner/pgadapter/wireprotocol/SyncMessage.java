@@ -15,20 +15,39 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import java.io.DataInputStream;
+import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
+import java.text.MessageFormat;
 
 /**
  * Handles a sync command from the user. JDBC does not require this step, so server-side this is a
  * noop.
  */
-public class SyncMessage extends WireMessage {
+public class SyncMessage extends ControlMessage {
 
-  public SyncMessage(ConnectionHandler connection, DataInputStream input) throws Exception {
-    super(connection, input);
+  protected static final char IDENTIFIER = 'S';
+
+  public SyncMessage(ConnectionHandler connection) throws Exception {
+    super(connection);
   }
 
   @Override
-  public void send() throws Exception {
-    this.connection.handleSync();
+  protected void sendPayload() throws Exception {
+    new ReadyResponse(this.outputStream, Status.IDLE).send();
+  }
+
+  @Override
+  protected String getMessageName() {
+    return "Sync";
+  }
+
+  @Override
+  protected String getPayloadString() {
+    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+  }
+
+  @Override
+  protected String getIdentifier() {
+    return String.valueOf(IDENTIFIER);
   }
 }

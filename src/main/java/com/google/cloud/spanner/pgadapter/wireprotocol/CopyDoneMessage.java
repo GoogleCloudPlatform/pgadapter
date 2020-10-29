@@ -15,7 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import java.io.DataInputStream;
+import java.text.MessageFormat;
 
 /**
  * Normally used to signal a copy command is done. Spanner does not currently support copies, so
@@ -23,15 +23,32 @@ import java.io.DataInputStream;
  * for this to be future proof, and to ensure the input stream is flushed of the command (in order
  * to continue receiving properly)
  */
-public class CopyDoneMessage extends WireMessage {
+public class CopyDoneMessage extends ControlMessage {
 
-  public CopyDoneMessage(ConnectionHandler connection, DataInputStream input) throws Exception {
-    super(connection, input);
+  protected static final char IDENTIFIER = 'c';
+
+  public CopyDoneMessage(ConnectionHandler connection) throws Exception {
+    super(connection);
   }
 
   @Override
-  public void send() throws Exception {
+  protected void sendPayload() throws Exception {
     throw new IllegalStateException(
         "Spanner does not currently support the copy functionality through the proxy.");
+  }
+
+  @Override
+  protected String getMessageName() {
+    return "Copy Done";
+  }
+
+  @Override
+  protected String getPayloadString() {
+    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+  }
+
+  @Override
+  protected String getIdentifier() {
+    return String.valueOf(IDENTIFIER);
   }
 }

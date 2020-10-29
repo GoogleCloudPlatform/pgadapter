@@ -16,22 +16,24 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import java.io.DataInputStream;
+import com.google.cloud.spanner.pgadapter.wireoutput.CloseResponse;
+import java.text.MessageFormat;
 
 /**
  * Close the designated statement.
  */
-public class CloseMessage extends WireMessage {
+public class CloseMessage extends ControlMessage {
+
+  protected static final char IDENTIFIER = 'C';
 
   private PreparedType type;
   private String name;
   private IntermediateStatement statement;
 
-  public CloseMessage(ConnectionHandler connection, DataInputStream input) throws Exception {
-    super(connection, input);
-    this.type = PreparedType.prepareType((char) input.readUnsignedByte());
-    this.remainder = 5;
-    this.name = this.read(input);
+  public CloseMessage(ConnectionHandler connection) throws Exception {
+    super(connection);
+    this.type = PreparedType.prepareType((char) this.inputStream.readUnsignedByte());
+    this.name = this.readAll();
     if (this.type == PreparedType.Statement) {
       this.statement = this.connection.getStatement(this.name);
     } else {
@@ -43,14 +45,37 @@ public class CloseMessage extends WireMessage {
    * Close the statement server-side and clean up by deleting their metdata locally.
    */
   @Override
-  public void send() throws Exception {
+  protected void sendPayload() throws Exception {
     if (this.type == PreparedType.Portal) {
       this.statement.close(); // Only portals need to be closed server side, since PS is not bound
       this.connection.closePortal(this.name);
     } else {
       this.connection.closeStatement(this.name);
     }
-    this.connection.handleClose();
+    new CloseResponse(this.outputStream).send();
+  }
+
+  @Override
+  protected String getMessageName() {
+    return "Close";
+  }
+
+  @Override
+  protected String getPayloadString() {
+    return new MessageFormat(
+        "Length: {0}, "
+            + "Name: {1}, "
+            + "Type: {2}")
+        .format(new Object[]{
+            this.length,
+            this.name,
+            this.type.toString()
+        });
+  }
+
+  @Override
+  protected String getIdentifier() {
+    return String.valueOf(IDENTIFIER);
   }
 
   public String getName() {
@@ -59,5 +84,10 @@ public class CloseMessage extends WireMessage {
 
   public PreparedType getType() {
     return this.type;
+  }
+
+  @Override
+  protected int getHeaderLength() {
+    return 5;
   }
 }

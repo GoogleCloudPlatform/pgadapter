@@ -15,30 +15,55 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import java.io.DataInputStream;
+import java.text.MessageFormat;
 
 /**
  * Executes a portal.
  */
-public class ExecuteMessage extends WireMessage {
+public class ExecuteMessage extends ControlMessage {
+
+  protected static final char IDENTIFIER = 'E';
 
   private String name;
   private int maxRows;
   private IntermediateStatement statement;
 
-  public ExecuteMessage(ConnectionHandler connection, DataInputStream input) throws Exception {
-    super(connection, input);
-    this.remainder = 8;
-    this.name = this.read(input);
-    this.maxRows = input.readInt();
+  public ExecuteMessage(ConnectionHandler connection) throws Exception {
+    super(connection);
+    this.name = this.readAll();
+    this.maxRows = this.inputStream.readInt();
     this.statement = this.connection.getPortal(this.name);
   }
 
   @Override
-  public void send() throws Exception {
+  protected void sendPayload() throws Exception {
     this.statement.execute();
-    this.connection.handleExecute(this.statement, this.maxRows);
+    this.handleExecute();
+  }
+
+  @Override
+  protected String getMessageName() {
+    return "Execute";
+  }
+
+  @Override
+  protected String getPayloadString() {
+    return new MessageFormat(
+        "Length: {0}, "
+            + "Name: {1}, "
+            + "Max Rows: {2}")
+        .format(new Object[]{
+            this.length,
+            this.name,
+            this.maxRows
+        });
+  }
+
+  @Override
+  protected String getIdentifier() {
+    return String.valueOf(IDENTIFIER);
   }
 
   public String getName() {
@@ -49,4 +74,22 @@ public class ExecuteMessage extends WireMessage {
     return this.maxRows;
   }
 
+  @Override
+  protected int getHeaderLength() {
+    return 8;
+  }
+
+  /**
+   * Called when an execute message is received.
+   *
+   * @throws Exception if sending the message back to the client causes an error.
+   */
+  private void handleExecute() throws Exception {
+    if (this.statement.hasException()) {
+      this.handleError(this.statement.getException());
+    } else {
+      this.sendSpannerResult(this.statement, QueryMode.EXTENDED, this.maxRows);
+    }
+    this.connection.cleanUp(this.statement);
+  }
 }

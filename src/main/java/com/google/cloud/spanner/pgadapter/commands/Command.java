@@ -31,8 +31,10 @@ import org.json.simple.JSONObject;
 abstract public class Command {
 
   protected Matcher matcher;
+  protected String sql;
 
   public Command(String sql) {
+    this.sql = sql;
     this.matcher = getPattern().matcher(sql);
   }
 

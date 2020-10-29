@@ -15,8 +15,8 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import java.io.DataInputStream;
 import java.io.IOException;
+import java.text.MessageFormat;
 
 /**
  * Normally used to send data to the back-end. Spanner does not currently support this, so send will
@@ -24,22 +24,39 @@ import java.io.IOException;
  * be future proof, and to ensure the input stream is flushed of the command (in order to continue
  * receiving properly)
  */
-public class CopyDataMessage extends WireMessage {
+public class CopyDataMessage extends ControlMessage {
+
+  protected static final char IDENTIFIER = 'd';
 
   private byte[] payload;
 
-  public CopyDataMessage(ConnectionHandler connection, DataInputStream input) throws Exception {
-    super(connection, input);
+  public CopyDataMessage(ConnectionHandler connection) throws Exception {
+    super(connection);
     this.payload = new byte[this.length - 4];
-    if (input.read(this.payload) < 0) {
+    if (this.inputStream.read(this.payload) < 0) {
       throw new IOException("Could not read copy data.");
     }
   }
 
   @Override
-  public void send() throws Exception {
+  protected void sendPayload() throws Exception {
     throw new IllegalStateException(
         "Spanner does not currently support the copy functionality through the proxy.");
+  }
+
+  @Override
+  protected String getMessageName() {
+    return "Copy Data";
+  }
+
+  @Override
+  protected String getPayloadString() {
+    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+  }
+
+  @Override
+  protected String getIdentifier() {
+    return String.valueOf(IDENTIFIER);
   }
 
   public byte[] getPayload() {

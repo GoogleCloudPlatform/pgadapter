@@ -15,16 +15,25 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.statements.PSQLStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.CancelMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.CloseMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.CopyDataMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.CopyDoneMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.CopyFailMessage;
@@ -34,19 +43,25 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.FlushMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.FunctionCallMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.TerminateMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage.PreparedType;
 import com.google.common.primitives.Bytes;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.junit.Assert;
@@ -77,6 +92,8 @@ public class ProtocolTest {
   @Mock
   private OptionsMetadata options;
   @Mock
+  private IntermediateStatement intermediateStatement;
+  @Mock
   private IntermediatePreparedStatement intermediatePreparedStatement;
   @Mock
   private IntermediatePortalStatement intermediatePortalStatement;
@@ -84,11 +101,25 @@ public class ProtocolTest {
   private DescribeStatementMetadata describeStatementMetadata;
   @Mock
   private DescribePortalMetadata describePortalMetadata;
+  @Mock
+  private ConnectionMetadata connectionMetadata;
+  @Mock
+  private DataOutputStream outputStream;
 
   private byte[] intToBytes(int value) {
     byte[] parameters = new byte[4];
     ByteConverter.int4(parameters, 0, value);
     return parameters;
+  }
+
+  private DataInputStream inputStreamFromOutputStream(ByteArrayOutputStream output) {
+    return new DataInputStream(new ByteArrayInputStream(output.toByteArray()));
+  }
+
+  private String readUntil(DataInputStream input, int length) throws Exception {
+    byte[] item = new byte[length];
+    input.read(item, 0, length);
+    return new String(item, StandardCharsets.UTF_8);
   }
 
   @Test
@@ -106,15 +137,22 @@ public class ProtocolTest {
     Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(options.isPSQLMode()).thenReturn(false);
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), QueryMessage.class);
     Assert.assertEquals(((QueryMessage) message).getStatement().getSql(), expectedSQL);
 
-    message.send();
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleQuery(((QueryMessage) message).getStatement());
-    Mockito.verify(statement, Mockito.times(1)).execute(expectedSQL);
+    QueryMessage messageSpy = (QueryMessage) Mockito.spy(message);
+
+    Mockito.doNothing().when(messageSpy).handleQuery();
+
+    messageSpy.send();
+    // Execute
+    Mockito.verify(statement, Mockito.times(1))
+        .execute(expectedSQL);
   }
 
   @Test
@@ -135,15 +173,20 @@ public class ProtocolTest {
     Mockito.when(options.getCommandMetadataJSON())
         .thenReturn((JSONObject) parser.parse("{\"commands\": []}"));
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), QueryMessage.class);
     Assert.assertEquals(((QueryMessage) message).getStatement().getClass(), PSQLStatement.class);
     Assert.assertEquals(((QueryMessage) message).getStatement().getSql(), expectedSQL);
 
-    message.send();
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleQuery(((QueryMessage) message).getStatement());
+    QueryMessage messageSpy = (QueryMessage) Mockito.spy(message);
+
+    Mockito.doNothing().when(messageSpy).handleQuery();
+
+    messageSpy.send();
     Mockito.verify(statement, Mockito.times(1)).execute(expectedSQL);
   }
 
@@ -153,13 +196,16 @@ public class ProtocolTest {
     String payload = "SELECT * FROM users";
     byte[] value = Bytes.concat(messageMetadata, payload.getBytes());
 
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(options.isPSQLMode()).thenReturn(false);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
-
-    WireMessage.create(connectionHandler, inputStream);
+    ControlMessage.create(connectionHandler);
   }
 
   @Test
@@ -193,10 +239,15 @@ public class ProtocolTest {
     String expectedMessageName = "some statement";
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), ParseMessage.class);
     Assert.assertEquals(((ParseMessage) message).getName(), expectedMessageName);
     Assert.assertEquals(
@@ -210,8 +261,11 @@ public class ProtocolTest {
     message.send();
     Mockito.verify(connectionHandler, Mockito.times(1))
         .registerStatement(expectedMessageName, ((ParseMessage) message).getStatement());
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleParse();
+
+    // ParseCompleteResponse
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    Assert.assertEquals(outputResult.readByte(), '1');
+    Assert.assertEquals(outputResult.readInt(), 4);
   }
 
   @Test(expected = IllegalStateException.class)
@@ -243,8 +297,11 @@ public class ProtocolTest {
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    WireMessage message = ControlMessage.create(connectionHandler);
 
     Mockito.when(connectionHandler.hasStatement(anyString())).thenReturn(true);
     message.send();
@@ -281,8 +338,11 @@ public class ProtocolTest {
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    WireMessage message = ControlMessage.create(connectionHandler);
 
     Mockito.when(connectionHandler.hasStatement(anyString())).thenReturn(true);
     message.send();
@@ -316,13 +376,17 @@ public class ProtocolTest {
 
     Mockito.when(connectionHandler.hasStatement(anyString())).thenReturn(true);
 
-    new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    WireMessage message = ControlMessage.create(connectionHandler);
 
     Mockito.when(connectionHandler.hasStatement(anyString())).thenReturn(true);
     message.send();
@@ -374,8 +438,14 @@ public class ProtocolTest {
     String expectedStatementName = "some statement";
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), BindMessage.class);
     Assert.assertEquals(((BindMessage) message).getPortalName(), expectedPortalName);
     Assert.assertEquals(((BindMessage) message).getStatementName(), expectedStatementName);
@@ -392,8 +462,11 @@ public class ProtocolTest {
     message.send();
     Mockito.verify(connectionHandler, Mockito.times(1))
         .registerPortal(expectedPortalName, intermediatePortalStatement);
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleBind();
+
+    // BindCompleteResponse
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    Assert.assertEquals(outputResult.readByte(), '2');
+    Assert.assertEquals(outputResult.readInt(), 4);
   }
 
   @Test
@@ -453,7 +526,11 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), BindMessage.class);
     Assert.assertEquals(((BindMessage) message).getPortalName(), expectedPortalName);
     Assert.assertEquals(((BindMessage) message).getStatementName(), expectedStatementName);
@@ -520,7 +597,11 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), BindMessage.class);
     Assert.assertEquals(((BindMessage) message).getPortalName(), expectedPortalName);
     Assert.assertEquals(((BindMessage) message).getStatementName(), expectedStatementName);
@@ -549,19 +630,29 @@ public class ProtocolTest {
 
     String expectedStatementName = "some statement";
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
     Mockito.when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), DescribeMessage.class);
     Assert.assertEquals(((DescribeMessage) message).getName(), expectedStatementName);
 
     Mockito.verify(connectionHandler, Mockito.times(1)).getPortal("some statement");
 
     Mockito.when(intermediatePortalStatement.describe()).thenReturn(describePortalMetadata);
-    message.send();
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleDescribePortal(intermediatePortalStatement, describePortalMetadata);
+    DescribeMessage messageSpy = (DescribeMessage) Mockito.spy(message);
+
+    Mockito.doNothing().when(messageSpy).handleDescribePortal();
+
+    messageSpy.send();
+
+    Mockito.verify(messageSpy, Mockito.times(1))
+        .handleDescribePortal();
   }
 
   @Test
@@ -585,20 +676,30 @@ public class ProtocolTest {
 
     String expectedStatementName = "some statement";
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
     Mockito.when(connectionHandler.getStatement(anyString()))
         .thenReturn(intermediatePreparedStatement);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), DescribeMessage.class);
     Assert.assertEquals(((DescribeMessage) message).getName(), expectedStatementName);
 
     Mockito.verify(connectionHandler, Mockito.times(1)).getStatement("some statement");
 
     Mockito.when(intermediatePreparedStatement.describe()).thenReturn(describeStatementMetadata);
-    message.send();
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleDescribeStatement(describeStatementMetadata);
+    DescribeMessage messageSpy = (DescribeMessage) Mockito.spy(message);
+
+    Mockito.doNothing().when(messageSpy).handleDescribeStatement();
+
+    messageSpy.send();
+
+    Mockito.verify(messageSpy, Mockito.times(1))
+        .handleDescribeStatement();
   }
 
   @Test
@@ -622,21 +723,32 @@ public class ProtocolTest {
 
     String expectedStatementName = "some portal";
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
     Mockito.when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), ExecuteMessage.class);
     Assert.assertEquals(((ExecuteMessage) message).getName(), expectedStatementName);
     Assert.assertEquals(((ExecuteMessage) message).getMaxRows(), totalRows);
 
     Mockito.verify(connectionHandler, Mockito.times(1)).getPortal("some portal");
+    ExecuteMessage messageSpy = (ExecuteMessage) Mockito.spy(message);
 
-    message.send();
+    Mockito.doReturn(false).when(messageSpy).sendSpannerResult(any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
+
+    messageSpy.send();
+
     Mockito.verify(intermediatePortalStatement, Mockito.times(1))
         .execute();
+    Mockito.verify(messageSpy, Mockito.times(1))
+        .sendSpannerResult(intermediatePortalStatement, QueryMode.EXTENDED, totalRows);
     Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleExecute(intermediatePortalStatement, totalRows);
+        .cleanUp(intermediatePortalStatement);
   }
 
   @Test
@@ -661,10 +773,15 @@ public class ProtocolTest {
     String expectedStatementName = "some portal";
     PreparedType expectedType = PreparedType.Portal;
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
     Mockito.when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), CloseMessage.class);
     Assert.assertEquals(((CloseMessage) message).getName(), expectedStatementName);
     Assert.assertEquals(((CloseMessage) message).getType(), expectedType);
@@ -676,8 +793,11 @@ public class ProtocolTest {
         .close();
     Mockito.verify(connectionHandler, Mockito.times(1))
         .closePortal(expectedStatementName);
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleClose();
+
+    // CloseResponse
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    Assert.assertEquals(outputResult.readByte(), '3');
+    Assert.assertEquals(outputResult.readInt(), 4);
   }
 
   @Test
@@ -702,11 +822,16 @@ public class ProtocolTest {
     String expectedStatementName = "some statement";
     PreparedType expectedType = PreparedType.Statement;
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
     Mockito.when(connectionHandler.getStatement(anyString()))
         .thenReturn(intermediatePortalStatement);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), CloseMessage.class);
     Assert.assertEquals(((CloseMessage) message).getName(), expectedStatementName);
     Assert.assertEquals(((CloseMessage) message).getType(), expectedType);
@@ -716,8 +841,11 @@ public class ProtocolTest {
     message.send();
     Mockito.verify(connectionHandler, Mockito.times(1))
         .closeStatement(expectedStatementName);
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleClose();
+
+    // CloseResponse
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    Assert.assertEquals(outputResult.readByte(), '3');
+    Assert.assertEquals(outputResult.readInt(), 4);
   }
 
   @Test
@@ -732,13 +860,23 @@ public class ProtocolTest {
     );
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), SyncMessage.class);
 
     message.send();
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleSync();
+
+    // ReadyResponse
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    Assert.assertEquals(outputResult.readByte(), 'Z');
+    Assert.assertEquals(outputResult.readInt(), 5);
+    Assert.assertEquals(outputResult.readByte(), 'I');
   }
 
   @Test
@@ -753,13 +891,23 @@ public class ProtocolTest {
     );
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), FlushMessage.class);
 
     message.send();
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleFlush();
+
+    // ReadyResponse
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    Assert.assertEquals(outputResult.readByte(), 'Z');
+    Assert.assertEquals(outputResult.readInt(), 5);
+    Assert.assertEquals(outputResult.readByte(), 'I');
   }
 
   @Test
@@ -774,8 +922,14 @@ public class ProtocolTest {
     );
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), TerminateMessage.class);
   }
 
@@ -785,7 +939,11 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(messageMetadata));
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
 
     message.send();
     Mockito.verify(connectionHandler, Mockito.times(1))
@@ -810,7 +968,11 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
 
     Assert.assertEquals(message.getClass(), CopyDataMessage.class);
     Assert.assertArrayEquals(((CopyDataMessage) message).getPayload(), payload);
@@ -830,7 +992,11 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
 
     Assert.assertEquals(message.getClass(), CopyDoneMessage.class);
     message.send();
@@ -856,7 +1022,11 @@ public class ProtocolTest {
 
     String expectedErrorMessage = "Error Message";
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
 
     Assert.assertEquals(message.getClass(), CopyFailMessage.class);
     Assert.assertEquals(((CopyFailMessage) message).getErrorMessage(), expectedErrorMessage);
@@ -905,10 +1075,190 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
-    WireMessage message = WireMessage.create(connectionHandler, inputStream);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
 
     Assert.assertEquals(message.getClass(), FunctionCallMessage.class);
     message.send();
   }
 
+  @Test
+  public void testStartUpMessage() throws Exception {
+    byte[] protocol = intToBytes( 196608);
+    byte[] payload = (
+        "database\0"
+            + "databasename\0"
+            + "application_name\0"
+            + "psql\0"
+            + "client_encoding\0"
+            + "UTF8\0"
+            + "user\0"
+            + "me\0"
+    ).getBytes();
+    byte[] length = intToBytes(8 + payload.length);
+
+    byte[] value = Bytes.concat(
+        length,
+        protocol,
+        payload
+    );
+
+    Map<String, String> expectedParameters = new HashMap<>();
+    expectedParameters.put("database", "databasename");
+    expectedParameters.put("application_name", "psql");
+    expectedParameters.put("client_encoding", "UTF8");
+    expectedParameters.put("user", "me");
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getServer()).thenReturn(server);
+    Mockito.when(connectionHandler.getConnectionId()).thenReturn(1);
+    Mockito.when(server.getOptions()).thenReturn(options);
+    Mockito.when(options.shouldAuthenticate()).thenReturn(false);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = BootstrapMessage.create(connectionHandler);
+    Assert.assertEquals(message.getClass(), StartupMessage.class);
+
+    Assert.assertEquals(((StartupMessage) message).getParameters(), expectedParameters);
+
+    message.send();
+
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+
+    // AuthenticationOkResponse
+    Assert.assertEquals(outputResult.readByte(), 'R');
+    Assert.assertEquals(outputResult.readInt(), 8);
+    Assert.assertEquals(outputResult.readInt(), 0);
+
+    // KeyDataResponse
+    Assert.assertEquals(outputResult.readByte(), 'K');
+    Assert.assertEquals(outputResult.readInt(), 12);
+    Assert.assertEquals(outputResult.readInt(), 1);
+    Assert.assertEquals(outputResult.readInt(), 0);
+
+    // StartupMessageResponse (x3)
+    Assert.assertEquals(outputResult.readByte(), 'S');
+    Assert.assertEquals(outputResult.readInt(), 25);
+    Assert.assertEquals(readUntil(outputResult, "integer_datetimes\0".length()), "integer_datetimes\0");
+    Assert.assertEquals(readUntil(outputResult, "on\0".length()), "on\0");
+    Assert.assertEquals(outputResult.readByte(), 'S');
+    Assert.assertEquals(outputResult.readInt(), 25);
+    Assert.assertEquals(readUntil(outputResult, "client_encoding\0".length()), "client_encoding\0");
+    Assert.assertEquals(readUntil(outputResult, "utf8\0".length()), "utf8\0");
+    Assert.assertEquals(outputResult.readByte(), 'S');
+    Assert.assertEquals(outputResult.readInt(), 18);
+    Assert.assertEquals(readUntil(outputResult, "DateStyle\0".length()), "DateStyle\0");
+    Assert.assertEquals(readUntil(outputResult, "ISO\0".length()), "ISO\0");
+
+    // ReadyResponse
+    Assert.assertEquals(outputResult.readByte(), 'Z');
+    Assert.assertEquals(outputResult.readInt(), 5);
+    Assert.assertEquals(outputResult.readByte(), 'I');
+  }
+
+  @Test
+  public void testCancelMessage() throws Exception {
+    byte[] length = intToBytes(16);
+    byte[] protocol = intToBytes( 80877102);
+    byte[] connectionId = intToBytes(1);
+    byte[] secret = intToBytes(1);
+
+    byte[] value = Bytes.concat(
+        length,
+        protocol,
+        connectionId,
+        secret
+    );
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getSecret()).thenReturn(1);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = BootstrapMessage.create(connectionHandler);
+    Assert.assertEquals(message.getClass(), CancelMessage.class);
+
+    Assert.assertEquals(((CancelMessage) message).getConnectionId(), 1);
+    Assert.assertEquals(((CancelMessage) message).getSecret(), 1);
+
+    message.send();
+
+    Mockito.verify(connectionHandler, Mockito.times(1))
+        .cancelActiveStatement(1, 1);
+    Mockito.verify(connectionHandler, Mockito.times(1))
+        .handleTerminate();
+  }
+
+
+  @Test
+  public void testSSLMessage() throws Exception {
+    byte[] length = intToBytes(8);
+    byte[] protocol = intToBytes( 80877103);
+
+    byte[] value = Bytes.concat(
+        length,
+        protocol
+    );
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = BootstrapMessage.create(connectionHandler);
+    Assert.assertEquals(message.getClass(), SSLMessage.class);
+
+    message.send();
+
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+
+    // DeclineSSLResponse
+    Assert.assertEquals(outputResult.readByte(), 'N');
+  }
+
+  @Test(expected = IOException.class)
+  public void testSSLMessageFailsWhenCalledTwice() throws Exception {
+    byte[] length = intToBytes(8);
+    byte[] protocol = intToBytes( 80877103);
+
+    byte[] value = Bytes.concat(
+        length,
+        protocol
+    );
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = BootstrapMessage.create(connectionHandler);
+    Assert.assertEquals(message.getClass(), SSLMessage.class);
+
+    message.send();
+
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+
+    // DeclineSSLResponse
+    Assert.assertEquals(outputResult.readByte(), 'N');
+
+    message.send();
+  }
 }

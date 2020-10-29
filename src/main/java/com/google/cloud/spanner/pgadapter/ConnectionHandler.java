@@ -14,12 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import com.google.cloud.spanner.pgadapter.PGWireProtocol.Status;
-import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
+import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -27,18 +28,21 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Handles a connection from a client to Spanner. This {@link ConnectionHandler} has a {@link
- * PGWireProtocol} that is responsible for sending all messages from and to the client, using the
+ * Handles a connection from a client to Spanner. This {@link ConnectionHandler} uses {@link
+ * WireMessage} to receive and send all messages from and to the client, using the
  * intermediate representation {@link IntermediateStatement} that servers as a middle layer between
  * Postgres and Spanner.
  *
@@ -53,14 +57,23 @@ public class ConnectionHandler extends Thread {
   private final Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
+  private static volatile Map<Integer, IntermediateStatement> activeStatementsMap = new HashMap<>();
+  private static final Map<Integer, Integer> connectionToSecretMapping = new HashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
-  private PGWireProtocol wire;
+  private int connectionId;
+  private final int secret;
+  // Separate the following from the threat ID generator, since PG connection IDs are maximum
+  //  32 bytes, and shouldn't be incremented on failed startups.
+  private static AtomicInteger incrementingConnectionId = new AtomicInteger(0);
+  private ConnectionMetadata connectionMetadata;
+  private WireMessage message;
   private Connection jdbcConnection;
 
   ConnectionHandler(ProxyServer server, Socket socket) throws SQLException {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
     this.socket = socket;
+    this.secret = new SecureRandom().nextInt();
     this.jdbcConnection = DriverManager.getConnection(server.getOptions().getConnectionURL());
     setDaemon(true);
     logger.log(Level.INFO, "Connection handler with ID {0} created for client {1}",
@@ -81,43 +94,31 @@ public class ConnectionHandler extends Thread {
         DataInputStream input =
             new DataInputStream(new BufferedInputStream(this.socket.getInputStream()));
         DataOutputStream output =
-            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream()))) {
-      this.wire = new PGWireProtocol(this, input, output);
+            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
+    ) {
       if (!this.socket.getInetAddress().isAnyLocalAddress() &&
           !this.socket.getInetAddress().isLoopbackAddress()) {
-        handleError(new IllegalAccessException("This proxy may only be accessed from localhost."));
+        handleError(output,
+            new IllegalAccessException("This proxy may only be accessed from localhost."));
         return;
       }
-      if (this.wire.dontAuthenticate() || this.wire.doAuthenticate()) {
-        logger.log(Level.INFO, "Connection handler with ID {0} authenticated for client {1}",
-            new Object[]{getName(), this.socket.getInetAddress().getHostAddress()});
-        this.status = ConnectionStatus.IDLE;
+
+      try {
+        this.connectionMetadata = new ConnectionMetadata(input, output);
+        this.message = BootstrapMessage.create(this);
+        this.message.send();
         while (this.status != ConnectionStatus.TERMINATED) {
-          logger.log(Level.FINEST, "Connection handler with ID {0} waiting for messages",
-              getName());
-          WireMessage message;
           try {
-            message = WireMessage.create(this, input);
-            logger.log(Level.FINEST, "Connection handler with ID {0} received message {1}",
-                new Object[]{getName(), message});
-          } catch (Exception e) {
-            this.handleError(e);
-            continue;
-          }
-          try {
+            message.nextHandler();
             message.send();
-            logger.log(Level.FINEST, "Connection handler with ID {0} executed message {1}",
-                new Object[]{getName(), message});
           } catch (Exception e) {
-            this.handleError(e);
+            this.handleError(output, e);
           }
         }
-      } else {
-        logger.log(Level.INFO,
-            "Authentication failed on connection handler with ID {0} for client {1}",
-            new Object[]{getName(), socket.getInetAddress().getHostAddress()});
+      } catch (Exception e) {
+        this.handleError(output, e);
       }
-    } catch (IOException e) {
+    } catch (Exception e) {
       logger.log(Level.WARNING, "Exception on connection handler with ID {0} for client {1}: {2}",
           new Object[]{getName(), socket.getInetAddress().getHostAddress(), e});
     } finally {
@@ -137,109 +138,6 @@ public class ConnectionHandler extends Thread {
   }
 
   /**
-   * Called when a Parse message is received
-   **/
-  public void handleParse() throws IOException {
-    this.wire.sendParseComplete();
-  }
-
-  /**
-   * Called when a Bind message is received.
-   */
-  public void handleBind() throws IOException {
-    this.wire.sendBindComplete();
-  }
-
-  /**
-   * Handles the return of a query message to the client. Specifically sends the row description as
-   * well as the row contents themselves to the client.
-   *
-   * @param statement {@link IntermediateStatement} containing the current representation.
-   * @throws Exception if sending the message back to the client causes an error.
-   */
-  public void handleQuery(IntermediateStatement statement) throws Exception {
-    if (statement.hasException()) {
-      this.handleError(statement.getException());
-    } else {
-      if (statement.containsResultSet()) {
-        this.wire.sendRowDescription(statement,
-            statement.getStatementResult().getMetaData(),
-            this.server.getOptions().getTextFormat(),
-            QueryMode.SIMPLE);
-      }
-      sendSpannerResult(statement, QueryMode.SIMPLE, 0L);
-      this.wire.sendReadyForQuery(Status.IDLE);
-    }
-    cleanUp(statement);
-  }
-
-  /**
-   * Called when a describe message of type 'P' is received.
-   *
-   * @param statement The statement to be described.
-   * @param describe The metadata relating to the statement.
-   * @throws Exception if sending the message back to the client causes an error.
-   */
-  public void handleDescribePortal(IntermediateStatement statement, DescribePortalMetadata describe)
-      throws Exception {
-    if (statement.hasException()) {
-      this.handleError(statement.getException());
-    } else {
-      this.wire.sendRowDescription(statement, describe.getMetadata(),
-          this.server.getOptions().getTextFormat(), QueryMode.EXTENDED);
-    }
-  }
-
-  /**
-   * Called when a describe message of type 'S' is received.
-   *
-   * @param describe The metadata relating to the statement.
-   * @throws Exception if sending the message back to the client causes an error.
-   */
-  public void handleDescribeStatement(DescribeStatementMetadata describe) throws Exception {
-    this.wire.sendParameterDescription(describe.getMetadata());
-    this.wire.sendNoData();
-  }
-
-  /**
-   * Called when an execute message is received.
-   *
-   * @param statement The statement to execute.
-   * @param maxRows The maximum number of rows to send back.
-   * @throws Exception if sending the message back to the client causes an error.
-   */
-  public void handleExecute(IntermediateStatement statement, int maxRows) throws Exception {
-    if (statement.hasException()) {
-      this.handleError(statement.getException());
-    } else {
-      sendSpannerResult(statement, QueryMode.EXTENDED, maxRows);
-    }
-    cleanUp(statement);
-  }
-
-  /**
-   * Called when a close message is received.
-   */
-  public void handleClose() throws Exception {
-    this.wire.sendCloseComplete();
-
-  }
-
-  /**
-   * Called when a Sync message is received.
-   */
-  public void handleSync() throws IOException {
-    this.wire.sendReadyForQuery(Status.IDLE);
-  }
-
-  /**
-   * Called when a Flush message is received.
-   */
-  public void handleFlush() throws IOException {
-    this.wire.sendReadyForQuery(Status.IDLE);
-  }
-
-  /**
    * Called when a Terminate message is received. This closes this {@link ConnectionHandler}.
    */
   public void handleTerminate() throws Exception {
@@ -254,57 +152,18 @@ public class ConnectionHandler extends Thread {
    * @param e The exception to be related.
    * @throws IOException if there is some issue in the sending of the error messages.
    */
-  private void handleError(Exception e) throws IOException {
-    logger.log(Level.FINEST,
+  private void handleError(DataOutputStream output, Exception e) throws Exception {
+    logger.log(Level.WARNING,
         "Exception on connection handler with ID {0}: {2}",
         new Object[]{getName(), e});
-    this.wire.sendError(e);
-    this.wire.sendReadyForQuery(Status.IDLE);
-  }
-
-  /**
-   * Sends the result of an execute or query to the client. The type of message depends on the type
-   * of result of the statement. This method may also be called multiple times for one result if the
-   * client has set a max number of rows to fetch for each execute message. The {@link
-   * IntermediateStatement} will cache the result in between calls and continue serving rows from
-   * the position it was left off after the last execute message.
-   */
-  private boolean sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
-      throws IOException, SQLException {
-    logger.log(Level.FINEST, "Sending result of statement {0}", statement.getStatement());
-    switch (statement.getResultType()) {
-      case NO_RESULT:
-        this.wire.sendCommandComplete(statement.getCommand());
-        return false;
-      case RESULT_SET:
-        SendResultSetState state = this.wire.sendResultSet(statement, mode, maxRows);
-        statement.setHasMoreData(state.hasMoreRows);
-        if (state.hasMoreRows) {
-          this.wire.sendPortalSuspended();
-        } else {
-          statement.getStatementResult().close();
-          this.wire.sendCommandComplete("SELECT " + state.rowsSent);
-        }
-        return state.hasMoreRows;
-      case UPDATE_COUNT:
-        String cmd = statement.getCommand();
-        if ("INSERT".equals(cmd)) {
-          // INSERT statements require both an OID and an update count to be returned.
-          // Cloud Spanner has no equivalent for this, so the returned OID is always zero.
-          cmd = cmd + " 0";
-        }
-        wire.sendCommandComplete(cmd + " " + statement.getUpdateCount());
-        return false;
-      default:
-        throw new IllegalStateException(
-            "Unknown result type: " + statement.getResultType());
-    }
+    new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
+    new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
   }
 
   /**
    * Closes portals and statements if the result of an execute was the end of a transaction.
    */
-  private void cleanUp(IntermediateStatement statement) throws Exception {
+  public void cleanUp(IntermediateStatement statement) throws Exception {
     if (!statement.isHasMoreData() && statement.isBound()) {
       statement.close();
     }
@@ -349,6 +208,61 @@ public class ConnectionHandler extends Thread {
     return this.portalsMap.containsKey(portalName);
   }
 
+  /**
+   * Add a currently executing statement to a buffer. This is only used in case a statement in
+   * flight is cancelled. It must be saved separately, as a new connection is spawned to issue
+   * a cancellation (as per Postgres protocol standard). This means some sort of IPC is required,
+   * which in this case is a global Map.
+   *
+   * @param statement Currently executing statement to be saved.
+   */
+  public synchronized void addActiveStatement(IntermediateStatement statement) {
+    activeStatementsMap.put(this.connectionId, statement);
+  }
+
+  /**
+   * Remove a statement from the buffer if it is currently executing. For more information on this
+   * use-case, read addActiveStatement comment.
+   *
+   * @param statement The statement to be removed.
+   */
+  public synchronized void removeActiveStatement(IntermediateStatement statement) {
+    if (activeStatementsMap.get(this.connectionId) == statement) {
+      activeStatementsMap.remove(this.connectionId);
+    }
+  }
+
+  /**
+   * To be used by a cancellation command to cancel a currently running statement, as contained
+   * in a specific connection identified by connectionId. Since cancellation is a flimsy contract
+   * at best, it is not imperative that the cancellation run, but it should be attempted
+   * nonetheless.
+   *
+   * @param connectionId The connection owhose statement must be cancelled.
+   * @param secret The secret value linked to this connection. If it does not match, we cannot cancel.
+   * @throws Exception If Cancellation fails.
+   */
+  public synchronized void cancelActiveStatement(int connectionId, int secret) throws Exception {
+    int expectedSecret = ConnectionHandler.connectionToSecretMapping.get(connectionId);
+    if(secret != expectedSecret) {
+      logger.log(Level.WARNING,
+          MessageFormat.format(
+              "User attempted to cancel a connection with the incorrect secret."
+              + "Connection: {}, Secret: {}, Expected Secret: {}",
+              connectionId, secret, expectedSecret
+          )
+      );
+      // Since the user does not accept a response, there is no need to except here: simply return.
+      return;
+    }
+    if (activeStatementsMap.containsKey(connectionId)) {
+      IntermediateStatement statement = activeStatementsMap.remove(connectionId);
+      // We can mostly ignore the exception since cancel does not expect any result (positive or
+      // otherwise)
+      statement.getStatement().cancel();
+    }
+  }
+
   public IntermediatePreparedStatement getStatement(String statementName) {
     if (!hasStatement(statementName)) {
       throw new IllegalStateException("Unregistered statement: " + statementName);
@@ -379,6 +293,26 @@ public class ConnectionHandler extends Thread {
     return this.jdbcConnection;
   }
 
+  public int getConnectionId() {
+    if (this.connectionId == 0) {
+      this.connectionId = ConnectionHandler.incrementingConnectionId.incrementAndGet();
+      ConnectionHandler.connectionToSecretMapping.put(this.connectionId, this.secret);
+    }
+    return this.connectionId;
+  }
+
+  public int getSecret() {
+    return this.secret;
+  }
+
+  public void setMessageState(WireMessage message) {
+    this.message = message;
+  }
+
+  public ConnectionMetadata getConnectionMetadata() {
+    return connectionMetadata;
+  }
+
   /**
    * Status of a {@link ConnectionHandler}
    */
@@ -391,23 +325,8 @@ public class ConnectionHandler extends Thread {
    * <a href="https://www.postgresql.org/docs/current/protocol-flow.html">
    * here</a>).
    */
-  enum QueryMode {
+  public enum QueryMode {
     SIMPLE, EXTENDED
   }
-
-  /**
-   * The state of a result after (a part of it) has been sent to the client.
-   */
-  static class SendResultSetState {
-
-    private final long rowsSent;
-    private final boolean hasMoreRows;
-
-    SendResultSetState(long rowsSent, boolean hasMoreRows) {
-      this.rowsSent = rowsSent;
-      this.hasMoreRows = hasMoreRows;
-    }
-  }
-
 
 }

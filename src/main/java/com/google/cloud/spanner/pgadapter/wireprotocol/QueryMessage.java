@@ -15,40 +15,87 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.statements.PSQLStatement;
-import java.io.DataInputStream;
+import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
+import java.text.MessageFormat;
 
 /**
  * Executes a simple statement.
  */
-public class QueryMessage extends WireMessage {
+public class QueryMessage extends ControlMessage {
+
+  protected static final char IDENTIFIER = 'Q';
 
   private IntermediateStatement statement;
 
-  public QueryMessage(ConnectionHandler connection, DataInputStream input) throws Exception {
-    super(connection, input);
-    this.remainder = 4;
+  public QueryMessage(ConnectionHandler connection) throws Exception {
+    super(connection);
     if (!connection.getServer().getOptions().isPSQLMode()) {
       this.statement = new IntermediateStatement(
-          this.read(input),
+          this.readAll(),
           this.connection.getJdbcConnection()
       );
     } else {
       this.statement = new PSQLStatement(
-          this.read(input),
+          this.readAll(),
           this.connection
       );
     }
+    this.connection.addActiveStatement(this.statement);
   }
 
   @Override
-  public void send() throws Exception {
+  protected void sendPayload() throws Exception {
     this.statement.execute();
-    this.connection.handleQuery(statement);
+    this.handleQuery();
+    this.connection.removeActiveStatement(this.statement);
+  }
+
+  @Override
+  protected String getMessageName() {
+    return "Query";
+  }
+
+  @Override
+  protected String getPayloadString() {
+    return new MessageFormat(
+        "Length: {0}, SQL: {1}")
+        .format(new Object[]{this.length, this.statement.getSql()});
+  }
+
+  @Override
+  protected String getIdentifier() {
+    return String.valueOf(IDENTIFIER);
   }
 
   public IntermediateStatement getStatement() {
     return this.statement;
+  }
+
+  /**
+   * Simple Query handler, whcih examined the state of the statement and processes accordingly
+   * (if error, handle error, otherwise sends the result and if contains result set,
+   * send row description)
+   *
+   * @throws Exception
+   */
+  public void handleQuery() throws Exception {
+    if (this.statement.hasException()) {
+      this.handleError(this.statement.getException());
+    } else {
+      if (this.statement.containsResultSet()) {
+        new RowDescriptionResponse(this.outputStream,
+            this.statement,
+            this.statement.getStatementResult().getMetaData(),
+            this.connection.getServer().getOptions(),
+            QueryMode.SIMPLE).send();
+      }
+      this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
+      new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
+    }
+    this.connection.cleanUp(this.statement);
   }
 }

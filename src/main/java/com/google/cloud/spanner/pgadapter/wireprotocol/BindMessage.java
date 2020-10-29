@@ -15,9 +15,10 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.PGWireProtocol;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
-import java.io.DataInputStream;
+import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
+import java.text.MessageFormat;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -25,7 +26,9 @@ import java.util.List;
  * with missing data to prepare for execution). A bound prepared statement always yields a portal
  * unless it fails.
  */
-public class BindMessage extends WireMessage {
+public class BindMessage extends ControlMessage {
+
+  protected static final char IDENTIFIER = 'B';
 
   private String portalName;
   private String statementName;
@@ -34,13 +37,13 @@ public class BindMessage extends WireMessage {
   private byte[][] parameters;
   private IntermediatePreparedStatement statement;
 
-  public BindMessage(ConnectionHandler connection, DataInputStream input) throws Exception {
-    super(connection, input);
-    this.portalName = PGWireProtocol.readString(input);
-    this.statementName = PGWireProtocol.readString(input);
-    this.formatCodes = getFormatCodes(input);
-    this.parameters = getParameters(input);
-    this.resultFormatCodes = getFormatCodes(input);
+  public BindMessage(ConnectionHandler connection) throws Exception {
+    super(connection);
+    this.portalName = this.readString();
+    this.statementName = this.readString();
+    this.formatCodes = getFormatCodes(this.inputStream);
+    this.parameters = getParameters(this.inputStream);
+    this.resultFormatCodes = getFormatCodes(this.inputStream);
     this.statement = connection.getStatement(this.statementName);
   }
 
@@ -50,11 +53,40 @@ public class BindMessage extends WireMessage {
    * @throws Exception If the binding fails.
    */
   @Override
-  public void send() throws Exception {
+  protected void sendPayload() throws Exception {
     this.connection.registerPortal(
         this.portalName,
         this.statement.bind(this.parameters, this.formatCodes, this.resultFormatCodes));
-    this.connection.handleBind();
+    new BindCompleteResponse(this.outputStream).send();
+  }
+
+  @Override
+  protected String getMessageName() {
+    return "Bind";
+  }
+
+  @Override
+  protected String getPayloadString() {
+    return new MessageFormat(
+        "Length: {0}, "
+            + "Portal Name: {1}, "
+            + "Statement Name: {2}, "
+            + "Format Codes: {3}, "
+            + "Parameters: {4}, "
+            + "ResultFormatCodes: {5}")
+        .format(new Object[]{
+            this.length,
+            this.portalName,
+            this.statementName,
+            this.formatCodes,
+            Arrays.toString(this.parameters),
+            this.resultFormatCodes
+        });
+  }
+
+  @Override
+  protected String getIdentifier() {
+    return String.valueOf(IDENTIFIER);
   }
 
   public String getPortalName() {

@@ -14,8 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
+import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -219,7 +221,22 @@ public class ProxyServer extends Thread {
       this.code = code;
     }
 
-    static DataFormat fromTextFormat(TextFormat textFormat) {
+    public static DataFormat getDataFormat(int index,
+        IntermediateStatement statement,
+        QueryMode mode,
+        OptionsMetadata options) {
+      if (options.isBinaryFormat()) {
+        return DataFormat.POSTGRESQL_BINARY;
+      }
+      if (mode == QueryMode.SIMPLE) {
+        // Simple query mode is always text.
+        return DataFormat.fromTextFormat(options.getTextFormat());
+      } else {
+        return DataFormat.byCode(statement.getResultFormatCode(index), options.getTextFormat());
+      }
+    }
+
+    public static DataFormat fromTextFormat(TextFormat textFormat) {
       switch (textFormat) {
         case POSTGRESQL:
           return POSTGRESQL_TEXT;
@@ -230,11 +247,11 @@ public class ProxyServer extends Thread {
       }
     }
 
-    static DataFormat byCode(short code, TextFormat textFormat) {
+    public static DataFormat byCode(short code, TextFormat textFormat) {
       return code == 0 ? fromTextFormat(textFormat) : POSTGRESQL_BINARY;
     }
 
-    short getCode() {
+    public short getCode() {
       return code;
     }
   }

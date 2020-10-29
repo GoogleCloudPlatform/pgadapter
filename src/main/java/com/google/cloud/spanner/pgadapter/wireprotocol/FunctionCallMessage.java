@@ -15,7 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import java.io.DataInputStream;
+import java.text.MessageFormat;
 import java.util.List;
 
 /**
@@ -24,23 +24,52 @@ import java.util.List;
  * for this to be future proof, and to ensure the input stream is flushed of the command (in order
  * to continue receiving properly)
  */
-public class FunctionCallMessage extends WireMessage {
+public class FunctionCallMessage extends ControlMessage {
+
+  protected static final char IDENTIFIER = 'F';
 
   private int functionID;
   private List<Short> argumentFormatCodes;
   private byte[][] arguments;
   private Short resultFormatCode;
 
-  public FunctionCallMessage(ConnectionHandler connection, DataInputStream input) throws Exception {
-    super(connection, input);
-    this.functionID = input.readInt();
-    this.argumentFormatCodes = getFormatCodes(input);
-    this.arguments = getParameters(input);
-    this.resultFormatCode = input.readShort();
+  public FunctionCallMessage(ConnectionHandler connection) throws Exception {
+    super(connection);
+    this.functionID = this.inputStream.readInt();
+    this.argumentFormatCodes = getFormatCodes(this.inputStream);
+    this.arguments = getParameters(this.inputStream);
+    this.resultFormatCode = this.inputStream.readShort();
   }
 
   @Override
-  public void send() throws Exception {
+  protected void sendPayload() throws Exception {
     throw new IllegalStateException("Spanner does not currently support function calls.");
+  }
+
+  @Override
+  protected String getMessageName() {
+    return "Function Call";
+  }
+
+  @Override
+  protected String getPayloadString() {
+    return new MessageFormat(
+        "Length: {0}, "
+            + "Function ID: {1},"
+            + "Argument Format Codes: {2}, "
+            + "Arguments: {3}, "
+            + "Result Format Code: {4}")
+        .format(new Object[]{
+            this.length,
+            this.functionID,
+            this.argumentFormatCodes,
+            this.arguments,
+            this.resultFormatCode
+        });
+  }
+
+  @Override
+  protected String getIdentifier() {
+    return String.valueOf(IDENTIFIER);
   }
 }
