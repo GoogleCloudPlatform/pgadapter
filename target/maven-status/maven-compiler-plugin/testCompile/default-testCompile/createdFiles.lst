@@ -1,0 +1,11 @@
+com/google/cloud/spanner/pgadapter/ConverterTest.class
+com/google/cloud/spanner/pgadapter/PSQLTest.class
+com/google/cloud/spanner/pgadapter/IntegrationTest.class
+com/google/cloud/spanner/pgadapter/metadata/CommandMetadataParserTest.class
+com/google/cloud/spanner/pgadapter/ProtocolTest.class
+com/google/cloud/spanner/pgadapter/StatementTest.class
+com/google/cloud/spanner/pgadapter/MetadataTest.class
+com/google/cloud/spanner/pgadapter/wireoutput/RowDescriptionTest.class
+com/google/cloud/spanner/pgadapter/ITQueryTest.class
+com/google/cloud/spanner/pgadapter/ParserTest.class
+com/google/cloud/spanner/pgadapter/PgAdapterTestEnv.class
