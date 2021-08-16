@@ -14,9 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
-/**
- * Simple POJO superclass to hold results from a describe statement.
- */
+/** Simple POJO superclass to hold results from a describe statement. */
 public abstract class DescribeMetadata<T> {
 
   protected T metadata;

@@ -42,11 +42,11 @@ import java.util.logging.Logger;
 
 /**
  * Handles a connection from a client to Spanner. This {@link ConnectionHandler} uses {@link
- * WireMessage} to receive and send all messages from and to the client, using the
- * intermediate representation {@link IntermediateStatement} that servers as a middle layer between
- * Postgres and Spanner.
+ * WireMessage} to receive and send all messages from and to the client, using the intermediate
+ * representation {@link IntermediateStatement} that servers as a middle layer between Postgres and
+ * Spanner.
  *
- * Each {@link ConnectionHandler} is also a {@link Thread}. Although a TCP connection does not
+ * <p>Each {@link ConnectionHandler} is also a {@link Thread}. Although a TCP connection does not
  * necessarily need to have its own thread, this makes the implementation more straightforward.
  */
 public class ConnectionHandler extends Thread {
@@ -74,10 +74,13 @@ public class ConnectionHandler extends Thread {
     this.server = server;
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
-    this.jdbcConnection = DriverManager.getConnection(server.getOptions().getConnectionURL());
+    this.jdbcConnection =
+        DriverManager.getConnection(server.getOptions().getConnectionURL(), server.getProperties());
     setDaemon(true);
-    logger.log(Level.INFO, "Connection handler with ID {0} created for client {1}",
-        new Object[]{getName(), socket.getInetAddress().getHostAddress()});
+    logger.log(
+        Level.INFO,
+        "Connection handler with ID {0} created for client {1}",
+        new Object[] {getName(), socket.getInetAddress().getHostAddress()});
   }
 
   /**
@@ -87,19 +90,20 @@ public class ConnectionHandler extends Thread {
    */
   @Override
   public void run() {
-    logger.log(Level.INFO, "Connection handler with ID {0} starting for client {1}",
-        new Object[]{getName(), socket.getInetAddress().getHostAddress()});
+    logger.log(
+        Level.INFO,
+        "Connection handler with ID {0} starting for client {1}",
+        new Object[] {getName(), socket.getInetAddress().getHostAddress()});
 
-    try (
-        DataInputStream input =
+    try (DataInputStream input =
             new DataInputStream(new BufferedInputStream(this.socket.getInputStream()));
         DataOutputStream output =
-            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
-    ) {
-      if (!this.socket.getInetAddress().isAnyLocalAddress() &&
-          !this.socket.getInetAddress().isLoopbackAddress()) {
-        handleError(output,
-            new IllegalAccessException("This proxy may only be accessed from localhost."));
+            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream())); ) {
+      if (!server.getOptions().disableLocalhostCheck()
+          && !this.socket.getInetAddress().isAnyLocalAddress()
+          && !this.socket.getInetAddress().isLoopbackAddress()) {
+        handleError(
+            output, new IllegalAccessException("This proxy may only be accessed from localhost."));
         return;
       }
 
@@ -119,8 +123,10 @@ public class ConnectionHandler extends Thread {
         this.handleError(output, e);
       }
     } catch (Exception e) {
-      logger.log(Level.WARNING, "Exception on connection handler with ID {0} for client {1}: {2}",
-          new Object[]{getName(), socket.getInetAddress().getHostAddress(), e});
+      logger.log(
+          Level.WARNING,
+          "Exception on connection handler with ID {0} for client {1}: {2}",
+          new Object[] {getName(), socket.getInetAddress().getHostAddress(), e});
     } finally {
       logger.log(Level.INFO, "Closing connection handler with ID {0}", getName());
       try {
@@ -129,17 +135,15 @@ public class ConnectionHandler extends Thread {
         }
         this.socket.close();
       } catch (SQLException | IOException e) {
-        logger.log(Level.WARNING, "Exception while closing connection handler with ID {0}",
-            getName());
+        logger.log(
+            Level.WARNING, "Exception while closing connection handler with ID {0}", getName());
       }
       this.server.deregister(this);
       logger.log(Level.INFO, "Connection handler with ID {0} closed", getName());
     }
   }
 
-  /**
-   * Called when a Terminate message is received. This closes this {@link ConnectionHandler}.
-   */
+  /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
   public void handleTerminate() throws Exception {
     closeAllPortals();
     this.jdbcConnection.close();
@@ -153,16 +157,15 @@ public class ConnectionHandler extends Thread {
    * @throws IOException if there is some issue in the sending of the error messages.
    */
   private void handleError(DataOutputStream output, Exception e) throws Exception {
-    logger.log(Level.WARNING,
-        "Exception on connection handler with ID {0}: {2}",
-        new Object[]{getName(), e});
+    logger.log(
+        Level.WARNING,
+        "Exception on connection handler with ID {0}: {1}",
+        new Object[] {getName(), e});
     new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
     new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
   }
 
-  /**
-   * Closes portals and statements if the result of an execute was the end of a transaction.
-   */
+  /** Closes portals and statements if the result of an execute was the end of a transaction. */
   public void cleanUp(IntermediateStatement statement) throws Exception {
     if (!statement.isHasMoreData() && statement.isBound()) {
       statement.close();
@@ -170,9 +173,7 @@ public class ConnectionHandler extends Thread {
     // TODO when we have transaction data from jdbcConnection, close all portals if done
   }
 
-  /**
-   * Closes all named and unnamed portals on this connection.
-   */
+  /** Closes all named and unnamed portals on this connection. */
   private void closeAllPortals() {
     for (IntermediatePortalStatement statement : portalsMap.values()) {
       try {
@@ -190,7 +191,6 @@ public class ConnectionHandler extends Thread {
       throw new IllegalStateException("Unregistered portal: " + portalName);
     }
     return this.portalsMap.get(portalName);
-
   }
 
   public void registerPortal(String portalName, IntermediatePortalStatement portal) {
@@ -210,8 +210,8 @@ public class ConnectionHandler extends Thread {
 
   /**
    * Add a currently executing statement to a buffer. This is only used in case a statement in
-   * flight is cancelled. It must be saved separately, as a new connection is spawned to issue
-   * a cancellation (as per Postgres protocol standard). This means some sort of IPC is required,
+   * flight is cancelled. It must be saved separately, as a new connection is spawned to issue a
+   * cancellation (as per Postgres protocol standard). This means some sort of IPC is required,
    * which in this case is a global Map.
    *
    * @param statement Currently executing statement to be saved.
@@ -233,25 +233,26 @@ public class ConnectionHandler extends Thread {
   }
 
   /**
-   * To be used by a cancellation command to cancel a currently running statement, as contained
-   * in a specific connection identified by connectionId. Since cancellation is a flimsy contract
-   * at best, it is not imperative that the cancellation run, but it should be attempted
-   * nonetheless.
+   * To be used by a cancellation command to cancel a currently running statement, as contained in a
+   * specific connection identified by connectionId. Since cancellation is a flimsy contract at
+   * best, it is not imperative that the cancellation run, but it should be attempted nonetheless.
    *
    * @param connectionId The connection owhose statement must be cancelled.
-   * @param secret The secret value linked to this connection. If it does not match, we cannot cancel.
+   * @param secret The secret value linked to this connection. If it does not match, we cannot
+   *     cancel.
    * @throws Exception If Cancellation fails.
    */
   public synchronized void cancelActiveStatement(int connectionId, int secret) throws Exception {
     int expectedSecret = ConnectionHandler.connectionToSecretMapping.get(connectionId);
-    if(secret != expectedSecret) {
-      logger.log(Level.WARNING,
+    if (secret != expectedSecret) {
+      logger.log(
+          Level.WARNING,
           MessageFormat.format(
               "User attempted to cancel a connection with the incorrect secret."
-              + "Connection: {}, Secret: {}, Expected Secret: {}",
-              connectionId, secret, expectedSecret
-          )
-      );
+                  + "Connection: {}, Secret: {}, Expected Secret: {}",
+              connectionId,
+              secret,
+              expectedSecret));
       // Since the user does not accept a response, there is no need to except here: simply return.
       return;
     }
@@ -313,20 +314,19 @@ public class ConnectionHandler extends Thread {
     return connectionMetadata;
   }
 
-  /**
-   * Status of a {@link ConnectionHandler}
-   */
+  /** Status of a {@link ConnectionHandler} */
   private enum ConnectionStatus {
-    UNAUTHENTICATED, IDLE, TERMINATED
+    UNAUTHENTICATED,
+    IDLE,
+    TERMINATED
   }
 
   /**
-   * PostgreSQL query mode (see also
-   * <a href="https://www.postgresql.org/docs/current/protocol-flow.html">
-   * here</a>).
+   * PostgreSQL query mode (see also <a
+   * href="https://www.postgresql.org/docs/current/protocol-flow.html">here</a>).
    */
   public enum QueryMode {
-    SIMPLE, EXTENDED
+    SIMPLE,
+    EXTENDED
   }
-
 }

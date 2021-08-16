@@ -84,41 +84,31 @@ public class ArrayParser extends Parser<List> {
   protected String stringParse() {
     List<String> results = new LinkedList<>();
     for (Object currentItem : this.item) {
-      results.add(
-          stringify(Parser.create(currentItem, this.arrayType).stringParse())
-      );
+      results.add(stringify(Parser.create(currentItem, this.arrayType).stringParse()));
     }
-    return results
-        .stream()
-        .collect(
-            Collectors.joining(ARRAY_DELIMITER, PG_ARRAY_OPEN, PG_ARRAY_CLOSE)
-        );
+    return results.stream()
+        .collect(Collectors.joining(ARRAY_DELIMITER, PG_ARRAY_OPEN, PG_ARRAY_CLOSE));
   }
 
   @Override
   protected String spannerParse() {
     List<String> results = new LinkedList<>();
     for (Object currentItem : this.item) {
-      results.add(
-          stringify(Parser.create(currentItem, this.arrayType).spannerParse())
-      );
+      results.add(stringify(Parser.create(currentItem, this.arrayType).spannerParse()));
     }
-    return results
-        .stream()
-        .collect(
-            Collectors.joining(ARRAY_DELIMITER, SPANNER_ARRAY_OPEN, SPANNER_ARRAY_CLOSE)
-        );
+    return results.stream()
+        .collect(Collectors.joining(ARRAY_DELIMITER, SPANNER_ARRAY_OPEN, SPANNER_ARRAY_CLOSE));
   }
 
   @Override
   protected byte[] binaryParse() {
     ByteArrayOutputStream arrayStream = new ByteArrayOutputStream();
     try {
-      arrayStream.write(toBinary(1, Types.INTEGER));   // dimension
-      arrayStream.write(toBinary(1, Types.INTEGER));   // Set null flag
-      arrayStream.write(toBinary(this.arrayType, Types.INTEGER));    // Set type
-      arrayStream.write(toBinary(this.item.size(), Types.INTEGER));  // Set array length
-      arrayStream.write(toBinary(0, Types.INTEGER));  // Lower bound (?)
+      arrayStream.write(toBinary(1, Types.INTEGER)); // dimension
+      arrayStream.write(toBinary(1, Types.INTEGER)); // Set null flag
+      arrayStream.write(toBinary(this.arrayType, Types.INTEGER)); // Set type
+      arrayStream.write(toBinary(this.item.size(), Types.INTEGER)); // Set array length
+      arrayStream.write(toBinary(0, Types.INTEGER)); // Lower bound (?)
       for (Object currentItem : this.item) {
         if (currentItem == null) {
           arrayStream.write(toBinary(-1, Types.INTEGER));
@@ -134,5 +124,3 @@ public class ArrayParser extends Parser<List> {
     }
   }
 }
-
-

@@ -22,9 +22,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
 import java.text.MessageFormat;
 
-/**
- * Executes a simple statement.
- */
+/** Executes a simple statement. */
 public class QueryMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'Q';
@@ -34,15 +32,10 @@ public class QueryMessage extends ControlMessage {
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     if (!connection.getServer().getOptions().isPSQLMode()) {
-      this.statement = new IntermediateStatement(
-          this.readAll(),
-          this.connection.getJdbcConnection()
-      );
+      this.statement =
+          new IntermediateStatement(this.readAll(), this.connection.getJdbcConnection());
     } else {
-      this.statement = new PSQLStatement(
-          this.readAll(),
-          this.connection
-      );
+      this.statement = new PSQLStatement(this.readAll(), this.connection);
     }
     this.connection.addActiveStatement(this.statement);
   }
@@ -61,9 +54,8 @@ public class QueryMessage extends ControlMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, SQL: {1}")
-        .format(new Object[]{this.length, this.statement.getSql()});
+    return new MessageFormat("Length: {0}, SQL: {1}")
+        .format(new Object[] {this.length, this.statement.getSql()});
   }
 
   @Override
@@ -76,9 +68,9 @@ public class QueryMessage extends ControlMessage {
   }
 
   /**
-   * Simple Query handler, whcih examined the state of the statement and processes accordingly
-   * (if error, handle error, otherwise sends the result and if contains result set,
-   * send row description)
+   * Simple Query handler, whcih examined the state of the statement and processes accordingly (if
+   * error, handle error, otherwise sends the result and if contains result set, send row
+   * description)
    *
    * @throws Exception
    */
@@ -87,11 +79,13 @@ public class QueryMessage extends ControlMessage {
       this.handleError(this.statement.getException());
     } else {
       if (this.statement.containsResultSet()) {
-        new RowDescriptionResponse(this.outputStream,
-            this.statement,
-            this.statement.getStatementResult().getMetaData(),
-            this.connection.getServer().getOptions(),
-            QueryMode.SIMPLE).send();
+        new RowDescriptionResponse(
+                this.outputStream,
+                this.statement,
+                this.statement.getStatementResult().getMetaData(),
+                this.connection.getServer().getOptions(),
+                QueryMode.SIMPLE)
+            .send();
       }
       this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
       new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();

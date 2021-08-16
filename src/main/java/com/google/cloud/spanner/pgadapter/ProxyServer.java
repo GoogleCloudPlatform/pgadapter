@@ -26,6 +26,8 @@ import java.net.SocketException;
 import java.sql.SQLException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
@@ -38,9 +40,12 @@ public class ProxyServer extends Thread {
 
   private static final Logger logger = Logger.getLogger(ProxyServer.class.getName());
   private final OptionsMetadata options;
+  private final Properties properties;
   private final List<ConnectionHandler> handlers = new LinkedList<>();
+
   @GuardedBy("itself")
   private volatile ServerStatus status = ServerStatus.NEW;
+
   private ServerSocket serverSocket;
 
   /**
@@ -51,44 +56,66 @@ public class ProxyServer extends Thread {
   public ProxyServer(OptionsMetadata optionsMetadata) {
     super("spanner-postgres-adapter-proxy-port-" + optionsMetadata.getProxyPort());
     this.options = optionsMetadata;
+    this.properties = new Properties();
+    addConnectionProperties();
   }
 
   /**
-   * Starts the server by running the thread runnable and setting status.
+   * Instantiates the ProxyServer from metadata and properties. For use with in-process invocations.
+   *
+   * @param optionsMetadata Resulting metadata from CLI.
+   * @param properties Properties for specificying additional information to JDBC like an external
+   *     channel provider (see ConnectionOptions in Java Spanner client library for more details on
+   *     supported properties).
    */
+  public ProxyServer(OptionsMetadata optionsMetadata, Properties properties) {
+    super("spanner-postgres-adapter-proxy-port-" + optionsMetadata.getProxyPort());
+    this.options = optionsMetadata;
+    this.properties = properties;
+    addConnectionProperties();
+  }
+
+  private void addConnectionProperties() {
+    for (Map.Entry<String, String> entry : options.getPropertyMap().entrySet()) {
+      properties.setProperty(entry.getKey(), entry.getValue());
+    }
+  }
+
+  /** Starts the server by running the thread runnable and setting status. */
   public void startServer() {
     synchronized (this.status) {
       Preconditions.checkState(this.status == ServerStatus.NEW);
-      logger.log(Level.INFO,
+      logger.log(
+          Level.INFO,
           "Server is starting on port {0}",
           String.valueOf(this.options.getProxyPort()));
       this.status = ServerStatus.STARTING;
       start();
-      logger.log(Level.INFO,
-          "Server started on port {0}",
-          String.valueOf(this.options.getProxyPort()));
+      logger.log(
+          Level.INFO, "Server started on port {0}", String.valueOf(this.options.getProxyPort()));
     }
   }
 
-  /**
-   * Safely stops the server (iff started), closing specific socket and cleaning up.
-   */
+  /** Safely stops the server (iff started), closing specific socket and cleaning up. */
   public void stopServer() {
     synchronized (status) {
-      Preconditions.checkState(status == ServerStatus.STARTED,
-          "Server is not in state Started");
+      Preconditions.checkState(status == ServerStatus.STARTED, "Server is not in state Started");
       try {
-        logger.log(Level.INFO,
+        logger.log(
+            Level.INFO,
             "Server on port {0} is stopping",
             String.valueOf(this.options.getProxyPort()));
         this.status = ServerStatus.STOPPING;
         this.serverSocket.close();
-        logger.log(Level.INFO,
+        logger.log(
+            Level.INFO,
             "Server socket on port {0} closed",
             String.valueOf(this.options.getProxyPort()));
       } catch (IOException e) {
-        logger.log(Level.WARNING, "Closing server socket on port {0} failed: {1}",
-            new Object[]{String.valueOf(this.options.getProxyPort()), e});
+        logger.log(
+            Level.WARNING,
+            "Closing server socket on port {0} failed: {1}",
+            new Object[] {String.valueOf(this.options.getProxyPort()), e});
       }
     }
   }
@@ -98,8 +125,10 @@ public class ProxyServer extends Thread {
     try {
       runServer();
     } catch (IOException e) {
-      logger.log(Level.WARNING, "Server on port {0} stopped by exception: {1}",
-          new Object[]{this.options.getProxyPort(), e});
+      logger.log(
+          Level.WARNING,
+          "Server on port {0} stopped by exception: {1}",
+          new Object[] {this.options.getProxyPort(), e});
     }
   }
 
@@ -117,14 +146,15 @@ public class ProxyServer extends Thread {
       }
     } catch (SocketException e) {
       // This is a normal exception, as this will occur when Server#stopServer() is called.
-      logger.log(Level.INFO,
+      logger.log(
+          Level.INFO,
           "Socket exception on port {0}: {1}. This is normal when the server is stopped.",
-          new Object[]{this.options.getProxyPort(), e});
+          new Object[] {this.options.getProxyPort(), e});
     } catch (SQLException e) {
-      logger.log(Level.SEVERE,
+      logger.log(
+          Level.SEVERE,
           "Something went wrong in establishing a Spanner connection: {0}",
-          e.getMessage()
-      );
+          e.getMessage());
     } finally {
       this.status = ServerStatus.STOPPED;
       logger.log(Level.INFO, "Socket on port {0} stopped", this.options.getProxyPort());
@@ -139,6 +169,9 @@ public class ProxyServer extends Thread {
    */
   void createConnectionHandler(Socket socket) throws SQLException {
     ConnectionHandler handler = new ConnectionHandler(this, socket);
+    if (!handler.getJdbcConnection().isValid(0)) {
+      throw new SQLException("Invalid JDBC connection. Make sure credentials are valid.");
+    }
     register(handler);
     handler.start();
   }
@@ -165,6 +198,10 @@ public class ProxyServer extends Thread {
     return this.options;
   }
 
+  public Properties getProperties() {
+    return this.properties;
+  }
+
   public int getNumberOfConnections() {
     return this.handlers.size();
   }
@@ -188,7 +225,7 @@ public class ProxyServer extends Thread {
    * is advisable to use Cloud Spanner formatting. The server will then return all data in a format
    * understood by Cloud Spanner.
    *
-   * The default format used by the server is {@link DataFormat#POSTGRESQL_TEXT}.
+   * <p>The default format used by the server is {@link DataFormat#POSTGRESQL_TEXT}.
    */
   public enum DataFormat {
     /**
@@ -221,10 +258,8 @@ public class ProxyServer extends Thread {
       this.code = code;
     }
 
-    public static DataFormat getDataFormat(int index,
-        IntermediateStatement statement,
-        QueryMode mode,
-        OptionsMetadata options) {
+    public static DataFormat getDataFormat(
+        int index, IntermediateStatement statement, QueryMode mode, OptionsMetadata options) {
       if (options.isBinaryFormat()) {
         return DataFormat.POSTGRESQL_BINARY;
       }
@@ -256,11 +291,12 @@ public class ProxyServer extends Thread {
     }
   }
 
-  /**
-   * Possible states of a {@link Server}.
-   */
+  /** Possible states of a {@link Server}. */
   public enum ServerStatus {
-    NEW, STARTING, STARTED, STOPPING, STOPPED
+    NEW,
+    STARTING,
+    STARTED,
+    STOPPING,
+    STOPPED
   }
-
 }

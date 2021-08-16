@@ -16,12 +16,15 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
+import com.google.common.collect.SetMultimap;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * An intermediate representation of a portal statement (that is, a prepared statement which
@@ -29,12 +32,18 @@ import java.util.List;
  */
 public class IntermediatePortalStatement extends IntermediatePreparedStatement {
 
+  private static final Logger logger =
+      Logger.getLogger(IntermediatePreparedStatement.class.getName());
   protected List<Short> parameterFormatCodes;
   protected List<Short> resultFormatCodes;
 
   public IntermediatePortalStatement(
-      PreparedStatement statement, String sql, int parameterCount, Connection connection) {
-    super(statement, sql, parameterCount, connection);
+      PreparedStatement statement,
+      String sql,
+      int parameterCount,
+      SetMultimap<Integer, Integer> parameterIndexToPositions,
+      Connection connection) {
+    super(statement, sql, parameterCount, parameterIndexToPositions, connection);
     this.parameterFormatCodes = new ArrayList<>();
     this.resultFormatCodes = new ArrayList<>();
   }
@@ -75,13 +84,15 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
       return new DescribePortalMetadata(metaData);
     } catch (SQLException e) {
       /* Generally this error will occur when a non-SELECT portal statement is described in Spanner,
-         however, it could occur when a statement is incorrectly formatted. Though we could catch
-         this early if we could parse the type of statement, it is a significant burden on the
-         proxy. As such, we send the user a descriptive message to help them understand the issue
-         in case they misuse the method.
-       */
-      throw new IllegalStateException("Something went wrong in Describing this statement."
-          + "Note that non-SELECT result types in Spanner cannot be described.");
+        however, it could occur when a statement is incorrectly formatted. Though we could catch
+        this early if we could parse the type of statement, it is a significant burden on the
+        proxy. As such, we send the user a descriptive message to help them understand the issue
+        in case they misuse the method.
+      */
+      logger.log(Level.SEVERE, e.toString());
+      throw new IllegalStateException(
+          "Something went wrong in Describing this statement."
+              + "Note that non-SELECT result types in Spanner cannot be described.");
     }
   }
 }

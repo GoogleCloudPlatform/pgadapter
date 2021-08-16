@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.parsers.BinaryParser;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.parsers.DateParser;
 import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
+import com.google.cloud.spanner.pgadapter.parsers.IntegerParser;
 import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
@@ -36,7 +37,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
-import java.time.ZonedDateTime;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -47,25 +47,18 @@ import org.postgresql.util.ByteConverter;
  * Testing for data format parsing; specifically anything that inherits from the {@link Parser}
  * Class.
  */
-
 @RunWith(JUnit4.class)
 public class ParserTest {
 
   private void validate(
-      Parser parser,
-      byte[] byteResult,
-      byte[] stringResult,
-      byte[] spannerResult) {
+      Parser parser, byte[] byteResult, byte[] stringResult, byte[] spannerResult) {
 
     // 1. Parse to Binary
-    assertThat(parser.parse(DataFormat.POSTGRESQL_BINARY),
-        is(equalTo(byteResult)));
+    assertThat(parser.parse(DataFormat.POSTGRESQL_BINARY), is(equalTo(byteResult)));
     // 2. Parse to SpannerBinary
-    assertThat(parser.parse(DataFormat.POSTGRESQL_TEXT),
-        is(equalTo(stringResult)));
+    assertThat(parser.parse(DataFormat.POSTGRESQL_TEXT), is(equalTo(stringResult)));
     // 3. Parse to StringBinary
-    assertThat(parser.parse(DataFormat.SPANNER),
-        is(equalTo(spannerResult)));
+    assertThat(parser.parse(DataFormat.SPANNER), is(equalTo(spannerResult)));
   }
 
   @Test
@@ -86,6 +79,28 @@ public class ParserTest {
     byte[] stringResult = {'-', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'};
 
     Parser parsedValue = new LongParser(value);
+
+    validate(parsedValue, byteResult, stringResult, stringResult);
+  }
+
+  @Test
+  public void testPositiveIntegerParsing() {
+    int value = 1234567890;
+    byte[] byteResult = {73, -106, 2, -46};
+    byte[] stringResult = {'1', '2', '3', '4', '5', '6', '7', '8', '9', '0'};
+
+    Parser parsedValue = new IntegerParser(value);
+
+    validate(parsedValue, byteResult, stringResult, stringResult);
+  }
+
+  @Test
+  public void testNegativeIntegerParsing() {
+    int value = -1234567890;
+    byte[] byteResult = {-74, 105, -3, 46};
+    byte[] stringResult = {'-', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'};
+
+    Parser parsedValue = new IntegerParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
   }
@@ -171,8 +186,9 @@ public class ParserTest {
   public void testStringParsing() {
     String value = "This is a String.";
 
-    byte[] stringResult = {'T', 'h', 'i', 's', ' ', 'i', 's', ' ', 'a', ' ', 'S', 't', 'r', 'i',
-        'n', 'g', '.'};
+    byte[] stringResult = {
+      'T', 'h', 'i', 's', ' ', 'i', 's', ' ', 'a', ' ', 'S', 't', 'r', 'i', 'n', 'g', '.'
+    };
 
     Parser parsedValue = new StringParser(value);
 
@@ -187,8 +203,7 @@ public class ParserTest {
 
     Parser parsedValue = new TimestampParser(value);
 
-    assertThat(parsedValue.parse(DataFormat.POSTGRESQL_BINARY),
-        is(equalTo(byteResult)));
+    assertThat(parsedValue.parse(DataFormat.POSTGRESQL_BINARY), is(equalTo(byteResult)));
   }
 
   @Test
@@ -234,17 +249,15 @@ public class ParserTest {
   public void testStringArrayParsing() throws SQLException {
     String[] value = {"abc", "def", "jhi"};
     byte[] byteResult = {
-        0, 0, 0, 1, 0, 0, 0, 1,
-        -1, -1, -1, -9, 0, 0, 0,
-        3, 0, 0, 0, 0, 0, 0, 0,
-        3, 97, 98, 99, 0, 0, 0,
-        3, 100, 101, 102, 0, 0,
-        0, 3, 106, 104, 105
+      0, 0, 0, 1, 0, 0, 0, 1, -1, -1, -1, -9, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 97, 98, 99, 0, 0,
+      0, 3, 100, 101, 102, 0, 0, 0, 3, 106, 104, 105
     };
-    byte[] stringResult = {'{', '"', 'a', 'b', 'c', '"', ',', '"', 'd', 'e', 'f', '"', ',', '"',
-        'j', 'h', 'i', '"', '}'};
-    byte[] spannerResult = {'[', '"', 'a', 'b', 'c', '"', ',', '"', 'd', 'e', 'f', '"', ',', '"',
-        'j', 'h', 'i', '"', ']'};
+    byte[] stringResult = {
+      '{', '"', 'a', 'b', 'c', '"', ',', '"', 'd', 'e', 'f', '"', ',', '"', 'j', 'h', 'i', '"', '}'
+    };
+    byte[] spannerResult = {
+      '[', '"', 'a', 'b', 'c', '"', ',', '"', 'd', 'e', 'f', '"', ',', '"', 'j', 'h', 'i', '"', ']'
+    };
 
     Array sqlArray = Mockito.mock(Array.class);
     ResultSet resultSet = Mockito.mock(ResultSet.class);
@@ -262,14 +275,9 @@ public class ParserTest {
   public void testLongArrayParsing() throws SQLException {
     Long[] value = {1L, 2L, 3L};
     byte[] byteResult = {
-        0, 0, 0, 1, 0, 0, 0, 1,
-        -1, -1, -1, -5, 0, 0, 0,
-        3, 0, 0, 0, 0, 0, 0, 0,
-        8, 0, 0, 0, 0, 0, 0, 0,
-        1, 0, 0, 0, 8, 0, 0, 0,
-        0, 0, 0, 0, 2, 0, 0, 0,
-        8, 0, 0, 0, 0, 0, 0, 0,
-        3};
+      0, 0, 0, 1, 0, 0, 0, 1, -1, -1, -1, -5, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0,
+      0, 1, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 3
+    };
     byte[] stringResult = {'{', '1', ',', '2', ',', '3', '}'};
     byte[] spannerResult = {'[', '1', ',', '2', ',', '3', ']'};
 
@@ -298,5 +306,4 @@ public class ParserTest {
 
     new ArrayParser(resultSet, 0);
   }
-
 }

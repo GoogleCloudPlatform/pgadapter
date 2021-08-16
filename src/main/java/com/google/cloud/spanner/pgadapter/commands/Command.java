@@ -28,7 +28,7 @@ import org.json.simple.JSONObject;
  * and translating it to a form that Spanner understands. The user should call is() to determine
  * whether it matches before trying to translate.
  */
-abstract public class Command {
+public abstract class Command {
 
   protected Matcher matcher;
   protected String sql;
@@ -57,20 +57,17 @@ abstract public class Command {
    * @param connection The connection currently in use.
    * @return A list of all Command subclasses.
    */
-  public static List<Command> getCommands(String sql, Connection connection,
-      JSONObject commandMetadataJSON) {
+  public static List<Command> getCommands(
+      String sql, Connection connection, JSONObject commandMetadataJSON) {
     List<Command> commandList = new ArrayList<>();
 
-    for (DynamicCommandMetadata currentMetadata : DynamicCommandMetadata
-        .fromJSON(commandMetadataJSON)) {
+    for (DynamicCommandMetadata currentMetadata :
+        DynamicCommandMetadata.fromJSON(commandMetadataJSON)) {
       commandList.add(new DynamicCommand(sql, currentMetadata));
     }
 
     commandList.addAll(
-        Arrays.asList(
-            new ListCommand(sql, connection),
-            new InvalidMetaCommand(sql)
-        ));
+        Arrays.asList(new ListCommand(sql, connection), new InvalidMetaCommand(sql)));
 
     return commandList;
   }
@@ -80,18 +77,13 @@ abstract public class Command {
    *
    * @return The pattern apposite (in relation to) the command.
    */
-  abstract protected Pattern getPattern();
+  protected abstract Pattern getPattern();
 
-  /**
-   * @return True if the SQL statement matches the pattern.
-   */
+  /** @return True if the SQL statement matches the pattern. */
   public boolean is() {
     return this.matcher.find();
   }
 
-  /**
-   * @return The equivalent Spanner statement for the specified SQL statement.
-   */
-  abstract public String translate();
-
+  /** @return The equivalent Spanner statement for the specified SQL statement. */
+  public abstract String translate();
 }

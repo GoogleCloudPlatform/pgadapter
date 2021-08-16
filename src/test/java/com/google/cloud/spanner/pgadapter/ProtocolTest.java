@@ -79,32 +79,19 @@ import org.postgresql.util.ByteConverter;
 @RunWith(JUnit4.class)
 public class ProtocolTest {
 
-  @Rule
-  public MockitoRule rule = MockitoJUnit.rule();
-  @Mock
-  private ConnectionHandler connectionHandler;
-  @Mock
-  private Connection connection;
-  @Mock
-  private Statement statement;
-  @Mock
-  private ProxyServer server;
-  @Mock
-  private OptionsMetadata options;
-  @Mock
-  private IntermediateStatement intermediateStatement;
-  @Mock
-  private IntermediatePreparedStatement intermediatePreparedStatement;
-  @Mock
-  private IntermediatePortalStatement intermediatePortalStatement;
-  @Mock
-  private DescribeStatementMetadata describeStatementMetadata;
-  @Mock
-  private DescribePortalMetadata describePortalMetadata;
-  @Mock
-  private ConnectionMetadata connectionMetadata;
-  @Mock
-  private DataOutputStream outputStream;
+  @Rule public MockitoRule rule = MockitoJUnit.rule();
+  @Mock private ConnectionHandler connectionHandler;
+  @Mock private Connection connection;
+  @Mock private Statement statement;
+  @Mock private ProxyServer server;
+  @Mock private OptionsMetadata options;
+  @Mock private IntermediateStatement intermediateStatement;
+  @Mock private IntermediatePreparedStatement intermediatePreparedStatement;
+  @Mock private IntermediatePortalStatement intermediatePortalStatement;
+  @Mock private DescribeStatementMetadata describeStatementMetadata;
+  @Mock private DescribePortalMetadata describePortalMetadata;
+  @Mock private ConnectionMetadata connectionMetadata;
+  @Mock private DataOutputStream outputStream;
 
   private byte[] intToBytes(int value) {
     byte[] parameters = new byte[4];
@@ -151,8 +138,7 @@ public class ProtocolTest {
 
     messageSpy.send();
     // Execute
-    Mockito.verify(statement, Mockito.times(1))
-        .execute(expectedSQL);
+    Mockito.verify(statement, Mockito.times(1)).execute(expectedSQL);
   }
 
   @Test
@@ -209,30 +195,89 @@ public class ProtocolTest {
   }
 
   @Test
-  public void testParseMessage() throws Exception {
+  public void testParseMessageGsqlException() throws Exception {
     byte[] messageMetadata = {'P'};
     String statementName = "some statement\0";
-    String payload = "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment\0";
+    String payload = "/*GSQL*/ SELECT * FROM users WHERE name = $1\0";
 
     byte[] parameterCount = {0, 1};
     byte[] parameters = intToBytes(1002);
 
-    byte[] length = intToBytes(
-        4
-            + statementName.length()
-            + payload.length()
-            + parameterCount.length
-            + parameters.length
-    );
+    byte[] length =
+        intToBytes(
+            4
+                + statementName.length()
+                + payload.length()
+                + parameterCount.length
+                + parameters.length);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        statementName.getBytes(),
-        payload.getBytes(),
-        parameterCount,
-        parameters
-    );
+    byte[] value =
+        Bytes.concat(
+            messageMetadata,
+            length,
+            statementName.getBytes(),
+            payload.getBytes(),
+            parameterCount,
+            parameters);
+
+    List<Integer> expectedParameterDataTypes = Arrays.asList(1002);
+    String expectedSQL = "/*GSQL*/SELECT * FROM users WHERE name = ?";
+    String expectedMessageName = "some statement";
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
+    Assert.assertEquals(message.getClass(), ParseMessage.class);
+    Assert.assertEquals(((ParseMessage) message).getName(), expectedMessageName);
+    Assert.assertEquals(((ParseMessage) message).getStatement().getSql(), expectedSQL);
+    Assert.assertThat(
+        ((ParseMessage) message).getStatement().getParameterDataTypes(),
+        is(expectedParameterDataTypes));
+
+    Mockito.when(connectionHandler.hasStatement(anyString())).thenReturn(false);
+    message.send();
+    Mockito.verify(connectionHandler, Mockito.times(1))
+        .registerStatement(expectedMessageName, ((ParseMessage) message).getStatement());
+
+    // ParseCompleteResponse
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    Assert.assertEquals(outputResult.readByte(), '1');
+    Assert.assertEquals(outputResult.readInt(), 4);
+  }
+
+  @Test
+  public void testParseMessage() throws Exception {
+    byte[] messageMetadata = {'P'};
+    String statementName = "some statement\0";
+    String payload =
+        "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment\0";
+
+    byte[] parameterCount = {0, 1};
+    byte[] parameters = intToBytes(1002);
+
+    byte[] length =
+        intToBytes(
+            4
+                + statementName.length()
+                + payload.length()
+                + parameterCount.length
+                + parameters.length);
+
+    byte[] value =
+        Bytes.concat(
+            messageMetadata,
+            length,
+            statementName.getBytes(),
+            payload.getBytes(),
+            parameterCount,
+            parameters);
 
     List<Integer> expectedParameterDataTypes = Arrays.asList(1002);
     String expectedSQL = "SELECT * FROM users WHERE name = ?";
@@ -250,9 +295,7 @@ public class ProtocolTest {
     WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), ParseMessage.class);
     Assert.assertEquals(((ParseMessage) message).getName(), expectedMessageName);
-    Assert.assertEquals(
-        ((ParseMessage) message).getStatement().getSql(),
-        expectedSQL);
+    Assert.assertEquals(((ParseMessage) message).getStatement().getSql(), expectedSQL);
     Assert.assertThat(
         ((ParseMessage) message).getStatement().getParameterDataTypes(),
         is(expectedParameterDataTypes));
@@ -268,31 +311,119 @@ public class ProtocolTest {
     Assert.assertEquals(outputResult.readInt(), 4);
   }
 
+  @Test(expected = IllegalArgumentException.class)
+  public void testParseMessageExceptsWithUntypedParameter() throws Exception {
+    byte[] messageMetadata = {'P'};
+    String statementName = "some statement\0";
+    String payload =
+        "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment\0";
+
+    byte[] parameterCount = {0, 1};
+    // Unspecifed parameter type.
+    byte[] parameters = intToBytes(0);
+
+    byte[] length =
+        intToBytes(
+            4
+                + statementName.length()
+                + payload.length()
+                + parameterCount.length
+                + parameters.length);
+
+    byte[] value =
+        Bytes.concat(
+            messageMetadata,
+            length,
+            statementName.getBytes(),
+            payload.getBytes(),
+            parameterCount,
+            parameters);
+
+    List<Integer> expectedParameterDataTypes = Arrays.asList(0);
+    String expectedSQL = "SELECT * FROM users WHERE name = ?";
+    String expectedMessageName = "some statement";
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
+    Assert.assertEquals(message.getClass(), ParseMessage.class);
+    Assert.assertEquals(((ParseMessage) message).getName(), expectedMessageName);
+    Assert.assertEquals(((ParseMessage) message).getStatement().getSql(), expectedSQL);
+    Assert.assertThat(
+        ((ParseMessage) message).getStatement().getParameterDataTypes(),
+        is(expectedParameterDataTypes));
+
+    Mockito.when(connectionHandler.hasStatement(anyString())).thenReturn(false);
+    message.send();
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testParseMessageExceptsWithNonMatchingParameterTypeCount() throws Exception {
+    byte[] messageMetadata = {'P'};
+    String statementName = "some statement\0";
+    String payload =
+        "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment\0";
+
+    byte[] length = intToBytes(4 + statementName.length() + payload.length() + 1);
+
+    byte[] value =
+        Bytes.concat(
+            messageMetadata, length, statementName.getBytes(), payload.getBytes(), intToBytes(0));
+
+    List<Integer> expectedParameterDataTypes = Arrays.asList(0);
+    String expectedSQL = "SELECT * FROM users WHERE name = ?";
+    String expectedMessageName = "some statement";
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
+    Assert.assertEquals(message.getClass(), ParseMessage.class);
+    Assert.assertEquals(((ParseMessage) message).getName(), expectedMessageName);
+    Assert.assertEquals(((ParseMessage) message).getStatement().getSql(), expectedSQL);
+    Assert.assertThat(
+        ((ParseMessage) message).getStatement().getParameterDataTypes(),
+        is(expectedParameterDataTypes));
+
+    Mockito.when(connectionHandler.hasStatement(anyString())).thenReturn(false);
+    message.send();
+  }
+
   @Test(expected = IllegalStateException.class)
   public void testParseMessageExceptsIfNameIsInUse() throws Exception {
     byte[] messageMetadata = {'P'};
     String statementName = "some statement\0";
-    String payload = "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment\0";
+    String payload =
+        "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment\0";
 
     byte[] parameterCount = {0, 1};
     byte[] parameters = intToBytes(1002);
 
-    byte[] length = intToBytes(
-        4
-            + statementName.length()
-            + payload.length()
-            + parameterCount.length
-            + parameters.length
-    );
+    byte[] length =
+        intToBytes(
+            4
+                + statementName.length()
+                + payload.length()
+                + parameterCount.length
+                + parameters.length);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        statementName.getBytes(),
-        payload.getBytes(),
-        parameterCount,
-        parameters
-    );
+    byte[] value =
+        Bytes.concat(
+            messageMetadata,
+            length,
+            statementName.getBytes(),
+            payload.getBytes(),
+            parameterCount,
+            parameters);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
@@ -311,27 +442,28 @@ public class ProtocolTest {
   public void testParseMessageExceptsIfNameIsNull() throws Exception {
     byte[] messageMetadata = {'P'};
     String statementName = "some statement\0";
-    String payload = "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment\0";
+    String payload =
+        "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment\0";
 
     byte[] parameterCount = {0, 1};
     byte[] parameters = intToBytes(1002);
 
-    byte[] length = intToBytes(
-        4
-            + statementName.length()
-            + payload.length()
-            + parameterCount.length
-            + parameters.length
-    );
+    byte[] length =
+        intToBytes(
+            4
+                + statementName.length()
+                + payload.length()
+                + parameterCount.length
+                + parameters.length);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        statementName.getBytes(),
-        payload.getBytes(),
-        parameterCount,
-        parameters
-    );
+    byte[] value =
+        Bytes.concat(
+            messageMetadata,
+            length,
+            statementName.getBytes(),
+            payload.getBytes(),
+            parameterCount,
+            parameters);
 
     Mockito.when(connectionHandler.hasStatement(anyString())).thenReturn(true);
 
@@ -352,27 +484,28 @@ public class ProtocolTest {
   public void testParseMessageWorksIfNameIsEmpty() throws Exception {
     byte[] messageMetadata = {'P'};
     String statementName = "\0";
-    String payload = "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment\0";
+    String payload =
+        "SELECT * FROM users WHERE name = $1 /*This is a comment*/ --this is another comment\0";
 
     byte[] parameterCount = {0, 1};
     byte[] parameters = intToBytes(1002);
 
-    byte[] length = intToBytes(
-        4
-            + statementName.length()
-            + payload.length()
-            + parameterCount.length
-            + parameters.length
-    );
+    byte[] length =
+        intToBytes(
+            4
+                + statementName.length()
+                + payload.length()
+                + parameterCount.length
+                + parameters.length);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        statementName.getBytes(),
-        payload.getBytes(),
-        parameterCount,
-        parameters
-    );
+    byte[] value =
+        Bytes.concat(
+            messageMetadata,
+            length,
+            statementName.getBytes(),
+            payload.getBytes(),
+            parameterCount,
+            parameters);
 
     Mockito.when(connectionHandler.hasStatement(anyString())).thenReturn(true);
 
@@ -406,28 +539,28 @@ public class ProtocolTest {
 
     byte[] resultCodesCount = {0, 0};
 
-    byte[] length = intToBytes(
-        4
-            + portalName.length()
-            + statementName.length()
-            + parameterCodesCount.length
-            + parameterCount.length
-            + parameterLength.length
-            + parameter.length
-            + resultCodesCount.length
-    );
+    byte[] length =
+        intToBytes(
+            4
+                + portalName.length()
+                + statementName.length()
+                + parameterCodesCount.length
+                + parameterCount.length
+                + parameterLength.length
+                + parameter.length
+                + resultCodesCount.length);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        portalName.getBytes(),
-        statementName.getBytes(),
-        parameterCodesCount,
-        parameterCount,
-        parameterLength,
-        parameter,
-        resultCodesCount
-    );
+    byte[] value =
+        Bytes.concat(
+            messageMetadata,
+            length,
+            portalName.getBytes(),
+            statementName.getBytes(),
+            parameterCodesCount,
+            parameterCount,
+            parameterLength,
+            parameter,
+            resultCodesCount);
 
     Mockito.when(connectionHandler.getStatement(anyString()))
         .thenReturn(intermediatePreparedStatement);
@@ -453,10 +586,9 @@ public class ProtocolTest {
     Assert.assertThat(((BindMessage) message).getFormatCodes(), is(expectedFormatCodes));
     Assert.assertThat(((BindMessage) message).getResultFormatCodes(), is(expectedFormatCodes));
 
-    Mockito.when(intermediatePreparedStatement.bind(
-        ArgumentMatchers.any(),
-        ArgumentMatchers.any(),
-        ArgumentMatchers.any()))
+    Mockito.when(
+            intermediatePreparedStatement.bind(
+                ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
         .thenReturn(intermediatePortalStatement);
 
     message.send();
@@ -487,36 +619,36 @@ public class ProtocolTest {
     byte[] resultCodesCount = {0, 1};
     byte[] resultCodes = {0, 1}; // binary
 
-    byte[] length = intToBytes(
-        4
-            + portalName.length()
-            + statementName.length()
-            + parameterCodesCount.length
-            + parameterCodes.length
-            + parameterCount.length
-            + firstParameterLength.length
-            + firstParameter.length
-            + secondParameterLength.length
-            + secondParameter.length
-            + resultCodesCount.length
-            + resultCodes.length
-    );
+    byte[] length =
+        intToBytes(
+            4
+                + portalName.length()
+                + statementName.length()
+                + parameterCodesCount.length
+                + parameterCodes.length
+                + parameterCount.length
+                + firstParameterLength.length
+                + firstParameter.length
+                + secondParameterLength.length
+                + secondParameter.length
+                + resultCodesCount.length
+                + resultCodes.length);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        portalName.getBytes(),
-        statementName.getBytes(),
-        parameterCodesCount,
-        parameterCodes,
-        parameterCount,
-        firstParameterLength,
-        firstParameter,
-        secondParameterLength,
-        secondParameter,
-        resultCodesCount,
-        resultCodes
-    );
+    byte[] value =
+        Bytes.concat(
+            messageMetadata,
+            length,
+            portalName.getBytes(),
+            statementName.getBytes(),
+            parameterCodesCount,
+            parameterCodes,
+            parameterCount,
+            firstParameterLength,
+            firstParameter,
+            secondParameterLength,
+            secondParameter,
+            resultCodesCount,
+            resultCodes);
 
     byte[][] expectedParameters = {firstParameter, secondParameter};
     List<Short> expectedFormatCodes = Arrays.asList((short) 0, (short) 1);
@@ -536,8 +668,8 @@ public class ProtocolTest {
     Assert.assertEquals(((BindMessage) message).getStatementName(), expectedStatementName);
     Assert.assertThat(((BindMessage) message).getParameters(), is(expectedParameters));
     Assert.assertThat(((BindMessage) message).getFormatCodes(), is(expectedFormatCodes));
-    Assert
-        .assertThat(((BindMessage) message).getResultFormatCodes(), is(expectedResultFormatCodes));
+    Assert.assertThat(
+        ((BindMessage) message).getResultFormatCodes(), is(expectedResultFormatCodes));
   }
 
   @Test
@@ -558,36 +690,36 @@ public class ProtocolTest {
     byte[] resultCodesCount = {0, 1};
     byte[] resultCodes = {0, 1}; // binary
 
-    byte[] length = intToBytes(
-        4
-            + portalName.length()
-            + statementName.length()
-            + parameterCodesCount.length
-            + parameterCodes.length
-            + parameterCount.length
-            + firstParameterLength.length
-            + firstParameter.length
-            + secondParameterLength.length
-            + secondParameter.length
-            + resultCodesCount.length
-            + resultCodes.length
-    );
+    byte[] length =
+        intToBytes(
+            4
+                + portalName.length()
+                + statementName.length()
+                + parameterCodesCount.length
+                + parameterCodes.length
+                + parameterCount.length
+                + firstParameterLength.length
+                + firstParameter.length
+                + secondParameterLength.length
+                + secondParameter.length
+                + resultCodesCount.length
+                + resultCodes.length);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        portalName.getBytes(),
-        statementName.getBytes(),
-        parameterCodesCount,
-        parameterCodes,
-        parameterCount,
-        firstParameterLength,
-        firstParameter,
-        secondParameterLength,
-        secondParameter,
-        resultCodesCount,
-        resultCodes
-    );
+    byte[] value =
+        Bytes.concat(
+            messageMetadata,
+            length,
+            portalName.getBytes(),
+            statementName.getBytes(),
+            parameterCodesCount,
+            parameterCodes,
+            parameterCount,
+            firstParameterLength,
+            firstParameter,
+            secondParameterLength,
+            secondParameter,
+            resultCodesCount,
+            resultCodes);
 
     byte[][] expectedParameters = {firstParameter, secondParameter};
     List<Short> expectedFormatCodes = Arrays.asList((short) 1);
@@ -607,8 +739,8 @@ public class ProtocolTest {
     Assert.assertEquals(((BindMessage) message).getStatementName(), expectedStatementName);
     Assert.assertThat(((BindMessage) message).getParameters(), is(expectedParameters));
     Assert.assertThat(((BindMessage) message).getFormatCodes(), is(expectedFormatCodes));
-    Assert
-        .assertThat(((BindMessage) message).getResultFormatCodes(), is(expectedResultFormatCodes));
+    Assert.assertThat(
+        ((BindMessage) message).getResultFormatCodes(), is(expectedResultFormatCodes));
   }
 
   @Test
@@ -617,16 +749,9 @@ public class ProtocolTest {
     byte[] statementType = {'P'};
     String statementName = "some statement\0";
 
-    byte[] length = intToBytes(
-        4
-            + 1
-            + statementName.length());
+    byte[] length = intToBytes(4 + 1 + statementName.length());
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        statementType,
-        statementName.getBytes());
+    byte[] value = Bytes.concat(messageMetadata, length, statementType, statementName.getBytes());
 
     String expectedStatementName = "some statement";
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
@@ -651,8 +776,7 @@ public class ProtocolTest {
 
     messageSpy.send();
 
-    Mockito.verify(messageSpy, Mockito.times(1))
-        .handleDescribePortal();
+    Mockito.verify(messageSpy, Mockito.times(1)).handleDescribePortal();
   }
 
   @Test
@@ -661,18 +785,9 @@ public class ProtocolTest {
     byte[] statementType = {'S'};
     String statementName = "some statement\0";
 
-    byte[] length = intToBytes(
-        4
-            + 1
-            + statementName.length()
-    );
+    byte[] length = intToBytes(4 + 1 + statementName.length());
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        statementType,
-        statementName.getBytes()
-    );
+    byte[] value = Bytes.concat(messageMetadata, length, statementType, statementName.getBytes());
 
     String expectedStatementName = "some statement";
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
@@ -698,8 +813,7 @@ public class ProtocolTest {
 
     messageSpy.send();
 
-    Mockito.verify(messageSpy, Mockito.times(1))
-        .handleDescribeStatement();
+    Mockito.verify(messageSpy, Mockito.times(1)).handleDescribeStatement();
   }
 
   @Test
@@ -708,18 +822,10 @@ public class ProtocolTest {
     String statementName = "some portal\0";
     int totalRows = 99999;
 
-    byte[] length = intToBytes(
-        4
-            + statementName.length()
-            + 4
-    );
+    byte[] length = intToBytes(4 + statementName.length() + 4);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        statementName.getBytes(),
-        intToBytes(totalRows)
-    );
+    byte[] value =
+        Bytes.concat(messageMetadata, length, statementName.getBytes(), intToBytes(totalRows));
 
     String expectedStatementName = "some portal";
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
@@ -739,16 +845,16 @@ public class ProtocolTest {
     Mockito.verify(connectionHandler, Mockito.times(1)).getPortal("some portal");
     ExecuteMessage messageSpy = (ExecuteMessage) Mockito.spy(message);
 
-    Mockito.doReturn(false).when(messageSpy).sendSpannerResult(any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
+    Mockito.doReturn(false)
+        .when(messageSpy)
+        .sendSpannerResult(any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
 
     messageSpy.send();
 
-    Mockito.verify(intermediatePortalStatement, Mockito.times(1))
-        .execute();
+    Mockito.verify(intermediatePortalStatement, Mockito.times(1)).execute();
     Mockito.verify(messageSpy, Mockito.times(1))
         .sendSpannerResult(intermediatePortalStatement, QueryMode.EXTENDED, totalRows);
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .cleanUp(intermediatePortalStatement);
+    Mockito.verify(connectionHandler, Mockito.times(1)).cleanUp(intermediatePortalStatement);
   }
 
   @Test
@@ -757,18 +863,9 @@ public class ProtocolTest {
     byte[] statementType = {'P'};
     String statementName = "some portal\0";
 
-    byte[] length = intToBytes(
-        4
-            + statementType.length
-            + statementName.length()
-    );
+    byte[] length = intToBytes(4 + statementType.length + statementName.length());
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        statementType,
-        statementName.getBytes()
-    );
+    byte[] value = Bytes.concat(messageMetadata, length, statementType, statementName.getBytes());
 
     String expectedStatementName = "some portal";
     PreparedType expectedType = PreparedType.Portal;
@@ -789,10 +886,8 @@ public class ProtocolTest {
     Mockito.verify(connectionHandler, Mockito.times(1)).getPortal("some portal");
 
     message.send();
-    Mockito.verify(intermediatePortalStatement, Mockito.times(1))
-        .close();
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .closePortal(expectedStatementName);
+    Mockito.verify(intermediatePortalStatement, Mockito.times(1)).close();
+    Mockito.verify(connectionHandler, Mockito.times(1)).closePortal(expectedStatementName);
 
     // CloseResponse
     DataInputStream outputResult = inputStreamFromOutputStream(result);
@@ -806,18 +901,9 @@ public class ProtocolTest {
     byte[] statementType = {'S'};
     String statementName = "some statement\0";
 
-    byte[] length = intToBytes(
-        4
-            + statementType.length
-            + statementName.length()
-    );
+    byte[] length = intToBytes(4 + statementType.length + statementName.length());
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        statementType,
-        statementName.getBytes()
-    );
+    byte[] value = Bytes.concat(messageMetadata, length, statementType, statementName.getBytes());
 
     String expectedStatementName = "some statement";
     PreparedType expectedType = PreparedType.Statement;
@@ -839,8 +925,7 @@ public class ProtocolTest {
     Mockito.verify(connectionHandler, Mockito.times(1)).getStatement("some statement");
 
     message.send();
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .closeStatement(expectedStatementName);
+    Mockito.verify(connectionHandler, Mockito.times(1)).closeStatement(expectedStatementName);
 
     // CloseResponse
     DataInputStream outputResult = inputStreamFromOutputStream(result);
@@ -854,10 +939,7 @@ public class ProtocolTest {
 
     byte[] length = intToBytes(4);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length
-    );
+    byte[] value = Bytes.concat(messageMetadata, length);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
     ByteArrayOutputStream result = new ByteArrayOutputStream();
@@ -885,10 +967,7 @@ public class ProtocolTest {
 
     byte[] length = intToBytes(4);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length
-    );
+    byte[] value = Bytes.concat(messageMetadata, length);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
     ByteArrayOutputStream result = new ByteArrayOutputStream();
@@ -916,10 +995,7 @@ public class ProtocolTest {
 
     byte[] length = intToBytes(4);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length
-    );
+    byte[] value = Bytes.concat(messageMetadata, length);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
     ByteArrayOutputStream result = new ByteArrayOutputStream();
@@ -946,8 +1022,7 @@ public class ProtocolTest {
     WireMessage message = ControlMessage.create(connectionHandler);
 
     message.send();
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleTerminate();
+    Mockito.verify(connectionHandler, Mockito.times(1)).handleTerminate();
   }
 
   @Test(expected = IllegalStateException.class)
@@ -955,16 +1030,9 @@ public class ProtocolTest {
     byte[] messageMetadata = {'d'};
     byte[] payload = "This is the payload".getBytes();
 
-    byte[] length = intToBytes(
-        4
-            + payload.length
-    );
+    byte[] length = intToBytes(4 + payload.length);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        payload
-    );
+    byte[] value = Bytes.concat(messageMetadata, length, payload);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
@@ -985,10 +1053,7 @@ public class ProtocolTest {
 
     byte[] length = intToBytes(4);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length
-    );
+    byte[] value = Bytes.concat(messageMetadata, length);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
@@ -1007,16 +1072,9 @@ public class ProtocolTest {
     byte[] messageMetadata = {'f'};
     byte[] errorMessage = "Error Message\0".getBytes();
 
-    byte[] length = intToBytes(
-        4
-            + errorMessage.length
-    );
+    byte[] length = intToBytes(4 + errorMessage.length);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        errorMessage
-    );
+    byte[] value = Bytes.concat(messageMetadata, length, errorMessage);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
@@ -1046,32 +1104,32 @@ public class ProtocolTest {
     byte[] secondParameterLength = intToBytes(secondParameter.length);
     byte[] resultCode = {0, 0};
 
-    byte[] length = intToBytes(
-        4
-            + functionId.length
-            + argumentCodesCount.length
-            + argumentCodes.length
-            + parameterCount.length
-            + firstParameterLength.length
-            + firstParameter.length
-            + secondParameterLength.length
-            + secondParameter.length
-            + resultCode.length
-    );
+    byte[] length =
+        intToBytes(
+            4
+                + functionId.length
+                + argumentCodesCount.length
+                + argumentCodes.length
+                + parameterCount.length
+                + firstParameterLength.length
+                + firstParameter.length
+                + secondParameterLength.length
+                + secondParameter.length
+                + resultCode.length);
 
-    byte[] value = Bytes.concat(
-        messageMetadata,
-        length,
-        functionId,
-        argumentCodesCount,
-        argumentCodes,
-        parameterCount,
-        firstParameterLength,
-        firstParameter,
-        secondParameterLength,
-        secondParameter,
-        resultCode
-    );
+    byte[] value =
+        Bytes.concat(
+            messageMetadata,
+            length,
+            functionId,
+            argumentCodesCount,
+            argumentCodes,
+            parameterCount,
+            firstParameterLength,
+            firstParameter,
+            secondParameterLength,
+            secondParameter,
+            resultCode);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
@@ -1087,24 +1145,20 @@ public class ProtocolTest {
 
   @Test
   public void testStartUpMessage() throws Exception {
-    byte[] protocol = intToBytes( 196608);
-    byte[] payload = (
-        "database\0"
-            + "databasename\0"
-            + "application_name\0"
-            + "psql\0"
-            + "client_encoding\0"
-            + "UTF8\0"
-            + "user\0"
-            + "me\0"
-    ).getBytes();
+    byte[] protocol = intToBytes(196608);
+    byte[] payload =
+        ("database\0"
+                + "databasename\0"
+                + "application_name\0"
+                + "psql\0"
+                + "client_encoding\0"
+                + "UTF8\0"
+                + "user\0"
+                + "me\0")
+            .getBytes();
     byte[] length = intToBytes(8 + payload.length);
 
-    byte[] value = Bytes.concat(
-        length,
-        protocol,
-        payload
-    );
+    byte[] value = Bytes.concat(length, protocol, payload);
 
     Map<String, String> expectedParameters = new HashMap<>();
     expectedParameters.put("database", "databasename");
@@ -1147,7 +1201,8 @@ public class ProtocolTest {
     // StartupMessageResponse (x3)
     Assert.assertEquals(outputResult.readByte(), 'S');
     Assert.assertEquals(outputResult.readInt(), 25);
-    Assert.assertEquals(readUntil(outputResult, "integer_datetimes\0".length()), "integer_datetimes\0");
+    Assert.assertEquals(
+        readUntil(outputResult, "integer_datetimes\0".length()), "integer_datetimes\0");
     Assert.assertEquals(readUntil(outputResult, "on\0".length()), "on\0");
     Assert.assertEquals(outputResult.readByte(), 'S');
     Assert.assertEquals(outputResult.readInt(), 25);
@@ -1167,16 +1222,11 @@ public class ProtocolTest {
   @Test
   public void testCancelMessage() throws Exception {
     byte[] length = intToBytes(16);
-    byte[] protocol = intToBytes( 80877102);
+    byte[] protocol = intToBytes(80877102);
     byte[] connectionId = intToBytes(1);
     byte[] secret = intToBytes(1);
 
-    byte[] value = Bytes.concat(
-        length,
-        protocol,
-        connectionId,
-        secret
-    );
+    byte[] value = Bytes.concat(length, protocol, connectionId, secret);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
     ByteArrayOutputStream result = new ByteArrayOutputStream();
@@ -1195,22 +1245,16 @@ public class ProtocolTest {
 
     message.send();
 
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .cancelActiveStatement(1, 1);
-    Mockito.verify(connectionHandler, Mockito.times(1))
-        .handleTerminate();
+    Mockito.verify(connectionHandler, Mockito.times(1)).cancelActiveStatement(1, 1);
+    Mockito.verify(connectionHandler, Mockito.times(1)).handleTerminate();
   }
-
 
   @Test
   public void testSSLMessage() throws Exception {
     byte[] length = intToBytes(8);
-    byte[] protocol = intToBytes( 80877103);
+    byte[] protocol = intToBytes(80877103);
 
-    byte[] value = Bytes.concat(
-        length,
-        protocol
-    );
+    byte[] value = Bytes.concat(length, protocol);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
     ByteArrayOutputStream result = new ByteArrayOutputStream();
@@ -1234,12 +1278,9 @@ public class ProtocolTest {
   @Test(expected = IOException.class)
   public void testSSLMessageFailsWhenCalledTwice() throws Exception {
     byte[] length = intToBytes(8);
-    byte[] protocol = intToBytes( 80877103);
+    byte[] protocol = intToBytes(80877103);
 
-    byte[] value = Bytes.concat(
-        length,
-        protocol
-    );
+    byte[] value = Bytes.concat(length, protocol);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
     ByteArrayOutputStream result = new ByteArrayOutputStream();

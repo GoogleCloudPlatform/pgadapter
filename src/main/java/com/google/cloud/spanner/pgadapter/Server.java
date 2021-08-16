@@ -16,9 +16,7 @@ package com.google.cloud.spanner.pgadapter;
 
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 
-/**
- * Effectively this is the main class
- **/
+/** Effectively this is the main class */
 public class Server {
 
   /**
@@ -32,12 +30,9 @@ public class Server {
       server.startServer();
     } catch (Exception e) {
       System.err.println(
-          "The server could not be started because an error occurred: " +
-              (e.getMessage() == null
-                  ? e.toString()
-                  : e.getMessage()));
+          "The server could not be started because an error occurred: "
+              + (e.getMessage() == null ? e.toString() : e.getMessage()));
       System.out.println("Run with option -h or --help to get help");
     }
   }
-
 }

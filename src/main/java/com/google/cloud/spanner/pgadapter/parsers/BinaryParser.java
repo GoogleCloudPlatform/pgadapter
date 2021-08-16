@@ -47,4 +47,3 @@ public class BinaryParser extends Parser<byte[]> {
     return this.item;
   }
 }
-

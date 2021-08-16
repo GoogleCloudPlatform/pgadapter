@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,33 +18,33 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 
-/** Translate from wire protocol to double. */
-public class DoubleParser extends Parser<Double> {
+/** Translate from wire protocol to int. */
+public class IntegerParser extends Parser<Integer> {
 
-  public DoubleParser(ResultSet item, int position) throws SQLException {
-    this.item = item.getDouble(position);
+  public IntegerParser(ResultSet item, int position) throws SQLException {
+    this.item = item.getInt(position);
   }
 
-  public DoubleParser(Object item) {
-    this.item = (Double) item;
+  public IntegerParser(Object item) {
+    this.item = (Integer) item;
   }
 
-  public DoubleParser(byte[] item) {
-    this.item = Double.valueOf(new String(item));
+  public IntegerParser(byte[] item) {
+    this.item = Integer.valueOf(new String(item));
   }
 
   @Override
-  public Double getItem() {
+  public Integer getItem() {
     return this.item;
   }
 
   @Override
   protected String stringParse() {
-    return Double.toString(this.item);
+    return Integer.toString(this.item);
   }
 
   @Override
   protected byte[] binaryParse() {
-    return toBinary(this.item, Types.DOUBLE);
+    return toBinary(this.item, Types.INTEGER);
   }
 }

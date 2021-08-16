@@ -43,7 +43,7 @@ public class SyncMessage extends ControlMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+    return new MessageFormat("Length: {0}").format(new Object[] {this.length});
   }
 
   @Override

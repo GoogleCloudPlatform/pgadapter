@@ -17,9 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 import java.io.DataOutputStream;
 import java.text.MessageFormat;
 
-/**
- * Signals that there are more rows available.
- */
+/** Signals that there are more rows available. */
 public class PortalSuspendedResponse extends WireOutput {
 
   public PortalSuspendedResponse(DataOutputStream output) {
@@ -43,6 +41,6 @@ public class PortalSuspendedResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+    return new MessageFormat("Length: {0}").format(new Object[] {this.length});
   }
 }

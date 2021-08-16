@@ -18,9 +18,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-/**
- * Assures the client that the authentication process (if any) was successful.
- */
+/** Assures the client that the authentication process (if any) was successful. */
 public class AuthenticationOkResponse extends WireOutput {
 
   private static final int SUCCESS_FLAG = 0;
@@ -47,6 +45,6 @@ public class AuthenticationOkResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+    return new MessageFormat("Length: {0}").format(new Object[] {this.length});
   }
 }

@@ -17,9 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import java.text.MessageFormat;
 
-/**
- * Closes a connection.
- */
+/** Closes a connection. */
 public class TerminateMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'X';
@@ -40,7 +38,7 @@ public class TerminateMessage extends ControlMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+    return new MessageFormat("Length: {0}").format(new Object[] {this.length});
   }
 
   @Override

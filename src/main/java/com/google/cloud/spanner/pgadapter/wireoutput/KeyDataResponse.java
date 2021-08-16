@@ -51,14 +51,7 @@ public class KeyDataResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Process ID: {1}, "
-            + "Secret Key: {2}")
-        .format(new Object[]{
-            this.length,
-            this.processId,
-            this.secretKey
-        });
+    return new MessageFormat("Length: {0}, " + "Process ID: {1}, " + "Secret Key: {2}")
+        .format(new Object[] {this.length, this.processId, this.secretKey});
   }
 }

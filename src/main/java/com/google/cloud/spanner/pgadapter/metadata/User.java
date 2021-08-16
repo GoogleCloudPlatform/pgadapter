@@ -20,9 +20,7 @@ import java.util.Random;
 import org.postgresql.util.ByteConverter;
 import org.postgresql.util.MD5Digest;
 
-/**
- * User class for when proper auth gets added.
- */
+/** User class for when proper auth gets added. */
 public class User {
 
   private static final Charset UTF8 = StandardCharsets.UTF_8;
@@ -37,8 +35,9 @@ public class User {
     byte[] saltBytes = new byte[4];
     ByteConverter.int4(saltBytes, 0, salt);
     this.username = username;
-    this.md5Password = new String(
-        MD5Digest.encode(username.getBytes(UTF8), password.getBytes(UTF8), saltBytes), UTF8);
+    this.md5Password =
+        new String(
+            MD5Digest.encode(username.getBytes(UTF8), password.getBytes(UTF8), saltBytes), UTF8);
   }
 
   public String getUsername() {
@@ -53,4 +52,3 @@ public class User {
     return this.md5Password.equals(md5Password);
   }
 }
-

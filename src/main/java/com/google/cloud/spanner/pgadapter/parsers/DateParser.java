@@ -23,9 +23,7 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import org.postgresql.util.ByteConverter;
 
-/**
- * Translate wire protocol dates to desired formats.
- */
+/** Translate wire protocol dates to desired formats. */
 public class DateParser extends Parser<java.sql.Date> {
 
   public DateParser(ResultSet item, int position) throws SQLException {
@@ -55,9 +53,9 @@ public class DateParser extends Parser<java.sql.Date> {
     // NOTE: Following algorithm might perform slowly due to exception handling; sadly, this seems
     //       to be the accepted default method for date validation.
     SimpleDateFormat[] dateFormats = {
-        new SimpleDateFormat("yyyy-mm-dd HH:mm"),
-        new SimpleDateFormat("yyyy-mm-dd +HH:mm"),
-        new SimpleDateFormat("yyyy-mm-dd -HH:mm")
+      new SimpleDateFormat("yyyy-mm-dd HH:mm"),
+      new SimpleDateFormat("yyyy-mm-dd +HH:mm"),
+      new SimpleDateFormat("yyyy-mm-dd -HH:mm")
     };
     for (SimpleDateFormat dateFormat : dateFormats) {
       try {

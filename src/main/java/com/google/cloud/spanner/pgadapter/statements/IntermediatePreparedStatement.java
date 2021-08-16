@@ -18,6 +18,7 @@ import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.SQLMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
+import com.google.common.collect.SetMultimap;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -26,33 +27,38 @@ import java.sql.SQLException;
 import java.util.List;
 
 /**
- * Intermediate representation for prepared statements (i.e.: statements before they become
- * portals)
+ * Intermediate representation for prepared statements (i.e.: statements before they become portals)
  */
 public class IntermediatePreparedStatement extends IntermediateStatement {
 
   private static final Charset UTF8 = StandardCharsets.UTF_8;
   protected final int parameterCount;
+  protected final SetMultimap<Integer, Integer> parameterIndexToPositions;
   protected List<Integer> parameterDataTypes;
-
 
   public IntermediatePreparedStatement(String sql, Connection connection) throws SQLException {
     super();
     SQLMetadata parsedSQL = Converter.toJDBCParams(sql);
     this.parameterCount = parsedSQL.getParameterCount();
     this.sql = parsedSQL.getSqlString();
+    this.parameterIndexToPositions = parsedSQL.getParameterIndexToPositions();
     this.command = parseCommand(sql);
     this.connection = connection;
     this.statement = this.connection.prepareStatement(this.sql);
     this.parameterDataTypes = null;
   }
 
-  IntermediatePreparedStatement(
-      PreparedStatement statement, String sql, int totalParameters, Connection connection) {
+  protected IntermediatePreparedStatement(
+      PreparedStatement statement,
+      String sql,
+      int totalParameters,
+      SetMultimap<Integer, Integer> parameterIndexToPositions,
+      Connection connection) {
     super();
     this.sql = sql;
     this.command = parseCommand(sql);
     this.parameterCount = totalParameters;
+    this.parameterIndexToPositions = parameterIndexToPositions;
     this.statement = statement;
     this.connection = connection;
     this.parameterDataTypes = null;
@@ -66,11 +72,11 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * @param index Index of the desired item.
    * @return The type of the item specified.
    */
-  private int parseType(byte[][] parameters, int index) {
+  private int parseType(byte[][] parameters, int index) throws IllegalArgumentException {
     if (this.parameterDataTypes.size() > index) {
       return this.parameterDataTypes.get(index);
     } else {
-      return Converter.guessPGDataType(new String(parameters[index], UTF8));
+      throw new IllegalArgumentException("PgAdapter does not support untyped parameters.");
     }
   }
 
@@ -78,8 +84,13 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     return this.parameterDataTypes;
   }
 
-  public void setParameterDataTypes(List<Integer> parameterDataTypes) {
+  public void setParameterDataTypes(List<Integer> parameterDataTypes)
+      throws IllegalArgumentException {
     this.parameterDataTypes = parameterDataTypes;
+    if (this.parameterDataTypes.size() != this.parameterCount) {
+      throw new IllegalArgumentException(
+          "Number of supplied parameter data types must match number of parameters. PgAdapter does not support untyped parameters.");
+    }
   }
 
   public int getParameterCount() {
@@ -108,25 +119,32 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * @throws SQLException If the binding fails.
    */
   public IntermediatePortalStatement bind(
-      byte[][] parameters,
-      List<Short> parameterFormatCodes,
-      List<Short> resultFormatCodes) throws SQLException {
-    IntermediatePortalStatement portal = new IntermediatePortalStatement(
-        this.connection.prepareStatement(this.sql),
-        this.sql,
-        this.parameterCount,
-        this.connection
-    );
+      byte[][] parameters, List<Short> parameterFormatCodes, List<Short> resultFormatCodes)
+      throws SQLException {
+    IntermediatePortalStatement portal =
+        new IntermediatePortalStatement(
+            this.connection.prepareStatement(this.sql),
+            this.sql,
+            this.parameterCount,
+            this.parameterIndexToPositions,
+            this.connection);
     portal.setParameterFormatCodes(parameterFormatCodes);
     portal.setResultFormatCodes(resultFormatCodes);
+    if (parameters.length != parameterCount) {
+      throw new IllegalArgumentException(
+          "Wrong number of parameters for prepared statement, expected: "
+              + parameterCount
+              + " but got: "
+              + parameters.length);
+    }
     for (int index = 0; index < parameters.length; index++) {
       short formatCode = portal.getParameterFormatCode(index);
       int type = this.parseType(parameters, index);
       if (formatCode == 0) {
-        ((PreparedStatement) portal.statement).setObject(
-            index + 1,
-            Parser.create(
-                parameters[index], type).getItem());
+        for (Integer position : parameterIndexToPositions.get(index)) {
+          ((PreparedStatement) portal.statement)
+              .setObject(position, Parser.create(parameters[index], type).getItem());
+        }
       } else {
         throw new IllegalStateException("Unimplemented");
       }
@@ -151,5 +169,4 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     throw new IllegalStateException(
         "Describe statements for non-bound statements are not allowed in spanner.");
   }
-
 }

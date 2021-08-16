@@ -32,21 +32,17 @@ public class StartupMessage extends BootstrapMessage {
   private final boolean authenticate;
   private Map<String, String> parameters;
 
-  public StartupMessage(ConnectionHandler connection, int length)
-      throws Exception {
+  public StartupMessage(ConnectionHandler connection, int length) throws Exception {
     super(connection, length);
     this.authenticate = connection.getServer().getOptions().shouldAuthenticate();
-    this.parameters= this.parseParameters(this.readAll());
+    this.parameters = this.parseParameters(this.readAll());
   }
 
   @Override
   protected void sendPayload() throws Exception {
     if (!authenticate) {
       sendStartupMessage(
-          this.outputStream,
-          this.connection.getConnectionId(),
-          this.connection.getSecret()
-      );
+          this.outputStream, this.connection.getConnectionId(), this.connection.getSecret());
     } else {
       new MD5AuthenticationRequest(this.outputStream, 0).send();
     }
@@ -64,10 +60,11 @@ public class StartupMessage extends BootstrapMessage {
     if (authenticate) {
       char protocol = (char) inputStream.readUnsignedByte();
       if (protocol != PasswordMessage.IDENTIFIER) {
-        throw new IOException("Unexpected response, expected '"
-            + PasswordMessage.IDENTIFIER
-            + "', but got: "
-            + protocol);
+        throw new IOException(
+            "Unexpected response, expected '"
+                + PasswordMessage.IDENTIFIER
+                + "', but got: "
+                + protocol);
       }
       this.connection.setMessageState(
           new PasswordMessage(this.connection, this.parameters.get(USER_KEY)));
@@ -88,13 +85,8 @@ public class StartupMessage extends BootstrapMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Parameters: {1}")
-        .format(new Object[]{
-            this.length,
-            this.parameters.toString()
-        });
+    return new MessageFormat("Length: {0}, " + "Parameters: {1}")
+        .format(new Object[] {this.length, this.parameters.toString()});
   }
 
   @Override

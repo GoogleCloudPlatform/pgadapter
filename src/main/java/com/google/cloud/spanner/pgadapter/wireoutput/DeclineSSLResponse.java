@@ -17,9 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-/**
- * Signals to client that we do not accept SSL.
- */
+/** Signals to client that we do not accept SSL. */
 public class DeclineSSLResponse extends WireOutput {
 
   public DeclineSSLResponse(DataOutputStream output) {

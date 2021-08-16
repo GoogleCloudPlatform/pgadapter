@@ -16,13 +16,10 @@ package com.google.cloud.spanner.pgadapter.metadata;
 
 import java.util.List;
 
-/**
- * Simple POJO to hold describe metadata specific to prepared statements.
- */
+/** Simple POJO to hold describe metadata specific to prepared statements. */
 public class DescribeStatementMetadata extends DescribeMetadata<List<Integer>> {
 
   public DescribeStatementMetadata(List<Integer> metadata) {
     this.metadata = metadata;
   }
 }
-

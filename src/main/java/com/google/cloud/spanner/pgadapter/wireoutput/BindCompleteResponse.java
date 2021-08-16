@@ -18,9 +18,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-/**
- * Assures to the client that a statement got bound to a portal successfully.
- */
+/** Assures to the client that a statement got bound to a portal successfully. */
 public class BindCompleteResponse extends WireOutput {
 
   public BindCompleteResponse(DataOutputStream output) {
@@ -44,6 +42,6 @@ public class BindCompleteResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+    return new MessageFormat("Length: {0}").format(new Object[] {this.length});
   }
 }

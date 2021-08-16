@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.common.collect.SetMultimap;
+
 /**
  * Simple POJO for storing SQL statement metadata (usually extracted proxy-side), meant generally
  * for prepared statements/portals.
@@ -22,10 +24,17 @@ public class SQLMetadata {
 
   private final String sqlString;
   private final int parameterCount;
+  // Multimap from the 0-based parameter index to the associated set of JDBC parameter positions
+  // (1-based).
+  private final SetMultimap<Integer, Integer> parameterIndexToPositions;
 
-  public SQLMetadata(String sqlString, int totalParameters) {
+  public SQLMetadata(
+      String sqlString,
+      int totalParameters,
+      SetMultimap<Integer, Integer> parameterIndexToPositions) {
     this.sqlString = sqlString;
     this.parameterCount = totalParameters;
+    this.parameterIndexToPositions = parameterIndexToPositions;
   }
 
   public int getParameterCount() {
@@ -34,5 +43,9 @@ public class SQLMetadata {
 
   public String getSqlString() {
     return this.sqlString;
+  }
+
+  public SetMultimap<Integer, Integer> getParameterIndexToPositions() {
+    return this.parameterIndexToPositions;
   }
 }

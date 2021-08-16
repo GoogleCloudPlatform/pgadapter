@@ -34,7 +34,6 @@ public abstract class Parser<T> {
   protected static final Charset UTF8 = StandardCharsets.UTF_8;
   protected T item;
 
-
   /**
    * Factory method to create a Parser subtype with a designated type from a byte array.
    *
@@ -54,14 +53,15 @@ public abstract class Parser<T> {
         return new DoubleParser(item);
       case Oid.INT8:
         return new LongParser(item);
+      case Oid.INT4:
+        return new IntegerParser(item);
       case Oid.UNSPECIFIED:
       case Oid.VARCHAR:
         return new StringParser(item);
       case Oid.TIMESTAMP:
         return new TimestampParser(item);
       default:
-        throw new IllegalArgumentException(
-            "Illegal or unknown element type: " + oidType);
+        throw new IllegalArgumentException("Illegal or unknown element type: " + oidType);
     }
   }
 
@@ -74,9 +74,8 @@ public abstract class Parser<T> {
    * @return The parser object for the designated data type.
    * @throws SQLException if the result data type does not correspond with the desired type.
    */
-  public static Parser create(ResultSet result,
-      int oidType,
-      int columnarPosition) throws SQLException {
+  public static Parser create(ResultSet result, int oidType, int columnarPosition)
+      throws SQLException {
     switch (oidType) {
       case Types.BOOLEAN:
         return new BooleanParser(result, columnarPosition);
@@ -88,6 +87,8 @@ public abstract class Parser<T> {
         return new DoubleParser(result, columnarPosition);
       case Types.BIGINT:
         return new LongParser(result, columnarPosition);
+      case Types.INTEGER:
+        return new IntegerParser(result, columnarPosition);
       case Types.NVARCHAR:
         return new StringParser(result, columnarPosition);
       case Types.TIMESTAMP:
@@ -96,8 +97,7 @@ public abstract class Parser<T> {
         return new ArrayParser(result, columnarPosition);
       case Types.STRUCT:
       default:
-        throw new IllegalArgumentException(
-            "Illegal or unknown element oidType: " + oidType);
+        throw new IllegalArgumentException("Illegal or unknown element oidType: " + oidType);
     }
   }
 
@@ -120,6 +120,8 @@ public abstract class Parser<T> {
         return new DoubleParser(result);
       case Types.BIGINT:
         return new LongParser(result);
+      case Types.INTEGER:
+        return new IntegerParser(result);
       case Types.NVARCHAR:
         return new StringParser(result);
       case Types.TIMESTAMP:
@@ -127,8 +129,7 @@ public abstract class Parser<T> {
       case Types.ARRAY:
       case Types.STRUCT:
       default:
-        throw new IllegalArgumentException(
-            "Illegal or unknown element type: " + oidType);
+        throw new IllegalArgumentException("Illegal or unknown element type: " + oidType);
     }
   }
 
@@ -184,7 +185,6 @@ public abstract class Parser<T> {
       default:
         throw new IllegalArgumentException("Unknown format: " + format);
     }
-
   }
 
   /**
@@ -194,9 +194,7 @@ public abstract class Parser<T> {
    */
   protected abstract String stringParse();
 
-  /**
-   * @return Binary representation of string data.
-   */
+  /** @return Binary representation of string data. */
   protected byte[] stringBinaryParse() {
     return this.stringParse().getBytes(UTF8);
   }
@@ -210,16 +208,12 @@ public abstract class Parser<T> {
     return this.stringParse();
   }
 
-  /**
-   * @return Binary representation of spanner string data.
-   */
+  /** @return Binary representation of spanner string data. */
   protected byte[] spannerBinaryParse() {
     return this.spannerParse().getBytes(UTF8);
   }
 
-  /**
-   * Used to parse data type onto binary. Override this to change binary representation.
-   */
+  /** Used to parse data type onto binary. Override this to change binary representation. */
   protected byte[] binaryParse() {
     return this.stringParse().getBytes(UTF8);
   }

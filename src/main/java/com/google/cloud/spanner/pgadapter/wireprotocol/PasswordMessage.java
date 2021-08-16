@@ -31,25 +31,21 @@ public class PasswordMessage extends ControlMessage {
   private final String username;
   private final String password;
 
-  public PasswordMessage(ConnectionHandler connection, String username)
-      throws Exception {
+  public PasswordMessage(ConnectionHandler connection, String username) throws Exception {
     super(connection);
     this.username = username;
     this.password = this.readAll();
   }
 
   protected void sendPayload() throws Exception {
-    if(useAuthentication() && !checkCredentials(this.username, this.password)) {
-      new ErrorResponse(this.outputStream,
-          new Exception("Could not Authenticate User"),
-          State.InternalError).send();
+    if (useAuthentication() && !checkCredentials(this.username, this.password)) {
+      new ErrorResponse(
+              this.outputStream, new Exception("Could not Authenticate User"), State.InternalError)
+          .send();
       new TerminateResponse(this.outputStream).send();
     } else {
       BootstrapMessage.sendStartupMessage(
-          this.outputStream,
-          this.connection.getConnectionId(),
-          this.connection.getSecret()
-      );
+          this.outputStream, this.connection.getConnectionId(), this.connection.getSecret());
     }
   }
 
@@ -69,15 +65,8 @@ public class PasswordMessage extends ControlMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Username: {1}, "
-            + "Password: {2}")
-        .format(new Object[]{
-            this.length,
-            this.username,
-            this.password
-        });
+    return new MessageFormat("Length: {0}, " + "Username: {1}, " + "Password: {2}")
+        .format(new Object[] {this.length, this.username, this.password});
   }
 
   @Override

@@ -23,9 +23,7 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Creates a prepared statement.
- */
+/** Creates a prepared statement. */
 public class ParseMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'P';
@@ -41,11 +39,13 @@ public class ParseMessage extends ControlMessage {
     this.parameterDataTypes = new ArrayList<>();
     short numberOfParameters = this.inputStream.readShort();
     for (int i = 0; i < numberOfParameters; i++) {
-      this.parameterDataTypes.add(this.inputStream.readInt());
+      int type = this.inputStream.readInt();
+      if (type == 0) {
+        throw new IllegalArgumentException("PgAdapter does not support untyped parameters.");
+      }
+      this.parameterDataTypes.add(type);
     }
-    this.statement = new IntermediatePreparedStatement(
-        queryString,
-        connection.getJdbcConnection());
+    this.statement = new IntermediatePreparedStatement(queryString, connection.getJdbcConnection());
     this.statement.setParameterDataTypes(this.parameterDataTypes);
   }
 
@@ -65,13 +65,11 @@ public class ParseMessage extends ControlMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, Name: {1},  SQL: {2}, Parameters: {3}")
-        .format(new Object[]{
-            this.length,
-            this.name,
-            this.statement.getSql(),
-            this.parameterDataTypes});
+    return new MessageFormat("Length: {0}, Name: {1},  SQL: {2}, Parameters: {3}")
+        .format(
+            new Object[] {
+              this.length, this.name, this.statement.getSql(), this.parameterDataTypes
+            });
   }
 
   @Override

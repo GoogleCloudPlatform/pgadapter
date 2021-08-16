@@ -18,9 +18,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-/**
- * Signals the end of a parse transaction.
- */
+/** Signals the end of a parse transaction. */
 public class ParseCompleteResponse extends WireOutput {
 
   public ParseCompleteResponse(DataOutputStream output) {
@@ -44,6 +42,6 @@ public class ParseCompleteResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+    return new MessageFormat("Length: {0}").format(new Object[] {this.length});
   }
 }

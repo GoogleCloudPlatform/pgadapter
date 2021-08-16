@@ -23,8 +23,7 @@ import java.util.regex.Pattern;
  */
 public class InvalidMetaCommand extends Command {
 
-  private static final Pattern INPUT_REGEX =
-      Pattern.compile(".*pg_catalog.*");
+  private static final Pattern INPUT_REGEX = Pattern.compile(".*pg_catalog.*");
 
   public InvalidMetaCommand(String sql) {
     super(sql);
@@ -41,8 +40,6 @@ public class InvalidMetaCommand extends Command {
         MessageFormat.format(
             "Unsupported Meta Command "
                 + "(the following generated command is not compatible with PGAdapter): \n{0}",
-            this.sql)
-    );
+            this.sql));
   }
-
 }

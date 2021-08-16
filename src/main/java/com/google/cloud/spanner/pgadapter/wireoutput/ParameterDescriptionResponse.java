@@ -19,9 +19,7 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.List;
 
-/**
- * Response (with data) for describe statement.
- */
+/** Response (with data) for describe statement. */
 public class ParameterDescriptionResponse extends WireOutput {
 
   private static final int HEADER_LENGTH = 4;
@@ -55,18 +53,11 @@ public class ParameterDescriptionResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Parameters: {1}")
-        .format(new Object[]{
-            this.length,
-            this.parameters.toString()
-        });
+    return new MessageFormat("Length: {0}, " + "Parameters: {1}")
+        .format(new Object[] {this.length, this.parameters.toString()});
   }
 
   private static int calculateLength(List<Integer> parameters) {
-    return HEADER_LENGTH + PARAMETER_NUMBER_LENGTH +
-        (parameters.size() * PARAMETER_LENGTH);
-
+    return HEADER_LENGTH + PARAMETER_NUMBER_LENGTH + (parameters.size() * PARAMETER_LENGTH);
   }
 }

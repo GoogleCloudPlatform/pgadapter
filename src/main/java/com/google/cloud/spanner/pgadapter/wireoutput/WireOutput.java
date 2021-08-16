@@ -22,13 +22,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Classes inheriting WireOutput concern themselves with sending data back to the client using
- * PG wire protocol. These classes function similarly to
- * {@link com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage} in that they use the
- * constructor to instantiate items, but require send to be called to actually send data. Here, you
- * must override postSend with data you wish to send. Note that this subclass will handle
- * sending the identifier and length (provided you initialize them correctly through getIdentifier
- * and he constructor respectively) via send, so you just have to implement payload sending.
+ * Classes inheriting WireOutput concern themselves with sending data back to the client using PG
+ * wire protocol. These classes function similarly to {@link
+ * com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage} in that they use the constructor to
+ * instantiate items, but require send to be called to actually send data. Here, you must override
+ * postSend with data you wish to send. Note that this subclass will handle sending the identifier
+ * and length (provided you initialize them correctly through getIdentifier and he constructor
+ * respectively) via send, so you just have to implement payload sending.
  */
 public abstract class WireOutput {
 
@@ -50,12 +50,13 @@ public abstract class WireOutput {
    * correctly). For most WireOutput subclasses this should be unchanged; there are however
    * exceptions (such as where length) need not be sent for very specific protocols: for those,
    * override this and you will need to send the identifier and log yourself.
+   *
    * @throws Exception
    */
   public void send() throws Exception {
     logger.log(Level.FINE, this.toString());
     this.outputStream.writeByte(this.getIdentifier());
-    if(this.isCompoundResponse()) {
+    if (this.isCompoundResponse()) {
       this.outputStream.writeInt(this.length);
     }
     sendPayload();
@@ -70,8 +71,9 @@ public abstract class WireOutput {
   protected abstract void sendPayload() throws Exception;
 
   /**
-   * Override this to specify the byte which represents the protocol for the specific message.
-   * Used for logging and by send.
+   * Override this to specify the byte which represents the protocol for the specific message. Used
+   * for logging and by send.
+   *
    * @return
    */
   public abstract byte getIdentifier();
@@ -92,8 +94,8 @@ public abstract class WireOutput {
 
   /**
    * Whether this response sends more data than just the identifier (i.e.: length). WireOutput items
-   *  are convoluted in that some do send a large payload, and other (such as
-   *  {@link DeclineSSLResponse}) send only one byte back. Override with false if that is the case.
+   * are convoluted in that some do send a large payload, and other (such as {@link
+   * DeclineSSLResponse}) send only one byte back. Override with false if that is the case.
    *
    * @return True if compound, false otherwise.
    */
@@ -104,10 +106,9 @@ public abstract class WireOutput {
   @Override
   public String toString() {
     return new MessageFormat("< Sending Message: ({0}) {1}, with Payload: '{'{2}'}'")
-        .format(new Object[]{
-            (char) this.getIdentifier(),
-            this.getMessageName(),
-            this.getPayloadString()
-        });
+        .format(
+            new Object[] {
+              (char) this.getIdentifier(), this.getMessageName(), this.getPayloadString()
+            });
   }
 }

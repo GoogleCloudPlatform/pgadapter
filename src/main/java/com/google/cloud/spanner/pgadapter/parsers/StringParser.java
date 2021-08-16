@@ -17,9 +17,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-/**
- * Translate from wire protocol to string.
- */
+/** Translate from wire protocol to string. */
 public class StringParser extends Parser<String> {
 
   public StringParser(ResultSet item, int position) throws SQLException {

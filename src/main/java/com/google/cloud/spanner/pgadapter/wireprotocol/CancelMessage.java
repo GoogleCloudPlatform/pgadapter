@@ -19,8 +19,8 @@ import java.text.MessageFormat;
 
 /**
  * This message handles the imperative cancellation, as issues in a new connection by the PG wire
- * protocol. We expect that this message contains an ID for the connection which issues the
- * original query, as well as an auth secret.
+ * protocol. We expect that this message contains an ID for the connection which issues the original
+ * query, as well as an auth secret.
  */
 public class CancelMessage extends BootstrapMessage {
 
@@ -49,15 +49,8 @@ public class CancelMessage extends BootstrapMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Connection ID: {1}, "
-            + "Secret: {2}")
-        .format(new Object[]{
-            this.length,
-            this.connectionId,
-            this.secret
-        });
+    return new MessageFormat("Length: {0}, " + "Connection ID: {1}, " + "Secret: {2}")
+        .format(new Object[] {this.length, this.connectionId, this.secret});
   }
 
   @Override

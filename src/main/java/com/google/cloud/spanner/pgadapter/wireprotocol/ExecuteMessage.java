@@ -19,9 +19,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import java.text.MessageFormat;
 
-/**
- * Executes a portal.
- */
+/** Executes a portal. */
 public class ExecuteMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'E';
@@ -50,15 +48,8 @@ public class ExecuteMessage extends ControlMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Name: {1}, "
-            + "Max Rows: {2}")
-        .format(new Object[]{
-            this.length,
-            this.name,
-            this.maxRows
-        });
+    return new MessageFormat("Length: {0}, " + "Name: {1}, " + "Max Rows: {2}")
+        .format(new Object[] {this.length, this.name, this.maxRows});
   }
 
   @Override

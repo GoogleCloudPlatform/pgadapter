@@ -19,9 +19,7 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.CloseResponse;
 import java.text.MessageFormat;
 
-/**
- * Close the designated statement.
- */
+/** Close the designated statement. */
 public class CloseMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'C';
@@ -41,9 +39,7 @@ public class CloseMessage extends ControlMessage {
     }
   }
 
-  /**
-   * Close the statement server-side and clean up by deleting their metdata locally.
-   */
+  /** Close the statement server-side and clean up by deleting their metdata locally. */
   @Override
   protected void sendPayload() throws Exception {
     if (this.type == PreparedType.Portal) {
@@ -62,15 +58,8 @@ public class CloseMessage extends ControlMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Name: {1}, "
-            + "Type: {2}")
-        .format(new Object[]{
-            this.length,
-            this.name,
-            this.type.toString()
-        });
+    return new MessageFormat("Length: {0}, " + "Name: {1}, " + "Type: {2}")
+        .format(new Object[] {this.length, this.name, this.type.toString()});
   }
 
   @Override

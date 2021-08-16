@@ -18,13 +18,16 @@ import com.google.common.base.Preconditions;
 
 public class StatementParser {
 
+  private static final String GSQL_STATEMENT = "/*GSQL*/";
+
   /**
    * Removes comments from and trims the given sql statement. Spanner supports three types of
    * comments:
+   *
    * <ul>
-   * <li>Single line comments starting with '--'</li>
-   * <li>Single line comments starting with '#'</li>
-   * <li>Multi line comments between '/&#42;' and '&#42;/'</li>
+   *   <li>Single line comments starting with '--'
+   *   <li>Single line comments starting with '#'
+   *   <li>Multi line comments between '/&#42;' and '&#42;/'
    * </ul>
    *
    * Reference: https://cloud.google.com/spanner/docs/lexical#comments
@@ -41,6 +44,7 @@ public class StatementParser {
     final char DASH = '#';
     final char SLASH = '/';
     final char ASTERISK = '*';
+    boolean isGsql = sql.startsWith(GSQL_STATEMENT);
     boolean isInQuoted = false;
     boolean isInSingleLineComment = false;
     boolean isInMultiLineComment = false;
@@ -58,7 +62,8 @@ public class StatementParser {
           if (lastCharWasEscapeChar) {
             lastCharWasEscapeChar = false;
           } else if (isTripleQuoted) {
-            if (sql.length() > index + 2 && sql.charAt(index + 1) == startQuote
+            if (sql.length() > index + 2
+                && sql.charAt(index + 1) == startQuote
                 && sql.charAt(index + 2) == startQuote) {
               isInQuoted = false;
               startQuote = 0;
@@ -70,8 +75,11 @@ public class StatementParser {
             isInQuoted = false;
             startQuote = 0;
           }
-        } else
-          lastCharWasEscapeChar = c == '\\';
+        } else if (c == '\\') {
+          lastCharWasEscapeChar = true;
+        } else {
+          lastCharWasEscapeChar = false;
+        }
         res.append(c);
       } else {
         // We are not in a quoted string.
@@ -99,7 +107,8 @@ public class StatementParser {
               isInQuoted = true;
               startQuote = c;
               // Check whether it is a triple-quote.
-              if (sql.length() > index + 2 && sql.charAt(index + 1) == startQuote
+              if (sql.length() > index + 2
+                  && sql.charAt(index + 1) == startQuote
                   && sql.charAt(index + 2) == startQuote) {
                 isTripleQuoted = true;
                 res.append(c).append(c);
@@ -118,7 +127,11 @@ public class StatementParser {
     if (res.length() > 0 && res.charAt(res.length() - 1) == ';') {
       res.deleteCharAt(res.length() - 1);
     }
-    return res.toString().trim();
+    if (isGsql) {
+      return GSQL_STATEMENT + res.toString().trim();
+    } else {
+      return res.toString().trim();
+    }
   }
 
   /**

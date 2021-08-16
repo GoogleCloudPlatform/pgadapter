@@ -25,15 +25,12 @@ import java.sql.ResultSetMetaData;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Sends to the client specific row contents.
- */
+/** Sends to the client specific row contents. */
 public class DataRowResponse extends WireOutput {
 
   private static final int HEADER_LENGTH = 4;
   private static final int COLUMN_NUMBER_LENGTH = 2;
   private static final int COLUMN_SIZE_LENGTH = 4;
-
 
   private final IntermediateStatement statement;
   private final QueryMode mode;
@@ -41,10 +38,12 @@ public class DataRowResponse extends WireOutput {
   private final ResultSetMetaData metadata;
   private final List<byte[]> columns;
 
-  public DataRowResponse(DataOutputStream output,
+  public DataRowResponse(
+      DataOutputStream output,
       IntermediateStatement statement,
       OptionsMetadata options,
-      QueryMode mode) throws Exception {
+      QueryMode mode)
+      throws Exception {
     super(output, 0);
     this.statement = statement;
     this.mode = mode;
@@ -61,8 +60,8 @@ public class DataRowResponse extends WireOutput {
         columns.add(null);
       } else {
         DataFormat format = DataFormat.getDataFormat(column_index, statement, this.mode, options);
-        byte[] column
-            = new Converter().parseData(this.resultSet, this.metadata, column_index, format);
+        byte[] column =
+            new Converter().parseData(this.resultSet, this.metadata, column_index, format);
         length += column.length;
         columns.add(column);
       }
@@ -81,7 +80,6 @@ public class DataRowResponse extends WireOutput {
       }
     }
     this.outputStream.flush();
-
   }
 
   @Override
