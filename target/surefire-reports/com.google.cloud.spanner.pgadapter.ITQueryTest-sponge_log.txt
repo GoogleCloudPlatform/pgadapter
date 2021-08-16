@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.google.cloud.spanner.pgadapter.ITQueryTest
--------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.386 s - in com.google.cloud.spanner.pgadapter.ITQueryTest
