@@ -41,40 +41,73 @@ public class Converter {
     // Multimap from the 0-based parameter index to the associated set of JDBC parameter positions
     // (1-based).
     SetMultimap<Integer, Integer> parameterIndexToPositions = HashMultimap.create();
-    boolean openSingleQuote = false;
-    boolean openDoubleQuote = false;
-    boolean openEscape = false;
+    final char SINGLE_QUOTE = '\'';
+    final char DOUBLE_QUOTE = '"';
+    final char DOLLAR = '$';
+    final char BACK_SLASH = '\\';
+    String currentTag = null;
+    boolean isInQuoted = false;
+    char startQuote = 0;
+    boolean lastCharWasEscapeChar = false;
     int parameterOrder = 0;
     int totalParameterCount = 0;
-    for (int index = 0; index < sql.length(); index++) {
-      char character = sql.charAt(index);
-      if (openEscape) {
-        openEscape = false;
-      } else if (character == '\"') {
-        openSingleQuote = !openSingleQuote;
-      } else if (character == '\'') {
-        openDoubleQuote = !openDoubleQuote;
-      } else if (character == '\\') {
-        openEscape = true;
-      } else if (!(openDoubleQuote || openSingleQuote)
-          && character == '$'
-          && index + 1 < sql.length()
-          && Character.isDigit(sql.charAt(index + 1))) {
-        // Consume the parameter index.
-        int beginIndex = index + 1;
-        result.append('?');
-        while (++index < sql.length() && Character.isDigit(sql.charAt(index))) {}
-        int parameterIndex = Integer.valueOf(sql.substring(beginIndex, index)) - 1;
-        if (parameterIndex < 0) {
-          throw new IllegalArgumentException("Parameter index should be >= 1");
+    int index = 0;
+    while (index < sql.length()) {
+      char c = sql.charAt(index);
+      if (isInQuoted) {
+        if (c == startQuote) {
+          if (c == DOLLAR) {
+            // Check if this is the end of the current dollar quoted string.
+            String tag = StatementParser.parseDollarQuotedString(sql, index + 1);
+            if (tag != null && tag.equals(currentTag)) {
+              index += tag.length() + 1;
+              result.append(c);
+              result.append(tag);
+              isInQuoted = false;
+              startQuote = 0;
+            }
+          } else if (lastCharWasEscapeChar) {
+            lastCharWasEscapeChar = false;
+          } else {
+            isInQuoted = false;
+            startQuote = 0;
+          }
+        } else if (c == BACK_SLASH) {
+          lastCharWasEscapeChar = true;
+        } else {
+          lastCharWasEscapeChar = false;
         }
-        parameterOrder++;
-        parameterIndexToPositions.put(parameterIndex, parameterOrder);
-        totalParameterCount = Integer.max(totalParameterCount, parameterIndex + 1);
-        index -= 1;
-        continue;
+      } else {
+        if (c == SINGLE_QUOTE || c == DOUBLE_QUOTE) {
+          isInQuoted = true;
+          startQuote = c;
+        } else if (c == DOLLAR && sql.length() > index + 1) {
+          if (Character.isDigit(sql.charAt(index + 1))) {
+            // Consume the parameter index.
+            int beginIndex = index + 1;
+            result.append('?');
+            while (++index < sql.length() && Character.isDigit(sql.charAt(index))) {}
+            int parameterIndex = Integer.valueOf(sql.substring(beginIndex, index)) - 1;
+            if (parameterIndex < 0) {
+              throw new IllegalArgumentException("Parameter index should be >= 1");
+            }
+            parameterOrder++;
+            parameterIndexToPositions.put(parameterIndex, parameterOrder);
+            totalParameterCount = Integer.max(totalParameterCount, parameterIndex + 1);
+            continue;
+          }
+          currentTag = StatementParser.parseDollarQuotedString(sql, index + 1);
+          if (currentTag != null) {
+            isInQuoted = true;
+            startQuote = DOLLAR;
+            index += currentTag.length() + 1;
+            result.append(c);
+            result.append(currentTag);
+          }
+        }
       }
-      result.append(character);
+      result.append(c);
+      index++;
     }
     return new SQLMetadata(result.toString(), totalParameterCount, parameterIndexToPositions);
   }

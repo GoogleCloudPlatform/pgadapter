@@ -26,9 +26,7 @@ public class BindCompleteResponse extends WireOutput {
   }
 
   @Override
-  protected void sendPayload() throws IOException {
-    this.outputStream.flush();
-  }
+  protected void sendPayload() throws IOException {}
 
   @Override
   public byte getIdentifier() {

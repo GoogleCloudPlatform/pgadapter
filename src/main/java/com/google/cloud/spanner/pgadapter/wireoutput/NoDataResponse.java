@@ -25,9 +25,7 @@ public class NoDataResponse extends WireOutput {
   }
 
   @Override
-  protected void sendPayload() throws Exception {
-    // Do nothing
-  }
+  protected void sendPayload() throws Exception {}
 
   @Override
   public byte getIdentifier() {

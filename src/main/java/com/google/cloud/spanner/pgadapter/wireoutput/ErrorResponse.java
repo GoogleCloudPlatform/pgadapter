@@ -65,7 +65,6 @@ public class ErrorResponse extends WireOutput {
     this.outputStream.write(this.errorMessage);
     this.outputStream.writeByte(NULL_TERMINATOR);
     this.outputStream.writeByte(NULL_TERMINATOR);
-    this.outputStream.flush();
   }
 
   @Override

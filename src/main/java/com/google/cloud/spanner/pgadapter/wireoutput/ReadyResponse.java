@@ -33,7 +33,6 @@ public class ReadyResponse extends WireOutput {
   @Override
   public void sendPayload() throws IOException {
     this.outputStream.writeByte(this.status.c);
-    this.outputStream.flush();
   }
 
   @Override

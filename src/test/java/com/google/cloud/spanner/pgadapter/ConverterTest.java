@@ -34,9 +34,8 @@ public class ConverterTest {
     Assert.assertEquals(
         result.getParameterIndexToPositions(), ImmutableSetMultimap.of(0, 1, 1, 2, 2, 3));
 
-    // Unexpected case, but should follow logic
-    sqlStatement = "SELECT * FROM users WHERE name = $$1 AND AGE = $1$";
-    expectedResult = "SELECT * FROM users WHERE name = $? AND AGE = ?$";
+    sqlStatement = "SELECT * FROM users WHERE name = $1$ AND AGE = $1$";
+    expectedResult = "SELECT * FROM users WHERE name = ?$ AND AGE = ?$";
     parameterCount = 1;
     result = Converter.toJDBCParams(sqlStatement);
     Assert.assertEquals(result.getSqlString(), expectedResult);
@@ -63,12 +62,6 @@ public class ConverterTest {
     Assert.assertEquals(result.getParameterCount(), parameterCount);
     Assert.assertEquals(result.getParameterIndexToPositions(), ImmutableSetMultimap.of(0, 1));
 
-    sqlStatement = "SELECT * FROM users WHERE data = \\$1234"; // unexpected, but let's test escapes
-    parameterCount = 0;
-    result = Converter.toJDBCParams(sqlStatement);
-    Assert.assertEquals(result.getSqlString(), sqlStatement);
-    Assert.assertEquals(result.getParameterCount(), parameterCount);
-
     // Out of order and multiple instances of the same index.
     sqlStatement = "SELECT * FROM users WHERE (name = $2 OR surname = $2) AND age = $1";
     expectedResult = "SELECT * FROM users WHERE (name = ? OR surname = ?) AND age = ?";
@@ -87,5 +80,21 @@ public class ConverterTest {
     Assert.assertEquals(result.getSqlString(), expectedResult);
     Assert.assertEquals(result.getParameterCount(), parameterCount);
     Assert.assertEquals(result.getParameterIndexToPositions(), ImmutableSetMultimap.of(122, 1));
+
+    // When parameters are mixed with dollar-quoted string
+    sqlStatement = "$1$$?it$?s$$$2";
+    expectedResult = "?$$?it$?s$$?";
+    result = Converter.toJDBCParams(sqlStatement);
+    Assert.assertEquals(result.getSqlString(), expectedResult);
+
+    sqlStatement = "$1$tag$?it$$?s$tag$$2";
+    expectedResult = "?$tag$?it$$?s$tag$?";
+    result = Converter.toJDBCParams(sqlStatement);
+    Assert.assertEquals(result.getSqlString(), expectedResult);
+
+    sqlStatement = "$1$$?it\\'?s \n ?it\\'?s$$$2";
+    expectedResult = "?$$?it\\'?s \n ?it\\'?s$$?";
+    result = Converter.toJDBCParams(sqlStatement);
+    Assert.assertEquals(result.getSqlString(), expectedResult);
   }
 }

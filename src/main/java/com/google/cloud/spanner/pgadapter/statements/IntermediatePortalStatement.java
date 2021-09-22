@@ -54,7 +54,7 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
     } else if (this.parameterFormatCodes.size() == 1) {
       return this.parameterFormatCodes.get(0);
     } else {
-      return this.parameterFormatCodes.get(index - 1);
+      return this.parameterFormatCodes.get(index);
     }
   }
 
@@ -65,7 +65,7 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
     } else if (this.resultFormatCodes.size() == 1) {
       return this.resultFormatCodes.get(0);
     } else {
-      return this.resultFormatCodes.get(index - 1);
+      return this.resultFormatCodes.get(index);
     }
   }
 

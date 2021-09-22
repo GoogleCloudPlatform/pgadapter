@@ -267,7 +267,8 @@ public class ProxyServer extends Thread {
         // Simple query mode is always text.
         return DataFormat.fromTextFormat(options.getTextFormat());
       } else {
-        return DataFormat.byCode(statement.getResultFormatCode(index), options.getTextFormat());
+        short resultFormatCode = statement == null ? 0 : statement.getResultFormatCode(index);
+        return DataFormat.byCode(resultFormatCode, options.getTextFormat());
       }
     }
 

@@ -306,4 +306,31 @@ public class ParserTest {
 
     new ArrayParser(resultSet, 0);
   }
+
+  @Test
+  public void testNumericParsing() throws SQLException {
+    String value = "1234567890.1234567890";
+
+    byte[] stringResult = {
+      '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.', '1', '2', '3', '4', '5', '6', '7', '8',
+      '9', '0'
+    };
+
+    Parser parser = new StringParser(value);
+
+    validate(parser, stringResult, stringResult, stringResult);
+    assertThat(parser.getItem(), is(equalTo(value)));
+  }
+
+  @Test
+  public void testNumericParsingNaN() throws SQLException {
+    String value = "NaN";
+
+    byte[] stringResult = {'N', 'a', 'N'};
+
+    Parser parser = new StringParser(value);
+
+    validate(parser, stringResult, stringResult, stringResult);
+    assertThat(parser.getItem(), is(equalTo(value)));
+  }
 }

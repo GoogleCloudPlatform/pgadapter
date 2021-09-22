@@ -16,7 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.wireoutput.CloseResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.CloseCompleteResponse;
 import java.text.MessageFormat;
 
 /** Close the designated statement. */
@@ -48,7 +48,7 @@ public class CloseMessage extends ControlMessage {
     } else {
       this.connection.closeStatement(this.name);
     }
-    new CloseResponse(this.outputStream).send();
+    new CloseCompleteResponse(this.outputStream).send();
   }
 
   @Override

@@ -60,6 +60,7 @@ public abstract class WireOutput {
       this.outputStream.writeInt(this.length);
     }
     sendPayload();
+    this.outputStream.flush();
   }
 
   /**

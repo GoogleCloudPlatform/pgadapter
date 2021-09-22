@@ -55,6 +55,9 @@ public abstract class Parser<T> {
         return new LongParser(item);
       case Oid.INT4:
         return new IntegerParser(item);
+      case Oid.NUMERIC:
+        return new StringParser(item);
+      case Oid.TEXT:
       case Oid.UNSPECIFIED:
       case Oid.VARCHAR:
         return new StringParser(item);
@@ -89,6 +92,8 @@ public abstract class Parser<T> {
         return new LongParser(result, columnarPosition);
       case Types.INTEGER:
         return new IntegerParser(result, columnarPosition);
+      case Types.NUMERIC:
+        return new StringParser(result, columnarPosition);
       case Types.NVARCHAR:
         return new StringParser(result, columnarPosition);
       case Types.TIMESTAMP:
@@ -122,6 +127,8 @@ public abstract class Parser<T> {
         return new LongParser(result);
       case Types.INTEGER:
         return new IntegerParser(result);
+      case Types.NUMERIC:
+        return new StringParser(result);
       case Types.NVARCHAR:
         return new StringParser(result);
       case Types.TIMESTAMP:

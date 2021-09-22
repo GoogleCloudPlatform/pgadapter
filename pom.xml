@@ -12,8 +12,8 @@
 -->
 
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <properties>
     <java.version>1.8</java.version>
     <maven.compiler.source>1.8</maven.compiler.source>
@@ -26,12 +26,15 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.1.0-pg-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner:current} -->
+  <version>0.1.0-pg-SNAPSHOT
+  </version><!-- {x-version-update:google-cloud-spanner:current} -->
   <name>Google Cloud Spanner PostgreSQL Adaptor</name>
   <packaging>jar</packaging>
   <description>
-    The Adapter server implements the PostgreSQL wire-protocol, but sends all received statements
-    to a Spanner database instead of a PostgreSQL database. This makes it possible to use tools
+    The Adapter server implements the PostgreSQL wire-protocol, but sends all
+    received statements
+    to a Spanner database instead of a PostgreSQL database. This makes it
+    possible to use tools
     developed for PostgreSQL to be used with Spanner.
   </description>
 
@@ -39,17 +42,23 @@
   <distributionManagement>
     <snapshotRepository>
       <id>artifact-registry</id>
-      <url>artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts</url>
+      <url>
+        artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts
+      </url>
     </snapshotRepository>
     <repository>
       <id>artifact-registry</id>
-      <url>artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts</url>
+      <url>
+        artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts
+      </url>
     </repository>
   </distributionManagement>
   <repositories>
     <repository>
       <id>artifact-registry</id>
-      <url>artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts</url>
+      <url>
+        artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts
+      </url>
       <releases>
         <enabled>false</enabled>
       </releases>
@@ -68,7 +77,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner-jdbc</artifactId>
-      <version>2.2.7-pg-SNAPSHOT</version>
+      <version>2.4.4-pg-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
@@ -80,7 +89,11 @@
       <artifactId>commons-cli</artifactId>
       <version>1.4</version>
     </dependency>
-
+    <dependency>
+      <groupId>com.google.api</groupId>
+      <artifactId>gax-grpc</artifactId>
+      <version>2.3.0</version>
+    </dependency>
     <!-- Test dependencies -->
     <dependency>
       <groupId>junit</groupId>
@@ -139,7 +152,8 @@
                   <transformers>
                     <transformer
                         implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                      <mainClass>com.google.cloud.spanner.pgadapter.Server</mainClass>
+                      <mainClass>com.google.cloud.spanner.pgadapter.Server
+                      </mainClass>
                     </transformer>
                     <transformer
                         implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
@@ -155,7 +169,7 @@
       </build>
     </profile>
   </profiles>
-  
+
   <build>
     <testResources>
       <testResource>
@@ -171,9 +185,29 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.0.0-M3</version>
         <configuration>
-          <excludedGroups>com.google.cloud.spanner.pgadapter.IntegrationTest</excludedGroups>
+          <excludedGroups>com.google.cloud.spanner.pgadapter.IntegrationTest
+          </excludedGroups>
           <reportNameSuffix>sponge_log</reportNameSuffix>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.7</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

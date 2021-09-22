@@ -33,6 +33,7 @@ import org.json.simple.JSONObject;
 public class OptionsMetadata {
 
   private static final Logger logger = Logger.getLogger(OptionsMetadata.class.getName());
+  private static final String DEFAULT_SERVER_VERSION = "13.4";
 
   private static final String OPTION_SERVER_PORT = "s";
   private static final String OPTION_PROJECT_ID = "p";
@@ -53,6 +54,7 @@ public class OptionsMetadata {
   /*Note: this is a private preview feature, not meant for GA version. */
   private static final String OPTION_SPANNER_ENDPOINT = "e";
   private static final String OPTION_JDBC_PROPERTIES = "r";
+  private static final String OPTION_SERVER_VERSION = "v";
 
   private final CommandMetadataParser commandMetadataParser;
   private final String connectionURL;
@@ -60,10 +62,11 @@ public class OptionsMetadata {
   private final TextFormat textFormat;
   private final boolean binaryFormat;
   private final boolean authenticate;
-  private final boolean psqlMode;
+  private final boolean requiresMatcher;
   private final boolean disableLocalhostCheck;
   private final JSONObject commandMetadataJSON;
   private final Map<String, String> propertyMap;
+  private final String serverVersion;
 
   public OptionsMetadata(String[] args) {
     CommandLine commandLine = buildOptions(args);
@@ -73,10 +76,13 @@ public class OptionsMetadata {
     this.textFormat = buildTextFormat(commandLine);
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
-    this.psqlMode = commandLine.hasOption(OPTION_PSQL_MODE);
+    this.requiresMatcher =
+        commandLine.hasOption(OPTION_PSQL_MODE)
+            || commandLine.hasOption(OPTION_COMMAND_METADATA_FILE);
     this.commandMetadataJSON = buildCommandMetadataJSON(commandLine);
     this.propertyMap = parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
+    this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
   }
 
   public OptionsMetadata(
@@ -85,7 +91,7 @@ public class OptionsMetadata {
       TextFormat textFormat,
       boolean forceBinary,
       boolean authenticate,
-      boolean psqlMode,
+      boolean requiresMatcher,
       JSONObject commandMetadata) {
     this.commandMetadataParser = new CommandMetadataParser();
     this.connectionURL = connectionURL;
@@ -93,10 +99,11 @@ public class OptionsMetadata {
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
-    this.psqlMode = psqlMode;
+    this.requiresMatcher = requiresMatcher;
     this.commandMetadataJSON = commandMetadata;
     this.propertyMap = new HashMap<>();
     this.disableLocalhostCheck = false;
+    this.serverVersion = DEFAULT_SERVER_VERSION;
   }
 
   private Map<String, String> parseProperties(String propertyOptions) {
@@ -195,9 +202,8 @@ public class OptionsMetadata {
 
   /**
    * Takes the content of the specified (or default) command file and parses it into JSON format. If
-   * finding the file fails in any-way, print an error and keep going with an empty spec. This is
-   * done as commands are only required for PSQL mode and we wouldn't want it to affect other
-   * important functionalities.
+   * finding the file fails in any-way, print an error and keep going with an empty spec. Custom
+   * metadata json file is allowed without PSQL mode.
    *
    * @param commandLine The parsed options for CLI
    * @return The JSON object corresponding to the string contained within the specified (or default)
@@ -205,9 +211,10 @@ public class OptionsMetadata {
    */
   private JSONObject buildCommandMetadataJSON(CommandLine commandLine) {
     if (commandLine.hasOption(OPTION_COMMAND_METADATA_FILE)
-        && !commandLine.hasOption(OPTION_PSQL_MODE)) {
+        && commandLine.hasOption(OPTION_PSQL_MODE)) {
       throw new IllegalArgumentException(
-          "PSQL Mode must be toggled (-q) to specify command metadata file (-j).");
+          "PSQL Mode shouldn't be toggled (-q) together with the custom command metadata file"
+              + " (-j).");
     }
 
     final String commandMetadataFileName = commandLine.getOptionValue(OPTION_COMMAND_METADATA_FILE);
@@ -282,16 +289,21 @@ public class OptionsMetadata {
         OPTION_PSQL_MODE,
         "psql-mode",
         false,
-        "This option turns on PSQL mode. This mode allows better compatibility to PSQL, "
-            + "with an added performance cost. This mode should not be used for production, and we "
-            + "do not guarantee its functionality beyond the basics.");
+        "This option turns on PSQL mode. This mode allows better compatibility to PSQL, with an"
+            + " added performance cost. PSQL mode is implemented using predefined dynamic matchers"
+            + " and as such cannot be used with the option -j. This mode should not be used for"
+            + " production, and we do not guarantee its functionality beyond the basics.");
     options.addOption(
         OPTION_COMMAND_METADATA_FILE,
         "options-metadata",
         true,
-        "The full path of the file containing the metadata specifications for psql-mode's "
-            + "dynamic matcher. Each item in this matcher will create a runtime-generated command "
-            + "which will translate incoming commands into whatever back-end SQL is desired.");
+        "This option specifies the full path of the file containing the metadata specifications for"
+            + " custom dynamic matchers. Each item in this matcher will create a runtime-generated"
+            + " command which will translate incoming commands into whatever back-end SQL is"
+            + " desired. This feature allows re-writing queries that are outside the user's control"
+            + " (e.g: issued by client libraries and / or tools) and are not currently supported by"
+            + " the backend with equivalent supported queries, but comes at a performance cost."
+            + " This option cannot be used with option -q.");
     options.addOption(OPTION_HELP, "help", false, "Print help.");
     options.addOption(
         OPTION_BINARY_FORMAT,
@@ -319,6 +331,13 @@ public class OptionsMetadata {
             + "When running inside docker however the docker host IP will not show as localhost. "
             + "Instead, set this flag and restrict connections from localhost using docker, e.g: "
             + "`-p 127.0.0.1:5432:5432`");
+    options.addOption(
+        OPTION_SERVER_VERSION,
+        "server-version",
+        true,
+        "This option specifies what server_version PG Adapter should claim to be. If not specified "
+            + " it will default to version "
+            + DEFAULT_SERVER_VERSION);
 
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
@@ -359,8 +378,8 @@ public class OptionsMetadata {
     return this.authenticate;
   }
 
-  public boolean isPSQLMode() {
-    return this.psqlMode;
+  public boolean requiresMatcher() {
+    return this.requiresMatcher;
   }
 
   public boolean disableLocalhostCheck() {
@@ -369,6 +388,10 @@ public class OptionsMetadata {
 
   public Map<String, String> getPropertyMap() {
     return this.propertyMap;
+  }
+
+  public String getServerVersion() {
+    return serverVersion;
   }
 
   /**

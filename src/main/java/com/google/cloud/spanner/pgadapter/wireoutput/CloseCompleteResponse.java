@@ -15,27 +15,26 @@
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import java.io.DataOutputStream;
-import java.io.IOException;
 import java.text.MessageFormat;
 
-/** Signals the end of a parse transaction. */
-public class ParseCompleteResponse extends WireOutput {
+/** Assures to the client that a portal got closed successfully. */
+public class CloseCompleteResponse extends WireOutput {
 
-  public ParseCompleteResponse(DataOutputStream output) {
+  public CloseCompleteResponse(DataOutputStream output) {
     super(output, 4);
   }
 
   @Override
-  protected void sendPayload() throws IOException {}
+  protected void sendPayload() throws Exception {}
 
   @Override
   public byte getIdentifier() {
-    return '1';
+    return '3';
   }
 
   @Override
   protected String getMessageName() {
-    return "Parse Complete";
+    return "CloseComplete";
   }
 
   @Override

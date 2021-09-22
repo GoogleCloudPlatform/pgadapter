@@ -1,10 +1,18 @@
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.is;
+
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSetMetaData;
 import java.sql.Types;
 import org.json.simple.JSONObject;
@@ -25,9 +33,12 @@ import org.postgresql.core.Oid;
 public final class RowDescriptionTest {
 
   private static final String EMPTY_COMMAND_JSON = "{\"commands\":[]}";
+  private static final byte DEFAULT_FLAG = 0;
+  private static final Charset UTF8 = StandardCharsets.UTF_8;
 
   @Rule public MockitoRule rule = MockitoJUnit.rule();
-  @Mock private DataOutputStream output;
+  private ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+  private DataOutputStream output = new DataOutputStream(buffer);
   @Mock private IntermediateStatement statement;
   @Mock private ResultSetMetaData metadata;
 
@@ -105,5 +116,155 @@ public final class RowDescriptionTest {
     // Types.TIMESTAMP
     Assert.assertEquals(response.getOidType(13), Oid.TIMESTAMP);
     Assert.assertEquals(response.getOidTypeSize(Oid.TIMESTAMP), 12);
+  }
+
+  @Test
+  public void SendPayloadNullStatementTest() throws Exception {
+    int COLUMN_COUNT = 1;
+    String COLUMN_NAME = "default-column-name";
+    Mockito.when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
+    Mockito.when(metadata.getColumnName(Mockito.anyInt())).thenReturn(COLUMN_NAME);
+    Mockito.when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Types.SMALLINT);
+    JSONParser parser = new JSONParser();
+    JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
+    OptionsMetadata options =
+        new OptionsMetadata(
+            "jdbc:cloudspanner:/projects/test-project/instances/test-instance/databases/test-database",
+            8888,
+            TextFormat.POSTGRESQL,
+            false,
+            false,
+            false,
+            commandMetadata);
+    QueryMode mode = QueryMode.EXTENDED;
+    RowDescriptionResponse response =
+        new RowDescriptionResponse(output, null, metadata, options, mode);
+    response.sendPayload();
+    DataInputStream outputReader =
+        new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));
+
+    // column count
+    Assert.assertThat(outputReader.readShort(), is(equalTo((short) COLUMN_COUNT)));
+    // column name
+    int numOfBytes = COLUMN_NAME.getBytes(UTF8).length;
+    byte[] bytes = new byte[numOfBytes];
+    outputReader.read(bytes, 0, numOfBytes);
+    Assert.assertEquals(new String(bytes, UTF8), COLUMN_NAME);
+    // null terminator
+    Assert.assertThat(outputReader.readByte(), is(equalTo(DEFAULT_FLAG)));
+    // table oid
+    Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
+    // column index
+    Assert.assertThat(outputReader.readShort(), is(equalTo((short) DEFAULT_FLAG)));
+    // type oid
+    Assert.assertEquals(outputReader.readInt(), Oid.INT2);
+    // type size
+    Assert.assertThat(outputReader.readShort(), is(equalTo((short) 2)));
+    // type modifier
+    Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
+    // format code
+    Assert.assertThat(outputReader.readShort(), is(equalTo((short) 0)));
+  }
+
+  @Test
+  public void SendPayloadStatementWithBinaryOptionTest() throws Exception {
+    int COLUMN_COUNT = 1;
+    String COLUMN_NAME = "default-column-name";
+    Mockito.when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
+    Mockito.when(metadata.getColumnName(Mockito.anyInt())).thenReturn(COLUMN_NAME);
+    Mockito.when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Types.SMALLINT);
+    Mockito.when(statement.getResultFormatCode(Mockito.anyInt())).thenReturn((short) 0);
+    JSONParser parser = new JSONParser();
+    JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
+    OptionsMetadata options =
+        new OptionsMetadata(
+            "jdbc:cloudspanner:/projects/test-project/instances/test-instance/databases/test-database",
+            8888,
+            TextFormat.POSTGRESQL,
+            true,
+            false,
+            false,
+            commandMetadata);
+    QueryMode mode = QueryMode.EXTENDED;
+    RowDescriptionResponse response =
+        new RowDescriptionResponse(output, statement, metadata, options, mode);
+    response.sendPayload();
+    DataInputStream outputReader =
+        new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));
+
+    // column count
+    Assert.assertThat(outputReader.readShort(), is(equalTo((short) COLUMN_COUNT)));
+    // column name
+    int numOfBytes = COLUMN_NAME.getBytes(UTF8).length;
+    byte[] bytes = new byte[numOfBytes];
+    outputReader.read(bytes, 0, numOfBytes);
+    Assert.assertEquals(new String(bytes, UTF8), COLUMN_NAME);
+    // null terminator
+    Assert.assertThat(outputReader.readByte(), is(equalTo(DEFAULT_FLAG)));
+    // table oid
+    Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
+    // column index
+    Assert.assertThat(outputReader.readShort(), is(equalTo((short) DEFAULT_FLAG)));
+    // type oid
+    Assert.assertEquals(outputReader.readInt(), Oid.INT2);
+    // type size
+    Assert.assertThat(outputReader.readShort(), is(equalTo((short) 2)));
+    // type modifier
+    Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
+    // format code
+    Assert.assertThat(outputReader.readShort(), is(equalTo((short) 1)));
+  }
+
+  @Test
+  public void SendPayloadStatementTest() throws Exception {
+    int COLUMN_COUNT = 2;
+    String COLUMN_NAME = "default-column-name";
+    Mockito.when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
+    Mockito.when(metadata.getColumnName(Mockito.anyInt())).thenReturn(COLUMN_NAME);
+    Mockito.when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Types.SMALLINT);
+    Mockito.when(statement.getResultFormatCode(Mockito.anyInt()))
+        .thenReturn((short) 0)
+        .thenReturn((short) 0)
+        .thenReturn((short) 1);
+    JSONParser parser = new JSONParser();
+    JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
+    OptionsMetadata options =
+        new OptionsMetadata(
+            "jdbc:cloudspanner:/projects/test-project/instances/test-instance/databases/test-database",
+            8888,
+            TextFormat.POSTGRESQL,
+            false,
+            false,
+            false,
+            commandMetadata);
+    QueryMode mode = QueryMode.EXTENDED;
+    RowDescriptionResponse response =
+        new RowDescriptionResponse(output, statement, metadata, options, mode);
+    response.sendPayload();
+    DataInputStream outputReader =
+        new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));
+    // column count
+    Assert.assertThat(outputReader.readShort(), is(equalTo((short) COLUMN_COUNT)));
+    for (int i = 0; i < COLUMN_COUNT; i++) {
+      // column name
+      int numOfBytes = COLUMN_NAME.getBytes(UTF8).length;
+      byte[] bytes = new byte[numOfBytes];
+      outputReader.read(bytes, 0, numOfBytes);
+      Assert.assertEquals(new String(bytes, UTF8), COLUMN_NAME);
+      // null terminator
+      Assert.assertThat(outputReader.readByte(), is(equalTo(DEFAULT_FLAG)));
+      // table oid
+      Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
+      // column index
+      Assert.assertThat(outputReader.readShort(), is(equalTo((short) DEFAULT_FLAG)));
+      // type oid
+      Assert.assertEquals(outputReader.readInt(), Oid.INT2);
+      // type size
+      Assert.assertThat(outputReader.readShort(), is(equalTo((short) 2)));
+      // type modifier
+      Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
+      // format code
+      Assert.assertThat(outputReader.readShort(), is(equalTo((short) i)));
+    }
   }
 }

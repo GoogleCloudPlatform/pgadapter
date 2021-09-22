@@ -193,9 +193,9 @@ public class StatementTest {
     Mockito.verify(connection, Mockito.times(1)).prepareStatement(expectedSQL);
 
     byte[][] parameters = {"userName".getBytes(), "20".getBytes(), "30".getBytes()};
-
     IntermediatePortalStatement intermediatePortalStatement =
-        intermediateStatement.bind(parameters, new ArrayList<>(), new ArrayList<>());
+        intermediateStatement.bind(
+            parameters, Arrays.asList((short) 0, (short) 0, (short) 0), new ArrayList<>());
 
     Mockito.verify(preparedStatement, Mockito.times(1)).setObject(1, 20L);
     Mockito.verify(preparedStatement, Mockito.times(1)).setObject(2, 30);
@@ -257,30 +257,30 @@ public class StatementTest {
 
     Mockito.verify(preparedStatement, Mockito.times(1)).getMetaData();
 
+    Assert.assertEquals(intermediateStatement.getParameterFormatCode(0), 0);
     Assert.assertEquals(intermediateStatement.getParameterFormatCode(1), 0);
     Assert.assertEquals(intermediateStatement.getParameterFormatCode(2), 0);
-    Assert.assertEquals(intermediateStatement.getParameterFormatCode(3), 0);
+    Assert.assertEquals(intermediateStatement.getResultFormatCode(0), 0);
     Assert.assertEquals(intermediateStatement.getResultFormatCode(1), 0);
     Assert.assertEquals(intermediateStatement.getResultFormatCode(2), 0);
-    Assert.assertEquals(intermediateStatement.getResultFormatCode(3), 0);
 
     intermediateStatement.setParameterFormatCodes(Arrays.asList((short) 1));
     intermediateStatement.setResultFormatCodes(Arrays.asList((short) 1));
+    Assert.assertEquals(intermediateStatement.getParameterFormatCode(0), 1);
     Assert.assertEquals(intermediateStatement.getParameterFormatCode(1), 1);
     Assert.assertEquals(intermediateStatement.getParameterFormatCode(2), 1);
-    Assert.assertEquals(intermediateStatement.getParameterFormatCode(3), 1);
+    Assert.assertEquals(intermediateStatement.getResultFormatCode(0), 1);
     Assert.assertEquals(intermediateStatement.getResultFormatCode(1), 1);
     Assert.assertEquals(intermediateStatement.getResultFormatCode(2), 1);
-    Assert.assertEquals(intermediateStatement.getResultFormatCode(3), 1);
 
     intermediateStatement.setParameterFormatCodes(Arrays.asList((short) 0, (short) 1, (short) 0));
     intermediateStatement.setResultFormatCodes(Arrays.asList((short) 0, (short) 1, (short) 0));
-    Assert.assertEquals(intermediateStatement.getParameterFormatCode(1), 0);
-    Assert.assertEquals(intermediateStatement.getParameterFormatCode(2), 1);
-    Assert.assertEquals(intermediateStatement.getParameterFormatCode(3), 0);
-    Assert.assertEquals(intermediateStatement.getResultFormatCode(1), 0);
-    Assert.assertEquals(intermediateStatement.getResultFormatCode(2), 1);
-    Assert.assertEquals(intermediateStatement.getResultFormatCode(3), 0);
+    Assert.assertEquals(intermediateStatement.getParameterFormatCode(0), 0);
+    Assert.assertEquals(intermediateStatement.getParameterFormatCode(1), 1);
+    Assert.assertEquals(intermediateStatement.getParameterFormatCode(2), 0);
+    Assert.assertEquals(intermediateStatement.getResultFormatCode(0), 0);
+    Assert.assertEquals(intermediateStatement.getResultFormatCode(1), 1);
+    Assert.assertEquals(intermediateStatement.getResultFormatCode(2), 0);
   }
 
   @Test(expected = IllegalStateException.class)

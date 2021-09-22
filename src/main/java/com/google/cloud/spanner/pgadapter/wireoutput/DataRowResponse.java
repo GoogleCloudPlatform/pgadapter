@@ -79,7 +79,6 @@ public class DataRowResponse extends WireOutput {
         this.outputStream.write(column_value);
       }
     }
-    this.outputStream.flush();
   }
 
   @Override

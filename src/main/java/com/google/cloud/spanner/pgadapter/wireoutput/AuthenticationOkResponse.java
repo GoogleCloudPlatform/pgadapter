@@ -30,7 +30,6 @@ public class AuthenticationOkResponse extends WireOutput {
   @Override
   public void sendPayload() throws IOException {
     this.outputStream.writeInt(SUCCESS_FLAG);
-    this.outputStream.flush();
   }
 
   @Override

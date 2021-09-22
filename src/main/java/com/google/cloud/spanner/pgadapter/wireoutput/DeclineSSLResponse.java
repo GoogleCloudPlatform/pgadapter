@@ -25,9 +25,7 @@ public class DeclineSSLResponse extends WireOutput {
   }
 
   @Override
-  public void sendPayload() throws IOException {
-    this.outputStream.flush();
-  }
+  public void sendPayload() throws IOException {}
 
   @Override
   protected boolean isCompoundResponse() {

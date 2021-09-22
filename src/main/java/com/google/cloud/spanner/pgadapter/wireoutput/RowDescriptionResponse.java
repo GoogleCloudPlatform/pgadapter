@@ -104,10 +104,9 @@ public class RowDescriptionResponse extends WireOutput {
               ? defaultFormat.getCode()
               : this.statement.getResultFormatCode(column_index) == 0
                   ? defaultFormat.getCode()
-                  : this.statement.getResultFormatCode(column_index);
+                  : this.statement.getResultFormatCode(column_index - 1);
       this.outputStream.writeShort(format);
     }
-    this.outputStream.flush();
   }
 
   @Override
@@ -179,6 +178,8 @@ public class RowDescriptionResponse extends WireOutput {
         return 8;
       case Oid.CHAR:
         return 1;
+      case Oid.TEXT:
+        return -1;
       case Oid.VARCHAR:
         return -1;
       case Oid.BYTEA:

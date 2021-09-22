@@ -15,11 +15,12 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationOkResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.KeyDataResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ParameterStatusResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
-import com.google.cloud.spanner.pgadapter.wireoutput.StartUpMessageResponse;
 import java.io.DataOutputStream;
 import java.util.HashMap;
 import java.util.Map;
@@ -82,13 +83,20 @@ public abstract class BootstrapMessage extends WireMessage {
    * @param secret The secret apposite this connection
    * @throws Exception
    */
-  public static void sendStartupMessage(DataOutputStream output, int connectionId, int secret)
+  public static void sendStartupMessage(
+      DataOutputStream output, int connectionId, int secret, OptionsMetadata options)
       throws Exception {
     new AuthenticationOkResponse(output).send();
     new KeyDataResponse(output, connectionId, secret).send();
-    new StartUpMessageResponse(output, "integer_datetimes".getBytes(), "on".getBytes()).send();
-    new StartUpMessageResponse(output, "client_encoding".getBytes(), "utf8".getBytes()).send();
-    new StartUpMessageResponse(output, "DateStyle".getBytes(), "ISO".getBytes()).send();
+    new ParameterStatusResponse(
+            output, "server_version".getBytes(), options.getServerVersion().getBytes())
+        .send();
+    new ParameterStatusResponse(output, "application_name".getBytes(), "PGAdapter".getBytes())
+        .send();
+    new ParameterStatusResponse(output, "integer_datetimes".getBytes(), "on".getBytes()).send();
+    new ParameterStatusResponse(output, "server_encoding".getBytes(), "utf8".getBytes()).send();
+    new ParameterStatusResponse(output, "client_encoding".getBytes(), "utf8".getBytes()).send();
+    new ParameterStatusResponse(output, "DateStyle".getBytes(), "ISO".getBytes()).send();
     new ReadyResponse(output, Status.IDLE).send();
   }
 }

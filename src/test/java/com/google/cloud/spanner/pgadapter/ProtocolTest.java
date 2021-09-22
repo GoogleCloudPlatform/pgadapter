@@ -27,7 +27,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.statements.PSQLStatement;
+import com.google.cloud.spanner.pgadapter.statements.MatcherStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.CancelMessage;
@@ -122,7 +122,7 @@ public class ProtocolTest {
     Mockito.when(connection.createStatement()).thenReturn(statement);
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
-    Mockito.when(options.isPSQLMode()).thenReturn(false);
+    Mockito.when(options.requiresMatcher()).thenReturn(false);
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -155,7 +155,7 @@ public class ProtocolTest {
     Mockito.when(connection.createStatement()).thenReturn(statement);
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
-    Mockito.when(options.isPSQLMode()).thenReturn(true);
+    Mockito.when(options.requiresMatcher()).thenReturn(true);
     Mockito.when(options.getCommandMetadataJSON())
         .thenReturn((JSONObject) parser.parse("{\"commands\": []}"));
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
@@ -165,7 +165,7 @@ public class ProtocolTest {
 
     WireMessage message = ControlMessage.create(connectionHandler);
     Assert.assertEquals(message.getClass(), QueryMessage.class);
-    Assert.assertEquals(((QueryMessage) message).getStatement().getClass(), PSQLStatement.class);
+    Assert.assertEquals(((QueryMessage) message).getStatement().getClass(), MatcherStatement.class);
     Assert.assertEquals(((QueryMessage) message).getStatement().getSql(), expectedSQL);
 
     QueryMessage messageSpy = (QueryMessage) Mockito.spy(message);
@@ -186,7 +186,7 @@ public class ProtocolTest {
 
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
-    Mockito.when(options.isPSQLMode()).thenReturn(false);
+    Mockito.when(options.requiresMatcher()).thenReturn(false);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1153,6 +1153,8 @@ public class ProtocolTest {
                 + "psql\0"
                 + "client_encoding\0"
                 + "UTF8\0"
+                + "server_version\0"
+                + "13.4\0"
                 + "user\0"
                 + "me\0")
             .getBytes();
@@ -1164,6 +1166,7 @@ public class ProtocolTest {
     expectedParameters.put("database", "databasename");
     expectedParameters.put("application_name", "psql");
     expectedParameters.put("client_encoding", "UTF8");
+    expectedParameters.put("server_version", "13.4");
     expectedParameters.put("user", "me");
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
@@ -1174,6 +1177,7 @@ public class ProtocolTest {
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(connectionHandler.getConnectionId()).thenReturn(1);
     Mockito.when(server.getOptions()).thenReturn(options);
+    Mockito.when(options.getServerVersion()).thenReturn("13.4");
     Mockito.when(options.shouldAuthenticate()).thenReturn(false);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1198,12 +1202,25 @@ public class ProtocolTest {
     Assert.assertEquals(outputResult.readInt(), 1);
     Assert.assertEquals(outputResult.readInt(), 0);
 
-    // StartupMessageResponse (x3)
+    // ParameterStatusResponse (x4)
+    Assert.assertEquals(outputResult.readByte(), 'S');
+    Assert.assertEquals(outputResult.readInt(), 24);
+    Assert.assertEquals(readUntil(outputResult, "server_version\0".length()), "server_version\0");
+    Assert.assertEquals(readUntil(outputResult, "13.4\0".length()), "13.4\0");
+    Assert.assertEquals(outputResult.readByte(), 'S');
+    Assert.assertEquals(outputResult.readInt(), 31);
+    Assert.assertEquals(
+        readUntil(outputResult, "application_name\0".length()), "application_name\0");
+    Assert.assertEquals(readUntil(outputResult, "PGAdapter\0".length()), "PGAdapter\0");
     Assert.assertEquals(outputResult.readByte(), 'S');
     Assert.assertEquals(outputResult.readInt(), 25);
     Assert.assertEquals(
         readUntil(outputResult, "integer_datetimes\0".length()), "integer_datetimes\0");
     Assert.assertEquals(readUntil(outputResult, "on\0".length()), "on\0");
+    Assert.assertEquals(outputResult.readByte(), 'S');
+    Assert.assertEquals(outputResult.readInt(), 25);
+    Assert.assertEquals(readUntil(outputResult, "server_encoding\0".length()), "server_encoding\0");
+    Assert.assertEquals(readUntil(outputResult, "utf8\0".length()), "utf8\0");
     Assert.assertEquals(outputResult.readByte(), 'S');
     Assert.assertEquals(outputResult.readInt(), 25);
     Assert.assertEquals(readUntil(outputResult, "client_encoding\0".length()), "client_encoding\0");

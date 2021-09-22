@@ -18,40 +18,56 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-/** Signals to a client that an issued query is complete. */
-public class CommandCompleteResponse extends WireOutput {
+/** Sends back start-up parameters (can be sent more than once) */
+public class ParameterStatusResponse extends WireOutput {
 
   private static final int HEADER_LENGTH = 4;
   private static final int NULL_TERMINATOR_LENGTH = 1;
 
   private static final byte NULL_TERMINATOR = 0;
 
-  private final byte[] command;
+  public final byte[] parameterKey;
+  public final byte[] parameterValue;
 
-  public CommandCompleteResponse(DataOutputStream output, String command) {
-    super(output, HEADER_LENGTH + command.getBytes(UTF8).length + NULL_TERMINATOR_LENGTH);
-    this.command = command.getBytes(UTF8);
+  public ParameterStatusResponse(
+      DataOutputStream output, byte[] parameterKey, byte[] parameterValue) {
+    super(
+        output,
+        HEADER_LENGTH
+            + parameterKey.length
+            + NULL_TERMINATOR_LENGTH
+            + parameterValue.length
+            + NULL_TERMINATOR_LENGTH);
+    this.parameterKey = parameterKey;
+    this.parameterValue = parameterValue;
   }
 
   @Override
-  protected void sendPayload() throws IOException {
-    this.outputStream.write(command);
+  public void sendPayload() throws IOException {
+    this.outputStream.write(this.parameterKey);
+    this.outputStream.writeByte(NULL_TERMINATOR);
+    this.outputStream.write(this.parameterValue);
     this.outputStream.writeByte(NULL_TERMINATOR);
   }
 
   @Override
   public byte getIdentifier() {
-    return 'C';
+    return 'S';
   }
 
   @Override
   protected String getMessageName() {
-    return "Command Complete";
+    return "Parameter Status";
   }
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}, " + "Command: {1}")
-        .format(new Object[] {this.length, new String(this.command, UTF8)});
+    return new MessageFormat("Length: {0}, " + "Parameter Key: {1}, " + "Parameter Value: {2}")
+        .format(
+            new Object[] {
+              this.length,
+              new String(this.parameterKey, UTF8),
+              new String(this.parameterValue, UTF8)
+            });
   }
 }

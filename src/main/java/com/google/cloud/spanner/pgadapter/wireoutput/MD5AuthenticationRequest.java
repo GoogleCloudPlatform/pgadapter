@@ -35,7 +35,6 @@ public class MD5AuthenticationRequest extends WireOutput {
   public void sendPayload() throws IOException {
     this.outputStream.writeInt(PASSWORD_REQUIRED_FLAG);
     this.outputStream.write(this.salt);
-    this.outputStream.flush();
   }
 
   @Override

@@ -17,7 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.statements.PSQLStatement;
+import com.google.cloud.spanner.pgadapter.statements.MatcherStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
 import java.text.MessageFormat;
@@ -31,11 +31,11 @@ public class QueryMessage extends ControlMessage {
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
-    if (!connection.getServer().getOptions().isPSQLMode()) {
+    if (!connection.getServer().getOptions().requiresMatcher()) {
       this.statement =
           new IntermediateStatement(this.readAll(), this.connection.getJdbcConnection());
     } else {
-      this.statement = new PSQLStatement(this.readAll(), this.connection);
+      this.statement = new MatcherStatement(this.readAll(), this.connection);
     }
     this.connection.addActiveStatement(this.statement);
   }
@@ -68,7 +68,7 @@ public class QueryMessage extends ControlMessage {
   }
 
   /**
-   * Simple Query handler, whcih examined the state of the statement and processes accordingly (if
+   * Simple Query handler, which examined the state of the statement and processes accordingly (if
    * error, handle error, otherwise sends the result and if contains result set, send row
    * description)
    *
