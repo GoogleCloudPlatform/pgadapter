@@ -24,6 +24,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import java.io.DataOutputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TimeZone;
 
 /**
  * This represents all messages which occur before {@link ControlMessage} type messages. Those
@@ -93,10 +94,21 @@ public abstract class BootstrapMessage extends WireMessage {
         .send();
     new ParameterStatusResponse(output, "application_name".getBytes(), "PGAdapter".getBytes())
         .send();
+    new ParameterStatusResponse(output, "is_superuser".getBytes(), "false".getBytes()).send();
+    new ParameterStatusResponse(output, "session_authorization".getBytes(), "PGAdapter".getBytes())
+        .send();
     new ParameterStatusResponse(output, "integer_datetimes".getBytes(), "on".getBytes()).send();
     new ParameterStatusResponse(output, "server_encoding".getBytes(), "utf8".getBytes()).send();
     new ParameterStatusResponse(output, "client_encoding".getBytes(), "utf8".getBytes()).send();
     new ParameterStatusResponse(output, "DateStyle".getBytes(), "ISO".getBytes()).send();
+    new ParameterStatusResponse(output, "IntervalStyle".getBytes(), "iso_8601".getBytes()).send();
+    new ParameterStatusResponse(output, "standard_conforming_strings".getBytes(), "true".getBytes())
+        .send();
+    new ParameterStatusResponse(
+            output,
+            "TimeZone".getBytes(),
+            TimeZone.getDefault().getDisplayName(false, TimeZone.SHORT).getBytes())
+        .send();
     new ReadyResponse(output, Status.IDLE).send();
   }
 }

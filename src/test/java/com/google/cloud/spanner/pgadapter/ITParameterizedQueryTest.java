@@ -20,7 +20,6 @@ import static org.junit.Assert.assertThat;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.common.primitives.Bytes;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -78,8 +77,6 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
       testEnv.getCredentials(),
       "-s",
       String.valueOf(testEnv.getPort()),
-      "-f",
-      TextFormat.POSTGRESQL.toString(),
       "-e",
       "staging-wrenchworks.sandbox.googleapis.com"
     };
