@@ -178,35 +178,6 @@ java -jar <jar-file> -p <project name> -i <instance id> -d <database name> -c
     --rm -it pgadapter
     ```
 
-#### Standalone through published docker image
-
-The following will only work if you have configured your project to be `span-cloud-testing`.
-
-1. Authenticate with gcloud:
-
-    ```
-    gcloud auth login
-    ```
-
-2. Configure docker to pull from the internal docker repository:
-
-    ```
-    gcloud auth configure-docker us-west1-docker.pkg.dev
-    ```
-
-3. Run the docker image. Remember to specify the local path to your credentials, the project id, the instance id and the database id.
-
-    ```
-    docker run \
-      --publish 5432:5432 \
-      -v <path to your local credentials.json>:/tmp/credentials.json \
-      us-west1-docker.pkg.dev/span-cloud-testing/spangres-artifacts-docker/google-cloud-spanner-pgadapter \
-      -p <project id> \
-      -i <instance id> \
-      -d <database id> \
-      -c /tmp/credentials.json
-    ```
-
 ### In-process
 1. Add google-cloud-spanner-pgadapter as a dependency to your project.
 2. Build a server using the `com.google.cloud.spanner.pgadapter.ProxyServer` 
