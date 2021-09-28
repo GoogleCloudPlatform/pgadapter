@@ -33,14 +33,13 @@ import org.json.simple.JSONObject;
 public class OptionsMetadata {
 
   private static final Logger logger = Logger.getLogger(OptionsMetadata.class.getName());
-  private static final String DEFAULT_SERVER_VERSION = "13.4";
+  private static final String DEFAULT_SERVER_VERSION = "1.0.0";
 
   private static final String OPTION_SERVER_PORT = "s";
   private static final String OPTION_PROJECT_ID = "p";
   private static final String OPTION_INSTANCE_ID = "i";
   private static final String OPTION_DATABASE_NAME = "d";
   private static final String OPTION_CREDENTIALS_FILE = "c";
-  private static final String OPTION_TEXT_FORMAT = "f";
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
   private static final String OPTION_PSQL_MODE = "q";
@@ -73,7 +72,7 @@ public class OptionsMetadata {
     this.commandMetadataParser = new CommandMetadataParser();
     this.connectionURL = buildConnectionURL(commandLine);
     this.proxyPort = buildProxyPort(commandLine);
-    this.textFormat = buildTextFormat(commandLine);
+    this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
     this.requiresMatcher =
@@ -120,17 +119,6 @@ public class OptionsMetadata {
       }
     }
     return properties;
-  }
-
-  /**
-   * Takes the text format option result and parses it accordingly to fit the TextFormat data type.
-   *
-   * @param commandLine The parsed options for CLI
-   * @return The specified text format from the user input, or default POSTGRESQL if none.
-   */
-  private TextFormat buildTextFormat(CommandLine commandLine) {
-    return TextFormat.valueOf(
-        commandLine.getOptionValue(OPTION_TEXT_FORMAT, TextFormat.POSTGRESQL.toString()));
   }
 
   /**
@@ -272,12 +260,6 @@ public class OptionsMetadata {
         true,
         "The full path of the file location wherein lives the GCP credentials."
             + "If not specified, will try to read application default credentials.");
-    options.addOption(
-        OPTION_TEXT_FORMAT,
-        "format",
-        true,
-        "The TextFormat that should be used as the format for the server"
-            + " (default is POSTGRESQL).");
     options.addOption(
         OPTION_SPANNER_ENDPOINT, "spanner-endpoint", true, "The Cloud Spanner service endpoint.");
     options.addOption(

@@ -109,6 +109,16 @@ public class ProtocolTest {
     return new String(item, StandardCharsets.UTF_8);
   }
 
+  private String readUntil(DataInputStream input, char delimeter) throws Exception {
+    String result = "";
+    byte c;
+    do {
+      c = input.readByte();
+      result += (char) c;
+    } while (c != '\0');
+    return result;
+  }
+
   @Test
   public void testQueryMessage() throws Exception {
     byte[] messageMetadata = {'Q', 0, 0, 0, 24};
@@ -1202,7 +1212,7 @@ public class ProtocolTest {
     Assert.assertEquals(outputResult.readInt(), 1);
     Assert.assertEquals(outputResult.readInt(), 0);
 
-    // ParameterStatusResponse (x4)
+    // ParameterStatusResponse (x11)
     Assert.assertEquals(outputResult.readByte(), 'S');
     Assert.assertEquals(outputResult.readInt(), 24);
     Assert.assertEquals(readUntil(outputResult, "server_version\0".length()), "server_version\0");
@@ -1211,6 +1221,15 @@ public class ProtocolTest {
     Assert.assertEquals(outputResult.readInt(), 31);
     Assert.assertEquals(
         readUntil(outputResult, "application_name\0".length()), "application_name\0");
+    Assert.assertEquals(readUntil(outputResult, "PGAdapter\0".length()), "PGAdapter\0");
+    Assert.assertEquals(outputResult.readByte(), 'S');
+    Assert.assertEquals(outputResult.readInt(), 23);
+    Assert.assertEquals(readUntil(outputResult, "is_superuser\0".length()), "is_superuser\0");
+    Assert.assertEquals(readUntil(outputResult, "false\0".length()), "false\0");
+    Assert.assertEquals(outputResult.readByte(), 'S');
+    Assert.assertEquals(outputResult.readInt(), 36);
+    Assert.assertEquals(
+        readUntil(outputResult, "session_authorization\0".length()), "session_authorization\0");
     Assert.assertEquals(readUntil(outputResult, "PGAdapter\0".length()), "PGAdapter\0");
     Assert.assertEquals(outputResult.readByte(), 'S');
     Assert.assertEquals(outputResult.readInt(), 25);
@@ -1229,6 +1248,21 @@ public class ProtocolTest {
     Assert.assertEquals(outputResult.readInt(), 18);
     Assert.assertEquals(readUntil(outputResult, "DateStyle\0".length()), "DateStyle\0");
     Assert.assertEquals(readUntil(outputResult, "ISO\0".length()), "ISO\0");
+    Assert.assertEquals(outputResult.readByte(), 'S');
+    Assert.assertEquals(outputResult.readInt(), 27);
+    Assert.assertEquals(readUntil(outputResult, "IntervalStyle\0".length()), "IntervalStyle\0");
+    Assert.assertEquals(readUntil(outputResult, "iso_8601\0".length()), "iso_8601\0");
+    Assert.assertEquals(outputResult.readByte(), 'S');
+    Assert.assertEquals(outputResult.readInt(), 37);
+    Assert.assertEquals(
+        readUntil(outputResult, "standard_conforming_strings\0".length()),
+        "standard_conforming_strings\0");
+    Assert.assertEquals(readUntil(outputResult, "true\0".length()), "true\0");
+    Assert.assertEquals(outputResult.readByte(), 'S');
+    Assert.assertEquals(outputResult.readInt(), 17);
+    Assert.assertEquals(readUntil(outputResult, "TimeZone\0".length()), "TimeZone\0");
+    // Timezone will vary depending on the default location of the JVM that is running.
+    readUntil(outputResult, '\0');
 
     // ReadyResponse
     Assert.assertEquals(outputResult.readByte(), 'Z');

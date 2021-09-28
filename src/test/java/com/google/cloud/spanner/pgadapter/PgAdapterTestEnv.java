@@ -355,6 +355,11 @@ public final class PgAdapterTestEnv {
     consumePGMessage('S', in); // ParameterStatus
     consumePGMessage('S', in); // ParameterStatus
     consumePGMessage('S', in); // ParameterStatus
+    consumePGMessage('S', in); // ParameterStatus
+    consumePGMessage('S', in); // ParameterStatus
+    consumePGMessage('S', in); // ParameterStatus
+    consumePGMessage('S', in); // ParameterStatus
+    consumePGMessage('S', in); // ParameterStatus
     consumePGMessage('Z', in); // ReadyForQuery
   }
 
