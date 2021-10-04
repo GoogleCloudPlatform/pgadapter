@@ -7,6 +7,13 @@ sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/
 sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-di-param.txt
 sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-dn.txt
 sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-dn-param.txt
+# remove --- hyphenated formatting lines
+sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dt.txt
+sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dt-param.txt
+sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-di.txt
+sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-di-param.txt
+sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dn.txt
+sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dn-param.txt
 
 echo "------Test \"select 1::int8\"------"
 echo "select 1::int8;" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/select-one.txt
