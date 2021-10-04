@@ -1,9 +1,9 @@
                                                                                 List of schemas
  catalog_name |    schema_name     | schema_owner | default_character_set_catalog | default_character_set_schema | default_character_set_name | sql_path | effective_timestamp 
 --------------+--------------------+--------------+-------------------------------+------------------------------+----------------------------+----------+---------------------
- e2e-test     | public             |              |                               |                              |                            |          |    1633377651714878
- e2e-test     | pg_catalog         |              |                               |                              |                            |          |                    
- e2e-test     | information_schema |              |                               |                              |                            |          |                    
- e2e-test     | spanner_sys        |              |                               |                              |                            |          |                    
+ testdb_e2e_psql_v??     | public             |              |                               |                              |                            |          |    1633377651714878
+ testdb_e2e_psql_v??     | pg_catalog         |              |                               |                              |                            |          |                    
+ testdb_e2e_psql_v??     | information_schema |              |                               |                              |                            |          |                    
+ testdb_e2e_psql_v??     | spanner_sys        |              |                               |                              |                            |          |                    
 (4 rows)
 
