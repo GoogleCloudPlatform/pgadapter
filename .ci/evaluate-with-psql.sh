@@ -37,21 +37,25 @@ RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"\\dt\"------"
 echo "\dt" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/backslash-dt.txt
+sed -i "s/---[-]*//g" .ci/e2e-result/backslash-dt.txt
 diff -i -w -s .ci/e2e-result/backslash-dt.txt .ci/e2e-expected/backslash-dt.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"\\dt <tablename>\------"
 echo "\dt users" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/backslash-dt-param.txt
+sed -i "s/---[-]*//g" .ci/e2e-result/backslash-dt-param.txt
 diff -i -w -s .ci/e2e-result/backslash-dt-param.txt .ci/e2e-expected/backslash-dt-param.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"\\di\"------"
 echo "\di" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/backslash-di.txt
+sed -i "s/---[-]*//g" .ci/e2e-result/backslash-di.txt
 diff -i -w -s .ci/e2e-result/backslash-di.txt .ci/e2e-expected/backslash-di.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"\\di <indexname>\"------"
 echo "\di PRIMARY_KEY;" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/backslash-di-param.txt
+sed -i "s/---[-]*//g" .ci/e2e-result/backslash-di-param.txt
 diff -i -w -s .ci/e2e-result/backslash-di-param.txt .ci/e2e-expected/backslash-di-param.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
@@ -59,6 +63,7 @@ echo "------Test \"\\dn\"------"
 echo "\dn" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/backslash-dn.txt
 # ignore effective_timestamp
 sed -i -E 's/[0-9]{16,}//' .ci/e2e-result/backslash-dn.txt
+sed -i "s/---[-]*//g" .ci/e2e-result/backslash-dn.txt
 diff -i -w -s .ci/e2e-result/backslash-dn.txt .ci/e2e-expected/backslash-dn.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
@@ -66,5 +71,6 @@ echo "------Test \"\\dn <schemaname>\"------"
 echo "\dn public" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/backslash-dn-param.txt
 # ignore effective_timestamp
 sed -i -E 's/[0-9]{16,}//' .ci/e2e-result/backslash-dn-param.txt
+sed -i "s/---[-]*//g" .ci/e2e-result/backslash-dn-param.txt
 diff -i -w -s .ci/e2e-result/backslash-dn-param.txt .ci/e2e-expected/backslash-dn-param.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
