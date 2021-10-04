@@ -1,0 +1,8 @@
+                                                                                   List of schemas
+    catalog_name     |    schema_name     | schema_owner | default_character_set_catalog | default_character_set_schema | default_character_set_name | sql_path | effective_timestamp 
+---------------------+--------------------+--------------+-------------------------------+------------------------------+----------------------------+----------+---------------------
+ testdb_e2e_psql_v?? | public             |              |                               |                              |                            |          |
+ testdb_e2e_psql_v?? | information_schema |              |                               |                              |                            |          |
+ testdb_e2e_psql_v?? | spanner_sys        |              |                               |                              |                            |          |
+(3 rows)
+
