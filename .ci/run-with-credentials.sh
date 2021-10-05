@@ -70,7 +70,13 @@ e2e-psql)
   gcloud config set api_endpoint_overrides/spanner "https://${GOOGLE_CLOUD_ENDPOINT}/"
   gcloud alpha spanner databases create "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --instance="${GOOGLE_CLOUD_INSTANCE}" --database-dialect=POSTGRESQL
   gcloud spanner databases ddl update "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --instance="${GOOGLE_CLOUD_INSTANCE}" --ddl='CREATE TABLE users (id bigint PRIMARY KEY, age bigint, name text);'
-  gcloud spanner databases execute-sql "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --instance="${GOOGLE_CLOUD_INSTANCE}" --sql="INSERT INTO users (id, age, name) VALUES (1, 1, 'John'), (2, 20, 'Joe'), (3, 23, 'Jack');"
+  for i in 1 2 3
+  do
+    # attempt this up to 3 times since it sometimes fails
+    gcloud spanner databases execute-sql "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --instance="${GOOGLE_CLOUD_INSTANCE}" --sql="INSERT INTO users (id, age, name) VALUES (1, 1, 'John'), (2, 20, 'Joe'), (3, 23, 'Jack');" && break
+    sleep 3
+  done
+
 #  start PgAdaptor
   PGADAPTER_VERSION="$(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=project.version -q -DforceStdout)"
   UBER_JAR="google-cloud-spanner-pgadapter-${PGADAPTER_VERSION}.jar"
