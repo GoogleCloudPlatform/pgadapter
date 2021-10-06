@@ -173,9 +173,10 @@ java -jar <jar-file> -p <project name> -i <instance id> -d <database name> -c
 2.  Run the docker image with environment variables set:
 
     ```
-    docker run --env PROJECT=<project> --env INSTANCE=<instance>
-    --env DATABASE=<database> --env CREDENTIALS=<credentials> --env PORT=<port>
-    --rm -it pgadapter
+    docker run -d -p 127.0.0.1:HOST-PORT:DOCKER-PORT \
+    -v CREDENTIALS_FILE_PATH:/acct_credentials.json pgadapter:latest \
+    -p PROJECT -i INSTANCE -d DATABASE  \
+    -c /acct_credentials.json -q -x OTHER_OPTIONS
     ```
 
 ### In-process
@@ -210,5 +211,6 @@ path; All other items map directly to previously mentioned CLI options.
 
 ## Support Level
 
-Please feel free to report issues and send pull requests, but note that this 
-application is not officially supported as part of the Cloud Spanner Product.
+We are not currently accepting external code contributions to this project. 
+Please feel free to file feature requests using GitHub's issue tracker or 
+using the existing Cloud Spanner support channels.
