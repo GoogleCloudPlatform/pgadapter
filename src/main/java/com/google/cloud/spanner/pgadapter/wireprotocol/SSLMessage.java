@@ -61,13 +61,8 @@ public class SSLMessage extends BootstrapMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Previously Executed: {1}")
-        .format(new Object[]{
-            this.length,
-            this.executedOnce.get()
-        });
+    return new MessageFormat("Length: {0}, " + "Previously Executed: {1}")
+        .format(new Object[] {this.length, this.executedOnce.get()});
   }
 
   @Override

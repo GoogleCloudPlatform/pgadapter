@@ -16,9 +16,11 @@ package com.google.cloud.spanner.pgadapter.metadata;
 
 import com.google.cloud.spanner.pgadapter.Server;
 import com.google.cloud.spanner.pgadapter.utils.Credentials;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -26,81 +28,97 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 
-/**
- * Metadata extractor for CLI.
- */
+/** Metadata extractor for CLI. */
 public class OptionsMetadata {
+
+  private static final Logger logger = Logger.getLogger(OptionsMetadata.class.getName());
+  private static final String DEFAULT_SERVER_VERSION = "1.0.0";
 
   private static final String OPTION_SERVER_PORT = "s";
   private static final String OPTION_PROJECT_ID = "p";
   private static final String OPTION_INSTANCE_ID = "i";
   private static final String OPTION_DATABASE_NAME = "d";
   private static final String OPTION_CREDENTIALS_FILE = "c";
-  private static final String OPTION_TEXT_FORMAT = "f";
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
   private static final String OPTION_PSQL_MODE = "q";
   private static final String OPTION_COMMAND_METADATA_FILE = "j";
-  private static final String COMMAND_METADATA_FILE_DEFAULT = "metadata/command_metadata.json";
+  private static final String OPTION_DISABLE_LOCALHOST_CHECK = "x";
   private static final String CLI_ARGS =
       "gcpga -p <project> -i <instance> -d <database> -c <credentials_file>";
   private static final String OPTION_HELP = "h";
   private static final String DEFAULT_PORT = "5432";
-  private static final String EMPTY_COMMAND_JSON = "{\"commands\":[]}";
   private static final int MIN_PORT = 1, MAX_PORT = 65535;
+  /*Note: this is a private preview feature, not meant for GA version. */
+  private static final String OPTION_SPANNER_ENDPOINT = "e";
+  private static final String OPTION_JDBC_PROPERTIES = "r";
+  private static final String OPTION_SERVER_VERSION = "v";
 
+  private final CommandMetadataParser commandMetadataParser;
   private final String connectionURL;
   private final int proxyPort;
   private final TextFormat textFormat;
   private final boolean binaryFormat;
   private final boolean authenticate;
-  private final boolean psqlMode;
+  private final boolean requiresMatcher;
+  private final boolean disableLocalhostCheck;
   private final JSONObject commandMetadataJSON;
+  private final Map<String, String> propertyMap;
+  private final String serverVersion;
 
   public OptionsMetadata(String[] args) {
     CommandLine commandLine = buildOptions(args);
+    this.commandMetadataParser = new CommandMetadataParser();
     this.connectionURL = buildConnectionURL(commandLine);
     this.proxyPort = buildProxyPort(commandLine);
-    this.textFormat = buildTextFormat(commandLine);
+    this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
-    this.psqlMode = commandLine.hasOption(OPTION_PSQL_MODE);
+    this.requiresMatcher =
+        commandLine.hasOption(OPTION_PSQL_MODE)
+            || commandLine.hasOption(OPTION_COMMAND_METADATA_FILE);
     this.commandMetadataJSON = buildCommandMetadataJSON(commandLine);
+    this.propertyMap = parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
+    this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
+    this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
   }
 
-  public OptionsMetadata(String connectionURL,
+  public OptionsMetadata(
+      String connectionURL,
       int proxyPort,
       TextFormat textFormat,
       boolean forceBinary,
       boolean authenticate,
-      boolean psqlMode,
+      boolean requiresMatcher,
       JSONObject commandMetadata) {
+    this.commandMetadataParser = new CommandMetadataParser();
     this.connectionURL = connectionURL;
     this.proxyPort = proxyPort;
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
-    this.psqlMode = psqlMode;
+    this.requiresMatcher = requiresMatcher;
     this.commandMetadataJSON = commandMetadata;
+    this.propertyMap = new HashMap<>();
+    this.disableLocalhostCheck = false;
+    this.serverVersion = DEFAULT_SERVER_VERSION;
   }
 
-  public static String getDefaultCommandMetadataFilePath() {
-    return COMMAND_METADATA_FILE_DEFAULT;
-  }
-
-  /**
-   * Takes the text format option result and parses it accordingly to fit the TextFormat data type.
-   *
-   * @param commandLine The parsed options for CLI
-   * @return The specified text format from the user input, or default POSTGRESQL if none.
-   */
-  private TextFormat buildTextFormat(CommandLine commandLine) {
-    return TextFormat.valueOf(
-        commandLine.getOptionValue(OPTION_TEXT_FORMAT,
-            TextFormat.POSTGRESQL.toString())
-    );
+  private Map<String, String> parseProperties(String propertyOptions) {
+    Map<String, String> properties = new HashMap<>();
+    if (!propertyOptions.isEmpty()) {
+      String[] propertyList = propertyOptions.split(";");
+      for (int i = 0; i < propertyList.length; ++i) {
+        String[] keyValue = propertyList[i].split("=");
+        if (keyValue.length == 2) {
+          properties.put(keyValue[0], keyValue[1]);
+        } else {
+          throw new IllegalArgumentException("Invalid JDBC property specified: " + propertyOptions);
+        }
+      }
+    }
+    return properties;
   }
 
   /**
@@ -110,10 +128,7 @@ public class OptionsMetadata {
    * @return The designated port if any, otherwise the default port.
    */
   private int buildProxyPort(CommandLine commandLine) {
-    int port = Integer.parseInt(
-        commandLine.getOptionValue(
-            OPTION_SERVER_PORT,
-            DEFAULT_PORT));
+    int port = Integer.parseInt(commandLine.getOptionValue(OPTION_SERVER_PORT, DEFAULT_PORT));
     if (port < MIN_PORT || port > MAX_PORT) {
       throw new IllegalArgumentException("Port must be between " + MIN_PORT + " and " + MAX_PORT);
     }
@@ -133,7 +148,7 @@ public class OptionsMetadata {
       if (credentialsPath == null) {
         throw new IllegalArgumentException(
             "User must specify a valid credential file, "
-            + "or have application default credentials set-up.");
+                + "or have application default credentials set-up.");
       }
       return credentialsPath;
     }
@@ -147,12 +162,26 @@ public class OptionsMetadata {
    * @return The parsed JDBC connection string.
    */
   private String buildConnectionURL(CommandLine commandLine) {
+    String host = commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT, "");
+    String jdbcEndpoint;
+    if (host.isEmpty()) {
+      jdbcEndpoint = "jdbc:cloudspanner:/";
+    } else {
+      jdbcEndpoint = "jdbc:cloudspanner://" + host + "/";
+      logger.log(
+          Level.INFO,
+          "PG Adapter will connect to the following Cloud Spanner service endpoint {0}",
+          host);
+    }
+
     // Note that Credentials here is the credentials file, not the actual credentials
-    return String.format("jdbc:cloudspanner:/"
+    return String.format(
+        jdbcEndpoint
             + "projects/%s/"
             + "instances/%s/"
             + "databases/%s"
-            + ";credentials=%s",
+            + ";credentials=%s"
+            + ";dialect=postgresql",
         commandLine.getOptionValue(OPTION_PROJECT_ID),
         commandLine.getOptionValue(OPTION_INSTANCE_ID),
         commandLine.getOptionValue(OPTION_DATABASE_NAME),
@@ -161,40 +190,42 @@ public class OptionsMetadata {
 
   /**
    * Takes the content of the specified (or default) command file and parses it into JSON format. If
-   * finding the file fails in any-way, print an error and keep going with an empty spec. This is
-   * done as commands are only required for PSQL mode and we wouldn't want it to affect other
-   * important functionalities.
+   * finding the file fails in any-way, print an error and keep going with an empty spec. Custom
+   * metadata json file is allowed without PSQL mode.
    *
    * @param commandLine The parsed options for CLI
    * @return The JSON object corresponding to the string contained within the specified (or default)
-   * command file.
+   *     command file.
    */
   private JSONObject buildCommandMetadataJSON(CommandLine commandLine) {
-    if(commandLine.hasOption(OPTION_COMMAND_METADATA_FILE) &&
-        !commandLine.hasOption(OPTION_PSQL_MODE)) {
+    if (commandLine.hasOption(OPTION_COMMAND_METADATA_FILE)
+        && commandLine.hasOption(OPTION_PSQL_MODE)) {
       throw new IllegalArgumentException(
-          "PSQL Mode must be toggled (-q) to specify command metadata file (-j).");
+          "PSQL Mode shouldn't be toggled (-q) together with the custom command metadata file"
+              + " (-j).");
     }
 
-    File commandMetadataFile = new File(commandLine.getOptionValue(
-        OPTION_COMMAND_METADATA_FILE,
-        COMMAND_METADATA_FILE_DEFAULT));
-    JSONParser parser = new JSONParser();
+    final String commandMetadataFileName = commandLine.getOptionValue(OPTION_COMMAND_METADATA_FILE);
     try {
-      return (JSONObject) parser
-          .parse(new String(Files.readAllBytes(commandMetadataFile.toPath())));
+      if (commandMetadataFileName != null) {
+        return commandMetadataParser.parse(commandMetadataFileName);
+      } else {
+        return commandMetadataParser.defaultCommands();
+      }
     } catch (IOException e) {
-      System.err.println(String
-          .format("Specified command metadata file %s not found! Ignoring commands metadata file.",
-              commandMetadataFile));
+      System.err.printf(
+          "Specified command metadata file %s not found! Ignoring commands metadata file.%n",
+          commandMetadataFileName);
+
       try {
-        return (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
-      } catch (org.json.simple.parser.ParseException ex) {
+        return commandMetadataParser.emptyCommands();
+      } catch (IOException | org.json.simple.parser.ParseException ex) {
         throw new IllegalArgumentException(
-            "Something went wrong! Processing empty JSON file failed!", e);
+            "Something went wrong! Processing empty JSON file failed!", ex);
       }
     } catch (org.json.simple.parser.ParseException e) {
-      throw new IllegalArgumentException("Unable to process provided JSON file:", e);
+      throw new IllegalArgumentException(
+          "Unable to process provided JSON file: " + commandMetadataFileName, e);
     }
   }
 
@@ -206,36 +237,60 @@ public class OptionsMetadata {
    */
   private CommandLine buildOptions(String[] args) {
     Options options = new Options();
-    options.addOption(OPTION_SERVER_PORT, "server-port", true,
-        "This proxy's port number (Default 5432).");
-    options.addRequiredOption(OPTION_PROJECT_ID, "project", true,
+    options.addOption(
+        OPTION_SERVER_PORT, "server-port", true, "This proxy's port number (Default 5432).");
+    options.addRequiredOption(
+        OPTION_PROJECT_ID,
+        "project",
+        true,
         "The id of the GCP project wherein lives the Spanner database.");
-    options.addRequiredOption(OPTION_INSTANCE_ID, "instance", true,
+    options.addRequiredOption(
+        OPTION_INSTANCE_ID,
+        "instance",
+        true,
         "The id of the Spanner instance within the GCP project.");
-    options.addRequiredOption(OPTION_DATABASE_NAME, "database", true,
+    options.addRequiredOption(
+        OPTION_DATABASE_NAME,
+        "database",
+        true,
         "The name of the Spanner database within the GCP project.");
-    options.addOption(OPTION_CREDENTIALS_FILE, "credentials-file", true,
+    options.addOption(
+        OPTION_CREDENTIALS_FILE,
+        "credentials-file",
+        true,
         "The full path of the file location wherein lives the GCP credentials."
             + "If not specified, will try to read application default credentials.");
-    options.addOption(OPTION_TEXT_FORMAT, "format", true,
-        "The TextFormat that should be used as the format for the server"
-            + " (default is POSTGRESQL).");
-    options.addOption(OPTION_AUTHENTICATE, "authenticate", false,
-        "Whether you wish the proxy to perform an authentication step."
-    );
-    options.addOption(OPTION_PSQL_MODE, "psql-mode", false,
-        "This option turns on PSQL mode. This mode allows better compatibility to PSQL, "
-            + "with an added performance cost. This mode should not be used for production, and we "
-            + "do not guarantee its functionality beyond the basics."
-    );
-    options.addOption(OPTION_COMMAND_METADATA_FILE, "options-metadata", true,
-        "The full path of the file containing the metadata specifications for psql-mode's "
-            + "dynamic matcher. Each item in this matcher will create a runtime-generated command "
-            + "which will translate incoming commands into whatever back-end SQL is desired.");
-    options.addOption(OPTION_HELP, "help", false,
-        "Print help."
-    );
-    options.addOption(OPTION_BINARY_FORMAT, "force-binary-format", false,
+    options.addOption(
+        OPTION_SPANNER_ENDPOINT, "spanner-endpoint", true, "The Cloud Spanner service endpoint.");
+    options.addOption(
+        OPTION_AUTHENTICATE,
+        "authenticate",
+        false,
+        "Whether you wish the proxy to perform an authentication step.");
+    options.addOption(
+        OPTION_PSQL_MODE,
+        "psql-mode",
+        false,
+        "This option turns on PSQL mode. This mode allows better compatibility to PSQL, with an"
+            + " added performance cost. PSQL mode is implemented using predefined dynamic matchers"
+            + " and as such cannot be used with the option -j. This mode should not be used for"
+            + " production, and we do not guarantee its functionality beyond the basics.");
+    options.addOption(
+        OPTION_COMMAND_METADATA_FILE,
+        "options-metadata",
+        true,
+        "This option specifies the full path of the file containing the metadata specifications for"
+            + " custom dynamic matchers. Each item in this matcher will create a runtime-generated"
+            + " command which will translate incoming commands into whatever back-end SQL is"
+            + " desired. This feature allows re-writing queries that are outside the user's control"
+            + " (e.g: issued by client libraries and / or tools) and are not currently supported by"
+            + " the backend with equivalent supported queries, but comes at a performance cost."
+            + " This option cannot be used with option -q.");
+    options.addOption(OPTION_HELP, "help", false, "Print help.");
+    options.addOption(
+        OPTION_BINARY_FORMAT,
+        "force-binary-format",
+        false,
         "Force the server to send data back in binary PostgreSQL format when no specific "
             + "format has been requested. The PostgreSQL wire protocol specifies that the server "
             + "should send data in text format in those cases. This setting overrides this default "
@@ -244,6 +299,28 @@ public class OptionsMetadata {
             + "mode. Queries in simple query mode will always return results in text format. If "
             + "you do not know what extended query mode and simple query mode is, then you should "
             + "probably not be using this setting.");
+    options.addOption(
+        OPTION_JDBC_PROPERTIES,
+        "jdbc-properties",
+        true,
+        "This option specifies additional properties that will be used with the JDBC connection. "
+            + "They should be in the format <key1>=<value1>;<key2>=<value2>;...");
+    options.addOption(
+        OPTION_DISABLE_LOCALHOST_CHECK,
+        "disable-localhost-check-for-docker",
+        false,
+        "By default, for safety, PG Adapter only accepts connections from localhost. "
+            + "When running inside docker however the docker host IP will not show as localhost. "
+            + "Instead, set this flag and restrict connections from localhost using docker, e.g: "
+            + "`-p 127.0.0.1:5432:5432`");
+    options.addOption(
+        OPTION_SERVER_VERSION,
+        "server-version",
+        true,
+        "This option specifies what server_version PG Adapter should claim to be. If not specified "
+            + " it will default to version "
+            + DEFAULT_SERVER_VERSION);
+
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
     try {
@@ -283,8 +360,20 @@ public class OptionsMetadata {
     return this.authenticate;
   }
 
-  public boolean isPSQLMode() {
-    return this.psqlMode;
+  public boolean requiresMatcher() {
+    return this.requiresMatcher;
+  }
+
+  public boolean disableLocalhostCheck() {
+    return this.disableLocalhostCheck;
+  }
+
+  public Map<String, String> getPropertyMap() {
+    return this.propertyMap;
+  }
+
+  public String getServerVersion() {
+    return serverVersion;
   }
 
   /**
@@ -295,7 +384,7 @@ public class OptionsMetadata {
    * is advisable to use Cloud Spanner formatting. The server will then return all data in a format
    * understood by Cloud Spanner.
    *
-   * The default format used by the server is {@link TextFormat}.
+   * <p>The default format used by the server is {@link TextFormat}.
    */
   public enum TextFormat {
     /**

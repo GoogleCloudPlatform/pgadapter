@@ -15,10 +15,12 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.cloud.spanner.jdbc.JdbcConstants;
+import com.google.cloud.spanner.pgadapter.metadata.SQLMetadata;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.ResultType;
+import com.google.cloud.spanner.pgadapter.utils.Converter;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -43,16 +45,11 @@ import org.postgresql.util.ByteConverter;
 @RunWith(JUnit4.class)
 public class StatementTest {
 
-  @Rule
-  public MockitoRule rule = MockitoJUnit.rule();
-  @Mock
-  private Connection connection;
-  @Mock
-  private Statement statement;
-  @Mock
-  private PreparedStatement preparedStatement;
-  @Mock
-  private ResultSet resultSet;
+  @Rule public MockitoRule rule = MockitoJUnit.rule();
+  @Mock private Connection connection;
+  @Mock private Statement statement;
+  @Mock private PreparedStatement preparedStatement;
+  @Mock private ResultSet resultSet;
 
   private byte[] longToBytes(int value) {
     byte[] parameters = new byte[8];
@@ -67,8 +64,8 @@ public class StatementTest {
     Mockito.when(statement.getResultSet()).thenReturn(resultSet);
     Mockito.when(resultSet.next()).thenReturn(true);
 
-    IntermediateStatement intermediateStatement = new IntermediateStatement("SELECT * FROM users",
-        connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement("SELECT * FROM users", connection);
 
     Assert.assertFalse(intermediateStatement.isExecuted());
     Assert.assertEquals(intermediateStatement.getCommand(), "SELECT");
@@ -94,8 +91,8 @@ public class StatementTest {
     Mockito.when(connection.createStatement()).thenReturn(statement);
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
 
-    IntermediateStatement intermediateStatement = new IntermediateStatement(
-        "UPDATE users SET name = someName WHERE id = 10", connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement("UPDATE users SET name = someName WHERE id = 10", connection);
 
     Assert.assertFalse(intermediateStatement.isExecuted());
     Assert.assertEquals(intermediateStatement.getCommand(), "UPDATE");
@@ -123,8 +120,8 @@ public class StatementTest {
     Mockito.when(connection.createStatement()).thenReturn(statement);
     Mockito.when(statement.getUpdateCount()).thenReturn(JdbcConstants.STATEMENT_NO_RESULT);
 
-    IntermediateStatement intermediateStatement = new IntermediateStatement(
-        "UPDATE users SET name = someName WHERE id = -1", connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement("UPDATE users SET name = someName WHERE id = -1", connection);
 
     Assert.assertFalse(intermediateStatement.isExecuted());
     Assert.assertEquals(intermediateStatement.getCommand(), "UPDATE");
@@ -151,8 +148,8 @@ public class StatementTest {
   public void testDescribeBasicStatementThrowsException() throws Exception {
     Mockito.when(connection.createStatement()).thenReturn(statement);
 
-    IntermediateStatement intermediateStatement = new IntermediateStatement("SELECT * FROM users",
-        connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement("SELECT * FROM users", connection);
 
     intermediateStatement.describe();
   }
@@ -164,8 +161,8 @@ public class StatementTest {
     Mockito.when(connection.createStatement()).thenReturn(statement);
     Mockito.when(statement.execute(ArgumentMatchers.anyString())).thenThrow(thrownException);
 
-    IntermediateStatement intermediateStatement = new IntermediateStatement("SELECT * FROM users",
-        connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement("SELECT * FROM users", connection);
 
     intermediateStatement.execute();
 
@@ -175,14 +172,14 @@ public class StatementTest {
 
   @Test
   public void testPreparedStatement() throws Exception {
-    String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
-    List<Integer> parameterDataTypes = Arrays.asList(Oid.INT8, Oid.INT8);
+    String sqlStatement = "SELECT * FROM users WHERE age > $2 AND age < $3 AND name = $1";
+    List<Integer> parameterDataTypes = Arrays.asList(Oid.VARCHAR, Oid.INT8, Oid.INT4);
 
     Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
         .thenReturn(preparedStatement);
 
-    IntermediatePreparedStatement intermediateStatement = new IntermediatePreparedStatement(
-        sqlStatement, connection);
+    IntermediatePreparedStatement intermediateStatement =
+        new IntermediatePreparedStatement(sqlStatement, connection);
     intermediateStatement.setParameterDataTypes(parameterDataTypes);
 
     String expectedSQL = "SELECT * FROM users WHERE age > ? AND age < ? AND name = ?";
@@ -195,13 +192,13 @@ public class StatementTest {
     Mockito.verify(preparedStatement, Mockito.times(1)).execute();
     Mockito.verify(connection, Mockito.times(1)).prepareStatement(expectedSQL);
 
-    byte[][] parameters = {"20".getBytes(), "30".getBytes(), "userName".getBytes()};
-
+    byte[][] parameters = {"userName".getBytes(), "20".getBytes(), "30".getBytes()};
     IntermediatePortalStatement intermediatePortalStatement =
-        intermediateStatement.bind(parameters, new ArrayList<>(), new ArrayList<>());
+        intermediateStatement.bind(
+            parameters, Arrays.asList((short) 0, (short) 0, (short) 0), new ArrayList<>());
 
     Mockito.verify(preparedStatement, Mockito.times(1)).setObject(1, 20L);
-    Mockito.verify(preparedStatement, Mockito.times(1)).setObject(2, 30L);
+    Mockito.verify(preparedStatement, Mockito.times(1)).setObject(2, 30);
     Mockito.verify(preparedStatement, Mockito.times(1)).setObject(3, "userName");
 
     Assert.assertEquals(intermediatePortalStatement.getSql(), expectedSQL);
@@ -213,14 +210,14 @@ public class StatementTest {
 
   @Test(expected = IllegalArgumentException.class)
   public void testPreparedStatementIllegalTypeThrowsException() throws Exception {
-    String sqlStatement = "SELECT * FROM users WHERE metadata = ?";
+    String sqlStatement = "SELECT * FROM users WHERE metadata = $1";
     List<Integer> parameterDataTypes = Arrays.asList(Oid.JSON);
 
     Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
         .thenReturn(preparedStatement);
 
-    IntermediatePreparedStatement intermediateStatement = new IntermediatePreparedStatement(
-        sqlStatement, connection);
+    IntermediatePreparedStatement intermediateStatement =
+        new IntermediatePreparedStatement(sqlStatement, connection);
     intermediateStatement.setParameterDataTypes(parameterDataTypes);
 
     byte[][] parameters = {"{}".getBytes()};
@@ -235,8 +232,8 @@ public class StatementTest {
     Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
         .thenReturn(preparedStatement);
 
-    IntermediatePreparedStatement intermediateStatement = new IntermediatePreparedStatement(
-        sqlStatement, connection);
+    IntermediatePreparedStatement intermediateStatement =
+        new IntermediatePreparedStatement(sqlStatement, connection);
 
     intermediateStatement.describe();
   }
@@ -244,60 +241,63 @@ public class StatementTest {
   @Test
   public void testPortalStatement() throws Exception {
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
-    List<Integer> parameterDataTypes = Arrays.asList(Oid.INT8, Oid.INT8);
+    List<Integer> parameterDataTypes = Arrays.asList(Oid.INT8, Oid.INT4);
     byte[][] parameters = {"20".getBytes(), "30".getBytes(), "userName".getBytes()};
+    SQLMetadata metadata = Converter.toJDBCParams(sqlStatement);
 
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
             preparedStatement,
-            sqlStatement,
-            3,
+            metadata.getSqlString(),
+            metadata.getParameterCount(),
+            metadata.getParameterIndexToPositions(),
             connection);
 
     intermediateStatement.describe();
 
     Mockito.verify(preparedStatement, Mockito.times(1)).getMetaData();
 
+    Assert.assertEquals(intermediateStatement.getParameterFormatCode(0), 0);
     Assert.assertEquals(intermediateStatement.getParameterFormatCode(1), 0);
     Assert.assertEquals(intermediateStatement.getParameterFormatCode(2), 0);
-    Assert.assertEquals(intermediateStatement.getParameterFormatCode(3), 0);
+    Assert.assertEquals(intermediateStatement.getResultFormatCode(0), 0);
     Assert.assertEquals(intermediateStatement.getResultFormatCode(1), 0);
     Assert.assertEquals(intermediateStatement.getResultFormatCode(2), 0);
-    Assert.assertEquals(intermediateStatement.getResultFormatCode(3), 0);
 
     intermediateStatement.setParameterFormatCodes(Arrays.asList((short) 1));
     intermediateStatement.setResultFormatCodes(Arrays.asList((short) 1));
+    Assert.assertEquals(intermediateStatement.getParameterFormatCode(0), 1);
     Assert.assertEquals(intermediateStatement.getParameterFormatCode(1), 1);
     Assert.assertEquals(intermediateStatement.getParameterFormatCode(2), 1);
-    Assert.assertEquals(intermediateStatement.getParameterFormatCode(3), 1);
+    Assert.assertEquals(intermediateStatement.getResultFormatCode(0), 1);
     Assert.assertEquals(intermediateStatement.getResultFormatCode(1), 1);
     Assert.assertEquals(intermediateStatement.getResultFormatCode(2), 1);
-    Assert.assertEquals(intermediateStatement.getResultFormatCode(3), 1);
 
     intermediateStatement.setParameterFormatCodes(Arrays.asList((short) 0, (short) 1, (short) 0));
     intermediateStatement.setResultFormatCodes(Arrays.asList((short) 0, (short) 1, (short) 0));
-    Assert.assertEquals(intermediateStatement.getParameterFormatCode(1), 0);
-    Assert.assertEquals(intermediateStatement.getParameterFormatCode(2), 1);
-    Assert.assertEquals(intermediateStatement.getParameterFormatCode(3), 0);
-    Assert.assertEquals(intermediateStatement.getResultFormatCode(1), 0);
-    Assert.assertEquals(intermediateStatement.getResultFormatCode(2), 1);
-    Assert.assertEquals(intermediateStatement.getResultFormatCode(3), 0);
+    Assert.assertEquals(intermediateStatement.getParameterFormatCode(0), 0);
+    Assert.assertEquals(intermediateStatement.getParameterFormatCode(1), 1);
+    Assert.assertEquals(intermediateStatement.getParameterFormatCode(2), 0);
+    Assert.assertEquals(intermediateStatement.getResultFormatCode(0), 0);
+    Assert.assertEquals(intermediateStatement.getResultFormatCode(1), 1);
+    Assert.assertEquals(intermediateStatement.getResultFormatCode(2), 0);
   }
 
   @Test(expected = IllegalStateException.class)
   public void testPortalStatementDescribePropagatesFailure() throws Exception {
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
+    SQLMetadata metadata = Converter.toJDBCParams(sqlStatement);
 
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
             preparedStatement,
-            sqlStatement,
-            3,
+            metadata.getSqlString(),
+            metadata.getParameterCount(),
+            metadata.getParameterIndexToPositions(),
             connection);
 
     Mockito.when(preparedStatement.getMetaData()).thenThrow(new SQLException());
 
     intermediateStatement.describe();
   }
-
 }

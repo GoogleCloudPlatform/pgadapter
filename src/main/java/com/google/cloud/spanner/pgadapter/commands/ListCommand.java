@@ -25,12 +25,14 @@ import java.util.regex.Pattern;
  */
 public class ListCommand extends Command {
 
-  private static final Pattern INPUT_REGEX = Pattern.compile("^SELECT d\\.datname as \"Name\",\n" +
-      "       pg_catalog\\.pg_get_userbyid\\(d.datdba\\) as \"Owner\",\n" +
-      "       pg_catalog\\.pg_encoding_to_char\\(d\\.encoding\\) as \"Encoding\",\n" +
-      "       pg_catalog\\.array_to_string\\(d\\.datacl, '\\\\n'\\) AS \"Access privileges\"\n" +
-      "FROM pg_catalog\\.pg_database d\n.*\n?" +
-      "ORDER BY 1;$");
+  private static final Pattern INPUT_REGEX =
+      Pattern.compile(
+          "^SELECT d\\.datname as \"Name\",\n"
+              + "       pg_catalog\\.pg_get_userbyid\\(d.datdba\\) as \"Owner\",\n"
+              + "       pg_catalog\\.pg_encoding_to_char\\(d\\.encoding\\) as \"Encoding\",\n"
+              + "       pg_catalog\\.array_to_string\\(d\\.datacl, '\\\\n'\\) AS \"Access privileges\"\n"
+              + "FROM pg_catalog\\.pg_database d\n.*\n?"
+              + "ORDER BY 1;$");
 
   private static final String OUTPUT_QUERY = "SELECT '%s' AS Name;";
 

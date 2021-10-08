@@ -17,9 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 import java.io.DataOutputStream;
 import java.text.MessageFormat;
 
-/**
- * Assures to the client that a portal got closed successfully.
- */
+/** Assures to the client that a portal got closed successfully. */
 public class CloseResponse extends WireOutput {
 
   public CloseResponse(DataOutputStream output) {
@@ -43,6 +41,6 @@ public class CloseResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+    return new MessageFormat("Length: {0}").format(new Object[] {this.length});
   }
 }

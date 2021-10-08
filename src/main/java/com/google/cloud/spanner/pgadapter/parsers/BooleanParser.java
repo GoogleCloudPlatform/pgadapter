@@ -49,4 +49,3 @@ public class BooleanParser extends Parser<Boolean> {
     return Boolean.toString(this.item);
   }
 }
-

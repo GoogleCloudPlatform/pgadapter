@@ -21,7 +21,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.logging.Logger;
 
 /**
  * Data type to store simple SQL statement with designated metadata. Allows manipulation of
@@ -40,6 +39,7 @@ public class IntermediateStatement {
   protected boolean executed;
   protected Connection connection;
   protected Integer updateCount;
+
   public IntermediateStatement(String sql, Connection connection) throws SQLException {
     this();
     this.sql = sql;
@@ -77,9 +77,7 @@ public class IntermediateStatement {
     }
   }
 
-  /**
-   * Determines the (update) command that was received from the sql string.
-   */
+  /** Determines the (update) command that was received from the sql string. */
   protected static String parseCommand(String sql) {
     Preconditions.checkNotNull(sql);
     String[] tokens = sql.split("\\s+", 2);
@@ -110,37 +108,27 @@ public class IntermediateStatement {
     }
   }
 
-  /**
-   * @return True if this is a select statement, false otherwise.
-   */
+  /** @return True if this is a select statement, false otherwise. */
   public boolean containsResultSet() {
     return this.resultType == ResultType.RESULT_SET;
   }
 
-  /**
-   * @return True if this statement was executed, False otherwise.
-   */
+  /** @return True if this statement was executed, False otherwise. */
   public boolean isExecuted() {
     return executed;
   }
 
-  /**
-   * @return The number of items that were modified by this execution.
-   */
+  /** @return The number of items that were modified by this execution. */
   public Integer getUpdateCount() {
     return this.updateCount;
   }
 
-  /**
-   * @return True if at some point in execution, and exception was thrown.
-   */
+  /** @return True if at some point in execution, and exception was thrown. */
   public boolean hasException() {
     return this.exception != null;
   }
 
-  /**
-   * @return True if only a subset of the available data has been returned.
-   */
+  /** @return True if only a subset of the available data has been returned. */
   public boolean isHasMoreData() {
     return this.hasMoreData;
   }
@@ -201,9 +189,7 @@ public class IntermediateStatement {
     this.resultType = ResultType.NO_RESULT;
   }
 
-  /**
-   * Execute the SQL statement, storing metadata.
-   */
+  /** Execute the SQL statement, storing metadata. */
   public void execute() {
     this.executed = true;
     try {
@@ -219,8 +205,8 @@ public class IntermediateStatement {
    * statements cannot be described, throw an error.
    */
   public DescribeMetadata describe() throws Exception {
-    throw new IllegalStateException("Cannot describe a simple statement "
-        + "(only prepared statements and portals)");
+    throw new IllegalStateException(
+        "Cannot describe a simple statement " + "(only prepared statements and portals)");
   }
 
   /**
@@ -231,12 +217,14 @@ public class IntermediateStatement {
     return 0;
   }
 
-  /**
-   * @return the extracted command (first word) from the SQL statement.
-   */
+  /** @return the extracted command (first word) from the SQL statement. */
   public String getCommand() {
     return this.command;
   }
 
-  public enum ResultType {UPDATE_COUNT, RESULT_SET, NO_RESULT}
+  public enum ResultType {
+    UPDATE_COUNT,
+    RESULT_SET,
+    NO_RESULT
+  }
 }

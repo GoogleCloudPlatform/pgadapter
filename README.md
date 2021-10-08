@@ -36,8 +36,21 @@ The PostgreSQL adapter can be started both as a standalone process as well as an
 in-process server.
 
 ### Standalone
-1. Build a jar file containing all dependencies by running `mvn package`.
+1. Build a jar file containing all dependencies by running `mvn package -P shade`.
 2. Execute `java -jar <jar-file> <options>`.
+3. To get fine-grained logging messages, make sure that you have the logging.properties file and run the jar with `-Djava.util.logging.config.file=logging.properties`. You need to create one according to this sample if it's missing. 
+    ```
+    handlers=java.util.logging.ConsoleHandler,java.util.logging.FileHandler
+    com.google.cloud.spanner.pgadapter.level=FINEST
+    java.util.logging.ConsoleHandler.level=FINEST
+    java.util.logging.FileHandler.level=INFO
+    java.util.logging.FileHandler.pattern=%h/spanner-pg-adapter-%u.log
+    java.util.logging.FileHandler.append=false
+    io.grpc.internal.level = WARNING
+    
+    java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS] [%4$s] (%2$s): %5$s%6$s%n
+    java.util.logging.FileHandler.formatter=java.util.logging.SimpleFormatter
+    ```
 
 The following options are required to run the proxy:
   
@@ -148,6 +161,24 @@ java -jar <jar-file> -p <project name> -i <instance id> -d <database name> -c
 <path to credentials file> -s 5432 
 ```
 
+#### Standalone through docker
+
+1.  Build the docker image:
+
+    ```
+    docker build . -t "pgadapter" -f build/Dockerfile
+
+    ```
+
+2.  Run the docker image with environment variables set:
+
+    ```
+    docker run -d -p 127.0.0.1:HOST-PORT:DOCKER-PORT \
+    -v CREDENTIALS_FILE_PATH:/acct_credentials.json pgadapter:latest \
+    -p PROJECT -i INSTANCE -d DATABASE  \
+    -c /acct_credentials.json -q -x OTHER_OPTIONS
+    ```
+
 ### In-process
 1. Add google-cloud-spanner-pgadapter as a dependency to your project.
 2. Build a server using the `com.google.cloud.spanner.pgadapter.ProxyServer` 
@@ -166,7 +197,7 @@ class PGProxyRunner {
                 textFormat,
                 forceBinary,
                 authenticate,
-                psqlMode,
+                requiresMatcher,
                 commandMetadataJSON)
         );
         server.startServer();
@@ -180,5 +211,6 @@ path; All other items map directly to previously mentioned CLI options.
 
 ## Support Level
 
-Please feel free to report issues and send pull requests, but note that this 
-application is not officially supported as part of the Cloud Spanner Product.
+We are not currently accepting external code contributions to this project. 
+Please feel free to file feature requests using GitHub's issue tracker or 
+using the existing Cloud Spanner support channels.

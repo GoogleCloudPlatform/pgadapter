@@ -18,9 +18,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 
-/**
- * Translate from wire protocol to double.
- */
+/** Translate from wire protocol to double. */
 public class DoubleParser extends Parser<Double> {
 
   public DoubleParser(ResultSet item, int position) throws SQLException {

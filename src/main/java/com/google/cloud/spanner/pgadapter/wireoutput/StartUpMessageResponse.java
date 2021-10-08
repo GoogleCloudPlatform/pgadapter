@@ -18,9 +18,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-/**
- * Sends back start-up parameters (can be sent more than once)
- */
+/** Sends back start-up parameters (can be sent more than once) */
 public class StartUpMessageResponse extends WireOutput {
 
   private static final int HEADER_LENGTH = 4;
@@ -31,13 +29,15 @@ public class StartUpMessageResponse extends WireOutput {
   public final byte[] parameterKey;
   public final byte[] parameterValue;
 
-  public StartUpMessageResponse(DataOutputStream output,
-      byte[] parameterKey,
-      byte[] parameterValue) {
-    super(output,
+  public StartUpMessageResponse(
+      DataOutputStream output, byte[] parameterKey, byte[] parameterValue) {
+    super(
+        output,
         HEADER_LENGTH
-        + parameterKey.length + NULL_TERMINATOR_LENGTH
-        + parameterValue.length + NULL_TERMINATOR_LENGTH);
+            + parameterKey.length
+            + NULL_TERMINATOR_LENGTH
+            + parameterValue.length
+            + NULL_TERMINATOR_LENGTH);
     this.parameterKey = parameterKey;
     this.parameterValue = parameterValue;
   }
@@ -62,14 +62,12 @@ public class StartUpMessageResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Parameter Key: {1}, "
-            + "Parameter Value: {2}")
-        .format(new Object[]{
-            this.length,
-            new String(this.parameterKey, UTF8),
-            new String(this.parameterValue, UTF8)
-        });
+    return new MessageFormat("Length: {0}, " + "Parameter Key: {1}, " + "Parameter Value: {2}")
+        .format(
+            new Object[] {
+              this.length,
+              new String(this.parameterKey, UTF8),
+              new String(this.parameterValue, UTF8)
+            });
   }
 }

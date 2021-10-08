@@ -24,9 +24,7 @@ import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * Generic representation for a wire message, generally executed by calling send.
- */
+/** Generic representation for a wire message, generally executed by calling send. */
 public abstract class WireMessage {
 
   private static final Logger logger = Logger.getLogger(WireMessage.class.getName());
@@ -50,7 +48,7 @@ public abstract class WireMessage {
    * @return A byte array of user-defined parameters to be bound.
    * @throws Exception If reading fails in any way.
    */
-  static protected byte[][] getParameters(DataInputStream input) throws Exception {
+  protected static byte[][] getParameters(DataInputStream input) throws Exception {
     int numberOfParameters = input.readShort();
     byte[][] parameters = new byte[numberOfParameters][];
     for (int i = 0; i < numberOfParameters; i++) {
@@ -68,8 +66,8 @@ public abstract class WireMessage {
   }
 
   /**
-   * Once the message is ready, call this to send it across the wire.
-   * Effectively a template pattern.
+   * Once the message is ready, call this to send it across the wire. Effectively a template
+   * pattern.
    *
    * @throws Exception If the sending fails.
    */
@@ -110,11 +108,8 @@ public abstract class WireMessage {
   @Override
   public String toString() {
     return new MessageFormat("> Received Message: ({0}) {1}, with Payload: '{'{2}'}'")
-        .format(new Object[]{
-            this.getIdentifier(),
-            this.getMessageName(),
-            this.getPayloadString()
-        });
+        .format(
+            new Object[] {this.getIdentifier(), this.getMessageName(), this.getPayloadString()});
   }
 
   /**
@@ -136,7 +131,7 @@ public abstract class WireMessage {
    * @param length The number of bytes to read.
    * @return the string.
    * @throws IOException if an error occurs while reading from the stream, or if no null-terminator
-   * is found at the end of the string.
+   *     is found at the end of the string.
    */
   public String read(int length) throws IOException {
     byte[] buffer = new byte[length - 1];
@@ -150,13 +145,13 @@ public abstract class WireMessage {
 
   /**
    * Reads a null-terminated string from a {@link DataInputStream}. Note that though existing
-   * solutions for this exist, they are either not keyed exactly for our use case, or would lead
-   * to a more combersome addition to this codebase. Also note the 128 byte length is chosen
-   * from profiling and determining that it exceeds the 90th percentile size for inbound messages.
+   * solutions for this exist, they are either not keyed exactly for our use case, or would lead to
+   * a more combersome addition to this codebase. Also note the 128 byte length is chosen from
+   * profiling and determining that it exceeds the 90th percentile size for inbound messages.
    *
    * @return the string.
    * @throws IOException if an error occurs while reading from the stream, or if no null-terminator
-   * is found before the end of the stream.
+   *     is found before the end of the stream.
    */
   public String readString() throws IOException {
     byte[] buffer = new byte[128];
@@ -177,9 +172,8 @@ public abstract class WireMessage {
 
   /**
    * How many bytes is taken by the payload header. Header is defined here as protocol definition +
-   *  length. Most common value here is four bytes, so we keep that as default.
-   * Effectively, this is how much of the message you "don't" want to read from the message's total
-   *  length with readAll.
+   * length. Most common value here is four bytes, so we keep that as default. Effectively, this is
+   * how much of the message you "don't" want to read from the message's total length with readAll.
    *
    * @return The remaining length to be processed once "header" information is processed.
    */
@@ -194,5 +188,4 @@ public abstract class WireMessage {
   public void nextHandler() throws Exception {
     this.connection.setMessageState(ControlMessage.create(this.connection));
   }
-
 }

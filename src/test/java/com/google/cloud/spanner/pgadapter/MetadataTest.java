@@ -27,22 +27,23 @@ public class MetadataTest {
 
   @Test
   public void testDynamicCommandMetadataSingleCommand() throws Exception {
-    String inputJSON = ""
-        + "{"
-        + " \"commands\": "
-        + "   [ "
-        + "     {"
-        + "       \"input_pattern\": \"this is the input SQL query\", "
-        + "       \"output_pattern\": \"this is the output SQL query\", "
-        + "       \"matcher_array\": []"
-        + "     }"
-        + "   ]"
-        + "}";
+    String inputJSON =
+        ""
+            + "{"
+            + " \"commands\": "
+            + "   [ "
+            + "     {"
+            + "       \"input_pattern\": \"this is the input SQL query\", "
+            + "       \"output_pattern\": \"this is the output SQL query\", "
+            + "       \"matcher_array\": []"
+            + "     }"
+            + "   ]"
+            + "}";
 
     JSONParser parser = new JSONParser();
 
-    List<DynamicCommandMetadata> result = DynamicCommandMetadata
-        .fromJSON((JSONObject) parser.parse(inputJSON));
+    List<DynamicCommandMetadata> result =
+        DynamicCommandMetadata.fromJSON((JSONObject) parser.parse(inputJSON));
     Assert.assertEquals(1, result.size());
     Assert.assertEquals("this is the output SQL query", result.get(0).getOutputPattern());
     Assert.assertEquals("this is the input SQL query", result.get(0).getInputPattern());
@@ -51,30 +52,31 @@ public class MetadataTest {
 
   @Test
   public void testDynamicCommandMetadataMultipleCommands() throws Exception {
-    String inputJSON = ""
-        + "{"
-        + " \"commands\": "
-        + "   [ "
-        + "     {"
-        + "       \"input_pattern\": \"this is the input SQL query\", "
-        + "       \"output_pattern\": \"this is the output SQL query\", "
-        + "       \"matcher_array\": []"
-        + "     },"
-        + "     {"
-        + "       \"input_pattern\": \"this is another input SQL query\", "
-        + "       \"output_pattern\": \"this is another output SQL query\", "
-        + "       \"matcher_array\": [\"1\", \"2\", \"3\", \"4\", \"5\", \"6\", \"7\", \"8\", \"9\", \"10\"]"
-        + "     }"
-        + "   ]"
-        + "}";
+    String inputJSON =
+        ""
+            + "{"
+            + " \"commands\": "
+            + "   [ "
+            + "     {"
+            + "       \"input_pattern\": \"this is the input SQL query\", "
+            + "       \"output_pattern\": \"this is the output SQL query\", "
+            + "       \"matcher_array\": []"
+            + "     },"
+            + "     {"
+            + "       \"input_pattern\": \"this is another input SQL query\", "
+            + "       \"output_pattern\": \"this is another output SQL query\", "
+            + "       \"matcher_array\": [\"1\", \"2\", \"3\", \"4\", \"5\", \"6\", \"7\", \"8\", \"9\", \"10\"]"
+            + "     }"
+            + "   ]"
+            + "}";
 
     JSONParser parser = new JSONParser();
 
     List<String> firstResult = new ArrayList<>();
     List<String> secondResult = Arrays.asList("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
 
-    List<DynamicCommandMetadata> result = DynamicCommandMetadata
-        .fromJSON((JSONObject) parser.parse(inputJSON));
+    List<DynamicCommandMetadata> result =
+        DynamicCommandMetadata.fromJSON((JSONObject) parser.parse(inputJSON));
     Assert.assertEquals(2, result.size());
     Assert.assertEquals("this is the output SQL query", result.get(0).getOutputPattern());
     Assert.assertEquals("this is the input SQL query", result.get(0).getInputPattern());
@@ -83,5 +85,4 @@ public class MetadataTest {
     Assert.assertEquals("this is another input SQL query", result.get(1).getInputPattern());
     Assert.assertEquals(secondResult, result.get(1).getMatcherOrder());
   }
-
 }

@@ -16,9 +16,7 @@ package com.google.cloud.spanner.pgadapter.metadata;
 
 import java.sql.ResultSetMetaData;
 
-/**
- * Simple POJO to hold describe metadata, specific to portal describes.
- */
+/** Simple POJO to hold describe metadata, specific to portal describes. */
 public class DescribePortalMetadata extends DescribeMetadata<ResultSetMetaData> {
 
   public DescribePortalMetadata(ResultSetMetaData metadata) {

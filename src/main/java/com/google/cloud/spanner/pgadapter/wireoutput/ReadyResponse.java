@@ -33,7 +33,6 @@ public class ReadyResponse extends WireOutput {
   @Override
   public void sendPayload() throws IOException {
     this.outputStream.writeByte(this.status.c);
-    this.outputStream.flush();
   }
 
   @Override
@@ -48,20 +47,15 @@ public class ReadyResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Status: {1}")
-        .format(new Object[]{
-            this.length,
-            this.status.c
-        });
+    return new MessageFormat("Length: {0}, " + "Status: {1}")
+        .format(new Object[] {this.length, this.status.c});
   }
 
-  /**
-   * Status of the session.
-   */
+  /** Status of the session. */
   public enum Status {
-    IDLE('I'), TRANSACTION('T'), FAILED('E');
+    IDLE('I'),
+    TRANSACTION('T'),
+    FAILED('E');
     private final char c;
 
     Status(char c) {

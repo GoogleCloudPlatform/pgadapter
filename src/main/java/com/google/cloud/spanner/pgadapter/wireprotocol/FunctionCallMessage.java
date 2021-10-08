@@ -54,18 +54,19 @@ public class FunctionCallMessage extends ControlMessage {
   @Override
   protected String getPayloadString() {
     return new MessageFormat(
-        "Length: {0}, "
-            + "Function ID: {1},"
-            + "Argument Format Codes: {2}, "
-            + "Arguments: {3}, "
-            + "Result Format Code: {4}")
-        .format(new Object[]{
-            this.length,
-            this.functionID,
-            this.argumentFormatCodes,
-            this.arguments,
-            this.resultFormatCode
-        });
+            "Length: {0}, "
+                + "Function ID: {1},"
+                + "Argument Format Codes: {2}, "
+                + "Arguments: {3}, "
+                + "Result Format Code: {4}")
+        .format(
+            new Object[] {
+              this.length,
+              this.functionID,
+              this.argumentFormatCodes,
+              this.arguments,
+              this.resultFormatCode
+            });
   }
 
   @Override

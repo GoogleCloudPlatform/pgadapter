@@ -14,9 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
-/**
- * The state of a result after (a part of it) has been sent to the client.
- */
+/** The state of a result after (a part of it) has been sent to the client. */
 public class SendResultSetState {
 
   private final long numRowsSent;

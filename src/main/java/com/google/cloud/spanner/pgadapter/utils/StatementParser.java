@@ -17,14 +17,25 @@ package com.google.cloud.spanner.pgadapter.utils;
 import com.google.common.base.Preconditions;
 
 public class StatementParser {
-
+  private static final String GSQL_STATEMENT = "/*GSQL*/";
+  private static final char SINGLE_QUOTE = '\'';
+  private static final char DOUBLE_QUOTE = '"';
+  private static final char BACKTICK_QUOTE = '`';
+  private static final char HYPHEN = '-';
+  private static final char DASH = '#';
+  private static final char SLASH = '/';
+  private static final char BACK_SLASH = '\\';
+  private static final char ASTERISK = '*';
+  private static final char DOLLAR = '$';
+  private static final char SEMICOLON = ';';
   /**
    * Removes comments from and trims the given sql statement. Spanner supports three types of
    * comments:
+   *
    * <ul>
-   * <li>Single line comments starting with '--'</li>
-   * <li>Single line comments starting with '#'</li>
-   * <li>Multi line comments between '/&#42;' and '&#42;/'</li>
+   *   <li>Single line comments starting with '--'
+   *   <li>Single line comments starting with '#'
+   *   <li>Multi line comments between '/&#42;' and '&#42;/'
    * </ul>
    *
    * Reference: https://cloud.google.com/spanner/docs/lexical#comments
@@ -33,14 +44,129 @@ public class StatementParser {
    * @return the sql statement without the comments and leading and trailing spaces.
    */
   public static String removeCommentsAndTrim(String sql) {
+    if (sql.startsWith(GSQL_STATEMENT)) {
+      return removeCommentsAndTrimGSQL(sql);
+    }
+    return removeCommentsAndTrimPostgres(sql);
+  }
+
+  private static String removeCommentsAndTrimPostgres(String sql) {
     Preconditions.checkNotNull(sql);
-    final char SINGLE_QUOTE = '\'';
-    final char DOUBLE_QUOTE = '"';
-    final char BACKTICK_QUOTE = '`';
-    final char HYPHEN = '-';
-    final char DASH = '#';
-    final char SLASH = '/';
-    final char ASTERISK = '*';
+    String currentTag = null;
+    boolean isInQuoted = false;
+    boolean isInSingleLineComment = false;
+    int multiLineCommentLevel = 0;
+    char startQuote = 0;
+    boolean lastCharWasEscapeChar = false;
+    StringBuilder res = new StringBuilder(sql.length());
+    int index = 0;
+    while (index < sql.length()) {
+      char c = sql.charAt(index);
+      if (isInQuoted) {
+        if ((c == '\n' || c == '\r') && startQuote != DOLLAR) {
+          throw new IllegalArgumentException("SQL statement contains an unclosed literal: " + sql);
+        } else if (c == startQuote) {
+          if (c == DOLLAR) {
+            // Check if this is the end of the current dollar quoted string.
+            String tag = parseDollarQuotedString(sql, index + 1);
+            if (tag != null && tag.equals(currentTag)) {
+              index += tag.length() + 1;
+              res.append(c);
+              res.append(tag);
+              isInQuoted = false;
+              startQuote = 0;
+            }
+          } else if (lastCharWasEscapeChar) {
+            lastCharWasEscapeChar = false;
+          } else {
+            isInQuoted = false;
+            startQuote = 0;
+          }
+        } else if (c == BACK_SLASH) {
+          lastCharWasEscapeChar = true;
+        } else {
+          lastCharWasEscapeChar = false;
+        }
+        res.append(c);
+      } else {
+        // We are not in a quoted string.
+        if (isInSingleLineComment) {
+          if (c == '\n') {
+            isInSingleLineComment = false;
+            // Include the line feed in the result.
+            res.append(c);
+          }
+        } else if (multiLineCommentLevel > 0) {
+          if (sql.length() > index + 1 && c == ASTERISK && sql.charAt(index + 1) == SLASH) {
+            multiLineCommentLevel--;
+            index++;
+          } else if (sql.length() > index + 1 && c == SLASH && sql.charAt(index + 1) == ASTERISK) {
+            multiLineCommentLevel++;
+            index++;
+          }
+        } else {
+          // Check for -- which indicates the start of a single-line comment.
+          if (sql.length() > index + 1 && c == HYPHEN && sql.charAt(index + 1) == HYPHEN) {
+            // This is a single line comment.
+            isInSingleLineComment = true;
+          } else if (sql.length() > index + 1 && c == SLASH && sql.charAt(index + 1) == ASTERISK) {
+            multiLineCommentLevel++;
+            index++;
+          } else {
+            if (c == SINGLE_QUOTE || c == DOUBLE_QUOTE) {
+              isInQuoted = true;
+              startQuote = c;
+            } else if (c == DOLLAR
+                && sql.length() > index + 1
+                && !Character.isDigit(sql.charAt(index + 1))) {
+              currentTag = parseDollarQuotedString(sql, index + 1);
+              if (currentTag != null) {
+                isInQuoted = true;
+                startQuote = DOLLAR;
+                index += currentTag.length() + 1;
+                res.append(c);
+                res.append(currentTag);
+              }
+            }
+            res.append(c);
+          }
+        }
+      }
+      index++;
+    }
+    if (isInQuoted) {
+      throw new IllegalArgumentException("SQL statement contains an unclosed literal: " + sql);
+    }
+    if (multiLineCommentLevel > 0) {
+      throw new IllegalArgumentException(
+          "SQL statement contains an unterminated block comment: " + sql);
+    }
+    if (res.length() > 0 && res.charAt(res.length() - 1) == SEMICOLON) {
+      res.deleteCharAt(res.length() - 1);
+    }
+    return res.toString().trim();
+  }
+
+  static String parseDollarQuotedString(String sql, int index) {
+    // Look ahead to the next dollar sign (if any). Everything in between is the quote tag.
+    final char DOLLAR = '$';
+    StringBuilder tag = new StringBuilder();
+    while (index < sql.length()) {
+      char c = sql.charAt(index);
+      if (c == DOLLAR) {
+        return tag.toString();
+      }
+      if (!Character.isJavaIdentifierPart(c)) {
+        break;
+      }
+      tag.append(c);
+      index++;
+    }
+    return null;
+  }
+
+  private static String removeCommentsAndTrimGSQL(String sql) {
+    Preconditions.checkNotNull(sql);
     boolean isInQuoted = false;
     boolean isInSingleLineComment = false;
     boolean isInMultiLineComment = false;
@@ -58,7 +184,8 @@ public class StatementParser {
           if (lastCharWasEscapeChar) {
             lastCharWasEscapeChar = false;
           } else if (isTripleQuoted) {
-            if (sql.length() > index + 2 && sql.charAt(index + 1) == startQuote
+            if (sql.length() > index + 2
+                && sql.charAt(index + 1) == startQuote
                 && sql.charAt(index + 2) == startQuote) {
               isInQuoted = false;
               startQuote = 0;
@@ -70,8 +197,11 @@ public class StatementParser {
             isInQuoted = false;
             startQuote = 0;
           }
-        } else
-          lastCharWasEscapeChar = c == '\\';
+        } else if (c == BACK_SLASH) {
+          lastCharWasEscapeChar = true;
+        } else {
+          lastCharWasEscapeChar = false;
+        }
         res.append(c);
       } else {
         // We are not in a quoted string.
@@ -99,7 +229,8 @@ public class StatementParser {
               isInQuoted = true;
               startQuote = c;
               // Check whether it is a triple-quote.
-              if (sql.length() > index + 2 && sql.charAt(index + 1) == startQuote
+              if (sql.length() > index + 2
+                  && sql.charAt(index + 1) == startQuote
                   && sql.charAt(index + 2) == startQuote) {
                 isTripleQuoted = true;
                 res.append(c).append(c);
@@ -115,10 +246,10 @@ public class StatementParser {
     if (isInQuoted) {
       throw new IllegalArgumentException("SQL statement contains an unclosed literal: " + sql);
     }
-    if (res.length() > 0 && res.charAt(res.length() - 1) == ';') {
+    if (res.length() > 0 && res.charAt(res.length() - 1) == SEMICOLON) {
       res.deleteCharAt(res.length() - 1);
     }
-    return res.toString().trim();
+    return GSQL_STATEMENT + res.toString().trim();
   }
 
   /**

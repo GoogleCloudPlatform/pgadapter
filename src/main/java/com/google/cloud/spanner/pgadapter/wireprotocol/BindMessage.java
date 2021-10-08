@@ -68,20 +68,21 @@ public class BindMessage extends ControlMessage {
   @Override
   protected String getPayloadString() {
     return new MessageFormat(
-        "Length: {0}, "
-            + "Portal Name: {1}, "
-            + "Statement Name: {2}, "
-            + "Format Codes: {3}, "
-            + "Parameters: {4}, "
-            + "ResultFormatCodes: {5}")
-        .format(new Object[]{
-            this.length,
-            this.portalName,
-            this.statementName,
-            this.formatCodes,
-            Arrays.toString(this.parameters),
-            this.resultFormatCodes
-        });
+            "Length: {0}, "
+                + "Portal Name: {1}, "
+                + "Statement Name: {2}, "
+                + "Format Codes: {3}, "
+                + "Parameters: {4}, "
+                + "ResultFormatCodes: {5}")
+        .format(
+            new Object[] {
+              this.length,
+              this.portalName,
+              this.statementName,
+              this.formatCodes,
+              Arrays.toString(this.parameters),
+              this.resultFormatCodes
+            });
   }
 
   @Override

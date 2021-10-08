@@ -18,9 +18,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-/**
- * Signals to a client that an issued query is complete.
- */
+/** Signals to a client that an issued query is complete. */
 public class CommandCompleteResponse extends WireOutput {
 
   private static final int HEADER_LENGTH = 4;
@@ -31,8 +29,7 @@ public class CommandCompleteResponse extends WireOutput {
   private final byte[] command;
 
   public CommandCompleteResponse(DataOutputStream output, String command) {
-    super(output,
-        HEADER_LENGTH + command.getBytes(UTF8).length + NULL_TERMINATOR_LENGTH);
+    super(output, HEADER_LENGTH + command.getBytes(UTF8).length + NULL_TERMINATOR_LENGTH);
     this.command = command.getBytes(UTF8);
   }
 
@@ -40,7 +37,6 @@ public class CommandCompleteResponse extends WireOutput {
   protected void sendPayload() throws IOException {
     this.outputStream.write(command);
     this.outputStream.writeByte(NULL_TERMINATOR);
-    this.outputStream.flush();
   }
 
   @Override
@@ -55,12 +51,7 @@ public class CommandCompleteResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Command: {1}")
-        .format(new Object[]{
-            this.length,
-            new String(this.command, UTF8)
-        });
+    return new MessageFormat("Length: {0}, " + "Command: {1}")
+        .format(new Object[] {this.length, new String(this.command, UTF8)});
   }
 }

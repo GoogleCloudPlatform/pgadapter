@@ -18,8 +18,8 @@ import java.io.File;
 import java.util.Locale;
 
 /**
- * Simple Google Cloud Credential Utilities. Similar code exists in GoogleCredentials, but does
- * not provide access to the credentials file path, which is what we need here.
+ * Simple Google Cloud Credential Utilities. Similar code exists in GoogleCredentials, but does not
+ * provide access to the credentials file path, which is what we need here.
  */
 public class Credentials {
 
@@ -34,19 +34,15 @@ public class Credentials {
   private static final String CREDENTIAL_FILE_NAME = "application_default_credentials.json";
 
   /**
-   * Returns the application default credential file path (if any) by looking in order at:
-   *  * Environment variables
-   *  * OS files
-   *  Once the paths are constructed, existence is captured by whether the file itself exists.
-   *  If none are found, returns null to signify none exist.
+   * Returns the application default credential file path (if any) by looking in order at: *
+   * Environment variables * OS files Once the paths are constructed, existence is captured by
+   * whether the file itself exists. If none are found, returns null to signify none exist.
    *
    * @return The absolute path to the application default credential file, or null if none.
    */
   public static String getApplicationDefaultCredentialsFilePath() {
     File[] credentialFiles = {
-        getDefaultCredentialFilePath(),
-        getCloudSDKCredentialFile(),
-        getOSCredentialFile()
+      getDefaultCredentialFilePath(), getCloudSDKCredentialFile(), getOSCredentialFile()
     };
 
     for (File currentCredentialsFile : credentialFiles) {
@@ -99,16 +95,13 @@ public class Credentials {
     return new File(appDataPath, CLOUDSDK_CONFIG_DIRECTORY);
   }
 
-
   /**
    * The directory containing application default credentials in Unix.
    *
    * @return The default directory as a File object.
    */
   private static File getUnixCredentialDirectory() {
-    File configPath = new File(System.getProperty(
-        UNIX_HOME_PROPERTY, ""),
-        UNIX_CONFIG_PROPERTY);
+    File configPath = new File(System.getProperty(UNIX_HOME_PROPERTY, ""), UNIX_CONFIG_PROPERTY);
     return new File(configPath, CLOUDSDK_CONFIG_DIRECTORY);
   }
 
@@ -129,8 +122,8 @@ public class Credentials {
   }
 
   /**
-   * Appends the default filename to the directory containing the credentials or returns null
-   * if the directory is null.
+   * Appends the default filename to the directory containing the credentials or returns null if the
+   * directory is null.
    *
    * @param directory The directory to append the default filename to.
    * @return A File representing the credentials.

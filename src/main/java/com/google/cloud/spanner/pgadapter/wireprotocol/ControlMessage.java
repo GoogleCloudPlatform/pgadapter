@@ -31,8 +31,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Generic representation for a control wire message: that is, a message which does not handle
- * any form of start-up, but reather general communications.
+ * Generic representation for a control wire message: that is, a message which does not handle any
+ * form of start-up, but reather general communications.
  */
 public abstract class ControlMessage extends WireMessage {
 
@@ -47,8 +47,7 @@ public abstract class ControlMessage extends WireMessage {
    * @return The constructed wire message given the input message.
    * @throws Exception If construction or reading fails.
    */
-  public static ControlMessage create(ConnectionHandler connection)
-      throws Exception {
+  public static ControlMessage create(ConnectionHandler connection) throws Exception {
     char nextMsg = (char) connection.getConnectionMetadata().getInputStream().readUnsignedByte();
     switch (nextMsg) {
       case QueryMessage.IDENTIFIER:
@@ -89,7 +88,7 @@ public abstract class ControlMessage extends WireMessage {
    * @return A list of format codes.
    * @throws Exception If reading fails in any way.
    */
-  static protected List<Short> getFormatCodes(DataInputStream input) throws Exception {
+  protected static List<Short> getFormatCodes(DataInputStream input) throws Exception {
     List<Short> formatCodes = new ArrayList<>();
     short numberOfFormatCodes = input.readShort();
     for (int i = 0; i < numberOfFormatCodes; i++) {
@@ -132,9 +131,7 @@ public abstract class ControlMessage extends WireMessage {
    * IntermediateStatement} will cache the result in between calls and continue serving rows from
    * the position it was left off after the last execute message.
    */
-  public boolean sendSpannerResult(IntermediateStatement statement,
-      QueryMode mode,
-      long maxRows)
+  public boolean sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
     String command = statement.getCommand();
     switch (statement.getResultType()) {
@@ -148,17 +145,20 @@ public abstract class ControlMessage extends WireMessage {
           new PortalSuspendedResponse(this.outputStream).send();
         } else {
           statement.getStatementResult().close();
-          new CommandCompleteResponse(
-              this.outputStream, "SELECT " + state.getNumberOfRowsSent()).send();
+          new CommandCompleteResponse(this.outputStream, "SELECT " + state.getNumberOfRowsSent())
+              .send();
         }
         return state.hasMoreRows();
       case UPDATE_COUNT:
-        command += ("INSERT ".equals(command)? "0 " : "") + statement.getUpdateCount();
+        // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
+        // inserted. oid used to be the object ID of the inserted row if rows was 1 and the target
+        // table had OIDs, but OIDs system columns are not supported anymore; therefore oid is
+        // always 0.
+        command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
         new CommandCompleteResponse(this.outputStream, command).send();
         return false;
       default:
-        throw new IllegalStateException(
-            "Unknown result type: " + statement.getResultType());
+        throw new IllegalStateException("Unknown result type: " + statement.getResultType());
     }
   }
 
@@ -169,22 +169,19 @@ public abstract class ControlMessage extends WireMessage {
    * @param describedResult Statement output by Spanner.
    * @param mode Specific Query Mode required for this specific message for Postgres
    * @param maxRows Maximum number of rows requested
-   *
    * @return An adapted representation with specific metadata which PG wire requires.
    * @throws Exception
    */
-  public SendResultSetState sendResultSet(IntermediateStatement describedResult,
-      QueryMode mode,
-      long maxRows) throws Exception {
+  public SendResultSetState sendResultSet(
+      IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
     long rows = 0;
     boolean hasData = describedResult.isHasMoreData();
     ResultSet resultSet = describedResult.getStatementResult();
     // TODO optimize loop
     while (hasData) {
       new DataRowResponse(
-          this.outputStream, describedResult,
-          this.connection.getServer().getOptions(),
-          mode).send();
+              this.outputStream, describedResult, this.connection.getServer().getOptions(), mode)
+          .send();
       rows++;
       try {
         hasData = resultSet.next();

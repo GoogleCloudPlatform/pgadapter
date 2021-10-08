@@ -1,0 +1,6 @@
+       List of relations
+ Schema | Name  | Type  | Owner 
+--------+-------+-------+-------
+ public | users | table | me
+(1 row)
+

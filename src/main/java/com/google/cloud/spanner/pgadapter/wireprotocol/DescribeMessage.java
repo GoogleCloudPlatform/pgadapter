@@ -24,9 +24,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ParameterDescriptionRespons
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
 import java.text.MessageFormat;
 
-/**
- * Calls describe on a portal or prepared statement.
- */
+/** Calls describe on a portal or prepared statement. */
 public class DescribeMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'D';
@@ -62,15 +60,8 @@ public class DescribeMessage extends ControlMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Type: {1}, "
-            + "Name: {2}")
-        .format(new Object[]{
-            this.length,
-            this.type.toString(),
-            this.name
-        });
+    return new MessageFormat("Length: {0}, " + "Type: {1}, " + "Name: {2}")
+        .format(new Object[] {this.length, this.type.toString(), this.name});
   }
 
   @Override
@@ -96,11 +87,13 @@ public class DescribeMessage extends ControlMessage {
     if (this.statement.hasException()) {
       this.handleError(this.statement.getException());
     } else {
-      new RowDescriptionResponse(this.outputStream,
-          this.statement,
-          ((DescribePortalMetadata) this.statement.describe()).getMetadata(),
-          this.connection.getServer().getOptions(),
-          QueryMode.EXTENDED).send();
+      new RowDescriptionResponse(
+              this.outputStream,
+              this.statement,
+              ((DescribePortalMetadata) this.statement.describe()).getMetadata(),
+              this.connection.getServer().getOptions(),
+              QueryMode.EXTENDED)
+          .send();
     }
   }
 
@@ -110,9 +103,10 @@ public class DescribeMessage extends ControlMessage {
    * @throws Exception if sending the message back to the client causes an error.
    */
   public void handleDescribeStatement() throws Exception {
-    new ParameterDescriptionResponse(this.outputStream,
-        ((DescribeStatementMetadata) this.statement.describe()).getMetadata()).send();
+    new ParameterDescriptionResponse(
+            this.outputStream,
+            ((DescribeStatementMetadata) this.statement.describe()).getMetadata())
+        .send();
     new NoDataResponse(this.outputStream).send();
   }
-
 }

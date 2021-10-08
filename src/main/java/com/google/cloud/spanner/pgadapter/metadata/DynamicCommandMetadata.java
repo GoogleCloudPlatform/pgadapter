@@ -49,7 +49,7 @@ public class DynamicCommandMetadata {
    * Takes a JSON object and returns a list of metadata objects holding the desired information.
    *
    * @param jsonObject Input JSON object in the format {"commands": [{"input_pattern": "",
-   * "output_pattern": "", "matcher_array": [number1, ...]}, ...]}
+   *     "output_pattern": "", "matcher_array": [number1, ...]}, ...]}
    * @return A list of constructed metadata objects in the format understood by DynamicCommands
    */
   public static List<DynamicCommandMetadata> fromJSON(JSONObject jsonObject) {
@@ -95,8 +95,7 @@ public class DynamicCommandMetadata {
     Object result = jsonObject.get(key);
     if (result == null) {
       throw new IllegalArgumentException(
-          String.format("A '%s' key must be specified in the JSON definition.", key)
-      );
+          String.format("A '%s' key must be specified in the JSON definition.", key));
     }
     return result;
   }

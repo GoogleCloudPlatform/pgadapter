@@ -22,9 +22,7 @@ import java.sql.Types;
 import java.util.regex.Pattern;
 import org.postgresql.util.ByteConverter;
 
-/**
- * Translate from wire protocol to timestamp.
- */
+/** Translate from wire protocol to timestamp. */
 public class TimestampParser extends Parser<Timestamp> {
 
   public static final int MILLISECONDS_IN_SECOND = 1000;
@@ -34,12 +32,15 @@ public class TimestampParser extends Parser<Timestamp> {
   private static final char ZERO_TIMEZONE = 'Z';
   private static final char EMPTY_SPACE = ' ';
 
-  /**
-   * Regular expression for parsing timestamps.
-   */
-  private static final String TIMESTAMP_REGEX = "(\\d{4})-(\\d{2})-(\\d{2})" // yyyy-MM-dd
-      + "( (\\d{2}):(\\d{2}):(\\d{2})(\\.\\d{1,9})?)" // ' 'HH:mm:ss.milliseconds
-      + "([Zz]|([+-])(\\d{2})(:(\\d{2}))?)?"; // 'Z' or time zone shift HH:mm following '+' or '-'
+  /** Regular expression for parsing timestamps. */
+  private static final String TIMESTAMP_REGEX =
+      // yyyy-MM-dd
+      "(\\d{4})-(\\d{2})-(\\d{2})"
+          // ' 'HH:mm:ss.milliseconds
+          + "( (\\d{2}):(\\d{2}):(\\d{2})(\\.\\d{1,9})?)"
+          // 'Z' or time zone shift HH:mm following '+' or '-'
+          + "([Zz]|([+-])(\\d{2})(:(\\d{2}))?)?";
+
   private static final Pattern TIMESTAMP_PATTERN = Pattern.compile(TIMESTAMP_REGEX);
 
   public TimestampParser(ResultSet item, int position) throws SQLException {
@@ -83,9 +84,9 @@ public class TimestampParser extends Parser<Timestamp> {
 
   @Override
   protected byte[] binaryParse() {
-    long microseconds = (
-        (this.item.getTime() / MILLISECONDS_IN_SECOND - PG_EPOCH_SECONDS) * MICROSECONDS_IN_SECOND)
-        + (this.item.getNanos() / NANOSECONDS_IN_MICROSECONDS);
+    long microseconds =
+        ((this.item.getTime() / MILLISECONDS_IN_SECOND - PG_EPOCH_SECONDS) * MICROSECONDS_IN_SECOND)
+            + (this.item.getNanos() / NANOSECONDS_IN_MICROSECONDS);
     return toBinary(microseconds, Types.BIGINT);
   }
 
@@ -96,7 +97,8 @@ public class TimestampParser extends Parser<Timestamp> {
    * @return a {@link String} that can be interpreted by PostgreSQL.
    */
   private String toPGString() {
-    return this.item.toString()
+    return this.item
+        .toString()
         .replace(TIMESTAMP_SEPARATOR, EMPTY_SPACE)
         .replace(ZERO_TIMEZONE, EMPTY_SPACE);
   }

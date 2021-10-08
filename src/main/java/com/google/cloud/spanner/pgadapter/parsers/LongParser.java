@@ -18,9 +18,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 
-/**
- * Translate from wire protocol to long.
- */
+/** Translate from wire protocol to long. */
 public class LongParser extends Parser<Long> {
 
   public LongParser(ResultSet item, int position) throws SQLException {

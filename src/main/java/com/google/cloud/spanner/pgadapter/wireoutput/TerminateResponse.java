@@ -18,9 +18,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-/**
- * Signals the end of a connection.
- */
+/** Signals the end of a connection. */
 public class TerminateResponse extends WireOutput {
 
   public TerminateResponse(DataOutputStream output) {
@@ -28,9 +26,7 @@ public class TerminateResponse extends WireOutput {
   }
 
   @Override
-  protected void sendPayload() throws IOException {
-    this.outputStream.flush();
-  }
+  protected void sendPayload() throws IOException {}
 
   @Override
   public byte getIdentifier() {
@@ -44,6 +40,6 @@ public class TerminateResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+    return new MessageFormat("Length: {0}").format(new Object[] {this.length});
   }
 }

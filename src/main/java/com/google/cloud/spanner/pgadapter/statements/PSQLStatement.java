@@ -22,8 +22,7 @@ import org.json.simple.JSONObject;
 /**
  * Meant to be utilized when running as a proxy for PSQL. Not meant for production runs. Generally
  * here, all statements will take some penalty by running matchers to determine whether they belong
- * to a specific meta-command. If matches, translates the command into something Spanner can
- * handle.
+ * to a specific meta-command. If matches, translates the command into something Spanner can handle.
  */
 public class PSQLStatement extends IntermediateStatement {
 
@@ -49,11 +48,11 @@ public class PSQLStatement extends IntermediateStatement {
    *
    * @param sql The SQL statement to be translated.
    * @return The translated SQL statement if it matches any {@link Command} statement. Otherwise
-   * gives out the original Statement.
+   *     gives out the original Statement.
    */
   private String translateSQL(String sql) {
-    for (Command currentCommand : Command
-        .getCommands(sql, this.connection, this.commandMetadataJSON)) {
+    for (Command currentCommand :
+        Command.getCommands(sql, this.connection, this.commandMetadataJSON)) {
       if (currentCommand.is()) {
         return currentCommand.translate();
       }

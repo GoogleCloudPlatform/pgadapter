@@ -17,9 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 import java.io.DataOutputStream;
 import java.text.MessageFormat;
 
-/**
- * Signals the end of a describe statement.
- */
+/** Signals the end of a describe statement. */
 public class NoDataResponse extends WireOutput {
 
   public NoDataResponse(DataOutputStream output) {
@@ -27,9 +25,7 @@ public class NoDataResponse extends WireOutput {
   }
 
   @Override
-  protected void sendPayload() throws Exception {
-    // Do nothing
-  }
+  protected void sendPayload() throws Exception {}
 
   @Override
   public byte getIdentifier() {
@@ -43,6 +39,6 @@ public class NoDataResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}").format(new Object[]{this.length});
+    return new MessageFormat("Length: {0}").format(new Object[] {this.length});
   }
 }

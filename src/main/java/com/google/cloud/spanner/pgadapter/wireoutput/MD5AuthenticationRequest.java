@@ -19,9 +19,7 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import org.postgresql.util.ByteConverter;
 
-/**
- * Used for password response.
- */
+/** Used for password response. */
 public class MD5AuthenticationRequest extends WireOutput {
 
   private static final int PASSWORD_REQUIRED_FLAG = 5;
@@ -37,7 +35,6 @@ public class MD5AuthenticationRequest extends WireOutput {
   public void sendPayload() throws IOException {
     this.outputStream.writeInt(PASSWORD_REQUIRED_FLAG);
     this.outputStream.write(this.salt);
-    this.outputStream.flush();
   }
 
   @Override
@@ -52,12 +49,7 @@ public class MD5AuthenticationRequest extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Salt: {1}")
-        .format(new Object[]{
-            this.length,
-            this.salt
-        });
+    return new MessageFormat("Length: {0}, " + "Salt: {1}")
+        .format(new Object[] {this.length, this.salt});
   }
 }

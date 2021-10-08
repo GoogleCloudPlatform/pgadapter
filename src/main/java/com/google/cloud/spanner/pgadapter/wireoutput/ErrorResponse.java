@@ -18,9 +18,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-/**
- * Sends error information back to client.
- */
+/** Sends error information back to client. */
 public class ErrorResponse extends WireOutput {
 
   private static final byte[] SEVERITY = "ERROR".getBytes(UTF8);
@@ -34,18 +32,23 @@ public class ErrorResponse extends WireOutput {
   private static final byte SEVERITY_FLAG = 'S';
   private static final byte NULL_TERMINATOR = 0;
 
-
   private final byte[] errorMessage;
   private final byte[] errorState; // TODO pull state from exception itself.
 
   public ErrorResponse(DataOutputStream output, Exception e, State errorState) {
-    super(output,
+    super(
+        output,
         HEADER_LENGTH
-            + FIELD_IDENTIFIER_LENGTH + SEVERITY.length + NULL_TERMINATOR_LENGTH
-            + FIELD_IDENTIFIER_LENGTH + errorState.getBytes().length + NULL_TERMINATOR_LENGTH
-            + FIELD_IDENTIFIER_LENGTH + getMessageFromException(e).length
-            + NULL_TERMINATOR_LENGTH + NULL_TERMINATOR_LENGTH
-    );
+            + FIELD_IDENTIFIER_LENGTH
+            + SEVERITY.length
+            + NULL_TERMINATOR_LENGTH
+            + FIELD_IDENTIFIER_LENGTH
+            + errorState.getBytes().length
+            + NULL_TERMINATOR_LENGTH
+            + FIELD_IDENTIFIER_LENGTH
+            + getMessageFromException(e).length
+            + NULL_TERMINATOR_LENGTH
+            + NULL_TERMINATOR_LENGTH);
     this.errorMessage = getMessageFromException(e);
     this.errorState = errorState.getBytes();
   }
@@ -62,7 +65,6 @@ public class ErrorResponse extends WireOutput {
     this.outputStream.write(this.errorMessage);
     this.outputStream.writeByte(NULL_TERMINATOR);
     this.outputStream.writeByte(NULL_TERMINATOR);
-    this.outputStream.flush();
   }
 
   @Override
@@ -77,18 +79,12 @@ public class ErrorResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat(
-        "Length: {0}, "
-            + "Error Message: {1}")
-        .format(new Object[]{
-            this.length,
-            new String(this.errorMessage, UTF8)
-        });
+    return new MessageFormat("Length: {0}, " + "Error Message: {1}")
+        .format(new Object[] {this.length, new String(this.errorMessage, UTF8)});
   }
 
   private static byte[] getMessageFromException(Exception e) {
-    return (e.getMessage() == null ? e.getClass().getName() : e.getMessage())
-        .getBytes(UTF8);
+    return (e.getMessage() == null ? e.getClass().getName() : e.getMessage()).getBytes(UTF8);
   }
 
   public enum State {
