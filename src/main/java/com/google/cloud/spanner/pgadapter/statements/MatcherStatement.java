@@ -55,7 +55,10 @@ public class MatcherStatement extends IntermediateStatement {
     for (Command currentCommand :
         Command.getCommands(sql, this.connection, this.commandMetadataJSON)) {
       if (currentCommand.is()) {
-        return currentCommand.translate();
+        System.out.println("DEBUG: ");
+        String s = currentCommand.translate();
+        System.out.println(s);
+        return s;
       }
     }
     return sql;
