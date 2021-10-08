@@ -8,7 +8,7 @@
     },
     {
       "input_pattern": "^SELECT c\\.oid,[ \n]+n\\.nspname,[ \n]+c\\.relname\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<tablename>.*)\\)\\$'[ \n]+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 2, 3;$",
-      "output_pattern": "SELECT sha256(t.table_name::BYTEA) as oid, '' as nspname, t.table_name as relname FROM information_schema.tables AS t WHERE t.table_schema='public' AND LOWER(t.table_name) = LOWER('%s');",
+      "output_pattern": "SELECT t.table_name as oid, 'public' as nspname, t.table_name as relname FROM information_schema.tables AS t WHERE t.table_schema='public' AND LOWER(t.table_name) = LOWER('%s');",
       "matcher_array": [
         "tablename"
       ],
@@ -22,7 +22,7 @@
     },
     {
       "input_pattern": "^SELECT a\\.attname,[ \n]+pg_catalog\\.format_type\\(a\\.atttypid, a\\.atttypmod\\),[ \n]+\\(SELECT (substring\\()?pg_catalog\\.pg_get_expr\\(d\\.adbin, d\\.adrelid(?:, true)?\\)( for 128\\))?[ \n]+FROM pg_catalog\\.pg_attrdef d[ \n]+WHERE d\\.adrelid = a\\.attrelid AND d\\.adnum = a\\.attnum AND a\\.atthasdef\\),[ \n]+a\\.attnotnull,(?: a\\.attnum,)?[ \n]+NULL AS attcollation,[ \n]+(?:''::pg_catalog\\.char AS attidentity,[ \n]+''::pg_catalog\\.char AS attgenerated\n|  NULL AS indexdef,[ \n]+NULL AS attfdwoptions\n)?([ ]*''::pg_catalog.char AS attidentity)?[ \n]*FROM pg_catalog\\.pg_attribute a\nWHERE a\\.attrelid = '(?<tablename>.*)' AND a\\.attnum > 0 AND NOT a\\.attisdropped\nORDER BY a\\.attnum;$",
-      "output_pattern": "SELECT t.column_name as attname, t.data_type as format_type, '' as substring, t.is_nullable = 'NO' as attnotnull, 1 as attnum, null::INTEGER as attcollation, null::INTEGER as indexdef, null::INTEGER as attfdwoptions FROM information_schema.columns AS t WHERE t.table_schema='public' AND sha256(t.table_name::BYTEA) = '%s';",
+      "output_pattern": "SELECT t.column_name as attname, t.data_type as format_type, '' as substring, t.is_nullable = 'NO' as attnotnull, null::INTEGER as attcollation, null::INTEGER as indexdef, null::INTEGER as attfdwoptions FROM information_schema.columns AS t WHERE t.table_schema='public' AND t.table_name = '%s';",
       "matcher_array": [
         "tablename"
       ],

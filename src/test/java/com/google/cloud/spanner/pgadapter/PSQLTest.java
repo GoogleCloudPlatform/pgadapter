@@ -107,8 +107,8 @@ public class PSQLTest {
             + "ORDER BY 2, 3;";
     String result =
         "SELECT"
-            + " sha256(t.table_name::BYTEA) as oid,"
-            + " '' as nspname,"
+            + " t.table_name as oid,"
+            + " 'public' as nspname,"
             + " t.table_name as relname"
             + " FROM"
             + " information_schema.tables AS t"
@@ -136,8 +136,8 @@ public class PSQLTest {
             + "ORDER BY 2, 3;";
     String result =
         "SELECT"
-            + " sha256(t.table_name::BYTEA) as oid,"
-            + " '' as nspname,"
+            + " t.table_name as oid,"
+            + " 'public' as nspname,"
             + " t.table_name as relname"
             + " FROM"
             + " information_schema.tables AS t"
@@ -198,7 +198,6 @@ public class PSQLTest {
             + " t.data_type as format_type,"
             + " '' as substring,"
             + " t.is_nullable = 'NO' as attnotnull,"
-            + " 1 as attnum,"
             + " null::INTEGER as attcollation,"
             + " null::INTEGER as indexdef,"
             + " null::INTEGER as attfdwoptions"
@@ -206,7 +205,7 @@ public class PSQLTest {
             + " information_schema.columns AS t"
             + " WHERE"
             + " t.table_schema='public'"
-            + " AND sha256(t.table_name::BYTEA) = '-1';";
+            + " AND t.table_name = '-1';";
 
     MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
 
@@ -236,7 +235,6 @@ public class PSQLTest {
             + " t.data_type as format_type,"
             + " '' as substring,"
             + " t.is_nullable = 'NO' as attnotnull,"
-            + " 1 as attnum,"
             + " null::INTEGER as attcollation,"
             + " null::INTEGER as indexdef,"
             + " null::INTEGER as attfdwoptions"
@@ -244,7 +242,7 @@ public class PSQLTest {
             + " information_schema.columns AS t"
             + " WHERE"
             + " t.table_schema='public'"
-            + " AND sha256(t.table_name::BYTEA) = 'bobby\\'; DROP TABLE USERS; SELECT\\'';";
+            + " AND t.table_name = 'bobby\\'; DROP TABLE USERS; SELECT\\'';";
 
     MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
 

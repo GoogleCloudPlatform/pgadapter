@@ -1,7 +1,7 @@
-                       Table ".users"
+                       Table "public.users"
  Column |       Type        | Collation | Nullable | Default 
 --------+-------------------+-----------+----------+---------
- id     | bigint            | 1         | not null | 
- age    | bigint            | 1         |          | 
- name   | character varying | 1         |          | 
+ id     | bigint            |           | not null |
+ age    | bigint            |           |          |
+ name   | character varying |           |          |
 
