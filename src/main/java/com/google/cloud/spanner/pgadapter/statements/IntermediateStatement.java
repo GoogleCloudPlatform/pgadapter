@@ -21,6 +21,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Data type to store simple SQL statement with designated metadata. Allows manipulation of
@@ -39,10 +41,16 @@ public class IntermediateStatement {
   protected boolean executed;
   protected Connection connection;
   protected Integer updateCount;
+  protected boolean batch;
+  protected List<String> statements;
+
+  private static final char STATEMENT_DELIMITER = ';';
+  private static final char SINGLE_QUOTE = '\'';
 
   public IntermediateStatement(String sql, Connection connection) throws SQLException {
     this();
     this.sql = sql;
+    this.statements = parseStatements(sql);
     this.command = parseCommand(sql);
     this.connection = connection;
     this.statement = connection.createStatement();
@@ -55,6 +63,7 @@ public class IntermediateStatement {
     this.hasMoreData = false;
     this.statementResult = null;
     this.updateCount = null;
+    this.batch = false;
   }
 
   /**
@@ -75,6 +84,36 @@ public class IntermediateStatement {
       default:
         return ResultType.UPDATE_COUNT;
     }
+  }
+
+  // Split statements by ';' delimiter, but ignore anything that is nested with '' or "".
+  private List<String> splitStatements(String sql) {
+    List<String> statements = new ArrayList<>();
+    boolean quoteEsacpe = false;
+    int index = 0;
+    for(int i=0; i<sql.length(); ++i) {
+      if(sql.charAt(i) == SINGLE_QUOTE) {
+        quoteEsacpe = !quoteEsacpe;
+      }
+      if(sql.charAt(i) == STATEMENT_DELIMITER && !quoteEsacpe) {
+        statements.add(sql.substring(index, i+1).trim());
+        index = i+1;
+      }
+    }
+
+    if(index < sql.length()) {
+      statements.add(sql.substring(index, sql.length()).trim());
+    }
+    return statements;
+  }
+
+  protected List<String> parseStatements(String sql) {
+    Preconditions.checkNotNull(sql);
+    List<String> statements = splitStatements(sql);
+    if(statements.size() > 1) {
+      batch = true;
+    }
+    return statements;
   }
 
   /** Determines the (update) command that was received from the sql string. */
@@ -141,6 +180,10 @@ public class IntermediateStatement {
     return this.statement;
   }
 
+  public List<String> getStatements() {
+    return this.statements;
+  }
+
   public ResultSet getStatementResult() {
     return this.statementResult;
   }
@@ -193,7 +236,15 @@ public class IntermediateStatement {
   public void execute() {
     this.executed = true;
     try {
-      this.statement.execute(this.sql);
+      if(batch) {
+        for(String stmt : statements) {
+          System.out.println("BATCH: " + stmt);
+          this.statement.addBatch(stmt);
+        }
+        this.statement.executeBatch();
+      } else {
+        this.statement.execute(this.sql);
+      }
       this.executeHelper();
     } catch (SQLException e) {
       handleExecutionException(e);
@@ -221,6 +272,8 @@ public class IntermediateStatement {
   public String getCommand() {
     return this.command;
   }
+
+  public boolean isBatch() { return batch; }
 
   public enum ResultType {
     UPDATE_COUNT,

@@ -300,4 +300,29 @@ public class StatementTest {
 
     intermediateStatement.describe();
   }
+
+  @Test
+  public void testBatchStatements() throws Exception {
+    String sql = "INSERT INTO users (id) VALUES (1); INSERT INTO users (id) VALUES (2);INSERT INTO users (id) VALUES (3);";
+    IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
+
+    Assert.assertTrue(intermediateStatement.isBatch());
+    List<String> result = intermediateStatement.getStatements();
+    Assert.assertEquals(result.size(), 3);
+    Assert.assertEquals(result.get(0), "INSERT INTO users (id) VALUES (1);");
+    Assert.assertEquals(result.get(1), "INSERT INTO users (id) VALUES (2);");
+    Assert.assertEquals(result.get(2), "INSERT INTO users (id) VALUES (3);");
+  }
+
+  @Test
+  public void testBatchStatementsWithQuotes() throws Exception {
+    String sql = "INSERT INTO users (name) VALUES (';;test;;'); INSERT INTO users (name1, name2) VALUES ('''''', ';'';');";
+    IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
+
+    Assert.assertTrue(intermediateStatement.isBatch());
+    List<String> result = intermediateStatement.getStatements();
+    Assert.assertEquals(result.size(), 2);
+    Assert.assertEquals(result.get(0), "INSERT INTO users (name) VALUES (';;test;;');");
+    Assert.assertEquals(result.get(1), "INSERT INTO users (name1, name2) VALUES ('''''', ';'';');");
+  }
 }

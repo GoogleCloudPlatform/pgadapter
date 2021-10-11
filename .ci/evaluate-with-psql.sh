@@ -7,7 +7,7 @@ sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/
 sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-di-param.txt
 sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-dn.txt
 sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-dn-param.txt
-# remove --- hyphenated formatting lines
+# remove --- hyphenated formatting lines for diff comparison
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dt.txt
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dt-param.txt
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-di.txt
@@ -73,4 +73,10 @@ echo "\dn public" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost 
 sed -i -E 's/[0-9]{16,}//' .ci/e2e-result/backslash-dn-param.txt
 sed -i "s/---[-]*//g" .ci/e2e-result/backslash-dn-param.txt
 diff -i -w -s .ci/e2e-result/backslash-dn-param.txt .ci/e2e-expected/backslash-dn-param.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"-c option ddl batching\"------"
+BATCH_OPTION=$(cat .ci/e2e-batching/ddl-batch.txt)
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c > .ci/e2e-result/
+diff -i -w -s .ci/e2e-result/ddl-batching.txt .ci/e2e-expected/ddl-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
