@@ -21,8 +21,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Data type to store simple SQL statement with designated metadata. Allows manipulation of
@@ -91,17 +91,17 @@ public class IntermediateStatement {
     List<String> statements = new ArrayList<>();
     boolean quoteEsacpe = false;
     int index = 0;
-    for(int i=0; i<sql.length(); ++i) {
-      if(sql.charAt(i) == SINGLE_QUOTE) {
+    for (int i = 0; i < sql.length(); ++i) {
+      if (sql.charAt(i) == SINGLE_QUOTE) {
         quoteEsacpe = !quoteEsacpe;
       }
-      if(sql.charAt(i) == STATEMENT_DELIMITER && !quoteEsacpe) {
-        statements.add(sql.substring(index, i+1).trim());
-        index = i+1;
+      if (sql.charAt(i) == STATEMENT_DELIMITER && !quoteEsacpe) {
+        statements.add(sql.substring(index, i + 1).trim());
+        index = i + 1;
       }
     }
 
-    if(index < sql.length()) {
+    if (index < sql.length()) {
       statements.add(sql.substring(index, sql.length()).trim());
     }
     return statements;
@@ -110,7 +110,7 @@ public class IntermediateStatement {
   protected List<String> parseStatements(String sql) {
     Preconditions.checkNotNull(sql);
     List<String> statements = splitStatements(sql);
-    if(statements.size() > 1) {
+    if (statements.size() > 1) {
       batch = true;
     }
     return statements;
@@ -236,8 +236,8 @@ public class IntermediateStatement {
   public void execute() {
     this.executed = true;
     try {
-      if(batch) {
-        for(String stmt : statements) {
+      if (batch) {
+        for (String stmt : statements) {
           System.out.println("BATCH: " + stmt);
           this.statement.addBatch(stmt);
         }
@@ -273,7 +273,9 @@ public class IntermediateStatement {
     return this.command;
   }
 
-  public boolean isBatch() { return batch; }
+  public boolean isBatch() {
+    return batch;
+  }
 
   public enum ResultType {
     UPDATE_COUNT,

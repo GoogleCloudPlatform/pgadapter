@@ -303,7 +303,8 @@ public class StatementTest {
 
   @Test
   public void testBatchStatements() throws Exception {
-    String sql = "INSERT INTO users (id) VALUES (1); INSERT INTO users (id) VALUES (2);INSERT INTO users (id) VALUES (3);";
+    String sql =
+        "INSERT INTO users (id) VALUES (1); INSERT INTO users (id) VALUES (2);INSERT INTO users (id) VALUES (3);";
     IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
 
     Assert.assertTrue(intermediateStatement.isBatch());
@@ -316,7 +317,8 @@ public class StatementTest {
 
   @Test
   public void testBatchStatementsWithQuotes() throws Exception {
-    String sql = "INSERT INTO users (name) VALUES (';;test;;'); INSERT INTO users (name1, name2) VALUES ('''''', ';'';');";
+    String sql =
+        "INSERT INTO users (name) VALUES (';;test;;'); INSERT INTO users (name1, name2) VALUES ('''''', ';'';');";
     IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
 
     Assert.assertTrue(intermediateStatement.isBatch());
