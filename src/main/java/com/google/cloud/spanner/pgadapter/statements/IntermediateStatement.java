@@ -41,7 +41,7 @@ public class IntermediateStatement {
   protected boolean executed;
   protected Connection connection;
   protected Integer updateCount;
-  protected boolean batch;
+  protected boolean batchedQuery;
   protected List<String> statements;
 
   private static final char STATEMENT_DELIMITER = ';';
@@ -63,7 +63,7 @@ public class IntermediateStatement {
     this.hasMoreData = false;
     this.statementResult = null;
     this.updateCount = null;
-    this.batch = false;
+    this.batchedQuery = false;
   }
 
   /**
@@ -111,7 +111,7 @@ public class IntermediateStatement {
     Preconditions.checkNotNull(sql);
     List<String> statements = splitStatements(sql);
     if (statements.size() > 1) {
-      batch = true;
+      batchedQuery = true;
     }
     return statements;
   }
@@ -236,9 +236,8 @@ public class IntermediateStatement {
   public void execute() {
     this.executed = true;
     try {
-      if (batch) {
+      if (batchedQuery) {
         for (String stmt : statements) {
-          System.out.println("BATCH: " + stmt);
           this.statement.addBatch(stmt);
         }
         this.statement.executeBatch();
@@ -273,8 +272,8 @@ public class IntermediateStatement {
     return this.command;
   }
 
-  public boolean isBatch() {
-    return batch;
+  public boolean isBatchedQuery() {
+    return batchedQuery;
   }
 
   public enum ResultType {

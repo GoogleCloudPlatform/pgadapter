@@ -186,6 +186,11 @@ public abstract class WireMessage {
    * setting for {@link ConnectionHandler}.
    */
   public void nextHandler() throws Exception {
-    this.connection.setMessageState(ControlMessage.create(this.connection));
+    try {
+      this.connection.setMessageState(ControlMessage.create(this.connection));
+    } catch (Exception e) {
+      System.out.println("**** " + e.toString());
+      throw e;
+    }
   }
 }

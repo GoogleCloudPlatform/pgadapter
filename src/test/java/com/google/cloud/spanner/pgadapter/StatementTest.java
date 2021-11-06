@@ -307,7 +307,7 @@ public class StatementTest {
         "INSERT INTO users (id) VALUES (1); INSERT INTO users (id) VALUES (2);INSERT INTO users (id) VALUES (3);";
     IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
 
-    Assert.assertTrue(intermediateStatement.isBatch());
+    Assert.assertTrue(intermediateStatement.isBatchedQuery());
     List<String> result = intermediateStatement.getStatements();
     Assert.assertEquals(result.size(), 3);
     Assert.assertEquals(result.get(0), "INSERT INTO users (id) VALUES (1);");
@@ -321,7 +321,7 @@ public class StatementTest {
         "INSERT INTO users (name) VALUES (';;test;;'); INSERT INTO users (name1, name2) VALUES ('''''', ';'';');";
     IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
 
-    Assert.assertTrue(intermediateStatement.isBatch());
+    Assert.assertTrue(intermediateStatement.isBatchedQuery());
     List<String> result = intermediateStatement.getStatements();
     Assert.assertEquals(result.size(), 2);
     Assert.assertEquals(result.get(0), "INSERT INTO users (name) VALUES (';;test;;');");
