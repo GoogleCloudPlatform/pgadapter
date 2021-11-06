@@ -1,1 +1,1 @@
-CREATE TABLE test1 (id bigint PRIMARY KEY, name TEXT); CREATE TABLE test2 (id bigint PRIMARY KEY, name TEXT); CREATE TABLE test3 (id bigint PRIMARY KEY, name TEXT);
+CREATE TABLE table1 (id INT64, name STRING(MAX)) PRIMARY KEY(id); CREATE TABLE table2 (id INT64, name STRING(MAX)) PRIMARY KEY(id); CREATE TABLE table3 (id INT64, name STRING(MAX)) PRIMARY KEY(id);
