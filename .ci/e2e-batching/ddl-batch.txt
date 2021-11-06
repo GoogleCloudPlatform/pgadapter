@@ -1,1 +1,1 @@
-CREATE TABLE test1 (id bigint PRIMARY KEY, name character[255]); CREATE TABLE test2 (id bigint PRIMARY KEY, name character[255]); CREATE TABLE test3 (id bigint PRIMARY KEY, name character[255]);
+CREATE TABLE test1 (id bigint PRIMARY KEY, name TEXT); CREATE TABLE test2 (id bigint PRIMARY KEY, name TEXT); CREATE TABLE test3 (id bigint PRIMARY KEY, name TEXT);
