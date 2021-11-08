@@ -215,3 +215,7 @@ We are not currently accepting external code contributions to this project.
 Please feel free to file feature requests using GitHub's issue tracker or 
 using the existing Cloud Spanner support channels.
 
+## Note
+
+Currently PGAdapter is in public preview, but there are dependencies that are not publicly available yet. 
+Contact Cloud Spanner support about getting whitelisted to have access to the Postgres specific dependencies.
