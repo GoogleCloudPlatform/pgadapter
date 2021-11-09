@@ -217,5 +217,6 @@ using the existing Cloud Spanner support channels.
 
 ## Note
 
-Currently PGAdapter is in public preview, but there are dependencies that are not publicly available yet. 
-Contact Cloud Spanner support about getting whitelisted to have access to the Postgres specific dependencies.
+Currently PGAdapter is in public preview, but there are required dependencies that are not publicly available yet. 
+Please fill out this form (https://goo.gle/PostgreSQL-interface) to start the process for getting whitelisted to 
+have access to the Postgres specific dependencies.
