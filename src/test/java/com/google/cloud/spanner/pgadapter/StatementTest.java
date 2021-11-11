@@ -15,12 +15,21 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.cloud.spanner.jdbc.JdbcConstants;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.SQLMetadata;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.ResultType;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import com.google.common.primitives.Bytes;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -47,9 +56,14 @@ public class StatementTest {
 
   @Rule public MockitoRule rule = MockitoJUnit.rule();
   @Mock private Connection connection;
+  @Mock private ConnectionHandler connectionHandler;
+  @Mock private ConnectionMetadata connectionMetadata;
   @Mock private Statement statement;
+  @Mock private ProxyServer server;
+  @Mock private OptionsMetadata options;
   @Mock private PreparedStatement preparedStatement;
   @Mock private ResultSet resultSet;
+  @Mock private DataOutputStream outputStream;
 
   private byte[] longToBytes(int value) {
     byte[] parameters = new byte[8];
@@ -316,6 +330,19 @@ public class StatementTest {
   }
 
   @Test
+  public void testBatchStatementsWithEmptyStatements() throws Exception {
+    String sql =
+        "INSERT INTO users (id) VALUES (1); ;;; INSERT INTO users (id) VALUES (2);";
+    IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
+
+    Assert.assertTrue(intermediateStatement.isBatchedQuery());
+    List<String> result = intermediateStatement.getStatements();
+    Assert.assertEquals(result.size(), 2);
+    Assert.assertEquals(result.get(0), "INSERT INTO users (id) VALUES (1);");
+    Assert.assertEquals(result.get(1), "INSERT INTO users (id) VALUES (2);");
+  }
+
+  @Test
   public void testBatchStatementsWithQuotes() throws Exception {
     String sql =
         "INSERT INTO users (name) VALUES (';;test;;'); INSERT INTO users (name1, name2) VALUES ('''''', ';'';');";
@@ -326,5 +353,33 @@ public class StatementTest {
     Assert.assertEquals(result.size(), 2);
     Assert.assertEquals(result.get(0), "INSERT INTO users (name) VALUES (';;test;;');");
     Assert.assertEquals(result.get(1), "INSERT INTO users (name1, name2) VALUES ('''''', ';'';');");
+  }
+
+  @Test
+  public void testBatchStatementsWithComments() throws Exception {
+    byte[] messageMetadata = {'Q', 0, 0, 0, (byte) 132};
+    String payload =
+        "INSERT INTO users (name) VALUES (';;test;;'); /* Comment;; Comment; */INSERT INTO users (name1, name2) VALUES ('''''', ';'';');\0";
+    byte[] value = Bytes.concat(messageMetadata, payload.getBytes());
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getServer()).thenReturn(server);
+    Mockito.when(server.getOptions()).thenReturn(options);
+    Mockito.when(options.requiresMatcher()).thenReturn(false);
+    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
+    Assert.assertEquals(message.getClass(), QueryMessage.class);
+    IntermediateStatement intermediateStatement = ((QueryMessage) message).getStatement();
+
+    Assert.assertTrue(intermediateStatement.isBatchedQuery());
+    List<String> result = intermediateStatement.getStatements();
+    Assert.assertEquals(result.size(), 2);
+    Assert.assertEquals(result.get(0), "INSERT INTO users (name) VALUES (';;test;;');");
+    Assert.assertEquals(result.get(1), "INSERT INTO users (name1, name2) VALUES ('''''', ';'';')");
   }
 }

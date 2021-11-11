@@ -96,7 +96,11 @@ public class IntermediateStatement {
         quoteEsacpe = !quoteEsacpe;
       }
       if (sql.charAt(i) == STATEMENT_DELIMITER && !quoteEsacpe) {
-        statements.add(sql.substring(index, i + 1).trim());
+        String stmt = sql.substring(index, i + 1).trim();
+        // Statements with only ';' character are empty and dropped.
+        if(stmt.length() > 1) {
+          statements.add(stmt);
+        }
         index = i + 1;
       }
     }
@@ -272,6 +276,7 @@ public class IntermediateStatement {
     return this.command;
   }
 
+  /* Used for testing purposes */
   public boolean isBatchedQuery() {
     return batchedQuery;
   }
