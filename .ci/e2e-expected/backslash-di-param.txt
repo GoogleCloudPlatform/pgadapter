@@ -2,7 +2,6 @@
  table_catalog |    table_schema    |           table_name            | index_name  | index_type  | parent_table_name | is_unique | is_null_filtered | index_state | spanner_is_managed 
 +++++++++
  testdb_e2e_psql_v?? | public             | users                           | PRIMARY_KEY | PRIMARY_KEY |                   | YES       | NO               |             | NO
- testdb_e2e_psql_v?? | pg_catalog         | pg_index                        | PRIMARY_KEY | PRIMARY_KEY |                   | YES       | NO               |             | NO
  testdb_e2e_psql_v?? | information_schema | information_schema_catalog_name | PRIMARY_KEY | PRIMARY_KEY |                   | YES       | NO               |             | NO
 (2 rows)
 
