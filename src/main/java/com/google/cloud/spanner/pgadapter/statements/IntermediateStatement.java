@@ -98,7 +98,7 @@ public class IntermediateStatement {
       if (sql.charAt(i) == STATEMENT_DELIMITER && !quoteEsacpe) {
         String stmt = sql.substring(index, i + 1).trim();
         // Statements with only ';' character are empty and dropped.
-        if(stmt.length() > 1) {
+        if (stmt.length() > 1) {
           statements.add(stmt);
         }
         index = i + 1;

@@ -331,8 +331,7 @@ public class StatementTest {
 
   @Test
   public void testBatchStatementsWithEmptyStatements() throws Exception {
-    String sql =
-        "INSERT INTO users (id) VALUES (1); ;;; INSERT INTO users (id) VALUES (2);";
+    String sql = "INSERT INTO users (id) VALUES (1); ;;; INSERT INTO users (id) VALUES (2);";
     IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
 
     Assert.assertTrue(intermediateStatement.isBatchedQuery());
