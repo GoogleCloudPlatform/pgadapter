@@ -141,9 +141,6 @@ public class StatementParser {
       throw new IllegalArgumentException(
           "SQL statement contains an unterminated block comment: " + sql);
     }
-    if (res.length() > 0 && res.charAt(res.length() - 1) == SEMICOLON) {
-      res.deleteCharAt(res.length() - 1);
-    }
     return res.toString().trim();
   }
 
@@ -245,9 +242,6 @@ public class StatementParser {
     }
     if (isInQuoted) {
       throw new IllegalArgumentException("SQL statement contains an unclosed literal: " + sql);
-    }
-    if (res.length() > 0 && res.charAt(res.length() - 1) == SEMICOLON) {
-      res.deleteCharAt(res.length() - 1);
     }
     return GSQL_STATEMENT + res.toString().trim();
   }

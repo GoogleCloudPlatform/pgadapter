@@ -379,6 +379,6 @@ public class StatementTest {
     List<String> result = intermediateStatement.getStatements();
     Assert.assertEquals(result.size(), 2);
     Assert.assertEquals(result.get(0), "INSERT INTO users (name) VALUES (';;test;;');");
-    Assert.assertEquals(result.get(1), "INSERT INTO users (name1, name2) VALUES ('''''', ';'';')");
+    Assert.assertEquals(result.get(1), "INSERT INTO users (name1, name2) VALUES ('''''', ';'';');");
   }
 }
