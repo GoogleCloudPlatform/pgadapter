@@ -1,8 +1,8 @@
        List of relations
  Schema | Name  | Type  | Owner
 --------+-------+-------+-------
- public | test1 | table | me
- public | test2 | table | me
- public | test3 | table | me
+ public | table1 | table | me
+ public | table2 | table | me
+ public | table3 | table | me
  public | users | table | me
  (4 rows)
