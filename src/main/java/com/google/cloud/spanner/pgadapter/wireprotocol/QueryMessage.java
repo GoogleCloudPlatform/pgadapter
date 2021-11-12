@@ -32,11 +32,11 @@ public class QueryMessage extends ControlMessage {
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
-    String statement = StatementParser.removeCommentsAndTrim(this.readAll());
+    String query = StatementParser.removeCommentsAndTrim(this.readAll());
     if (!connection.getServer().getOptions().requiresMatcher()) {
-      this.statement = new IntermediateStatement(statement, this.connection.getJdbcConnection());
+      this.statement = new IntermediateStatement(query, this.connection.getJdbcConnection());
     } else {
-      this.statement = new MatcherStatement(statement, this.connection);
+      this.statement = new MatcherStatement(query, this.connection);
     }
     this.connection.addActiveStatement(this.statement);
   }
