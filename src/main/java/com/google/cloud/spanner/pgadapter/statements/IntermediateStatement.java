@@ -207,13 +207,21 @@ public class IntermediateStatement {
    *
    * @throws SQLException If an issue occurred in extracting result metadata.
    */
-  protected void executeHelper() throws SQLException {
+  protected void executeHelper(int[] updateCounts) throws SQLException {
     this.resultType = IntermediateStatement.extractResultType(this.statement);
     if (this.containsResultSet()) {
       this.statementResult = this.statement.getResultSet();
       this.hasMoreData = this.statementResult.next();
     } else {
-      this.updateCount = this.statement.getUpdateCount();
+      // updateCounts will be non-null for batch statements.
+      if (updateCounts != null) {
+        this.updateCount = 0;
+        for (int i = 0; i < updateCounts.length; ++i) {
+          this.updateCount += updateCounts[i];
+        }
+      } else {
+        this.updateCount = this.statement.getUpdateCount();
+      }
       this.hasMoreData = false;
       this.statementResult = null;
     }
@@ -234,16 +242,17 @@ public class IntermediateStatement {
   /** Execute the SQL statement, storing metadata. */
   public void execute() {
     this.executed = true;
+    int[] updateCounts = null;
     try {
       if (statements.size() > 1) {
         for (String stmt : statements) {
           this.statement.addBatch(stmt);
         }
-        this.statement.executeBatch();
+        updateCounts = this.statement.executeBatch();
       } else {
         this.statement.execute(this.sql);
       }
-      this.executeHelper();
+      this.executeHelper(updateCounts);
     } catch (SQLException e) {
       handleExecutionException(e);
     }

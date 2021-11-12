@@ -102,7 +102,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     this.executed = true;
     try {
       ((PreparedStatement) this.statement).execute();
-      this.executeHelper();
+      this.executeHelper(null);
     } catch (SQLException e) {
       handleExecutionException(e);
     }
