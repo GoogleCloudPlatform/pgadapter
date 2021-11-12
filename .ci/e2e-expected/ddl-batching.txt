@@ -6,4 +6,3 @@
  public | table3 | table | me
  public | users | table | me
  (4 rows)
-
