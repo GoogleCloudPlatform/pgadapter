@@ -1,0 +1,1 @@
+ERROR:  INVALID_ARGUMENT: Mixing DML and DDL statements in a batch is not allowed.
