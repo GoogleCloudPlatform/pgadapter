@@ -1,1 +1,1 @@
-SELECT * FROM users; INSERT INTO users (id, age, name) VALUES (99, 99, "person"); SELECT * FROM users;
+SELECT * FROM users; INSERT INTO users (id, age, name) VALUES (99, 99, 'person'); SELECT * FROM users;

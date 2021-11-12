@@ -1,0 +1,1 @@
+ERROR:  INVALID_ARGUMENT: io.grpc.StatusRuntimeException: INVALID_ARGUMENT: SQL queries are limited to single statements - Statement: 'SELECT * FROM users; INSERT INTO users (id, age, name) VALUES (99, 99, 'person'); SELECT * FROM users;'
