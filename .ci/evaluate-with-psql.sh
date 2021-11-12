@@ -90,6 +90,6 @@ RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"-c option ddl-dml mix batching\"------"
 BATCH_OPTION=$(cat .ci/e2e-batching/ddl-dml-batch.txt)
-/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(echo $(cat .ci/e2e-batching/ddl-dml-batch.txt))"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(echo $(cat .ci/e2e-batching/ddl-dml-batch.txt))" > .ci/e2e-result/ddl-dml-batching.txt
 diff -i -w -s .ci/e2e-result/ddl-dml-batching.txt .ci/e2e-expected/ddl-dml-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
