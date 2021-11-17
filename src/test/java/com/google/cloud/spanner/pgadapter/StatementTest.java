@@ -330,6 +330,22 @@ public class StatementTest {
   }
 
   @Test
+  public void testAdditionalBatchStatements() throws Exception {
+    String sql =
+        "BEGIN TRANSACTION; INSERT INTO users (id) VALUES (1); INSERT INTO users (id) VALUES (2); INSERT INTO users (id) VALUES (3); COMMIT;";
+    IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
+
+    Assert.assertTrue(intermediateStatement.isBatchedQuery());
+    List<String> result = intermediateStatement.getStatements();
+    Assert.assertEquals(result.size(), 5);
+    Assert.assertEquals(result.get(0), "BEGIN TRANSACTION;");
+    Assert.assertEquals(result.get(1), "INSERT INTO users (id) VALUES (1);");
+    Assert.assertEquals(result.get(2), "INSERT INTO users (id) VALUES (2);");
+    Assert.assertEquals(result.get(3), "INSERT INTO users (id) VALUES (3);");
+    Assert.assertEquals(result.get(4), "COMMIT;");
+  }
+
+  @Test
   public void testBatchStatementsWithEmptyStatements() throws Exception {
     String sql = "INSERT INTO users (id) VALUES (1); ;;; INSERT INTO users (id) VALUES (2);";
     IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);

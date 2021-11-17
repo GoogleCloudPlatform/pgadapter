@@ -202,12 +202,13 @@ public class IntermediateStatement {
   }
 
   /**
-   * Runs a specific execution, extracting metadata from that execution (including results and
-   * update counts)
+   * Processes the results from an execute/executeBatch execution, extracting metadata from that
+   * execution (including results and update counts). An array of updateCounts is needed in the case
+   * of batched executions.
    *
    * @throws SQLException If an issue occurred in extracting result metadata.
    */
-  protected void executeHelper(int[] updateCounts) throws SQLException {
+  protected void updateResultCount(int[] updateCounts) throws SQLException {
     this.resultType = IntermediateStatement.extractResultType(this.statement);
     if (this.containsResultSet()) {
       this.statementResult = this.statement.getResultSet();
@@ -252,7 +253,7 @@ public class IntermediateStatement {
       } else {
         this.statement.execute(this.sql);
       }
-      this.executeHelper(updateCounts);
+      this.updateResultCount(updateCounts);
     } catch (SQLException e) {
       handleExecutionException(e);
     }
