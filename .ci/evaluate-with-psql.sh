@@ -91,7 +91,13 @@ echo "------Test \"-c option ddl-dml mix batching\"------"
 diff -i -w -s .ci/e2e-result/ddl-dml-batching.txt .ci/e2e-expected/ddl-dml-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
-echo "------Test \"-c option SELECT batching\"------"
-/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(echo $(cat .ci/e2e-batching/select-batch.txt))" &> .ci/e2e-result/select-batching.txt
-diff -i -w -s .ci/e2e-result/select-batching.txt .ci/e2e-expected/select-batching.txt
+echo "------Test \"-c option SELECT DML batching\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(echo $(cat .ci/e2e-batching/select-dml-batch.txt))" &> .ci/e2e-result/select-dml-batching.txt
+diff -i -w -s .ci/e2e-result/select-dml-batching.txt .ci/e2e-expected/select-dml-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"-c option SELECT DDL batching\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(echo $(cat .ci/e2e-batching/select-ddl-batch.txt))" &> .ci/e2e-result/select-ddl-batching.txt
+diff -i -w -s .ci/e2e-result/select-ddl-batching.txt .ci/e2e-expected/select-ddl-batching.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
