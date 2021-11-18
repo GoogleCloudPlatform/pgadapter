@@ -101,3 +101,12 @@ echo "------Test \"-c option SELECT DDL batching\"------"
 diff -i -w -s .ci/e2e-result/select-ddl-batching.txt .ci/e2e-expected/select-ddl-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
+echo "------Test \"-c option invalid WITH batching\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(echo $(cat .ci/e2e-batching/invalid-with-batch.txt))" &> .ci/e2e-result/invalid-with-batching.txt
+diff -i -w -s .ci/e2e-result/invalid-with-batching.txt .ci/e2e-expected/invalid-with-batching.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"-c option invalid begin/commit batching\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(echo $(cat .ci/e2e-batching/invalid-commit-batch.txt))" &> .ci/e2e-result/invalid-commit-batching.txt
+diff -i -w -s .ci/e2e-result/invalid-commit-batching.txt .ci/e2e-expected/invalid-commit-batching.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
