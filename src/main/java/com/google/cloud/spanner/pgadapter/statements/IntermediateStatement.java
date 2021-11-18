@@ -221,6 +221,7 @@ public class IntermediateStatement {
   }
 
   protected void updateBatchResultCount(int[] updateCounts) throws SQLException {
+    this.resultType = IntermediateStatement.extractResultType(this.statement);
     this.updateCount = 0;
     for (int i = 0; i < updateCounts.length; ++i) {
       this.updateCount += updateCounts[i];
