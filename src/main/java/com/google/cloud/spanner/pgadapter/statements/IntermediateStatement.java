@@ -204,28 +204,29 @@ public class IntermediateStatement {
   /**
    * Processes the results from an execute/executeBatch execution, extracting metadata from that
    * execution (including results and update counts). An array of updateCounts is needed in the case
-   * of batched executions.
+   * of updateBatchResultCount.
    *
    * @throws SQLException If an issue occurred in extracting result metadata.
    */
-  protected void updateResultCount(int[] updateCounts) throws SQLException {
+  protected void updateResultCount() throws SQLException {
     this.resultType = IntermediateStatement.extractResultType(this.statement);
     if (this.containsResultSet()) {
       this.statementResult = this.statement.getResultSet();
       this.hasMoreData = this.statementResult.next();
     } else {
-      // updateCounts will be non-null for batch statements.
-      if (updateCounts != null) {
-        this.updateCount = 0;
-        for (int i = 0; i < updateCounts.length; ++i) {
-          this.updateCount += updateCounts[i];
-        }
-      } else {
-        this.updateCount = this.statement.getUpdateCount();
-      }
+      this.updateCount = this.statement.getUpdateCount();
       this.hasMoreData = false;
       this.statementResult = null;
     }
+  }
+
+  protected void updateBatchResultCount(int[] updateCounts) throws SQLException {
+    this.updateCount = 0;
+    for (int i = 0; i < updateCounts.length; ++i) {
+      this.updateCount += updateCounts[i];
+    }
+    this.hasMoreData = false;
+    this.statementResult = null;
   }
 
   /**
@@ -250,12 +251,18 @@ public class IntermediateStatement {
           this.statement.addBatch(stmt);
         }
         updateCounts = this.statement.executeBatch();
+        this.updateBatchResultCount(updateCounts);
       } else {
         this.statement.execute(this.sql);
+        this.updateResultCount();
       }
-      this.updateResultCount(updateCounts);
     } catch (SQLException e) {
-      handleExecutionException(e);
+      if (statements.size() > 1) {
+        SQLException exception = new SQLException(e.getMessage() + " \"" + this.sql + "\"", e);
+        handleExecutionException(exception);
+      } else {
+        handleExecutionException(e);
+      }
     }
   }
 
