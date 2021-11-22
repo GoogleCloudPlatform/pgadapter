@@ -21,6 +21,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Data type to store simple SQL statement with designated metadata. Allows manipulation of
@@ -39,10 +41,15 @@ public class IntermediateStatement {
   protected boolean executed;
   protected Connection connection;
   protected Integer updateCount;
+  protected List<String> statements;
+
+  private static final char STATEMENT_DELIMITER = ';';
+  private static final char SINGLE_QUOTE = '\'';
 
   public IntermediateStatement(String sql, Connection connection) throws SQLException {
     this();
     this.sql = sql;
+    this.statements = parseStatements(sql);
     this.command = parseCommand(sql);
     this.connection = connection;
     this.statement = connection.createStatement();
@@ -75,6 +82,37 @@ public class IntermediateStatement {
       default:
         return ResultType.UPDATE_COUNT;
     }
+  }
+
+  // Split statements by ';' delimiter, but ignore anything that is nested with '' or "".
+  private List<String> splitStatements(String sql) {
+    List<String> statements = new ArrayList<>();
+    boolean quoteEsacpe = false;
+    int index = 0;
+    for (int i = 0; i < sql.length(); ++i) {
+      if (sql.charAt(i) == SINGLE_QUOTE) {
+        quoteEsacpe = !quoteEsacpe;
+      }
+      if (sql.charAt(i) == STATEMENT_DELIMITER && !quoteEsacpe) {
+        String stmt = sql.substring(index, i + 1).trim();
+        // Statements with only ';' character are empty and dropped.
+        if (stmt.length() > 1) {
+          statements.add(stmt);
+        }
+        index = i + 1;
+      }
+    }
+
+    if (index < sql.length()) {
+      statements.add(sql.substring(index, sql.length()).trim());
+    }
+    return statements;
+  }
+
+  protected List<String> parseStatements(String sql) {
+    Preconditions.checkNotNull(sql);
+    List<String> statements = splitStatements(sql);
+    return statements;
   }
 
   /** Determines the (update) command that was received from the sql string. */
@@ -141,6 +179,10 @@ public class IntermediateStatement {
     return this.statement;
   }
 
+  public List<String> getStatements() {
+    return this.statements;
+  }
+
   public ResultSet getStatementResult() {
     return this.statementResult;
   }
@@ -160,12 +202,13 @@ public class IntermediateStatement {
   }
 
   /**
-   * Runs a specific execution, extracting metadata from that execution (including results and
-   * update counts)
+   * Processes the results from an execute/executeBatch execution, extracting metadata from that
+   * execution (including results and update counts). An array of updateCounts is needed in the case
+   * of updateBatchResultCount.
    *
    * @throws SQLException If an issue occurred in extracting result metadata.
    */
-  protected void executeHelper() throws SQLException {
+  protected void updateResultCount() throws SQLException {
     this.resultType = IntermediateStatement.extractResultType(this.statement);
     if (this.containsResultSet()) {
       this.statementResult = this.statement.getResultSet();
@@ -175,6 +218,16 @@ public class IntermediateStatement {
       this.hasMoreData = false;
       this.statementResult = null;
     }
+  }
+
+  protected void updateBatchResultCount(int[] updateCounts) throws SQLException {
+    this.resultType = IntermediateStatement.extractResultType(this.statement);
+    this.updateCount = 0;
+    for (int i = 0; i < updateCounts.length; ++i) {
+      this.updateCount += updateCounts[i];
+    }
+    this.hasMoreData = false;
+    this.statementResult = null;
   }
 
   /**
@@ -192,11 +245,25 @@ public class IntermediateStatement {
   /** Execute the SQL statement, storing metadata. */
   public void execute() {
     this.executed = true;
+    int[] updateCounts = null;
     try {
-      this.statement.execute(this.sql);
-      this.executeHelper();
+      if (statements.size() > 1) {
+        for (String stmt : statements) {
+          this.statement.addBatch(stmt);
+        }
+        updateCounts = this.statement.executeBatch();
+        this.updateBatchResultCount(updateCounts);
+      } else {
+        this.statement.execute(this.sql);
+        this.updateResultCount();
+      }
     } catch (SQLException e) {
-      handleExecutionException(e);
+      if (statements.size() > 1) {
+        SQLException exception = new SQLException(e.getMessage() + " \"" + this.sql + "\"", e);
+        handleExecutionException(exception);
+      } else {
+        handleExecutionException(e);
+      }
     }
   }
 
@@ -220,6 +287,11 @@ public class IntermediateStatement {
   /** @return the extracted command (first word) from the SQL statement. */
   public String getCommand() {
     return this.command;
+  }
+
+  /* Used for testing purposes */
+  public boolean isBatchedQuery() {
+    return (statements.size() > 1);
   }
 
   public enum ResultType {

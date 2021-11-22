@@ -1,0 +1,1 @@
+WITH temp (value) as (SELECT avg(id) FROM users) SELECT id FROM users, temp;

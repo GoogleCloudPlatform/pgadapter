@@ -54,7 +54,7 @@ public class StatementParserTest {
             + "  INSERT VALUES (v.column1, v.column2, v.column3)\n"
             + "WHEN MATCHED\n"
             + "  UPDATE SET FirstName = v.column2,\n"
-            + "             LastName = v.column3";
+            + "             LastName = v.column3;";
     result = StatementParser.removeCommentsAndTrim(sqlStatement);
     Assert.assertEquals(result, expectedResult);
 

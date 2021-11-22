@@ -1,0 +1,9 @@
+       List of relations
+ Schema | Name  | Type  | Owner
+--------+--------+-------+-------
+ public | table1 | table | me
+ public | table2 | table | me
+ public | table3 | table | me
+ public | users | table | me
+ (4 rows)
+

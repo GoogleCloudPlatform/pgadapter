@@ -1,0 +1,1 @@
+CREATE TABLE test (id integer PRIMARY KEY); SELECT * FROM test; SELECT * FROM test;

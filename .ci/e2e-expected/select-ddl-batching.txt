@@ -1,0 +1,1 @@
+ERROR:  INVALID_ARGUMENT: The statement is not suitable for batching. Only DML and DDL statements are allowed for batching. "CREATE TABLE test (id integer PRIMARY KEY); SELECT * FROM test; SELECT * FROM test;"

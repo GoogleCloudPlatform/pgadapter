@@ -7,7 +7,7 @@ sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/
 sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-di-param.txt
 sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-dn.txt
 sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-dn-param.txt
-# remove --- hyphenated formatting lines
+# remove --- hyphenated formatting lines for diff comparison
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dt.txt
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dt-param.txt
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-di.txt
@@ -73,4 +73,40 @@ echo "\dn public" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost 
 sed -i -E 's/[0-9]{16,}//' .ci/e2e-result/backslash-dn-param.txt
 sed -i "s/---[-]*//g" .ci/e2e-result/backslash-dn-param.txt
 diff -i -w -s .ci/e2e-result/backslash-dn-param.txt .ci/e2e-expected/backslash-dn-param.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"-c option dml batching\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/dml-batch.txt)" > .ci/e2e-result/dml-batching.txt
+diff -i -w -s .ci/e2e-result/dml-batching.txt .ci/e2e-expected/dml-batching.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"-c option ddl batching\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/ddl-batch.txt)"
+echo "\d" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/ddl-batching.txt
+diff -i -w -s .ci/e2e-result/ddl-batching.txt .ci/e2e-expected/ddl-batching.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"-c option ddl-dml mix batching\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/ddl-dml-batch.txt)" &> .ci/e2e-result/ddl-dml-batching.txt
+diff -i -w -s .ci/e2e-result/ddl-dml-batching.txt .ci/e2e-expected/ddl-dml-batching.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"-c option SELECT DML batching\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/select-dml-batch.txt)" &> .ci/e2e-result/select-dml-batching.txt
+diff -i -w -s .ci/e2e-result/select-dml-batching.txt .ci/e2e-expected/select-dml-batching.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"-c option SELECT DDL batching\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/select-ddl-batch.txt)" &> .ci/e2e-result/select-ddl-batching.txt
+diff -i -w -s .ci/e2e-result/select-ddl-batching.txt .ci/e2e-expected/select-ddl-batching.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"-c option invalid WITH batching\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/invalid-with-batch.txt)" &> .ci/e2e-result/invalid-with-batching.txt
+diff -i -w -s .ci/e2e-result/invalid-with-batching.txt .ci/e2e-expected/invalid-with-batching.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"-c option invalid begin/commit batching\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/invalid-commit-batch.txt)" &> .ci/e2e-result/invalid-commit-batching.txt
+diff -i -w -s .ci/e2e-result/invalid-commit-batching.txt .ci/e2e-expected/invalid-commit-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))

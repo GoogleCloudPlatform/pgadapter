@@ -35,6 +35,7 @@ public class MatcherStatement extends IntermediateStatement {
     this.statement = this.connection.createStatement();
     this.commandMetadataJSON = connectionHandler.getServer().getOptions().getCommandMetadataJSON();
     this.sql = translateSQL(sql);
+    this.statements = parseStatements(sql);
     this.command = parseCommand(sql);
   }
 
