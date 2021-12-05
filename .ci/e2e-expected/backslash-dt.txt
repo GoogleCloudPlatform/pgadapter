@@ -53,5 +53,5 @@
  testdb_e2e_psql_v?? | spanner_sys        | txn_stats_total_10minute        | VIEW       |                              |                      |                           |                          |                        |                    |          |               |                   |                  |               |                 | 
  testdb_e2e_psql_v?? | spanner_sys        | txn_stats_total_hour            | VIEW       |                              |                      |                           |                          |                        |                    |          |               |                   |                  |               |                 | 
  testdb_e2e_psql_v?? | spanner_sys        | txn_stats_total_minute          | VIEW       |                              |                      |                           |                          |                        |                    |          |               |                   |                  |               |                 | 
-(49 rows)
+(52 rows)
 
