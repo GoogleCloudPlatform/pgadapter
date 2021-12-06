@@ -1,0 +1,29 @@
+<project name="pgadapter" default="copy" basedir=".">
+
+  <property name="javacc.home" value="/usr/local/google/home/jsking/projects/javacc/target/"/>
+
+  <target name="copy" description="Builds 'copy parser'">
+    <delete dir="copy"/>
+    <mkdir dir="copy"/> 
+    <copy file="copy.jjt" todir="copy"/>
+    <copy file="ASTID.java" todir="copy"/>
+    <copy file="ASTColumnElement.java" todir="copy"/>
+    <copy file="ASTCopyOptionElement.java" todir="copy"/>
+    <copy file="ASTFilename.java" todir="copy"/>
+    <copy file="CopyDumpVisitor.java" todir="copy"/>
+    <jjtree target="copy.jjt" outputdirectory="copy" javacchome="${javacc.home}"/>
+    <javacc target="copy/copy.jj" outputdirectory="copy" javacchome="${javacc.home}"/>
+    <javac deprecation="false" srcdir="copy" destdir="copy" includeantruntime='false'/>
+  </target>
+
+  <target name="all" description="Builds all" depends="clean,copy">
+    <echo message="*******"/>
+    <echo message="******* All Built ******"/>
+    <echo message="*******"/>
+  </target>
+    
+  <target name="clean" description="Cleans up build">
+    <delete dir="copy"/>
+  </target>
+  
+</project>
