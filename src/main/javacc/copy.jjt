@@ -6,7 +6,7 @@ options {
 
 PARSER_BEGIN(Copy)
 
-package com.google.cloud.spanner.pgadapter.parsers;
+package com.google.cloud.spanner.pgadapter.parsers.copy;
 
 public class Copy {
 
@@ -199,6 +199,7 @@ void copyOptionElement() #CopyOptionElement :
     }
   | <O_FREEZE> {
       jjtThis.setName("FREEZE");
+      throw new ParseException("FREEZE is not supported.");
     }
   | <O_DELIMITER> identifier() {
       jjtThis.setName("DELIMITER");
@@ -218,17 +219,21 @@ void copyOptionElement() #CopyOptionElement :
   | LOOKAHEAD(3)
     <O_FORCE_QUOTE> "(" columnList() ")" {
       jjtThis.setName("FORCE_QUOTE");
+      throw new ParseException("FORCE_QUOTE is not supported.");
     }
   | LOOKAHEAD(3)
     <O_FORCE_NOT_NULL> "(" columnList() ")" {
       jjtThis.setName("FORCE_NOT_NULL");
+      throw new ParseException("FORCE_NOT_NULL is not supported.");
     }
   | LOOKAHEAD(3)
     <O_FORCE_NULL> "(" columnList() ")" {
       jjtThis.setName("FORCE_NULL");
+      throw new ParseException("FORCE_NULL is not supported.");
     }
   | <O_ENCODING> identifier() {
       jjtThis.setName("ENCODING");
+      throw new ParseException("ENCODING is not supported.");
     }
 }
 
