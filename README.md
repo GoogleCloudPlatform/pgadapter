@@ -95,6 +95,16 @@ The following options are optional:
   * The data result format coming back to the client from the proxy. By default,
     this is POSTGRESQL, but you can choose SPANNER format if you do not wish the
     data to be modified and the client used can handle it.
+    
+-c <multi-statementcommand>
+    Runs a single command before exiting. This command can be comprised of multiple 
+    statments separated by ';'. Each SQL command string passed to -c is sent to the 
+    server as a single request. Because of this, the server executes it as a single 
+    transaction even if the string contains multiple SQL commands. There are some
+    limitations in Cloud Spanner which require this option to operate in a different
+    manner from PSQL. 'SELECT' statements are not allowed in batched commands. Mixing
+    DML and DDL is not allowed in a single multi-statement command. Also, 
+    'BEGIN TRANSACTION' and 'COMMIT' statements are not allowed in batched commands.
 
 -b
   * Force the server to send data back in binary PostgreSQL format when no
