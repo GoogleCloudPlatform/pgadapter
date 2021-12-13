@@ -10,7 +10,7 @@
     <copy file="ASTColumnElement.java" todir="copy"/>
     <copy file="ASTCopyOptionElement.java" todir="copy"/>
     <copy file="ASTFilename.java" todir="copy"/>
-    <copy file="CopyDumpVisitor.java" todir="copy"/>
+    <copy file="CopyTreeVisitor.java" todir="copy"/>
     <jjtree target="copy.jjt" outputdirectory="copy" javacchome="${javacc.home}"/>
     <javacc target="copy/copy.jj" outputdirectory="copy" javacchome="${javacc.home}"/>
     <javac deprecation="false" srcdir="copy" destdir="copy" includeantruntime='false'/>
