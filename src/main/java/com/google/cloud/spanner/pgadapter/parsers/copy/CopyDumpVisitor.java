@@ -1,7 +1,6 @@
 package com.google.cloud.spanner.pgadapter.parsers.copy;
 
-public class CopyDumpVisitor implements CopyVisitor
-{
+public class CopyDumpVisitor implements CopyVisitor {
   private int indent = 0;
 
   private String indentString() {
@@ -13,8 +12,7 @@ public class CopyDumpVisitor implements CopyVisitor
   }
 
   public Object visit(SimpleNode node, Object data) {
-    System.out.println(indentString() + node +
-                   ": acceptor not unimplemented in subclass?");
+    System.out.println(indentString() + node + ": acceptor not unimplemented in subclass?");
     ++indent;
     data = node.childrenAccept(this, data);
     --indent;

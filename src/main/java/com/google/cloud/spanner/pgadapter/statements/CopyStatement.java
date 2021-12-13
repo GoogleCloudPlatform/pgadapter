@@ -17,14 +17,12 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
 
 import com.google.cloud.spanner.pgadapter.utils.MutationBuilder;
-import com.google.cloud.spanner.pgadapter.parsers.copy.Copy;
 import com.google.spanner.v1.TypeCode;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.csv.CSVFormat;
-import org.json.JSONException;
 
 public class CopyStatement extends IntermediateStatement {
 
@@ -175,7 +173,9 @@ public class CopyStatement extends IntermediateStatement {
       parseCopy();
       setMutationBuilder(
           new MutationBuilder(this.tableName, this.tableColumns, getParserFormat(), hasHeader()));
-      this.updateResultCount(); // Gets update count, set hasMoreData false and statement result null
+      this
+          .updateResultCount(); // Gets update count, set hasMoreData false and statement result
+                                // null
     } catch (Exception e) {
       SQLException se = new SQLException(e.toString());
       handleExecutionException(se);
@@ -185,7 +185,7 @@ public class CopyStatement extends IntermediateStatement {
   private void parseCopy() throws Exception {
     try {
       parse(sql);
-      //queryInformationSchema();
+      // queryInformationSchema();
     } catch (Exception e) {
       throw new SQLException("Invalid COPY statement syntax.");
     }
