@@ -15,6 +15,11 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
+import com.google.cloud.spanner.pgadapter.utils.MutationBuilder;
+import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
+import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import java.text.MessageFormat;
 
 /**
@@ -26,18 +31,28 @@ import java.text.MessageFormat;
 public class CopyFailMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'f';
+  private CopyStatement statement;
 
   private String errorMessage;
 
   public CopyFailMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.errorMessage = this.readAll();
+    this.statement = (CopyStatement) connection.getActiveStatement();
   }
 
   @Override
   protected void sendPayload() throws Exception {
-    throw new IllegalStateException(
-        "Spanner does not currently support the copy functionality through the proxy.");
+    // If backend error occurred during copy-in mode, drop any subsequent CopyFail messages.
+    if (!statement.hasException()) {
+      new ErrorResponse(this.outputStream, new Exception(this.errorMessage), State.IOError).send();
+      new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
+    } else {
+      MutationBuilder mb = this.statement.getMutationBuilder();
+      mb.closeErrorFile();
+    }
+    this.connection.removeActiveStatement(this.statement);
+    this.outputStream.flush();
   }
 
   @Override

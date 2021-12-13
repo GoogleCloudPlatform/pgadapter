@@ -15,7 +15,10 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
+import com.google.cloud.spanner.pgadapter.utils.MutationBuilder;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.text.MessageFormat;
 
 /**
@@ -29,19 +32,32 @@ public class CopyDataMessage extends ControlMessage {
   protected static final char IDENTIFIER = 'd';
 
   private byte[] payload;
+  private CopyStatement statement;
 
   public CopyDataMessage(ConnectionHandler connection) throws Exception {
     super(connection);
+    // Payload byte array excluding 4 bytes containing the length of message itself
     this.payload = new byte[this.length - 4];
     if (this.inputStream.read(this.payload) < 0) {
       throw new IOException("Could not read copy data.");
     }
+    this.statement = (CopyStatement) connection.getActiveStatement();
   }
 
   @Override
   protected void sendPayload() throws Exception {
-    throw new IllegalStateException(
-        "Spanner does not currently support the copy functionality through the proxy.");
+    // If backend error occurred during copy-in mode, drop any subsequent CopyData messages.
+    MutationBuilder mb = this.statement.getMutationBuilder();
+    if (!statement.hasException()) {
+      try {
+        mb.buildMutation(this.connection, this.payload);
+      } catch (SQLException e) {
+        statement.handleExecutionException(e);
+        throw e;
+      }
+    } else {
+      mb.writeToErrorFile(this.payload);
+    }
   }
 
   @Override

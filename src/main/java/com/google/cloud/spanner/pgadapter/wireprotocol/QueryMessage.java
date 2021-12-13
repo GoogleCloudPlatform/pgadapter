@@ -16,9 +16,11 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.statements.MatcherStatement;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
+import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
 import java.text.MessageFormat;
@@ -79,7 +81,14 @@ public class QueryMessage extends ControlMessage {
     if (this.statement.hasException()) {
       this.handleError(this.statement.getException());
     } else {
-      if (this.statement.containsResultSet()) {
+      if (this.statement.getCommand().equalsIgnoreCase("COPY")) {
+        CopyStatement copyStatement = (CopyStatement) this.statement;
+        new CopyInResponse(
+                this.outputStream,
+                copyStatement.getTableColumns().size(),
+                copyStatement.getFormatCode())
+            .send();
+      } else if (this.statement.containsResultSet()) {
         new RowDescriptionResponse(
                 this.outputStream,
                 this.statement,

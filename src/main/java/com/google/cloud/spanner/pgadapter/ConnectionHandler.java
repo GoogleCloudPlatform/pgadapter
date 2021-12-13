@@ -314,6 +314,10 @@ public class ConnectionHandler extends Thread {
     return connectionMetadata;
   }
 
+  public IntermediateStatement getActiveStatement() {
+    return activeStatementsMap.get(this.connectionId);
+  }
+
   /** Status of a {@link ConnectionHandler} */
   private enum ConnectionStatus {
     UNAUTHENTICATED,

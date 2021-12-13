@@ -161,6 +161,10 @@ public class IntermediateStatement {
     return this.updateCount;
   }
 
+  public void addUpdateCount(int count) {
+    this.updateCount += count;
+  }
+
   /** @return True if at some point in execution, and exception was thrown. */
   public boolean hasException() {
     return this.exception != null;
@@ -235,7 +239,7 @@ public class IntermediateStatement {
    *
    * @param e The exception to store.
    */
-  protected void handleExecutionException(SQLException e) {
+  public void handleExecutionException(SQLException e) {
     this.exception = e;
     this.hasMoreData = false;
     this.statementResult = null;
