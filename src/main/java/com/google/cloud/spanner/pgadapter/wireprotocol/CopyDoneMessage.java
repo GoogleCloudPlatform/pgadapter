@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationBuilder;
@@ -49,6 +50,8 @@ public class CopyDoneMessage extends ControlMessage {
     } else {
       mb.closeErrorFile();
     }
+    // Revert from COPY_IN / COPY_OUT mode.
+    this.connection.setStatus(ConnectionStatus.IDLE);
     this.connection.removeActiveStatement(this.statement);
   }
 

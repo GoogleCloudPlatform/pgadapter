@@ -24,19 +24,15 @@ public class MutationBuilder {
   private static final long MUTATION_LIMIT = 20000; // PLACEHOLDER
   private static final long BATCH_LIMIT = 64000; // PLACEHOLDER
 
-  private int mutationCount;
-  private int batchSize;
-
   private boolean hasHeader;
   private boolean isHeaderParsed;
-
+  private int mutationCount;
+  private int batchSize;
   private int rowCount;
   private List<Mutation> mutations;
-
   private String tableName;
   private Map<String, TypeCode> tableColumns;
   private CSVFormat format;
-
   private FileWriter fileWriter;
 
   public MutationBuilder(
@@ -180,7 +176,7 @@ public class MutationBuilder {
       this.fileWriter = new FileWriter("output.txt");
       writeToErrorFile(payload);
     } else {
-      System.out.println("File " + unsuccessfulCopy.getName() + " already exists");
+      System.err.println("File " + unsuccessfulCopy.getName() + " already exists");
     }
   }
 

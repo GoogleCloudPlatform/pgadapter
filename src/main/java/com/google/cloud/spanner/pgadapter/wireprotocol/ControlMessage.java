@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.SendResultSetState;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
@@ -49,35 +50,46 @@ public abstract class ControlMessage extends WireMessage {
    */
   public static ControlMessage create(ConnectionHandler connection) throws Exception {
     char nextMsg = (char) connection.getConnectionMetadata().getInputStream().readUnsignedByte();
-    switch (nextMsg) {
-      case QueryMessage.IDENTIFIER:
-        return new QueryMessage(connection);
-      case ParseMessage.IDENTIFIER:
-        return new ParseMessage(connection);
-      case BindMessage.IDENTIFIER:
-        return new BindMessage(connection);
-      case DescribeMessage.IDENTIFIER:
-        return new DescribeMessage(connection);
-      case ExecuteMessage.IDENTIFIER:
-        return new ExecuteMessage(connection);
-      case CloseMessage.IDENTIFIER:
-        return new CloseMessage(connection);
-      case SyncMessage.IDENTIFIER:
-        return new SyncMessage(connection);
-      case TerminateMessage.IDENTIFIER:
-        return new TerminateMessage(connection);
-      case CopyDoneMessage.IDENTIFIER:
-        return new CopyDoneMessage(connection);
-      case CopyDataMessage.IDENTIFIER:
-        return new CopyDataMessage(connection);
-      case CopyFailMessage.IDENTIFIER:
-        return new CopyFailMessage(connection);
-      case FunctionCallMessage.IDENTIFIER:
-        return new FunctionCallMessage(connection);
-      case FlushMessage.IDENTIFIER:
-        return new FlushMessage(connection);
-      default:
-        throw new IllegalStateException("Unknown message");
+    if (connection.getStatus() == ConnectionStatus.COPY_IN) {
+      switch (nextMsg) {
+        case CopyDoneMessage.IDENTIFIER:
+          return new CopyDoneMessage(connection);
+        case CopyDataMessage.IDENTIFIER:
+          return new CopyDataMessage(connection);
+        default:
+          throw new IllegalStateException("Expected 0 or more Copy Data messages.");
+      }
+    } else {
+      switch (nextMsg) {
+        case QueryMessage.IDENTIFIER:
+          return new QueryMessage(connection);
+        case ParseMessage.IDENTIFIER:
+          return new ParseMessage(connection);
+        case BindMessage.IDENTIFIER:
+          return new BindMessage(connection);
+        case DescribeMessage.IDENTIFIER:
+          return new DescribeMessage(connection);
+        case ExecuteMessage.IDENTIFIER:
+          return new ExecuteMessage(connection);
+        case CloseMessage.IDENTIFIER:
+          return new CloseMessage(connection);
+        case SyncMessage.IDENTIFIER:
+          return new SyncMessage(connection);
+        case TerminateMessage.IDENTIFIER:
+          return new TerminateMessage(connection);
+        case CopyDoneMessage.IDENTIFIER:
+          return new CopyDoneMessage(connection);
+        case CopyDataMessage.IDENTIFIER:
+          return new CopyDataMessage(connection);
+        case CopyFailMessage.IDENTIFIER:
+          return new CopyFailMessage(connection);
+        case FunctionCallMessage.IDENTIFIER:
+          return new FunctionCallMessage(connection);
+        case FlushMessage.IDENTIFIER:
+          return new FlushMessage(connection);
+        default:
+          throw new IllegalStateException("Unknown message");
+      }
     }
   }
 

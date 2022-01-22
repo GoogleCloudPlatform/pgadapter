@@ -161,6 +161,7 @@ public class ConnectionHandler extends Thread {
         Level.WARNING,
         "Exception on connection handler with ID {0}: {1}",
         new Object[] {getName(), e});
+    this.status = ConnectionStatus.IDLE;
     new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
     new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
   }
@@ -318,10 +319,19 @@ public class ConnectionHandler extends Thread {
     return activeStatementsMap.get(this.connectionId);
   }
 
+  public ConnectionStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(ConnectionStatus status) {
+    this.status = status;
+  }
+
   /** Status of a {@link ConnectionHandler} */
-  private enum ConnectionStatus {
+  public enum ConnectionStatus {
     UNAUTHENTICATED,
     IDLE,
+    COPY_IN,
     TERMINATED
   }
 

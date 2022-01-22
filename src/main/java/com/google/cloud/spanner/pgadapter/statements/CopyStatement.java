@@ -16,17 +16,22 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
 
+import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.utils.MutationBuilder;
 import com.google.spanner.v1.TypeCode;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.csv.CSVFormat;
 
 public class CopyStatement extends IntermediateStatement {
 
-  protected Map<String, TypeCode> tableColumns;
+  private static final String COLUMN_NAME = "column_name";
+  private static final String SPANNER_TYPE = "spanner_type";
+  private static final String CSV = "CSV";
 
   protected String tableName;
   protected List<String> copyColumnNames;
@@ -38,6 +43,7 @@ public class CopyStatement extends IntermediateStatement {
   protected boolean hasHeader;
   protected int formatCode;
 
+  protected Map<String, TypeCode> tableColumns;
   protected MutationBuilder mutationBuilder;
 
   public CopyStatement(String sql, Connection connection) throws SQLException {
@@ -166,28 +172,96 @@ public class CopyStatement extends IntermediateStatement {
     this.mutationBuilder = mutationBuilder;
   }
 
+  private void verifyCopyColumns() throws SQLException {
+    if (this.copyColumnNames.size() > this.tableColumns.size()) {
+      throw new SQLException("Number of copy columns provided exceed table column count");
+    }
+    LinkedHashMap<String, TypeCode> tempTableColumns = new LinkedHashMap<>();
+    // Verify that every copy column given is a valid table column name
+    for (String copyColumn : this.copyColumnNames) {
+      if (!this.tableColumns.containsKey(copyColumn)) {
+        throw new SQLException(
+            "Column \"" + copyColumn + "\" of relation \"" + this.tableName + "\" does not exist");
+      }
+      // Update table column ordering with the copy column ordering
+      tempTableColumns.put(copyColumn, tableColumns.get(copyColumn));
+    }
+    this.tableColumns = tempTableColumns;
+  }
+
+  private static TypeCode parseSpannerDataType(String columnType) {
+    if (columnType.matches("(i?)STRING(?:\\((?:MAX|[0-9]+)\\))?")) {
+      return TypeCode.STRING;
+    } else if (columnType.matches("(i?)BYTES(?:\\((?:MAX|[0-9]+)\\))?")) {
+      return TypeCode.BYTES;
+    } else if (columnType.equalsIgnoreCase("INT64")) {
+      return TypeCode.INT64;
+    } else if (columnType.equalsIgnoreCase("FLOAT64")) {
+      return TypeCode.FLOAT64;
+    } else if (columnType.equalsIgnoreCase("BOOL")) {
+      return TypeCode.BOOL;
+    } else if (columnType.equalsIgnoreCase("TIMESTAMP")) {
+      return TypeCode.TIMESTAMP;
+    } else {
+      throw new IllegalArgumentException(
+          "Unrecognized or unsupported column data type: " + columnType);
+    }
+  }
+
+  private void queryInformationSchema() throws SQLException {
+    Map<String, TypeCode> tableColumns = new LinkedHashMap<>();
+    ResultSet result =
+        this.connection
+            .createStatement()
+            .executeQuery(
+                "SELECT "
+                    + COLUMN_NAME
+                    + ", "
+                    + SPANNER_TYPE
+                    + " FROM information_schema.columns WHERE table_name = '"
+                    + this.tableName
+                    + "'");
+
+    while (result.next()) {
+      String columnName = result.getString(COLUMN_NAME);
+      TypeCode type = parseSpannerDataType(result.getString(SPANNER_TYPE));
+      tableColumns.put(columnName, type);
+    }
+
+    if (tableColumns.isEmpty()) {
+      throw new SQLException("Table " + this.tableName + " is not found in information_schema");
+    }
+
+    setTableColumns(tableColumns);
+
+    if (this.copyColumnNames != null) {
+      verifyCopyColumns();
+    }
+  }
+
   @Override
   public void execute() {
     this.executed = true;
     try {
-      parseCopy();
+      parseCopyStatement();
       setMutationBuilder(
           new MutationBuilder(this.tableName, this.tableColumns, getParserFormat(), hasHeader()));
-      this
-          .updateResultCount(); // Gets update count, set hasMoreData false and statement result
-                                // null
+      this.updateResultCount(); // Gets update count, set hasMoreData false and statement result
     } catch (Exception e) {
       SQLException se = new SQLException(e.toString());
       handleExecutionException(se);
     }
   }
 
-  private void parseCopy() throws Exception {
+  private void parseCopyStatement() throws Exception {
     try {
-      parse(sql);
-      // queryInformationSchema();
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      parse(sql, options);
+      // Set options gathered from the Copy statement.
+      tableName = options.getTableName();
+      queryInformationSchema();
     } catch (Exception e) {
-      throw new SQLException("Invalid COPY statement syntax.");
+      throw new SQLException("Invalid COPY statement syntax: " + e.toString());
     }
   }
 }

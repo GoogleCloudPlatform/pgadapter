@@ -1,7 +1,25 @@
 package com.google.cloud.spanner.pgadapter.parsers.copy;
 
-public class CopyDumpVisitor implements CopyVisitor {
+public class CopyTreeVisitor implements CopyVisitor {
+  public static class CopyOptions {
+    public enum Format {
+      TEXT,
+      BINARY,
+      CSV
+    }
+
+    String tableName;
+    Format format;
+    boolean from; // True == FROM, False == TO
+    char delimiter;
+  }
+
   private int indent = 0;
+  private CopyOptions options;
+
+  public CopyTreeVisitor(CopyOptions options) {
+    this.options = options;
+  }
 
   private String indentString() {
     StringBuffer sb = new StringBuffer();
@@ -20,6 +38,14 @@ public class CopyDumpVisitor implements CopyVisitor {
   }
 
   public Object visit(ASTStart node, Object data) {
+    System.out.println(indentString() + node);
+    ++indent;
+    data = node.childrenAccept(this, data);
+    --indent;
+    return data;
+  }
+
+  public Object visit(ASTCopyStatement node, Object data) {
     System.out.println(indentString() + node);
     ++indent;
     data = node.childrenAccept(this, data);
@@ -99,5 +125,3 @@ public class CopyDumpVisitor implements CopyVisitor {
     return data;
   }
 }
-
-/*end*/

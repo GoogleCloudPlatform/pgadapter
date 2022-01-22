@@ -116,7 +116,7 @@ public class IntermediateStatement {
   }
 
   /** Determines the (update) command that was received from the sql string. */
-  protected static String parseCommand(String sql) {
+  public static String parseCommand(String sql) {
     Preconditions.checkNotNull(sql);
     String[] tokens = sql.split("\\s+", 2);
     if (tokens.length > 0) {
