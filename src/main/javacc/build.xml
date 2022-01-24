@@ -1,7 +1,6 @@
 <project name="pgadapter" default="copy" basedir=".">
 
-  <!-- Set value to path of javacc jar. -->
-  <property name="javacc.home" value=""/>
+  <property name="javacc.home" value="/usr/local/google/home/jsking/projects/javacc/target/"/>
 
   <target name="copy" description="Builds 'copy parser'">
     <delete dir="copy"/>
@@ -10,9 +9,8 @@
     <copy file="ASTID.java" todir="copy"/>
     <copy file="ASTColumnElement.java" todir="copy"/>
     <copy file="ASTCopyOptionElement.java" todir="copy"/>
-    <copy file="ASTCopyStatement.java" todir="copy"/>
     <copy file="ASTFilename.java" todir="copy"/>
-    <copy file="CopyTreeParser.java" todir="copy"/>
+    <copy file="CopyTreeVisitor.java" todir="copy"/>
     <jjtree target="copy.jjt" outputdirectory="copy" javacchome="${javacc.home}"/>
     <javacc target="copy/copy.jj" outputdirectory="copy" javacchome="${javacc.home}"/>
     <javac deprecation="false" srcdir="copy" destdir="copy" includeantruntime='false'/>

@@ -1,4 +1,4 @@
-package com.google.cloud.spanner.pgadapter.parsers.copy;
+package com.google.cloud.spanner.pgadapter.parsers;
 
 public class ASTID extends SimpleNode {
   private String name;
@@ -9,10 +9,6 @@ public class ASTID extends SimpleNode {
 
   public void setName(String n) {
     name = n;
-  }
-
-  public String getName() {
-    return name;
   }
 
   public String toString() {

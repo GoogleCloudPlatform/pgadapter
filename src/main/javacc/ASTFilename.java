@@ -1,8 +1,7 @@
-package com.google.cloud.spanner.pgadapter.parsers.copy;
+package com.google.cloud.spanner.pgadapter.parsers;
 
 public class ASTFilename extends SimpleNode {
   private String name;
-
   public ASTFilename(int id) {
     super(id);
   }
@@ -19,7 +18,7 @@ public class ASTFilename extends SimpleNode {
     return "Filename: " + name;
   }
 
-  /** Accept the visitor. * */
+  /** Accept the visitor. **/
   public Object jjtAccept(CopyVisitor visitor, Object data) {
     return visitor.visit(this, data);
   }

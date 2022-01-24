@@ -2,7 +2,6 @@ options {
   MULTI=true;
   VISITOR=true;
   NODE_DEFAULT_VOID=true;
-  STATIC=false;
 }
 
 PARSER_BEGIN(Copy)
@@ -11,15 +10,15 @@ package com.google.cloud.spanner.pgadapter.parsers.copy;
 
 public class Copy {
 
-  public static void parse(String stmt, CopyTreeParser.CopyOptions options) throws Exception {
+  public static void parse(String stmt) throws Exception {
     java.io.InputStream stmtStream = new java.io.ByteArrayInputStream(stmt.getBytes());
-    Copy tree = new Copy(stmtStream);
+    Copy t = new Copy(stmtStream);
     try {
-      ASTStart node = tree.Start();
-      CopyVisitor v = new CopyTreeParser(options);
-      node.jjtAccept(v, null);
+      ASTStart n = t.Start();
+      CopyVisitor v = new CopyDumpVisitor();
+      n.jjtAccept(v, null);
     } catch (Exception e) {
-      System.err.println(e.getMessage());
+      System.out.println(e.getMessage());
       e.printStackTrace();
       throw e;
     }
@@ -103,7 +102,7 @@ void Expression() : {}
 }
 
 /** Copy Statement. */
-void CopyStmt() #CopyStatement : {}
+void CopyStmt() : {}
 {
   <K_COPY> qualifiedName() optColumnList() copyFrom() copyFileName() optWith() copyOptions()
 }
@@ -177,6 +176,7 @@ void copyOptions() #CopyOptions : {}
   LOOKAHEAD(2)
   "(" copyOptionList() ")"
   | copyOptionList()
+  | {} /* EMPTY */
 }
 
 void copyOptionList() #CopyOptionList : {}
@@ -249,3 +249,4 @@ void identifier() #ID :
     jjtThis.setName(t.image);
   }
 }
+
