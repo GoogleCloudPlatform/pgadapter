@@ -2,6 +2,7 @@ package com.google.cloud.spanner.pgadapter.parsers.copy;
 
 public class ASTCopyOptionElement extends SimpleNode {
   private String name;
+
   public ASTCopyOptionElement(int id) {
     super(id);
   }
@@ -18,7 +19,7 @@ public class ASTCopyOptionElement extends SimpleNode {
     return "Copy Option Element: " + name;
   }
 
-  /** Accept the visitor. **/
+  /** Accept the visitor. * */
   public Object jjtAccept(CopyVisitor visitor, Object data) {
     return visitor.visit(this, data);
   }
