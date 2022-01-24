@@ -1,12 +1,13 @@
 package com.google.cloud.spanner.pgadapter.parsers.copy;
 
-public class ASTColumnElement extends SimpleNode {
+public class ASTCopyOptionElement extends SimpleNode {
   private String name;
-  public ASTColumnElement(int id) {
+
+  public ASTCopyOptionElement(int id) {
     super(id);
   }
 
-  public ASTColumnElement(Copy p, int id) {
+  public ASTCopyOptionElement(Copy p, int id) {
     super(p, id);
   }
 
@@ -15,10 +16,10 @@ public class ASTColumnElement extends SimpleNode {
   }
 
   public String toString() {
-    return "Column Element: " + name;
+    return "Copy Option Element: " + name;
   }
 
-  /** Accept the visitor. **/
+  /** Accept the visitor. * */
   public Object jjtAccept(CopyVisitor visitor, Object data) {
     return visitor.visit(this, data);
   }
