@@ -1,6 +1,7 @@
 <project name="pgadapter" default="copy" basedir=".">
 
-  <property name="javacc.home" value="/usr/local/google/home/jsking/projects/javacc/target/"/>
+  <!-- Set value to path of javacc jar. -->
+  <property name="javacc.home" value=""/>
 
   <target name="copy" description="Builds 'copy parser'">
     <delete dir="copy"/>
