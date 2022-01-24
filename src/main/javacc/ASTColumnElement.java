@@ -1,4 +1,4 @@
-package com.google.cloud.spanner.pgadapter.parsers.copy;
+package com.google.cloud.spanner.pgadapter.parsers;
 
 public class ASTColumnElement extends SimpleNode {
   private String name;
