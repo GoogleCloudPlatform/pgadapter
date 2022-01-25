@@ -33,18 +33,18 @@ public class CopyStatement extends IntermediateStatement {
   private static final String SPANNER_TYPE = "spanner_type";
   private static final String CSV = "CSV";
 
-  protected String tableName;
-  protected List<String> copyColumnNames;
-  protected String formatType;
-  protected String nullString;
-  protected char delimiterChar;
-  protected char quoteChar;
-  protected char escapeChar;
-  protected boolean hasHeader;
-  protected int formatCode;
+  private String tableName;
+  private List<String> copyColumnNames;
+  private String formatType;
+  private String nullString;
+  private char delimiterChar;
+  private char quoteChar;
+  private char escapeChar;
+  private boolean hasHeader;
+  private int formatCode;
 
-  protected Map<String, TypeCode> tableColumns;
-  protected MutationBuilder mutationBuilder;
+  private Map<String, TypeCode> tableColumns;
+  private MutationBuilder mutationBuilder;
 
   public CopyStatement(String sql, Connection connection) throws SQLException {
     super();
@@ -59,7 +59,7 @@ public class CopyStatement extends IntermediateStatement {
     return this.tableColumns;
   }
 
-  protected void setTableColumns(Map tableColumns) {
+  private void setTableColumns(Map<String, TypeCode> tableColumns) {
     this.tableColumns = tableColumns;
   }
 
@@ -89,7 +89,7 @@ public class CopyStatement extends IntermediateStatement {
     return this.tableName;
   }
 
-  protected void setTableName(String tableName) {
+  private void setTableName(String tableName) {
     this.tableName = tableName;
   }
 
@@ -98,7 +98,7 @@ public class CopyStatement extends IntermediateStatement {
     return this.copyColumnNames;
   }
 
-  protected void setCopyColumnNames(List<String> copyColumnNames) {
+  private void setCopyColumnNames(List<String> copyColumnNames) {
     this.copyColumnNames = copyColumnNames;
   }
 
@@ -107,7 +107,7 @@ public class CopyStatement extends IntermediateStatement {
     return this.formatType;
   }
 
-  protected void setFormatType(String formatType) {
+  private void setFormatType(String formatType) {
     this.formatType = formatType;
   }
 
@@ -116,7 +116,7 @@ public class CopyStatement extends IntermediateStatement {
     return this.nullString;
   }
 
-  protected void setNullString(String nullString) {
+  private void setNullString(String nullString) {
     this.nullString = nullString;
   }
 
@@ -125,7 +125,7 @@ public class CopyStatement extends IntermediateStatement {
     return this.delimiterChar;
   }
 
-  protected void setDelimiterChar(char delimiterChar) {
+  private void setDelimiterChar(char delimiterChar) {
     this.delimiterChar = delimiterChar;
   }
 
@@ -134,7 +134,7 @@ public class CopyStatement extends IntermediateStatement {
     return this.escapeChar;
   }
 
-  protected void setEscapeChar(char escapeChar) {
+  private void setEscapeChar(char escapeChar) {
     this.escapeChar = escapeChar;
   }
 
@@ -143,7 +143,7 @@ public class CopyStatement extends IntermediateStatement {
     return this.quoteChar;
   }
 
-  protected void setQuoteChar(char quoteChar) {
+  private void setQuoteChar(char quoteChar) {
     this.quoteChar = quoteChar;
   }
 
@@ -152,7 +152,7 @@ public class CopyStatement extends IntermediateStatement {
     return this.hasHeader;
   }
 
-  protected void setHasHeader(boolean hasHeader) {
+  private void setHasHeader(boolean hasHeader) {
     this.hasHeader = hasHeader;
   }
 
@@ -160,7 +160,7 @@ public class CopyStatement extends IntermediateStatement {
     return this.formatCode;
   }
 
-  protected void setFormatCode(int columnCount) {
+  private void setFormatCode(int columnCount) {
     this.formatCode = columnCount;
   }
 
@@ -168,7 +168,7 @@ public class CopyStatement extends IntermediateStatement {
     return this.mutationBuilder;
   }
 
-  protected void setMutationBuilder(MutationBuilder mutationBuilder) {
+  private void setMutationBuilder(MutationBuilder mutationBuilder) {
     this.mutationBuilder = mutationBuilder;
   }
 

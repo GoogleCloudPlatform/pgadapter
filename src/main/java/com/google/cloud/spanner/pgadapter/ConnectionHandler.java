@@ -319,11 +319,11 @@ public class ConnectionHandler extends Thread {
     return activeStatementsMap.get(this.connectionId);
   }
 
-  public ConnectionStatus getStatus() {
+  public synchronized ConnectionStatus getStatus() {
     return status;
   }
 
-  public void setStatus(ConnectionStatus status) {
+  public synchronized void setStatus(ConnectionStatus status) {
     this.status = status;
   }
 
