@@ -30,7 +30,6 @@ import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
-import com.google.cloud.spanner.testing.RemoteSpannerHelper;
 import com.google.common.base.Strings;
 import com.google.common.primitives.Bytes;
 import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
@@ -238,6 +237,7 @@ public final class PgAdapterTestEnv {
 
   /**
    * Writes data to the given test database.
+   *
    * @param databaseId The id of the database to write to
    * @param mutations The mutations to write
    */
@@ -259,9 +259,8 @@ public final class PgAdapterTestEnv {
     if (!Strings.isNullOrEmpty(gcpCredentials)) {
       credentials = GoogleCredentials.fromStream(new FileInputStream(gcpCredentials));
     }
-    SpannerOptions.Builder builder = SpannerOptions.newBuilder()
-        .setProjectId(projectId)
-        .setHost(spannerURL.toString());
+    SpannerOptions.Builder builder =
+        SpannerOptions.newBuilder().setProjectId(projectId).setHost(spannerURL.toString());
     if (credentials != null) {
       builder.setCredentials(credentials);
     }
