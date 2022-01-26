@@ -20,6 +20,7 @@ import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.utils.MutationBuilder;
 import com.google.spanner.v1.TypeCode;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
@@ -59,10 +60,6 @@ public class CopyStatement extends IntermediateStatement {
     return this.tableColumns;
   }
 
-  private void setTableColumns(Map<String, TypeCode> tableColumns) {
-    this.tableColumns = tableColumns;
-  }
-
   /** @return CSVFormat for parsing copy data based on COPY statement options specified. */
   public CSVFormat getParserFormat() {
     CSVFormat format = CSVFormat.POSTGRESQL_TEXT;
@@ -89,17 +86,9 @@ public class CopyStatement extends IntermediateStatement {
     return this.tableName;
   }
 
-  private void setTableName(String tableName) {
-    this.tableName = tableName;
-  }
-
   /** @return List of column names specified in COPY statement, if provided. */
   public List<String> getCopyColumnNames() {
     return this.copyColumnNames;
-  }
-
-  private void setCopyColumnNames(List<String> copyColumnNames) {
-    this.copyColumnNames = copyColumnNames;
   }
 
   /** @return Format type specified in COPY statement, if provided. */
@@ -107,17 +96,9 @@ public class CopyStatement extends IntermediateStatement {
     return this.formatType;
   }
 
-  private void setFormatType(String formatType) {
-    this.formatType = formatType;
-  }
-
   /** @return Null string specified in COPY statement, if provided. */
   public String getNullString() {
     return this.nullString;
-  }
-
-  private void setNullString(String nullString) {
-    this.nullString = nullString;
   }
 
   /** @return Delimiter character specified in COPY statement, if provided. */
@@ -125,17 +106,9 @@ public class CopyStatement extends IntermediateStatement {
     return this.delimiterChar;
   }
 
-  private void setDelimiterChar(char delimiterChar) {
-    this.delimiterChar = delimiterChar;
-  }
-
   /** @return Escape character specified in COPY statement, if provided. */
   public char getEscapeChar() {
     return this.escapeChar;
-  }
-
-  private void setEscapeChar(char escapeChar) {
-    this.escapeChar = escapeChar;
   }
 
   /** @return Quote character specified in COPY statement, if provided. */
@@ -143,33 +116,17 @@ public class CopyStatement extends IntermediateStatement {
     return this.quoteChar;
   }
 
-  private void setQuoteChar(char quoteChar) {
-    this.quoteChar = quoteChar;
-  }
-
   /** @return True if copy data contains a header, false otherwise. */
   public boolean hasHeader() {
     return this.hasHeader;
-  }
-
-  private void setHasHeader(boolean hasHeader) {
-    this.hasHeader = hasHeader;
   }
 
   public int getFormatCode() {
     return this.formatCode;
   }
 
-  private void setFormatCode(int columnCount) {
-    this.formatCode = columnCount;
-  }
-
   public MutationBuilder getMutationBuilder() {
     return this.mutationBuilder;
-  }
-
-  private void setMutationBuilder(MutationBuilder mutationBuilder) {
-    this.mutationBuilder = mutationBuilder;
   }
 
   private void verifyCopyColumns() throws SQLException {
@@ -190,37 +147,26 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   private static TypeCode parseSpannerDataType(String columnType) {
-    if (columnType.matches("(i?)STRING(?:\\((?:MAX|[0-9]+)\\))?")) {
-      return TypeCode.STRING;
-    } else if (columnType.matches("(i?)BYTES(?:\\((?:MAX|[0-9]+)\\))?")) {
-      return TypeCode.BYTES;
-    } else if (columnType.equalsIgnoreCase("INT64")) {
-      return TypeCode.INT64;
-    } else if (columnType.equalsIgnoreCase("FLOAT64")) {
-      return TypeCode.FLOAT64;
-    } else if (columnType.equalsIgnoreCase("BOOL")) {
-      return TypeCode.BOOL;
-    } else if (columnType.equalsIgnoreCase("TIMESTAMP")) {
-      return TypeCode.TIMESTAMP;
-    } else {
+    // Eliminate size modifiers in column type (e.g. STRING(100), BYTES(50), etc.)
+    int index = columnType.indexOf("(");
+    columnType = (index > 0) ? columnType.substring(0, index) : columnType;
+    TypeCode type = TypeCode.valueOf(columnType);
+    if (type == null) {
       throw new IllegalArgumentException(
           "Unrecognized or unsupported column data type: " + columnType);
     }
+    return type;
   }
 
   private void queryInformationSchema() throws SQLException {
     Map<String, TypeCode> tableColumns = new LinkedHashMap<>();
-    ResultSet result =
-        this.connection
-            .createStatement()
-            .executeQuery(
-                "SELECT "
-                    + COLUMN_NAME
-                    + ", "
-                    + SPANNER_TYPE
-                    + " FROM information_schema.columns WHERE table_name = '"
-                    + this.tableName
-                    + "'");
+    PreparedStatement statement =
+        this.connection.prepareStatement(
+            "SELECT ?, ? FROM information_schema.columns WHERE table_name = '?'");
+    statement.setString(1, COLUMN_NAME);
+    statement.setString(2, SPANNER_TYPE);
+    statement.setString(3, this.getTableName());
+    ResultSet result = statement.executeQuery();
 
     while (result.next()) {
       String columnName = result.getString(COLUMN_NAME);
@@ -232,7 +178,7 @@ public class CopyStatement extends IntermediateStatement {
       throw new SQLException("Table " + this.tableName + " is not found in information_schema");
     }
 
-    setTableColumns(tableColumns);
+    this.tableColumns = tableColumns;
 
     if (this.copyColumnNames != null) {
       verifyCopyColumns();
@@ -244,8 +190,8 @@ public class CopyStatement extends IntermediateStatement {
     this.executed = true;
     try {
       parseCopyStatement();
-      setMutationBuilder(
-          new MutationBuilder(this.tableName, this.tableColumns, getParserFormat(), hasHeader()));
+      mutationBuilder =
+          new MutationBuilder(this.tableName, this.tableColumns, getParserFormat(), hasHeader());
       this.updateResultCount(); // Gets update count, set hasMoreData false and statement result
     } catch (Exception e) {
       SQLException se = new SQLException(e.toString());

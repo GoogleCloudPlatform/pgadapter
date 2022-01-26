@@ -315,7 +315,7 @@ public class ConnectionHandler extends Thread {
     return connectionMetadata;
   }
 
-  public IntermediateStatement getActiveStatement() {
+  public synchronized IntermediateStatement getActiveStatement() {
     return activeStatementsMap.get(this.connectionId);
   }
 

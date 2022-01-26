@@ -152,7 +152,7 @@ public class MutationBuilder {
   }
 
   /** @return list of CSVRecord rows parsed with CSVParser from CopyData payload byte array */
-  public List<CSVRecord> parsePayloadData(byte[] payload) throws IOException {
+  private List<CSVRecord> parsePayloadData(byte[] payload) throws IOException {
     String copyData = new String(payload, StandardCharsets.UTF_8).trim();
     CSVParser parser;
     if (this.hasHeader && !this.isHeaderParsed) {
