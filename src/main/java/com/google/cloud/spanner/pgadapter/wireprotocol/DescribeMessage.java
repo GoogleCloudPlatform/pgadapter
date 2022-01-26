@@ -94,11 +94,11 @@ public class DescribeMessage extends ControlMessage {
           break;
         case RESULT_SET:
           new RowDescriptionResponse(
-              this.outputStream,
-              this.statement,
-              ((DescribePortalMetadata) this.statement.describe()).getMetadata(),
-              this.connection.getServer().getOptions(),
-              QueryMode.EXTENDED)
+                  this.outputStream,
+                  this.statement,
+                  ((DescribePortalMetadata) this.statement.describe()).getMetadata(),
+                  this.connection.getServer().getOptions(),
+                  QueryMode.EXTENDED)
               .send();
           break;
       }

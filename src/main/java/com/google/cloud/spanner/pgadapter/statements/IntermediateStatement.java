@@ -31,7 +31,8 @@ import java.util.List;
  * statements which does not belong directly to Postgres, Spanner, etc.
  */
 public class IntermediateStatement {
-  private static final AbstractStatementParser PARSER = AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+  private static final AbstractStatementParser PARSER =
+      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
   protected Statement statement;
   protected ResultType resultType;
@@ -65,8 +66,7 @@ public class IntermediateStatement {
     }
   }
 
-  protected IntermediateStatement() {
-  }
+  protected IntermediateStatement() {}
 
   // Split statements by ';' delimiter, but ignore anything that is nested with '' or "".
   private List<String> splitStatements(String sql) {
