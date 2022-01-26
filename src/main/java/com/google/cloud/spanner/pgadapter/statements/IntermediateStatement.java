@@ -14,7 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import com.google.cloud.spanner.jdbc.JdbcConstants;
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
@@ -30,6 +31,7 @@ import java.util.List;
  * statements which does not belong directly to Postgres, Spanner, etc.
  */
 public class IntermediateStatement {
+  private static final AbstractStatementParser PARSER = AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
   protected Statement statement;
   protected ResultType resultType;
@@ -37,6 +39,7 @@ public class IntermediateStatement {
   protected boolean hasMoreData;
   protected Exception exception;
   protected String sql;
+  protected String sqlWithoutComments;
   protected String command;
   protected boolean executed;
   protected Connection connection;
@@ -47,41 +50,22 @@ public class IntermediateStatement {
   private static final char SINGLE_QUOTE = '\'';
 
   public IntermediateStatement(String sql, Connection connection) throws SQLException {
-    this();
     this.sql = sql;
+    this.sqlWithoutComments = PARSER.removeCommentsAndTrim(sql);
     this.statements = parseStatements(sql);
-    this.command = parseCommand(sql);
+    this.command = parseCommand(sqlWithoutComments);
     this.connection = connection;
     this.statement = connection.createStatement();
+    if (PARSER.isUpdateStatement(sql)) {
+      this.resultType = ResultType.UPDATE_COUNT;
+    } else if (PARSER.isQuery(sql)) {
+      this.resultType = ResultType.RESULT_SET;
+    } else {
+      this.resultType = ResultType.NO_RESULT;
+    }
   }
 
   protected IntermediateStatement() {
-    this.executed = false;
-    this.exception = null;
-    this.resultType = null;
-    this.hasMoreData = false;
-    this.statementResult = null;
-    this.updateCount = null;
-  }
-
-  /**
-   * Extracts what type of result exists within the statement. In JDBC a statement update count is
-   * positive if it is an update statement, 0 if there is no result, or negative if there are
-   * results (i.e.: select statement)
-   *
-   * @param statement The resulting statement from an execution.
-   * @return The statement result type.
-   * @throws SQLException If getUpdateCount fails.
-   */
-  private static ResultType extractResultType(Statement statement) throws SQLException {
-    switch (statement.getUpdateCount()) {
-      case JdbcConstants.STATEMENT_NO_RESULT:
-        return ResultType.NO_RESULT;
-      case JdbcConstants.STATEMENT_RESULT_SET:
-        return ResultType.RESULT_SET;
-      default:
-        return ResultType.UPDATE_COUNT;
-    }
   }
 
   // Split statements by ';' delimiter, but ignore anything that is nested with '' or "".
@@ -209,7 +193,6 @@ public class IntermediateStatement {
    * @throws SQLException If an issue occurred in extracting result metadata.
    */
   protected void updateResultCount() throws SQLException {
-    this.resultType = IntermediateStatement.extractResultType(this.statement);
     if (this.containsResultSet()) {
       this.statementResult = this.statement.getResultSet();
       this.hasMoreData = this.statementResult.next();
@@ -221,7 +204,6 @@ public class IntermediateStatement {
   }
 
   protected void updateBatchResultCount(int[] updateCounts) throws SQLException {
-    this.resultType = IntermediateStatement.extractResultType(this.statement);
     this.updateCount = 0;
     for (int i = 0; i < updateCounts.length; ++i) {
       this.updateCount += updateCounts[i];
