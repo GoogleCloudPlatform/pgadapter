@@ -20,9 +20,9 @@ import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.utils.MutationBuilder;
 import com.google.spanner.v1.TypeCode;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -160,16 +160,15 @@ public class CopyStatement extends IntermediateStatement {
 
   private void queryInformationSchema() throws SQLException {
     Map<String, TypeCode> tableColumns = new LinkedHashMap<>();
-    Statement statement = this.connection.createStatement();
-    String query =
-        "SELECT "
-            + COLUMN_NAME
-            + ", "
-            + SPANNER_TYPE
-            + " FROM information_schema.columns WHERE table_name = '"
-            + this.tableName
-            + "'";
-    ResultSet result = statement.executeQuery(query);
+    PreparedStatement statement =
+        this.connection.prepareStatement(
+            "SELECT "
+                + COLUMN_NAME
+                + ", "
+                + SPANNER_TYPE
+                + " FROM information_schema.columns WHERE table_name = ?");
+    statement.setString(1, this.tableName);
+    ResultSet result = statement.executeQuery();
 
     while (result.next()) {
       String columnName = result.getString(COLUMN_NAME);
