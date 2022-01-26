@@ -53,8 +53,8 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       String sql,
       int totalParameters,
       SetMultimap<Integer, Integer> parameterIndexToPositions,
-      Connection connection) {
-    super();
+      Connection connection) throws SQLException {
+    super(sql, connection);
     this.sql = sql;
     this.command = parseCommand(sql);
     this.parameterCount = totalParameters;

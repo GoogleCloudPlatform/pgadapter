@@ -130,9 +130,9 @@ public class StatementTest {
   }
 
   @Test
-  public void testBasicNoResultStatement() throws Exception {
+  public void testBasicZeroUpdateCountStatement() throws Exception {
     Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(statement.getUpdateCount()).thenReturn(JdbcConstants.STATEMENT_NO_RESULT);
+    Mockito.when(statement.getUpdateCount()).thenReturn(0);
 
     IntermediateStatement intermediateStatement =
         new IntermediateStatement("UPDATE users SET name = someName WHERE id = -1", connection);
@@ -145,9 +145,9 @@ public class StatementTest {
     Mockito.verify(statement, Mockito.times(1))
         .execute("UPDATE users SET name = someName WHERE id = -1");
     Assert.assertFalse(intermediateStatement.containsResultSet());
-    Assert.assertEquals((int) intermediateStatement.getUpdateCount(), -2);
+    Assert.assertEquals((int) intermediateStatement.getUpdateCount(), 0);
     Assert.assertTrue(intermediateStatement.isExecuted());
-    Assert.assertEquals(intermediateStatement.getResultType(), ResultType.NO_RESULT);
+    Assert.assertEquals(intermediateStatement.getResultType(), ResultType.UPDATE_COUNT);
     Assert.assertNull(intermediateStatement.getStatementResult());
     Assert.assertFalse(intermediateStatement.isHasMoreData());
     Assert.assertFalse(intermediateStatement.hasException());

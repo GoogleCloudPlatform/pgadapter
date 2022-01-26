@@ -18,6 +18,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
@@ -56,6 +57,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -130,6 +132,7 @@ public class ProtocolTest {
     String expectedSQL = "SELECT * FROM users";
 
     Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.getResultSet()).thenReturn(mock(ResultSet.class));
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(options.requiresMatcher()).thenReturn(false);
@@ -1253,11 +1256,11 @@ public class ProtocolTest {
     Assert.assertEquals(readUntil(outputResult, "IntervalStyle\0".length()), "IntervalStyle\0");
     Assert.assertEquals(readUntil(outputResult, "iso_8601\0".length()), "iso_8601\0");
     Assert.assertEquals(outputResult.readByte(), 'S');
-    Assert.assertEquals(outputResult.readInt(), 37);
+    Assert.assertEquals(outputResult.readInt(), 35);
     Assert.assertEquals(
         readUntil(outputResult, "standard_conforming_strings\0".length()),
         "standard_conforming_strings\0");
-    Assert.assertEquals(readUntil(outputResult, "true\0".length()), "true\0");
+    Assert.assertEquals(readUntil(outputResult, "on\0".length()), "on\0");
     Assert.assertEquals(outputResult.readByte(), 'S');
     Assert.assertEquals(outputResult.readInt(), 17);
     Assert.assertEquals(readUntil(outputResult, "TimeZone\0".length()), "TimeZone\0");
