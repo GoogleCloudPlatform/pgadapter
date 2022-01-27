@@ -57,16 +57,22 @@ public class IntermediateStatement {
     this.command = parseCommand(sqlWithoutComments);
     this.connection = connection;
     this.statement = connection.createStatement();
-    if (PARSER.isUpdateStatement(sql)) {
-      this.resultType = ResultType.UPDATE_COUNT;
-    } else if (PARSER.isQuery(sql)) {
-      this.resultType = ResultType.RESULT_SET;
-    } else {
-      this.resultType = ResultType.NO_RESULT;
-    }
+    this.resultType = determineResultType(sql);
   }
 
-  protected IntermediateStatement() {}
+  protected IntermediateStatement(String sql) {
+    this.resultType = determineResultType(sql);
+  }
+
+  protected static ResultType determineResultType(String sql) {
+    if (PARSER.isUpdateStatement(sql)) {
+      return ResultType.UPDATE_COUNT;
+    } else if (PARSER.isQuery(sql)) {
+      return ResultType.RESULT_SET;
+    } else {
+      return ResultType.NO_RESULT;
+    }
+  }
 
   // Split statements by ';' delimiter, but ignore anything that is nested with '' or "".
   private List<String> splitStatements(String sql) {

@@ -166,6 +166,7 @@ public class ProtocolTest {
     String expectedSQL = "SELECT * FROM users";
 
     Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.getResultSet()).thenReturn(mock(ResultSet.class));
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(options.requiresMatcher()).thenReturn(true);

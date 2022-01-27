@@ -38,7 +38,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   protected List<Integer> parameterDataTypes;
 
   public IntermediatePreparedStatement(String sql, Connection connection) throws SQLException {
-    super();
+    super(sql);
     SQLMetadata parsedSQL = Converter.toJDBCParams(sql);
     this.parameterCount = parsedSQL.getParameterCount();
     this.sql = parsedSQL.getSqlString();

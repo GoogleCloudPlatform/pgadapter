@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static org.mockito.Mockito.mock;
+
 import com.google.cloud.spanner.jdbc.JdbcConstants;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -191,6 +193,7 @@ public class StatementTest {
 
     Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
         .thenReturn(preparedStatement);
+    Mockito.when(preparedStatement.getResultSet()).thenReturn(mock(ResultSet.class));
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(sqlStatement, connection);
