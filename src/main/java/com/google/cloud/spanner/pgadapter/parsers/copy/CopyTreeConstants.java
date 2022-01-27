@@ -8,12 +8,15 @@ public interface CopyTreeConstants {
   public int JJTQUALIFIEDNAME = 3;
   public int JJTCOLUMNLIST = 4;
   public int JJTCOLUMNELEMENT = 5;
-  public int JJTCOPYFROM = 6;
+  public int JJTCOPYDIRECTION = 6;
   public int JJTFILENAME = 7;
   public int JJTCOPYOPTIONS = 8;
   public int JJTCOPYOPTIONLIST = 9;
   public int JJTCOPYOPTIONELEMENT = 10;
-  public int JJTID = 11;
+  public int JJTFORMATTYPE = 11;
+  public int JJTID = 12;
+  public int JJTSINGLECHAR = 13;
+  public int JJTBOOLEAN = 14;
 
   public String[] jjtNodeName = {
     "Start",
@@ -22,12 +25,15 @@ public interface CopyTreeConstants {
     "QualifiedName",
     "ColumnList",
     "ColumnElement",
-    "CopyFrom",
+    "CopyDirection",
     "Filename",
     "CopyOptions",
     "CopyOptionList",
     "CopyOptionElement",
+    "FormatType",
     "ID",
+    "SingleChar",
+    "Boolean",
   };
 }
-/* JavaCC - OriginalChecksum=bc0b779bf9f53da6579402764aa248b7 (do not edit this line) */
+/* JavaCC - OriginalChecksum=900593ffbcdb66e5db2a975119b80880 (do not edit this line) */

@@ -15,6 +15,10 @@ public class ASTFilename extends SimpleNode {
     name = n;
   }
 
+  public String getName() {
+    return name;
+  }
+
   public String toString() {
     return "Filename: " + name;
   }

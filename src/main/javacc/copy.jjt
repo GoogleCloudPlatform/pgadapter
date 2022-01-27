@@ -49,10 +49,18 @@ TOKEN : /* KEYWORDS */
 | <K_WITH: "WITH">
 }
 
+TOKEN : /* SPECIAL CHARACTERS */
+{
+  <K_COMMA: ",">
+| <K_QUOTE: "'">
+| <K_DOUBLEQUOTE: "\"">
+}
+
 TOKEN : /* COPY OPTIONS */
 {
   <O_BINARY: "BINARY">
 | <O_CSV: "CSV">
+| <O_TEXT: "TEXT">
 | <O_FORMAT: "FORMAT">
 | <O_FREEZE: "FREEZE">
 | <O_DELIMITER: "DELIMITER">
@@ -64,29 +72,27 @@ TOKEN : /* COPY OPTIONS */
 | <O_FORCE_NOT_NULL: "FORCE_NOT_NULL">
 | <O_FORCE_NULL: "FORCE_NULL">
 | <O_ENCODING: "ENCODING">
-}
-
-TOKEN : /* SPECIAL_CHARACTERS */
-{
-    <K_COMMA: ",">
-  | <K_COLON: ":">
-  | <K_DOT: ".">
-  | <K_TILDE: "~">
-  | <K_QUOTE: "'">
-  | <K_SLASH: "/">
+| <O_TRUE: "TRUE">
+| <O_FALSE: "FALSE">
 }
 
 TOKEN : /* IDENTIFIERS */
 {
+  < QUOTED_IDENTIFIER: ("\"" <IDENTIFIER> "\"" | "\'" <IDENTIFIER> "\'") >
+|
+  < IDENTIFIER: ("'" <ID> "'" | <ID>) >
+|
+  < QUOTED_CHAR: ("\"" <SINGLE_CHAR> "\"" | "\'" <SINGLE_CHAR> "\'") >
+|
+  < SINGLE_CHAR: (["!"-"'","*"-"/",":","<"-"@","["-"`"]) >
+|
+  < #ID: <LETTER> (<LETTER>|<DIGIT>)* >
+|
   < #DIGIT: ["0"-"9"] >
 |
   < #LETTER: ["_","a"-"z","A"-"Z"] >
 |
   < #LOWER_CASE_LETTER: ["_","a"-"z"] >
-|
-  < #ID: <LETTER> (<LETTER>|<DIGIT>)*>
-|
-  < IDENTIFIER: (<K_QUOTE> <ID> <K_QUOTE> | <ID>)>
 }
 
 /** Main production. */
@@ -114,20 +120,19 @@ void qualifiedName() #QualifiedName : {}
   identifier()
 }
 
-/** Column List option. */
+/** Optional Column List */
 void optColumnList() : {}
 {
-  columnList()
+  LOOKAHEAD(2)
+  "(" columnList() ")"
   | {} /* EMPTY */
 }
 
 /** Column List. */
 void columnList() #ColumnList : {}
 {
-    LOOKAHEAD(2)
-    "(" columnList() ")"
-  | LOOKAHEAD(2)
-    columnElem() "," columnList()
+  LOOKAHEAD(2)
+  columnElem() <K_COMMA> columnList()
   | columnElem()
 }
 
@@ -143,17 +148,14 @@ void columnElem() #ColumnElement :
   }
 }
 
-/** Copy From. */
-void copyFrom() #CopyFrom : 
+/** Copy From */
+void copyFrom() #CopyDirection : {}
 {
-  Object o;
-}
-{
-  <K_FROM>	{o = Boolean.TRUE;}
+  <K_FROM> { jjtThis.setDirection("FROM"); }
   | <K_TO>	{
-      o = Boolean.FALSE;
-      throw new ParseException("COPY TO is not supported.");
-    }
+    jjtThis.setDirection("TO");
+    throw new ParseException("COPY TO is not supported.");
+  }
 }
 
 void copyFileName() #Filename :
@@ -166,12 +168,14 @@ void copyFileName() #Filename :
   | identifier()
 }
 
+/** Optional With */
 void optWith() : {}
 {
   <K_WITH>
   | {} /* EMPTY */
 }
 
+/** Optional list of copy options */
 void copyOptions() #CopyOptions : {}
 {
   LOOKAHEAD(2)
@@ -185,35 +189,31 @@ void copyOptionList() #CopyOptionList : {}
   | {} /* EMPTY */
 }
 
-void copyOptionElement() #CopyOptionElement : 
+void copyOptionElement() #CopyOptionElement : {}
 {
-  Token t;
-  Object o;
-}
-{
-    <O_BINARY> {
-      jjtThis.setName("BINARY");
+    <O_FORMAT> formatType() {
+      jjtThis.setName("FORMAT");
     }
-  | <O_CSV> {
-      jjtThis.setName("CSV");
-    }
+  | formatType() {
+      jjtThis.setName("FORMAT");
+  }
   | <O_FREEZE> {
       jjtThis.setName("FREEZE");
       throw new ParseException("FREEZE is not supported.");
     }
-  | <O_DELIMITER> identifier() {
+  | <O_DELIMITER> singleChar() {
       jjtThis.setName("DELIMITER");
     }
-  | <O_NULL> identifier() {
+  | <O_NULL> quotedIdentifier() {
       jjtThis.setName("NULL");
     }
-  | <O_HEADER> {
+  | <O_HEADER> booleanOption() {
       jjtThis.setName("HEADER");
     }
-  | <O_QUOTE> identifier() {
+  | <O_QUOTE> singleChar() {
       jjtThis.setName("QUOTE");
     }
-  | <O_ESCAPE> identifier() {
+  | <O_ESCAPE> singleChar() {
       jjtThis.setName("ESCAPE");
     }
   | LOOKAHEAD(3)
@@ -237,15 +237,55 @@ void copyOptionElement() #CopyOptionElement :
     }
 }
 
+void formatType() #FormatType : {}
+{
+    <O_TEXT> {
+      jjtThis.setFormat("TEXT");
+    }
+  | <O_BINARY> {
+      jjtThis.setFormat("BINARY");
+    }
+  | <O_CSV> {
+      jjtThis.setFormat("CSV");
+    }
+}
+
 /** An Identifier. */
 void identifier() #ID :
 {
   Token t;
-  Object o;
 }
 {
   t=<IDENTIFIER>
   {
     jjtThis.setName(t.image);
   }
+}
+
+void quotedIdentifier() #ID :
+{
+  Token t;
+}
+{
+  t=<QUOTED_IDENTIFIER>
+  {
+    jjtThis.setName(t.image);
+  }
+}
+
+void singleChar() #SingleChar :
+{
+  Token t;
+}
+{
+  t=<QUOTED_CHAR>
+  {
+    jjtThis.setChar(t.image.charAt(1));
+  }
+}
+
+void booleanOption() #Boolean : {}
+{
+    <O_TRUE> { jjtThis.setBool(true); }
+  | <O_FALSE> { jjtThis.setBool(false); }
 }

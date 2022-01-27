@@ -31,7 +31,7 @@ public class CopyDefaultVisitor implements CopyVisitor {
     return defaultVisit(node, data);
   }
 
-  public Object visit(ASTCopyFrom node, Object data) {
+  public Object visit(ASTCopyDirection node, Object data) {
     return defaultVisit(node, data);
   }
 
@@ -51,8 +51,20 @@ public class CopyDefaultVisitor implements CopyVisitor {
     return defaultVisit(node, data);
   }
 
+  public Object visit(ASTFormatType node, Object data) {
+    return defaultVisit(node, data);
+  }
+
   public Object visit(ASTID node, Object data) {
     return defaultVisit(node, data);
   }
+
+  public Object visit(ASTSingleChar node, Object data) {
+    return defaultVisit(node, data);
+  }
+
+  public Object visit(ASTBoolean node, Object data) {
+    return defaultVisit(node, data);
+  }
 }
-/* JavaCC - OriginalChecksum=d11666e6891ddb643d39b380f38f418b (do not edit this line) */
+/* JavaCC - OriginalChecksum=6f0c8ac5adf7090fdae79d31b6c14c6a (do not edit this line) */
