@@ -1,4 +1,4 @@
-// Copyright 2021 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,29 +14,27 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
-import org.postgresql.util.ByteConverter;
 
-/** Translate from wire protocol to int. */
-public class IntegerParser extends Parser<Integer> {
+/** Translate from wire protocol to {@link BigDecimal}. */
+public class NumericParser extends Parser<BigDecimal> {
 
-  public IntegerParser(ResultSet item, int position) throws SQLException {
-    this.item = item.getInt(position);
+  public NumericParser(ResultSet item, int position) throws SQLException {
+    this.item = item.getBigDecimal(position);
   }
 
-  public IntegerParser(Object item) {
-    this.item = (Integer) item;
+  public NumericParser(Object item) {
+    this.item = (BigDecimal) item;
   }
 
-  public IntegerParser(byte[] item, FormatCode formatCode) {
+  public NumericParser(byte[] item, FormatCode formatCode) {
     switch (formatCode) {
       case TEXT:
-        this.item = Integer.valueOf(new String(item));
-        break;
       case BINARY:
-        this.item = ByteConverter.int4(item, 0);
+        this.item = new BigDecimal(new String(item));
         break;
       default:
         throw new IllegalArgumentException("Unsupported format: " + formatCode);
@@ -44,17 +42,17 @@ public class IntegerParser extends Parser<Integer> {
   }
 
   @Override
-  public Integer getItem() {
+  public BigDecimal getItem() {
     return this.item;
   }
 
   @Override
   protected String stringParse() {
-    return Integer.toString(this.item);
+    return this.item.toPlainString();
   }
 
   @Override
   protected byte[] binaryParse() {
-    return toBinary(this.item, Types.INTEGER);
+    return toBinary(this.item, Types.NUMERIC);
   }
 }

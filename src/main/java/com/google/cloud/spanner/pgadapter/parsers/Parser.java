@@ -29,40 +29,86 @@ import org.postgresql.util.ByteConverter;
  */
 public abstract class Parser<T> {
 
+  public enum FormatCode {
+    TEXT,
+    BINARY;
+
+    public static FormatCode of(short code) {
+      FormatCode[] values = FormatCode.values();
+      if (code < 0 || code > values.length) {
+        throw new IllegalArgumentException("Unknown format code: " + code);
+      }
+      return values[code];
+    }
+  }
+
   public static final long PG_EPOCH_SECONDS = 946684800L;
   public static final long PG_EPOCH_DAYS = PG_EPOCH_SECONDS / 86400L;
   protected static final Charset UTF8 = StandardCharsets.UTF_8;
   protected T item;
 
   /**
+   * Untyped parameters are allowed in PostgreSQL, and some drivers use this deliberately to work
+   * around side effects regarding dates and timestamps with and without timezones. See for example
+   * https://github.com/pgjdbc/pgjdbc/blob/3af3b32cc5b77db3e7af1cbc217d6288fd0cf9b9/pgjdbc/src/main/java/org/postgresql/jdbc/PgPreparedStatement.java#L1322
+   *
+   * <p>TODO: This method currently only checks whether the value could be a timestamp with
+   * timezone. Date and timestamp without timezone are also known to be sent with type code {@link
+   * Oid#UNSPECIFIED} by the JDBC driver, and must be implemented once Spanner supports these types.
+   *
+   * @param item The value to guess the type for
+   * @param formatCode The encoding that is used for the value
+   * @return The {@link Oid} type code that is guessed for the value or {@link Oid#UNSPECIFIED} if
+   *     no type could be guessed.
+   */
+  private static int guessType(byte[] item, FormatCode formatCode) {
+    if (formatCode == FormatCode.TEXT) {
+      String value = new String(item, StandardCharsets.UTF_8);
+      if (TimestampParser.isTimestamp(value)) {
+        return Oid.TIMESTAMPTZ;
+      }
+    }
+    return Oid.UNSPECIFIED;
+  }
+
+  /**
    * Factory method to create a Parser subtype with a designated type from a byte array.
    *
-   * @param item The data to be parsed.
-   * @param oidType The type of the designated data.
+   * @param item The data to be parsed
+   * @param oidType The type of the designated data
+   * @param formatCode The format of the data to be parsed
    * @return The parser object for the designated data type.
    */
-  public static Parser create(byte[] item, int oidType) {
+  public static Parser create(byte[] item, int oidType, FormatCode formatCode) {
     switch (oidType) {
       case Oid.BOOL:
-        return new BooleanParser(item);
+        return new BooleanParser(item, formatCode);
+      case Oid.BYTEA:
       case Oid.BIT_ARRAY:
-        return new BinaryParser(item);
+        return new BinaryParser(item, formatCode);
       case Oid.DATE:
-        return new DateParser(item);
+        return new DateParser(item, formatCode);
       case Oid.FLOAT8:
-        return new DoubleParser(item);
+        return new DoubleParser(item, formatCode);
       case Oid.INT8:
-        return new LongParser(item);
+        return new LongParser(item, formatCode);
       case Oid.INT4:
-        return new IntegerParser(item);
+        return new IntegerParser(item, formatCode);
       case Oid.NUMERIC:
-        return new StringParser(item);
+        return new NumericParser(item, formatCode);
       case Oid.TEXT:
-      case Oid.UNSPECIFIED:
       case Oid.VARCHAR:
-        return new StringParser(item);
-      case Oid.TIMESTAMP:
-        return new TimestampParser(item);
+        return new StringParser(item, formatCode);
+      case Oid.TIMESTAMPTZ:
+        return new TimestampParser(item, formatCode);
+      case Oid.UNSPECIFIED:
+        int type = guessType(item, formatCode);
+        if (type == Oid.UNSPECIFIED) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Could not guess type of value %s", new String(item, StandardCharsets.UTF_8)));
+        }
+        return create(item, type, formatCode);
       default:
         throw new IllegalArgumentException("Illegal or unknown element type: " + oidType);
     }
@@ -137,6 +183,30 @@ public abstract class Parser<T> {
       case Types.STRUCT:
       default:
         throw new IllegalArgumentException("Illegal or unknown element type: " + oidType);
+    }
+  }
+
+  /**
+   * Converts a binary wire value to a Java type.
+   *
+   * @param value The value to convert.
+   * @param type Type of the value. The type should be an {@link Oid} constant.
+   * @return Object as a Java wrapper class of a primitive type, for example {@link Boolean}, {@link
+   *     String} or {@link Integer}.
+   */
+  public static Object fromBinary(byte[] value, int type) {
+    byte[] result;
+    switch (type) {
+      case Oid.BOOL:
+        return ByteConverter.bool(value, 0);
+      case Oid.INT4:
+        return ByteConverter.int4(value, 0);
+      case Oid.FLOAT8:
+        return ByteConverter.float8(value, 0);
+      case Oid.INT8:
+        return ByteConverter.int8(value, 0);
+      default:
+        throw new IllegalArgumentException("Type " + type + " is not valid!");
     }
   }
 

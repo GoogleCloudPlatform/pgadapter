@@ -42,7 +42,8 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
       String sql,
       int parameterCount,
       SetMultimap<Integer, Integer> parameterIndexToPositions,
-      Connection connection) {
+      Connection connection)
+      throws SQLException {
     super(statement, sql, parameterCount, parameterIndexToPositions, connection);
     this.parameterFormatCodes = new ArrayList<>();
     this.resultFormatCodes = new ArrayList<>();

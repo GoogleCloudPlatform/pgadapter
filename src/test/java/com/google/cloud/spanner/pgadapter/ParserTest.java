@@ -29,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
 import com.google.cloud.spanner.pgadapter.parsers.IntegerParser;
 import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
 import java.sql.Array;
@@ -165,7 +166,7 @@ public class ParserTest {
   public void testDateParsingRejectsInvalidDateTooLong() {
     byte[] result = new byte[4];
     ByteConverter.int4(result, 0, Integer.MAX_VALUE);
-    new DateParser(result);
+    new DateParser(result, FormatCode.BINARY);
   }
 
   @Test

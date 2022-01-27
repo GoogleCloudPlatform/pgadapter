@@ -28,7 +28,7 @@ public class StringParser extends Parser<String> {
     this.item = (String) item;
   }
 
-  public StringParser(byte[] item) {
+  public StringParser(byte[] item, FormatCode formatCode) {
     this.item = new String(item, UTF8);
   }
 

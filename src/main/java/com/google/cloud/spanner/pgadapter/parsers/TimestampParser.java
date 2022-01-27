@@ -15,10 +15,14 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.common.base.Preconditions;
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAccessor;
 import java.util.regex.Pattern;
 import org.postgresql.util.ByteConverter;
 
@@ -43,6 +47,11 @@ public class TimestampParser extends Parser<Timestamp> {
 
   private static final Pattern TIMESTAMP_PATTERN = Pattern.compile(TIMESTAMP_REGEX);
 
+  private static final DateTimeFormatter TIMESTAMP_WITHOUT_FRACTION_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssX");
+  private static final DateTimeFormatter TIMESTAMP_WITH_FRACTION_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSSSSSX");
+
   public TimestampParser(ResultSet item, int position) throws SQLException {
     this.item = item.getTimestamp(position);
   }
@@ -51,9 +60,25 @@ public class TimestampParser extends Parser<Timestamp> {
     this.item = (Timestamp) item;
   }
 
-  public TimestampParser(byte[] item) {
-    long micros = ByteConverter.int8(item, 0);
-    this.item = new Timestamp(micros);
+  public TimestampParser(byte[] item, FormatCode formatCode) {
+    switch (formatCode) {
+      case TEXT:
+        String stringValue = new String(item, StandardCharsets.UTF_8);
+        TemporalAccessor temporalAccessor;
+        if (stringValue.contains(".")) {
+          temporalAccessor = TIMESTAMP_WITH_FRACTION_FORMATTER.parse(stringValue);
+        } else {
+          temporalAccessor = TIMESTAMP_WITHOUT_FRACTION_FORMATTER.parse(stringValue);
+        }
+        this.item = Timestamp.from(Instant.from(temporalAccessor));
+        break;
+      case BINARY:
+        long micros = ByteConverter.int8(item, 0);
+        this.item = new Timestamp(micros);
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
+    }
   }
 
   /**

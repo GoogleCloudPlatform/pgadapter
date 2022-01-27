@@ -32,6 +32,10 @@ public class BinaryParser extends Parser<byte[]> {
     this.item = (byte[]) item;
   }
 
+  public BinaryParser(byte[] item, FormatCode formatCode) {
+    this.item = item;
+  }
+
   @Override
   protected String stringParse() {
     return PGbytea.toPGString(this.item);

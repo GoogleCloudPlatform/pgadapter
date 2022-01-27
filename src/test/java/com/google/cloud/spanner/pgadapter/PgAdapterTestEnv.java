@@ -26,10 +26,11 @@ import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
-import com.google.cloud.spanner.testing.RemoteSpannerHelper;
+import com.google.common.base.Strings;
 import com.google.common.primitives.Bytes;
 import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
@@ -40,6 +41,7 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -70,6 +72,8 @@ public final class PgAdapterTestEnv {
 
   // PgAdapter port should be set through this system property.
   public static final String SERVICE_PORT = "PG_ADAPTER_PORT";
+
+  public static final String USE_EXISTING_DB = "PG_ADAPTER_USE_EXISTING_DB";
 
   // Default fallback project Id will be used if one isn't set via the system property.
   private static final String DEFAULT_PROJECT_ID = "span-cloud-testing";
@@ -105,14 +109,14 @@ public final class PgAdapterTestEnv {
   // Spanner options for creating a client.
   private SpannerOptions options;
 
+  // Shared Spanner instance that is automatically created and closed.
+  private Spanner spanner;
+
   // Spanner URL.
   private URL spannerURL;
 
   // Log stream for the test process.
   private static final Logger logger = Logger.getLogger(PgAdapterTestEnv.class.getName());
-
-  // Utility class for setting up test connection.
-  private RemoteSpannerHelper spannerHelper;
 
   private final List<Database> databases = new ArrayList<>();
 
@@ -121,14 +125,20 @@ public final class PgAdapterTestEnv {
     options = createSpannerOptions();
   }
 
-  public SpannerOptions spannerOptions() {
-    return options;
+  public Spanner getSpanner() {
+    if (spanner == null) {
+      spanner = options.getService();
+    }
+    return spanner;
   }
 
-  public String getCredentials() throws Exception {
+  public String getCredentials() {
+    if (System.getenv().get(GCP_CREDENTIALS) == null) {
+      return null;
+    }
+
     if (gcpCredentials == null) {
-      Map<String, String> env = System.getenv();
-      gcpCredentials = env.get(GCP_CREDENTIALS);
+      gcpCredentials = System.getenv().get(GCP_CREDENTIALS);
       if (gcpCredentials.isEmpty()) {
         throw new IllegalArgumentException("Invalid GCP credentials file.");
       }
@@ -178,27 +188,41 @@ public final class PgAdapterTestEnv {
     return spannerURL;
   }
 
+  public boolean isUseExistingDb() {
+    return Boolean.parseBoolean(System.getProperty(USE_EXISTING_DB, "false"));
+  }
+
+  public Database getExistingDatabase() {
+    if (databaseId == null) {
+      databaseId = System.getProperty(TEST_DATABASE_PROPERTY, DEFAULT_DATABASE_ID);
+    }
+    return getSpanner().getDatabaseAdminClient().getDatabase(instanceId, databaseId);
+  }
+
   // Create database.
   public Database createDatabase() throws Exception {
+    if (isUseExistingDb()) {
+      throw new IllegalStateException(
+          "Cannot create a new test database if " + USE_EXISTING_DB + " is true.");
+    }
     String databaseId = getDatabaseId();
-    Spanner spanner = options.getService();
+    Spanner spanner = getSpanner();
     DatabaseAdminClient client = spanner.getDatabaseAdminClient();
-    Database db = null;
     OperationFuture<Database, CreateDatabaseMetadata> op =
         client.createDatabase(
             client
                 .newDatabaseBuilder(DatabaseId.of(projectId, instanceId, databaseId))
                 .setDialect(Dialect.POSTGRESQL)
                 .build(),
-            Arrays.asList());
-    db = op.get();
+            Collections.emptyList());
+    Database db = op.get();
     databases.add(db);
     logger.log(Level.INFO, "Created database [" + db.getId() + "]");
     return db;
   }
 
   public void updateDdl(String databaseId, Iterable<String> statements) throws Exception {
-    Spanner spanner = options.getService();
+    Spanner spanner = getSpanner();
     DatabaseAdminClient client = spanner.getDatabaseAdminClient();
     OperationFuture<Void, UpdateDatabaseDdlMetadata> op =
         client.updateDatabaseDdl(instanceId, databaseId, statements, null);
@@ -207,8 +231,8 @@ public final class PgAdapterTestEnv {
   }
 
   // Update tables of the database.
-  public void updateTables(String databaseId, Iterable<String> statements) throws Exception {
-    Spanner spanner = options.getService();
+  public void updateTables(String databaseId, Iterable<String> statements) {
+    Spanner spanner = getSpanner();
     DatabaseId db = DatabaseId.of(projectId, instanceId, databaseId);
     DatabaseClient dbClient = spanner.getDatabaseClient(db);
     dbClient
@@ -228,6 +252,19 @@ public final class PgAdapterTestEnv {
             });
   }
 
+  /**
+   * Writes data to the given test database.
+   *
+   * @param databaseId The id of the database to write to
+   * @param mutations The mutations to write
+   */
+  public void write(String databaseId, Iterable<Mutation> mutations) {
+    Spanner spanner = getSpanner();
+    DatabaseId db = DatabaseId.of(projectId, instanceId, databaseId);
+    DatabaseClient dbClient = spanner.getDatabaseClient(db);
+    dbClient.write(mutations);
+  }
+
   // Setup spanner options.
   private SpannerOptions createSpannerOptions() throws Exception {
     projectId = getProjectId();
@@ -236,12 +273,15 @@ public final class PgAdapterTestEnv {
     Map<String, String> env = System.getenv();
     gcpCredentials = env.get(GCP_CREDENTIALS);
     GoogleCredentials credentials = null;
-    credentials = GoogleCredentials.fromStream(new FileInputStream(gcpCredentials));
-    return SpannerOptions.newBuilder()
-        .setProjectId(projectId)
-        .setHost(spannerURL.toString())
-        .setCredentials(credentials)
-        .build();
+    if (!Strings.isNullOrEmpty(gcpCredentials)) {
+      credentials = GoogleCredentials.fromStream(new FileInputStream(gcpCredentials));
+    }
+    SpannerOptions.Builder builder =
+        SpannerOptions.newBuilder().setProjectId(projectId).setHost(spannerURL.toString());
+    if (credentials != null) {
+      builder.setCredentials(credentials);
+    }
+    return builder.build();
   }
 
   public static class PGMessage {
@@ -365,12 +405,17 @@ public final class PgAdapterTestEnv {
 
   // Drop all the databases we created explicitly.
   public void cleanUp() {
-    for (Database db : databases) {
-      try {
-        db.drop();
-      } catch (Exception e) {
-        logger.log(Level.WARNING, "Failed to drop test database " + db.getId(), e);
+    if (!isUseExistingDb()) {
+      for (Database db : databases) {
+        try {
+          db.drop();
+        } catch (Exception e) {
+          logger.log(Level.WARNING, "Failed to drop test database " + db.getId(), e);
+        }
       }
+    }
+    if (spanner != null) {
+      spanner.close();
     }
   }
 }
