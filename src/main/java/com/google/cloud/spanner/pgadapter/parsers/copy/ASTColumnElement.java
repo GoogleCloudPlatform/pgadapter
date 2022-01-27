@@ -15,6 +15,10 @@ public class ASTColumnElement extends SimpleNode {
     name = n;
   }
 
+  public String getName() {
+    return name;
+  }
+
   public String toString() {
     return "Column Element: " + name;
   }
