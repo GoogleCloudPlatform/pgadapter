@@ -61,11 +61,6 @@ public class MutationWriter {
     this.mutations = new ArrayList<>();
   }
 
-  /** @return list of CopyData mutations not yet written into Spanner */
-  public List<Mutation> getMutations() {
-    return this.mutations;
-  }
-
   /** @return number of rows copied into Spanner */
   public int getRowCount() {
     return this.rowCount;
