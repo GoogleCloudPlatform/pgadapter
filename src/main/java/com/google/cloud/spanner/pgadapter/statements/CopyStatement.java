@@ -1,4 +1,4 @@
-// Copyright 2021 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,8 @@ import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
 import static com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
 
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
-import com.google.cloud.spanner.pgadapter.utils.MutationBuilder;
+import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
+import com.google.common.base.Strings;
 import com.google.spanner.v1.TypeCode;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -39,10 +40,9 @@ public class CopyStatement extends IntermediateStatement {
   private CSVFormat format;
 
   private Map<String, TypeCode> tableColumns;
-  private MutationBuilder mutationBuilder;
+  private MutationWriter mutationWriter;
 
   public CopyStatement(String sql, Connection connection) throws SQLException {
-    super();
     this.sql = sql;
     this.command = parseCommand(sql);
     this.connection = connection;
@@ -60,7 +60,7 @@ public class CopyStatement extends IntermediateStatement {
     if (options.getFormat() == Format.CSV) {
       format = CSVFormat.POSTGRESQL_CSV;
     }
-    if (options.getNullString() != null && options.getNullString().isEmpty()) {
+    if (!Strings.isNullOrEmpty(options.getNullString())) {
       format = format.withNullString(options.getNullString());
     }
     if (options.getDelimiter() != '\0') {
@@ -115,8 +115,8 @@ public class CopyStatement extends IntermediateStatement {
     return options.getHeader();
   }
 
-  public MutationBuilder getMutationBuilder() {
-    return this.mutationBuilder;
+  public MutationWriter getMutationWriter() {
+    return this.mutationWriter;
   }
 
   private void verifyCopyColumns() throws SQLException {
@@ -182,10 +182,10 @@ public class CopyStatement extends IntermediateStatement {
     this.executed = true;
     try {
       parseCopyStatement();
-      mutationBuilder =
-          new MutationBuilder(
+      mutationWriter =
+          new MutationWriter(
               options.getTableName(), this.tableColumns, getParserFormat(), hasHeader());
-      this.updateResultCount(); // Gets update count, set hasMoreData false and statement result
+      updateResultCount(); // Gets update count, set hasMoreData false and statement result
     } catch (Exception e) {
       SQLException se = new SQLException(e.toString());
       handleExecutionException(se);

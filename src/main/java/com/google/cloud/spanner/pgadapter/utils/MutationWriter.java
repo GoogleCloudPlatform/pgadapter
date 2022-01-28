@@ -1,4 +1,4 @@
-// Copyright 2021 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 
-public class MutationBuilder {
+public class MutationWriter {
 
   private static final long MUTATION_LIMIT = 20000; // PLACEHOLDER
   private static final long BATCH_LIMIT = 64000; // PLACEHOLDER
@@ -49,7 +49,7 @@ public class MutationBuilder {
   private CSVFormat format;
   private FileWriter fileWriter;
 
-  public MutationBuilder(
+  public MutationWriter(
       String tableName, Map<String, TypeCode> tableColumns, CSVFormat format, boolean hasHeader) {
     this.mutationCount = 0;
     this.batchSize = 0;
