@@ -41,7 +41,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     super(sql);
     SQLMetadata parsedSQL = Converter.toJDBCParams(sql);
     this.parameterCount = parsedSQL.getParameterCount();
-    this.sql = parsedSQL.getSqlString();
+    this.sql = replaceKnownUnsupportedTables(parsedSQL.getSqlString());
     this.parameterIndexToPositions = parsedSQL.getParameterIndexToPositions();
     this.command = parseCommand(sql);
     this.connection = connection;

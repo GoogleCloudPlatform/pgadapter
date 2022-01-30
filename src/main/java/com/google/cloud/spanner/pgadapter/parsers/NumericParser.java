@@ -21,6 +21,7 @@ import java.sql.Types;
 
 /** Translate from wire protocol to {@link BigDecimal}. */
 public class NumericParser extends Parser<BigDecimal> {
+  private boolean isNaN;
 
   public NumericParser(ResultSet item, int position) throws SQLException {
     this.item = item.getBigDecimal(position);
@@ -33,8 +34,15 @@ public class NumericParser extends Parser<BigDecimal> {
   public NumericParser(byte[] item, FormatCode formatCode) {
     switch (formatCode) {
       case TEXT:
-      case BINARY:
         this.item = new BigDecimal(new String(item));
+        break;
+      case BINARY:
+        Number result = ByteConverter.numeric(item, 0, item.length);
+        if (result instanceof Double && Double.isNaN((Double) result)) {
+          isNaN = true;
+        } else if (result instanceof BigDecimal) {
+          this.item = (BigDecimal) result;
+        }
         break;
       default:
         throw new IllegalArgumentException("Unsupported format: " + formatCode);
@@ -48,7 +56,7 @@ public class NumericParser extends Parser<BigDecimal> {
 
   @Override
   protected String stringParse() {
-    return this.item.toPlainString();
+    return isNaN ? "NaN" : this.item.toPlainString();
   }
 
   @Override

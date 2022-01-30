@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import org.postgresql.util.ByteConverter;
 
 /**
  * Parse specified data to boolean. For most cases it is simply translating from chars 't'/'f' to

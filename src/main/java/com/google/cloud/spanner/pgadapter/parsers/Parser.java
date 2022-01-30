@@ -21,7 +21,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import org.postgresql.core.Oid;
-import org.postgresql.util.ByteConverter;
 
 /**
  * Parser is the parsing superclass, used to take wire format data types and convert them
