@@ -84,7 +84,7 @@ TOKEN : /* IDENTIFIERS */
 |
   < QUOTED_CHAR: ("\"" <SINGLE_CHAR> "\"" | "\'" <SINGLE_CHAR> "\'") >
 |
-  < SINGLE_CHAR: (["!"-"'","*"-"/",":","<"-"@","["-"`"]) >
+  < #SINGLE_CHAR: (["!"-"'","*"-"/",":","<"-"@","["-"`"]) >
 |
   < #ID: <LETTER> (<LETTER>|<DIGIT>)* >
 |
@@ -118,6 +118,7 @@ void CopyStmt() #CopyStatement : {}
 void qualifiedName() #QualifiedName : {}
 {
   identifier()
+  | quotedIdentifier()
 }
 
 /** Optional Column List */
@@ -137,15 +138,10 @@ void columnList() #ColumnList : {}
 }
 
 /** Column Element. */
-void columnElem() #ColumnElement :
+void columnElem() #ColumnElement : {}
 {
-  Token t;
-}
-{
-  t=<IDENTIFIER>
-  {
-    jjtThis.setName(t.image);
-  }
+  identifier()
+  | quotedIdentifier()
 }
 
 /** Copy From */

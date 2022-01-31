@@ -349,7 +349,7 @@ public class ParserTest {
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
-      assertThat(options.getColumnNames(), is(equalTo(null)));
+      assertTrue(options.getColumnNames().isEmpty());
     }
 
     {
@@ -357,10 +357,10 @@ public class ParserTest {
       String sql = "COPY Users FROM STDIN;";
       parse(sql, options);
 
-      assertThat(options.getTableName(), is(equalTo("Users")));
+      assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
-      assertThat(options.getColumnNames(), is(equalTo(null)));
+      assertTrue(options.getColumnNames().isEmpty());
     }
 
     {
@@ -368,10 +368,10 @@ public class ParserTest {
       String sql = "COPY UsErS FROM STDIN;";
       parse(sql, options);
 
-      assertThat(options.getTableName(), is(equalTo("UsErS")));
+      assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
-      assertThat(options.getColumnNames(), is(equalTo(null)));
+      assertTrue(options.getColumnNames().isEmpty());
     }
 
     {
@@ -379,10 +379,43 @@ public class ParserTest {
       String sql = "COPY USERS FROM STDIN;";
       parse(sql, options);
 
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertTrue(options.getColumnNames().isEmpty());
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \'Users\' FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("Users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertTrue(options.getColumnNames().isEmpty());
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \"UsErS\" FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("UsErS")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertTrue(options.getColumnNames().isEmpty());
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \'USERS\' FROM STDIN;";
+      parse(sql, options);
+
       assertThat(options.getTableName(), is(equalTo("USERS")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
-      assertThat(options.getColumnNames(), is(equalTo(null)));
+      assertTrue(options.getColumnNames().isEmpty());
     }
 
     {
@@ -426,7 +459,7 @@ public class ParserTest {
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
-      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("ID", "AGE", "NAME"))));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("id", "age", "name"))));
     }
 
     {
@@ -437,12 +470,45 @@ public class ParserTest {
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
-      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("Id", "Age", "Name"))));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("id", "age", "name"))));
     }
 
     {
       CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
       String sql = "COPY users (iD, aGe, nAMe) FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("id", "age", "name"))));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users (\'ID\', \"AGE\", \'NAME\') FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("ID", "AGE", "NAME"))));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users (\'Id\', \'Age\', \'Name\') FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("Id", "Age", "Name"))));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users (\"iD\", \"aGe\", \"nAMe\") FROM STDIN;";
       parse(sql, options);
 
       assertThat(options.getTableName(), is(equalTo("users")));

@@ -17,9 +17,6 @@ public class CopyTreeParser implements CopyVisitor {
     }
 
     public void addColumnName(String name) {
-      if(columnNames == null) {
-        columnNames = new ArrayList<String>();
-      }
       columnNames.add(name);
     }
 
@@ -91,8 +88,8 @@ public class CopyTreeParser implements CopyVisitor {
       return this.nullString;
     }
 
-    private List<String> columnNames;
-    private String tableName;
+    private List<String> columnNames = new ArrayList<String>();
+    private String tableName = "";
     private Format format = Format.TEXT;
     private FromTo direction;
     private boolean header;
@@ -120,7 +117,7 @@ public class CopyTreeParser implements CopyVisitor {
 
   public Object visit(ASTCopyStatement node, Object data) {
     ASTID idNode = (ASTID) node.jjtGetChild(0).jjtGetChild(0);
-    options.setTableName(idNode.getName());
+    options.setTableName(idNode.getFormattedName());
     data = node.childrenAccept(this, data);
     return data;
   }
@@ -147,7 +144,8 @@ public class CopyTreeParser implements CopyVisitor {
   }
 
   public Object visit(ASTColumnElement node, Object data) {
-    options.addColumnName(node.getName());
+    ASTID columnNode = (ASTID) node.jjtGetChild(0);
+    options.addColumnName(columnNode.getFormattedName());
     data = node.childrenAccept(this, data);
     return data;
   }
@@ -186,7 +184,7 @@ public class CopyTreeParser implements CopyVisitor {
       } break;
       case "NULL": {
         ASTID idNode = (ASTID) node.jjtGetChild(0);
-        options.setNullString(idNode.getName().replaceAll("[\"|\']", ""));
+        options.setNullString(idNode.getFormattedName());
       } break;
       case "HEADER": {
         ASTBoolean boolNode = (ASTBoolean) node.jjtGetChild(0);
