@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.SetMultimap;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -38,13 +39,14 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   protected List<Short> resultFormatCodes;
 
   public IntermediatePortalStatement(
+      OptionsMetadata options,
       PreparedStatement statement,
       String sql,
       int parameterCount,
       SetMultimap<Integer, Integer> parameterIndexToPositions,
       Connection connection)
       throws SQLException {
-    super(statement, sql, parameterCount, parameterIndexToPositions, connection);
+    super(options, statement, sql, parameterCount, parameterIndexToPositions, connection);
     this.parameterFormatCodes = new ArrayList<>();
     this.resultFormatCodes = new ArrayList<>();
   }

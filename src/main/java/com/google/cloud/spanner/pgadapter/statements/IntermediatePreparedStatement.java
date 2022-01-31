@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.SQLMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
@@ -37,11 +38,12 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   protected final SetMultimap<Integer, Integer> parameterIndexToPositions;
   protected List<Integer> parameterDataTypes;
 
-  public IntermediatePreparedStatement(String sql, Connection connection) throws SQLException {
-    super(sql);
+  public IntermediatePreparedStatement(OptionsMetadata options, String sql, Connection connection)
+      throws SQLException {
+    super(options, sql);
     SQLMetadata parsedSQL = Converter.toJDBCParams(sql);
     this.parameterCount = parsedSQL.getParameterCount();
-    this.sql = replaceKnownUnsupportedTables(parsedSQL.getSqlString());
+    this.sql = replaceKnownUnsupportedQueries(parsedSQL.getSqlString());
     this.parameterIndexToPositions = parsedSQL.getParameterIndexToPositions();
     this.command = parseCommand(sql);
     this.connection = connection;
@@ -50,13 +52,14 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   }
 
   protected IntermediatePreparedStatement(
+      OptionsMetadata options,
       PreparedStatement statement,
       String sql,
       int totalParameters,
       SetMultimap<Integer, Integer> parameterIndexToPositions,
       Connection connection)
       throws SQLException {
-    super(sql, connection);
+    super(options, sql, connection);
     this.sql = sql;
     this.command = parseCommand(sql);
     this.parameterCount = totalParameters;
@@ -125,6 +128,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       throws SQLException {
     IntermediatePortalStatement portal =
         new IntermediatePortalStatement(
+            this.options,
             this.connection.prepareStatement(this.sql),
             this.sql,
             this.parameterCount,

@@ -81,7 +81,7 @@ public class StatementTest {
     Mockito.when(resultSet.next()).thenReturn(true);
 
     IntermediateStatement intermediateStatement =
-        new IntermediateStatement("SELECT * FROM users", connection);
+        new IntermediateStatement(mock(OptionsMetadata.class), "SELECT * FROM users", connection);
 
     Assert.assertFalse(intermediateStatement.isExecuted());
     Assert.assertEquals(intermediateStatement.getCommand(), "SELECT");
@@ -108,7 +108,10 @@ public class StatementTest {
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
 
     IntermediateStatement intermediateStatement =
-        new IntermediateStatement("UPDATE users SET name = someName WHERE id = 10", connection);
+        new IntermediateStatement(
+            mock(OptionsMetadata.class),
+            "UPDATE users SET name = someName WHERE id = 10",
+            connection);
 
     Assert.assertFalse(intermediateStatement.isExecuted());
     Assert.assertEquals(intermediateStatement.getCommand(), "UPDATE");
@@ -137,7 +140,10 @@ public class StatementTest {
     Mockito.when(statement.getUpdateCount()).thenReturn(0);
 
     IntermediateStatement intermediateStatement =
-        new IntermediateStatement("UPDATE users SET name = someName WHERE id = -1", connection);
+        new IntermediateStatement(
+            mock(OptionsMetadata.class),
+            "UPDATE users SET name = someName WHERE id = -1",
+            connection);
 
     Assert.assertFalse(intermediateStatement.isExecuted());
     Assert.assertEquals(intermediateStatement.getCommand(), "UPDATE");
@@ -165,7 +171,7 @@ public class StatementTest {
     Mockito.when(connection.createStatement()).thenReturn(statement);
 
     IntermediateStatement intermediateStatement =
-        new IntermediateStatement("SELECT * FROM users", connection);
+        new IntermediateStatement(mock(OptionsMetadata.class), "SELECT * FROM users", connection);
 
     intermediateStatement.describe();
   }
@@ -178,7 +184,7 @@ public class StatementTest {
     Mockito.when(statement.execute(ArgumentMatchers.anyString())).thenThrow(thrownException);
 
     IntermediateStatement intermediateStatement =
-        new IntermediateStatement("SELECT * FROM users", connection);
+        new IntermediateStatement(mock(OptionsMetadata.class), "SELECT * FROM users", connection);
 
     intermediateStatement.execute();
 
@@ -196,7 +202,7 @@ public class StatementTest {
     Mockito.when(preparedStatement.getResultSet()).thenReturn(mock(ResultSet.class));
 
     IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(sqlStatement, connection);
+        new IntermediatePreparedStatement(mock(OptionsMetadata.class), sqlStatement, connection);
     intermediateStatement.setParameterDataTypes(parameterDataTypes);
 
     String expectedSQL = "SELECT * FROM users WHERE age > ? AND age < ? AND name = ?";
@@ -234,7 +240,7 @@ public class StatementTest {
         .thenReturn(preparedStatement);
 
     IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(sqlStatement, connection);
+        new IntermediatePreparedStatement(mock(OptionsMetadata.class), sqlStatement, connection);
     intermediateStatement.setParameterDataTypes(parameterDataTypes);
 
     byte[][] parameters = {"{}".getBytes()};
@@ -250,7 +256,7 @@ public class StatementTest {
         .thenReturn(preparedStatement);
 
     IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(sqlStatement, connection);
+        new IntermediatePreparedStatement(mock(OptionsMetadata.class), sqlStatement, connection);
 
     intermediateStatement.describe();
   }
@@ -264,6 +270,7 @@ public class StatementTest {
 
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
+            mock(OptionsMetadata.class),
             preparedStatement,
             metadata.getSqlString(),
             metadata.getParameterCount(),
@@ -307,6 +314,7 @@ public class StatementTest {
 
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
+            mock(OptionsMetadata.class),
             preparedStatement,
             metadata.getSqlString(),
             metadata.getParameterCount(),
@@ -322,7 +330,8 @@ public class StatementTest {
   public void testBatchStatements() throws Exception {
     String sql =
         "INSERT INTO users (id) VALUES (1); INSERT INTO users (id) VALUES (2);INSERT INTO users (id) VALUES (3);";
-    IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement(mock(OptionsMetadata.class), sql, connection);
 
     Assert.assertTrue(intermediateStatement.isBatchedQuery());
     List<String> result = intermediateStatement.getStatements();
@@ -336,7 +345,8 @@ public class StatementTest {
   public void testAdditionalBatchStatements() throws Exception {
     String sql =
         "BEGIN TRANSACTION; INSERT INTO users (id) VALUES (1); INSERT INTO users (id) VALUES (2); INSERT INTO users (id) VALUES (3); COMMIT;";
-    IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement(mock(OptionsMetadata.class), sql, connection);
 
     Assert.assertTrue(intermediateStatement.isBatchedQuery());
     List<String> result = intermediateStatement.getStatements();
@@ -351,7 +361,8 @@ public class StatementTest {
   @Test
   public void testBatchStatementsWithEmptyStatements() throws Exception {
     String sql = "INSERT INTO users (id) VALUES (1); ;;; INSERT INTO users (id) VALUES (2);";
-    IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement(mock(OptionsMetadata.class), sql, connection);
 
     Assert.assertTrue(intermediateStatement.isBatchedQuery());
     List<String> result = intermediateStatement.getStatements();
@@ -364,7 +375,8 @@ public class StatementTest {
   public void testBatchStatementsWithQuotes() throws Exception {
     String sql =
         "INSERT INTO users (name) VALUES (';;test;;'); INSERT INTO users (name1, name2) VALUES ('''''', ';'';');";
-    IntermediateStatement intermediateStatement = new IntermediateStatement(sql, connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement(mock(OptionsMetadata.class), sql, connection);
 
     Assert.assertTrue(intermediateStatement.isBatchedQuery());
     List<String> result = intermediateStatement.getStatements();

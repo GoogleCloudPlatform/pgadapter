@@ -83,6 +83,7 @@ public final class ControlMessageTest {
             false,
             false,
             false,
+            false,
             commandMetadata);
     ProxyServer server = new ProxyServer(options);
     Mockito.when(connectionHandler.getServer()).thenReturn(server);

@@ -34,9 +34,12 @@ public class QueryMessage extends ControlMessage {
     super(connection);
     String query = StatementParser.removeCommentsAndTrim(this.readAll());
     if (!connection.getServer().getOptions().requiresMatcher()) {
-      this.statement = new IntermediateStatement(query, this.connection.getJdbcConnection());
+      this.statement =
+          new IntermediateStatement(
+              this.connection.getServer().getOptions(), query, this.connection.getJdbcConnection());
     } else {
-      this.statement = new MatcherStatement(query, this.connection);
+      this.statement =
+          new MatcherStatement(this.connection.getServer().getOptions(), query, this.connection);
     }
     this.connection.addActiveStatement(this.statement);
   }

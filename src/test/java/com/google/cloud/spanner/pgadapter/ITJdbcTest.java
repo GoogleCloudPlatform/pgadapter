@@ -104,6 +104,7 @@ public class ITJdbcTest implements IntegrationTest {
     ImmutableList.Builder<String> argsListBuilder =
         ImmutableList.<String>builder()
             .add(
+                "-jdbc",
                 "-p",
                 testEnv.getProjectId(),
                 "-i",

@@ -244,6 +244,8 @@ public class ProtocolTest {
 
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getServer()).thenReturn(server);
+    Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -303,6 +305,8 @@ public class ProtocolTest {
 
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getServer()).thenReturn(server);
+    Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -346,6 +350,8 @@ public class ProtocolTest {
 
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getServer()).thenReturn(server);
+    Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -392,6 +398,8 @@ public class ProtocolTest {
 
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getServer()).thenReturn(server);
+    Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -434,6 +442,8 @@ public class ProtocolTest {
 
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getServer()).thenReturn(server);
+    Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -479,6 +489,8 @@ public class ProtocolTest {
 
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getServer()).thenReturn(server);
+    Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
