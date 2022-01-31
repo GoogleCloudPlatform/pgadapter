@@ -2,8 +2,7 @@
 /* JavaCCOptions:MULTI=true,NODE_USES_PARSER=false,VISITOR=true,TRACK_TOKENS=false,NODE_PREFIX=AST,NODE_EXTENDS=,NODE_FACTORY=,SUPPORT_CLASS_VISIBILITY_PUBLIC=true */
 package com.google.cloud.spanner.pgadapter.parsers.copy;
 
-public
-class ASTColumnList extends SimpleNode {
+public class ASTColumnList extends SimpleNode {
   public ASTColumnList(int id) {
     super(id);
   }
@@ -12,12 +11,10 @@ class ASTColumnList extends SimpleNode {
     super(p, id);
   }
 
-
-  /** Accept the visitor. **/
+  /** Accept the visitor. * */
   public Object jjtAccept(CopyVisitor visitor, Object data) {
 
-    return
-    visitor.visit(this, data);
+    return visitor.visit(this, data);
   }
 }
 /* JavaCC - OriginalChecksum=64a3ab6ba9da679265cb690f98b3790d (do not edit this line) */

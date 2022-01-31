@@ -178,26 +178,36 @@ public class CopyTreeParser implements CopyVisitor {
 
   public Object visit(ASTCopyOptionElement node, Object data) {
     switch (node.getName()) {
-      case "DELIMITER": {
-        ASTSingleChar charNode = (ASTSingleChar) node.jjtGetChild(0);
-        options.setDelimiter(charNode.getChar());
-      } break;
-      case "NULL": {
-        ASTID idNode = (ASTID) node.jjtGetChild(0);
-        options.setNullString(idNode.getFormattedName());
-      } break;
-      case "HEADER": {
-        ASTBoolean boolNode = (ASTBoolean) node.jjtGetChild(0);
-        options.setHeader(boolNode.getBool());
-      } break;
-      case "QUOTE": {
-        ASTSingleChar charNode = (ASTSingleChar) node.jjtGetChild(0);
-        options.setQuote(charNode.getChar());
-      } break;
-      case "ESCAPE": {
-        ASTSingleChar charNode = (ASTSingleChar) node.jjtGetChild(0);
-        options.setEscape(charNode.getChar());
-      } break;
+      case "DELIMITER":
+        {
+          ASTSingleChar charNode = (ASTSingleChar) node.jjtGetChild(0);
+          options.setDelimiter(charNode.getChar());
+        }
+        break;
+      case "NULL":
+        {
+          ASTID idNode = (ASTID) node.jjtGetChild(0);
+          options.setNullString(idNode.getFormattedName());
+        }
+        break;
+      case "HEADER":
+        {
+          ASTBoolean boolNode = (ASTBoolean) node.jjtGetChild(0);
+          options.setHeader(boolNode.getBool());
+        }
+        break;
+      case "QUOTE":
+        {
+          ASTSingleChar charNode = (ASTSingleChar) node.jjtGetChild(0);
+          options.setQuote(charNode.getChar());
+        }
+        break;
+      case "ESCAPE":
+        {
+          ASTSingleChar charNode = (ASTSingleChar) node.jjtGetChild(0);
+          options.setEscape(charNode.getChar());
+        }
+        break;
       default:
         break;
     }

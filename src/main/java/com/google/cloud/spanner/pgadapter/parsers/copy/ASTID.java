@@ -16,8 +16,8 @@ public class ASTID extends SimpleNode {
   }
 
   public String getFormattedName() {
-    if(name.length() > 0 && (name.charAt(0) == '\'' || name.charAt(0) == '\"')) {
-      return name.substring(1, name.length()-1);
+    if (name.length() > 0 && (name.charAt(0) == '\'' || name.charAt(0) == '\"')) {
+      return name.substring(1, name.length() - 1);
     } else {
       return name.toLowerCase();
     }
@@ -26,5 +26,4 @@ public class ASTID extends SimpleNode {
   public String toString() {
     return "Identifier: " + name;
   }
-
 }

@@ -23,7 +23,7 @@ public class ASTColumnElement extends SimpleNode {
     return "Column Element: " + name;
   }
 
-  /** Accept the visitor. **/
+  /** Accept the visitor. * */
   public Object jjtAccept(CopyVisitor visitor, Object data) {
     return visitor.visit(this, data);
   }

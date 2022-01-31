@@ -23,7 +23,7 @@ public class ASTCopyDirection extends SimpleNode {
     return "Copy Direction: " + direction.toString();
   }
 
-  /** Accept the visitor. **/
+  /** Accept the visitor. * */
   public Object jjtAccept(CopyVisitor visitor, Object data) {
     return visitor.visit(this, data);
   }
