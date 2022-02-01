@@ -154,16 +154,20 @@ public class CopyTreeParser implements CopyVisitor {
   }
 
   public Object visit(ASTQualifiedName node, Object data) {
-    if (node.jjtGetNumChildren() > 1) {
-      // namespace.table
-      ASTID namespaceNode = (ASTID) node.jjtGetChild(0);
-      ASTID idNode = (ASTID) node.jjtGetChild(1);
-      options.setTableName(namespaceNode.getName() + "." + idNode.getName());
-    } else {
-      // table
-      ASTID idNode = (ASTID) node.jjtGetChild(0);
-      options.setTableName(idNode.getName());
+    // Zero or more namespaces can prefix the identifier.
+    // (<namespace>.)*table
+    String prefix = "";
+    ASTNamespace currentNode = (ASTNamespace) node.jjtGetChild(0);
+    while (currentNode.jjtGetNumChildren() > 1) {
+      prefix += (((ASTID) currentNode.jjtGetChild(0)).getName() + ".");
+      currentNode = (ASTNamespace) currentNode.jjtGetChild(1);
     }
+    options.setTableName(prefix + ((ASTID) currentNode.jjtGetChild(0)).getName());
+    data = node.childrenAccept(this, data);
+    return data;
+  }
+
+  public Object visit(ASTNamespace node, Object data) {
     data = node.childrenAccept(this, data);
     return data;
   }

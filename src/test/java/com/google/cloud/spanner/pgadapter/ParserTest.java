@@ -36,7 +36,7 @@ import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.FromTo;
-import com.google.cloud.spanner.pgadapter.parsers.copy.ParseException;
+import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import java.sql.Array;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -671,14 +671,24 @@ public class ParserTest {
 
     {
       CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY one.two.three.users FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("one.two.three.users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
       String sql = "COPY public.\'users\" FROM STDIN;";
-      assertThrows(ParseException.class, () -> parse(sql, options));
+      assertThrows(TokenMgrError.class, () -> parse(sql, options));
     }
 
     {
       CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
       String sql = "COPY \"public.users\" FROM STDIN;";
-      assertThrows(ParseException.class, () -> parse(sql, options));
+      assertThrows(TokenMgrError.class, () -> parse(sql, options));
     }
   }
 

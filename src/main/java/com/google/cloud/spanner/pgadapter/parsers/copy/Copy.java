@@ -27,7 +27,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     jjtree.openNodeScope(jjtn000);
     try {
       Expression();
-      jj_consume_token(41);
+      jj_consume_token(37);
       jjtree.closeNodeScope(jjtn000, true);
       jjtc000 = false;
       {
@@ -107,21 +107,55 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     }
   }
 
-  /** Qualified Name. */
+  /** Qualified Name. Zero or more namespaces qualifiers can prefix the name. */
   public final void qualifiedName() throws ParseException {
     /*@bgen(jjtree) QualifiedName */
     ASTQualifiedName jjtn000 = new ASTQualifiedName(JJTQUALIFIEDNAME);
     boolean jjtc000 = true;
     jjtree.openNodeScope(jjtn000);
     try {
-      if (jj_2_1(3)) {
-        namespace();
-        jj_consume_token(K_DOT);
+      namespace();
+    } catch (Throwable jjte000) {
+      if (jjtc000) {
+        jjtree.clearNodeScope(jjtn000);
+        jjtc000 = false;
+      } else {
+        jjtree.popNode();
+      }
+      if (jjte000 instanceof RuntimeException) {
+        {
+          if (true) throw (RuntimeException) jjte000;
+        }
+      }
+      if (jjte000 instanceof ParseException) {
+        {
+          if (true) throw (ParseException) jjte000;
+        }
+      }
+      {
+        if (true) throw (Error) jjte000;
+      }
+    } finally {
+      if (jjtc000) {
+        jjtree.closeNodeScope(jjtn000, true);
+      }
+    }
+  }
+
+  public final void namespace() throws ParseException {
+    /*@bgen(jjtree) Namespace */
+    ASTNamespace jjtn000 = new ASTNamespace(JJTNAMESPACE);
+    boolean jjtc000 = true;
+    jjtree.openNodeScope(jjtn000);
+    try {
+      if (jj_2_1(2)) {
         identifier();
-      } else if (jj_2_2(3)) {
+        jj_consume_token(38);
         namespace();
-        jj_consume_token(K_DOT);
+      } else if (jj_2_2(2)) {
         quotedIdentifier();
+        jj_consume_token(38);
+        namespace();
       } else {
         switch ((jj_ntk == -1) ? jj_ntk_f() : jj_ntk) {
           case IDENTIFIER:
@@ -167,31 +201,12 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     }
   }
 
-  public final void namespace() throws ParseException {
-    switch ((jj_ntk == -1) ? jj_ntk_f() : jj_ntk) {
-      case IDENTIFIER:
-        {
-          identifier();
-          break;
-        }
-      case QUOTED_IDENTIFIER:
-        {
-          quotedIdentifier();
-          break;
-        }
-      default:
-        jj_la1[1] = jj_gen;
-        jj_consume_token(-1);
-        throw new ParseException();
-    }
-  }
-
   /** Optional Column List */
   public final void optColumnList() throws ParseException {
     if (jj_2_3(2)) {
-      jj_consume_token(42);
+      jj_consume_token(39);
       columnList();
-      jj_consume_token(43);
+      jj_consume_token(40);
     } else {
 
     }
@@ -206,7 +221,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     try {
       if (jj_2_4(2)) {
         columnElem();
-        jj_consume_token(K_COMMA);
+        jj_consume_token(41);
         columnList();
       } else {
         switch ((jj_ntk == -1) ? jj_ntk_f() : jj_ntk) {
@@ -217,7 +232,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
               break;
             }
           default:
-            jj_la1[2] = jj_gen;
+            jj_la1[1] = jj_gen;
             jj_consume_token(-1);
             throw new ParseException();
         }
@@ -268,7 +283,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
             break;
           }
         default:
-          jj_la1[3] = jj_gen;
+          jj_la1[2] = jj_gen;
           jj_consume_token(-1);
           throw new ParseException();
       }
@@ -327,7 +342,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
             break;
           }
         default:
-          jj_la1[4] = jj_gen;
+          jj_la1[3] = jj_gen;
           jj_consume_token(-1);
           throw new ParseException();
       }
@@ -368,7 +383,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
             break;
           }
         default:
-          jj_la1[5] = jj_gen;
+          jj_la1[4] = jj_gen;
           jj_consume_token(-1);
           throw new ParseException();
       }
@@ -408,7 +423,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
           break;
         }
       default:
-        jj_la1[6] = jj_gen;
+        jj_la1[5] = jj_gen;
     }
   }
 
@@ -420,9 +435,9 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     jjtree.openNodeScope(jjtn000);
     try {
       if (jj_2_5(2)) {
-        jj_consume_token(42);
+        jj_consume_token(39);
         copyOptionList();
-        jj_consume_token(43);
+        jj_consume_token(40);
       } else {
         copyOptionList();
       }
@@ -480,7 +495,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
             break;
           }
         default:
-          jj_la1[7] = jj_gen;
+          jj_la1[6] = jj_gen;
           jjtree.closeNodeScope(jjtn000, true);
           jjtc000 = false;
       }
@@ -594,12 +609,12 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
             break;
           }
         default:
-          jj_la1[8] = jj_gen;
+          jj_la1[7] = jj_gen;
           if (jj_2_6(3)) {
             jj_consume_token(O_FORCE_QUOTE);
-            jj_consume_token(42);
+            jj_consume_token(39);
             columnList();
-            jj_consume_token(43);
+            jj_consume_token(40);
             jjtree.closeNodeScope(jjtn000, true);
             jjtc000 = false;
             jjtn000.setName("FORCE_QUOTE");
@@ -608,9 +623,9 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
             }
           } else if (jj_2_7(3)) {
             jj_consume_token(O_FORCE_NOT_NULL);
-            jj_consume_token(42);
+            jj_consume_token(39);
             columnList();
-            jj_consume_token(43);
+            jj_consume_token(40);
             jjtree.closeNodeScope(jjtn000, true);
             jjtc000 = false;
             jjtn000.setName("FORCE_NOT_NULL");
@@ -619,9 +634,9 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
             }
           } else if (jj_2_8(3)) {
             jj_consume_token(O_FORCE_NULL);
-            jj_consume_token(42);
+            jj_consume_token(39);
             columnList();
-            jj_consume_token(43);
+            jj_consume_token(40);
             jjtree.closeNodeScope(jjtn000, true);
             jjtc000 = false;
             jjtn000.setName("FORCE_NULL");
@@ -643,7 +658,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
                   break;
                 }
               default:
-                jj_la1[9] = jj_gen;
+                jj_la1[8] = jj_gen;
                 jj_consume_token(-1);
                 throw new ParseException();
             }
@@ -708,7 +723,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
             break;
           }
         default:
-          jj_la1[10] = jj_gen;
+          jj_la1[9] = jj_gen;
           jj_consume_token(-1);
           throw new ParseException();
       }
@@ -798,7 +813,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
             break;
           }
         default:
-          jj_la1[11] = jj_gen;
+          jj_la1[10] = jj_gen;
           jj_consume_token(-1);
           throw new ParseException();
       }
@@ -905,154 +920,169 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     }
   }
 
-  private boolean jj_3_3() {
-    if (jj_scan_token(42)) return true;
-    if (jj_3R_columnList_145_3_4()) return true;
+  private boolean jj_3_4() {
+    if (jj_3R_columnElem_144_3_4()) return true;
+    if (jj_scan_token(41)) return true;
     return false;
   }
 
-  private boolean jj_3R_quotedIdentifier_276_3_3() {
+  private boolean jj_3R_columnList_136_3_3() {
+    Token xsp;
+    xsp = jj_scanpos;
+    if (jj_3_4()) {
+      jj_scanpos = xsp;
+      if (jj_3R_columnList_138_5_6()) return true;
+    }
+    return false;
+  }
+
+  private boolean jj_3_8() {
+    if (jj_scan_token(O_FORCE_NULL)) return true;
+    if (jj_scan_token(39)) return true;
+    if (jj_3R_columnList_136_3_3()) return true;
+    return false;
+  }
+
+  private boolean jj_3_5() {
+    if (jj_scan_token(39)) return true;
+    if (jj_3R_copyOptionList_185_3_5()) return true;
+    if (jj_scan_token(40)) return true;
+    return false;
+  }
+
+  private boolean jj_3_7() {
+    if (jj_scan_token(O_FORCE_NOT_NULL)) return true;
+    if (jj_scan_token(39)) return true;
+    if (jj_3R_columnList_136_3_3()) return true;
+    return false;
+  }
+
+  private boolean jj_3_3() {
+    if (jj_scan_token(39)) return true;
+    if (jj_3R_columnList_136_3_3()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_quotedIdentifier_267_3_2() {
     if (jj_scan_token(QUOTED_IDENTIFIER)) return true;
     return false;
   }
 
   private boolean jj_3_6() {
     if (jj_scan_token(O_FORCE_QUOTE)) return true;
-    if (jj_scan_token(42)) return true;
-    if (jj_3R_columnList_145_3_4()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_namespace_131_5_8() {
-    if (jj_3R_quotedIdentifier_276_3_3()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_copyOptionElement_222_5_22() {
-    if (jj_scan_token(O_ESCAPE)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_namespace_130_3_1() {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3R_namespace_130_3_7()) {
-      jj_scanpos = xsp;
-      if (jj_3R_namespace_131_5_8()) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3R_namespace_130_3_7() {
-    if (jj_3R_identifier_265_3_2()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_copyOptionElement_219_5_21() {
-    if (jj_scan_token(O_QUOTE)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_copyOptionElement_216_5_20() {
-    if (jj_scan_token(O_HEADER)) return true;
-    return false;
-  }
-
-  private boolean jj_3_2() {
-    if (jj_3R_namespace_130_3_1()) return true;
-    if (jj_scan_token(K_DOT)) return true;
-    if (jj_3R_quotedIdentifier_276_3_3()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_identifier_265_3_2() {
-    if (jj_scan_token(IDENTIFIER)) return true;
+    if (jj_scan_token(39)) return true;
+    if (jj_3R_columnList_136_3_3()) return true;
     return false;
   }
 
   private boolean jj_3R_copyOptionElement_213_5_19() {
-    if (jj_scan_token(O_NULL)) return true;
+    if (jj_scan_token(O_ESCAPE)) return true;
+    return false;
+  }
+
+  private boolean jj_3_2() {
+    if (jj_3R_quotedIdentifier_267_3_2()) return true;
+    if (jj_scan_token(38)) return true;
     return false;
   }
 
   private boolean jj_3_1() {
-    if (jj_3R_namespace_130_3_1()) return true;
-    if (jj_scan_token(K_DOT)) return true;
-    if (jj_3R_identifier_265_3_2()) return true;
+    if (jj_3R_identifier_256_3_1()) return true;
+    if (jj_scan_token(38)) return true;
     return false;
   }
 
   private boolean jj_3R_copyOptionElement_210_5_18() {
+    if (jj_scan_token(O_QUOTE)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_copyOptionElement_207_5_17() {
+    if (jj_scan_token(O_HEADER)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_identifier_256_3_1() {
+    if (jj_scan_token(IDENTIFIER)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_copyOptionElement_204_5_16() {
+    if (jj_scan_token(O_NULL)) return true;
+    return false;
+  }
+
+  private boolean jj_3R_copyOptionElement_201_5_15() {
     if (jj_scan_token(O_DELIMITER)) return true;
     return false;
   }
 
-  private boolean jj_3R_formatType_254_5_27() {
+  private boolean jj_3R_formatType_245_5_24() {
     if (jj_scan_token(O_CSV)) return true;
     return false;
   }
 
-  private boolean jj_3R_copyOptionElement_206_5_17() {
+  private boolean jj_3R_copyOptionElement_197_5_14() {
     if (jj_scan_token(O_FREEZE)) return true;
     return false;
   }
 
-  private boolean jj_3R_formatType_251_5_26() {
+  private boolean jj_3R_formatType_242_5_23() {
     if (jj_scan_token(O_BINARY)) return true;
     return false;
   }
 
-  private boolean jj_3R_copyOptionElement_203_5_16() {
-    if (jj_3R_formatType_248_5_24()) return true;
+  private boolean jj_3R_copyOptionElement_194_5_13() {
+    if (jj_3R_formatType_239_5_21()) return true;
     return false;
   }
 
-  private boolean jj_3R_formatType_248_5_25() {
+  private boolean jj_3R_formatType_239_5_22() {
     if (jj_scan_token(O_TEXT)) return true;
     return false;
   }
 
-  private boolean jj_3R_formatType_248_5_24() {
+  private boolean jj_3R_formatType_239_5_21() {
     Token xsp;
     xsp = jj_scanpos;
-    if (jj_3R_formatType_248_5_25()) {
+    if (jj_3R_formatType_239_5_22()) {
       jj_scanpos = xsp;
-      if (jj_3R_formatType_251_5_26()) {
+      if (jj_3R_formatType_242_5_23()) {
         jj_scanpos = xsp;
-        if (jj_3R_formatType_254_5_27()) return true;
+        if (jj_3R_formatType_245_5_24()) return true;
       }
     }
     return false;
   }
 
-  private boolean jj_3R_columnElem_154_5_11() {
-    if (jj_3R_quotedIdentifier_276_3_3()) return true;
+  private boolean jj_3R_columnElem_145_5_8() {
+    if (jj_3R_quotedIdentifier_267_3_2()) return true;
     return false;
   }
 
-  private boolean jj_3R_copyOptionElement_200_5_15() {
+  private boolean jj_3R_copyOptionElement_191_5_12() {
     if (jj_scan_token(O_FORMAT)) return true;
     return false;
   }
 
-  private boolean jj_3R_copyOptionElement_200_5_14() {
+  private boolean jj_3R_copyOptionElement_191_5_11() {
     Token xsp;
     xsp = jj_scanpos;
-    if (jj_3R_copyOptionElement_200_5_15()) {
+    if (jj_3R_copyOptionElement_191_5_12()) {
       jj_scanpos = xsp;
-      if (jj_3R_copyOptionElement_203_5_16()) {
+      if (jj_3R_copyOptionElement_194_5_13()) {
         jj_scanpos = xsp;
-        if (jj_3R_copyOptionElement_206_5_17()) {
+        if (jj_3R_copyOptionElement_197_5_14()) {
           jj_scanpos = xsp;
-          if (jj_3R_copyOptionElement_210_5_18()) {
+          if (jj_3R_copyOptionElement_201_5_15()) {
             jj_scanpos = xsp;
-            if (jj_3R_copyOptionElement_213_5_19()) {
+            if (jj_3R_copyOptionElement_204_5_16()) {
               jj_scanpos = xsp;
-              if (jj_3R_copyOptionElement_216_5_20()) {
+              if (jj_3R_copyOptionElement_207_5_17()) {
                 jj_scanpos = xsp;
-                if (jj_3R_copyOptionElement_219_5_21()) {
+                if (jj_3R_copyOptionElement_210_5_18()) {
                   jj_scanpos = xsp;
-                  if (jj_3R_copyOptionElement_222_5_22()) {
+                  if (jj_3R_copyOptionElement_213_5_19()) {
                     jj_scanpos = xsp;
                     if (jj_3_6()) {
                       jj_scanpos = xsp;
@@ -1060,7 +1090,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
                         jj_scanpos = xsp;
                         if (jj_3_8()) {
                           jj_scanpos = xsp;
-                          if (jj_3R_copyOptionElement_240_5_23()) return true;
+                          if (jj_3R_copyOptionElement_231_5_20()) return true;
                         }
                       }
                     }
@@ -1075,84 +1105,47 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     return false;
   }
 
-  private boolean jj_3R_columnElem_153_3_10() {
-    if (jj_3R_identifier_265_3_2()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_columnElem_153_3_5() {
+  private boolean jj_3R_columnElem_144_3_4() {
     Token xsp;
     xsp = jj_scanpos;
-    if (jj_3R_columnElem_153_3_10()) {
+    if (jj_3R_columnElem_144_3_7()) {
       jj_scanpos = xsp;
-      if (jj_3R_columnElem_154_5_11()) return true;
+      if (jj_3R_columnElem_145_5_8()) return true;
     }
     return false;
   }
 
-  private boolean jj_3R_copyOptionList_196_5_13() {
+  private boolean jj_3R_columnElem_144_3_7() {
+    if (jj_3R_identifier_256_3_1()) return true;
     return false;
   }
 
-  private boolean jj_3R_columnList_147_5_9() {
-    if (jj_3R_columnElem_153_3_5()) return true;
+  private boolean jj_3R_copyOptionList_187_5_10() {
     return false;
   }
 
-  private boolean jj_3R_copyOptionElement_240_5_23() {
+  private boolean jj_3R_columnList_138_5_6() {
+    if (jj_3R_columnElem_144_3_4()) return true;
+    return false;
+  }
+
+  private boolean jj_3R_copyOptionElement_231_5_20() {
     if (jj_scan_token(O_ENCODING)) return true;
     return false;
   }
 
-  private boolean jj_3R_copyOptionList_194_3_12() {
-    if (jj_3R_copyOptionElement_200_5_14()) return true;
-    return false;
-  }
-
-  private boolean jj_3R_copyOptionList_194_3_6() {
+  private boolean jj_3R_copyOptionList_185_3_5() {
     Token xsp;
     xsp = jj_scanpos;
-    if (jj_3R_copyOptionList_194_3_12()) {
+    if (jj_3R_copyOptionList_185_3_9()) {
       jj_scanpos = xsp;
-      if (jj_3R_copyOptionList_196_5_13()) return true;
+      if (jj_3R_copyOptionList_187_5_10()) return true;
     }
     return false;
   }
 
-  private boolean jj_3_4() {
-    if (jj_3R_columnElem_153_3_5()) return true;
-    if (jj_scan_token(K_COMMA)) return true;
-    return false;
-  }
-
-  private boolean jj_3R_columnList_145_3_4() {
-    Token xsp;
-    xsp = jj_scanpos;
-    if (jj_3_4()) {
-      jj_scanpos = xsp;
-      if (jj_3R_columnList_147_5_9()) return true;
-    }
-    return false;
-  }
-
-  private boolean jj_3_8() {
-    if (jj_scan_token(O_FORCE_NULL)) return true;
-    if (jj_scan_token(42)) return true;
-    if (jj_3R_columnList_145_3_4()) return true;
-    return false;
-  }
-
-  private boolean jj_3_5() {
-    if (jj_scan_token(42)) return true;
-    if (jj_3R_copyOptionList_194_3_6()) return true;
-    if (jj_scan_token(43)) return true;
-    return false;
-  }
-
-  private boolean jj_3_7() {
-    if (jj_scan_token(O_FORCE_NOT_NULL)) return true;
-    if (jj_scan_token(42)) return true;
-    if (jj_3R_columnList_145_3_4()) return true;
+  private boolean jj_3R_copyOptionList_185_3_9() {
+    if (jj_3R_copyOptionElement_191_5_11()) return true;
     return false;
   }
 
@@ -1169,7 +1162,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
   private Token jj_scanpos, jj_lastpos;
   private int jj_la;
   private int jj_gen;
-  private final int[] jj_la1 = new int[12];
+  private final int[] jj_la1 = new int[11];
   private static int[] jj_la1_0;
   private static int[] jj_la1_1;
 
@@ -1181,25 +1174,24 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
   private static void jj_la1_init_0() {
     jj_la1_0 =
         new int[] {
-          0x0,
-          0x0,
-          0x0,
-          0x0,
+          0x60000000,
+          0x60000000,
+          0x60000000,
           0x600,
-          0x180,
+          0x40000180,
           0x1000,
-          0x7ffe0000,
-          0x7fe0000,
-          0x40000000,
-          0xe0000,
-          0x80000000,
+          0x7ffe000,
+          0x7fe000,
+          0x4000000,
+          0xe000,
+          0x18000000,
         };
   }
 
   private static void jj_la1_init_1() {
     jj_la1_1 =
         new int[] {
-          0x6, 0x6, 0x6, 0x6, 0x0, 0x4, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+          0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
         };
   }
 
@@ -1222,7 +1214,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 12; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 11; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -1242,7 +1234,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     jj_ntk = -1;
     jjtree.reset();
     jj_gen = 0;
-    for (int i = 0; i < 12; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 11; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -1253,7 +1245,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 12; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 11; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -1273,7 +1265,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     jj_ntk = -1;
     jjtree.reset();
     jj_gen = 0;
-    for (int i = 0; i < 12; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 11; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -1283,7 +1275,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     token = new Token();
     jj_ntk = -1;
     jj_gen = 0;
-    for (int i = 0; i < 12; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 11; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -1294,7 +1286,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
     jj_ntk = -1;
     jjtree.reset();
     jj_gen = 0;
-    for (int i = 0; i < 12; i++) jj_la1[i] = -1;
+    for (int i = 0; i < 11; i++) jj_la1[i] = -1;
     for (int i = 0; i < jj_2_rtns.length; i++) jj_2_rtns[i] = new JJCalls();
   }
 
@@ -1428,12 +1420,12 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
   /** Generate ParseException. */
   public ParseException generateParseException() {
     jj_expentries.clear();
-    boolean[] la1tokens = new boolean[44];
+    boolean[] la1tokens = new boolean[42];
     if (jj_kind >= 0) {
       la1tokens[jj_kind] = true;
       jj_kind = -1;
     }
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < 11; i++) {
       if (jj_la1[i] == jj_gen) {
         for (int j = 0; j < 32; j++) {
           if ((jj_la1_0[i] & (1 << j)) != 0) {
@@ -1445,7 +1437,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
         }
       }
     }
-    for (int i = 0; i < 44; i++) {
+    for (int i = 0; i < 42; i++) {
       if (la1tokens[i]) {
         jj_expentry = new int[1];
         jj_expentry[0] = i;

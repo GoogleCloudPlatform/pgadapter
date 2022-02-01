@@ -48,14 +48,6 @@ TOKEN [IGNORE_CASE] : /* KEYWORDS */
 | <K_WITH: "WITH">
 }
 
-TOKEN : /* SPECIAL CHARACTERS */
-{
-  <K_COMMA: ",">
-| <K_DOT: ".">
-| <K_QUOTE: "'">
-| <K_DOUBLEQUOTE: "\"">
-}
-
 TOKEN [IGNORE_CASE] : /* COPY OPTIONS */
 {
   <O_BINARY: "BINARY">
@@ -114,20 +106,19 @@ void CopyStmt() #CopyStatement : {}
   <K_COPY> qualifiedName() optColumnList() copyFrom() copyFileName() optWith() copyOptions()
 }
 
-/** Qualified Name. */
+/** Qualified Name. Zero or more namespaces qualifiers can prefix the name. */
 void qualifiedName() #QualifiedName : {}
 {
-  LOOKAHEAD(3)
-  namespace() <K_DOT> identifier()
-  | LOOKAHEAD(3)
-    namespace() <K_DOT> quotedIdentifier()
-  | identifier()
-  | quotedIdentifier()
+  namespace()
 }
 
-void namespace() : {}
+void namespace() #Namespace : {}
 {
-  identifier()
+    LOOKAHEAD(2)
+    identifier() "." namespace()
+  | LOOKAHEAD(2)
+    quotedIdentifier() "." namespace()
+  | identifier()
   | quotedIdentifier()
 }
 
@@ -143,7 +134,7 @@ void optColumnList() : {}
 void columnList() #ColumnList : {}
 {
   LOOKAHEAD(2)
-  columnElem() <K_COMMA> columnList()
+  columnElem() "," columnList()
   | columnElem()
 }
 

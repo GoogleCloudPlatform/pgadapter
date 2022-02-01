@@ -32,69 +32,63 @@ public class CopyTokenManager implements CopyConstants {
       case 32:
         jjmatchedKind = 1;
         return jjMoveNfa_0(0, 0);
-      case 34:
-        jjmatchedKind = 16;
-        return jjMoveNfa_0(0, 0);
-      case 39:
-        jjmatchedKind = 15;
-        return jjMoveNfa_0(0, 0);
       case 40:
-        jjmatchedKind = 42;
+        jjmatchedKind = 39;
         return jjMoveNfa_0(0, 0);
       case 41:
-        jjmatchedKind = 43;
+        jjmatchedKind = 40;
         return jjMoveNfa_0(0, 0);
       case 44:
-        jjmatchedKind = 13;
-        return jjMoveNfa_0(0, 0);
-      case 46:
-        jjmatchedKind = 14;
-        return jjMoveNfa_0(0, 0);
-      case 59:
         jjmatchedKind = 41;
         return jjMoveNfa_0(0, 0);
+      case 46:
+        jjmatchedKind = 38;
+        return jjMoveNfa_0(0, 0);
+      case 59:
+        jjmatchedKind = 37;
+        return jjMoveNfa_0(0, 0);
       case 66:
-        return jjMoveStringLiteralDfa1_0(0x20000L);
+        return jjMoveStringLiteralDfa1_0(0x2000L);
       case 67:
-        return jjMoveStringLiteralDfa1_0(0x40800L);
+        return jjMoveStringLiteralDfa1_0(0x4800L);
       case 68:
-        return jjMoveStringLiteralDfa1_0(0x400000L);
+        return jjMoveStringLiteralDfa1_0(0x40000L);
       case 69:
-        return jjMoveStringLiteralDfa1_0(0x44000000L);
+        return jjMoveStringLiteralDfa1_0(0x4400000L);
       case 70:
-        return jjMoveStringLiteralDfa1_0(0x138300400L);
+        return jjMoveStringLiteralDfa1_0(0x13830400L);
       case 72:
-        return jjMoveStringLiteralDfa1_0(0x1000000L);
+        return jjMoveStringLiteralDfa1_0(0x100000L);
       case 78:
-        return jjMoveStringLiteralDfa1_0(0x800000L);
+        return jjMoveStringLiteralDfa1_0(0x80000L);
       case 81:
-        return jjMoveStringLiteralDfa1_0(0x2000000L);
+        return jjMoveStringLiteralDfa1_0(0x200000L);
       case 83:
         return jjMoveStringLiteralDfa1_0(0x180L);
       case 84:
-        return jjMoveStringLiteralDfa1_0(0x80080200L);
+        return jjMoveStringLiteralDfa1_0(0x8008200L);
       case 87:
         return jjMoveStringLiteralDfa1_0(0x1000L);
       case 98:
-        return jjMoveStringLiteralDfa1_0(0x20000L);
+        return jjMoveStringLiteralDfa1_0(0x2000L);
       case 99:
-        return jjMoveStringLiteralDfa1_0(0x40800L);
+        return jjMoveStringLiteralDfa1_0(0x4800L);
       case 100:
-        return jjMoveStringLiteralDfa1_0(0x400000L);
+        return jjMoveStringLiteralDfa1_0(0x40000L);
       case 101:
-        return jjMoveStringLiteralDfa1_0(0x44000000L);
+        return jjMoveStringLiteralDfa1_0(0x4400000L);
       case 102:
-        return jjMoveStringLiteralDfa1_0(0x138300400L);
+        return jjMoveStringLiteralDfa1_0(0x13830400L);
       case 104:
-        return jjMoveStringLiteralDfa1_0(0x1000000L);
+        return jjMoveStringLiteralDfa1_0(0x100000L);
       case 110:
-        return jjMoveStringLiteralDfa1_0(0x800000L);
+        return jjMoveStringLiteralDfa1_0(0x80000L);
       case 113:
-        return jjMoveStringLiteralDfa1_0(0x2000000L);
+        return jjMoveStringLiteralDfa1_0(0x200000L);
       case 115:
         return jjMoveStringLiteralDfa1_0(0x180L);
       case 116:
-        return jjMoveStringLiteralDfa1_0(0x80080200L);
+        return jjMoveStringLiteralDfa1_0(0x8008200L);
       case 119:
         return jjMoveStringLiteralDfa1_0(0x1000L);
       default:
@@ -110,49 +104,49 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 65:
-        return jjMoveStringLiteralDfa2_0(active0, 0x100000000L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x10000000L);
       case 69:
-        return jjMoveStringLiteralDfa2_0(active0, 0x1480000L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x148000L);
       case 73:
-        return jjMoveStringLiteralDfa2_0(active0, 0x21000L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x3000L);
       case 78:
-        return jjMoveStringLiteralDfa2_0(active0, 0x40000000L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x4000000L);
       case 79:
         if ((active0 & 0x200L) != 0L) {
           jjmatchedKind = 9;
           jjmatchedPos = 1;
         }
-        return jjMoveStringLiteralDfa2_0(active0, 0x38100800L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x3810800L);
       case 82:
-        return jjMoveStringLiteralDfa2_0(active0, 0x80200400L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x8020400L);
       case 83:
-        return jjMoveStringLiteralDfa2_0(active0, 0x4040000L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x404000L);
       case 84:
         return jjMoveStringLiteralDfa2_0(active0, 0x180L);
       case 85:
-        return jjMoveStringLiteralDfa2_0(active0, 0x2800000L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x280000L);
       case 97:
-        return jjMoveStringLiteralDfa2_0(active0, 0x100000000L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x10000000L);
       case 101:
-        return jjMoveStringLiteralDfa2_0(active0, 0x1480000L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x148000L);
       case 105:
-        return jjMoveStringLiteralDfa2_0(active0, 0x21000L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x3000L);
       case 110:
-        return jjMoveStringLiteralDfa2_0(active0, 0x40000000L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x4000000L);
       case 111:
         if ((active0 & 0x200L) != 0L) {
           jjmatchedKind = 9;
           jjmatchedPos = 1;
         }
-        return jjMoveStringLiteralDfa2_0(active0, 0x38100800L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x3810800L);
       case 114:
-        return jjMoveStringLiteralDfa2_0(active0, 0x80200400L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x8020400L);
       case 115:
-        return jjMoveStringLiteralDfa2_0(active0, 0x4040000L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x404000L);
       case 116:
         return jjMoveStringLiteralDfa2_0(active0, 0x180L);
       case 117:
-        return jjMoveStringLiteralDfa2_0(active0, 0x2800000L);
+        return jjMoveStringLiteralDfa2_0(active0, 0x280000L);
       default:
         break;
     }
@@ -168,65 +162,65 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 65:
-        return jjMoveStringLiteralDfa3_0(active0, 0x1000000L);
+        return jjMoveStringLiteralDfa3_0(active0, 0x100000L);
       case 67:
-        return jjMoveStringLiteralDfa3_0(active0, 0x44000000L);
+        return jjMoveStringLiteralDfa3_0(active0, 0x4400000L);
       case 68:
         return jjMoveStringLiteralDfa3_0(active0, 0x180L);
       case 69:
-        return jjMoveStringLiteralDfa3_0(active0, 0x200000L);
-      case 76:
-        return jjMoveStringLiteralDfa3_0(active0, 0x100c00000L);
-      case 78:
         return jjMoveStringLiteralDfa3_0(active0, 0x20000L);
+      case 76:
+        return jjMoveStringLiteralDfa3_0(active0, 0x100c0000L);
+      case 78:
+        return jjMoveStringLiteralDfa3_0(active0, 0x2000L);
       case 79:
-        return jjMoveStringLiteralDfa3_0(active0, 0x2000400L);
+        return jjMoveStringLiteralDfa3_0(active0, 0x200400L);
       case 80:
         return jjMoveStringLiteralDfa3_0(active0, 0x800L);
       case 82:
-        return jjMoveStringLiteralDfa3_0(active0, 0x38100000L);
+        return jjMoveStringLiteralDfa3_0(active0, 0x3810000L);
       case 84:
         return jjMoveStringLiteralDfa3_0(active0, 0x1000L);
       case 85:
-        return jjMoveStringLiteralDfa3_0(active0, 0x80000000L);
+        return jjMoveStringLiteralDfa3_0(active0, 0x8000000L);
       case 86:
-        if ((active0 & 0x40000L) != 0L) {
-          jjmatchedKind = 18;
+        if ((active0 & 0x4000L) != 0L) {
+          jjmatchedKind = 14;
           jjmatchedPos = 2;
         }
         break;
       case 88:
-        return jjMoveStringLiteralDfa3_0(active0, 0x80000L);
+        return jjMoveStringLiteralDfa3_0(active0, 0x8000L);
       case 97:
-        return jjMoveStringLiteralDfa3_0(active0, 0x1000000L);
+        return jjMoveStringLiteralDfa3_0(active0, 0x100000L);
       case 99:
-        return jjMoveStringLiteralDfa3_0(active0, 0x44000000L);
+        return jjMoveStringLiteralDfa3_0(active0, 0x4400000L);
       case 100:
         return jjMoveStringLiteralDfa3_0(active0, 0x180L);
       case 101:
-        return jjMoveStringLiteralDfa3_0(active0, 0x200000L);
-      case 108:
-        return jjMoveStringLiteralDfa3_0(active0, 0x100c00000L);
-      case 110:
         return jjMoveStringLiteralDfa3_0(active0, 0x20000L);
+      case 108:
+        return jjMoveStringLiteralDfa3_0(active0, 0x100c0000L);
+      case 110:
+        return jjMoveStringLiteralDfa3_0(active0, 0x2000L);
       case 111:
-        return jjMoveStringLiteralDfa3_0(active0, 0x2000400L);
+        return jjMoveStringLiteralDfa3_0(active0, 0x200400L);
       case 112:
         return jjMoveStringLiteralDfa3_0(active0, 0x800L);
       case 114:
-        return jjMoveStringLiteralDfa3_0(active0, 0x38100000L);
+        return jjMoveStringLiteralDfa3_0(active0, 0x3810000L);
       case 116:
         return jjMoveStringLiteralDfa3_0(active0, 0x1000L);
       case 117:
-        return jjMoveStringLiteralDfa3_0(active0, 0x80000000L);
+        return jjMoveStringLiteralDfa3_0(active0, 0x8000000L);
       case 118:
-        if ((active0 & 0x40000L) != 0L) {
-          jjmatchedKind = 18;
+        if ((active0 & 0x4000L) != 0L) {
+          jjmatchedKind = 14;
           jjmatchedPos = 2;
         }
         break;
       case 120:
-        return jjMoveStringLiteralDfa3_0(active0, 0x80000L);
+        return jjMoveStringLiteralDfa3_0(active0, 0x8000L);
       default:
         break;
     }
@@ -242,17 +236,17 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 65:
-        return jjMoveStringLiteralDfa4_0(active0, 0x4020000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x402000L);
       case 67:
-        return jjMoveStringLiteralDfa4_0(active0, 0x38000000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x3800000L);
       case 68:
-        return jjMoveStringLiteralDfa4_0(active0, 0x1000000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x100000L);
       case 69:
-        if ((active0 & 0x80000000L) != 0L) {
-          jjmatchedKind = 31;
+        if ((active0 & 0x8000000L) != 0L) {
+          jjmatchedKind = 27;
           jjmatchedPos = 3;
         }
-        return jjMoveStringLiteralDfa4_0(active0, 0x200000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x20000L);
       case 72:
         if ((active0 & 0x1000L) != 0L) {
           jjmatchedKind = 12;
@@ -260,10 +254,10 @@ public class CopyTokenManager implements CopyConstants {
         }
         break;
       case 73:
-        return jjMoveStringLiteralDfa4_0(active0, 0x400080L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x40080L);
       case 76:
-        if ((active0 & 0x800000L) != 0L) {
-          jjmatchedKind = 23;
+        if ((active0 & 0x80000L) != 0L) {
+          jjmatchedKind = 19;
           jjmatchedPos = 3;
         }
         break;
@@ -272,17 +266,17 @@ public class CopyTokenManager implements CopyConstants {
           jjmatchedKind = 10;
           jjmatchedPos = 3;
         }
-        return jjMoveStringLiteralDfa4_0(active0, 0x100000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x10000L);
       case 79:
-        return jjMoveStringLiteralDfa4_0(active0, 0x40000100L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x4000100L);
       case 83:
-        return jjMoveStringLiteralDfa4_0(active0, 0x100000000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x10000000L);
       case 84:
-        if ((active0 & 0x80000L) != 0L) {
-          jjmatchedKind = 19;
+        if ((active0 & 0x8000L) != 0L) {
+          jjmatchedKind = 15;
           jjmatchedPos = 3;
         }
-        return jjMoveStringLiteralDfa4_0(active0, 0x2000000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x200000L);
       case 89:
         if ((active0 & 0x800L) != 0L) {
           jjmatchedKind = 11;
@@ -290,17 +284,17 @@ public class CopyTokenManager implements CopyConstants {
         }
         break;
       case 97:
-        return jjMoveStringLiteralDfa4_0(active0, 0x4020000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x402000L);
       case 99:
-        return jjMoveStringLiteralDfa4_0(active0, 0x38000000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x3800000L);
       case 100:
-        return jjMoveStringLiteralDfa4_0(active0, 0x1000000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x100000L);
       case 101:
-        if ((active0 & 0x80000000L) != 0L) {
-          jjmatchedKind = 31;
+        if ((active0 & 0x8000000L) != 0L) {
+          jjmatchedKind = 27;
           jjmatchedPos = 3;
         }
-        return jjMoveStringLiteralDfa4_0(active0, 0x200000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x20000L);
       case 104:
         if ((active0 & 0x1000L) != 0L) {
           jjmatchedKind = 12;
@@ -308,10 +302,10 @@ public class CopyTokenManager implements CopyConstants {
         }
         break;
       case 105:
-        return jjMoveStringLiteralDfa4_0(active0, 0x400080L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x40080L);
       case 108:
-        if ((active0 & 0x800000L) != 0L) {
-          jjmatchedKind = 23;
+        if ((active0 & 0x80000L) != 0L) {
+          jjmatchedKind = 19;
           jjmatchedPos = 3;
         }
         break;
@@ -320,17 +314,17 @@ public class CopyTokenManager implements CopyConstants {
           jjmatchedKind = 10;
           jjmatchedPos = 3;
         }
-        return jjMoveStringLiteralDfa4_0(active0, 0x100000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x10000L);
       case 111:
-        return jjMoveStringLiteralDfa4_0(active0, 0x40000100L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x4000100L);
       case 115:
-        return jjMoveStringLiteralDfa4_0(active0, 0x100000000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x10000000L);
       case 116:
-        if ((active0 & 0x80000L) != 0L) {
-          jjmatchedKind = 19;
+        if ((active0 & 0x8000L) != 0L) {
+          jjmatchedKind = 15;
           jjmatchedPos = 3;
         }
-        return jjMoveStringLiteralDfa4_0(active0, 0x2000000L);
+        return jjMoveStringLiteralDfa4_0(active0, 0x200000L);
       case 121:
         if ((active0 & 0x800L) != 0L) {
           jjmatchedKind = 11;
@@ -352,20 +346,20 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 65:
-        return jjMoveStringLiteralDfa5_0(active0, 0x100000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x10000L);
       case 68:
-        return jjMoveStringLiteralDfa5_0(active0, 0x40000000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x4000000L);
       case 69:
-        if ((active0 & 0x2000000L) != 0L) {
-          jjmatchedKind = 25;
+        if ((active0 & 0x200000L) != 0L) {
+          jjmatchedKind = 21;
           jjmatchedPos = 4;
-        } else if ((active0 & 0x100000000L) != 0L) {
-          jjmatchedKind = 32;
+        } else if ((active0 & 0x10000000L) != 0L) {
+          jjmatchedKind = 28;
           jjmatchedPos = 4;
         }
-        return jjMoveStringLiteralDfa5_0(active0, 0x39000000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x3900000L);
       case 77:
-        return jjMoveStringLiteralDfa5_0(active0, 0x400000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x40000L);
       case 78:
         if ((active0 & 0x80L) != 0L) {
           jjmatchedKind = 7;
@@ -373,28 +367,28 @@ public class CopyTokenManager implements CopyConstants {
         }
         break;
       case 80:
-        return jjMoveStringLiteralDfa5_0(active0, 0x4000000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x400000L);
       case 82:
-        return jjMoveStringLiteralDfa5_0(active0, 0x20000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x2000L);
       case 85:
         return jjMoveStringLiteralDfa5_0(active0, 0x100L);
       case 90:
-        return jjMoveStringLiteralDfa5_0(active0, 0x200000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x20000L);
       case 97:
-        return jjMoveStringLiteralDfa5_0(active0, 0x100000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x10000L);
       case 100:
-        return jjMoveStringLiteralDfa5_0(active0, 0x40000000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x4000000L);
       case 101:
-        if ((active0 & 0x2000000L) != 0L) {
-          jjmatchedKind = 25;
+        if ((active0 & 0x200000L) != 0L) {
+          jjmatchedKind = 21;
           jjmatchedPos = 4;
-        } else if ((active0 & 0x100000000L) != 0L) {
-          jjmatchedKind = 32;
+        } else if ((active0 & 0x10000000L) != 0L) {
+          jjmatchedKind = 28;
           jjmatchedPos = 4;
         }
-        return jjMoveStringLiteralDfa5_0(active0, 0x39000000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x3900000L);
       case 109:
-        return jjMoveStringLiteralDfa5_0(active0, 0x400000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x40000L);
       case 110:
         if ((active0 & 0x80L) != 0L) {
           jjmatchedKind = 7;
@@ -402,13 +396,13 @@ public class CopyTokenManager implements CopyConstants {
         }
         break;
       case 112:
-        return jjMoveStringLiteralDfa5_0(active0, 0x4000000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x400000L);
       case 114:
-        return jjMoveStringLiteralDfa5_0(active0, 0x20000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x2000L);
       case 117:
         return jjMoveStringLiteralDfa5_0(active0, 0x100L);
       case 122:
-        return jjMoveStringLiteralDfa5_0(active0, 0x200000L);
+        return jjMoveStringLiteralDfa5_0(active0, 0x20000L);
       default:
         break;
     }
@@ -424,19 +418,19 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 69:
-        if ((active0 & 0x200000L) != 0L) {
-          jjmatchedKind = 21;
+        if ((active0 & 0x20000L) != 0L) {
+          jjmatchedKind = 17;
           jjmatchedPos = 5;
-        } else if ((active0 & 0x4000000L) != 0L) {
-          jjmatchedKind = 26;
+        } else if ((active0 & 0x400000L) != 0L) {
+          jjmatchedKind = 22;
           jjmatchedPos = 5;
         }
         break;
       case 73:
-        return jjMoveStringLiteralDfa6_0(active0, 0x40400000L);
+        return jjMoveStringLiteralDfa6_0(active0, 0x4040000L);
       case 82:
-        if ((active0 & 0x1000000L) != 0L) {
-          jjmatchedKind = 24;
+        if ((active0 & 0x100000L) != 0L) {
+          jjmatchedKind = 20;
           jjmatchedPos = 5;
         }
         break;
@@ -444,33 +438,33 @@ public class CopyTokenManager implements CopyConstants {
         if ((active0 & 0x100L) != 0L) {
           jjmatchedKind = 8;
           jjmatchedPos = 5;
-        } else if ((active0 & 0x100000L) != 0L) {
-          jjmatchedKind = 20;
+        } else if ((active0 & 0x10000L) != 0L) {
+          jjmatchedKind = 16;
           jjmatchedPos = 5;
         }
         break;
       case 89:
-        if ((active0 & 0x20000L) != 0L) {
-          jjmatchedKind = 17;
+        if ((active0 & 0x2000L) != 0L) {
+          jjmatchedKind = 13;
           jjmatchedPos = 5;
         }
         break;
       case 95:
-        return jjMoveStringLiteralDfa6_0(active0, 0x38000000L);
+        return jjMoveStringLiteralDfa6_0(active0, 0x3800000L);
       case 101:
-        if ((active0 & 0x200000L) != 0L) {
-          jjmatchedKind = 21;
+        if ((active0 & 0x20000L) != 0L) {
+          jjmatchedKind = 17;
           jjmatchedPos = 5;
-        } else if ((active0 & 0x4000000L) != 0L) {
-          jjmatchedKind = 26;
+        } else if ((active0 & 0x400000L) != 0L) {
+          jjmatchedKind = 22;
           jjmatchedPos = 5;
         }
         break;
       case 105:
-        return jjMoveStringLiteralDfa6_0(active0, 0x40400000L);
+        return jjMoveStringLiteralDfa6_0(active0, 0x4040000L);
       case 114:
-        if ((active0 & 0x1000000L) != 0L) {
-          jjmatchedKind = 24;
+        if ((active0 & 0x100000L) != 0L) {
+          jjmatchedKind = 20;
           jjmatchedPos = 5;
         }
         break;
@@ -478,14 +472,14 @@ public class CopyTokenManager implements CopyConstants {
         if ((active0 & 0x100L) != 0L) {
           jjmatchedKind = 8;
           jjmatchedPos = 5;
-        } else if ((active0 & 0x100000L) != 0L) {
-          jjmatchedKind = 20;
+        } else if ((active0 & 0x10000L) != 0L) {
+          jjmatchedKind = 16;
           jjmatchedPos = 5;
         }
         break;
       case 121:
-        if ((active0 & 0x20000L) != 0L) {
-          jjmatchedKind = 17;
+        if ((active0 & 0x2000L) != 0L) {
+          jjmatchedKind = 13;
           jjmatchedPos = 5;
         }
         break;
@@ -504,17 +498,17 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 78:
-        return jjMoveStringLiteralDfa7_0(active0, 0x70000000L);
+        return jjMoveStringLiteralDfa7_0(active0, 0x7000000L);
       case 81:
-        return jjMoveStringLiteralDfa7_0(active0, 0x8000000L);
+        return jjMoveStringLiteralDfa7_0(active0, 0x800000L);
       case 84:
-        return jjMoveStringLiteralDfa7_0(active0, 0x400000L);
+        return jjMoveStringLiteralDfa7_0(active0, 0x40000L);
       case 110:
-        return jjMoveStringLiteralDfa7_0(active0, 0x70000000L);
+        return jjMoveStringLiteralDfa7_0(active0, 0x7000000L);
       case 113:
-        return jjMoveStringLiteralDfa7_0(active0, 0x8000000L);
+        return jjMoveStringLiteralDfa7_0(active0, 0x800000L);
       case 116:
-        return jjMoveStringLiteralDfa7_0(active0, 0x400000L);
+        return jjMoveStringLiteralDfa7_0(active0, 0x40000L);
       default:
         break;
     }
@@ -530,29 +524,29 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 69:
-        return jjMoveStringLiteralDfa8_0(active0, 0x400000L);
+        return jjMoveStringLiteralDfa8_0(active0, 0x40000L);
       case 71:
-        if ((active0 & 0x40000000L) != 0L) {
-          jjmatchedKind = 30;
+        if ((active0 & 0x4000000L) != 0L) {
+          jjmatchedKind = 26;
           jjmatchedPos = 7;
         }
         break;
       case 79:
-        return jjMoveStringLiteralDfa8_0(active0, 0x10000000L);
+        return jjMoveStringLiteralDfa8_0(active0, 0x1000000L);
       case 85:
-        return jjMoveStringLiteralDfa8_0(active0, 0x28000000L);
+        return jjMoveStringLiteralDfa8_0(active0, 0x2800000L);
       case 101:
-        return jjMoveStringLiteralDfa8_0(active0, 0x400000L);
+        return jjMoveStringLiteralDfa8_0(active0, 0x40000L);
       case 103:
-        if ((active0 & 0x40000000L) != 0L) {
-          jjmatchedKind = 30;
+        if ((active0 & 0x4000000L) != 0L) {
+          jjmatchedKind = 26;
           jjmatchedPos = 7;
         }
         break;
       case 111:
-        return jjMoveStringLiteralDfa8_0(active0, 0x10000000L);
+        return jjMoveStringLiteralDfa8_0(active0, 0x1000000L);
       case 117:
-        return jjMoveStringLiteralDfa8_0(active0, 0x28000000L);
+        return jjMoveStringLiteralDfa8_0(active0, 0x2800000L);
       default:
         break;
     }
@@ -568,29 +562,29 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 76:
-        return jjMoveStringLiteralDfa9_0(active0, 0x20000000L);
+        return jjMoveStringLiteralDfa9_0(active0, 0x2000000L);
       case 79:
-        return jjMoveStringLiteralDfa9_0(active0, 0x8000000L);
+        return jjMoveStringLiteralDfa9_0(active0, 0x800000L);
       case 82:
-        if ((active0 & 0x400000L) != 0L) {
-          jjmatchedKind = 22;
+        if ((active0 & 0x40000L) != 0L) {
+          jjmatchedKind = 18;
           jjmatchedPos = 8;
         }
         break;
       case 84:
-        return jjMoveStringLiteralDfa9_0(active0, 0x10000000L);
+        return jjMoveStringLiteralDfa9_0(active0, 0x1000000L);
       case 108:
-        return jjMoveStringLiteralDfa9_0(active0, 0x20000000L);
+        return jjMoveStringLiteralDfa9_0(active0, 0x2000000L);
       case 111:
-        return jjMoveStringLiteralDfa9_0(active0, 0x8000000L);
+        return jjMoveStringLiteralDfa9_0(active0, 0x800000L);
       case 114:
-        if ((active0 & 0x400000L) != 0L) {
-          jjmatchedKind = 22;
+        if ((active0 & 0x40000L) != 0L) {
+          jjmatchedKind = 18;
           jjmatchedPos = 8;
         }
         break;
       case 116:
-        return jjMoveStringLiteralDfa9_0(active0, 0x10000000L);
+        return jjMoveStringLiteralDfa9_0(active0, 0x1000000L);
       default:
         break;
     }
@@ -606,23 +600,23 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 76:
-        if ((active0 & 0x20000000L) != 0L) {
-          jjmatchedKind = 29;
+        if ((active0 & 0x2000000L) != 0L) {
+          jjmatchedKind = 25;
           jjmatchedPos = 9;
         }
         break;
       case 84:
-        return jjMoveStringLiteralDfa10_0(active0, 0x8000000L);
+        return jjMoveStringLiteralDfa10_0(active0, 0x800000L);
       case 95:
-        return jjMoveStringLiteralDfa10_0(active0, 0x10000000L);
+        return jjMoveStringLiteralDfa10_0(active0, 0x1000000L);
       case 108:
-        if ((active0 & 0x20000000L) != 0L) {
-          jjmatchedKind = 29;
+        if ((active0 & 0x2000000L) != 0L) {
+          jjmatchedKind = 25;
           jjmatchedPos = 9;
         }
         break;
       case 116:
-        return jjMoveStringLiteralDfa10_0(active0, 0x8000000L);
+        return jjMoveStringLiteralDfa10_0(active0, 0x800000L);
       default:
         break;
     }
@@ -638,21 +632,21 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 69:
-        if ((active0 & 0x8000000L) != 0L) {
-          jjmatchedKind = 27;
+        if ((active0 & 0x800000L) != 0L) {
+          jjmatchedKind = 23;
           jjmatchedPos = 10;
         }
         break;
       case 78:
-        return jjMoveStringLiteralDfa11_0(active0, 0x10000000L);
+        return jjMoveStringLiteralDfa11_0(active0, 0x1000000L);
       case 101:
-        if ((active0 & 0x8000000L) != 0L) {
-          jjmatchedKind = 27;
+        if ((active0 & 0x800000L) != 0L) {
+          jjmatchedKind = 23;
           jjmatchedPos = 10;
         }
         break;
       case 110:
-        return jjMoveStringLiteralDfa11_0(active0, 0x10000000L);
+        return jjMoveStringLiteralDfa11_0(active0, 0x1000000L);
       default:
         break;
     }
@@ -668,9 +662,9 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 85:
-        return jjMoveStringLiteralDfa12_0(active0, 0x10000000L);
+        return jjMoveStringLiteralDfa12_0(active0, 0x1000000L);
       case 117:
-        return jjMoveStringLiteralDfa12_0(active0, 0x10000000L);
+        return jjMoveStringLiteralDfa12_0(active0, 0x1000000L);
       default:
         break;
     }
@@ -686,9 +680,9 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 76:
-        return jjMoveStringLiteralDfa13_0(active0, 0x10000000L);
+        return jjMoveStringLiteralDfa13_0(active0, 0x1000000L);
       case 108:
-        return jjMoveStringLiteralDfa13_0(active0, 0x10000000L);
+        return jjMoveStringLiteralDfa13_0(active0, 0x1000000L);
       default:
         break;
     }
@@ -704,14 +698,14 @@ public class CopyTokenManager implements CopyConstants {
     }
     switch (curChar) {
       case 76:
-        if ((active0 & 0x10000000L) != 0L) {
-          jjmatchedKind = 28;
+        if ((active0 & 0x1000000L) != 0L) {
+          jjmatchedKind = 24;
           jjmatchedPos = 13;
         }
         break;
       case 108:
-        if ((active0 & 0x10000000L) != 0L) {
-          jjmatchedKind = 28;
+        if ((active0 & 0x1000000L) != 0L) {
+          jjmatchedKind = 24;
           jjmatchedPos = 13;
         }
         break;
@@ -756,7 +750,7 @@ public class CopyTokenManager implements CopyConstants {
               break;
             case 1:
               if ((0x3ff000000000000L & l) == 0L) break;
-              if (kind > 34) kind = 34;
+              if (kind > 30) kind = 30;
               jjstateSet[jjnewStateCnt++] = 1;
               break;
             case 2:
@@ -830,7 +824,7 @@ public class CopyTokenManager implements CopyConstants {
               }
               break;
             case 19:
-              if (curChar == 34 && kind > 33) kind = 33;
+              if (curChar == 34 && kind > 29) kind = 29;
               break;
             case 21:
               if ((0x3ff000000000000L & l) != 0L) {
@@ -841,7 +835,7 @@ public class CopyTokenManager implements CopyConstants {
               if ((0xf400fcfe00000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 23;
               break;
             case 23:
-              if (curChar == 34 && kind > 35) kind = 35;
+              if (curChar == 34 && kind > 31) kind = 31;
               break;
             case 24:
               if (curChar == 39) {
@@ -862,7 +856,7 @@ public class CopyTokenManager implements CopyConstants {
               }
               break;
             case 29:
-              if (curChar == 39 && kind > 33) kind = 33;
+              if (curChar == 39 && kind > 29) kind = 29;
               break;
             case 31:
               if ((0x3ff000000000000L & l) != 0L) {
@@ -875,13 +869,13 @@ public class CopyTokenManager implements CopyConstants {
               }
               break;
             case 34:
-              if (curChar == 39 && kind > 34) kind = 34;
+              if (curChar == 39 && kind > 30) kind = 30;
               break;
             case 35:
               if ((0xf400fcfe00000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 36;
               break;
             case 36:
-              if (curChar == 39 && kind > 35) kind = 35;
+              if (curChar == 39 && kind > 31) kind = 31;
               break;
             default:
               break;
@@ -894,7 +888,7 @@ public class CopyTokenManager implements CopyConstants {
             case 0:
             case 1:
               if ((0x7fffffe87fffffeL & l) == 0L) break;
-              if (kind > 34) kind = 34;
+              if (kind > 30) kind = 30;
               {
                 jjCheckNAdd(1);
               }
@@ -1016,9 +1010,9 @@ public class CopyTokenManager implements CopyConstants {
 
   /** Token literal values. */
   public static final String[] jjstrLiteralImages = {
-    "", null, null, null, null, null, null, null, null, null, null, null, null, "\54", "\56", "\47",
-    "\42", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, null, null, null, null, "\73", "\50", "\51",
+    "", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+    null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+    null, null, null, null, null, "\73", "\56", "\50", "\51", "\54",
   };
 
   protected Token jjFillToken() {
@@ -1214,11 +1208,11 @@ public class CopyTokenManager implements CopyConstants {
   /** Lex State array. */
   public static final int[] jjnewLexState = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
   };
 
   static final long[] jjtoToken = {
-    0xe0fffffff81L,
+    0x3e0ffffff81L,
   };
   static final long[] jjtoSkip = {
     0x7eL,

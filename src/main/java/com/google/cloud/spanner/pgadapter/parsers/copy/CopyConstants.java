@@ -19,61 +19,53 @@ public interface CopyConstants {
   /** RegularExpression Id. */
   int K_WITH = 12;
   /** RegularExpression Id. */
-  int K_COMMA = 13;
+  int O_BINARY = 13;
   /** RegularExpression Id. */
-  int K_DOT = 14;
+  int O_CSV = 14;
   /** RegularExpression Id. */
-  int K_QUOTE = 15;
+  int O_TEXT = 15;
   /** RegularExpression Id. */
-  int K_DOUBLEQUOTE = 16;
+  int O_FORMAT = 16;
   /** RegularExpression Id. */
-  int O_BINARY = 17;
+  int O_FREEZE = 17;
   /** RegularExpression Id. */
-  int O_CSV = 18;
+  int O_DELIMITER = 18;
   /** RegularExpression Id. */
-  int O_TEXT = 19;
+  int O_NULL = 19;
   /** RegularExpression Id. */
-  int O_FORMAT = 20;
+  int O_HEADER = 20;
   /** RegularExpression Id. */
-  int O_FREEZE = 21;
+  int O_QUOTE = 21;
   /** RegularExpression Id. */
-  int O_DELIMITER = 22;
+  int O_ESCAPE = 22;
   /** RegularExpression Id. */
-  int O_NULL = 23;
+  int O_FORCE_QUOTE = 23;
   /** RegularExpression Id. */
-  int O_HEADER = 24;
+  int O_FORCE_NOT_NULL = 24;
   /** RegularExpression Id. */
-  int O_QUOTE = 25;
+  int O_FORCE_NULL = 25;
   /** RegularExpression Id. */
-  int O_ESCAPE = 26;
+  int O_ENCODING = 26;
   /** RegularExpression Id. */
-  int O_FORCE_QUOTE = 27;
+  int O_TRUE = 27;
   /** RegularExpression Id. */
-  int O_FORCE_NOT_NULL = 28;
+  int O_FALSE = 28;
   /** RegularExpression Id. */
-  int O_FORCE_NULL = 29;
+  int QUOTED_IDENTIFIER = 29;
   /** RegularExpression Id. */
-  int O_ENCODING = 30;
+  int IDENTIFIER = 30;
   /** RegularExpression Id. */
-  int O_TRUE = 31;
+  int QUOTED_CHAR = 31;
   /** RegularExpression Id. */
-  int O_FALSE = 32;
+  int SINGLE_CHAR = 32;
   /** RegularExpression Id. */
-  int QUOTED_IDENTIFIER = 33;
+  int ID = 33;
   /** RegularExpression Id. */
-  int IDENTIFIER = 34;
+  int DIGIT = 34;
   /** RegularExpression Id. */
-  int QUOTED_CHAR = 35;
+  int LETTER = 35;
   /** RegularExpression Id. */
-  int SINGLE_CHAR = 36;
-  /** RegularExpression Id. */
-  int ID = 37;
-  /** RegularExpression Id. */
-  int DIGIT = 38;
-  /** RegularExpression Id. */
-  int LETTER = 39;
-  /** RegularExpression Id. */
-  int LOWER_CASE_LETTER = 40;
+  int LOWER_CASE_LETTER = 36;
 
   /** Lexical state. */
   int DEFAULT = 0;
@@ -93,10 +85,6 @@ public interface CopyConstants {
     "\"FROM\"",
     "\"COPY\"",
     "\"WITH\"",
-    "\",\"",
-    "\".\"",
-    "\"\\\'\"",
-    "\"\\\"\"",
     "\"BINARY\"",
     "\"CSV\"",
     "\"TEXT\"",
@@ -122,7 +110,9 @@ public interface CopyConstants {
     "<LETTER>",
     "<LOWER_CASE_LETTER>",
     "\";\"",
+    "\".\"",
     "\"(\"",
     "\")\"",
+    "\",\"",
   };
 }
