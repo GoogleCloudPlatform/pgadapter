@@ -9,6 +9,9 @@ PARSER_BEGIN(Copy)
 
 package com.google.cloud.spanner.pgadapter.parsers.copy;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+
 public class Copy {
 
   public static void parse(String stmt, CopyTreeParser.CopyOptions options) throws Exception {
@@ -255,7 +258,9 @@ void identifier() #ID :
 {
   t=<IDENTIFIER>
   {
-    jjtThis.setName(t.image.toLowerCase());
+    // Only support US_ASCII for now. UTF-8 support will be added later.
+    ByteBuffer bytes = StandardCharsets.US_ASCII.encode(t.image.toLowerCase());
+    jjtThis.setName(new String(bytes.array(), StandardCharsets.US_ASCII));
   }
 }
 
@@ -266,7 +271,9 @@ void quotedIdentifier() #ID :
 {
   t=<QUOTED_IDENTIFIER>
   {
-    jjtThis.setName(t.image.substring(1, t.image.length()-1));
+    // Only support US_ASCII for now. UTF-8 support will be added later.
+    ByteBuffer bytes = StandardCharsets.US_ASCII.encode(t.image.substring(1, t.image.length()-1));
+    jjtThis.setName(new String(bytes.array(), StandardCharsets.US_ASCII));
   }
 }
 

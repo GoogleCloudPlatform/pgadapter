@@ -37,6 +37,7 @@ import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.FromTo;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
+import java.nio.charset.StandardCharsets;
 import java.sql.Array;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -702,6 +703,16 @@ public class ParserTest {
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+  }
+
+  @Test
+  public void testCopyParserWithUnicode() throws Exception {
+    {
+      String text = new String("COPY ÀÚ§ýJ@ö¥ FROM STDIN;".getBytes(), StandardCharsets.UTF_8);
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = text;
+      assertThrows(TokenMgrError.class, () -> parse(sql, options));
     }
   }
 }
