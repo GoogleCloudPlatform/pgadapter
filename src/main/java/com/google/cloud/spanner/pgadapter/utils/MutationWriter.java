@@ -71,12 +71,12 @@ public class MutationWriter {
     List<CSVRecord> records = parsePayloadData(payload);
     if (!records.isEmpty()
         && !payloadFitsInCurrentBatch(records.size() * records.get(0).size(), payload.length)) {
-      writeToSpanner(connectionHandler); // Close out the current batch and reset for the next batch
+      rollback(connectionHandler);
     }
     for (CSVRecord record : records) {
       // Check that the number of columns in a record matches the number of columns in the table
       if (record.size() != this.tableColumns.keySet().size()) {
-        writeToSpanner(connectionHandler);
+        rollback(connectionHandler);
         throw new SQLException(
             "Invalid COPY data: Row length mismatched. Expected "
                 + this.tableColumns.keySet().size()
@@ -111,7 +111,7 @@ public class MutationWriter {
               break;
           }
         } catch (NumberFormatException | DateTimeParseException e) {
-          writeToSpanner(connectionHandler);
+          rollback(connectionHandler);
           createErrorFile(payload);
           throw new SQLException(
               "Invalid input syntax for type "
@@ -121,11 +121,11 @@ public class MutationWriter {
                   + recordValue
                   + "\"");
         } catch (IllegalArgumentException e) {
-          writeToSpanner(connectionHandler);
+          rollback(connectionHandler);
           createErrorFile(payload);
           throw new SQLException("Invalid input syntax for column \"" + columnName + "\"");
         } catch (Exception e) {
-          writeToSpanner(connectionHandler);
+          rollback(connectionHandler);
           createErrorFile(payload);
           throw e;
         }
@@ -177,6 +177,14 @@ public class MutationWriter {
     this.mutationCount = 0;
     this.batchSize = 0;
     return this.rowCount;
+  }
+
+  public void rollback(ConnectionHandler connectionHandler) throws Exception {
+    Connection connection = connectionHandler.getJdbcConnection();
+    connection.rollback();
+    this.mutations = new ArrayList<>();
+    this.mutationCount = 0;
+    this.batchSize = 0;
   }
 
   public void createErrorFile(byte[] payload) throws IOException {
