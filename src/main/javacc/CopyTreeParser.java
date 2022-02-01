@@ -116,8 +116,6 @@ public class CopyTreeParser implements CopyVisitor {
   }
 
   public Object visit(ASTCopyStatement node, Object data) {
-    ASTID idNode = (ASTID) node.jjtGetChild(0).jjtGetChild(0);
-    options.setTableName(idNode.getFormattedName());
     data = node.childrenAccept(this, data);
     return data;
   }
@@ -156,6 +154,16 @@ public class CopyTreeParser implements CopyVisitor {
   }
 
   public Object visit(ASTQualifiedName node, Object data) {
+    if(node.jjtGetNumChildren() > 1) {
+      // namespace.table
+      ASTID namespaceNode = (ASTID) node.jjtGetChild(0);
+      ASTID idNode = (ASTID) node.jjtGetChild(1);
+      options.setTableName(namespaceNode.getFormattedName() + "." + idNode.getFormattedName());
+    } else {
+      // table
+      ASTID idNode = (ASTID) node.jjtGetChild(0);
+      options.setTableName(idNode.getFormattedName());
+    }
     data = node.childrenAccept(this, data);
     return data;
   }

@@ -19,6 +19,7 @@ import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
@@ -35,6 +36,7 @@ import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.FromTo;
+import com.google.cloud.spanner.pgadapter.parsers.copy.ParseException;
 import java.sql.Array;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -622,6 +624,74 @@ public class ParserTest {
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
       assertThat(options.getNullString(), is(equalTo("null")));
+    }
+  }
+
+  @Test
+  public void testCopyParserWithNamespace() throws Exception {
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY public.users FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("public.users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \"public\".users FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("public.users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \"public\".\'users\' FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("public.users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY public.\"users\" FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("public.users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY public.\'users\" FROM STDIN;";
+      assertThrows(ParseException.class, () -> parse(sql, options));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \"public.users\" FROM STDIN;";
+      assertThrows(ParseException.class, () -> parse(sql, options));
+    }
+  }
+
+  @Test
+  public void testCopyParserWithMixedCase() throws Exception {
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "CoPy UsErS fROm stdIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
     }
   }
 }
