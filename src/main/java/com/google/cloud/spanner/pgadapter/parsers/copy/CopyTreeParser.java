@@ -143,7 +143,7 @@ public class CopyTreeParser implements CopyVisitor {
 
   public Object visit(ASTColumnElement node, Object data) {
     ASTID columnNode = (ASTID) node.jjtGetChild(0);
-    options.addColumnName(columnNode.getFormattedName());
+    options.addColumnName(columnNode.getName());
     data = node.childrenAccept(this, data);
     return data;
   }
@@ -158,11 +158,11 @@ public class CopyTreeParser implements CopyVisitor {
       // namespace.table
       ASTID namespaceNode = (ASTID) node.jjtGetChild(0);
       ASTID idNode = (ASTID) node.jjtGetChild(1);
-      options.setTableName(namespaceNode.getFormattedName() + "." + idNode.getFormattedName());
+      options.setTableName(namespaceNode.getName() + "." + idNode.getName());
     } else {
       // table
       ASTID idNode = (ASTID) node.jjtGetChild(0);
-      options.setTableName(idNode.getFormattedName());
+      options.setTableName(idNode.getName());
     }
     data = node.childrenAccept(this, data);
     return data;
@@ -195,7 +195,7 @@ public class CopyTreeParser implements CopyVisitor {
       case "NULL":
         {
           ASTID idNode = (ASTID) node.jjtGetChild(0);
-          options.setNullString(idNode.getFormattedName());
+          options.setNullString(idNode.getName());
         }
         break;
       case "HEADER":

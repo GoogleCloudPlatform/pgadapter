@@ -730,7 +730,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
       t = jj_consume_token(IDENTIFIER);
       jjtree.closeNodeScope(jjtn000, true);
       jjtc000 = false;
-      jjtn000.setName(t.image);
+      jjtn000.setName(t.image.toLowerCase());
     } finally {
       if (jjtc000) {
         jjtree.closeNodeScope(jjtn000, true);
@@ -748,7 +748,7 @@ public class Copy /*@bgen(jjtree)*/ implements CopyTreeConstants, CopyConstants 
       t = jj_consume_token(QUOTED_IDENTIFIER);
       jjtree.closeNodeScope(jjtn000, true);
       jjtc000 = false;
-      jjtn000.setName(t.image);
+      jjtn000.setName(t.image.substring(1, t.image.length() - 1));
     } finally {
       if (jjtc000) {
         jjtree.closeNodeScope(jjtn000, true);

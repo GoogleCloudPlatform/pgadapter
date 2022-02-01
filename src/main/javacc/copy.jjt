@@ -38,14 +38,14 @@ SKIP :
 | <"/*" (~["*"])* "*" (~["/"] (~["*"])* "*")* "/">
 }
 
-TOKEN : /* KEYWORDS */
+TOKEN [IGNORE_CASE] : /* KEYWORDS */
 {
-  <K_STDIN: ["s","S"]["t","T"]["d","D"]["i","I"]["n","N"]>
-| <K_STDOUT: ["s","S"]["t","T"]["d","D"]["o","O"]["u","U"]["t","T"]>
-| <K_TO: ["t","T"]["o","O"]>
-| <K_FROM: ["f","F"]["r","R"]["o","O"]["m","M"]>
-| <K_COPY: ["c","C"]["o","O"]["p","P"]["y","Y"]>
-| <K_WITH: ["w","W"]["i","I"]["t","T"]["h","H"]>
+  <K_STDIN: "STDIN">
+| <K_STDOUT: "STDOUT">
+| <K_TO: "TO">
+| <K_FROM: "FROM">
+| <K_COPY: "COPY">
+| <K_WITH: "WITH">
 }
 
 TOKEN : /* SPECIAL CHARACTERS */
@@ -56,24 +56,24 @@ TOKEN : /* SPECIAL CHARACTERS */
 | <K_DOUBLEQUOTE: "\"">
 }
 
-TOKEN : /* COPY OPTIONS */
+TOKEN [IGNORE_CASE] : /* COPY OPTIONS */
 {
-  <O_BINARY: ["b","B"]["i","I"]["n","N"]["a","A"]["r","R"]["y","Y"]>
-| <O_CSV: ["c","C"]["s","S"]["v","V"]>
-| <O_TEXT: ["t","T"]["e","E"]["x","X"]["t","T"]>
-| <O_FORMAT: ["f","F"]["o","O"]["r","R"]["m","M"]["a","A"]["t","T"]>
-| <O_FREEZE: ["f","F"]["r","R"]["e","E"]["e","E"]["z","Z"]["e","E"]>
-| <O_DELIMITER: ["d","D"]["e","E"]["l","L"]["i","I"]["m","M"]["i","I"]["t","T"]["e","E"]["r","R"]>
-| <O_NULL: ["n","N"]["u","U"]["l","L"]["l","L"]>
-| <O_HEADER: ["h","H"]["e","E"]["a","A"]["d","D"]["e","E"]["r","R"]>
-| <O_QUOTE: ["q","Q"]["u","U"]["o","O"]["t","T"]["e","E"]>
-| <O_ESCAPE: ["e","E"]["s","S"]["c","C"]["a","A"]["p","P"]["e","E"]>
-| <O_FORCE_QUOTE: ["f","F"]["o","O"]["r","R"]["c","C"]["e","E"]["_"]["q","Q"]["u","U"]["o","O"]["t","T"]["e","E"]>
-| <O_FORCE_NOT_NULL: ["f","F"]["o","O"]["r","R"]["c","C"]["e","E"]["_"]["n","N"]["o","O"]["t","T"]["_"]["n","N"]["u","U"]["l","L"]["l","L"]>
-| <O_FORCE_NULL: ["f","F"]["o","O"]["r","R"]["c","C"]["e","E"]["_"]["n","N"]["u","U"]["l","L"]["l","L"]>
-| <O_ENCODING: ["e","E"]["n","N"]["c","C"]["o","O"]["d","D"]["i","I"]["n","N"]["g","G"]>
-| <O_TRUE: ("TRUE" | "true")>
-| <O_FALSE: ("FALSE" | "false")>
+  <O_BINARY: "BINARY">
+| <O_CSV: "CSV">
+| <O_TEXT: "TEXT">
+| <O_FORMAT: "FORMAT">
+| <O_FREEZE: "FREEZE">
+| <O_DELIMITER: "DELIMITER">
+| <O_NULL: "NULL">
+| <O_HEADER: "HEADER">
+| <O_QUOTE: "QUOTE">
+| <O_ESCAPE: "ESCAPE">
+| <O_FORCE_QUOTE: "FORCE_QUOTE">
+| <O_FORCE_NOT_NULL: "FORCE_NOT_NULL">
+| <O_FORCE_NULL: "FORCE_NULL">
+| <O_ENCODING: "ENCODING">
+| <O_TRUE: "TRUE">
+| <O_FALSE: "FALSE">
 }
 
 TOKEN : /* IDENTIFIERS */
@@ -264,7 +264,7 @@ void identifier() #ID :
 {
   t=<IDENTIFIER>
   {
-    jjtThis.setName(t.image);
+    jjtThis.setName(t.image.toLowerCase());
   }
 }
 
@@ -275,7 +275,7 @@ void quotedIdentifier() #ID :
 {
   t=<QUOTED_IDENTIFIER>
   {
-    jjtThis.setName(t.image);
+    jjtThis.setName(t.image.substring(1, t.image.length()-1));
   }
 }
 
