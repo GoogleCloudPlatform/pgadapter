@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.SQLMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.common.collect.SetMultimap;
 import java.nio.charset.Charset;
@@ -140,13 +141,9 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     for (int index = 0; index < parameters.length; index++) {
       short formatCode = portal.getParameterFormatCode(index);
       int type = this.parseType(parameters, index);
-      if (formatCode == 0) {
-        for (Integer position : parameterIndexToPositions.get(index)) {
-          ((PreparedStatement) portal.statement)
-              .setObject(position, Parser.create(parameters[index], type).getItem());
-        }
-      } else {
-        throw new IllegalStateException("Unimplemented");
+      for (Integer position : parameterIndexToPositions.get(index)) {
+        Object value = Parser.create(parameters[index], type, FormatCode.of(formatCode)).getItem();
+        ((PreparedStatement) portal.statement).setObject(position, value);
       }
     }
     return portal;

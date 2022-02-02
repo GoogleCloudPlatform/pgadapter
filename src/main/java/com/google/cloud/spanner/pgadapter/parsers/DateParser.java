@@ -17,7 +17,6 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import com.google.common.base.Preconditions;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Types;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
@@ -34,10 +33,20 @@ public class DateParser extends Parser<java.sql.Date> {
     this.item = (java.sql.Date) item;
   }
 
-  public DateParser(byte[] item) {
-    long days = ByteConverter.int4(item, 0) + PG_EPOCH_DAYS;
-    this.validateRange(days);
-    this.item = java.sql.Date.valueOf(LocalDate.ofEpochDay(days));
+  public DateParser(byte[] item, FormatCode formatCode) {
+    switch (formatCode) {
+      case TEXT:
+        String stringValue = new String(item, UTF8);
+        this.item = java.sql.Date.valueOf(stringValue);
+        break;
+      case BINARY:
+        long days = ByteConverter.int4(item, 0) + PG_EPOCH_DAYS;
+        this.validateRange(days);
+        this.item = java.sql.Date.valueOf(LocalDate.ofEpochDay(days));
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
+    }
   }
 
   /**
@@ -74,9 +83,9 @@ public class DateParser extends Parser<java.sql.Date> {
 
   @Override
   protected byte[] binaryParse() {
-    Long days = this.item.toLocalDate().toEpochDay() - PG_EPOCH_DAYS;
-    this.validateRange(days);
-    return toBinary(days.intValue(), Types.INTEGER);
+    long days = this.item.toLocalDate().toEpochDay() - PG_EPOCH_DAYS;
+    int daysAsInt = validateRange(days);
+    return IntegerParser.binaryParse(daysAsInt);
   }
 
   /**
@@ -85,9 +94,10 @@ public class DateParser extends Parser<java.sql.Date> {
    *
    * @param days Number of days to validate.
    */
-  private void validateRange(long days) {
+  private int validateRange(long days) {
     if (days > Integer.MAX_VALUE) {
       throw new IllegalArgumentException("Date is out of range, epoch day=" + days);
     }
+    return (int) days;
   }
 }

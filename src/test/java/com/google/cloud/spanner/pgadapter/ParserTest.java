@@ -16,6 +16,8 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -28,9 +30,12 @@ import com.google.cloud.spanner.pgadapter.parsers.DateParser;
 import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
 import com.google.cloud.spanner.pgadapter.parsers.IntegerParser;
 import com.google.cloud.spanner.pgadapter.parsers.LongParser;
+import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
+import java.math.BigDecimal;
 import java.sql.Array;
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -41,6 +46,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mockito;
+import org.postgresql.core.Oid;
 import org.postgresql.util.ByteConverter;
 
 /**
@@ -61,6 +67,29 @@ public class ParserTest {
     assertThat(parser.parse(DataFormat.SPANNER), is(equalTo(spannerResult)));
   }
 
+  private void validateCreateBinary(byte[] item, int oid, Object value) {
+    Parser binary = Parser.create(item, oid, FormatCode.BINARY);
+
+    assertParserValueEqual(binary, value);
+  }
+
+  private void validateCreateText(byte[] item, int oid, Object value) {
+    Parser text = Parser.create(item, oid, FormatCode.TEXT);
+
+    assertParserValueEqual(text, value);
+  }
+
+  private void assertParserValueEqual(Parser parser, Object value) {
+    if (value instanceof byte[]) {
+      assertArrayEquals((byte[]) value, (byte[]) parser.getItem());
+    } else if (value instanceof Date) {
+      // To prevent false failures because dates are automatically appended with the local timezone.
+      assertEquals(value.toString(), parser.getItem().toString());
+    } else {
+      assertEquals(value, parser.getItem());
+    }
+  }
+
   @Test
   public void testPositiveLongParsing() {
     long value = 1234567890L;
@@ -70,6 +99,8 @@ public class ParserTest {
     Parser parsedValue = new LongParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.INT8, value);
+    validateCreateText(stringResult, Oid.INT8, value);
   }
 
   @Test
@@ -81,6 +112,8 @@ public class ParserTest {
     Parser parsedValue = new LongParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.INT8, value);
+    validateCreateText(stringResult, Oid.INT8, value);
   }
 
   @Test
@@ -92,6 +125,8 @@ public class ParserTest {
     Parser parsedValue = new IntegerParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.INT4, value);
+    validateCreateText(stringResult, Oid.INT4, value);
   }
 
   @Test
@@ -103,6 +138,8 @@ public class ParserTest {
     Parser parsedValue = new IntegerParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.INT4, value);
+    validateCreateText(stringResult, Oid.INT4, value);
   }
 
   @Test
@@ -114,6 +151,8 @@ public class ParserTest {
     Parser parsedValue = new DoubleParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.FLOAT8, value);
+    validateCreateText(stringResult, Oid.FLOAT8, value);
   }
 
   @Test
@@ -125,28 +164,36 @@ public class ParserTest {
     Parser parsedValue = new DoubleParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.FLOAT8, value);
+    validateCreateText(stringResult, Oid.FLOAT8, value);
   }
 
   @Test
   public void testFalseBooleanParsing() {
     boolean value = false;
+    byte[] byteResult = {0};
     byte[] stringResult = {'f'};
     byte[] spannerResult = {'f', 'a', 'l', 's', 'e'};
 
     Parser parsedValue = new BooleanParser(value);
 
-    validate(parsedValue, stringResult, stringResult, spannerResult);
+    validate(parsedValue, byteResult, stringResult, spannerResult);
+    validateCreateBinary(byteResult, Oid.BIT, value);
+    validateCreateText(stringResult, Oid.BIT, value);
   }
 
   @Test
   public void testTrueBooleanParsing() {
     boolean value = true;
+    byte[] byteResult = {1};
     byte[] stringResult = {'t'};
     byte[] spannerResult = {'t', 'r', 'u', 'e'};
 
     Parser parsedValue = new BooleanParser(value);
 
-    validate(parsedValue, stringResult, stringResult, spannerResult);
+    validate(parsedValue, byteResult, stringResult, spannerResult);
+    validateCreateBinary(byteResult, Oid.BIT, value);
+    validateCreateText(stringResult, Oid.BIT, value);
   }
 
   @Test
@@ -159,13 +206,15 @@ public class ParserTest {
     Parser parsedValue = new DateParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.DATE, value);
+    validateCreateText(stringResult, Oid.DATE, value);
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testDateParsingRejectsInvalidDateTooLong() {
     byte[] result = new byte[4];
     ByteConverter.int4(result, 0, Integer.MAX_VALUE);
-    new DateParser(result);
+    new DateParser(result, FormatCode.BINARY);
   }
 
   @Test
@@ -193,6 +242,8 @@ public class ParserTest {
     Parser parsedValue = new StringParser(value);
 
     validate(parsedValue, stringResult, stringResult, stringResult);
+    validateCreateBinary(stringResult, Oid.VARCHAR, value);
+    validateCreateText(stringResult, Oid.VARCHAR, value);
   }
 
   @Test
@@ -204,6 +255,7 @@ public class ParserTest {
     Parser parsedValue = new TimestampParser(value);
 
     assertThat(parsedValue.parse(DataFormat.POSTGRESQL_BINARY), is(equalTo(byteResult)));
+    validateCreateBinary(byteResult, Oid.TIMESTAMP, value);
   }
 
   @Test
@@ -243,6 +295,8 @@ public class ParserTest {
     Parser parsedValue = new BinaryParser(value);
 
     validate(parsedValue, byteResult, stringResult, byteResult);
+    validateCreateBinary(byteResult, Oid.BYTEA, value);
+    validateCreateText(stringResult, Oid.BYTEA, value);
   }
 
   @Test
@@ -309,28 +363,32 @@ public class ParserTest {
 
   @Test
   public void testNumericParsing() throws SQLException {
-    String value = "1234567890.1234567890";
+    BigDecimal value = new BigDecimal("1234567890.1234567890");
 
+    byte[] byteResult = ByteConverter.numeric(new BigDecimal("1234567890.1234567890"));
     byte[] stringResult = {
       '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.', '1', '2', '3', '4', '5', '6', '7', '8',
       '9', '0'
     };
 
-    Parser parser = new StringParser(value);
+    Parser parser = new NumericParser(value);
 
-    validate(parser, stringResult, stringResult, stringResult);
+    validate(parser, byteResult, stringResult, stringResult);
     assertThat(parser.getItem(), is(equalTo(value)));
+    validateCreateBinary(byteResult, Oid.NUMERIC, value);
+    validateCreateText(stringResult, Oid.NUMERIC, value);
   }
 
   @Test
   public void testNumericParsingNaN() throws SQLException {
-    String value = "NaN";
+    Number value = Double.NaN;
 
     byte[] stringResult = {'N', 'a', 'N'};
 
-    Parser parser = new StringParser(value);
+    NumericParser parser = new NumericParser(value);
 
     validate(parser, stringResult, stringResult, stringResult);
     assertThat(parser.getItem(), is(equalTo(value)));
+    validateCreateText(stringResult, Oid.NUMERIC, value);
   }
 }

@@ -40,9 +40,6 @@ public class ParseMessage extends ControlMessage {
     short numberOfParameters = this.inputStream.readShort();
     for (int i = 0; i < numberOfParameters; i++) {
       int type = this.inputStream.readInt();
-      if (type == 0) {
-        throw new IllegalArgumentException("PgAdapter does not support untyped parameters.");
-      }
       this.parameterDataTypes.add(type);
     }
     this.statement = new IntermediatePreparedStatement(queryString, connection.getJdbcConnection());

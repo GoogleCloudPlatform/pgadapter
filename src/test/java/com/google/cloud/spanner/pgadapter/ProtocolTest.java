@@ -326,8 +326,8 @@ public class ProtocolTest {
     Assert.assertEquals(outputResult.readInt(), 4);
   }
 
-  @Test(expected = IllegalArgumentException.class)
-  public void testParseMessageExceptsWithUntypedParameter() throws Exception {
+  @Test
+  public void testParseMessageAcceptsUntypedParameter() throws Exception {
     byte[] messageMetadata = {'P'};
     String statementName = "some statement\0";
     String payload =
@@ -359,6 +359,8 @@ public class ProtocolTest {
     String expectedMessageName = "some statement";
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
@@ -375,6 +377,13 @@ public class ProtocolTest {
 
     Mockito.when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
+    Mockito.verify(connectionHandler, Mockito.times(1))
+        .registerStatement(expectedMessageName, ((ParseMessage) message).getStatement());
+
+    // ParseCompleteResponse
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    Assert.assertEquals(outputResult.readByte(), '1');
+    Assert.assertEquals(outputResult.readInt(), 4);
   }
 
   @Test(expected = IllegalArgumentException.class)
