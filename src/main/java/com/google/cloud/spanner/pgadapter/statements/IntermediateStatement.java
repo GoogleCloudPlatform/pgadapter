@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
-import com.google.cloud.spanner.jdbc.JdbcConstants;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
@@ -69,11 +68,11 @@ public class IntermediateStatement {
   }
 
   /**
-   * Determines the result type based on the given sql string. The sql string has already been
-   * stripped of
+   * Determines the result type based on the given sql string. The sql string must already been
+   * stripped of any comments that might precede the actual sql string.
    *
-   * @param sql
-   * @return
+   * @param sql The sql string to determine the type of result for
+   * @return The {@link ResultType} that the given sql string will produce
    */
   protected static ResultType determineResultType(String sql) {
     if (PARSER.isUpdateStatement(sql)) {
@@ -82,25 +81,6 @@ public class IntermediateStatement {
       return ResultType.RESULT_SET;
     } else {
       return ResultType.NO_RESULT;
-    }
-  }
-  /**
-   * Extracts what type of result exists within the statement. In JDBC a statement update count is
-   * positive if it is an update statement, 0 if there is no result, or negative if there are
-   * results (i.e.: select statement)
-   *
-   * @param statement The resulting statement from an execution.
-   * @return The statement result type.
-   * @throws SQLException If getUpdateCount fails.
-   */
-  private static ResultType extractResultType(Statement statement) throws SQLException {
-    switch (statement.getUpdateCount()) {
-      case JdbcConstants.STATEMENT_NO_RESULT:
-        return ResultType.NO_RESULT;
-      case JdbcConstants.STATEMENT_RESULT_SET:
-        return ResultType.RESULT_SET;
-      default:
-        return ResultType.UPDATE_COUNT;
     }
   }
 
