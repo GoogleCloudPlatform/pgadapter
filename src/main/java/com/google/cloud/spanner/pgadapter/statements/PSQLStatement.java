@@ -29,7 +29,7 @@ public class PSQLStatement extends IntermediateStatement {
   private JSONObject commandMetadataJSON;
 
   public PSQLStatement(String sql, ConnectionHandler connectionHandler) throws SQLException {
-    super();
+    super(sql);
     this.connection = connectionHandler.getJdbcConnection();
     this.statement = this.connection.createStatement();
     this.commandMetadataJSON = connectionHandler.getServer().getOptions().getCommandMetadataJSON();
