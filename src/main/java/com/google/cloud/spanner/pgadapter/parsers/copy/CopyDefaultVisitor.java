@@ -23,6 +23,10 @@ public class CopyDefaultVisitor implements CopyVisitor {
     return defaultVisit(node, data);
   }
 
+  public Object visit(ASTNamespace node, Object data) {
+    return defaultVisit(node, data);
+  }
+
   public Object visit(ASTColumnList node, Object data) {
     return defaultVisit(node, data);
   }
@@ -67,4 +71,4 @@ public class CopyDefaultVisitor implements CopyVisitor {
     return defaultVisit(node, data);
   }
 }
-/* JavaCC - OriginalChecksum=6f0c8ac5adf7090fdae79d31b6c14c6a (do not edit this line) */
+/* JavaCC - OriginalChecksum=5a4f53d1bba42fe3e2c197a73700ded1 (do not edit this line) */

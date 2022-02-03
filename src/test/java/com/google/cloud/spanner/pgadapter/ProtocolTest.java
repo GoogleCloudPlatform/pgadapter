@@ -23,12 +23,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
-import com.google.cloud.spanner.jdbc.JdbcConstants;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
@@ -61,6 +61,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -135,6 +137,7 @@ public class ProtocolTest {
     String expectedSQL = "SELECT * FROM users";
 
     Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.getResultSet()).thenReturn(mock(ResultSet.class));
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(options.requiresMatcher()).thenReturn(false);
@@ -168,6 +171,7 @@ public class ProtocolTest {
     String expectedSQL = "SELECT * FROM users";
 
     Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.getResultSet()).thenReturn(mock(ResultSet.class));
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(options.requiresMatcher()).thenReturn(true);
@@ -1076,28 +1080,29 @@ public class ProtocolTest {
 
   @Test
   public void testQueryMessageInTransaction() throws Exception {
-    byte[] messageMetadata = {'Q', 0, 0, 0, 24};
-    String payload = "SELECT * FROM users\0";
+    byte[] messageMetadata = {'Q', 0, 0, 0, 45};
+    String payload = "INSERT INTO users (name) VALUES ('test')\0";
     byte[] value = Bytes.concat(messageMetadata, payload.getBytes());
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    String expectedSQL = "SELECT * FROM users";
+    String expectedSQL = "INSERT INTO users (name) VALUES ('test')";
 
     CloudSpannerJdbcConnection cloudSpannerConnection = mock(CloudSpannerJdbcConnection.class);
     when(cloudSpannerConnection.isInTransaction()).thenReturn(true);
     when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     when(connection.unwrap(CloudSpannerJdbcConnection.class)).thenReturn(cloudSpannerConnection);
     when(connection.createStatement()).thenReturn(statement);
-    // TODO: Remove the following mock result, as this is wrong, but is currently needed because of
-    // a bug in the way that PgAdapter determines the result type of a statement. That is fixed in
-    // https://github.com/GoogleCloudPlatform/pgadapter/pull/23
-    when(statement.getUpdateCount()).thenReturn(JdbcConstants.STATEMENT_NO_RESULT);
+    ResultSet resultSet = mock(ResultSet.class);
+    when(statement.getResultSet()).thenReturn(resultSet);
+    when(resultSet.getMetaData()).thenReturn(mock(ResultSetMetaData.class));
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
-    when(server.getOptions()).thenReturn(mock(OptionsMetadata.class));
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    when(server.getOptions()).thenReturn(options);
+    when(options.getTextFormat()).thenReturn(TextFormat.POSTGRESQL);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -1113,11 +1118,11 @@ public class ProtocolTest {
     assertEquals('\0', outputResult.readByte());
     assertEquals('\0', outputResult.readByte());
     assertEquals('\0', outputResult.readByte());
-    // 11 = 4 + "SELECT".length() + 1 (header + command length + null terminator)
-    assertEquals(11, outputResult.readByte());
-    byte[] command = new byte[6];
-    assertEquals(6, outputResult.read(command, 0, 6));
-    assertEquals("SELECT", new String(command));
+    // 15 = 4 + "INSERT".length() + " 0 0".length() + 1 (header + command length + null terminator)
+    assertEquals(15, outputResult.readByte());
+    byte[] command = new byte[10];
+    assertEquals(10, outputResult.read(command, 0, 10));
+    assertEquals("INSERT 0 0", new String(command));
     assertEquals('\0', outputResult.readByte());
     // ReadyResponse in transaction ('T')
     assertEquals('Z', outputResult.readByte());
