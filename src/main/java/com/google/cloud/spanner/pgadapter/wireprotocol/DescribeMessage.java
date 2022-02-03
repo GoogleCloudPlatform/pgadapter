@@ -87,13 +87,21 @@ public class DescribeMessage extends ControlMessage {
     if (this.statement.hasException()) {
       this.handleError(this.statement.getException());
     } else {
-      new RowDescriptionResponse(
-              this.outputStream,
-              this.statement,
-              ((DescribePortalMetadata) this.statement.describe()).getMetadata(),
-              this.connection.getServer().getOptions(),
-              QueryMode.EXTENDED)
-          .send();
+      switch (this.statement.getResultType()) {
+        case UPDATE_COUNT:
+        case NO_RESULT:
+          new NoDataResponse(this.outputStream).send();
+          break;
+        case RESULT_SET:
+          new RowDescriptionResponse(
+                  this.outputStream,
+                  this.statement,
+                  ((DescribePortalMetadata) this.statement.describe()).getMetadata(),
+                  this.connection.getServer().getOptions(),
+                  QueryMode.EXTENDED)
+              .send();
+          break;
+      }
     }
   }
 
