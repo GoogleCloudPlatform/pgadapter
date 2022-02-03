@@ -71,17 +71,26 @@ TOKEN [IGNORE_CASE] : /* COPY OPTIONS */
 | <O_FALSE: "FALSE">
 }
 
+TOKEN : /* UNICODE */
+{
+  < UNICODE: ("U&" <CODEPOINT_LIST> | "u&" <CODEPOINT_LIST>) >
+|
+  < #CODEPOINT_LIST: ("\"" (<CODEPOINT>|<LETTER>|<DIGIT>)+ "\"" | "\'" (<CODEPOINT>|<LETTER>|<DIGIT>)+ "\'") >
+|
+  < #CODEPOINT: ("\\" <HEX><HEX><HEX><HEX> | "\\" <HEX><HEX><HEX><HEX><HEX><HEX>) >
+|
+  < #HEX: ["0"-"9","A"-"F","a"-"f"] >
+}
+
 TOKEN : /* IDENTIFIERS */
 {
   < QUOTED_IDENTIFIER: ("\"" <IDENTIFIER> "\"" | "\'" <IDENTIFIER> "\'") >
 |
-  < IDENTIFIER: ("'" <ID> "'" | <ID>) >
+  < IDENTIFIER: <LETTER> (<LETTER>|<DIGIT>)* >
 |
   < QUOTED_CHAR: ("\"" <SINGLE_CHAR> "\"" | "\'" <SINGLE_CHAR> "\'") >
 |
   < #SINGLE_CHAR: (["!"-"'","*"-"/",":","<"-"@","["-"`"]) >
-|
-  < #ID: <LETTER> (<LETTER>|<DIGIT>)* >
 |
   < #DIGIT: ["0"-"9"] >
 |
@@ -269,12 +278,16 @@ void quotedIdentifier() #ID :
   Token t;
 }
 {
-  t=<QUOTED_IDENTIFIER>
-  {
-    // Only support US_ASCII for now. UTF-8 support will be added later.
-    ByteBuffer bytes = StandardCharsets.US_ASCII.encode(t.image.substring(1, t.image.length()-1));
-    jjtThis.setName(new String(bytes.array(), StandardCharsets.US_ASCII));
-  }
+    t=<UNICODE>
+    {
+      throw new ParseException("Escaped UNICODE is not supported.");
+    }
+  | t=<QUOTED_IDENTIFIER>
+    {
+      // Only support US_ASCII for now. UTF-8 support will be added later.
+      ByteBuffer bytes = StandardCharsets.US_ASCII.encode(t.image.substring(1, t.image.length()-1));
+      jjtThis.setName(new String(bytes.array(), StandardCharsets.US_ASCII));
+    }
 }
 
 void singleChar() #SingleChar :

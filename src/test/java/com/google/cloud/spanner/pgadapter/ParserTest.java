@@ -36,6 +36,7 @@ import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.FromTo;
+import com.google.cloud.spanner.pgadapter.parsers.copy.ParseException;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import java.nio.charset.StandardCharsets;
 import java.sql.Array;
@@ -642,6 +643,26 @@ public class ParserTest {
 
     {
       CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY public.\"USERS\" FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("public.USERS")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \'PUBLIC\'.\"USERS\" FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("PUBLIC.USERS")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
       String sql = "COPY \"public\".users FROM STDIN;";
       parse(sql, options);
 
@@ -713,6 +734,24 @@ public class ParserTest {
       CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
       String sql = text;
       assertThrows(TokenMgrError.class, () -> parse(sql, options));
+    }
+
+    {
+      String text =
+          new String(
+              "COPY U&\"\\0441\\043B\\043E\\043D\" FROM STDIN;".getBytes(), StandardCharsets.UTF_8);
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = text;
+      assertThrows(ParseException.class, () -> parse(sql, options));
+    }
+
+    {
+      String text =
+          new String(
+              "COPY u&\"\\0441\\043B\\043E\\043D\" FROM STDIN;".getBytes(), StandardCharsets.UTF_8);
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = text;
+      assertThrows(ParseException.class, () -> parse(sql, options));
     }
   }
 }
