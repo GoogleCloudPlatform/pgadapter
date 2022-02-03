@@ -35,19 +35,19 @@ public class CopyTokenManager implements CopyConstants {
         jjmatchedKind = 1;
         return jjMoveNfa_0(27, 0);
       case 40:
-        jjmatchedKind = 43;
-        return jjMoveNfa_0(27, 0);
-      case 41:
-        jjmatchedKind = 44;
-        return jjMoveNfa_0(27, 0);
-      case 44:
-        jjmatchedKind = 45;
-        return jjMoveNfa_0(27, 0);
-      case 46:
         jjmatchedKind = 42;
         return jjMoveNfa_0(27, 0);
-      case 59:
+      case 41:
+        jjmatchedKind = 43;
+        return jjMoveNfa_0(27, 0);
+      case 44:
+        jjmatchedKind = 44;
+        return jjMoveNfa_0(27, 0);
+      case 46:
         jjmatchedKind = 41;
+        return jjMoveNfa_0(27, 0);
+      case 59:
+        jjmatchedKind = 40;
         return jjMoveNfa_0(27, 0);
       case 66:
         return jjMoveStringLiteralDfa1_0(0x2000L);
@@ -69,8 +69,6 @@ public class CopyTokenManager implements CopyConstants {
         return jjMoveStringLiteralDfa1_0(0x180L);
       case 84:
         return jjMoveStringLiteralDfa1_0(0x8008200L);
-      case 85:
-        return jjMoveStringLiteralDfa1_0(0x20000000L);
       case 87:
         return jjMoveStringLiteralDfa1_0(0x1000L);
       case 98:
@@ -93,8 +91,6 @@ public class CopyTokenManager implements CopyConstants {
         return jjMoveStringLiteralDfa1_0(0x180L);
       case 116:
         return jjMoveStringLiteralDfa1_0(0x8008200L);
-      case 117:
-        return jjMoveStringLiteralDfa1_0(0x20000000L);
       case 119:
         return jjMoveStringLiteralDfa1_0(0x1000L);
       default:
@@ -109,12 +105,6 @@ public class CopyTokenManager implements CopyConstants {
       return jjMoveNfa_0(27, 0);
     }
     switch (curChar) {
-      case 38:
-        if ((active0 & 0x20000000L) != 0L) {
-          jjmatchedKind = 29;
-          jjmatchedPos = 1;
-        }
-        break;
       case 65:
         return jjMoveStringLiteralDfa2_0(active0, 0x10000000L);
       case 69:
@@ -777,7 +767,7 @@ public class CopyTokenManager implements CopyConstants {
               }
               break;
             case 3:
-              if (curChar == 34 && kind > 30) kind = 30;
+              if (curChar == 34 && kind > 29) kind = 29;
               break;
             case 5:
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 6;
@@ -815,7 +805,7 @@ public class CopyTokenManager implements CopyConstants {
               }
               break;
             case 16:
-              if (curChar == 39 && kind > 30) kind = 30;
+              if (curChar == 39 && kind > 29) kind = 29;
               break;
             case 18:
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 19;
@@ -918,7 +908,7 @@ public class CopyTokenManager implements CopyConstants {
               break;
             case 55:
               if ((0x3ff000000000000L & l) == 0L) break;
-              if (kind > 35) kind = 35;
+              if (kind > 34) kind = 34;
               jjstateSet[jjnewStateCnt++] = 55;
               break;
             case 56:
@@ -984,13 +974,13 @@ public class CopyTokenManager implements CopyConstants {
               }
               break;
             case 71:
-              if (curChar == 34 && kind > 34) kind = 34;
+              if (curChar == 34 && kind > 33) kind = 33;
               break;
             case 72:
               if ((0xf400fcfe00000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 73;
               break;
             case 73:
-              if (curChar == 34 && kind > 36) kind = 36;
+              if (curChar == 34 && kind > 35) kind = 35;
               break;
             case 74:
               if (curChar == 39) {
@@ -1003,13 +993,13 @@ public class CopyTokenManager implements CopyConstants {
               }
               break;
             case 77:
-              if (curChar == 39 && kind > 34) kind = 34;
+              if (curChar == 39 && kind > 33) kind = 33;
               break;
             case 78:
               if ((0xf400fcfe00000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 79;
               break;
             case 79:
-              if (curChar == 39 && kind > 36) kind = 36;
+              if (curChar == 39 && kind > 35) kind = 35;
               break;
             default:
               break;
@@ -1021,7 +1011,7 @@ public class CopyTokenManager implements CopyConstants {
           switch (jjstateSet[--i]) {
             case 27:
               if ((0x7fffffe87fffffeL & l) != 0L) {
-                if (kind > 35) kind = 35;
+                if (kind > 34) kind = 34;
                 {
                   jjCheckNAdd(55);
                 }
@@ -1191,7 +1181,7 @@ public class CopyTokenManager implements CopyConstants {
             case 54:
             case 55:
               if ((0x7fffffe87fffffeL & l) == 0L) break;
-              if (kind > 35) kind = 35;
+              if (kind > 34) kind = 34;
               {
                 jjCheckNAdd(55);
               }
@@ -1297,7 +1287,7 @@ public class CopyTokenManager implements CopyConstants {
   public static final String[] jjstrLiteralImages = {
     "", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
     null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, null, null, null, null, "\73", "\56", "\50", "\51", "\54",
+    null, null, null, null, null, null, null, null, "\73", "\56", "\50", "\51", "\54",
   };
 
   protected Token jjFillToken() {
@@ -1495,11 +1485,11 @@ public class CopyTokenManager implements CopyConstants {
   /** Lex State array. */
   public static final int[] jjnewLexState = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
   };
 
   static final long[] jjtoToken = {
-    0x3e1c7fffff81L,
+    0x1f0e3fffff81L,
   };
   static final long[] jjtoSkip = {
     0x7eL,
