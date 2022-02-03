@@ -9,6 +9,9 @@ PARSER_BEGIN(Copy)
 
 package com.google.cloud.spanner.pgadapter.parsers.copy;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+
 public class Copy {
 
   public static void parse(String stmt, CopyTreeParser.CopyOptions options) throws Exception {
@@ -19,8 +22,7 @@ public class Copy {
       CopyVisitor v = new CopyTreeParser(options);
       node.jjtAccept(v, null);
     } catch (Exception e) {
-      System.err.println(e.getMessage());
-      e.printStackTrace();
+      System.err.println(e.toString());
       throw e;
     }
   }
@@ -39,7 +41,7 @@ SKIP :
 | <"/*" (~["*"])* "*" (~["/"] (~["*"])* "*")* "/">
 }
 
-TOKEN : /* KEYWORDS */
+TOKEN [IGNORE_CASE] : /* KEYWORDS */
 {
   <K_STDIN: "STDIN">
 | <K_STDOUT: "STDOUT">
@@ -49,14 +51,7 @@ TOKEN : /* KEYWORDS */
 | <K_WITH: "WITH">
 }
 
-TOKEN : /* SPECIAL CHARACTERS */
-{
-  <K_COMMA: ",">
-| <K_QUOTE: "'">
-| <K_DOUBLEQUOTE: "\"">
-}
-
-TOKEN : /* COPY OPTIONS */
+TOKEN [IGNORE_CASE] : /* COPY OPTIONS */
 {
   <O_BINARY: "BINARY">
 | <O_CSV: "CSV">
@@ -76,17 +71,26 @@ TOKEN : /* COPY OPTIONS */
 | <O_FALSE: "FALSE">
 }
 
+TOKEN : /* UNICODE */
+{
+  < UNICODE: ("U&" <CODEPOINT_LIST> | "u&" <CODEPOINT_LIST>) >
+|
+  < #CODEPOINT_LIST: ("\"" (<CODEPOINT>|<LETTER>|<DIGIT>)+ "\"" | "\'" (<CODEPOINT>|<LETTER>|<DIGIT>)+ "\'") >
+|
+  < #CODEPOINT: ("\\" <HEX><HEX><HEX><HEX> | "\\" <HEX><HEX><HEX><HEX><HEX><HEX>) >
+|
+  < #HEX: ["0"-"9","A"-"F","a"-"f"] >
+}
+
 TOKEN : /* IDENTIFIERS */
 {
   < QUOTED_IDENTIFIER: ("\"" <IDENTIFIER> "\"" | "\'" <IDENTIFIER> "\'") >
 |
-  < IDENTIFIER: ("'" <ID> "'" | <ID>) >
+  < IDENTIFIER: <LETTER> (<LETTER>|<DIGIT>)* >
 |
   < QUOTED_CHAR: ("\"" <SINGLE_CHAR> "\"" | "\'" <SINGLE_CHAR> "\'") >
 |
-  < SINGLE_CHAR: (["!"-"'","*"-"/",":","<"-"@","["-"`"]) >
-|
-  < #ID: <LETTER> (<LETTER>|<DIGIT>)* >
+  < #SINGLE_CHAR: (["!"-"'","*"-"/",":","<"-"@","["-"`"]) >
 |
   < #DIGIT: ["0"-"9"] >
 |
@@ -114,10 +118,20 @@ void CopyStmt() #CopyStatement : {}
   <K_COPY> qualifiedName() optColumnList() copyFrom() copyFileName() optWith() copyOptions()
 }
 
-/** Qualified Name. */
+/** Qualified Name. Zero or more namespaces qualifiers can prefix the name. */
 void qualifiedName() #QualifiedName : {}
 {
-  identifier()
+  namespace()
+}
+
+void namespace() #Namespace : {}
+{
+    LOOKAHEAD(2)
+    identifier() "." namespace()
+  | LOOKAHEAD(2)
+    quotedIdentifier() "." namespace()
+  | identifier()
+  | quotedIdentifier()
 }
 
 /** Optional Column List */
@@ -132,20 +146,15 @@ void optColumnList() : {}
 void columnList() #ColumnList : {}
 {
   LOOKAHEAD(2)
-  columnElem() <K_COMMA> columnList()
+  columnElem() "," columnList()
   | columnElem()
 }
 
 /** Column Element. */
-void columnElem() #ColumnElement :
+void columnElem() #ColumnElement : {}
 {
-  Token t;
-}
-{
-  t=<IDENTIFIER>
-  {
-    jjtThis.setName(t.image);
-  }
+  identifier()
+  | quotedIdentifier()
 }
 
 /** Copy From */
@@ -258,7 +267,9 @@ void identifier() #ID :
 {
   t=<IDENTIFIER>
   {
-    jjtThis.setName(t.image);
+    // Only support US_ASCII for now. UTF-8 support will be added later.
+    ByteBuffer bytes = StandardCharsets.US_ASCII.encode(t.image.toLowerCase());
+    jjtThis.setName(new String(bytes.array(), StandardCharsets.US_ASCII));
   }
 }
 
@@ -267,10 +278,16 @@ void quotedIdentifier() #ID :
   Token t;
 }
 {
-  t=<QUOTED_IDENTIFIER>
-  {
-    jjtThis.setName(t.image);
-  }
+    t=<UNICODE>
+    {
+      throw new ParseException("Escaped UNICODE is not supported.");
+    }
+  | t=<QUOTED_IDENTIFIER>
+    {
+      // Only support US_ASCII for now. UTF-8 support will be added later.
+      ByteBuffer bytes = StandardCharsets.US_ASCII.encode(t.image.substring(1, t.image.length()-1));
+      jjtThis.setName(new String(bytes.array(), StandardCharsets.US_ASCII));
+    }
 }
 
 void singleChar() #SingleChar :

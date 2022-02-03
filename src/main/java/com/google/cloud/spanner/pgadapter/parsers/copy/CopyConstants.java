@@ -19,53 +19,53 @@ public interface CopyConstants {
   /** RegularExpression Id. */
   int K_WITH = 12;
   /** RegularExpression Id. */
-  int K_COMMA = 13;
+  int O_BINARY = 13;
   /** RegularExpression Id. */
-  int K_QUOTE = 14;
+  int O_CSV = 14;
   /** RegularExpression Id. */
-  int K_DOUBLEQUOTE = 15;
+  int O_TEXT = 15;
   /** RegularExpression Id. */
-  int O_BINARY = 16;
+  int O_FORMAT = 16;
   /** RegularExpression Id. */
-  int O_CSV = 17;
+  int O_FREEZE = 17;
   /** RegularExpression Id. */
-  int O_TEXT = 18;
+  int O_DELIMITER = 18;
   /** RegularExpression Id. */
-  int O_FORMAT = 19;
+  int O_NULL = 19;
   /** RegularExpression Id. */
-  int O_FREEZE = 20;
+  int O_HEADER = 20;
   /** RegularExpression Id. */
-  int O_DELIMITER = 21;
+  int O_QUOTE = 21;
   /** RegularExpression Id. */
-  int O_NULL = 22;
+  int O_ESCAPE = 22;
   /** RegularExpression Id. */
-  int O_HEADER = 23;
+  int O_FORCE_QUOTE = 23;
   /** RegularExpression Id. */
-  int O_QUOTE = 24;
+  int O_FORCE_NOT_NULL = 24;
   /** RegularExpression Id. */
-  int O_ESCAPE = 25;
+  int O_FORCE_NULL = 25;
   /** RegularExpression Id. */
-  int O_FORCE_QUOTE = 26;
+  int O_ENCODING = 26;
   /** RegularExpression Id. */
-  int O_FORCE_NOT_NULL = 27;
+  int O_TRUE = 27;
   /** RegularExpression Id. */
-  int O_FORCE_NULL = 28;
+  int O_FALSE = 28;
   /** RegularExpression Id. */
-  int O_ENCODING = 29;
+  int UNICODE = 29;
   /** RegularExpression Id. */
-  int O_TRUE = 30;
+  int CODEPOINT_LIST = 30;
   /** RegularExpression Id. */
-  int O_FALSE = 31;
+  int CODEPOINT = 31;
   /** RegularExpression Id. */
-  int QUOTED_IDENTIFIER = 32;
+  int HEX = 32;
   /** RegularExpression Id. */
-  int IDENTIFIER = 33;
+  int QUOTED_IDENTIFIER = 33;
   /** RegularExpression Id. */
-  int QUOTED_CHAR = 34;
+  int IDENTIFIER = 34;
   /** RegularExpression Id. */
-  int SINGLE_CHAR = 35;
+  int QUOTED_CHAR = 35;
   /** RegularExpression Id. */
-  int ID = 36;
+  int SINGLE_CHAR = 36;
   /** RegularExpression Id. */
   int DIGIT = 37;
   /** RegularExpression Id. */
@@ -91,9 +91,6 @@ public interface CopyConstants {
     "\"FROM\"",
     "\"COPY\"",
     "\"WITH\"",
-    "\",\"",
-    "\"\\\'\"",
-    "\"\\\"\"",
     "\"BINARY\"",
     "\"CSV\"",
     "\"TEXT\"",
@@ -110,16 +107,21 @@ public interface CopyConstants {
     "\"ENCODING\"",
     "\"TRUE\"",
     "\"FALSE\"",
+    "<UNICODE>",
+    "<CODEPOINT_LIST>",
+    "<CODEPOINT>",
+    "<HEX>",
     "<QUOTED_IDENTIFIER>",
     "<IDENTIFIER>",
     "<QUOTED_CHAR>",
     "<SINGLE_CHAR>",
-    "<ID>",
     "<DIGIT>",
     "<LETTER>",
     "<LOWER_CASE_LETTER>",
     "\";\"",
+    "\".\"",
     "\"(\"",
     "\")\"",
+    "\",\"",
   };
 }
