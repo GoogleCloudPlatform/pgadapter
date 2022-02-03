@@ -15,10 +15,15 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
+import com.google.cloud.spanner.jdbc.JdbcConstants;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
@@ -955,6 +960,9 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connection.unwrap(CloudSpannerJdbcConnection.class))
+        .thenReturn(mock(CloudSpannerJdbcConnection.class));
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -972,6 +980,38 @@ public class ProtocolTest {
   }
 
   @Test
+  public void testSyncMessageInTransaction() throws Exception {
+    byte[] messageMetadata = {'S'};
+
+    byte[] length = intToBytes(4);
+
+    byte[] value = Bytes.concat(messageMetadata, length);
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    CloudSpannerJdbcConnection cloudSpannerConnection = mock(CloudSpannerJdbcConnection.class);
+    when(cloudSpannerConnection.isInTransaction()).thenReturn(true);
+    when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    when(connection.unwrap(CloudSpannerJdbcConnection.class)).thenReturn(cloudSpannerConnection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
+    assertEquals(SyncMessage.class, message.getClass());
+
+    message.send();
+
+    // ReadyResponse
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    assertEquals('Z', outputResult.readByte());
+    assertEquals(5, outputResult.readInt());
+    assertEquals('T', outputResult.readByte());
+  }
+
+  @Test
   public void testFlushMessage() throws Exception {
     byte[] messageMetadata = {'H'};
 
@@ -983,6 +1023,9 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connection.unwrap(CloudSpannerJdbcConnection.class))
+        .thenReturn(mock(CloudSpannerJdbcConnection.class));
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -997,6 +1040,89 @@ public class ProtocolTest {
     Assert.assertEquals(outputResult.readByte(), 'Z');
     Assert.assertEquals(outputResult.readInt(), 5);
     Assert.assertEquals(outputResult.readByte(), 'I');
+  }
+
+  @Test
+  public void testFlushMessageInTransaction() throws Exception {
+    byte[] messageMetadata = {'H'};
+
+    byte[] length = intToBytes(4);
+
+    byte[] value = Bytes.concat(messageMetadata, length);
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    CloudSpannerJdbcConnection cloudSpannerConnection = mock(CloudSpannerJdbcConnection.class);
+    when(cloudSpannerConnection.isInTransaction()).thenReturn(true);
+    when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    when(connection.unwrap(CloudSpannerJdbcConnection.class)).thenReturn(cloudSpannerConnection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
+    assertEquals(FlushMessage.class, message.getClass());
+
+    message.send();
+
+    // ReadyResponse
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    assertEquals('Z', outputResult.readByte());
+    assertEquals(5, outputResult.readInt());
+    assertEquals('T', outputResult.readByte());
+  }
+
+  @Test
+  public void testQueryMessageInTransaction() throws Exception {
+    byte[] messageMetadata = {'Q', 0, 0, 0, 24};
+    String payload = "SELECT * FROM users\0";
+    byte[] value = Bytes.concat(messageMetadata, payload.getBytes());
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    String expectedSQL = "SELECT * FROM users";
+
+    CloudSpannerJdbcConnection cloudSpannerConnection = mock(CloudSpannerJdbcConnection.class);
+    when(cloudSpannerConnection.isInTransaction()).thenReturn(true);
+    when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    when(connection.unwrap(CloudSpannerJdbcConnection.class)).thenReturn(cloudSpannerConnection);
+    when(connection.createStatement()).thenReturn(statement);
+    // TODO: Remove the following mock result, as this is wrong, but is currently needed because of
+    // a bug in the way that PgAdapter determines the result type of a statement. That is fixed in
+    // https://github.com/GoogleCloudPlatform/pgadapter/pull/23
+    when(statement.getUpdateCount()).thenReturn(JdbcConstants.STATEMENT_NO_RESULT);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(mock(OptionsMetadata.class));
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
+    assertEquals(QueryMessage.class, message.getClass());
+    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSql());
+
+    message.send();
+
+    // NoData response (query does not return any results).
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    assertEquals('C', outputResult.readByte()); // CommandComplete
+    assertEquals('\0', outputResult.readByte());
+    assertEquals('\0', outputResult.readByte());
+    assertEquals('\0', outputResult.readByte());
+    // 11 = 4 + "SELECT".length() + 1 (header + command length + null terminator)
+    assertEquals(11, outputResult.readByte());
+    byte[] command = new byte[6];
+    assertEquals(6, outputResult.read(command, 0, 6));
+    assertEquals("SELECT", new String(command));
+    assertEquals('\0', outputResult.readByte());
+    // ReadyResponse in transaction ('T')
+    assertEquals('Z', outputResult.readByte());
+    assertEquals(5, outputResult.readInt());
+    assertEquals('T', outputResult.readByte());
   }
 
   @Test
