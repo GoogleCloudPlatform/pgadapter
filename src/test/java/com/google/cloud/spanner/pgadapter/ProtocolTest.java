@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -866,13 +867,13 @@ public class ProtocolTest {
 
     Mockito.doReturn(false)
         .when(messageSpy)
-        .sendSpannerResult(any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
+        .sendSpannerResult(anyInt(), any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
 
     messageSpy.send();
 
     Mockito.verify(intermediatePortalStatement, Mockito.times(1)).execute();
     Mockito.verify(messageSpy, Mockito.times(1))
-        .sendSpannerResult(intermediatePortalStatement, QueryMode.EXTENDED, totalRows);
+        .sendSpannerResult(0, intermediatePortalStatement, QueryMode.EXTENDED, totalRows);
     Mockito.verify(connectionHandler, Mockito.times(1)).cleanUp(intermediatePortalStatement);
   }
 
@@ -1384,11 +1385,11 @@ public class ProtocolTest {
     Assert.assertEquals(readUntil(outputResult, "IntervalStyle\0".length()), "IntervalStyle\0");
     Assert.assertEquals(readUntil(outputResult, "iso_8601\0".length()), "iso_8601\0");
     Assert.assertEquals(outputResult.readByte(), 'S');
-    Assert.assertEquals(outputResult.readInt(), 37);
+    Assert.assertEquals(outputResult.readInt(), 35);
     Assert.assertEquals(
         readUntil(outputResult, "standard_conforming_strings\0".length()),
         "standard_conforming_strings\0");
-    Assert.assertEquals(readUntil(outputResult, "true\0".length()), "true\0");
+    Assert.assertEquals(readUntil(outputResult, "on\0".length()), "on\0");
     Assert.assertEquals(outputResult.readByte(), 'S');
     Assert.assertEquals(outputResult.readInt(), 17);
     Assert.assertEquals(readUntil(outputResult, "TimeZone\0".length()), "TimeZone\0");

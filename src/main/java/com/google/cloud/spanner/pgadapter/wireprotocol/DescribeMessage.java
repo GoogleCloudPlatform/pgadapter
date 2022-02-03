@@ -87,12 +87,12 @@ public class DescribeMessage extends ControlMessage {
     if (this.statement.hasException()) {
       this.handleError(this.statement.getException());
     } else {
-      switch (this.statement.getResultType()) {
-        case UPDATE_COUNT:
-        case NO_RESULT:
+      switch (this.statement.getResultTypes().get(0)) {
+        case DML:
+        case DDL:
           new NoDataResponse(this.outputStream).send();
           break;
-        case RESULT_SET:
+        case QUERY:
           new RowDescriptionResponse(
                   this.outputStream,
                   this.statement,

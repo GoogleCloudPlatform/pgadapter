@@ -30,7 +30,7 @@ public class QueryMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'Q';
 
-  private IntermediateStatement statement;
+  private final IntermediateStatement statement;
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
@@ -75,28 +75,33 @@ public class QueryMessage extends ControlMessage {
    * error, handle error, otherwise sends the result and if contains result set, send row
    * description)
    *
-   * @throws Exception
+   * @throws Exception If handling the query fails
    */
   public void handleQuery() throws Exception {
-    if (this.statement.hasException()) {
-      this.handleError(this.statement.getException());
-    } else {
-      if (this.statement.containsResultSet()) {
-        new RowDescriptionResponse(
-                this.outputStream,
-                this.statement,
-                this.statement.getStatementResult().getMetaData(),
-                this.connection.getServer().getOptions(),
-                QueryMode.SIMPLE)
-            .send();
+    for (int index = 0; index < statement.getStatementCount(); index++) {
+      if (this.statement.hasException()) {
+        this.handleError(this.statement.getException());
+      } else {
+        if (this.statement.isResultSet(index)) {
+          new RowDescriptionResponse(
+                  this.outputStream,
+                  this.statement,
+                  this.statement.getStatementResult(index).getMetaData(),
+                  this.connection.getServer().getOptions(),
+                  QueryMode.SIMPLE)
+              .send();
+        }
+        this.sendSpannerResult(index, this.statement, QueryMode.SIMPLE, 0L);
       }
-      this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
-      boolean inTransaction =
-          connection.getJdbcConnection().unwrap(CloudSpannerJdbcConnection.class).isInTransaction();
-      new ReadyResponse(
-              this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
-          .send();
     }
+    boolean inTransaction =
+        connection
+            .getJdbcConnection()
+            .unwrap(CloudSpannerJdbcConnection.class)
+            .isInTransaction();
+    new ReadyResponse(
+        this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
+        .send();
     this.connection.cleanUp(this.statement);
   }
 }

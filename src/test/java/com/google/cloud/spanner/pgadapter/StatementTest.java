@@ -27,7 +27,7 @@ import com.google.cloud.spanner.pgadapter.metadata.SQLMetadata;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.ResultType;
+import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.StatementType;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
@@ -93,11 +93,11 @@ public class StatementTest {
     intermediateStatement.execute();
 
     Mockito.verify(statement, Mockito.times(1)).execute("SELECT * FROM users");
-    assertTrue(intermediateStatement.containsResultSet());
+    assertTrue(intermediateStatement.isResultSet(0));
     assertTrue(intermediateStatement.isExecuted());
-    assertEquals(intermediateStatement.getResultType(), ResultType.RESULT_SET);
-    assertEquals(intermediateStatement.getStatementResult(), resultSet);
-    assertTrue(intermediateStatement.isHasMoreData());
+    assertEquals(intermediateStatement.getResultTypes().get(0), StatementType.QUERY);
+    assertEquals(intermediateStatement.getStatementResult(0), resultSet);
+    assertTrue(intermediateStatement.isHasMoreData(0));
     assertFalse(intermediateStatement.hasException());
     assertEquals(intermediateStatement.getResultFormatCode(0), 0);
 
@@ -121,12 +121,12 @@ public class StatementTest {
 
     Mockito.verify(statement, Mockito.times(1))
         .execute("UPDATE users SET name = someName WHERE id = 10");
-    assertFalse(intermediateStatement.containsResultSet());
-    assertEquals((int) intermediateStatement.getUpdateCount(), 1);
+    assertFalse(intermediateStatement.isResultSet(0));
+    assertEquals((int) intermediateStatement.getUpdateCount(0), 1);
     assertTrue(intermediateStatement.isExecuted());
-    assertEquals(intermediateStatement.getResultType(), ResultType.UPDATE_COUNT);
-    Assert.assertNull(intermediateStatement.getStatementResult());
-    assertFalse(intermediateStatement.isHasMoreData());
+    assertEquals(intermediateStatement.getResultTypes().get(0), StatementType.DML);
+    Assert.assertNull(intermediateStatement.getStatementResult(0));
+    assertFalse(intermediateStatement.isHasMoreData(0));
     assertFalse(intermediateStatement.hasException());
     assertEquals(intermediateStatement.getResultFormatCode(0), 0);
 
@@ -150,12 +150,12 @@ public class StatementTest {
 
     Mockito.verify(statement, Mockito.times(1))
         .execute("UPDATE users SET name = someName WHERE id = -1");
-    assertFalse(intermediateStatement.containsResultSet());
-    assertEquals((int) intermediateStatement.getUpdateCount(), 0);
+    assertFalse(intermediateStatement.isResultSet(0));
+    assertEquals((int) intermediateStatement.getUpdateCount(0), 0);
     assertTrue(intermediateStatement.isExecuted());
-    assertEquals(intermediateStatement.getResultType(), ResultType.UPDATE_COUNT);
-    Assert.assertNull(intermediateStatement.getStatementResult());
-    assertFalse(intermediateStatement.isHasMoreData());
+    assertEquals(intermediateStatement.getResultTypes().get(0), StatementType.DML);
+    Assert.assertNull(intermediateStatement.getStatementResult(0));
+    assertFalse(intermediateStatement.isHasMoreData(0));
     assertFalse(intermediateStatement.hasException());
     assertEquals(intermediateStatement.getResultFormatCode(0), 0);
 
@@ -179,12 +179,12 @@ public class StatementTest {
 
     Mockito.verify(statement, Mockito.times(1))
         .execute("CREATE TABLE users (name varchar(100) primary key)");
-    assertFalse(intermediateStatement.containsResultSet());
-    assertEquals((int) intermediateStatement.getUpdateCount(), 0);
+    assertFalse(intermediateStatement.isResultSet(0));
+    assertEquals((int) intermediateStatement.getUpdateCount(0), 0);
     assertTrue(intermediateStatement.isExecuted());
-    assertEquals(intermediateStatement.getResultType(), ResultType.NO_RESULT);
-    Assert.assertNull(intermediateStatement.getStatementResult());
-    assertFalse(intermediateStatement.isHasMoreData());
+    assertEquals(intermediateStatement.getResultTypes().get(0), StatementType.DDL);
+    Assert.assertNull(intermediateStatement.getStatementResult(0));
+    assertFalse(intermediateStatement.isHasMoreData(0));
     assertFalse(intermediateStatement.hasException());
     assertEquals(intermediateStatement.getResultFormatCode(0), 0);
 
@@ -357,9 +357,9 @@ public class StatementTest {
     assertTrue(intermediateStatement.isBatchedQuery());
     List<String> result = intermediateStatement.getStatements();
     assertEquals(result.size(), 3);
-    assertEquals(result.get(0), "INSERT INTO users (id) VALUES (1);");
-    assertEquals(result.get(1), "INSERT INTO users (id) VALUES (2);");
-    assertEquals(result.get(2), "INSERT INTO users (id) VALUES (3);");
+    assertEquals(result.get(0), "INSERT INTO users (id) VALUES (1)");
+    assertEquals(result.get(1), "INSERT INTO users (id) VALUES (2)");
+    assertEquals(result.get(2), "INSERT INTO users (id) VALUES (3)");
   }
 
   @Test
@@ -371,11 +371,11 @@ public class StatementTest {
     assertTrue(intermediateStatement.isBatchedQuery());
     List<String> result = intermediateStatement.getStatements();
     assertEquals(result.size(), 5);
-    assertEquals(result.get(0), "BEGIN TRANSACTION;");
-    assertEquals(result.get(1), "INSERT INTO users (id) VALUES (1);");
-    assertEquals(result.get(2), "INSERT INTO users (id) VALUES (2);");
-    assertEquals(result.get(3), "INSERT INTO users (id) VALUES (3);");
-    assertEquals(result.get(4), "COMMIT;");
+    assertEquals(result.get(0), "BEGIN TRANSACTION");
+    assertEquals(result.get(1), "INSERT INTO users (id) VALUES (1)");
+    assertEquals(result.get(2), "INSERT INTO users (id) VALUES (2)");
+    assertEquals(result.get(3), "INSERT INTO users (id) VALUES (3)");
+    assertEquals(result.get(4), "COMMIT");
   }
 
   @Test
@@ -386,8 +386,8 @@ public class StatementTest {
     assertTrue(intermediateStatement.isBatchedQuery());
     List<String> result = intermediateStatement.getStatements();
     assertEquals(result.size(), 2);
-    assertEquals(result.get(0), "INSERT INTO users (id) VALUES (1);");
-    assertEquals(result.get(1), "INSERT INTO users (id) VALUES (2);");
+    assertEquals(result.get(0), "INSERT INTO users (id) VALUES (1)");
+    assertEquals(result.get(1), "INSERT INTO users (id) VALUES (2)");
   }
 
   @Test
@@ -399,8 +399,8 @@ public class StatementTest {
     assertTrue(intermediateStatement.isBatchedQuery());
     List<String> result = intermediateStatement.getStatements();
     assertEquals(result.size(), 2);
-    assertEquals(result.get(0), "INSERT INTO users (name) VALUES (';;test;;');");
-    assertEquals(result.get(1), "INSERT INTO users (name1, name2) VALUES ('''''', ';'';');");
+    assertEquals(result.get(0), "INSERT INTO users (name) VALUES (';;test;;')");
+    assertEquals(result.get(1), "INSERT INTO users (name1, name2) VALUES ('''''', ';'';')");
   }
 
   @Test
@@ -427,7 +427,7 @@ public class StatementTest {
     assertTrue(intermediateStatement.isBatchedQuery());
     List<String> result = intermediateStatement.getStatements();
     assertEquals(result.size(), 2);
-    assertEquals(result.get(0), "INSERT INTO users (name) VALUES (';;test;;');");
-    assertEquals(result.get(1), "INSERT INTO users (name1, name2) VALUES ('''''', ';'';');");
+    assertEquals(result.get(0), "INSERT INTO users (name) VALUES (';;test;;')");
+    assertEquals(result.get(1), "INSERT INTO users (name1, name2) VALUES ('''''', ';'';')");
   }
 }

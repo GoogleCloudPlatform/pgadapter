@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.commands.Command;
+import com.google.common.collect.ImmutableList;
 import java.sql.SQLException;
 import org.json.simple.JSONObject;
 
@@ -30,12 +31,11 @@ public class MatcherStatement extends IntermediateStatement {
   private JSONObject commandMetadataJSON;
 
   public MatcherStatement(String sql, ConnectionHandler connectionHandler) throws SQLException {
-    super(sql);
+    super(ImmutableList.of(sql));
     this.connection = connectionHandler.getJdbcConnection();
     this.statement = this.connection.createStatement();
     this.commandMetadataJSON = connectionHandler.getServer().getOptions().getCommandMetadataJSON();
     this.sql = translateSQL(sql);
-    this.statements = parseStatements(sql);
     this.command = parseCommand(sql);
   }
 

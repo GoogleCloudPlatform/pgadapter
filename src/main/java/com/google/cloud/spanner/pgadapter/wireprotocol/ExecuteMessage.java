@@ -79,7 +79,7 @@ public class ExecuteMessage extends ControlMessage {
     if (this.statement.hasException()) {
       this.handleError(this.statement.getException());
     } else {
-      this.sendSpannerResult(this.statement, QueryMode.EXTENDED, this.maxRows);
+      this.sendSpannerResult(0, this.statement, QueryMode.EXTENDED, this.maxRows);
     }
     this.connection.cleanUp(this.statement);
   }

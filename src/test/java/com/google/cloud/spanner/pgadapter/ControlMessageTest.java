@@ -19,7 +19,7 @@ import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.ResultType;
+import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.StatementType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -68,9 +68,9 @@ public final class ControlMessageTest {
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    Mockito.when(intermediateStatement.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
+    Mockito.when(intermediateStatement.getStatementType(0)).thenReturn(StatementType.DML);
     Mockito.when(intermediateStatement.getCommand()).thenReturn("INSERT");
-    Mockito.when(intermediateStatement.getUpdateCount()).thenReturn(1);
+    Mockito.when(intermediateStatement.getUpdateCount(0)).thenReturn(1);
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
 
     JSONParser parser = new JSONParser();
@@ -88,7 +88,7 @@ public final class ControlMessageTest {
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
 
     controlMessage = ControlMessage.create(connectionHandler);
-    controlMessage.sendSpannerResult(intermediateStatement, QueryMode.SIMPLE, 0L);
+    controlMessage.sendSpannerResult(0, intermediateStatement, QueryMode.SIMPLE, 0L);
 
     DataInputStream outputReader =
         new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));

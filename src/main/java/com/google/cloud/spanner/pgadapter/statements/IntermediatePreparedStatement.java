@@ -18,6 +18,7 @@ import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.SQLMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.SetMultimap;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -37,7 +38,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   protected List<Integer> parameterDataTypes;
 
   public IntermediatePreparedStatement(String sql, Connection connection) throws SQLException {
-    super(sql);
+    super(ImmutableList.of(sql));
     SQLMetadata parsedSQL = Converter.toJDBCParams(sql);
     this.parameterCount = parsedSQL.getParameterCount();
     this.sql = parsedSQL.getSqlString();
@@ -54,7 +55,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       int totalParameters,
       SetMultimap<Integer, Integer> parameterIndexToPositions,
       Connection connection) {
-    super(sql);
+    super(ImmutableList.of(sql));
     this.sql = sql;
     this.command = parseCommand(sql);
     this.parameterCount = totalParameters;
@@ -102,7 +103,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     this.executed = true;
     try {
       ((PreparedStatement) this.statement).execute();
-      this.updateResultCount();
+      this.updateResultCount(0);
     } catch (SQLException e) {
       handleExecutionException(e);
     }
