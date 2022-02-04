@@ -867,7 +867,8 @@ public class ProtocolTest {
 
     Mockito.doReturn(false)
         .when(messageSpy)
-        .sendSpannerResult(anyInt(), any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
+        .sendSpannerResult(
+            anyInt(), any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
 
     messageSpy.send();
 
@@ -1371,15 +1372,15 @@ public class ProtocolTest {
     Assert.assertEquals(outputResult.readByte(), 'S');
     Assert.assertEquals(outputResult.readInt(), 25);
     Assert.assertEquals(readUntil(outputResult, "server_encoding\0".length()), "server_encoding\0");
-    Assert.assertEquals(readUntil(outputResult, "utf8\0".length()), "utf8\0");
+    Assert.assertEquals(readUntil(outputResult, "UTF8\0".length()), "UTF8\0");
     Assert.assertEquals(outputResult.readByte(), 'S');
     Assert.assertEquals(outputResult.readInt(), 25);
     Assert.assertEquals(readUntil(outputResult, "client_encoding\0".length()), "client_encoding\0");
-    Assert.assertEquals(readUntil(outputResult, "utf8\0".length()), "utf8\0");
+    Assert.assertEquals(readUntil(outputResult, "UTF8\0".length()), "UTF8\0");
     Assert.assertEquals(outputResult.readByte(), 'S');
-    Assert.assertEquals(outputResult.readInt(), 18);
+    Assert.assertEquals(outputResult.readInt(), 22);
     Assert.assertEquals(readUntil(outputResult, "DateStyle\0".length()), "DateStyle\0");
-    Assert.assertEquals(readUntil(outputResult, "ISO\0".length()), "ISO\0");
+    Assert.assertEquals(readUntil(outputResult, "ISO,YMD\0".length()), "ISO,YMD\0");
     Assert.assertEquals(outputResult.readByte(), 'S');
     Assert.assertEquals(outputResult.readInt(), 27);
     Assert.assertEquals(readUntil(outputResult, "IntervalStyle\0".length()), "IntervalStyle\0");

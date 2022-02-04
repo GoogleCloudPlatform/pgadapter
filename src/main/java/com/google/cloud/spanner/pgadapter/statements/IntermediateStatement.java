@@ -71,9 +71,7 @@ public class IntermediateStatement {
     this.hasMoreData = new boolean[this.statements.size()];
   }
 
-  /**
-   * @return The number of SQL statements in this {@link IntermediateStatement}
-   */
+  /** @return The number of SQL statements in this {@link IntermediateStatement} */
   public int getStatementCount() {
     return statements.size();
   }
@@ -300,6 +298,7 @@ public class IntermediateStatement {
    * Executes all the statements in this {@link IntermediateStatement}. This method tries to batch
    * statements together when that is possible (i.e. multiple DML statements in a row), and executes
    * other statements individually.
+   *
    * @throws SQLException If a database error occurs
    */
   private void executeBatch() throws SQLException {
@@ -335,7 +334,8 @@ public class IntermediateStatement {
    */
   private int executeStatementsInBatch(int fromIndex) throws SQLException {
     Preconditions.checkArgument(fromIndex < getStatementCount() - 1);
-    Preconditions.checkArgument(canBeBatchedTogether(getStatementType(fromIndex), getStatementType(fromIndex + 1)));
+    Preconditions.checkArgument(
+        canBeBatchedTogether(getStatementType(fromIndex), getStatementType(fromIndex + 1)));
     StatementType batchType = getResultTypes().get(fromIndex);
     // Add the first statement to the batch, as we know that this statement is compatible with this
     // batch.
@@ -359,7 +359,8 @@ public class IntermediateStatement {
   }
 
   private boolean canBeBatchedTogether(StatementType statement1, StatementType statement2) {
-    if (Objects.equals(statement1, StatementType.QUERY) || Objects.equals(statement1, StatementType.OTHER)) {
+    if (Objects.equals(statement1, StatementType.QUERY)
+        || Objects.equals(statement1, StatementType.OTHER)) {
       return false;
     }
     return Objects.equals(statement1, statement2);

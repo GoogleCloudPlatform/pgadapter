@@ -95,12 +95,9 @@ public class QueryMessage extends ControlMessage {
       }
     }
     boolean inTransaction =
-        connection
-            .getJdbcConnection()
-            .unwrap(CloudSpannerJdbcConnection.class)
-            .isInTransaction();
+        connection.getJdbcConnection().unwrap(CloudSpannerJdbcConnection.class).isInTransaction();
     new ReadyResponse(
-        this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
+            this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
         .send();
     this.connection.cleanUp(this.statement);
   }

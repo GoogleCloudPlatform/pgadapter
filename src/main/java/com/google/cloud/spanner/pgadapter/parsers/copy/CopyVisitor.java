@@ -10,6 +10,8 @@ public interface CopyVisitor {
 
   public Object visit(ASTQualifiedName node, Object data);
 
+  public Object visit(ASTNamespace node, Object data);
+
   public Object visit(ASTColumnList node, Object data);
 
   public Object visit(ASTColumnElement node, Object data);
@@ -32,4 +34,4 @@ public interface CopyVisitor {
 
   public Object visit(ASTBoolean node, Object data);
 }
-/* JavaCC - OriginalChecksum=893c4444b3575abc83ad4333b2332301 (do not edit this line) */
+/* JavaCC - OriginalChecksum=25f605c8d31c82e3eef2057d8a0a0d9f (do not edit this line) */

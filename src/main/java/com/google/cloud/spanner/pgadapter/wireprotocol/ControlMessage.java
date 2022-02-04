@@ -131,7 +131,8 @@ public abstract class ControlMessage extends WireMessage {
    * IntermediateStatement} will cache the result in between calls and continue serving rows from
    * the position it was left off after the last execute message.
    */
-  public boolean sendSpannerResult(int resultIndex, IntermediateStatement statement, QueryMode mode, long maxRows)
+  public boolean sendSpannerResult(
+      int resultIndex, IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
     String command = statement.getCommand();
     switch (statement.getStatementType(resultIndex)) {
@@ -159,7 +160,8 @@ public abstract class ControlMessage extends WireMessage {
         new CommandCompleteResponse(this.outputStream, command).send();
         return false;
       default:
-        throw new IllegalStateException("Unknown result type: " + statement.getResultTypes().get(0));
+        throw new IllegalStateException(
+            "Unknown result type: " + statement.getResultTypes().get(0));
     }
   }
 
@@ -174,14 +176,19 @@ public abstract class ControlMessage extends WireMessage {
    * @throws Exception
    */
   public SendResultSetState sendResultSet(
-      int resultIndex, IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
+      int resultIndex, IntermediateStatement describedResult, QueryMode mode, long maxRows)
+      throws Exception {
     long rows = 0;
     boolean hasData = describedResult.isHasMoreData(resultIndex);
     ResultSet resultSet = describedResult.getStatementResult(resultIndex);
     // TODO optimize loop
     while (hasData) {
       new DataRowResponse(
-              this.outputStream, resultIndex, describedResult, this.connection.getServer().getOptions(), mode)
+              this.outputStream,
+              resultIndex,
+              describedResult,
+              this.connection.getServer().getOptions(),
+              mode)
           .send();
       rows++;
       try {

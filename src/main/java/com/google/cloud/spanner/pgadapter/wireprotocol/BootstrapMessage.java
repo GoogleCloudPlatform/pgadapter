@@ -98,9 +98,9 @@ public abstract class BootstrapMessage extends WireMessage {
     new ParameterStatusResponse(output, "session_authorization".getBytes(), "PGAdapter".getBytes())
         .send();
     new ParameterStatusResponse(output, "integer_datetimes".getBytes(), "on".getBytes()).send();
-    new ParameterStatusResponse(output, "server_encoding".getBytes(), "utf8".getBytes()).send();
-    new ParameterStatusResponse(output, "client_encoding".getBytes(), "utf8".getBytes()).send();
-    new ParameterStatusResponse(output, "DateStyle".getBytes(), "ISO".getBytes()).send();
+    new ParameterStatusResponse(output, "server_encoding".getBytes(), "UTF8".getBytes()).send();
+    new ParameterStatusResponse(output, "client_encoding".getBytes(), "UTF8".getBytes()).send();
+    new ParameterStatusResponse(output, "DateStyle".getBytes(), "ISO,YMD".getBytes()).send();
     new ParameterStatusResponse(output, "IntervalStyle".getBytes(), "iso_8601".getBytes()).send();
     new ParameterStatusResponse(output, "standard_conforming_strings".getBytes(), "on".getBytes())
         .send();
