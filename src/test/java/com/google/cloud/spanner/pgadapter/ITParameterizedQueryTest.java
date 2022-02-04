@@ -64,6 +64,8 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     List<String> values =
         new ArrayList<>(Arrays.asList("(1, 1, '1')", "(2, 20, 'Joe')", "(3, 23, 'Jack')"));
     String dml = "INSERT INTO users (id, age, name) VALUES " + String.join(", ", values);
+    // TODO: Refactor the integration tests to use a common subclass, as this is repeated in each
+    // class.
     testEnv.setUp();
     Database database = testEnv.createDatabase();
     testEnv.updateDdl(database.getId().getDatabase(), Collections.singleton(ddl));

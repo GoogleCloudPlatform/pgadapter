@@ -64,6 +64,8 @@ public final class ITQueryTest implements IntegrationTest {
             Arrays.asList(
                 "(1, 1, '1', '12345.67890')", "(2, 20, 'ABCD', 'NaN')", "(3, 23, 'Jack', '22')"));
     String dml = "INSERT INTO users (id, age, name, data) VALUES " + String.join(", ", values);
+    // TODO: Refactor the integration tests to use a common subclass, as this is repeated in each
+    // class.
     testEnv.setUp();
     Database database = testEnv.createDatabase();
     testEnv.updateDdl(database.getId().getDatabase(), Collections.singleton(ddl));
