@@ -17,9 +17,6 @@ public class CopyTreeParser implements CopyVisitor {
     }
 
     public void addColumnName(String name) {
-      if(columnNames == null) {
-        columnNames = new ArrayList<String>();
-      }
       columnNames.add(name);
     }
 
@@ -91,8 +88,8 @@ public class CopyTreeParser implements CopyVisitor {
       return this.nullString;
     }
 
-    private List<String> columnNames;
-    private String tableName;
+    private List<String> columnNames = new ArrayList<String>();
+    private String tableName = "";
     private Format format = Format.TEXT;
     private FromTo direction;
     private boolean header;
@@ -119,8 +116,6 @@ public class CopyTreeParser implements CopyVisitor {
   }
 
   public Object visit(ASTCopyStatement node, Object data) {
-    ASTID idNode = (ASTID) node.jjtGetChild(0).jjtGetChild(0);
-    options.setTableName(idNode.getName());
     data = node.childrenAccept(this, data);
     return data;
   }
@@ -147,7 +142,8 @@ public class CopyTreeParser implements CopyVisitor {
   }
 
   public Object visit(ASTColumnElement node, Object data) {
-    options.addColumnName(node.getName());
+    ASTID columnNode = (ASTID) node.jjtGetChild(0);
+    options.addColumnName(columnNode.getName());
     data = node.childrenAccept(this, data);
     return data;
   }
@@ -158,6 +154,20 @@ public class CopyTreeParser implements CopyVisitor {
   }
 
   public Object visit(ASTQualifiedName node, Object data) {
+    // Zero or more namespaces can prefix the identifier.
+    // (<namespace>.)*table
+    String prefix = "";
+    ASTNamespace currentNode = (ASTNamespace) node.jjtGetChild(0);
+    while(currentNode.jjtGetNumChildren() > 1) {
+      prefix += (((ASTID) currentNode.jjtGetChild(0)).getName() + ".");
+      currentNode = (ASTNamespace) currentNode.jjtGetChild(1);
+    }
+    options.setTableName(prefix + ((ASTID) currentNode.jjtGetChild(0)).getName());
+    data = node.childrenAccept(this, data);
+    return data;
+  }
+
+  public Object visit(ASTNamespace node, Object data) {
     data = node.childrenAccept(this, data);
     return data;
   }
@@ -186,7 +196,7 @@ public class CopyTreeParser implements CopyVisitor {
       } break;
       case "NULL": {
         ASTID idNode = (ASTID) node.jjtGetChild(0);
-        options.setNullString(idNode.getName().replaceAll("[\"|\']", ""));
+        options.setNullString(idNode.getName());
       } break;
       case "HEADER": {
         ASTBoolean boolNode = (ASTBoolean) node.jjtGetChild(0);

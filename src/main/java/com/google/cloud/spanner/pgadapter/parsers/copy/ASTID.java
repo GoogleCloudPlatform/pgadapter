@@ -7,12 +7,12 @@ public class ASTID extends SimpleNode {
     super(id);
   }
 
-  public void setName(String n) {
-    name = n;
+  public void setName(String name) {
+    this.name = name;
   }
 
   public String getName() {
-    return name;
+    return this.name;
   }
 
   public String toString() {
