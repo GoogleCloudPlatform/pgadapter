@@ -215,20 +215,26 @@ public final class PgAdapterTestEnv {
       throw new IllegalStateException(
           "Cannot create a new test database if " + USE_EXISTING_DB + " is true.");
     }
-    String databaseId = getDatabaseId();
-    Spanner spanner = getSpanner();
-    DatabaseAdminClient client = spanner.getDatabaseAdminClient();
-    OperationFuture<Database, CreateDatabaseMetadata> op =
-        client.createDatabase(
-            client
-                .newDatabaseBuilder(DatabaseId.of(projectId, instanceId, databaseId))
-                .setDialect(Dialect.POSTGRESQL)
-                .build(),
-            Collections.emptyList());
-    Database db = op.get();
-    databases.add(db);
-    logger.log(Level.INFO, "Created database [" + db.getId() + "]");
-    return db;
+    try {
+      String databaseId = getDatabaseId();
+      Spanner spanner = getSpanner();
+      DatabaseAdminClient client = spanner.getDatabaseAdminClient();
+      OperationFuture<Database, CreateDatabaseMetadata> op =
+          client.createDatabase(
+              client
+                  .newDatabaseBuilder(DatabaseId.of(projectId, instanceId, databaseId))
+                  .setDialect(Dialect.POSTGRESQL)
+                  .build(),
+              Collections.emptyList());
+      Database db = op.get();
+      databases.add(db);
+      logger.log(Level.INFO, "Created database [" + db.getId() + "]");
+      return db;
+    } catch (Exception e) {
+      // TODO: Remove once clear is what is causing the INVALID_ARGUMENT error
+      e.printStackTrace();
+      throw e;
+    }
   }
 
   public void updateDdl(String databaseId, Iterable<String> statements) throws Exception {
