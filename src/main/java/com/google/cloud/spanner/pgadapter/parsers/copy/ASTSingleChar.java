@@ -18,5 +18,4 @@ public class ASTSingleChar extends SimpleNode {
   public String toString() {
     return "Char: " + this.character;
   }
-
 }

@@ -18,5 +18,4 @@ public class ASTID extends SimpleNode {
   public String toString() {
     return "Identifier: " + name;
   }
-
 }
