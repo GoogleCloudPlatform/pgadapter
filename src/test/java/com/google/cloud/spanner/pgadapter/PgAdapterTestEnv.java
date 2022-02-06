@@ -191,6 +191,9 @@ public final class PgAdapterTestEnv {
     if (id.length() > 30) {
       id = id.substring(0, 30);
     }
+    if (id.endsWith("-") || id.endsWith("_")) {
+      id = id.substring(0, id.length() - 1);
+    }
     return id;
   }
 
@@ -215,26 +218,20 @@ public final class PgAdapterTestEnv {
       throw new IllegalStateException(
           "Cannot create a new test database if " + USE_EXISTING_DB + " is true.");
     }
-    try {
-      String databaseId = getDatabaseId();
-      Spanner spanner = getSpanner();
-      DatabaseAdminClient client = spanner.getDatabaseAdminClient();
-      OperationFuture<Database, CreateDatabaseMetadata> op =
-          client.createDatabase(
-              client
-                  .newDatabaseBuilder(DatabaseId.of(projectId, instanceId, databaseId))
-                  .setDialect(Dialect.POSTGRESQL)
-                  .build(),
-              Collections.emptyList());
-      Database db = op.get();
-      databases.add(db);
-      logger.log(Level.INFO, "Created database [" + db.getId() + "]");
-      return db;
-    } catch (Exception e) {
-      // TODO: Remove once clear is what is causing the INVALID_ARGUMENT error
-      e.printStackTrace();
-      throw e;
-    }
+    String databaseId = getDatabaseId();
+    Spanner spanner = getSpanner();
+    DatabaseAdminClient client = spanner.getDatabaseAdminClient();
+    OperationFuture<Database, CreateDatabaseMetadata> op =
+        client.createDatabase(
+            client
+                .newDatabaseBuilder(DatabaseId.of(projectId, instanceId, databaseId))
+                .setDialect(Dialect.POSTGRESQL)
+                .build(),
+            Collections.emptyList());
+    Database db = op.get();
+    databases.add(db);
+    logger.log(Level.INFO, "Created database [" + db.getId() + "]");
+    return db;
   }
 
   public void updateDdl(String databaseId, Iterable<String> statements) throws Exception {
