@@ -224,7 +224,7 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
   public void unnamedParameterTest() throws Exception {
     testEnv.waitForServer(server);
 
-    clientSocket = new Socket(InetAddress.getByName(null), testEnv.getPort());
+    clientSocket = new Socket(InetAddress.getByName(null), server.getLocalPort());
     out = new DataOutputStream(clientSocket.getOutputStream());
     in = new DataInputStream(clientSocket.getInputStream());
     testEnv.initializeConnection(out);
@@ -280,7 +280,7 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     String statementName = "test-statement\0";
     String portalName = "test-portal\0";
 
-    clientSocket = new Socket(InetAddress.getByName(null), testEnv.getPort());
+    clientSocket = new Socket(InetAddress.getByName(null), server.getLocalPort());
     out = new DataOutputStream(clientSocket.getOutputStream());
     in = new DataInputStream(clientSocket.getInputStream());
     testEnv.initializeConnection(out);

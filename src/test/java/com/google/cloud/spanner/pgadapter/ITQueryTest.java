@@ -103,7 +103,7 @@ public final class ITQueryTest implements IntegrationTest {
   public void simplePgQuery() throws Exception {
     testEnv.waitForServer(server);
 
-    Socket clientSocket = new Socket(InetAddress.getByName(null), testEnv.getPort());
+    Socket clientSocket = new Socket(InetAddress.getByName(null), server.getLocalPort());
     DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
     DataInputStream in = new DataInputStream(clientSocket.getInputStream());
     testEnv.initializeConnection(out);
@@ -138,7 +138,7 @@ public final class ITQueryTest implements IntegrationTest {
   public void basicSelectTest() throws Exception {
     testEnv.waitForServer(server);
 
-    Socket clientSocket = new Socket(InetAddress.getByName(null), testEnv.getPort());
+    Socket clientSocket = new Socket(InetAddress.getByName(null), server.getLocalPort());
     DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
     DataInputStream in = new DataInputStream(clientSocket.getInputStream());
     testEnv.initializeConnection(out);

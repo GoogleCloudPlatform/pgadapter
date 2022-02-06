@@ -108,7 +108,7 @@ public final class PgAdapterTestEnv {
   private String gcpCredentials;
 
   // Port used by the pgadapter.
-  private int port = 0;
+  private int port = -1;
 
   // Shared Spanner instance that is automatically created and closed.
   private Spanner spanner;
@@ -151,10 +151,8 @@ public final class PgAdapterTestEnv {
   }
 
   public int getPort() {
-    if (port == 0) {
-      Random rand = new Random(System.currentTimeMillis());
-      int defaultPort = rand.nextInt(10000) + 10000;
-      port = Integer.parseInt(System.getProperty(SERVICE_PORT, String.valueOf(defaultPort)));
+    if (port == -1) {
+      port = Integer.parseInt(System.getProperty(SERVICE_PORT, "0"));
     }
     return port;
   }

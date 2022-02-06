@@ -91,8 +91,12 @@ public class ProxyServer extends Thread {
           String.valueOf(this.options.getProxyPort()));
       this.status = ServerStatus.STARTING;
       start();
-      logger.log(
-          Level.INFO, "Server started on port {0}", String.valueOf(this.options.getProxyPort()));
+      // TODO: Consider changing the server to use ApiService, so we don't have to manage the state
+      //  of the server manually.
+      while (this.status == ServerStatus.STARTING) {
+        Thread.yield();
+      }
+      logger.log(Level.INFO, "Server started on port {0}", String.valueOf(getLocalPort()));
     }
   }
 
@@ -204,6 +208,13 @@ public class ProxyServer extends Thread {
 
   public int getNumberOfConnections() {
     return this.handlers.size();
+  }
+
+  public int getLocalPort() {
+    if (this.serverSocket != null) {
+      return this.serverSocket.getLocalPort();
+    }
+    return -1;
   }
 
   public ServerStatus getServerStatus() {
