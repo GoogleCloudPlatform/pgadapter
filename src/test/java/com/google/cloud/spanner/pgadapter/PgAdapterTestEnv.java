@@ -184,8 +184,19 @@ public final class PgAdapterTestEnv {
     if (databaseId == null) {
       databaseId = System.getProperty(TEST_DATABASE_PROPERTY, DEFAULT_DATABASE_ID);
     }
-    return String.format(
-        "%s_%d_%d", databaseId, System.currentTimeMillis(), new Random().nextInt(Short.MAX_VALUE));
+    String id =
+        String.format(
+            "%s_%d_%d",
+            databaseId, System.currentTimeMillis(), new Random().nextInt(Short.MAX_VALUE));
+    // Make sure the database id is not longer than the max allowed 30 characters.
+    if (id.length() > 30) {
+      id = id.substring(0, 30);
+    }
+    // Database ids may not end with a hyphen or an underscore.
+    if (id.endsWith("-") || id.endsWith("_")) {
+      id = id.substring(0, id.length() - 1);
+    }
+    return id;
   }
 
   public URL getUrl() {
