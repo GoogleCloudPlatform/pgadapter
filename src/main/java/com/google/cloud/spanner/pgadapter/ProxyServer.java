@@ -110,6 +110,8 @@ public class ProxyServer extends Thread {
             "Server on port {0} is stopping",
             String.valueOf(this.options.getProxyPort()));
         this.status = ServerStatus.STOPPING;
+        // TODO: This should also gracefully inform clients that the server will be shutting down
+        // and close any open connections.
         this.serverSocket.close();
         logger.log(
             Level.INFO,

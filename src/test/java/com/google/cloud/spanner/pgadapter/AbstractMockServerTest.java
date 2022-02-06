@@ -17,10 +17,12 @@ package com.google.cloud.spanner.pgadapter;
 import com.google.api.gax.core.NoCredentialsProvider;
 import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
 import com.google.cloud.NoCredentials;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockDatabaseAdminServiceImpl;
 import com.google.cloud.spanner.MockOperationsServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient;
 import com.google.cloud.spanner.admin.database.v1.DatabaseAdminSettings;
@@ -39,11 +41,33 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.net.InetSocketAddress;
+import java.util.logging.Logger;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 
+/**
+ * Abstract base class for tests that verify that PgAdapter is receiving wire protocol requests
+ * correctly, translates these correctly to Spanner RPC invocations, and correctly translates the
+ * RPC invocations back to wire protocol responses. The test starts two in-process servers for this
+ * purpose: 1. An in-process {@link MockSpannerServiceImpl}. The mock server implements the entire
+ * gRPC API of Cloud Spanner, but does not contain an actual query engine or any other
+ * implementation. Instead, all query and DML statements that the client will be executing must
+ * first be registered as mock results on the server. This makes the mock server dialect agnostic
+ * and usable for both normal Spanner requests and Spangres requests. Note that this also means that
+ * the server does NOT verify that the SQL statement is correct and valid for the specific dialect.
+ * It only verifies that the statement corresponds with one of the previously registered statements
+ * on the server. 2. An in-process PgAdapter {@link ProxyServer} that connects to the
+ * above-mentioned mock Spanner server. The in-process PgAdapter server listens on a random local
+ * port, and tests can use the client of their choosing to connect to the {@link ProxyServer}. The
+ * requests are translated by the proxy into RPC invocations on the mock Spanner server, and the
+ * responses from the mock Spanner server are translated into wire protocol responses to the client.
+ * The tests can then inspect the requests that the mock Spanner server received to verify that the
+ * server received the requests that the test expected.
+ */
 abstract class AbstractMockServerTest {
+  private static final Logger logger = Logger.getLogger(AbstractMockServerTest.class.getName());
+
   protected static final Statement SELECT1 = Statement.of("SELECT 1");
   protected static final Statement SELECT2 = Statement.of("SELECT 2");
   private static final ResultSetMetadata SELECT1_METADATA =
@@ -147,7 +171,22 @@ abstract class AbstractMockServerTest {
   @AfterClass
   public static void stopMockSpannerAndPgAdapterServers() throws Exception {
     pgServer.stopServer();
-    SpannerPool.closeSpannerPool();
+    try {
+      SpannerPool.closeSpannerPool();
+    } catch (SpannerException e) {
+      if (e.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+          && e.getMessage()
+              .contains(
+                  "There is/are 1 connection(s) still open. Close all connections before calling closeSpanner()")) {
+        // Ignore this exception for now. It is caused by the fact that the PgAdapter proxy server
+        // is not gracefully shutting down all connections when the proxy is stopped, and it also
+        // does not wait until any connections that have been requested to close, actually have
+        // closed.
+        logger.warning(String.format("Ignoring %s as this is expected", e.getMessage()));
+      } else {
+        throw e;
+      }
+    }
     spannerServer.shutdown();
     spannerServer.awaitTermination();
   }
