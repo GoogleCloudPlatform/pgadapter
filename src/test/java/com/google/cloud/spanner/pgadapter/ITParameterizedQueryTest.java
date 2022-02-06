@@ -20,6 +20,7 @@ import static org.junit.Assert.assertThat;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Bytes;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -66,20 +67,24 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     Database db = testEnv.createDatabase();
     testEnv.updateDdl(db.getId().getDatabase(), Arrays.asList(ddl));
     testEnv.updateTables(db.getId().getDatabase(), Arrays.asList(dml));
-    String[] args = {
-      "-p",
-      testEnv.getProjectId(),
-      "-i",
-      testEnv.getInstanceId(),
-      "-d",
-      db.getId().getDatabase(),
-      "-c",
-      testEnv.getCredentials(),
-      "-s",
-      String.valueOf(testEnv.getPort()),
-      "-e",
-      "staging-wrenchworks.sandbox.googleapis.com"
-    };
+    String credentials = testEnv.getCredentials();
+    ImmutableList.Builder<String> argsListBuilder =
+        ImmutableList.<String>builder()
+            .add(
+                "-p",
+                testEnv.getProjectId(),
+                "-i",
+                testEnv.getInstanceId(),
+                "-d",
+                db.getId().getDatabase(),
+                "-s",
+                String.valueOf(testEnv.getPort()),
+                "-e",
+                testEnv.getUrl().getHost());
+    if (credentials != null) {
+      argsListBuilder.add("-c", testEnv.getCredentials());
+    }
+    args = argsListBuilder.build().toArray(new String[0]);
     server = new ProxyServer(new OptionsMetadata(args));
     server.startServer();
   }
