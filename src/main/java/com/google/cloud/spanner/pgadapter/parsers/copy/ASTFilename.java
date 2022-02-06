@@ -23,7 +23,7 @@ public class ASTFilename extends SimpleNode {
     return "Filename: " + name;
   }
 
-  /** Accept the visitor. * */
+  /** Accept the visitor. **/
   public Object jjtAccept(CopyVisitor visitor, Object data) {
     return visitor.visit(this, data);
   }

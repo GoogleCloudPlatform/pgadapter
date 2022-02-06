@@ -39,10 +39,12 @@ public class CopyStatement extends IntermediateStatement {
   private CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
   private CSVFormat format;
 
+  // Table columns read from information schema.
   private Map<String, TypeCode> tableColumns;
   private MutationWriter mutationWriter;
 
   public CopyStatement(String sql, Connection connection) throws SQLException {
+    super(sql);
     this.sql = sql;
     this.command = parseCommand(sql);
     this.connection = connection;
@@ -55,25 +57,30 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   /** @return CSVFormat for parsing copy data based on COPY statement options specified. */
-  public CSVFormat getParserFormat() {
-    CSVFormat format = CSVFormat.POSTGRESQL_TEXT;
+  public void setParserFormat() {
+    this.format = CSVFormat.POSTGRESQL_TEXT;
     if (options.getFormat() == Format.CSV) {
-      format = CSVFormat.POSTGRESQL_CSV;
+      this.format = CSVFormat.POSTGRESQL_CSV;
     }
     if (!Strings.isNullOrEmpty(options.getNullString())) {
-      format = format.withNullString(options.getNullString());
+      this.format = this.format.withNullString(options.getNullString());
     }
     if (options.getDelimiter() != '\0') {
-      format = format.withDelimiter(options.getDelimiter());
+      this.format = this.format.withDelimiter(options.getDelimiter());
     }
     if (options.getEscape() != '\0') {
-      format = format.withEscape(options.getEscape());
+      this.format = this.format.withEscape(options.getEscape());
     }
     if (options.getQuote() != '\0') {
-      format = format.withQuote(options.getQuote());
+      this.format = this.format.withQuote(options.getQuote());
     }
-    format = format.withHeader(this.tableColumns.keySet().toArray(new String[0]));
-    return format;
+    // if(options.hasHeader()) {
+    this.format = this.format.withHeader(this.tableColumns.keySet().toArray(new String[0]));
+    // }
+  }
+
+  public CSVFormat getParserFormat() {
+    return this.format;
   }
 
   public String getTableName() {
@@ -90,29 +97,29 @@ public class CopyStatement extends IntermediateStatement {
     return options.getFormat().toString();
   }
 
+  /** @return True if copy data contains a header, false otherwise. */
+  public boolean hasHeader() {
+    return options.hasHeader();
+  }
+
   /** @return Null string specified in COPY statement, if provided. */
   public String getNullString() {
-    return options.getNullString();
+    return this.format.getNullString();
   }
 
   /** @return Delimiter character specified in COPY statement, if provided. */
   public char getDelimiterChar() {
-    return options.getDelimiter();
+    return this.format.getDelimiter();
   }
 
   /** @return Escape character specified in COPY statement, if provided. */
   public char getEscapeChar() {
-    return options.getEscape();
+    return this.format.getEscapeCharacter();
   }
 
   /** @return Quote character specified in COPY statement, if provided. */
   public char getQuoteChar() {
-    return options.getQuote();
-  }
-
-  /** @return True if copy data contains a header, false otherwise. */
-  public boolean hasHeader() {
-    return options.getHeader();
+    return this.format.getQuoteCharacter();
   }
 
   public MutationWriter getMutationWriter() {
@@ -120,6 +127,10 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   private void verifyCopyColumns() throws SQLException {
+    if (options.getColumnNames().size() == 0) {
+      // Use all columns if none were specified.
+      return;
+    }
     if (options.getColumnNames().size() > this.tableColumns.size()) {
       throw new SQLException("Number of copy columns provided exceed table column count");
     }
@@ -156,7 +167,7 @@ public class CopyStatement extends IntermediateStatement {
                 + COLUMN_NAME
                 + ", "
                 + SPANNER_TYPE
-                + " FROM information_schema.columns WHERE table_name = ?");
+                + " FROM information_schema.columns WHERE table_name = \"?\"");
     statement.setString(1, getTableName());
     ResultSet result = statement.executeQuery();
 
@@ -182,9 +193,11 @@ public class CopyStatement extends IntermediateStatement {
     this.executed = true;
     try {
       parseCopyStatement();
+      queryInformationSchema();
+      setParserFormat();
       mutationWriter =
           new MutationWriter(
-              options.getTableName(), this.tableColumns, getParserFormat(), hasHeader());
+              options.getTableName(), getTableColumns(), getParserFormat(), hasHeader());
       updateResultCount(); // Gets update count, set hasMoreData false and statement result
     } catch (Exception e) {
       SQLException se = new SQLException(e.toString());
@@ -195,7 +208,6 @@ public class CopyStatement extends IntermediateStatement {
   private void parseCopyStatement() throws Exception {
     try {
       parse(sql, this.options);
-      queryInformationSchema();
     } catch (Exception e) {
       throw new SQLException("Invalid COPY statement syntax: " + e.toString());
     }

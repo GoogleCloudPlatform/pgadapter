@@ -23,7 +23,7 @@ public class ASTBoolean extends SimpleNode {
     return "Value: " + Boolean.toString(this.bool);
   }
 
-  /** Accept the visitor. * */
+  /** Accept the visitor. **/
   public Object jjtAccept(CopyVisitor visitor, Object data) {
     return visitor.visit(this, data);
   }

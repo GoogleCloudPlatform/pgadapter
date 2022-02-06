@@ -2,7 +2,8 @@
 /* JavaCCOptions:MULTI=true,NODE_USES_PARSER=false,VISITOR=true,TRACK_TOKENS=false,NODE_PREFIX=AST,NODE_EXTENDS=,NODE_FACTORY=,SUPPORT_CLASS_VISIBILITY_PUBLIC=true */
 package com.google.cloud.spanner.pgadapter.parsers.copy;
 
-public class ASTCopyOptions extends SimpleNode {
+public
+class ASTCopyOptions extends SimpleNode {
   public ASTCopyOptions(int id) {
     super(id);
   }
@@ -11,10 +12,12 @@ public class ASTCopyOptions extends SimpleNode {
     super(p, id);
   }
 
-  /** Accept the visitor. * */
+
+  /** Accept the visitor. **/
   public Object jjtAccept(CopyVisitor visitor, Object data) {
 
-    return visitor.visit(this, data);
+    return
+    visitor.visit(this, data);
   }
 }
 /* JavaCC - OriginalChecksum=a93d6d1adf7405bb1483266d811e9357 (do not edit this line) */
