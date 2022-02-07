@@ -151,7 +151,7 @@ public class ITJdbcTest implements IntegrationTest {
     try (Connection connection =
         DriverManager.getConnection(
             String.format(
-                "jdbc:postgresql://localhost:%d/?preferQueryMode=simple", testEnv.getPort()))) {
+                "jdbc:postgresql://localhost:%d/?preferQueryMode=simple", server.getLocalPort()))) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // Statement#execute(String) returns false if the result is an update count or no result.
         assertFalse(
@@ -196,7 +196,7 @@ public class ITJdbcTest implements IntegrationTest {
     try (Connection connection =
         DriverManager.getConnection(
             String.format(
-                "jdbc:postgresql://localhost:%d/?preferQueryMode=simple", testEnv.getPort()))) {
+                "jdbc:postgresql://localhost:%d/?preferQueryMode=simple", server.getLocalPort()))) {
       try (java.sql.Statement statement = connection.createStatement()) {
         assertFalse(
             statement.execute(
