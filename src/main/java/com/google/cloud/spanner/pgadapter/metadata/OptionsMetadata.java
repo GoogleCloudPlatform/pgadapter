@@ -49,7 +49,7 @@ public class OptionsMetadata {
       "gcpga -p <project> -i <instance> -d <database> -c <credentials_file>";
   private static final String OPTION_HELP = "h";
   private static final String DEFAULT_PORT = "5432";
-  private static final int MIN_PORT = 1, MAX_PORT = 65535;
+  private static final int MIN_PORT = 0, MAX_PORT = 65535;
   /*Note: this is a private preview feature, not meant for GA version. */
   private static final String OPTION_SPANNER_ENDPOINT = "e";
   private static final String OPTION_JDBC_PROPERTIES = "r";

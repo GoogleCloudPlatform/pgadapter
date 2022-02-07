@@ -29,7 +29,6 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
 import org.junit.After;
@@ -67,9 +66,9 @@ public final class ITQueryTest implements IntegrationTest {
     // TODO: Refactor the integration tests to use a common subclass, as this is repeated in each
     // class.
     testEnv.setUp();
-    Database database = testEnv.createDatabase();
-    testEnv.updateDdl(database.getId().getDatabase(), Collections.singleton(ddl));
-    testEnv.updateTables(database.getId().getDatabase(), Collections.singleton(dml));
+    Database db = testEnv.createDatabase();
+    testEnv.updateDdl(db.getId().getDatabase(), Arrays.asList(ddl));
+    testEnv.updateTables(db.getId().getDatabase(), Arrays.asList(dml));
     String credentials = testEnv.getCredentials();
     ImmutableList.Builder<String> argsListBuilder =
         ImmutableList.<String>builder()
@@ -79,7 +78,7 @@ public final class ITQueryTest implements IntegrationTest {
                 "-i",
                 testEnv.getInstanceId(),
                 "-d",
-                database.getId().getDatabase(),
+                db.getId().getDatabase(),
                 "-s",
                 String.valueOf(testEnv.getPort()),
                 "-e",
@@ -87,9 +86,7 @@ public final class ITQueryTest implements IntegrationTest {
     if (credentials != null) {
       argsListBuilder.add("-c", testEnv.getCredentials());
     }
-    String[] args = argsListBuilder.build().toArray(new String[0]);
-    server = new ProxyServer(new OptionsMetadata(args));
-    server.startServer();
+    args = argsListBuilder.build().toArray(new String[0]);
   }
 
   @Before
@@ -112,7 +109,7 @@ public final class ITQueryTest implements IntegrationTest {
   public void simplePgQuery() throws Exception {
     testEnv.waitForServer(server);
 
-    Socket clientSocket = new Socket(InetAddress.getByName(null), testEnv.getPort());
+    Socket clientSocket = new Socket(InetAddress.getByName(null), server.getLocalPort());
     DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
     DataInputStream in = new DataInputStream(clientSocket.getInputStream());
     testEnv.initializeConnection(out);
@@ -147,7 +144,7 @@ public final class ITQueryTest implements IntegrationTest {
   public void basicSelectTest() throws Exception {
     testEnv.waitForServer(server);
 
-    Socket clientSocket = new Socket(InetAddress.getByName(null), testEnv.getPort());
+    Socket clientSocket = new Socket(InetAddress.getByName(null), server.getLocalPort());
     DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
     DataInputStream in = new DataInputStream(clientSocket.getInputStream());
     testEnv.initializeConnection(out);

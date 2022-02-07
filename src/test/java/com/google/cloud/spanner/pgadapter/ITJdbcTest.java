@@ -136,7 +136,7 @@ public class ITJdbcTest implements IntegrationTest {
   public void testSelectHelloWorld() throws SQLException {
     try (Connection connection =
         DriverManager.getConnection(
-            String.format("jdbc:postgresql://localhost:%d/", testEnv.getPort()))) {
+            String.format("jdbc:postgresql://localhost:%d/", server.getLocalPort()))) {
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("SELECT 'Hello World!'")) {
         assertTrue(resultSet.next());
