@@ -154,7 +154,6 @@ public class MutationWriter {
   /** @return list of CSVRecord rows parsed with CSVParser from CopyData payload byte array */
   private List<CSVRecord> parsePayloadData(byte[] payload) throws IOException {
     String copyData = new String(payload, StandardCharsets.UTF_8).trim();
-    // String copyData = new String(payload, StandardCharsets.UTF_8);
     CSVParser parser;
     if (this.hasHeader && !this.isHeaderParsed) {
       parser = CSVParser.parse(copyData, this.format.withFirstRecordAsHeader());
