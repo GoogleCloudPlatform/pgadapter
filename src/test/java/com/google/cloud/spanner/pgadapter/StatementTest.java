@@ -88,7 +88,7 @@ public class StatementTest {
         new IntermediateStatement("SELECT * FROM users", connection);
 
     assertFalse(intermediateStatement.isExecuted());
-    assertEquals(intermediateStatement.getCommand(), "SELECT");
+    assertEquals(intermediateStatement.getCommand(0), "SELECT");
 
     intermediateStatement.execute();
 
@@ -115,7 +115,7 @@ public class StatementTest {
         new IntermediateStatement("UPDATE users SET name = someName WHERE id = 10", connection);
 
     assertFalse(intermediateStatement.isExecuted());
-    assertEquals(intermediateStatement.getCommand(), "UPDATE");
+    assertEquals(intermediateStatement.getCommand(0), "UPDATE");
 
     intermediateStatement.execute();
 
@@ -144,7 +144,7 @@ public class StatementTest {
         new IntermediateStatement("UPDATE users SET name = someName WHERE id = -1", connection);
 
     assertFalse(intermediateStatement.isExecuted());
-    assertEquals(intermediateStatement.getCommand(), "UPDATE");
+    assertEquals(intermediateStatement.getCommand(0), "UPDATE");
 
     intermediateStatement.execute();
 
@@ -173,7 +173,7 @@ public class StatementTest {
         new IntermediateStatement("CREATE TABLE users (name varchar(100) primary key)", connection);
 
     assertFalse(intermediateStatement.isExecuted());
-    assertEquals(intermediateStatement.getCommand(), "CREATE");
+    assertEquals(intermediateStatement.getCommand(0), "CREATE");
 
     intermediateStatement.execute();
 
@@ -251,7 +251,7 @@ public class StatementTest {
     Mockito.verify(preparedStatement, Mockito.times(1)).setObject(3, "userName");
 
     assertEquals(intermediatePortalStatement.getSql(), expectedSQL);
-    assertEquals(intermediatePortalStatement.getCommand(), "SELECT");
+    assertEquals(intermediatePortalStatement.getCommand(0), "SELECT");
     assertEquals(intermediatePortalStatement.getStatement(), preparedStatement);
     assertFalse(intermediatePortalStatement.isExecuted());
     assertTrue(intermediateStatement.isBound());

@@ -43,7 +43,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     this.parameterCount = parsedSQL.getParameterCount();
     this.sql = parsedSQL.getSqlString();
     this.parameterIndexToPositions = parsedSQL.getParameterIndexToPositions();
-    this.command = parseCommand(sql);
+    this.commands = parseCommands(ImmutableList.of(sql));
     this.connection = connection;
     this.statement = this.connection.prepareStatement(this.sql);
     this.parameterDataTypes = null;
@@ -57,7 +57,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       Connection connection) {
     super(ImmutableList.of(sql));
     this.sql = sql;
-    this.command = parseCommand(sql);
+    this.commands = parseCommands(ImmutableList.of(sql));
     this.parameterCount = totalParameters;
     this.parameterIndexToPositions = parameterIndexToPositions;
     this.statement = statement;

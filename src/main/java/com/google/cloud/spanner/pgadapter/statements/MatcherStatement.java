@@ -16,9 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.commands.Command;
-import com.google.common.collect.ImmutableList;
 import java.sql.SQLException;
-import org.json.simple.JSONObject;
 
 /**
  * Meant to be utilized when running as a proxy for any interactive terminal tool either PSQL or
@@ -46,7 +44,10 @@ public class MatcherStatement extends IntermediateStatement {
    */
   private static String translateSQL(String sql, ConnectionHandler connectionHandler) {
     for (Command currentCommand :
-        Command.getCommands(sql, connectionHandler.getJdbcConnection(), connectionHandler.getServer().getOptions().getCommandMetadataJSON())) {
+        Command.getCommands(
+            sql,
+            connectionHandler.getJdbcConnection(),
+            connectionHandler.getServer().getOptions().getCommandMetadataJSON())) {
       if (currentCommand.is()) {
         return currentCommand.translate();
       }

@@ -69,7 +69,7 @@ public final class ControlMessageTest {
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(intermediateStatement.getStatementType(0)).thenReturn(StatementType.DML);
-    Mockito.when(intermediateStatement.getCommand()).thenReturn("INSERT");
+    Mockito.when(intermediateStatement.getCommand(0)).thenReturn("INSERT");
     Mockito.when(intermediateStatement.getUpdateCount(0)).thenReturn(1);
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
 

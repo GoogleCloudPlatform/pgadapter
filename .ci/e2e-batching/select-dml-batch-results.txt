@@ -1,1 +1,1 @@
-SELECT COUNT(*) AS c FROM users;
+SELECT COUNT(*) AS c FROM users WHERE id IN (7, 8, 9, 10, 11);

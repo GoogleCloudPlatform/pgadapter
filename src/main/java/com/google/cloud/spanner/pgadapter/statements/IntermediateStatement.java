@@ -41,7 +41,7 @@ public class IntermediateStatement {
   private final boolean[] hasMoreData;
   protected Exception exception;
   protected String sql;
-  protected String command;
+  protected String[] commands;
   protected boolean executed;
   protected Connection connection;
   protected int[] updateCounts;
@@ -53,7 +53,7 @@ public class IntermediateStatement {
   public IntermediateStatement(String sql, Connection connection) throws SQLException {
     this.sql = sql;
     this.statements = parseStatements(sql);
-    this.command = parseCommand(sql);
+    this.commands = parseCommands(this.statements);
     this.connection = connection;
     this.statement = connection.createStatement();
     // Note: This determines the result type based on the first statement in the SQL statement. That
@@ -126,14 +126,19 @@ public class IntermediateStatement {
     return splitStatements(Preconditions.checkNotNull(sql));
   }
 
-  /** Determines the (update) command that was received from the sql string. */
-  protected static String parseCommand(String sql) {
-    Preconditions.checkNotNull(sql);
-    String[] tokens = sql.split("\\s+", 2);
-    if (tokens.length > 0) {
-      return tokens[0].toUpperCase();
+  /** Determines the (update) commands that was received from the sql string. */
+  protected static String[] parseCommands(ImmutableList<String> statements) {
+    Preconditions.checkNotNull(statements);
+    String[] commands = new String[statements.size()];
+    int index = 0;
+    for (String sql : statements) {
+      String[] tokens = sql.split("\\s+", 2);
+      if (tokens.length > 0) {
+        commands[index] = tokens[0].toUpperCase();
+      }
+      index++;
     }
-    return null;
+    return commands;
   }
 
   /**
@@ -384,8 +389,8 @@ public class IntermediateStatement {
   }
 
   /** @return the extracted command (first word) from the SQL statement. */
-  public String getCommand() {
-    return this.command;
+  public String getCommand(int index) {
+    return this.commands[index];
   }
 
   /* Used for testing purposes */
