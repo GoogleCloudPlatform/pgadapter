@@ -27,16 +27,8 @@ import org.json.simple.JSONObject;
  * matches, translates the command into something Spanner can handle.
  */
 public class MatcherStatement extends IntermediateStatement {
-
-  private JSONObject commandMetadataJSON;
-
   public MatcherStatement(String sql, ConnectionHandler connectionHandler) throws SQLException {
-    super(ImmutableList.of(sql));
-    this.connection = connectionHandler.getJdbcConnection();
-    this.statement = this.connection.createStatement();
-    this.commandMetadataJSON = connectionHandler.getServer().getOptions().getCommandMetadataJSON();
-    this.sql = translateSQL(sql);
-    this.command = parseCommand(sql);
+    super(translateSQL(sql, connectionHandler), connectionHandler.getJdbcConnection());
   }
 
   @Override
@@ -52,9 +44,9 @@ public class MatcherStatement extends IntermediateStatement {
    * @return The translated SQL statement if it matches any {@link Command} statement. Otherwise
    *     gives out the original Statement.
    */
-  private String translateSQL(String sql) {
+  private static String translateSQL(String sql, ConnectionHandler connectionHandler) {
     for (Command currentCommand :
-        Command.getCommands(sql, this.connection, this.commandMetadataJSON)) {
+        Command.getCommands(sql, connectionHandler.getJdbcConnection(), connectionHandler.getServer().getOptions().getCommandMetadataJSON())) {
       if (currentCommand.is()) {
         return currentCommand.translate();
       }

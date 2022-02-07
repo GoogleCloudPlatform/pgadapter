@@ -79,6 +79,10 @@ echo "------Test \"-c option dml batching\"------"
 /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/dml-batch.txt)" > .ci/e2e-result/dml-batching.txt
 diff -i -w -s .ci/e2e-result/dml-batching.txt .ci/e2e-expected/dml-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
+echo "------Select dml batching results------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/select-dml-batch-results.txt)" > .ci/e2e-result/select-dml-batch-results.txt
+diff -i -w -s .ci/e2e-result/select-dml-batch-results.txt .ci/e2e-expected/select-dml-batch-results.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"-c option ddl batching\"------"
 /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/ddl-batch.txt)"
