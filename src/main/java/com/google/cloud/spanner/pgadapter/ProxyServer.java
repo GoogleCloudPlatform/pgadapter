@@ -155,7 +155,7 @@ public class ProxyServer extends Thread {
       logger.log(
           Level.INFO,
           "Socket exception on port {0}: {1}. This is normal when the server is stopped.",
-          new Object[] {this.options.getProxyPort(), e});
+          new Object[] {getLocalPort(), e});
     } catch (SQLException e) {
       logger.log(
           Level.SEVERE,
@@ -163,7 +163,7 @@ public class ProxyServer extends Thread {
           e.getMessage());
     } finally {
       this.status = ServerStatus.STOPPED;
-      logger.log(Level.INFO, "Socket on port {0} stopped", this.options.getProxyPort());
+      logger.log(Level.INFO, "Socket on port {0} stopped", getLocalPort());
     }
   }
 
