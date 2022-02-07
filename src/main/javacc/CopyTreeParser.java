@@ -52,7 +52,7 @@ public class CopyTreeParser implements CopyVisitor {
       this.header = header;
     }
 
-    public boolean getHeader() {
+    public boolean hasHeader() {
       return this.header;
     }
 

@@ -6,7 +6,7 @@ on:
 name: ci
 env:
   GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
-  GOOGLE_CLOUD_INSTANCE: "spanner-testing"
+  GOOGLE_CLOUD_INSTANCE: "pg-testing"
   GOOGLE_CLOUD_DATABASE: "testdb_e2e_psql"
   GOOGLE_CLOUD_ENDPOINT: "staging-wrenchworks.sandbox.googleapis.com"
   DOCKERFILE: "build/Dockerfile.ci"
