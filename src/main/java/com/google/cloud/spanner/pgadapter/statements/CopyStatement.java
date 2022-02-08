@@ -57,7 +57,7 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   /** @return CSVFormat for parsing copy data based on COPY statement options specified. */
-  public void setParserFormat() {
+  public void setParserFormat(CopyTreeParser.CopyOptions options) {
     this.format = CSVFormat.POSTGRESQL_TEXT;
     if (options.getFormat() == Format.CSV) {
       this.format = CSVFormat.POSTGRESQL_CSV;
@@ -194,7 +194,7 @@ public class CopyStatement extends IntermediateStatement {
     try {
       parseCopyStatement();
       queryInformationSchema();
-      setParserFormat();
+      setParserFormat(this.options);
       mutationWriter =
           new MutationWriter(
               options.getTableName(), getTableColumns(), getParserFormat(), hasHeader());
