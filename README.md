@@ -5,7 +5,7 @@ Spanner-PGAdapter is a simple, MITM, forward, non-transparent proxy, which
 translates Postgres wire protocol into the Cloud Spanner equivalent. By running
 this proxy locally, any Postgres client (including the SQL command-line client
 PSQL) should function seamlessly by simply pointing its outbound port to the 
-this proxy's inbound port. For the time being, we only support PSQL with the version of 11, 12, 13.
+this proxy's inbound port. For the time being, we only support PSQL versions 11, 12, 13, and 14.
 
 Additionally to translation, this proxy also concerns itself with authentication
 and to some extent, connection pooling. Translation for the most part is simply
