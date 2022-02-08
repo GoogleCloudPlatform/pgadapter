@@ -1166,8 +1166,8 @@ public class ProtocolTest {
     Mockito.verify(connectionHandler, Mockito.times(1)).handleTerminate();
   }
 
-  @Test(expected = IllegalStateException.class)
-  public void testCopyDataMessagePopulatesButThrowsException() throws Exception {
+  @Test
+  public void testCopyDataMessage() throws Exception {
     byte[] messageMetadata = {'d'};
     byte[] payload = "This is the payload".getBytes();
 
@@ -1177,19 +1177,28 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
+    Mockito.when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    MutationBuilder mb = Mockito.mock(MutationBuilder.class);
+    Mockito.when(copyStatement.getMutationBuilder()).thenReturn(mb);
 
     WireMessage message = ControlMessage.create(connectionHandler);
 
     Assert.assertEquals(message.getClass(), CopyDataMessage.class);
     Assert.assertArrayEquals(((CopyDataMessage) message).getPayload(), payload);
-    message.send();
+
+    CopyDataMessage messageSpy = (CopyDataMessage) Mockito.spy(message);
+
+    messageSpy.send();
+
+    Mockito.verify(mb, Mockito.times(1)).buildMutation(connectionHandler, payload);
   }
 
-  @Test(expected = IllegalStateException.class)
-  public void testCopyDoneMessageThrowsException() throws Exception {
+  @Test
+  public void testCopyDoneMessage() throws Exception {
     byte[] messageMetadata = {'c'};
 
     byte[] length = intToBytes(4);
@@ -1197,19 +1206,36 @@ public class ProtocolTest {
     byte[] value = Bytes.concat(messageMetadata, length);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
+    Mockito.when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
+    MutationBuilder mb = Mockito.mock(MutationBuilder.class);
+    Mockito.when(copyStatement.getMutationBuilder()).thenReturn(mb);
+
     WireMessage message = ControlMessage.create(connectionHandler);
 
     Assert.assertEquals(message.getClass(), CopyDoneMessage.class);
-    message.send();
+
+    CopyDoneMessage messageSpy = (CopyDoneMessage) Mockito.spy(message);
+
+    Mockito.doReturn(false)
+        .when(messageSpy)
+        .sendSpannerResult(any(IntermediateStatement.class), any(QueryMode.class), anyLong());
+
+    messageSpy.send();
+
+    Mockito.verify(messageSpy, Mockito.times(1))
+        .sendSpannerResult(copyStatement, QueryMode.SIMPLE, 0L);
+    Mockito.verify(mb, Mockito.times(1)).writeToSpanner(connectionHandler);
   }
 
-  @Test(expected = IllegalStateException.class)
-  public void testCopyFailMessageThrowsException() throws Exception {
+  @Test
+  public void testCopyFailMessage() throws Exception {
     byte[] messageMetadata = {'f'};
     byte[] errorMessage = "Error Message\0".getBytes();
 
@@ -1218,9 +1244,12 @@ public class ProtocolTest {
     byte[] value = Bytes.concat(messageMetadata, length, errorMessage);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
     String expectedErrorMessage = "Error Message";
 
+    Mockito.when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
