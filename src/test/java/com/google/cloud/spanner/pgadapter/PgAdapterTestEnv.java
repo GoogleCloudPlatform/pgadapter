@@ -108,7 +108,7 @@ public final class PgAdapterTestEnv {
   private String gcpCredentials;
 
   // Port used by the pgadapter.
-  private int port = 0;
+  private int port = -1;
 
   // Shared Spanner instance that is automatically created and closed.
   private Spanner spanner;
@@ -151,10 +151,8 @@ public final class PgAdapterTestEnv {
   }
 
   public int getPort() {
-    if (port == 0) {
-      Random rand = new Random(System.currentTimeMillis());
-      int defaultPort = rand.nextInt(10000) + 10000;
-      port = Integer.parseInt(System.getProperty(SERVICE_PORT, String.valueOf(defaultPort)));
+    if (port == -1) {
+      port = Integer.parseInt(System.getProperty(SERVICE_PORT, "0"));
     }
     return port;
   }
@@ -184,8 +182,19 @@ public final class PgAdapterTestEnv {
     if (databaseId == null) {
       databaseId = System.getProperty(TEST_DATABASE_PROPERTY, DEFAULT_DATABASE_ID);
     }
-    return String.format(
-        "%s_%d_%d", databaseId, System.currentTimeMillis(), new Random().nextInt(Short.MAX_VALUE));
+    String id =
+        String.format(
+            "%s_%d_%d",
+            databaseId, System.currentTimeMillis(), new Random().nextInt(Short.MAX_VALUE));
+    // Make sure the database id is not longer than the max allowed 30 characters.
+    if (id.length() > 30) {
+      id = id.substring(0, 30);
+    }
+    // Database ids may not end with a hyphen or an underscore.
+    if (id.endsWith("-") || id.endsWith("_")) {
+      id = id.substring(0, id.length() - 1);
+    }
+    return id;
   }
 
   public URL getUrl() {
