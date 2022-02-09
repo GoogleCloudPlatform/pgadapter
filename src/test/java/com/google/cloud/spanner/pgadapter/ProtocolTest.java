@@ -29,10 +29,12 @@ import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.statements.MatcherStatement;
+import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.CancelMessage;
@@ -58,11 +60,16 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -90,6 +97,7 @@ public class ProtocolTest {
   @Mock private ConnectionHandler connectionHandler;
   @Mock private Connection connection;
   @Mock private Statement statement;
+  @Mock private PreparedStatement preparedStatement;
   @Mock private ProxyServer server;
   @Mock private OptionsMetadata options;
   @Mock private IntermediateStatement intermediateStatement;
@@ -99,6 +107,7 @@ public class ProtocolTest {
   @Mock private DescribePortalMetadata describePortalMetadata;
   @Mock private ConnectionMetadata connectionMetadata;
   @Mock private DataOutputStream outputStream;
+  @Mock private ResultSet resultSet;
 
   private byte[] intToBytes(int value) {
     byte[] parameters = new byte[4];
@@ -1230,6 +1239,206 @@ public class ProtocolTest {
     Assert.assertEquals(message.getClass(), CopyFailMessage.class);
     Assert.assertEquals(((CopyFailMessage) message).getErrorMessage(), expectedErrorMessage);
     message.send();
+  }
+
+  @Test
+  public void testCopyFromFilePipe() throws Exception {
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
+        .thenReturn(preparedStatement);
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(statement.getUpdateCount()).thenReturn(1);
+
+    byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));
+
+    ResultSet spannerType = Mockito.mock(ResultSet.class);
+    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
+    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.next()).thenReturn(true, true, false);
+    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+
+    CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+    copyStatement.execute();
+
+    MutationWriter mw = copyStatement.getMutationWriter();
+    mw.buildMutation(connectionHandler, payload);
+
+    Assert.assertEquals(copyStatement.getFormatType(), "TEXT");
+    Assert.assertEquals(copyStatement.getDelimiterChar(), '\t');
+    Assert.assertEquals(
+        copyStatement.getMutationWriter().getMutations().toString(),
+        "[insert(keyvalue{key=1,value='one'})]");
+
+    copyStatement.close();
+    Mockito.verify(resultSet, Mockito.times(0)).close();
+  }
+
+  @Test
+  public void testCopyBatchSizeLimit() throws Exception {
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.getUpdateCount()).thenReturn(1);
+    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
+        .thenReturn(preparedStatement);
+
+    byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
+
+    ResultSet spannerType = Mockito.mock(ResultSet.class);
+    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
+    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.next()).thenReturn(true, true, false);
+    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+
+    CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+
+    Assert.assertFalse(copyStatement.isExecuted());
+    copyStatement.execute();
+    Assert.assertTrue(copyStatement.isExecuted());
+
+    MutationWriter mw = copyStatement.getMutationWriter();
+    MutationWriter mwSpy = Mockito.spy(mw);
+    Mockito.when(mwSpy.writeToSpanner(connectionHandler)).thenReturn(10, 2);
+    mwSpy.buildMutation(connectionHandler, payload);
+    mwSpy.writeToSpanner(connectionHandler);
+
+    Assert.assertEquals(copyStatement.getFormatType(), "TEXT");
+    Assert.assertEquals(copyStatement.getDelimiterChar(), '\t');
+    Assert.assertEquals(copyStatement.hasException(), false);
+    Assert.assertEquals(mwSpy.getRowCount(), 12);
+
+    // Verify writeToSpanner is called once inside buildMutation when batch size is exceeded
+    Mockito.verify(mwSpy, Mockito.times(1)).writeToSpanner(connectionHandler);
+    copyStatement.close();
+  }
+
+  @Test
+  public void testCopyDataRowLengthMismatchLimit() throws Exception {
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.getUpdateCount()).thenReturn(1);
+    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
+        .thenReturn(preparedStatement);
+
+    byte[] payload = "1\t'one'\n2".getBytes();
+
+    ResultSet spannerType = Mockito.mock(ResultSet.class);
+    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
+    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.next()).thenReturn(true, true, false);
+    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+
+    CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+
+    Assert.assertFalse(copyStatement.isExecuted());
+    copyStatement.execute();
+    Assert.assertTrue(copyStatement.isExecuted());
+
+    MutationWriter mw = copyStatement.getMutationWriter();
+    MutationWriter mwSpy = Mockito.spy(mw);
+    Mockito.when(mwSpy.writeToSpanner(Mockito.any(ConnectionHandler.class))).thenReturn(1);
+
+    Exception thrown =
+        Assert.assertThrows(
+            SQLException.class,
+            () -> {
+              mwSpy.buildMutation(connectionHandler, payload);
+              ;
+            });
+    Assert.assertEquals(
+        thrown.getMessage(),
+        "Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1");
+    copyStatement.close();
+  }
+
+  @Test
+  public void testCopyResumeErrorOutputFile() throws Exception {
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.getUpdateCount()).thenReturn(1);
+    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
+        .thenReturn(preparedStatement);
+
+    byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/test-copy-output.txt"));
+
+    ResultSet spannerType = Mockito.mock(ResultSet.class);
+    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
+    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.next()).thenReturn(true, true, false);
+    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+
+    CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+    Assert.assertFalse(copyStatement.isExecuted());
+    copyStatement.execute();
+    Assert.assertTrue(copyStatement.isExecuted());
+
+    MutationWriter mw = copyStatement.getMutationWriter();
+    MutationWriter mwSpy = Mockito.spy(mw);
+    Mockito.when(mwSpy.writeToSpanner(connectionHandler)).thenReturn(4);
+
+    Exception thrown =
+        Assert.assertThrows(
+            SQLException.class,
+            () -> {
+              mwSpy.buildMutation(connectionHandler, payload);
+              mwSpy.writeToSpanner(connectionHandler);
+            });
+    Assert.assertEquals(thrown.getMessage(), "Invalid input syntax for type INT64:\"'5'\"");
+
+    Mockito.verify(mwSpy, Mockito.times(1)).createErrorFile(payload);
+    Mockito.verify(mwSpy, Mockito.times(1)).writeToErrorFile(payload);
+
+    File outputFile = new File("output.txt");
+    Assert.assertTrue(outputFile.exists());
+    Assert.assertTrue(outputFile.isFile());
+
+    outputFile.delete();
+    copyStatement.close();
+  }
+
+  @Test
+  public void testCopyResumeErrorStartOutputFile() throws Exception {
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.getUpdateCount()).thenReturn(1);
+    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
+        .thenReturn(preparedStatement);
+
+    byte[] payload =
+        Files.readAllBytes(Paths.get("./src/test/resources/test-copy-start-output.txt"));
+
+    ResultSet spannerType = Mockito.mock(ResultSet.class);
+    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
+    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.next()).thenReturn(true, true, false);
+    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+
+    CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+    Assert.assertFalse(copyStatement.isExecuted());
+    copyStatement.execute();
+    Assert.assertTrue(copyStatement.isExecuted());
+
+    MutationWriter mw = copyStatement.getMutationWriter();
+    MutationWriter mwSpy = Mockito.spy(mw);
+    Mockito.when(mwSpy.writeToSpanner(connectionHandler)).thenReturn(1);
+
+    Exception thrown =
+        Assert.assertThrows(
+            SQLException.class,
+            () -> {
+              mwSpy.buildMutation(connectionHandler, payload);
+              mwSpy.writeToSpanner(connectionHandler);
+            });
+    Assert.assertEquals(thrown.getMessage(), "Invalid input syntax for type INT64:\"'1'\"");
+
+    Mockito.verify(mwSpy, Mockito.times(1)).createErrorFile(payload);
+    Mockito.verify(mwSpy, Mockito.times(1)).writeToErrorFile(payload);
+
+    File outputFile = new File("output.txt");
+    Assert.assertTrue(outputFile.exists());
+    Assert.assertTrue(outputFile.isFile());
+
+    outputFile.delete();
+    copyStatement.close();
   }
 
   @Test(expected = IllegalStateException.class)

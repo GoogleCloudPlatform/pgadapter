@@ -24,11 +24,13 @@ import com.google.cloud.spanner.jdbc.JdbcConstants;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.SQLMetadata;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.ResultType;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
+import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
@@ -65,9 +67,9 @@ public class StatementTest {
   @Mock private ConnectionHandler connectionHandler;
   @Mock private ConnectionMetadata connectionMetadata;
   @Mock private Statement statement;
+  @Mock private PreparedStatement preparedStatement;
   @Mock private ProxyServer server;
   @Mock private OptionsMetadata options;
-  @Mock private PreparedStatement preparedStatement;
   @Mock private ResultSet resultSet;
   @Mock private DataOutputStream outputStream;
 
@@ -429,5 +431,70 @@ public class StatementTest {
     assertEquals(result.size(), 2);
     assertEquals(result.get(0), "INSERT INTO users (name) VALUES (';;test;;');");
     assertEquals(result.get(1), "INSERT INTO users (name1, name2) VALUES ('''''', ';'';');");
+  }
+
+  @Test
+  public void testCopyBuildMutation() throws Exception {
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
+        .thenReturn(preparedStatement);
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(statement.getUpdateCount()).thenReturn(1);
+
+    ResultSet spannerType = Mockito.mock(ResultSet.class);
+    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
+    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.next()).thenReturn(true, true, false);
+    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+
+    CopyStatement statement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+    statement.execute();
+
+    byte[] payload = "2\t3\n".getBytes();
+    MutationWriter mw = statement.getMutationWriter();
+    mw.buildMutation(connectionHandler, payload);
+
+    Assert.assertEquals(statement.getFormatType(), "TEXT");
+    Assert.assertEquals(statement.getDelimiterChar(), '\t');
+    Assert.assertEquals(
+        statement.getMutationWriter().getMutations().toString(),
+        "[insert(keyvalue{key=2,value=3})]");
+
+    statement.close();
+    Mockito.verify(resultSet, Mockito.times(0)).close();
+  }
+
+  @Test
+  public void testCopyInvalidBuildMutation() throws Exception {
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
+        .thenReturn(preparedStatement);
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(statement.getUpdateCount()).thenReturn(1);
+
+    ResultSet spannerType = Mockito.mock(ResultSet.class);
+    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
+    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.next()).thenReturn(true, true, false);
+    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+
+    CopyStatement statement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+    statement.execute();
+
+    byte[] payload = "2 3\n".getBytes();
+    MutationWriter mw = statement.getMutationWriter();
+
+    Exception thrown =
+        Assert.assertThrows(
+            SQLException.class,
+            () -> {
+              mw.buildMutation(connectionHandler, payload);
+            });
+    Assert.assertEquals(
+        thrown.getMessage(),
+        "Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1");
+
+    statement.close();
+    Mockito.verify(resultSet, Mockito.times(0)).close();
   }
 }
