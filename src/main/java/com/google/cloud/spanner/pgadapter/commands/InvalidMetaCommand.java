@@ -36,10 +36,6 @@ public class InvalidMetaCommand extends Command {
 
   @Override
   public String translate() {
-    throw new IllegalArgumentException(
-        MessageFormat.format(
-            "Unsupported Meta Command "
-                + "(the following generated command is not compatible with PGAdapter): \n{0}",
-            this.sql));
+    throw new IllegalArgumentException(MessageFormat.format("Unsupported Meta Command"));
   }
 }
