@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.commands;
 
-import java.text.MessageFormat;
 import java.util.regex.Pattern;
 
 /**
@@ -36,6 +35,6 @@ public class InvalidMetaCommand extends Command {
 
   @Override
   public String translate() {
-    throw new IllegalArgumentException(MessageFormat.format("Unsupported Meta Command"));
+    throw new IllegalArgumentException("Unsupported Meta Command");
   }
 }
