@@ -45,10 +45,10 @@ public class CopyDoneMessage extends ControlMessage {
       int rowCount = mw.writeToSpanner(this.connection); // Write any remaining mutations to Spanner
       statement.addUpdateCount(rowCount); // Increase the row count of number of rows copied.
       this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
-      new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
     } else {
       mw.closeErrorFile();
     }
+    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
     this.connection.removeActiveStatement(this.statement);
   }
 

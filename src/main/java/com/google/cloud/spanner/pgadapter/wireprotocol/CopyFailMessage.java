@@ -46,11 +46,11 @@ public class CopyFailMessage extends ControlMessage {
     // If backend error occurred during copy-in mode, drop any subsequent CopyFail messages.
     if (!statement.hasException()) {
       new ErrorResponse(this.outputStream, new Exception(this.errorMessage), State.IOError).send();
-      new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
     } else {
       MutationWriter mw = this.statement.getMutationWriter();
       mw.closeErrorFile();
     }
+    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
     this.connection.removeActiveStatement(this.statement);
     this.outputStream.flush();
   }
