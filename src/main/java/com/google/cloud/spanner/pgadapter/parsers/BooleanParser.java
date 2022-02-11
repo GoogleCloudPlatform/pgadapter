@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import org.postgresql.util.ByteConverter;
 
 /**
  * Parse specified data to boolean. For most cases it is simply translating from chars 't'/'f' to
@@ -34,6 +35,20 @@ public class BooleanParser extends Parser<Boolean> {
     this.item = (Boolean) item;
   }
 
+  public BooleanParser(byte[] item, FormatCode formatCode) {
+    switch (formatCode) {
+      case TEXT:
+        String stringValue = new String(item, UTF8);
+        this.item = stringValue.equals(TRUE_KEY);
+        break;
+      case BINARY:
+        this.item = ByteConverter.bool(item, 0);
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported format: " + formatCode);
+    }
+  }
+
   @Override
   public Boolean getItem() {
     return this.item;
@@ -47,5 +62,12 @@ public class BooleanParser extends Parser<Boolean> {
   @Override
   protected String spannerParse() {
     return Boolean.toString(this.item);
+  }
+
+  @Override
+  protected byte[] binaryParse() {
+    byte[] result = new byte[1];
+    ByteConverter.bool(result, 0, this.item);
+    return result;
   }
 }

@@ -52,6 +52,8 @@ public class ITJdbcTest implements IntegrationTest {
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
 
+    // TODO: Refactor the integration tests to use a common subclass, as this is repeated in each
+    // class.
     testEnv.setUp();
     if (testEnv.isUseExistingDb()) {
       database = testEnv.getExistingDatabase();
