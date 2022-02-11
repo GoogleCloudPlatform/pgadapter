@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
@@ -28,7 +29,7 @@ public class StringParser extends Parser<String> {
     this.item = (String) item;
   }
 
-  public StringParser(byte[] item) {
+  public StringParser(byte[] item, FormatCode formatCode) {
     this.item = new String(item, UTF8);
   }
 
@@ -40,5 +41,10 @@ public class StringParser extends Parser<String> {
   @Override
   protected String stringParse() {
     return this.item;
+  }
+
+  @Override
+  protected byte[] binaryParse() {
+    return this.item.getBytes(StandardCharsets.UTF_8);
   }
 }
