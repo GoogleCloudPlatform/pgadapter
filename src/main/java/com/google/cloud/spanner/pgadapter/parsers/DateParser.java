@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import com.google.common.base.Preconditions;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
@@ -34,18 +35,20 @@ public class DateParser extends Parser<java.sql.Date> {
   }
 
   public DateParser(byte[] item, FormatCode formatCode) {
-    switch (formatCode) {
-      case TEXT:
-        String stringValue = new String(item, UTF8);
-        this.item = java.sql.Date.valueOf(stringValue);
-        break;
-      case BINARY:
-        long days = ByteConverter.int4(item, 0) + PG_EPOCH_DAYS;
-        this.validateRange(days);
-        this.item = java.sql.Date.valueOf(LocalDate.ofEpochDay(days));
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported format: " + formatCode);
+    if (item != null) {
+      switch (formatCode) {
+        case TEXT:
+          String stringValue = new String(item, UTF8);
+          this.item = java.sql.Date.valueOf(stringValue);
+          break;
+        case BINARY:
+          long days = ByteConverter.int4(item, 0) + PG_EPOCH_DAYS;
+          this.validateRange(days);
+          this.item = java.sql.Date.valueOf(LocalDate.ofEpochDay(days));
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported format: " + formatCode);
+      }
     }
   }
 
@@ -74,6 +77,11 @@ public class DateParser extends Parser<java.sql.Date> {
       }
     }
     return false;
+  }
+
+  @Override
+  public int getSqlType() {
+    return Types.DATE;
   }
 
   @Override
