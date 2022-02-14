@@ -140,7 +140,7 @@ public abstract class Parser<T> {
       case Types.INTEGER:
         return new IntegerParser(result, columnarPosition);
       case Types.NUMERIC:
-        return new StringParser(result, columnarPosition);
+        return new NumericParser(result, columnarPosition);
       case Types.NVARCHAR:
         return new StringParser(result, columnarPosition);
       case Types.TIMESTAMP:
@@ -158,7 +158,7 @@ public abstract class Parser<T> {
    *
    * @param result The generic object to parse.
    * @param oidType The type of the object to be parsed.
-   * @return Theparser object for the designated data type.
+   * @return The parser object for the designated data type.
    */
   protected static Parser create(Object result, int oidType) {
     switch (oidType) {
@@ -175,7 +175,7 @@ public abstract class Parser<T> {
       case Types.INTEGER:
         return new IntegerParser(result);
       case Types.NUMERIC:
-        return new StringParser(result);
+        return new NumericParser(result);
       case Types.NVARCHAR:
         return new StringParser(result);
       case Types.TIMESTAMP:
