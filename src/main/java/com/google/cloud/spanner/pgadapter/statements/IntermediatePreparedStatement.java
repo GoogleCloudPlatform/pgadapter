@@ -142,8 +142,9 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       short formatCode = portal.getParameterFormatCode(index);
       int type = this.parseType(parameters, index);
       for (Integer position : parameterIndexToPositions.get(index)) {
-        Object value = Parser.create(parameters[index], type, FormatCode.of(formatCode)).getItem();
-        ((PreparedStatement) portal.statement).setObject(position, value);
+        Parser<?> parser = Parser.create(parameters[index], type, FormatCode.of(formatCode));
+        ((PreparedStatement) portal.statement)
+            .setObject(position, parser.getItem(), parser.getSqlType());
       }
     }
     return portal;
