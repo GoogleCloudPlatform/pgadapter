@@ -18,6 +18,7 @@ import com.google.cloud.Date;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.common.base.Preconditions;
+import java.sql.Types;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
@@ -35,21 +36,23 @@ public class DateParser extends Parser<Date> {
   }
 
   public DateParser(byte[] item, FormatCode formatCode) {
-    switch (formatCode) {
-      case TEXT:
-        String stringValue = new String(item, UTF8);
-        this.item = Date.parseDate(stringValue);
-        break;
-      case BINARY:
-        long days = ByteConverter.int4(item, 0) + PG_EPOCH_DAYS;
-        this.validateRange(days);
-        LocalDate localDate = LocalDate.ofEpochDay(days);
-        this.item =
-            Date.fromYearMonthDay(
-                localDate.getYear(), localDate.getMonthValue(), localDate.getDayOfMonth());
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported format: " + formatCode);
+    if (item != null) {
+      switch (formatCode) {
+        case TEXT:
+          String stringValue = new String(item, UTF8);
+          this.item = Date.parseDate(stringValue);
+          break;
+        case BINARY:
+          long days = ByteConverter.int4(item, 0) + PG_EPOCH_DAYS;
+          this.validateRange(days);
+          LocalDate localDate = LocalDate.ofEpochDay(days);
+          this.item =
+              Date.fromYearMonthDay(
+                  localDate.getYear(), localDate.getMonthValue(), localDate.getDayOfMonth());
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported format: " + formatCode);
+      }
     }
   }
 
@@ -78,6 +81,11 @@ public class DateParser extends Parser<Date> {
       }
     }
     return false;
+  }
+
+  @Override
+  public int getSqlType() {
+    return Types.DATE;
   }
 
   @Override

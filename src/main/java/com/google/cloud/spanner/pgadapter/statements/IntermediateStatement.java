@@ -162,6 +162,10 @@ public class IntermediateStatement {
     return this.updateCount;
   }
 
+  public void addUpdateCount(int count) {
+    this.updateCount += count;
+  }
+
   /** @return True if at some point in execution, and exception was thrown. */
   public boolean hasException() {
     return this.exception != null;

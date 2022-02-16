@@ -19,7 +19,9 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
+import java.sql.Types;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
 import java.util.regex.Pattern;
@@ -47,10 +49,12 @@ public class TimestampParser extends Parser<Timestamp> {
 
   private static final Pattern TIMESTAMP_PATTERN = Pattern.compile(TIMESTAMP_REGEX);
 
-  private static final DateTimeFormatter TIMESTAMP_WITHOUT_FRACTION_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssX");
-  private static final DateTimeFormatter TIMESTAMP_WITH_FRACTION_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSSSSSX");
+  private static final DateTimeFormatter TIMESTAMP_FORMATTER =
+      new DateTimeFormatterBuilder()
+          .appendPattern("yyyy-MM-dd HH:mm:ss")
+          .appendFraction(ChronoField.MICRO_OF_SECOND, 0, 9, true)
+          .appendOffset("+HH:mm", "Z")
+          .toFormatter();
 
   public TimestampParser(ResultSet item, int position) {
     this.item = item.getTimestamp(position);
@@ -61,29 +65,26 @@ public class TimestampParser extends Parser<Timestamp> {
   }
 
   public TimestampParser(byte[] item, FormatCode formatCode) {
-    switch (formatCode) {
-      case TEXT:
-        String stringValue = new String(item, StandardCharsets.UTF_8);
-        TemporalAccessor temporalAccessor;
-        if (stringValue.contains(".")) {
-          temporalAccessor = TIMESTAMP_WITH_FRACTION_FORMATTER.parse(stringValue);
-        } else {
-          temporalAccessor = TIMESTAMP_WITHOUT_FRACTION_FORMATTER.parse(stringValue);
-        }
-        this.item =
-            Timestamp.ofTimeSecondsAndNanos(
-                temporalAccessor.getLong(ChronoField.INSTANT_SECONDS),
-                temporalAccessor.get(ChronoField.NANO_OF_SECOND));
-        break;
-      case BINARY:
-        long pgMicros = ByteConverter.int8(item, 0);
-        com.google.cloud.Timestamp ts = com.google.cloud.Timestamp.ofTimeMicroseconds(pgMicros);
-        long javaSeconds = ts.getSeconds() + PG_EPOCH_SECONDS;
-        int javaNanos = ts.getNanos();
-        this.item = Timestamp.ofTimeSecondsAndNanos(javaSeconds, javaNanos);
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported format: " + formatCode);
+    if (item != null) {
+      switch (formatCode) {
+        case TEXT:
+          String stringValue = new String(item, StandardCharsets.UTF_8);
+          TemporalAccessor temporalAccessor = TIMESTAMP_FORMATTER.parse(stringValue);
+          this.item =
+              Timestamp.ofTimeSecondsAndNanos(
+                  temporalAccessor.getLong(ChronoField.INSTANT_SECONDS),
+                  temporalAccessor.get(ChronoField.NANO_OF_SECOND));
+          break;
+        case BINARY:
+          long pgMicros = ByteConverter.int8(item, 0);
+          com.google.cloud.Timestamp ts = com.google.cloud.Timestamp.ofTimeMicroseconds(pgMicros);
+          long javaSeconds = ts.getSeconds() + PG_EPOCH_SECONDS;
+          int javaNanos = ts.getNanos();
+          this.item = Timestamp.ofTimeSecondsAndNanos(javaSeconds, javaNanos);
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported format: " + formatCode);
+      }
     }
   }
 
@@ -99,8 +100,8 @@ public class TimestampParser extends Parser<Timestamp> {
   }
 
   @Override
-  public Timestamp getItem() {
-    return item;
+  public int getSqlType() {
+    return Types.TIMESTAMP_WITH_TIMEZONE;
   }
 
   @Override
