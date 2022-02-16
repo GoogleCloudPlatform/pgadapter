@@ -189,6 +189,11 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   @Override
+  public void handleExecutionException(SQLException e) {
+    super.handleExecutionException(e);
+  }
+
+  @Override
   public void execute() {
     this.executed = true;
     try {
