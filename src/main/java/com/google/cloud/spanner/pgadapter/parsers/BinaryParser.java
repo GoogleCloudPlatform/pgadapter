@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import org.postgresql.util.PGbytea;
 
 /**
@@ -34,21 +35,28 @@ public class BinaryParser extends Parser<byte[]> {
   }
 
   public BinaryParser(byte[] item, FormatCode formatCode) {
-    switch (formatCode) {
-      case TEXT:
-        try {
-          this.item = PGbytea.toBytes(item);
+    if (item != null) {
+      switch (formatCode) {
+        case TEXT:
+          try {
+            this.item = PGbytea.toBytes(item);
+            break;
+          } catch (SQLException e) {
+            throw new IllegalArgumentException(
+                "Invalid binary value: " + new String(item, StandardCharsets.UTF_8), e);
+          }
+        case BINARY:
+          this.item = item;
           break;
-        } catch (SQLException e) {
-          throw new IllegalArgumentException(
-              "Invalid binary value: " + new String(item, StandardCharsets.UTF_8), e);
-        }
-      case BINARY:
-        this.item = item;
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported format: " + formatCode);
+        default:
+          throw new IllegalArgumentException("Unsupported format: " + formatCode);
+      }
     }
+  }
+
+  @Override
+  public int getSqlType() {
+    return Types.BINARY;
   }
 
   @Override
