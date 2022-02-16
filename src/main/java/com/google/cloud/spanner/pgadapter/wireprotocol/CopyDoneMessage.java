@@ -48,7 +48,11 @@ public class CopyDoneMessage extends ControlMessage {
         statement.addUpdateCount(rowCount); // Increase the row count of number of rows copied.
         this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
       } catch (Exception e) {
+        // Spanner returned an error when trying to commit the batch of mutations.
         mw.writeMutationsToErrorFile();
+        mw.closeErrorFile();
+        this.connection.removeActiveStatement(this.statement);
+        throw e;
       }
     } else {
       mw.closeErrorFile();
