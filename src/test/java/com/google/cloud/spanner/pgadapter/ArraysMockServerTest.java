@@ -264,14 +264,15 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         assertTrue(resultSet.next());
         Array array = resultSet.getArray("TIMESTAMP_ARRAY");
-        assertArrayEquals(
+        Timestamp[] expected =
             new Timestamp[] {
               com.google.cloud.Timestamp.parseTimestamp("2022-02-14T11:47:10.123456700Z")
                   .toSqlTimestamp(),
               com.google.cloud.Timestamp.parseTimestamp("2000-02-29T00:00:01.00000100Z")
                   .toSqlTimestamp()
-            },
-            (Timestamp[]) array.getArray());
+            };
+        Timestamp[] actual = (Timestamp[]) array.getArray();
+        assertArrayEquals(expected, actual);
         assertFalse(resultSet.next());
       }
     }

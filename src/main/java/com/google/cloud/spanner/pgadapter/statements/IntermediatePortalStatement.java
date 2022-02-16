@@ -14,13 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
-import com.google.common.collect.SetMultimap;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -37,21 +37,20 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   protected List<Short> parameterFormatCodes;
   protected List<Short> resultFormatCodes;
 
-  public IntermediatePortalStatement(
-      PreparedStatement statement,
-      String sql,
-      int parameterCount,
-      SetMultimap<Integer, Integer> parameterIndexToPositions,
-      Connection connection) {
-    super(statement, sql, parameterCount, parameterIndexToPositions, connection);
+  public IntermediatePortalStatement(String sql, Connection connection) {
+    super(sql, connection);
     this.parameterFormatCodes = new ArrayList<>();
     this.resultFormatCodes = new ArrayList<>();
+  }
+
+  void setBoundStatement(Statement statement) {
+    this.statement = statement;
   }
 
   public short getParameterFormatCode(int index) {
     if (this.parameterFormatCodes.size() == 0) {
       return 0;
-    } else if (this.parameterFormatCodes.size() == 1) {
+    } else if (index >= this.parameterFormatCodes.size()) {
       return this.parameterFormatCodes.get(0);
     } else {
       return this.parameterFormatCodes.get(index);
@@ -79,10 +78,12 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
 
   @Override
   public DescribeMetadata describe() throws Exception {
-    try {
-      ResultSetMetaData metaData = ((PreparedStatement) this.statement).getMetaData();
-      return new DescribePortalMetadata(metaData);
-    } catch (SQLException e) {
+    try (ResultSet resultSet = connection.analyzeQuery(Statement.of(sql), QueryAnalyzeMode.PLAN)) {
+      // TODO: Remove ResultSet.next() call once this is supported in the client library.
+      // See https://github.com/googleapis/java-spanner/pull/1691
+      resultSet.next();
+      return new DescribePortalMetadata(resultSet);
+    } catch (SpannerException e) {
       /* Generally this error will occur when a non-SELECT portal statement is described in Spanner,
         however, it could occur when a statement is incorrectly formatted. Though we could catch
         this early if we could parse the type of statement, it is a significant burden on the

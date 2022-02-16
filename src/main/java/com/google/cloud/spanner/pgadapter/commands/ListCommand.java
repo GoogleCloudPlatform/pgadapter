@@ -14,8 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.commands;
 
-import java.sql.Connection;
-import java.sql.SQLException;
+import com.google.cloud.spanner.connection.Connection;
 import java.util.regex.Pattern;
 
 /**
@@ -50,10 +49,7 @@ public class ListCommand extends Command {
 
   @Override
   public String translate() {
-    try {
-      return String.format(OUTPUT_QUERY, this.connection.getCatalog());
-    } catch (SQLException e) {
-      return String.format(OUTPUT_QUERY, "UNKNOWN");
-    }
+    // TODO: Pass in the database name, or add it to the Connection API surface and get it here.
+    return String.format(OUTPUT_QUERY, "");
   }
 }

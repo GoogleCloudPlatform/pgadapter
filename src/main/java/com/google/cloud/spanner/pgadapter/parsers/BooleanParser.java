@@ -14,8 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import org.postgresql.util.ByteConverter;
 
 /**
@@ -27,7 +27,7 @@ public class BooleanParser extends Parser<Boolean> {
   private static String TRUE_KEY = "t";
   private static String FALSE_KEY = "f";
 
-  public BooleanParser(ResultSet item, int position) throws SQLException {
+  public BooleanParser(ResultSet item, int position) {
     this.item = item.getBoolean(position);
   }
 
@@ -69,5 +69,9 @@ public class BooleanParser extends Parser<Boolean> {
     byte[] result = new byte[1];
     ByteConverter.bool(result, 0, this.item);
     return result;
+  }
+
+  public void bind(Statement.Builder statementBuilder, String name) {
+    statementBuilder.bind(name).to(this.item);
   }
 }

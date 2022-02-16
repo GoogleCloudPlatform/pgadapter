@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.commands.Command;
-import java.sql.SQLException;
 import org.json.simple.JSONObject;
 
 /**
@@ -28,10 +27,9 @@ public class PSQLStatement extends IntermediateStatement {
 
   private JSONObject commandMetadataJSON;
 
-  public PSQLStatement(String sql, ConnectionHandler connectionHandler) throws SQLException {
+  public PSQLStatement(String sql, ConnectionHandler connectionHandler) {
     super(sql);
-    this.connection = connectionHandler.getJdbcConnection();
-    this.statement = this.connection.createStatement();
+    this.connection = connectionHandler.getSpannerConnection();
     this.commandMetadataJSON = connectionHandler.getServer().getOptions().getCommandMetadataJSON();
     this.sql = translateSQL(sql);
     this.command = parseCommand(sql);

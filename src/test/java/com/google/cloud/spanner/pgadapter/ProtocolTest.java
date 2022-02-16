@@ -22,7 +22,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
@@ -65,14 +70,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -96,8 +96,6 @@ public class ProtocolTest {
   @Rule public MockitoRule rule = MockitoJUnit.rule();
   @Mock private ConnectionHandler connectionHandler;
   @Mock private Connection connection;
-  @Mock private Statement statement;
-  @Mock private PreparedStatement preparedStatement;
   @Mock private ProxyServer server;
   @Mock private OptionsMetadata options;
   @Mock private IntermediateStatement intermediateStatement;
@@ -108,6 +106,7 @@ public class ProtocolTest {
   @Mock private ConnectionMetadata connectionMetadata;
   @Mock private DataOutputStream outputStream;
   @Mock private ResultSet resultSet;
+  @Mock private StatementResult statementResult;
 
   private byte[] intToBytes(int value) {
     byte[] parameters = new byte[4];
@@ -145,12 +144,12 @@ public class ProtocolTest {
 
     String expectedSQL = "SELECT * FROM users";
 
-    Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(statement.getResultSet()).thenReturn(mock(ResultSet.class));
+    Mockito.when(connection.execute(Statement.of(expectedSQL))).thenReturn(statementResult);
+    when(statementResult.getResultSet()).thenReturn(resultSet);
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(options.requiresMatcher()).thenReturn(false);
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -165,7 +164,7 @@ public class ProtocolTest {
 
     messageSpy.send();
     // Execute
-    Mockito.verify(statement, Mockito.times(1)).execute(expectedSQL);
+    Mockito.verify(connection, Mockito.times(1)).execute(Statement.of(expectedSQL));
   }
 
   @Test
@@ -179,14 +178,14 @@ public class ProtocolTest {
 
     String expectedSQL = "SELECT * FROM users";
 
-    Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(statement.getResultSet()).thenReturn(mock(ResultSet.class));
+    when(connection.execute(Statement.of(expectedSQL))).thenReturn(statementResult);
+    Mockito.when(statementResult.getResultSet()).thenReturn(resultSet);
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(options.requiresMatcher()).thenReturn(true);
     Mockito.when(options.getCommandMetadataJSON())
         .thenReturn((JSONObject) parser.parse("{\"commands\": []}"));
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -201,7 +200,7 @@ public class ProtocolTest {
     Mockito.doNothing().when(messageSpy).handleQuery();
 
     messageSpy.send();
-    Mockito.verify(statement, Mockito.times(1)).execute(expectedSQL);
+    Mockito.verify(connection, Mockito.times(1)).execute(Statement.of(expectedSQL));
   }
 
   @Test(expected = IOException.class)
@@ -249,14 +248,14 @@ public class ProtocolTest {
             parameters);
 
     List<Integer> expectedParameterDataTypes = Arrays.asList(1002);
-    String expectedSQL = "/*GSQL*/SELECT * FROM users WHERE name = ?";
+    String expectedSQL = "/*GSQL*/SELECT * FROM users WHERE name = $1";
     String expectedMessageName = "some statement";
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -308,14 +307,14 @@ public class ProtocolTest {
             parameters);
 
     List<Integer> expectedParameterDataTypes = Arrays.asList(1002);
-    String expectedSQL = "SELECT * FROM users WHERE name = ?";
+    String expectedSQL = "SELECT * FROM users WHERE name = $1";
     String expectedMessageName = "some statement";
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -368,14 +367,14 @@ public class ProtocolTest {
             parameters);
 
     List<Integer> expectedParameterDataTypes = Arrays.asList(0);
-    String expectedSQL = "SELECT * FROM users WHERE name = ?";
+    String expectedSQL = "SELECT * FROM users WHERE name = $1";
     String expectedMessageName = "some statement";
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -399,8 +398,8 @@ public class ProtocolTest {
     Assert.assertEquals(outputResult.readInt(), 4);
   }
 
-  @Test(expected = IllegalArgumentException.class)
-  public void testParseMessageExceptsWithNonMatchingParameterTypeCount() throws Exception {
+  @Test
+  public void testParseMessageWithNonMatchingParameterTypeCount() throws Exception {
     byte[] messageMetadata = {'P'};
     String statementName = "some statement\0";
     String payload =
@@ -412,13 +411,15 @@ public class ProtocolTest {
         Bytes.concat(
             messageMetadata, length, statementName.getBytes(), payload.getBytes(), intToBytes(0));
 
-    List<Integer> expectedParameterDataTypes = Arrays.asList(0);
-    String expectedSQL = "SELECT * FROM users WHERE name = ?";
+    List<Integer> expectedParameterDataTypes = Collections.emptyList();
+    String expectedSQL = "SELECT * FROM users WHERE name = $1";
     String expectedMessageName = "some statement";
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
 
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -433,6 +434,13 @@ public class ProtocolTest {
 
     Mockito.when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
+    Mockito.verify(connectionHandler, Mockito.times(1))
+        .registerStatement(expectedMessageName, ((ParseMessage) message).getStatement());
+
+    // ParseCompleteResponse
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    Assert.assertEquals(outputResult.readByte(), '1');
+    Assert.assertEquals(outputResult.readInt(), 4);
   }
 
   @Test(expected = IllegalStateException.class)
@@ -464,7 +472,7 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -506,7 +514,7 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -551,7 +559,7 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -982,9 +990,7 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
-    Mockito.when(connection.unwrap(CloudSpannerJdbcConnection.class))
-        .thenReturn(mock(CloudSpannerJdbcConnection.class));
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1013,10 +1019,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    CloudSpannerJdbcConnection cloudSpannerConnection = mock(CloudSpannerJdbcConnection.class);
-    when(cloudSpannerConnection.isInTransaction()).thenReturn(true);
-    when(connectionHandler.getJdbcConnection()).thenReturn(connection);
-    when(connection.unwrap(CloudSpannerJdbcConnection.class)).thenReturn(cloudSpannerConnection);
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connection.isInTransaction()).thenReturn(true);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1045,9 +1049,7 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
-    Mockito.when(connection.unwrap(CloudSpannerJdbcConnection.class))
-        .thenReturn(mock(CloudSpannerJdbcConnection.class));
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1076,10 +1078,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    CloudSpannerJdbcConnection cloudSpannerConnection = mock(CloudSpannerJdbcConnection.class);
-    when(cloudSpannerConnection.isInTransaction()).thenReturn(true);
-    when(connectionHandler.getJdbcConnection()).thenReturn(connection);
-    when(connection.unwrap(CloudSpannerJdbcConnection.class)).thenReturn(cloudSpannerConnection);
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connection.isInTransaction()).thenReturn(true);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1108,14 +1108,11 @@ public class ProtocolTest {
 
     String expectedSQL = "INSERT INTO users (name) VALUES ('test')";
 
-    CloudSpannerJdbcConnection cloudSpannerConnection = mock(CloudSpannerJdbcConnection.class);
-    when(cloudSpannerConnection.isInTransaction()).thenReturn(true);
-    when(connectionHandler.getJdbcConnection()).thenReturn(connection);
-    when(connection.unwrap(CloudSpannerJdbcConnection.class)).thenReturn(cloudSpannerConnection);
-    when(connection.createStatement()).thenReturn(statement);
+    when(connection.isInTransaction()).thenReturn(true);
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     ResultSet resultSet = mock(ResultSet.class);
-    when(statement.getResultSet()).thenReturn(resultSet);
-    when(resultSet.getMetaData()).thenReturn(mock(ResultSetMetaData.class));
+    when(statementResult.getResultSet()).thenReturn(resultSet);
+    when(connection.execute(Statement.of(expectedSQL))).thenReturn(statementResult);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
     OptionsMetadata options = mock(OptionsMetadata.class);
@@ -1252,11 +1249,9 @@ public class ProtocolTest {
 
   @Test
   public void testCopyFromFilePipe() throws Exception {
-    Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
-    Mockito.when(statement.getUpdateCount()).thenReturn(1);
+    when(connection.execute(any(Statement.class))).thenReturn(statementResult);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    Mockito.when(statementResult.getUpdateCount()).thenReturn(1L);
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));
 
@@ -1264,7 +1259,7 @@ public class ProtocolTest {
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
     Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+    Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
     CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
     copyStatement.execute();
@@ -1284,11 +1279,9 @@ public class ProtocolTest {
 
   @Test
   public void testCopyBatchSizeLimit() throws Exception {
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
-    Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(statement.getUpdateCount()).thenReturn(1);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connection.execute(any(Statement.class))).thenReturn(statementResult);
+    when(statementResult.getUpdateCount()).thenReturn(1L);
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
 
@@ -1296,7 +1289,7 @@ public class ProtocolTest {
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
     Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+    Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
     CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
 
@@ -1322,11 +1315,9 @@ public class ProtocolTest {
 
   @Test
   public void testCopyDataRowLengthMismatchLimit() throws Exception {
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
-    Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(statement.getUpdateCount()).thenReturn(1);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connection.execute(any(Statement.class))).thenReturn(statementResult);
+    Mockito.when(statementResult.getUpdateCount()).thenReturn(1L);
 
     byte[] payload = "1\t'one'\n2".getBytes();
 
@@ -1334,7 +1325,7 @@ public class ProtocolTest {
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
     Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+    Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
     CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
 
@@ -1346,26 +1337,24 @@ public class ProtocolTest {
     MutationWriter mwSpy = Mockito.spy(mw);
     Mockito.when(mwSpy.writeToSpanner(Mockito.any(ConnectionHandler.class))).thenReturn(1);
 
-    Exception thrown =
+    SpannerException thrown =
         Assert.assertThrows(
-            SQLException.class,
+            SpannerException.class,
             () -> {
               mwSpy.buildMutation(connectionHandler, payload);
-              ;
             });
+    Assert.assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
     Assert.assertEquals(
-        thrown.getMessage(),
-        "Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1");
+        "INVALID_ARGUMENT: Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
+        thrown.getMessage());
     copyStatement.close();
   }
 
   @Test
   public void testCopyResumeErrorOutputFile() throws Exception {
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
-    Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(statement.getUpdateCount()).thenReturn(1);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connection.execute(any(Statement.class))).thenReturn(statementResult);
+    Mockito.when(statementResult.getUpdateCount()).thenReturn(1L);
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/test-copy-output.txt"));
 
@@ -1373,30 +1362,34 @@ public class ProtocolTest {
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
     Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+    Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
     CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
     Assert.assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
     Assert.assertTrue(copyStatement.isExecuted());
 
+    File outputFile = new File("output.txt");
+    outputFile.delete();
+
     MutationWriter mw = copyStatement.getMutationWriter();
     MutationWriter mwSpy = Mockito.spy(mw);
     Mockito.when(mwSpy.writeToSpanner(connectionHandler)).thenReturn(4);
 
-    Exception thrown =
+    SpannerException thrown =
         Assert.assertThrows(
-            SQLException.class,
+            SpannerException.class,
             () -> {
               mwSpy.buildMutation(connectionHandler, payload);
               mwSpy.writeToSpanner(connectionHandler);
             });
-    Assert.assertEquals(thrown.getMessage(), "Invalid input syntax for type INT64:\"'5'\"");
+    Assert.assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
+    Assert.assertEquals(
+        "INVALID_ARGUMENT: Invalid input syntax for type INT64:\"'5'\"", thrown.getMessage());
 
     Mockito.verify(mwSpy, Mockito.times(1)).createErrorFile(payload);
     Mockito.verify(mwSpy, Mockito.times(1)).writeToErrorFile(payload);
 
-    File outputFile = new File("output.txt");
     Assert.assertTrue(outputFile.exists());
     Assert.assertTrue(outputFile.isFile());
 
@@ -1406,11 +1399,9 @@ public class ProtocolTest {
 
   @Test
   public void testCopyResumeErrorStartOutputFile() throws Exception {
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
-    Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(statement.getUpdateCount()).thenReturn(1);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connection.execute(any(Statement.class))).thenReturn(statementResult);
+    Mockito.when(statementResult.getUpdateCount()).thenReturn(1L);
 
     byte[] payload =
         Files.readAllBytes(Paths.get("./src/test/resources/test-copy-start-output.txt"));
@@ -1419,7 +1410,12 @@ public class ProtocolTest {
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
     Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+    Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
+
+    // Pre-emptively try to delete the output file if it is lingering from a previous test run.
+    // TODO: Make the output file for COPY configurable, so we can use a temp file for this.
+    File outputFile = new File("output.txt");
+    outputFile.delete();
 
     CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
     Assert.assertFalse(copyStatement.isExecuted());
@@ -1430,19 +1426,20 @@ public class ProtocolTest {
     MutationWriter mwSpy = Mockito.spy(mw);
     Mockito.when(mwSpy.writeToSpanner(connectionHandler)).thenReturn(1);
 
-    Exception thrown =
+    SpannerException thrown =
         Assert.assertThrows(
-            SQLException.class,
+            SpannerException.class,
             () -> {
               mwSpy.buildMutation(connectionHandler, payload);
               mwSpy.writeToSpanner(connectionHandler);
             });
-    Assert.assertEquals(thrown.getMessage(), "Invalid input syntax for type INT64:\"'1'\"");
+    Assert.assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
+    Assert.assertEquals(
+        "INVALID_ARGUMENT: Invalid input syntax for type INT64:\"'1'\"", thrown.getMessage());
 
     Mockito.verify(mwSpy, Mockito.times(1)).createErrorFile(payload);
     Mockito.verify(mwSpy, Mockito.times(1)).writeToErrorFile(payload);
 
-    File outputFile = new File("output.txt");
     Assert.assertTrue(outputFile.exists());
     Assert.assertTrue(outputFile.isFile());
 

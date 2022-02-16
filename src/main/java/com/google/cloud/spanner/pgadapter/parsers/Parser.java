@@ -14,12 +14,15 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Type;
+import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Types;
 import org.postgresql.core.Oid;
 
 /**
@@ -78,7 +81,7 @@ public abstract class Parser<T> {
    * @param formatCode The format of the data to be parsed
    * @return The parser object for the designated data type.
    */
-  public static Parser create(byte[] item, int oidType, FormatCode formatCode) {
+  public static Parser<?> create(byte[] item, int oidType, FormatCode formatCode) {
     switch (oidType) {
       case Oid.BOOL:
       case Oid.BIT:
@@ -119,37 +122,34 @@ public abstract class Parser<T> {
    * Factory method for parsing given a result set, for the specified column.
    *
    * @param result The result set object containing all data retrieved.
-   * @param oidType The type of the data to be parsed.
+   * @param type The type of the data to be parsed.
    * @param columnarPosition Column from the result to be parsed.
    * @return The parser object for the designated data type.
-   * @throws SQLException if the result data type does not correspond with the desired type.
    */
-  public static Parser create(ResultSet result, int oidType, int columnarPosition)
-      throws SQLException {
-    switch (oidType) {
-      case Types.BOOLEAN:
+  public static Parser<?> create(ResultSet result, Type type, int columnarPosition) {
+    switch (type.getCode()) {
+      case BOOL:
         return new BooleanParser(result, columnarPosition);
-      case Types.BINARY:
+      case BYTES:
         return new BinaryParser(result, columnarPosition);
-      case Types.DATE:
+      case DATE:
         return new DateParser(result, columnarPosition);
-      case Types.DOUBLE:
+      case FLOAT64:
         return new DoubleParser(result, columnarPosition);
-      case Types.BIGINT:
+      case INT64:
         return new LongParser(result, columnarPosition);
-      case Types.INTEGER:
-        return new IntegerParser(result, columnarPosition);
-      case Types.NUMERIC:
+      case NUMERIC:
+      case PG_NUMERIC:
         return new NumericParser(result, columnarPosition);
-      case Types.NVARCHAR:
+      case STRING:
         return new StringParser(result, columnarPosition);
-      case Types.TIMESTAMP:
+      case TIMESTAMP:
         return new TimestampParser(result, columnarPosition);
-      case Types.ARRAY:
+      case ARRAY:
         return new ArrayParser(result, columnarPosition);
-      case Types.STRUCT:
+      case STRUCT:
       default:
-        throw new IllegalArgumentException("Illegal or unknown element oidType: " + oidType);
+        throw new IllegalArgumentException("Illegal or unknown element type: " + type);
     }
   }
 
@@ -157,33 +157,93 @@ public abstract class Parser<T> {
    * Factory method for parsing generic data given a specified type.
    *
    * @param result The generic object to parse.
-   * @param oidType The type of the object to be parsed.
+   * @param typeCode The type of the object to be parsed.
    * @return The parser object for the designated data type.
    */
-  protected static Parser create(Object result, int oidType) {
-    switch (oidType) {
-      case Types.BOOLEAN:
+  protected static Parser<?> create(Object result, Code typeCode) {
+    switch (typeCode) {
+      case BOOL:
         return new BooleanParser(result);
-      case Types.BINARY:
+      case BYTES:
         return new BinaryParser(result);
-      case Types.DATE:
+      case DATE:
         return new DateParser(result);
-      case Types.DOUBLE:
+      case FLOAT64:
         return new DoubleParser(result);
-      case Types.BIGINT:
+      case INT64:
         return new LongParser(result);
-      case Types.INTEGER:
-        return new IntegerParser(result);
-      case Types.NUMERIC:
+      case NUMERIC:
+      case PG_NUMERIC:
         return new NumericParser(result);
-      case Types.NVARCHAR:
+      case STRING:
         return new StringParser(result);
-      case Types.TIMESTAMP:
+      case TIMESTAMP:
         return new TimestampParser(result);
-      case Types.ARRAY:
-      case Types.STRUCT:
+      case ARRAY:
+      case STRUCT:
       default:
-        throw new IllegalArgumentException("Illegal or unknown element type: " + oidType);
+        throw new IllegalArgumentException("Illegal or unknown element type: " + typeCode);
+    }
+  }
+
+  /**
+   * Translates the given Cloud Spanner {@link Type} to a PostgreSQL OID constant.
+   *
+   * @param type the type to translate
+   * @return The OID constant value for the type
+   */
+  public static int toOid(Type type) {
+    switch (type.getCode()) {
+      case BOOL:
+        return Oid.BOOL;
+      case INT64:
+        return Oid.INT8;
+      case NUMERIC:
+      case PG_NUMERIC:
+        return Oid.NUMERIC;
+      case FLOAT64:
+        return Oid.FLOAT8;
+      case STRING:
+        return Oid.VARCHAR;
+      case JSON:
+        return Oid.JSONB;
+      case BYTES:
+        return Oid.BYTEA;
+      case TIMESTAMP:
+        return Oid.TIMESTAMP;
+      case DATE:
+        return Oid.DATE;
+      case ARRAY:
+        switch (type.getArrayElementType().getCode()) {
+          case BOOL:
+            return Oid.BOOL_ARRAY;
+          case INT64:
+            return Oid.INT8_ARRAY;
+          case NUMERIC:
+          case PG_NUMERIC:
+            return Oid.NUMERIC_ARRAY;
+          case FLOAT64:
+            return Oid.FLOAT8_ARRAY;
+          case STRING:
+            return Oid.VARCHAR_ARRAY;
+          case JSON:
+            return Oid.JSONB_ARRAY;
+          case BYTES:
+            return Oid.BYTEA_ARRAY;
+          case TIMESTAMP:
+            return Oid.TIMESTAMP_ARRAY;
+          case DATE:
+            return Oid.DATE_ARRAY;
+          case ARRAY:
+          case STRUCT:
+          default:
+            throw SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown array type: " + type);
+        }
+      case STRUCT:
+      default:
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown type: " + type);
     }
   }
 
@@ -238,4 +298,6 @@ public abstract class Parser<T> {
 
   /** Used to parse data type onto binary. Override this to change binary representation. */
   protected abstract byte[] binaryParse();
+
+  public abstract void bind(Statement.Builder statementBuilder, String name);
 }

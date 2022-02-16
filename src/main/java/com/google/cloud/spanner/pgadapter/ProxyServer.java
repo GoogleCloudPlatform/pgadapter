@@ -14,6 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
@@ -23,7 +27,6 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.sql.SQLException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -154,7 +157,7 @@ public class ProxyServer extends Thread {
           Level.INFO,
           "Socket exception on port {0}: {1}. This is normal when the server is stopped.",
           new Object[] {getLocalPort(), e});
-    } catch (SQLException e) {
+    } catch (SpannerException e) {
       logger.log(
           Level.SEVERE,
           "Something went wrong in establishing a Spanner connection: {0}",
@@ -169,12 +172,14 @@ public class ProxyServer extends Thread {
    * Creates and runs the {@link ConnectionHandler}, saving an instance of it locally.
    *
    * @param socket The socket the {@link ConnectionHandler} will read from.
-   * @throws SQLException if the {@link ConnectionHandler} is unable to Connect.
+   * @throws SpannerException if the {@link ConnectionHandler} is unable to Connect.
    */
-  void createConnectionHandler(Socket socket) throws SQLException {
+  void createConnectionHandler(Socket socket) {
     ConnectionHandler handler = new ConnectionHandler(this, socket);
-    if (!handler.getJdbcConnection().isValid(0)) {
-      throw new SQLException("Invalid JDBC connection. Make sure credentials are valid.");
+    if (handler.getSpannerConnection().getDialect() != Dialect.POSTGRESQL) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          "Invalid Spanner connection. Make sure credentials are valid and that the database uses the PostgreSQL dialect.");
     }
     register(handler);
     handler.start();

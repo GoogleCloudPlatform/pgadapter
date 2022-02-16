@@ -14,17 +14,17 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Mutation.WriteBuilder;
-import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
+import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.spanner.v1.TypeCode;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -82,7 +82,8 @@ public class MutationWriter {
       // Check that the number of columns in a record matches the number of columns in the table
       if (record.size() != this.tableColumns.keySet().size()) {
         rollback(connectionHandler);
-        throw new SQLException(
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
             "Invalid COPY data: Row length mismatched. Expected "
                 + this.tableColumns.keySet().size()
                 + " columns, but only found "
@@ -118,7 +119,8 @@ public class MutationWriter {
         } catch (NumberFormatException | DateTimeParseException e) {
           rollback(connectionHandler);
           createErrorFile(payload);
-          throw new SQLException(
+          throw SpannerExceptionFactory.newSpannerException(
+              ErrorCode.INVALID_ARGUMENT,
               "Invalid input syntax for type "
                   + columnType.toString()
                   + ":"
@@ -128,7 +130,8 @@ public class MutationWriter {
         } catch (IllegalArgumentException e) {
           rollback(connectionHandler);
           createErrorFile(payload);
-          throw new SQLException("Invalid input syntax for column \"" + columnName + "\"");
+          throw SpannerExceptionFactory.newSpannerException(
+              ErrorCode.INVALID_ARGUMENT, "Invalid input syntax for column \"" + columnName + "\"");
         } catch (Exception e) {
           rollback(connectionHandler);
           createErrorFile(payload);
@@ -169,14 +172,12 @@ public class MutationWriter {
    *
    * @return count of the number of rows updated.
    */
-  public int writeToSpanner(ConnectionHandler connectionHandler) throws SQLException {
+  public int writeToSpanner(ConnectionHandler connectionHandler) {
     if (this.mutations.isEmpty()) {
       return 0;
     }
-    Connection connection = connectionHandler.getJdbcConnection();
-    CloudSpannerJdbcConnection spannerConnection =
-        connection.unwrap(CloudSpannerJdbcConnection.class);
-    spannerConnection.write(this.mutations); // Write mutation to spanner
+    Connection connection = connectionHandler.getSpannerConnection();
+    connection.write(this.mutations); // Write mutation to spanner
     // Reset mutations, mutation counter, and batch size count for a new batch
     this.mutations = new ArrayList<>();
     this.mutationCount = 0;
@@ -185,7 +186,7 @@ public class MutationWriter {
   }
 
   public void rollback(ConnectionHandler connectionHandler) throws Exception {
-    Connection connection = connectionHandler.getJdbcConnection();
+    Connection connection = connectionHandler.getSpannerConnection();
     connection.rollback();
     this.mutations = new ArrayList<>();
     this.mutationCount = 0;

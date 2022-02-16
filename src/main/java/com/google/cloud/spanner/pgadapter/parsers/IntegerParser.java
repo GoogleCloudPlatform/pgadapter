@@ -14,15 +14,15 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to int. */
 public class IntegerParser extends Parser<Integer> {
 
-  public IntegerParser(ResultSet item, int position) throws SQLException {
-    this.item = item.getInt(position);
+  public IntegerParser(ResultSet item, int position) {
+    this.item = Math.toIntExact(item.getLong(position));
   }
 
   public IntegerParser(Object item) {
@@ -61,5 +61,9 @@ public class IntegerParser extends Parser<Integer> {
     byte[] result = new byte[4];
     ByteConverter.int4(result, 0, value);
     return result;
+  }
+
+  public void bind(Statement.Builder statementBuilder, String name) {
+    statementBuilder.bind(name).to(this.item);
   }
 }

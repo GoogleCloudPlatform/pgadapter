@@ -92,11 +92,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     // PgAdapter therefore also simply executes these as separate DML statements.
     assertTrue(mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).isEmpty());
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // We get three requests: One keep-alive and the two DML statements.
-    assertEquals(3, requests.size());
-    assertEquals(SELECT1.getSql(), requests.get(0).getSql());
-    assertEquals(INSERT_STATEMENT.getSql(), requests.get(1).getSql());
-    assertEquals(UPDATE_STATEMENT.getSql(), requests.get(2).getSql());
+    assertEquals(2, requests.size());
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
+    assertEquals(UPDATE_STATEMENT.getSql(), requests.get(1).getSql());
   }
 
   @Test
@@ -119,12 +117,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertTrue(mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).isEmpty());
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
 
-    // The server will also receive a 'SELECT 1' statement from PgAdapter, as PgAdapter calls
-    // connection.isAlive() before using it.
-    assertEquals(3, requests.size());
-    assertEquals(SELECT1.getSql(), requests.get(0).getSql());
-    assertEquals(INSERT_STATEMENT.getSql(), requests.get(1).getSql());
-    assertEquals(UPDATE_STATEMENT.getSql(), requests.get(2).getSql());
+    assertEquals(2, requests.size());
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
+    assertEquals(UPDATE_STATEMENT.getSql(), requests.get(1).getSql());
   }
 
   @Test

@@ -14,14 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import java.io.DataOutputStream;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,7 +34,6 @@ public class DataRowResponse extends WireOutput {
   private final IntermediateStatement statement;
   private final QueryMode mode;
   private final ResultSet resultSet;
-  private final ResultSetMetaData metadata;
   private final List<byte[]> columns;
 
   public DataRowResponse(
@@ -48,20 +46,18 @@ public class DataRowResponse extends WireOutput {
     this.statement = statement;
     this.mode = mode;
     this.resultSet = statement.getStatementResult();
-    this.metadata = resultSet.getMetaData();
-    this.columns = new ArrayList<>(this.metadata.getColumnCount());
+    this.columns = new ArrayList<>(this.resultSet.getColumnCount());
     this.length = HEADER_LENGTH + COLUMN_NUMBER_LENGTH;
     // TODO profile this with immense rows/column count to see if it's an aread of optimization.
-    for (int column_index = 1; /* column indices start at 1 */
-        column_index <= this.metadata.getColumnCount();
+    for (int column_index = 0; /* column indices start at 0 */
+        column_index < this.resultSet.getColumnCount();
         column_index++) {
       length += COLUMN_SIZE_LENGTH;
-      if (resultSet.getObject(column_index) == null) {
+      if (resultSet.isNull(column_index)) {
         columns.add(null);
       } else {
         DataFormat format = DataFormat.getDataFormat(column_index, statement, this.mode, options);
-        byte[] column =
-            new Converter().parseData(this.resultSet, this.metadata, column_index, format);
+        byte[] column = new Converter().parseData(this.resultSet, column_index, format);
         length += column.length;
         columns.add(column);
       }
@@ -70,7 +66,7 @@ public class DataRowResponse extends WireOutput {
 
   @Override
   protected void sendPayload() throws Exception {
-    this.outputStream.writeShort(this.metadata.getColumnCount());
+    this.outputStream.writeShort(this.resultSet.getColumnCount());
     for (byte[] column_value : columns) {
       if (column_value == null) {
         this.outputStream.writeInt(-1);
