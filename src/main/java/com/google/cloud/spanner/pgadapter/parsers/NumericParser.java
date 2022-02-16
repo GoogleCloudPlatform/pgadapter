@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to {@link Number}. */
@@ -32,26 +33,28 @@ public class NumericParser extends Parser<Number> {
   }
 
   public NumericParser(byte[] item, FormatCode formatCode) {
-    switch (formatCode) {
-      case TEXT:
-        String stringValue = new String(item);
-        if (stringValue.equalsIgnoreCase("NaN")) {
-          this.item = Double.NaN;
-        } else {
-          this.item = new BigDecimal(new String(item));
-        }
-        break;
-      case BINARY:
-        this.item = ByteConverter.numeric(item, 0, item.length);
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported format: " + formatCode);
+    if (item != null) {
+      switch (formatCode) {
+        case TEXT:
+          String stringValue = new String(item);
+          if (stringValue.equalsIgnoreCase("NaN")) {
+            this.item = Double.NaN;
+          } else {
+            this.item = new BigDecimal(new String(item));
+          }
+          break;
+        case BINARY:
+          this.item = ByteConverter.numeric(item, 0, item.length);
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported format: " + formatCode);
+      }
     }
   }
 
   @Override
-  public Number getItem() {
-    return this.item;
+  public int getSqlType() {
+    return Types.NUMERIC;
   }
 
   @Override
