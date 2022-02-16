@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
@@ -23,6 +24,7 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.protobuf.ListValue;
+import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -38,6 +40,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -108,6 +111,20 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                   .addValues(Value.newBuilder().setStringValue("test").build())
                   .build())
           .build();
+  private static final com.google.spanner.v1.ResultSet ALL_TYPES_NULLS_RESULTSET =
+      com.google.spanner.v1.ResultSet.newBuilder()
+          .setMetadata(ALL_TYPES_METADATA)
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .build();
 
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
@@ -143,7 +160,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_bool=? "
             + "and col_bytea=? "
             + "and col_float8=? "
-            //        + "and col_numeric=? "
             + "and col_timestamptz=? "
             + "and col_varchar=?";
     String pgSql =
@@ -153,7 +169,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_bool=$2 "
             + "and col_bytea=$3 "
             + "and col_float8=$4 "
-            //        + "and col_numeric=$5 "
             + "and col_timestamptz=$5 "
             + "and col_varchar=$6";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
@@ -168,7 +183,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .to(ByteArray.copyFrom("test"))
                 .bind("p4")
                 .to(3.14d)
-                // .bind("p5").to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p5")
                 .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
                 .bind("p6")
@@ -184,7 +198,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         preparedStatement.setBoolean(2, true);
         preparedStatement.setBytes(3, "test".getBytes(StandardCharsets.UTF_8));
         preparedStatement.setDouble(4, 3.14d);
-        // preparedStatement.setBigDecimal(5, new BigDecimal("6.626"));
         preparedStatement.setTimestamp(5, java.sql.Timestamp.from(Instant.from(zonedDateTime)));
         preparedStatement.setString(6, "test");
         try (ResultSet resultSet = preparedStatement.executeQuery()) {
@@ -192,6 +205,90 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           assertEquals(1L, resultSet.getLong(1));
           assertFalse(resultSet.next());
         }
+      }
+    }
+  }
+
+  @Test
+  public void testNullValues() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(
+                    "insert into all_types "
+                        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_varchar) "
+                        + "values ($1, $2, $3, $4, $5, $6)")
+                .bind("p1")
+                .to(2L)
+                .bind("p2")
+                .to((Boolean) null)
+                .bind("p3")
+                .to((ByteArray) null)
+                .bind("p4")
+                .to((Double) null)
+                .bind("p5")
+                .to((Long) null)
+                .bind("p6")
+                .to((String) null)
+                .build(),
+            1L));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from all_types where col_bigint is null"),
+            ALL_TYPES_NULLS_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // TODO: Add col_timestamptz to the statement when PgAdapter allows untyped null values.
+      // The PG JDBC driver sends date and timestamp parameters with type code Oid.UNSPECIFIED.
+      // TODO: Add col_numeric to the statement when the mock serverr supports numeric parameters.
+      try (PreparedStatement statement =
+          connection.prepareStatement(
+              "insert into all_types "
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_varchar) "
+                  + "values (?, ?, ?, ?, ?, ?)")) {
+        int index = 0;
+        statement.setLong(++index, 2);
+        statement.setNull(++index, Types.BOOLEAN);
+        statement.setNull(++index, Types.BINARY);
+        statement.setNull(++index, Types.DOUBLE);
+        statement.setNull(++index, Types.INTEGER);
+        // TODO: Enable the next line when the mock server supports numeric parameter values.
+        // statement.setNull(++index, Types.NUMERIC);
+        // TODO: Enable the next line when PgAdapter allows untyped null values.
+        // This is currently blocked on both the Spangres backend allowing untyped null values in
+        // SQL statements, as well as the Java client library and/or JDBC driver allowing untyped
+        // null values.
+        // See also https://github.com/googleapis/java-spanner/pull/1680
+        // statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
+        statement.setNull(++index, Types.VARCHAR);
+
+        assertEquals(1, statement.executeUpdate());
+      }
+
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select * from all_types where col_bigint is null")) {
+        assertTrue(resultSet.next());
+
+        int index = 0;
+        // Note: JDBC returns the zero-value for primitive types if the value is NULL, and you have
+        // to call wasNull() to determine whether the value was NULL or zero.
+        assertEquals(0L, resultSet.getLong(++index));
+        assertTrue(resultSet.wasNull());
+        assertFalse(resultSet.getBoolean(++index));
+        assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getBytes(++index));
+        assertTrue(resultSet.wasNull());
+        assertEquals(0d, resultSet.getDouble(++index), 0.0d);
+        assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getBigDecimal(++index));
+        assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getTimestamp(++index));
+        assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getString(++index));
+        assertTrue(resultSet.wasNull());
+
+        assertFalse(resultSet.next());
       }
     }
   }

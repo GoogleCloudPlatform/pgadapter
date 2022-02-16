@@ -39,6 +39,7 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
 
   public IntermediatePortalStatement(String sql, Connection connection) {
     super(sql, connection);
+    this.statement = Statement.of(sql);
     this.parameterFormatCodes = new ArrayList<>();
     this.resultFormatCodes = new ArrayList<>();
   }
@@ -78,7 +79,9 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
 
   @Override
   public DescribeMetadata describe() throws Exception {
-    try (ResultSet resultSet = connection.analyzeQuery(Statement.of(sql), QueryAnalyzeMode.PLAN)) {
+    // TODO: Consider replacing this with an execute call, so we don't take two round-trips to the
+    // backend just to first describe and then execute a query.
+    try (ResultSet resultSet = connection.analyzeQuery(this.statement, QueryAnalyzeMode.PLAN)) {
       // TODO: Remove ResultSet.next() call once this is supported in the client library.
       // See https://github.com/googleapis/java-spanner/pull/1691
       resultSet.next();

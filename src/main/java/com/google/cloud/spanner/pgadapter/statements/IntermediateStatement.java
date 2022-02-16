@@ -247,6 +247,9 @@ public class IntermediateStatement {
     this.executed = true;
     try {
       if (statements.size() > 1) {
+        // TODO: Clean this up a little once the statement parsing in the client library has been
+        // released: https://github.com/googleapis/java-spanner/pull/1690
+        // Also, the restriction that mixed batches are not allowed will be removed in a future PR.
         if (resultType == ResultType.UPDATE_COUNT) {
           connection.startBatchDml();
         } else if (resultType == ResultType.NO_RESULT) {

@@ -66,7 +66,8 @@ public class IntegerParser extends Parser<Integer> {
     return result;
   }
 
+  @Override
   public void bind(Statement.Builder statementBuilder, String name) {
-    statementBuilder.bind(name).to(this.item);
+    statementBuilder.bind(name).to(this.item == null ? null : this.item.longValue());
   }
 }
