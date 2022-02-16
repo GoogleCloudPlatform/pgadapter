@@ -42,9 +42,14 @@ public class CopyDoneMessage extends ControlMessage {
     // If backend error occurred during copy-in mode, drop any subsequent CopyDone messages.
     MutationWriter mw = this.statement.getMutationWriter();
     if (!statement.hasException()) {
-      int rowCount = mw.writeToSpanner(this.connection); // Write any remaining mutations to Spanner
-      statement.addUpdateCount(rowCount); // Increase the row count of number of rows copied.
-      this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
+      try {
+        int rowCount =
+            mw.writeToSpanner(this.connection); // Write any remaining mutations to Spanner
+        statement.addUpdateCount(rowCount); // Increase the row count of number of rows copied.
+        this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
+      } catch (Exception e) {
+        mw.writeMutationsToErrorFile();
+      }
     } else {
       mw.closeErrorFile();
     }
