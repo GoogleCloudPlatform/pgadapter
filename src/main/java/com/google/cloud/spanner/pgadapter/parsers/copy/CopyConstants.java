@@ -23,49 +23,55 @@ public interface CopyConstants {
   /** RegularExpression Id. */
   int O_CSV = 14;
   /** RegularExpression Id. */
-  int O_FORMAT = 15;
+  int O_TEXT = 15;
   /** RegularExpression Id. */
-  int O_FREEZE = 16;
+  int O_FORMAT = 16;
   /** RegularExpression Id. */
-  int O_DELIMITER = 17;
+  int O_FREEZE = 17;
   /** RegularExpression Id. */
-  int O_NULL = 18;
+  int O_DELIMITER = 18;
   /** RegularExpression Id. */
-  int O_HEADER = 19;
+  int O_NULL = 19;
   /** RegularExpression Id. */
-  int O_QUOTE = 20;
+  int O_HEADER = 20;
   /** RegularExpression Id. */
-  int O_ESCAPE = 21;
+  int O_QUOTE = 21;
   /** RegularExpression Id. */
-  int O_FORCE_QUOTE = 22;
+  int O_ESCAPE = 22;
   /** RegularExpression Id. */
-  int O_FORCE_NOT_NULL = 23;
+  int O_FORCE_QUOTE = 23;
   /** RegularExpression Id. */
-  int O_FORCE_NULL = 24;
+  int O_FORCE_NOT_NULL = 24;
   /** RegularExpression Id. */
-  int O_ENCODING = 25;
+  int O_FORCE_NULL = 25;
   /** RegularExpression Id. */
-  int K_COMMA = 26;
+  int O_ENCODING = 26;
   /** RegularExpression Id. */
-  int K_COLON = 27;
+  int O_TRUE = 27;
   /** RegularExpression Id. */
-  int K_DOT = 28;
+  int O_FALSE = 28;
   /** RegularExpression Id. */
-  int K_TILDE = 29;
+  int UNICODE = 29;
   /** RegularExpression Id. */
-  int K_QUOTE = 30;
+  int CODEPOINT_LIST = 30;
   /** RegularExpression Id. */
-  int K_SLASH = 31;
+  int CODEPOINT = 31;
   /** RegularExpression Id. */
-  int DIGIT = 32;
+  int HEX = 32;
   /** RegularExpression Id. */
-  int LETTER = 33;
+  int QUOTED_IDENTIFIER = 33;
   /** RegularExpression Id. */
-  int LOWER_CASE_LETTER = 34;
+  int IDENTIFIER = 34;
   /** RegularExpression Id. */
-  int ID = 35;
+  int QUOTED_CHAR = 35;
   /** RegularExpression Id. */
-  int IDENTIFIER = 36;
+  int SINGLE_CHAR = 36;
+  /** RegularExpression Id. */
+  int DIGIT = 37;
+  /** RegularExpression Id. */
+  int LETTER = 38;
+  /** RegularExpression Id. */
+  int LOWER_CASE_LETTER = 39;
 
   /** Lexical state. */
   int DEFAULT = 0;
@@ -87,6 +93,7 @@ public interface CopyConstants {
     "\"WITH\"",
     "\"BINARY\"",
     "\"CSV\"",
+    "\"TEXT\"",
     "\"FORMAT\"",
     "\"FREEZE\"",
     "\"DELIMITER\"",
@@ -98,19 +105,23 @@ public interface CopyConstants {
     "\"FORCE_NOT_NULL\"",
     "\"FORCE_NULL\"",
     "\"ENCODING\"",
-    "\",\"",
-    "\":\"",
-    "\".\"",
-    "\"~\"",
-    "\"\\\'\"",
-    "\"/\"",
+    "\"TRUE\"",
+    "\"FALSE\"",
+    "<UNICODE>",
+    "<CODEPOINT_LIST>",
+    "<CODEPOINT>",
+    "<HEX>",
+    "<QUOTED_IDENTIFIER>",
+    "<IDENTIFIER>",
+    "<QUOTED_CHAR>",
+    "<SINGLE_CHAR>",
     "<DIGIT>",
     "<LETTER>",
     "<LOWER_CASE_LETTER>",
-    "<ID>",
-    "<IDENTIFIER>",
     "\";\"",
+    "\".\"",
     "\"(\"",
     "\")\"",
+    "\",\"",
   };
 }

@@ -15,10 +15,9 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
-import com.google.cloud.spanner.pgadapter.utils.MutationBuilder;
+import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import java.text.MessageFormat;
 
@@ -41,17 +40,15 @@ public class CopyDoneMessage extends ControlMessage {
   @Override
   protected void sendPayload() throws Exception {
     // If backend error occurred during copy-in mode, drop any subsequent CopyDone messages.
-    MutationBuilder mb = this.statement.getMutationBuilder();
+    MutationWriter mw = this.statement.getMutationWriter();
     if (!statement.hasException()) {
-      int rowCount = mb.writeToSpanner(this.connection); // Write any remaining mutations to Spanner
+      int rowCount = mw.writeToSpanner(this.connection); // Write any remaining mutations to Spanner
       statement.addUpdateCount(rowCount); // Increase the row count of number of rows copied.
       this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
-      new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
     } else {
-      mb.closeErrorFile();
+      mw.closeErrorFile();
     }
-    // Revert from COPY_IN / COPY_OUT mode.
-    this.connection.setStatus(ConnectionStatus.IDLE);
+    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
     this.connection.removeActiveStatement(this.statement);
   }
 

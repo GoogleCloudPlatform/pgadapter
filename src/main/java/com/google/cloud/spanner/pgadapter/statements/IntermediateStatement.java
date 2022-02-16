@@ -14,7 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import com.google.cloud.spanner.jdbc.JdbcConstants;
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
@@ -30,9 +31,11 @@ import java.util.List;
  * statements which does not belong directly to Postgres, Spanner, etc.
  */
 public class IntermediateStatement {
+  private static final AbstractStatementParser PARSER =
+      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
   protected Statement statement;
-  protected ResultType resultType;
+  private final ResultType resultType;
   protected ResultSet statementResult;
   protected boolean hasMoreData;
   protected Exception exception;
@@ -47,40 +50,37 @@ public class IntermediateStatement {
   private static final char SINGLE_QUOTE = '\'';
 
   public IntermediateStatement(String sql, Connection connection) throws SQLException {
-    this();
     this.sql = sql;
     this.statements = parseStatements(sql);
     this.command = parseCommand(sql);
     this.connection = connection;
     this.statement = connection.createStatement();
+    // Note: This determines the result type based on the first statement in the SQL statement. That
+    // means that it assumes that if this is a batch of statements, all the statements in the batch
+    // will have the same type of result (that is; they are all DML statements, all DDL statements,
+    // all queries, etc.). That is a safe assumption for now, as PgAdapter currently only supports
+    // all-DML and all-DDL batches.
+    this.resultType = determineResultType(sql);
   }
 
-  protected IntermediateStatement() {
-    this.executed = false;
-    this.exception = null;
-    this.resultType = null;
-    this.hasMoreData = false;
-    this.statementResult = null;
-    this.updateCount = null;
+  protected IntermediateStatement(String sql) {
+    this.resultType = determineResultType(sql);
   }
 
   /**
-   * Extracts what type of result exists within the statement. In JDBC a statement update count is
-   * positive if it is an update statement, 0 if there is no result, or negative if there are
-   * results (i.e.: select statement)
+   * Determines the result type based on the given sql string. The sql string must already been
+   * stripped of any comments that might precede the actual sql string.
    *
-   * @param statement The resulting statement from an execution.
-   * @return The statement result type.
-   * @throws SQLException If getUpdateCount fails.
+   * @param sql The sql string to determine the type of result for
+   * @return The {@link ResultType} that the given sql string will produce
    */
-  private static ResultType extractResultType(Statement statement) throws SQLException {
-    switch (statement.getUpdateCount()) {
-      case JdbcConstants.STATEMENT_NO_RESULT:
-        return ResultType.NO_RESULT;
-      case JdbcConstants.STATEMENT_RESULT_SET:
-        return ResultType.RESULT_SET;
-      default:
-        return ResultType.UPDATE_COUNT;
+  protected static ResultType determineResultType(String sql) {
+    if (PARSER.isUpdateStatement(sql)) {
+      return ResultType.UPDATE_COUNT;
+    } else if (PARSER.isQuery(sql)) {
+      return ResultType.RESULT_SET;
+    } else {
+      return ResultType.NO_RESULT;
     }
   }
 
@@ -213,7 +213,6 @@ public class IntermediateStatement {
    * @throws SQLException If an issue occurred in extracting result metadata.
    */
   protected void updateResultCount() throws SQLException {
-    this.resultType = IntermediateStatement.extractResultType(this.statement);
     if (this.containsResultSet()) {
       this.statementResult = this.statement.getResultSet();
       this.hasMoreData = this.statementResult.next();
@@ -225,7 +224,6 @@ public class IntermediateStatement {
   }
 
   protected void updateBatchResultCount(int[] updateCounts) throws SQLException {
-    this.resultType = IntermediateStatement.extractResultType(this.statement);
     this.updateCount = 0;
     for (int i = 0; i < updateCounts.length; ++i) {
       this.updateCount += updateCounts[i];
@@ -243,7 +241,6 @@ public class IntermediateStatement {
     this.exception = e;
     this.hasMoreData = false;
     this.statementResult = null;
-    this.resultType = ResultType.NO_RESULT;
   }
 
   /** Execute the SQL statement, storing metadata. */

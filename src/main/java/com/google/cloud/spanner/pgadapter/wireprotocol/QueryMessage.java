@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -23,6 +24,7 @@ import com.google.cloud.spanner.pgadapter.statements.MatcherStatement;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
 import java.text.MessageFormat;
 
@@ -108,6 +110,12 @@ public class QueryMessage extends ControlMessage {
         this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
         new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
       }
+      this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
+      boolean inTransaction =
+          connection.getJdbcConnection().unwrap(CloudSpannerJdbcConnection.class).isInTransaction();
+      new ReadyResponse(
+              this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
+          .send();
     }
     this.connection.cleanUp(this.statement);
   }

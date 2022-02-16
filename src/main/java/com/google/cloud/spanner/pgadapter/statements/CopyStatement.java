@@ -1,4 +1,4 @@
-// Copyright 2021 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,9 +15,11 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
+import static com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
 
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
-import com.google.cloud.spanner.pgadapter.utils.MutationBuilder;
+import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
+import com.google.common.base.Strings;
 import com.google.spanner.v1.TypeCode;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -34,21 +36,15 @@ public class CopyStatement extends IntermediateStatement {
   private static final String SPANNER_TYPE = "spanner_type";
   private static final String CSV = "CSV";
 
-  private String tableName;
-  private List<String> copyColumnNames;
-  private String formatType;
-  private String nullString;
-  private char delimiterChar;
-  private char quoteChar;
-  private char escapeChar;
-  private boolean hasHeader;
-  private int formatCode;
+  private CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+  private CSVFormat format;
 
+  // Table columns read from information schema.
   private Map<String, TypeCode> tableColumns;
-  private MutationBuilder mutationBuilder;
+  private MutationWriter mutationWriter;
 
   public CopyStatement(String sql, Connection connection) throws SQLException {
-    super();
+    super(sql);
     this.sql = sql;
     this.command = parseCommand(sql);
     this.connection = connection;
@@ -61,84 +57,89 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   /** @return CSVFormat for parsing copy data based on COPY statement options specified. */
+  public void setParserFormat(CopyTreeParser.CopyOptions options) {
+    this.format = CSVFormat.POSTGRESQL_TEXT;
+    if (options.getFormat() == Format.CSV) {
+      this.format = CSVFormat.POSTGRESQL_CSV;
+    }
+    if (!Strings.isNullOrEmpty(options.getNullString())) {
+      this.format = this.format.withNullString(options.getNullString());
+    }
+    if (options.getDelimiter() != '\0') {
+      this.format = this.format.withDelimiter(options.getDelimiter());
+    }
+    if (options.getEscape() != '\0') {
+      this.format = this.format.withEscape(options.getEscape());
+    }
+    if (options.getQuote() != '\0') {
+      this.format = this.format.withQuote(options.getQuote());
+    }
+    // if(options.hasHeader()) {
+    this.format = this.format.withHeader(this.tableColumns.keySet().toArray(new String[0]));
+    // }
+  }
+
   public CSVFormat getParserFormat() {
-    CSVFormat format = CSVFormat.POSTGRESQL_TEXT;
-    if (this.formatType != null && this.formatType.equalsIgnoreCase("CSV")) {
-      format = CSVFormat.POSTGRESQL_CSV;
-    }
-    if (this.nullString != null && !this.nullString.isEmpty()) {
-      format = format.withNullString(this.nullString);
-    }
-    if (this.delimiterChar != '\0') {
-      format = format.withDelimiter(this.delimiterChar);
-    }
-    if (this.escapeChar != '\0') {
-      format = format.withEscape(this.escapeChar);
-    }
-    if (this.quoteChar != '\0') {
-      format = format.withQuote(this.quoteChar);
-    }
-    format = format.withHeader(this.tableColumns.keySet().toArray(new String[0]));
-    return format;
+    return this.format;
   }
 
   public String getTableName() {
-    return this.tableName;
+    return options.getTableName();
   }
 
   /** @return List of column names specified in COPY statement, if provided. */
   public List<String> getCopyColumnNames() {
-    return this.copyColumnNames;
+    return options.getColumnNames();
   }
 
   /** @return Format type specified in COPY statement, if provided. */
   public String getFormatType() {
-    return this.formatType;
-  }
-
-  /** @return Null string specified in COPY statement, if provided. */
-  public String getNullString() {
-    return this.nullString;
-  }
-
-  /** @return Delimiter character specified in COPY statement, if provided. */
-  public char getDelimiterChar() {
-    return this.delimiterChar;
-  }
-
-  /** @return Escape character specified in COPY statement, if provided. */
-  public char getEscapeChar() {
-    return this.escapeChar;
-  }
-
-  /** @return Quote character specified in COPY statement, if provided. */
-  public char getQuoteChar() {
-    return this.quoteChar;
+    return options.getFormat().toString();
   }
 
   /** @return True if copy data contains a header, false otherwise. */
   public boolean hasHeader() {
-    return this.hasHeader;
+    return options.hasHeader();
   }
 
-  public int getFormatCode() {
-    return this.formatCode;
+  /** @return Null string specified in COPY statement, if provided. */
+  public String getNullString() {
+    return this.format.getNullString();
   }
 
-  public MutationBuilder getMutationBuilder() {
-    return this.mutationBuilder;
+  /** @return Delimiter character specified in COPY statement, if provided. */
+  public char getDelimiterChar() {
+    return this.format.getDelimiter();
+  }
+
+  /** @return Escape character specified in COPY statement, if provided. */
+  public char getEscapeChar() {
+    return this.format.getEscapeCharacter();
+  }
+
+  /** @return Quote character specified in COPY statement, if provided. */
+  public char getQuoteChar() {
+    return this.format.getQuoteCharacter();
+  }
+
+  public MutationWriter getMutationWriter() {
+    return this.mutationWriter;
   }
 
   private void verifyCopyColumns() throws SQLException {
-    if (this.copyColumnNames.size() > this.tableColumns.size()) {
+    if (options.getColumnNames().size() == 0) {
+      // Use all columns if none were specified.
+      return;
+    }
+    if (options.getColumnNames().size() > this.tableColumns.size()) {
       throw new SQLException("Number of copy columns provided exceed table column count");
     }
     LinkedHashMap<String, TypeCode> tempTableColumns = new LinkedHashMap<>();
     // Verify that every copy column given is a valid table column name
-    for (String copyColumn : this.copyColumnNames) {
+    for (String copyColumn : options.getColumnNames()) {
       if (!this.tableColumns.containsKey(copyColumn)) {
         throw new SQLException(
-            "Column \"" + copyColumn + "\" of relation \"" + this.tableName + "\" does not exist");
+            "Column \"" + copyColumn + "\" of relation \"" + getTableName() + "\" does not exist");
       }
       // Update table column ordering with the copy column ordering
       tempTableColumns.put(copyColumn, tableColumns.get(copyColumn));
@@ -166,8 +167,8 @@ public class CopyStatement extends IntermediateStatement {
                 + COLUMN_NAME
                 + ", "
                 + SPANNER_TYPE
-                + " FROM information_schema.columns WHERE table_name = ?");
-    statement.setString(1, this.tableName);
+                + " FROM information_schema.columns WHERE table_name = \"?\"");
+    statement.setString(1, getTableName());
     ResultSet result = statement.executeQuery();
 
     while (result.next()) {
@@ -177,14 +178,19 @@ public class CopyStatement extends IntermediateStatement {
     }
 
     if (tableColumns.isEmpty()) {
-      throw new SQLException("Table " + this.tableName + " is not found in information_schema");
+      throw new SQLException("Table " + getTableName() + " is not found in information_schema");
     }
 
     this.tableColumns = tableColumns;
 
-    if (this.copyColumnNames != null) {
+    if (options.getColumnNames() != null) {
       verifyCopyColumns();
     }
+  }
+
+  @Override
+  public void handleExecutionException(SQLException e) {
+    super.handleExecutionException(e);
   }
 
   @Override
@@ -192,9 +198,12 @@ public class CopyStatement extends IntermediateStatement {
     this.executed = true;
     try {
       parseCopyStatement();
-      mutationBuilder =
-          new MutationBuilder(this.tableName, this.tableColumns, getParserFormat(), hasHeader());
-      this.updateResultCount(); // Gets update count, set hasMoreData false and statement result
+      queryInformationSchema();
+      setParserFormat(this.options);
+      mutationWriter =
+          new MutationWriter(
+              options.getTableName(), getTableColumns(), getParserFormat(), hasHeader());
+      updateResultCount(); // Gets update count, set hasMoreData false and statement result
     } catch (Exception e) {
       SQLException se = new SQLException(e.toString());
       handleExecutionException(se);
@@ -203,11 +212,7 @@ public class CopyStatement extends IntermediateStatement {
 
   private void parseCopyStatement() throws Exception {
     try {
-      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
-      parse(sql, options);
-      // Set options gathered from the Copy statement.
-      tableName = options.getTableName();
-      queryInformationSchema();
+      parse(sql, this.options);
     } catch (Exception e) {
       throw new SQLException("Invalid COPY statement syntax: " + e.toString());
     }

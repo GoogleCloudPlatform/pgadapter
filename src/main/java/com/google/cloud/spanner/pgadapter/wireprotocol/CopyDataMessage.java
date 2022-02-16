@@ -16,7 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
-import com.google.cloud.spanner.pgadapter.utils.MutationBuilder;
+import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.text.MessageFormat;
@@ -47,16 +47,17 @@ public class CopyDataMessage extends ControlMessage {
   @Override
   protected void sendPayload() throws Exception {
     // If backend error occurred during copy-in mode, drop any subsequent CopyData messages.
-    MutationBuilder mb = this.statement.getMutationBuilder();
+    MutationWriter mw = this.statement.getMutationWriter();
     if (!statement.hasException()) {
       try {
-        mb.buildMutation(this.connection, this.payload);
+        mw.buildMutation(this.connection, this.payload);
       } catch (SQLException e) {
+        mw.writeToErrorFile(this.payload);
         statement.handleExecutionException(e);
         throw e;
       }
     } else {
-      mb.writeToErrorFile(this.payload);
+      mw.writeToErrorFile(this.payload);
     }
   }
 

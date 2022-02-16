@@ -16,7 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
-import com.google.cloud.spanner.pgadapter.utils.MutationBuilder;
+import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
@@ -46,11 +46,11 @@ public class CopyFailMessage extends ControlMessage {
     // If backend error occurred during copy-in mode, drop any subsequent CopyFail messages.
     if (!statement.hasException()) {
       new ErrorResponse(this.outputStream, new Exception(this.errorMessage), State.IOError).send();
-      new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
     } else {
-      MutationBuilder mb = this.statement.getMutationBuilder();
-      mb.closeErrorFile();
+      MutationWriter mw = this.statement.getMutationWriter();
+      mw.closeErrorFile();
     }
+    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
     this.connection.removeActiveStatement(this.statement);
     this.outputStream.flush();
   }

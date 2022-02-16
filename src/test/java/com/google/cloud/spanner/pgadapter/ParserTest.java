@@ -14,10 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
@@ -28,19 +32,30 @@ import com.google.cloud.spanner.pgadapter.parsers.DateParser;
 import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
 import com.google.cloud.spanner.pgadapter.parsers.IntegerParser;
 import com.google.cloud.spanner.pgadapter.parsers.LongParser;
+import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
+import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
+import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
+import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.FromTo;
+import com.google.cloud.spanner.pgadapter.parsers.copy.ParseException;
+import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Array;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.util.Arrays;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mockito;
+import org.postgresql.core.Oid;
 import org.postgresql.util.ByteConverter;
 
 /**
@@ -61,6 +76,29 @@ public class ParserTest {
     assertThat(parser.parse(DataFormat.SPANNER), is(equalTo(spannerResult)));
   }
 
+  private void validateCreateBinary(byte[] item, int oid, Object value) {
+    Parser binary = Parser.create(item, oid, FormatCode.BINARY);
+
+    assertParserValueEqual(binary, value);
+  }
+
+  private void validateCreateText(byte[] item, int oid, Object value) {
+    Parser text = Parser.create(item, oid, FormatCode.TEXT);
+
+    assertParserValueEqual(text, value);
+  }
+
+  private void assertParserValueEqual(Parser parser, Object value) {
+    if (value instanceof byte[]) {
+      assertArrayEquals((byte[]) value, (byte[]) parser.getItem());
+    } else if (value instanceof Date) {
+      // To prevent false failures because dates are automatically appended with the local timezone.
+      assertEquals(value.toString(), parser.getItem().toString());
+    } else {
+      assertEquals(value, parser.getItem());
+    }
+  }
+
   @Test
   public void testPositiveLongParsing() {
     long value = 1234567890L;
@@ -70,6 +108,8 @@ public class ParserTest {
     Parser parsedValue = new LongParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.INT8, value);
+    validateCreateText(stringResult, Oid.INT8, value);
   }
 
   @Test
@@ -81,6 +121,8 @@ public class ParserTest {
     Parser parsedValue = new LongParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.INT8, value);
+    validateCreateText(stringResult, Oid.INT8, value);
   }
 
   @Test
@@ -92,6 +134,8 @@ public class ParserTest {
     Parser parsedValue = new IntegerParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.INT4, value);
+    validateCreateText(stringResult, Oid.INT4, value);
   }
 
   @Test
@@ -103,6 +147,8 @@ public class ParserTest {
     Parser parsedValue = new IntegerParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.INT4, value);
+    validateCreateText(stringResult, Oid.INT4, value);
   }
 
   @Test
@@ -114,6 +160,8 @@ public class ParserTest {
     Parser parsedValue = new DoubleParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.FLOAT8, value);
+    validateCreateText(stringResult, Oid.FLOAT8, value);
   }
 
   @Test
@@ -125,28 +173,36 @@ public class ParserTest {
     Parser parsedValue = new DoubleParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.FLOAT8, value);
+    validateCreateText(stringResult, Oid.FLOAT8, value);
   }
 
   @Test
   public void testFalseBooleanParsing() {
     boolean value = false;
+    byte[] byteResult = {0};
     byte[] stringResult = {'f'};
     byte[] spannerResult = {'f', 'a', 'l', 's', 'e'};
 
     Parser parsedValue = new BooleanParser(value);
 
-    validate(parsedValue, stringResult, stringResult, spannerResult);
+    validate(parsedValue, byteResult, stringResult, spannerResult);
+    validateCreateBinary(byteResult, Oid.BIT, value);
+    validateCreateText(stringResult, Oid.BIT, value);
   }
 
   @Test
   public void testTrueBooleanParsing() {
     boolean value = true;
+    byte[] byteResult = {1};
     byte[] stringResult = {'t'};
     byte[] spannerResult = {'t', 'r', 'u', 'e'};
 
     Parser parsedValue = new BooleanParser(value);
 
-    validate(parsedValue, stringResult, stringResult, spannerResult);
+    validate(parsedValue, byteResult, stringResult, spannerResult);
+    validateCreateBinary(byteResult, Oid.BIT, value);
+    validateCreateText(stringResult, Oid.BIT, value);
   }
 
   @Test
@@ -159,13 +215,15 @@ public class ParserTest {
     Parser parsedValue = new DateParser(value);
 
     validate(parsedValue, byteResult, stringResult, stringResult);
+    validateCreateBinary(byteResult, Oid.DATE, value);
+    validateCreateText(stringResult, Oid.DATE, value);
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testDateParsingRejectsInvalidDateTooLong() {
     byte[] result = new byte[4];
     ByteConverter.int4(result, 0, Integer.MAX_VALUE);
-    new DateParser(result);
+    new DateParser(result, FormatCode.BINARY);
   }
 
   @Test
@@ -193,6 +251,8 @@ public class ParserTest {
     Parser parsedValue = new StringParser(value);
 
     validate(parsedValue, stringResult, stringResult, stringResult);
+    validateCreateBinary(stringResult, Oid.VARCHAR, value);
+    validateCreateText(stringResult, Oid.VARCHAR, value);
   }
 
   @Test
@@ -204,6 +264,7 @@ public class ParserTest {
     Parser parsedValue = new TimestampParser(value);
 
     assertThat(parsedValue.parse(DataFormat.POSTGRESQL_BINARY), is(equalTo(byteResult)));
+    validateCreateBinary(byteResult, Oid.TIMESTAMP, value);
   }
 
   @Test
@@ -243,6 +304,8 @@ public class ParserTest {
     Parser parsedValue = new BinaryParser(value);
 
     validate(parsedValue, byteResult, stringResult, byteResult);
+    validateCreateBinary(byteResult, Oid.BYTEA, value);
+    validateCreateText(stringResult, Oid.BYTEA, value);
   }
 
   @Test
@@ -309,28 +372,444 @@ public class ParserTest {
 
   @Test
   public void testNumericParsing() throws SQLException {
-    String value = "1234567890.1234567890";
+    BigDecimal value = new BigDecimal("1234567890.1234567890");
 
+    byte[] byteResult = ByteConverter.numeric(new BigDecimal("1234567890.1234567890"));
     byte[] stringResult = {
       '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.', '1', '2', '3', '4', '5', '6', '7', '8',
       '9', '0'
     };
 
-    Parser parser = new StringParser(value);
+    Parser parser = new NumericParser(value);
 
-    validate(parser, stringResult, stringResult, stringResult);
+    validate(parser, byteResult, stringResult, stringResult);
     assertThat(parser.getItem(), is(equalTo(value)));
+    validateCreateBinary(byteResult, Oid.NUMERIC, value);
+    validateCreateText(stringResult, Oid.NUMERIC, value);
   }
 
   @Test
   public void testNumericParsingNaN() throws SQLException {
-    String value = "NaN";
+    Number value = Double.NaN;
 
     byte[] stringResult = {'N', 'a', 'N'};
 
-    Parser parser = new StringParser(value);
+    NumericParser parser = new NumericParser(value);
 
     validate(parser, stringResult, stringResult, stringResult);
     assertThat(parser.getItem(), is(equalTo(value)));
+    validateCreateText(stringResult, Oid.NUMERIC, value);
+  }
+
+  @Test
+  public void testCopyParser() throws Exception {
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertTrue(options.getColumnNames().isEmpty());
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY Users FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertTrue(options.getColumnNames().isEmpty());
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY UsErS FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertTrue(options.getColumnNames().isEmpty());
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY USERS FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertTrue(options.getColumnNames().isEmpty());
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \'Users\' FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("Users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertTrue(options.getColumnNames().isEmpty());
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \"UsErS\" FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("UsErS")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertTrue(options.getColumnNames().isEmpty());
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \'USERS\' FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("USERS")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertTrue(options.getColumnNames().isEmpty());
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users (id) FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("id"))));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users (id, age) FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("id", "age"))));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users (id, age, name) FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("id", "age", "name"))));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users (ID, AGE, NAME) FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("id", "age", "name"))));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users (Id, Age, Name) FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("id", "age", "name"))));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users (iD, aGe, nAMe) FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("id", "age", "name"))));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users (\'ID\', \"AGE\", \'NAME\') FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("ID", "AGE", "NAME"))));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users (\'Id\', \'Age\', \'Name\') FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("Id", "Age", "Name"))));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users (\"iD\", \"aGe\", \"nAMe\") FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getColumnNames(), is(equalTo(Arrays.asList("iD", "aGe", "nAMe"))));
+    }
+  }
+
+  @Test
+  public void testCopyParserOptions() throws Exception {
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users FROM STDIN WITH FORMAT CSV;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.CSV)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users FROM STDIN WITH FORMAT BINARY;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.BINARY)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users FROM STDIN WITH FORMAT TEXT;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users FROM STDIN CSV;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.CSV)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users FROM STDIN BINARY;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.BINARY)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users FROM STDIN TEXT;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users FROM STDIN DELIMITER '*';";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getDelimiter(), is(equalTo('*')));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users FROM STDIN ESCAPE '\\';";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getEscape(), is(equalTo('\\')));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users FROM STDIN QUOTE '\'';";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getQuote(), is(equalTo('\'')));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users FROM STDIN NULL 'null';";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+      assertThat(options.getNullString(), is(equalTo("null")));
+    }
+  }
+
+  @Test
+  public void testCopyParserWithNamespace() throws Exception {
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY public.users FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("public.users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY public.\"USERS\" FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("public.USERS")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \'PUBLIC\'.\"USERS\" FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("PUBLIC.USERS")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \"public\".users FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("public.users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \"public\".\'users\' FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("public.users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY public.\"users\" FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("public.users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY one.two.three.users FROM STDIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("one.two.three.users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY public.\'users\" FROM STDIN;";
+      assertThrows(TokenMgrError.class, () -> parse(sql, options));
+    }
+
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY \"public.users\" FROM STDIN;";
+      assertThrows(TokenMgrError.class, () -> parse(sql, options));
+    }
+  }
+
+  @Test
+  public void testCopyParserWithMixedCase() throws Exception {
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "CoPy UsErS fROm stdIN;";
+      parse(sql, options);
+
+      assertThat(options.getTableName(), is(equalTo("users")));
+      assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+      assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+    }
+  }
+
+  @Test
+  public void testCopyParserWithUnicode() throws Exception {
+    {
+      String text = new String("COPY ÀÚ§ýJ@ö¥ FROM STDIN;".getBytes(), StandardCharsets.UTF_8);
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = text;
+      assertThrows(TokenMgrError.class, () -> parse(sql, options));
+    }
+
+    {
+      String text =
+          new String(
+              "COPY U&\"\\0441\\043B\\043E\\043D\" FROM STDIN;".getBytes(), StandardCharsets.UTF_8);
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = text;
+      assertThrows(ParseException.class, () -> parse(sql, options));
+    }
+
+    {
+      String text =
+          new String(
+              "COPY u&\"\\0441\\043B\\043E\\043D\" FROM STDIN;".getBytes(), StandardCharsets.UTF_8);
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = text;
+      assertThrows(ParseException.class, () -> parse(sql, options));
+    }
   }
 }

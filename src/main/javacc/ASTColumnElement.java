@@ -2,6 +2,7 @@ package com.google.cloud.spanner.pgadapter.parsers.copy;
 
 public class ASTColumnElement extends SimpleNode {
   private String name;
+
   public ASTColumnElement(int id) {
     super(id);
   }
@@ -12,6 +13,10 @@ public class ASTColumnElement extends SimpleNode {
 
   public void setName(String n) {
     name = n;
+  }
+
+  public String getName() {
+    return name;
   }
 
   public String toString() {

@@ -10,11 +10,13 @@ public interface CopyVisitor {
 
   public Object visit(ASTQualifiedName node, Object data);
 
+  public Object visit(ASTNamespace node, Object data);
+
   public Object visit(ASTColumnList node, Object data);
 
   public Object visit(ASTColumnElement node, Object data);
 
-  public Object visit(ASTCopyFrom node, Object data);
+  public Object visit(ASTCopyDirection node, Object data);
 
   public Object visit(ASTFilename node, Object data);
 
@@ -24,6 +26,12 @@ public interface CopyVisitor {
 
   public Object visit(ASTCopyOptionElement node, Object data);
 
+  public Object visit(ASTFormatType node, Object data);
+
   public Object visit(ASTID node, Object data);
+
+  public Object visit(ASTSingleChar node, Object data);
+
+  public Object visit(ASTBoolean node, Object data);
 }
-/* JavaCC - OriginalChecksum=d755a456aed92b39e7dec62ef87362ef (do not edit this line) */
+/* JavaCC - OriginalChecksum=25f605c8d31c82e3eef2057d8a0a0d9f (do not edit this line) */

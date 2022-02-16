@@ -7,10 +7,13 @@
     <mkdir dir="copy"/> 
     <copy file="copy.jjt" todir="copy"/>
     <copy file="ASTID.java" todir="copy"/>
+    <copy file="ASTSingleChar.java" todir="copy"/>
+    <copy file="ASTBoolean.java" todir="copy"/>
+    <copy file="ASTCopyDirection.java" todir="copy"/>
     <copy file="ASTColumnElement.java" todir="copy"/>
     <copy file="ASTCopyOptionElement.java" todir="copy"/>
-    <copy file="ASTCopyStatement.java" todir="copy"/>
     <copy file="ASTFilename.java" todir="copy"/>
+    <copy file="ASTFormatType.java" todir="copy"/>
     <copy file="CopyTreeParser.java" todir="copy"/>
     <jjtree target="copy.jjt" outputdirectory="copy" javacchome="${javacc.home}"/>
     <javacc target="copy/copy.jj" outputdirectory="copy" javacchome="${javacc.home}"/>

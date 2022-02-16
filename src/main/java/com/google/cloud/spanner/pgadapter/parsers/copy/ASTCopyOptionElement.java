@@ -15,6 +15,10 @@ public class ASTCopyOptionElement extends SimpleNode {
     name = n;
   }
 
+  public String getName() {
+    return name;
+  }
+
   public String toString() {
     return "Copy Option Element: " + name;
   }
