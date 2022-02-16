@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
+import java.sql.Types;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to long. */
@@ -30,21 +31,23 @@ public class LongParser extends Parser<Long> {
   }
 
   public LongParser(byte[] item, FormatCode formatCode) {
-    switch (formatCode) {
-      case TEXT:
-        this.item = Long.valueOf(new String(item));
-        break;
-      case BINARY:
-        this.item = ByteConverter.int8(item, 0);
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported format: " + formatCode);
+    if (item != null) {
+      switch (formatCode) {
+        case TEXT:
+          this.item = Long.valueOf(new String(item));
+          break;
+        case BINARY:
+          this.item = ByteConverter.int8(item, 0);
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported format: " + formatCode);
+      }
     }
   }
 
   @Override
-  public Long getItem() {
-    return this.item;
+  public int getSqlType() {
+    return Types.BIGINT;
   }
 
   @Override

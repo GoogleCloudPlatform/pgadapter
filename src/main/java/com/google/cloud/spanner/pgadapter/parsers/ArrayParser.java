@@ -23,6 +23,7 @@ import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.Value;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.sql.Types;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -41,14 +42,19 @@ public class ArrayParser extends Parser<List<?>> {
   private final boolean isStringEquivalent;
 
   public ArrayParser(ResultSet item, int position) {
-    this.arrayElementType = item.getColumnType(position).getArrayElementType();
-    if (this.arrayElementType.getCode() == Code.ARRAY) {
-      throw new IllegalArgumentException(
-          "Spanner does not support embedded Arrays."
-              + " If you are seeing this, something went wrong!");
+    if (item != null) {
+      this.arrayElementType = item.getColumnType(position).getArrayElementType();
+      if (this.arrayElementType.getCode() == Code.ARRAY) {
+        throw new IllegalArgumentException(
+            "Spanner does not support embedded Arrays."
+                + " If you are seeing this, something went wrong!");
+      }
+      this.item = toList(item.getValue(position), this.arrayElementType.getCode());
+      this.isStringEquivalent = stringEquivalence(this.arrayElementType.getCode());
+    } else {
+      arrayElementType = null;
+      isStringEquivalent = false;
     }
-    this.item = toList(item.getValue(position), this.arrayElementType.getCode());
-    this.isStringEquivalent = stringEquivalence(this.arrayElementType.getCode());
   }
 
   private List<?> toList(Value value, Code arrayElementType) {
@@ -84,6 +90,11 @@ public class ArrayParser extends Parser<List<?>> {
   @Override
   public List<?> getItem() {
     return this.item;
+  }
+
+  @Override
+  public int getSqlType() {
+    return Types.ARRAY;
   }
 
   /**

@@ -16,6 +16,10 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
+import com.google.common.collect.ImmutableSet;
+import java.sql.Types;
+import java.util.Locale;
+import java.util.Set;
 import org.postgresql.util.ByteConverter;
 
 /**
@@ -23,9 +27,13 @@ import org.postgresql.util.ByteConverter;
  * bit, or simply returning the bit representation.
  */
 public class BooleanParser extends Parser<Boolean> {
-
-  private static String TRUE_KEY = "t";
-  private static String FALSE_KEY = "f";
+  private static final String TRUE_VALUE = "t";
+  private static final String FALSE_VALUE = "f";
+  // See https://www.postgresql.org/docs/current/datatype-boolean.html
+  private static final Set<String> TRUE_VALUES =
+      ImmutableSet.of("t", "tr", "tru", "true", "y", "ye", "yes", "on", "1");
+  private static final Set<String> FALSE_VALUES =
+      ImmutableSet.of("f", "fa", "fal", "fals", "false", "n", "no", "of", "off");
 
   public BooleanParser(ResultSet item, int position) {
     this.item = item.getBoolean(position);
@@ -36,27 +44,35 @@ public class BooleanParser extends Parser<Boolean> {
   }
 
   public BooleanParser(byte[] item, FormatCode formatCode) {
-    switch (formatCode) {
-      case TEXT:
-        String stringValue = new String(item, UTF8);
-        this.item = stringValue.equals(TRUE_KEY);
-        break;
-      case BINARY:
-        this.item = ByteConverter.bool(item, 0);
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported format: " + formatCode);
+    if (item != null) {
+      switch (formatCode) {
+        case TEXT:
+          String stringValue = new String(item, UTF8).toLowerCase(Locale.ENGLISH);
+          if (TRUE_VALUES.contains(stringValue)) {
+            this.item = true;
+          } else if (FALSE_VALUES.contains(stringValue)) {
+            this.item = false;
+          } else {
+            throw new IllegalArgumentException(stringValue + " is not a valid boolean value");
+          }
+          break;
+        case BINARY:
+          this.item = ByteConverter.bool(item, 0);
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported format: " + formatCode);
+      }
     }
   }
 
   @Override
-  public Boolean getItem() {
-    return this.item;
+  public int getSqlType() {
+    return Types.BOOLEAN;
   }
 
   @Override
   protected String stringParse() {
-    return this.item ? TRUE_KEY : FALSE_KEY;
+    return this.item ? TRUE_VALUE : FALSE_VALUE;
   }
 
   @Override

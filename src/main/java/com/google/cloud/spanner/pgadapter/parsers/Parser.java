@@ -64,7 +64,7 @@ public abstract class Parser<T> {
    *     no type could be guessed.
    */
   private static int guessType(byte[] item, FormatCode formatCode) {
-    if (formatCode == FormatCode.TEXT) {
+    if (formatCode == FormatCode.TEXT && item != null) {
       String value = new String(item, StandardCharsets.UTF_8);
       if (TimestampParser.isTimestamp(value)) {
         return Oid.TIMESTAMPTZ;
@@ -106,11 +106,11 @@ public abstract class Parser<T> {
       case Oid.TIMESTAMPTZ:
         return new TimestampParser(item, formatCode);
       case Oid.UNSPECIFIED:
+        // Try to guess the type based on the value. Use an unspecified parser if no type could be
+        // determined.
         int type = guessType(item, formatCode);
         if (type == Oid.UNSPECIFIED) {
-          throw new IllegalArgumentException(
-              String.format(
-                  "Could not guess type of value %s", new String(item, StandardCharsets.UTF_8)));
+          return new UnspecifiedParser(item, formatCode);
         }
         return create(item, type, formatCode);
       default:
@@ -250,6 +250,9 @@ public abstract class Parser<T> {
   public T getItem() {
     return this.item;
   }
+
+  /** Returns the corresponding JDBC SQL type. */
+  public abstract int getSqlType();
 
   /**
    * Parses data based on specified data format (Spanner, text, or binary)
