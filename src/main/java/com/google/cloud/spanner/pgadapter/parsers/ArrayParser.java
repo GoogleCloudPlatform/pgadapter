@@ -125,6 +125,9 @@ public class ArrayParser extends Parser<List<?>> {
 
   @Override
   protected String stringParse() {
+    if (this.item == null) {
+      return null;
+    }
     List<String> results = new LinkedList<>();
     for (Object currentItem : this.item) {
       results.add(
@@ -136,6 +139,9 @@ public class ArrayParser extends Parser<List<?>> {
 
   @Override
   protected String spannerParse() {
+    if (this.item == null) {
+      return null;
+    }
     List<String> results = new LinkedList<>();
     for (Object currentItem : this.item) {
       results.add(
@@ -147,6 +153,9 @@ public class ArrayParser extends Parser<List<?>> {
 
   @Override
   protected byte[] binaryParse() {
+    if (this.item == null) {
+      return null;
+    }
     ByteArrayOutputStream arrayStream = new ByteArrayOutputStream();
     try {
       arrayStream.write(IntegerParser.binaryParse(1)); // dimension

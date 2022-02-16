@@ -48,7 +48,7 @@ public class StringParser extends Parser<String> {
 
   @Override
   protected byte[] binaryParse() {
-    return this.item.getBytes(StandardCharsets.UTF_8);
+    return this.item == null ? null : this.item.getBytes(StandardCharsets.UTF_8);
   }
 
   public void bind(Statement.Builder statementBuilder, String name) {

@@ -52,12 +52,12 @@ public class IntegerParser extends Parser<Integer> {
 
   @Override
   protected String stringParse() {
-    return Integer.toString(this.item);
+    return this.item == null ? null : Integer.toString(this.item);
   }
 
   @Override
   protected byte[] binaryParse() {
-    return binaryParse(this.item);
+    return this.item == null ? null : binaryParse(this.item);
   }
 
   public static byte[] binaryParse(int value) {

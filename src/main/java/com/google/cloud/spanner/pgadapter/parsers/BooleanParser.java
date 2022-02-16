@@ -72,16 +72,22 @@ public class BooleanParser extends Parser<Boolean> {
 
   @Override
   protected String stringParse() {
+    if (this.item == null) {
+      return null;
+    }
     return this.item ? TRUE_VALUE : FALSE_VALUE;
   }
 
   @Override
   protected String spannerParse() {
-    return Boolean.toString(this.item);
+    return this.item == null ? null : Boolean.toString(this.item);
   }
 
   @Override
   protected byte[] binaryParse() {
+    if (this.item == null) {
+      return null;
+    }
     byte[] result = new byte[1];
     ByteConverter.bool(result, 0, this.item);
     return result;

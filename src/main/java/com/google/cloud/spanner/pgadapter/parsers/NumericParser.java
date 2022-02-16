@@ -65,11 +65,17 @@ public class NumericParser extends Parser<Number> {
 
   @Override
   protected String stringParse() {
+    if (this.item == null) {
+      return null;
+    }
     return Double.isNaN(this.item.doubleValue()) ? "NaN" : ((BigDecimal) this.item).toPlainString();
   }
 
   @Override
   protected byte[] binaryParse() {
+    if (this.item == null) {
+      return null;
+    }
     if (Double.isNaN(this.item.doubleValue())) {
       return "NaN".getBytes(StandardCharsets.UTF_8);
     }

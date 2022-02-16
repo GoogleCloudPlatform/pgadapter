@@ -63,17 +63,17 @@ public class BinaryParser extends Parser<ByteArray> {
 
   @Override
   protected String stringParse() {
-    return PGbytea.toPGString(this.item.toByteArray());
+    return this.item == null ? null : PGbytea.toPGString(this.item.toByteArray());
   }
 
   @Override
   protected byte[] spannerBinaryParse() {
-    return this.item.toByteArray();
+    return this.item == null ? null : this.item.toByteArray();
   }
 
   @Override
   protected byte[] binaryParse() {
-    return this.item.toByteArray();
+    return this.item == null ? null : this.item.toByteArray();
   }
 
   public void bind(Statement.Builder statementBuilder, String name) {

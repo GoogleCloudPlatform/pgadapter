@@ -106,16 +106,19 @@ public class TimestampParser extends Parser<Timestamp> {
 
   @Override
   protected String stringParse() {
-    return toPGString();
+    return this.item == null ? null : toPGString();
   }
 
   @Override
   protected String spannerParse() {
-    return item.toString();
+    return this.item == null ? null : item.toString();
   }
 
   @Override
   protected byte[] binaryParse() {
+    if (this.item == null) {
+      return null;
+    }
     long microseconds =
         ((this.item.getSeconds() - PG_EPOCH_SECONDS) * MICROSECONDS_IN_SECOND)
             + (this.item.getNanos() / NANOSECONDS_IN_MICROSECONDS);

@@ -90,11 +90,14 @@ public class DateParser extends Parser<Date> {
 
   @Override
   protected String stringParse() {
-    return item.toString();
+    return this.item == null ? null : item.toString();
   }
 
   @Override
   protected byte[] binaryParse() {
+    if (this.item == null) {
+      return null;
+    }
     LocalDate localDate =
         LocalDate.of(this.item.getYear(), this.item.getMonth(), this.item.getDayOfMonth());
     long days = localDate.toEpochDay() - PG_EPOCH_DAYS;

@@ -52,11 +52,14 @@ public class LongParser extends Parser<Long> {
 
   @Override
   protected String stringParse() {
-    return Long.toString(this.item);
+    return this.item == null ? null : Long.toString(this.item);
   }
 
   @Override
   protected byte[] binaryParse() {
+    if (this.item == null) {
+      return null;
+    }
     byte[] result = new byte[8];
     ByteConverter.int8(result, 0, this.item);
     return result;

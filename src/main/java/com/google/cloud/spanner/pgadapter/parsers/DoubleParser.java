@@ -52,11 +52,14 @@ public class DoubleParser extends Parser<Double> {
 
   @Override
   protected String stringParse() {
-    return Double.toString(this.item);
+    return this.item == null ? null : Double.toString(this.item);
   }
 
   @Override
   protected byte[] binaryParse() {
+    if (this.item == null) {
+      return null;
+    }
     byte[] result = new byte[8];
     ByteConverter.float8(result, 0, this.item);
     return result;
