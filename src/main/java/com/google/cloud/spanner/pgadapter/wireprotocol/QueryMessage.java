@@ -16,10 +16,13 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.statements.MatcherStatement;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
+import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
@@ -29,13 +32,17 @@ import java.text.MessageFormat;
 public class QueryMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'Q';
+  protected static final String COPY = "COPY";
 
   private IntermediateStatement statement;
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     String query = StatementParser.removeCommentsAndTrim(this.readAll());
-    if (!connection.getServer().getOptions().requiresMatcher()) {
+    String command = StatementParser.parseCommand(query);
+    if (command.equalsIgnoreCase(COPY)) {
+      this.statement = new CopyStatement(query, this.connection.getJdbcConnection());
+    } else if (!connection.getServer().getOptions().requiresMatcher()) {
       this.statement = new IntermediateStatement(query, this.connection.getJdbcConnection());
     } else {
       this.statement = new MatcherStatement(query, this.connection);
@@ -47,7 +54,9 @@ public class QueryMessage extends ControlMessage {
   protected void sendPayload() throws Exception {
     this.statement.execute();
     this.handleQuery();
-    this.connection.removeActiveStatement(this.statement);
+    if (!this.statement.getCommand().equalsIgnoreCase(COPY)) {
+      this.connection.removeActiveStatement(this.statement);
+    }
   }
 
   @Override
@@ -81,7 +90,15 @@ public class QueryMessage extends ControlMessage {
     if (this.statement.hasException()) {
       this.handleError(this.statement.getException());
     } else {
-      if (this.statement.containsResultSet()) {
+      if (this.statement.getCommand().equalsIgnoreCase(COPY)) {
+        CopyStatement copyStatement = (CopyStatement) this.statement;
+        new CopyInResponse(
+                this.outputStream,
+                copyStatement.getTableColumns().size(),
+                copyStatement.getFormatCode())
+            .send();
+        this.connection.setStatus(ConnectionStatus.COPY_IN);
+      } else if (this.statement.containsResultSet()) {
         new RowDescriptionResponse(
                 this.outputStream,
                 this.statement,

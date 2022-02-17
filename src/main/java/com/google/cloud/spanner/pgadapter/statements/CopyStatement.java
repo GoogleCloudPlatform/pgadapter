@@ -19,6 +19,7 @@ import static com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.Cop
 
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
+import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Strings;
 import com.google.spanner.v1.TypeCode;
 import java.sql.Connection;
@@ -46,7 +47,7 @@ public class CopyStatement extends IntermediateStatement {
   public CopyStatement(String sql, Connection connection) throws SQLException {
     super(sql);
     this.sql = sql;
-    this.command = parseCommand(sql);
+    this.command = StatementParser.parseCommand(sql);
     this.connection = connection;
     this.statement = connection.createStatement();
   }
@@ -126,6 +127,11 @@ public class CopyStatement extends IntermediateStatement {
     return this.mutationWriter;
   }
 
+  /** @return 0 for text/csv formatting and 1 for binary */
+  public int getFormatCode() {
+    return (options.getFormat() == CopyTreeParser.CopyOptions.Format.BINARY) ? 1 : 0;
+  }
+
   private void verifyCopyColumns() throws SQLException {
     if (options.getColumnNames().size() == 0) {
       // Use all columns if none were specified.
@@ -167,7 +173,7 @@ public class CopyStatement extends IntermediateStatement {
                 + COLUMN_NAME
                 + ", "
                 + SPANNER_TYPE
-                + " FROM information_schema.columns WHERE table_name = \"?\"");
+                + " FROM information_schema.columns WHERE table_name = ?");
     statement.setString(1, getTableName());
     ResultSet result = statement.executeQuery();
 

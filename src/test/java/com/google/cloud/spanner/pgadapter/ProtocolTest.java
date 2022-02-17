@@ -1202,15 +1202,20 @@ public class ProtocolTest {
     MutationWriter mb = Mockito.mock(MutationWriter.class);
     Mockito.when(copyStatement.getMutationWriter()).thenReturn(mb);
 
-    WireMessage message = ControlMessage.create(connectionHandler);
-    Assert.assertEquals(message.getClass(), CopyDataMessage.class);
-    Assert.assertArrayEquals(((CopyDataMessage) message).getPayload(), payload);
+    {
+      WireMessage message = ControlMessage.create(connectionHandler);
+      Assert.assertEquals(message.getClass(), CopyDataMessage.class);
+      Assert.assertArrayEquals(((CopyDataMessage) message).getPayload(), payload);
 
-    CopyDataMessage messageSpy = (CopyDataMessage) Mockito.spy(message);
-    messageSpy.send();
+      CopyDataMessage messageSpy = (CopyDataMessage) Mockito.spy(message);
+      messageSpy.send();
+    }
 
-    Mockito.verify(mb, Mockito.times(1)).buildMutation(connectionHandler, payload);
+    Mockito.verify(mb, Mockito.times(1)).addMutations(connectionHandler, payload);
   }
+
+  @Test
+  public void testMultipleCopyDataMessages() throws Exception {}
 
   @Test
   public void testCopyDoneMessage() throws Exception {
@@ -1290,7 +1295,8 @@ public class ProtocolTest {
     copyStatement.execute();
 
     MutationWriter mw = copyStatement.getMutationWriter();
-    mw.buildMutation(connectionHandler, payload);
+    mw.addMutations(connectionHandler, payload);
+    mw.buildMutationList(connectionHandler);
 
     Assert.assertEquals(copyStatement.getFormatType(), "TEXT");
     Assert.assertEquals(copyStatement.getDelimiterChar(), '\t');
@@ -1327,7 +1333,8 @@ public class ProtocolTest {
     MutationWriter mw = copyStatement.getMutationWriter();
     MutationWriter mwSpy = Mockito.spy(mw);
     Mockito.when(mwSpy.writeToSpanner(connectionHandler)).thenReturn(10, 2);
-    mwSpy.buildMutation(connectionHandler, payload);
+    mwSpy.addMutations(connectionHandler, payload);
+    mwSpy.buildMutationList(connectionHandler);
     mwSpy.writeToSpanner(connectionHandler);
 
     Assert.assertEquals(copyStatement.getFormatType(), "TEXT");
@@ -1335,7 +1342,6 @@ public class ProtocolTest {
     Assert.assertEquals(copyStatement.hasException(), false);
     Assert.assertEquals(mwSpy.getRowCount(), 12);
 
-    // Verify writeToSpanner is called once inside buildMutation when batch size is exceeded
     Mockito.verify(mwSpy, Mockito.times(1)).writeToSpanner(connectionHandler);
     copyStatement.close();
   }
@@ -1370,7 +1376,8 @@ public class ProtocolTest {
         Assert.assertThrows(
             SQLException.class,
             () -> {
-              mwSpy.buildMutation(connectionHandler, payload);
+              mwSpy.addMutations(connectionHandler, payload);
+              mwSpy.buildMutationList(connectionHandler);
               ;
             });
     Assert.assertEquals(
@@ -1408,12 +1415,13 @@ public class ProtocolTest {
         Assert.assertThrows(
             SQLException.class,
             () -> {
-              mwSpy.buildMutation(connectionHandler, payload);
+              mwSpy.addMutations(connectionHandler, payload);
+              mwSpy.buildMutationList(connectionHandler);
               mwSpy.writeToSpanner(connectionHandler);
             });
     Assert.assertEquals(thrown.getMessage(), "Invalid input syntax for type INT64:\"'5'\"");
 
-    Mockito.verify(mwSpy, Mockito.times(1)).createErrorFile(payload);
+    Mockito.verify(mwSpy, Mockito.times(1)).createErrorFile();
     Mockito.verify(mwSpy, Mockito.times(1)).writeToErrorFile(payload);
 
     File outputFile = new File("output.txt");
@@ -1454,12 +1462,13 @@ public class ProtocolTest {
         Assert.assertThrows(
             SQLException.class,
             () -> {
-              mwSpy.buildMutation(connectionHandler, payload);
+              mwSpy.addMutations(connectionHandler, payload);
+              mwSpy.buildMutationList(connectionHandler);
               mwSpy.writeToSpanner(connectionHandler);
             });
     Assert.assertEquals(thrown.getMessage(), "Invalid input syntax for type INT64:\"'1'\"");
 
-    Mockito.verify(mwSpy, Mockito.times(1)).createErrorFile(payload);
+    Mockito.verify(mwSpy, Mockito.times(1)).createErrorFile();
     Mockito.verify(mwSpy, Mockito.times(1)).writeToErrorFile(payload);
 
     File outputFile = new File("output.txt");
