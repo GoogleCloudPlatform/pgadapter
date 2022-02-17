@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.utils.StatementParser.parseComm
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.commands.Command;
+import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import java.sql.SQLException;
 import org.json.simple.JSONObject;
 
@@ -38,7 +39,7 @@ public class MatcherStatement extends IntermediateStatement {
     this.commandMetadataJSON = connectionHandler.getServer().getOptions().getCommandMetadataJSON();
     this.sql = translateSQL(sql);
     this.statements = parseStatements(sql);
-    this.command = parseCommand(sql);
+    this.command = StatementParser.parseCommand(sql);
   }
 
   @Override
