@@ -43,9 +43,11 @@ import com.google.common.primitives.Bytes;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -75,6 +77,13 @@ public class StatementTest {
     byte[] parameters = new byte[8];
     ByteConverter.int8(parameters, 0, value);
     return parameters;
+  }
+
+  @AfterClass
+  public static void cleanup() {
+    // TODO: Make error log file configurable and turn off writing to a file during tests.
+    File outputFile = new File("output.txt");
+    outputFile.delete();
   }
 
   @Test

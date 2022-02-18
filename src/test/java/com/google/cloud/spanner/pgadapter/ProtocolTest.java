@@ -78,6 +78,7 @@ import java.util.List;
 import java.util.Map;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -132,6 +133,13 @@ public class ProtocolTest {
       result += (char) c;
     } while (c != '\0');
     return result;
+  }
+
+  @AfterClass
+  public static void cleanup() {
+    // TODO: Make error log file configurable and turn off writing to a file during tests.
+    File outputFile = new File("output.txt");
+    outputFile.delete();
   }
 
   @Test
@@ -1368,6 +1376,9 @@ public class ProtocolTest {
         "INVALID_ARGUMENT: Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
         thrown.getMessage());
     copyStatement.close();
+
+    File outputFile = new File("output.txt");
+    outputFile.delete();
   }
 
   @Test
@@ -1419,9 +1430,9 @@ public class ProtocolTest {
 
   @Test
   public void testCopyResumeErrorStartOutputFile() throws Exception {
-    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connection.execute(any(Statement.class))).thenReturn(statementResult);
-    Mockito.when(statementResult.getUpdateCount()).thenReturn(1L);
+    when(statementResult.getUpdateCount()).thenReturn(1L);
 
     byte[] payload =
         Files.readAllBytes(Paths.get("./src/test/resources/test-copy-start-output.txt"));

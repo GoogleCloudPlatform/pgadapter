@@ -35,8 +35,9 @@ import org.apache.commons.csv.CSVRecord;
 
 public class MutationWriter {
 
-  private static final long MUTATION_LIMIT = 20000; // PLACEHOLDER
-  private static final long BATCH_LIMIT = 64000; // PLACEHOLDER
+  private static final long MUTATION_LIMIT = 20000; // 20k mutation count limit
+  private static final long COMMIT_LIMIT = 100000000; // 100MB mutation API commit size limit
+  private static final String ERROR_FILE = "output.txt";
 
   private boolean hasHeader;
   private boolean isHeaderParsed;
@@ -76,12 +77,21 @@ public class MutationWriter {
     List<CSVRecord> records = parsePayloadData(payload);
     if (!records.isEmpty()
         && !payloadFitsInCurrentBatch(records.size() * records.get(0).size(), payload.length)) {
-      rollback(connectionHandler);
+      rollback(connectionHandler, payload);
+      long mutationCount = this.mutationCount + records.size() * records.get(0).size();
+      long commitSize = this.batchSize + payload.length;
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.FAILED_PRECONDITION,
+          "Mutation count: "
+              + mutationCount
+              + " or mutation commit size: "
+              + commitSize
+              + " has exceeded the limit.");
     }
     for (CSVRecord record : records) {
       // Check that the number of columns in a record matches the number of columns in the table
       if (record.size() != this.tableColumns.keySet().size()) {
-        rollback(connectionHandler);
+        rollback(connectionHandler, payload);
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT,
             "Invalid COPY data: Row length mismatched. Expected "
@@ -117,8 +127,7 @@ public class MutationWriter {
               break;
           }
         } catch (NumberFormatException | DateTimeParseException e) {
-          rollback(connectionHandler);
-          createErrorFile(payload);
+          rollback(connectionHandler, payload);
           throw SpannerExceptionFactory.newSpannerException(
               ErrorCode.INVALID_ARGUMENT,
               "Invalid input syntax for type "
@@ -128,13 +137,11 @@ public class MutationWriter {
                   + recordValue
                   + "\"");
         } catch (IllegalArgumentException e) {
-          rollback(connectionHandler);
-          createErrorFile(payload);
+          rollback(connectionHandler, payload);
           throw SpannerExceptionFactory.newSpannerException(
               ErrorCode.INVALID_ARGUMENT, "Invalid input syntax for column \"" + columnName + "\"");
         } catch (Exception e) {
-          rollback(connectionHandler);
-          createErrorFile(payload);
+          rollback(connectionHandler, payload);
           throw e;
         }
       }
@@ -151,7 +158,7 @@ public class MutationWriter {
    */
   private boolean payloadFitsInCurrentBatch(int rowMutationCount, int payloadLength) {
     return (this.mutationCount + rowMutationCount <= MUTATION_LIMIT
-        && this.batchSize + payloadLength <= BATCH_LIMIT);
+        && this.batchSize + payloadLength <= COMMIT_LIMIT);
   }
 
   /** @return list of CSVRecord rows parsed with CSVParser from CopyData payload byte array */
@@ -185,18 +192,19 @@ public class MutationWriter {
     return this.rowCount;
   }
 
-  public void rollback(ConnectionHandler connectionHandler) throws Exception {
+  public void rollback(ConnectionHandler connectionHandler, byte[] payload) throws Exception {
     Connection connection = connectionHandler.getSpannerConnection();
     connection.rollback();
     this.mutations = new ArrayList<>();
     this.mutationCount = 0;
     this.batchSize = 0;
+    createErrorFile(payload);
   }
 
   public void createErrorFile(byte[] payload) throws IOException {
-    File unsuccessfulCopy = new File("./output.txt");
+    File unsuccessfulCopy = new File(ERROR_FILE);
     if (unsuccessfulCopy.createNewFile()) {
-      this.fileWriter = new FileWriter("output.txt");
+      this.fileWriter = new FileWriter(ERROR_FILE);
       writeToErrorFile(payload);
     } else {
       System.err.println("File " + unsuccessfulCopy.getName() + " already exists");
@@ -206,6 +214,17 @@ public class MutationWriter {
   public void writeToErrorFile(byte[] payload) throws IOException {
     if (this.fileWriter != null) {
       this.fileWriter.write(new String(payload, StandardCharsets.UTF_8).trim() + "\n");
+    }
+  }
+
+  public void writeMutationsToErrorFile() throws IOException {
+    File unsuccessfulCopy = new File(ERROR_FILE);
+    if (unsuccessfulCopy.createNewFile()) {
+      this.fileWriter = new FileWriter(ERROR_FILE);
+    }
+
+    for (Mutation mutation : this.mutations) {
+      this.fileWriter.write(mutation.toString());
     }
   }
 

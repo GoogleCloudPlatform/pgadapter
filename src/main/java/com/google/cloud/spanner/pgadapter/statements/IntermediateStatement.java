@@ -24,6 +24,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
+import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,7 +55,7 @@ public class IntermediateStatement {
   public IntermediateStatement(String sql, Connection connection) {
     this.sql = sql;
     this.statements = parseStatements(sql);
-    this.command = parseCommand(sql);
+    this.command = StatementParser.parseCommand(sql);
     this.connection = connection;
     // Note: This determines the result type based on the first statement in the SQL statement. That
     // means that it assumes that if this is a batch of statements, all the statements in the batch
@@ -114,16 +115,6 @@ public class IntermediateStatement {
     Preconditions.checkNotNull(sql);
     List<String> statements = splitStatements(sql);
     return statements;
-  }
-
-  /** Determines the (update) command that was received from the sql string. */
-  protected static String parseCommand(String sql) {
-    Preconditions.checkNotNull(sql);
-    String[] tokens = sql.split("\\s+", 2);
-    if (tokens.length > 0) {
-      return tokens[0].toUpperCase();
-    }
-    return null;
   }
 
   /**

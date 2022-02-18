@@ -25,6 +25,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
+import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Strings;
 import com.google.spanner.v1.TypeCode;
 import java.util.LinkedHashMap;
@@ -48,7 +49,7 @@ public class CopyStatement extends IntermediateStatement {
   public CopyStatement(String sql, Connection connection) {
     super(sql);
     this.sql = sql;
-    this.command = parseCommand(sql);
+    this.command = StatementParser.parseCommand(sql);
     this.connection = connection;
   }
 

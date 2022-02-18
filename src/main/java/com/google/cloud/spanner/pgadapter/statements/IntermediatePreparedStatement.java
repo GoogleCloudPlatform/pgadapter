@@ -21,6 +21,7 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -38,7 +39,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   public IntermediatePreparedStatement(String sql, Connection connection) {
     super(sql);
     this.sql = sql;
-    this.command = parseCommand(sql);
+    this.command = StatementParser.parseCommand(sql);
     this.connection = connection;
     this.parameterDataTypes = null;
   }
