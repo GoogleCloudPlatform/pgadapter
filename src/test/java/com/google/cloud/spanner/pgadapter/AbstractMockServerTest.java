@@ -21,6 +21,7 @@ import com.google.api.gax.longrunning.OperationTimedPollAlgorithm;
 import com.google.api.gax.retrying.RetrySettings;
 import com.google.api.gax.rpc.UnaryCallSettings;
 import com.google.cloud.NoCredentials;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockDatabaseAdminServiceImpl;
 import com.google.cloud.spanner.MockOperationsServiceImpl;
@@ -123,6 +124,8 @@ abstract class AbstractMockServerTest {
     mockSpanner.putStatementResult(StatementResult.query(SELECT2, SELECT2_RESULTSET));
     mockSpanner.putStatementResult(StatementResult.update(UPDATE_STATEMENT, UPDATE_COUNT));
     mockSpanner.putStatementResult(StatementResult.update(INSERT_STATEMENT, INSERT_COUNT));
+    mockSpanner.putStatementResult(
+        MockSpannerServiceImpl.StatementResult.detectDialectResult(Dialect.POSTGRESQL));
 
     mockOperationsService = new MockOperationsServiceImpl();
     mockDatabaseAdmin = new MockDatabaseAdminServiceImpl(mockOperationsService);

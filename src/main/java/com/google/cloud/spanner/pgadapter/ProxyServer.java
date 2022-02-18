@@ -158,6 +158,7 @@ public class ProxyServer extends Thread {
           "Socket exception on port {0}: {1}. This is normal when the server is stopped.",
           new Object[] {getLocalPort(), e});
     } catch (SpannerException e) {
+      e.printStackTrace();
       logger.log(
           Level.SEVERE,
           "Something went wrong in establishing a Spanner connection: {0}",
@@ -176,10 +177,14 @@ public class ProxyServer extends Thread {
    */
   void createConnectionHandler(Socket socket) {
     ConnectionHandler handler = new ConnectionHandler(this, socket);
+    // Note: Calling getDialect() will cause a SpannerException if the connection itself is
+    // invalid, for example as a result of the credentials being wrong.
     if (handler.getSpannerConnection().getDialect() != Dialect.POSTGRESQL) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT,
-          "Invalid Spanner connection. Make sure credentials are valid and that the database uses the PostgreSQL dialect.");
+          String.format(
+              "The database uses dialect %s. Only databases using dialect %s are allowed.",
+              handler.getSpannerConnection().getDialect(), Dialect.POSTGRESQL));
     }
     register(handler);
     handler.start();
