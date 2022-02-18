@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,40 +14,32 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.spanner.Value;
 import java.nio.charset.StandardCharsets;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Types;
 
-/** Translate from wire protocol to string. */
-public class StringParser extends Parser<String> {
+/**
+ * Parser for values with unspecified type. Any non-null values will be stored as a string, but the
+ * SQL type will be reported as {@link Types#OTHER}.
+ */
+public class UnspecifiedParser extends Parser<Value> {
 
-  public StringParser(ResultSet item, int position) throws SQLException {
-    this.item = item.getString(position);
-  }
-
-  public StringParser(Object item) {
-    this.item = (String) item;
-  }
-
-  public StringParser(byte[] item, FormatCode formatCode) {
-    if (item != null) {
-      this.item = new String(item, UTF8);
-    }
+  public UnspecifiedParser(byte[] item, FormatCode formatCode) {
+    this.item = Value.string(item == null ? null : new String(item, UTF8));
   }
 
   @Override
   public int getSqlType() {
-    return Types.VARCHAR;
+    return Types.OTHER;
   }
 
   @Override
   protected String stringParse() {
-    return this.item;
+    return this.item.isNull() ? null : this.item.getString();
   }
 
   @Override
   protected byte[] binaryParse() {
-    return this.item.getBytes(StandardCharsets.UTF_8);
+    return this.item.isNull() ? null : this.item.getString().getBytes(StandardCharsets.UTF_8);
   }
 }

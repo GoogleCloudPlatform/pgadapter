@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
+import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -52,7 +53,7 @@ public class IntermediateStatement {
   public IntermediateStatement(String sql, Connection connection) throws SQLException {
     this.sql = sql;
     this.statements = parseStatements(sql);
-    this.command = parseCommand(sql);
+    this.command = StatementParser.parseCommand(sql);
     this.connection = connection;
     this.statement = connection.createStatement();
     // Note: This determines the result type based on the first statement in the SQL statement. That
@@ -115,16 +116,6 @@ public class IntermediateStatement {
     return statements;
   }
 
-  /** Determines the (update) command that was received from the sql string. */
-  protected static String parseCommand(String sql) {
-    Preconditions.checkNotNull(sql);
-    String[] tokens = sql.split("\\s+", 2);
-    if (tokens.length > 0) {
-      return tokens[0].toUpperCase();
-    }
-    return null;
-  }
-
   /**
    * Whether this is a bound statement (i.e.: ready to execute)
    *
@@ -159,6 +150,10 @@ public class IntermediateStatement {
   /** @return The number of items that were modified by this execution. */
   public Integer getUpdateCount() {
     return this.updateCount;
+  }
+
+  public void addUpdateCount(int count) {
+    this.updateCount += count;
   }
 
   /** @return True if at some point in execution, and exception was thrown. */

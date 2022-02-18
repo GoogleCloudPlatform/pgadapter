@@ -39,19 +39,21 @@ public class ArrayParser extends Parser<List> {
   boolean isStringEquivalent;
 
   public ArrayParser(ResultSet item, int position) throws SQLException {
-    this.item = Arrays.asList((Object[]) item.getArray(position).getArray());
-    this.arrayType = item.getArray(position).getBaseType();
-    if (this.arrayType == Types.ARRAY) {
-      throw new IllegalArgumentException(
-          "Spanner does not support embedded Arrays."
-              + " If you are seeing this, something went wrong!");
+    if (item != null) {
+      this.item = Arrays.asList((Object[]) item.getArray(position).getArray());
+      this.arrayType = item.getArray(position).getBaseType();
+      if (this.arrayType == Types.ARRAY) {
+        throw new IllegalArgumentException(
+            "Spanner does not support embedded Arrays."
+                + " If you are seeing this, something went wrong!");
+      }
+      this.isStringEquivalent = stringEquivalence(this.arrayType);
     }
-    this.isStringEquivalent = stringEquivalence(this.arrayType);
   }
 
   @Override
-  public List getItem() {
-    return this.item;
+  public int getSqlType() {
+    return Types.ARRAY;
   }
 
   /**
