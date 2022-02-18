@@ -319,16 +319,12 @@ public class ConnectionHandler extends Thread {
     return activeStatementsMap.get(this.connectionId);
   }
 
-  public synchronized ConnectionStatus getStatus() {
-    return status;
-  }
-
   public synchronized void setStatus(ConnectionStatus status) {
     this.status = status;
   }
 
   /** Status of a {@link ConnectionHandler} */
-  public enum ConnectionStatus {
+  private enum ConnectionStatus {
     UNAUTHENTICATED,
     IDLE,
     COPY_IN,

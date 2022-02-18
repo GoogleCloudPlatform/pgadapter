@@ -53,7 +53,8 @@ public class CopyDoneMessage extends ControlMessage {
         // Spanner returned an error when trying to commit the batch of mutations.
         mw.writeMutationsToErrorFile();
         mw.closeErrorFile();
-        this.connection.setStatus(ConnectionStatus.IDLE);
+        // TODO: enable in next PR
+        // this.connection.setStatus(ConnectionStatus.IDLE);
         this.connection.removeActiveStatement(this.statement);
         throw e;
       }
@@ -61,7 +62,8 @@ public class CopyDoneMessage extends ControlMessage {
       mw.closeErrorFile();
     }
     new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
-    this.connection.setStatus(ConnectionStatus.IDLE);
+    // TODO: enable in next PR
+    // this.connection.setStatus(ConnectionStatus.IDLE);
     this.connection.removeActiveStatement(this.statement);
   }
 
