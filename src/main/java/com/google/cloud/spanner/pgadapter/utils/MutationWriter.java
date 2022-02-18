@@ -73,7 +73,7 @@ public class MutationWriter {
   }
 
   public void addMutations(ConnectionHandler connectionHandler, byte[] payload) throws Exception {
-    this.payload.writeBytes(payload);
+    this.payload.write(payload, 0, payload.length);
     if (!payloadFitsInCurrentBatch()) {
       rollback(connectionHandler);
       throw new SQLException(
