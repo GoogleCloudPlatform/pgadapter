@@ -28,12 +28,14 @@ import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -48,6 +50,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import org.bouncycastle.util.encoders.Base64;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -133,8 +136,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   /**
-   * Creates a JDBC connection string that instructs the PG JDBC driver to use the default extended
-   * mode for queries and DML statements.
+   * Creates a JDBC connection string that instructs the PG JDBC driver to use the current query
+   * mode.
    */
   private String createUrl() {
     return String.format("jdbc:postgresql://localhost:%d/", pgServer.getLocalPort());
@@ -142,12 +145,32 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testQuery() throws SQLException {
+    String sql = "SELECT 1";
+
     try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         assertTrue(resultSet.next());
         assertEquals(1L, resultSet.getLong(1));
         assertFalse(resultSet.next());
       }
+    }
+
+    // The statement is sent twice to the mock server:
+    // 1. The first time it is sent with the PLAN mode enabled.
+    // 2. The second time it is sent in normal execute mode.
+    // TODO: Consider skipping the PLAN step and always execute the query already when we receive a
+    // DESCRIBE portal message.
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest planRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+
+    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
+      assertEquals(sql, request.getSql());
+      assertTrue(request.getTransaction().hasSingleUse());
+      assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
     }
   }
 
@@ -160,6 +183,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_bool=? "
             + "and col_bytea=? "
             + "and col_float8=? "
+            + "and col_numeric=? "
             + "and col_timestamptz=? "
             + "and col_varchar=?";
     String pgSql =
@@ -169,8 +193,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_bool=$2 "
             + "and col_bytea=$3 "
             + "and col_float8=$4 "
-            + "and col_timestamptz=$5 "
-            + "and col_varchar=$6";
+            + "and col_numeric=$5 "
+            + "and col_timestamptz=$6 "
+            + "and col_varchar=$7";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -184,8 +209,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p4")
                 .to(3.14d)
                 .bind("p5")
-                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p6")
+                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
+                .bind("p7")
                 .to("test")
                 .build(),
             ALL_TYPES_RESULTSET));
@@ -198,8 +225,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         preparedStatement.setBoolean(2, true);
         preparedStatement.setBytes(3, "test".getBytes(StandardCharsets.UTF_8));
         preparedStatement.setDouble(4, 3.14d);
-        preparedStatement.setTimestamp(5, java.sql.Timestamp.from(Instant.from(zonedDateTime)));
-        preparedStatement.setString(6, "test");
+        preparedStatement.setBigDecimal(5, new BigDecimal("6.626"));
+        preparedStatement.setTimestamp(6, java.sql.Timestamp.from(Instant.from(zonedDateTime)));
+        preparedStatement.setString(7, "test");
         try (ResultSet resultSet = preparedStatement.executeQuery()) {
           assertTrue(resultSet.next());
           assertEquals(1L, resultSet.getLong(1));
@@ -209,14 +237,16 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
+  // TODO: Enable test when possible.
+  @Ignore("Requires https://github.com/googleapis/java-spanner/pull/1707")
   @Test
   public void testNullValues() throws SQLException {
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(
                     "insert into all_types "
-                        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_varchar) "
-                        + "values ($1, $2, $3, $4, $5, $6)")
+                        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar) "
+                        + "values ($1, $2, $3, $4, $5, $6, $7, $8)")
                 .bind("p1")
                 .to(2L)
                 .bind("p2")
@@ -228,6 +258,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p5")
                 .to((Long) null)
                 .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric(null))
+                .bind("p7")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p8")
                 .to((String) null)
                 .build(),
             1L));
@@ -243,8 +277,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?)")) {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setNull(++index, Types.BOOLEAN);
@@ -252,13 +286,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         statement.setNull(++index, Types.DOUBLE);
         statement.setNull(++index, Types.INTEGER);
         // TODO: Enable the next line when the mock server supports numeric parameter values.
-        // statement.setNull(++index, Types.NUMERIC);
+        statement.setNull(++index, Types.NUMERIC);
         // TODO: Enable the next line when PgAdapter allows untyped null values.
         // This is currently blocked on both the Spangres backend allowing untyped null values in
         // SQL statements, as well as the Java client library and/or JDBC driver allowing untyped
         // null values.
         // See also https://github.com/googleapis/java-spanner/pull/1680
-        // statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
+        statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
         statement.setNull(++index, Types.VARCHAR);
 
         assertEquals(1, statement.executeUpdate());
