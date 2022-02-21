@@ -1,7 +1,7 @@
                                                                                    List of relations
  table_catalog |    table_schema    |           table_name            | index_name  | index_type  | parent_table_name | is_unique | is_null_filtered | index_state | spanner_is_managed 
 +++++++++
- testdb_e2e_psqlv??_([0-9]\{1,5\}) | public             | users                           | PRIMARY_KEY | PRIMARY_KEY |                   | YES       | NO               |             | NO
- testdb_e2e_psqlv??_([0-9]\{1,5\}) | information_schema | information_schema_catalog_name | PRIMARY_KEY | PRIMARY_KEY |                   | YES       | NO               |             | NO
+ testdb_e2e_psqlv?? | public             | users                           | PRIMARY_KEY | PRIMARY_KEY |                   | YES       | NO               |             | NO
+ testdb_e2e_psqlv?? | information_schema | information_schema_catalog_name | PRIMARY_KEY | PRIMARY_KEY |                   | YES       | NO               |             | NO
 (2 rows)
 
