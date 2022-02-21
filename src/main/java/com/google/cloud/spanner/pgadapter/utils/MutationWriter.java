@@ -203,29 +203,24 @@ public class MutationWriter {
     connection.rollback();
     this.mutations = new ArrayList<>();
     this.mutationCount = 0;
-    createErrorFile();
+    writeToErrorFile(this.payload.toByteArray());
   }
 
-  public void createErrorFile() throws IOException {
+  private void createErrorFile() throws IOException {
     File unsuccessfulCopy = new File(ERROR_FILE);
-    if (unsuccessfulCopy.createNewFile()) {
-      this.fileWriter = new FileWriter(ERROR_FILE);
-      writeToErrorFile(this.payload.toByteArray());
-    } else {
-      System.err.println("File " + unsuccessfulCopy.getName() + " already exists");
-    }
+    this.fileWriter = new FileWriter(unsuccessfulCopy, false);
   }
 
   public void writeToErrorFile(byte[] payload) throws IOException {
-    if (this.fileWriter != null) {
-      this.fileWriter.write(new String(payload, StandardCharsets.UTF_8).trim() + "\n");
+    if (this.fileWriter == null) {
+      createErrorFile();
     }
+    this.fileWriter.write(new String(payload, StandardCharsets.UTF_8).trim() + "\n");
   }
 
   public void writeMutationsToErrorFile() throws IOException {
-    File unsuccessfulCopy = new File(ERROR_FILE);
-    if (unsuccessfulCopy.createNewFile()) {
-      this.fileWriter = new FileWriter(ERROR_FILE);
+    if (this.fileWriter == null) {
+      createErrorFile();
     }
 
     for (Mutation mutation : this.mutations) {
