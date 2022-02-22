@@ -72,9 +72,9 @@ public class MutationWriter {
     return this.rowCount;
   }
 
-  public void addMutations(ConnectionHandler connectionHandler, byte[] payload) throws Exception {
+  public void addCopyData(ConnectionHandler connectionHandler, byte[] payload) throws Exception {
     this.payload.write(payload, 0, payload.length);
-    if (!payloadFitsInCurrentBatch()) {
+    if (!commitSizeIsWithinLimit()) {
       rollback(connectionHandler);
       throw new SQLException(
           "Commit size: " + this.payload.size() + " has exceeded the limit: " + COMMIT_LIMIT);
@@ -153,7 +153,7 @@ public class MutationWriter {
    * @return True if current payload will fit within COMMIT_LIMIT. This is only an estimate and the
    *     actual commit size may still be rejected by Spanner.
    */
-  private boolean payloadFitsInCurrentBatch() {
+  private boolean commitSizeIsWithinLimit() {
     return this.payload.size() <= COMMIT_LIMIT;
   }
 
@@ -203,7 +203,8 @@ public class MutationWriter {
     connection.rollback();
     this.mutations = new ArrayList<>();
     this.mutationCount = 0;
-    writeToErrorFile(this.payload.toByteArray());
+    writeCopyDataToErrorFile(this.payload.toByteArray());
+    this.payload.reset();
   }
 
   private void createErrorFile() throws IOException {
@@ -211,13 +212,21 @@ public class MutationWriter {
     this.fileWriter = new FileWriter(unsuccessfulCopy, false);
   }
 
-  public void writeToErrorFile(byte[] payload) throws IOException {
+  /**
+   * Copy data will be written to an error file if size limits were exceeded or a problem was
+   * encountered.
+   */
+  public void writeCopyDataToErrorFile(byte[] payload) throws IOException {
     if (this.fileWriter == null) {
       createErrorFile();
     }
     this.fileWriter.write(new String(payload, StandardCharsets.UTF_8).trim() + "\n");
   }
 
+  /**
+   * The list of mutaitons will be written to the error file if a problem was encountered while
+   * generating the mutaiton list or if Spanner returns an error upon commiting the mutations.
+   */
   public void writeMutationsToErrorFile() throws IOException {
     if (this.fileWriter == null) {
       createErrorFile();

@@ -453,7 +453,7 @@ public class StatementTest {
 
     byte[] payload = "2\t3\n".getBytes();
     MutationWriter mw = statement.getMutationWriter();
-    mw.addMutations(connectionHandler, payload);
+    mw.addCopyData(connectionHandler, payload);
     mw.buildMutationList(connectionHandler);
 
     Assert.assertEquals(statement.getFormatType(), "TEXT");
@@ -490,7 +490,7 @@ public class StatementTest {
         Assert.assertThrows(
             SQLException.class,
             () -> {
-              mw.addMutations(connectionHandler, payload);
+              mw.addCopyData(connectionHandler, payload);
               mw.buildMutationList(connectionHandler);
             });
     Assert.assertEquals(

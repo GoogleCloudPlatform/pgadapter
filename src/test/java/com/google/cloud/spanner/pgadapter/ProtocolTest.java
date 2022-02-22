@@ -1210,7 +1210,7 @@ public class ProtocolTest {
     CopyDataMessage messageSpy = (CopyDataMessage) Mockito.spy(message);
     messageSpy.send();
 
-    Mockito.verify(mw, Mockito.times(1)).addMutations(connectionHandler, payload);
+    Mockito.verify(mw, Mockito.times(1)).addCopyData(connectionHandler, payload);
   }
 
   @Test
@@ -1222,9 +1222,9 @@ public class ProtocolTest {
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
 
     byte[] messageMetadata = {'d'};
-    byte[] payload1 = "1\t'one'\n".getBytes();
-    byte[] payload2 = "2\t'two'\n".getBytes();
-    byte[] payload3 = "3\t'three'\n".getBytes();
+    byte[] payload1 = "1\t'one'\n2\t".getBytes();
+    byte[] payload2 = "'two'\n3".getBytes();
+    byte[] payload3 = "\t'three'\n4\t'four'\n".getBytes();
     byte[] length1 = intToBytes(4 + payload1.length);
     byte[] length2 = intToBytes(4 + payload2.length);
     byte[] length3 = intToBytes(4 + payload3.length);
@@ -1278,7 +1278,8 @@ public class ProtocolTest {
     mw.buildMutationList(connectionHandler);
     Assert.assertEquals(
         mw.getMutations().toString(),
-        "[insert(keyvalue{key=1,value='one'}), insert(keyvalue{key=2,value='two'}), insert(keyvalue{key=3,value='three'})]");
+        "[insert(keyvalue{key=1,value='one'}), insert(keyvalue{key=2,value='two'}), "
+            + "insert(keyvalue{key=3,value='three'}), insert(keyvalue{key=4,value='four'})]");
   }
 
   @Test
@@ -1359,7 +1360,7 @@ public class ProtocolTest {
     copyStatement.execute();
 
     MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addMutations(connectionHandler, payload);
+    mw.addCopyData(connectionHandler, payload);
     mw.buildMutationList(connectionHandler);
 
     Assert.assertEquals(copyStatement.getFormatType(), "TEXT");
@@ -1397,7 +1398,7 @@ public class ProtocolTest {
     MutationWriter mw = copyStatement.getMutationWriter();
     MutationWriter mwSpy = Mockito.spy(mw);
     Mockito.when(mwSpy.writeToSpanner(connectionHandler)).thenReturn(10, 2);
-    mwSpy.addMutations(connectionHandler, payload);
+    mwSpy.addCopyData(connectionHandler, payload);
     mwSpy.buildMutationList(connectionHandler);
     mwSpy.writeToSpanner(connectionHandler);
 
@@ -1440,7 +1441,7 @@ public class ProtocolTest {
         Assert.assertThrows(
             SQLException.class,
             () -> {
-              mwSpy.addMutations(connectionHandler, payload);
+              mwSpy.addCopyData(connectionHandler, payload);
               mwSpy.buildMutationList(connectionHandler);
               ;
             });
@@ -1479,13 +1480,13 @@ public class ProtocolTest {
         Assert.assertThrows(
             SQLException.class,
             () -> {
-              mwSpy.addMutations(connectionHandler, payload);
+              mwSpy.addCopyData(connectionHandler, payload);
               mwSpy.buildMutationList(connectionHandler);
               mwSpy.writeToSpanner(connectionHandler);
             });
     Assert.assertEquals(thrown.getMessage(), "Invalid input syntax for type INT64:\"'5'\"");
 
-    Mockito.verify(mwSpy, Mockito.times(1)).writeToErrorFile(payload);
+    Mockito.verify(mwSpy, Mockito.times(1)).writeCopyDataToErrorFile(payload);
     File outputFile = new File("output.txt");
     Assert.assertTrue(outputFile.exists());
     Assert.assertTrue(outputFile.isFile());
@@ -1524,13 +1525,13 @@ public class ProtocolTest {
         Assert.assertThrows(
             SQLException.class,
             () -> {
-              mwSpy.addMutations(connectionHandler, payload);
+              mwSpy.addCopyData(connectionHandler, payload);
               mwSpy.buildMutationList(connectionHandler);
               mwSpy.writeToSpanner(connectionHandler);
             });
     Assert.assertEquals(thrown.getMessage(), "Invalid input syntax for type INT64:\"'1'\"");
 
-    Mockito.verify(mwSpy, Mockito.times(1)).writeToErrorFile(payload);
+    Mockito.verify(mwSpy, Mockito.times(1)).writeCopyDataToErrorFile(payload);
     File outputFile = new File("output.txt");
     Assert.assertTrue(outputFile.exists());
     Assert.assertTrue(outputFile.isFile());
