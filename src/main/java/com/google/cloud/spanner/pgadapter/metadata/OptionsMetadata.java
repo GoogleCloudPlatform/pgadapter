@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.metadata;
 
 import com.google.cloud.spanner.pgadapter.Server;
 import com.google.cloud.spanner.pgadapter.utils.Credentials;
+import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -175,17 +176,23 @@ public class OptionsMetadata {
     }
 
     // Note that Credentials here is the credentials file, not the actual credentials
-    return String.format(
-        jdbcEndpoint
-            + "projects/%s/"
-            + "instances/%s/"
-            + "databases/%s"
-            + ";credentials=%s"
-            + ";dialect=postgresql",
-        commandLine.getOptionValue(OPTION_PROJECT_ID),
-        commandLine.getOptionValue(OPTION_INSTANCE_ID),
-        commandLine.getOptionValue(OPTION_DATABASE_NAME),
-        buildCredentialsFile(commandLine));
+    String url =
+        String.format(
+            jdbcEndpoint
+                + "projects/%s/"
+                + "instances/%s/"
+                + "databases/%s"
+                + ";dialect=postgresql",
+            commandLine.getOptionValue(OPTION_PROJECT_ID),
+            commandLine.getOptionValue(OPTION_INSTANCE_ID),
+            commandLine.getOptionValue(OPTION_DATABASE_NAME));
+
+    String credentials = buildCredentialsFile(commandLine);
+    if (!Strings.isNullOrEmpty(credentials)) {
+      url = String.format("%s;credentials=%s", url, credentials);
+    }
+
+    return url;
   }
 
   /**
