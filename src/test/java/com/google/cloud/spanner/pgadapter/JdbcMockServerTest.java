@@ -51,6 +51,16 @@ import java.util.List;
 import org.bouncycastle.util.encoders.Base64;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
+import static org.junit.Assert.assertTrue;
+
+import com.google.spanner.v1.ExecuteBatchDmlRequest;
+import com.google.spanner.v1.ExecuteSqlRequest;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.List;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -136,8 +146,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   /**
-   * Creates a JDBC connection string that instructs the PG JDBC driver to use the current query
-   * mode.
+   * Creates a JDBC connection string that instructs the PG JDBC driver to use the default extended
+   * mode for queries and DML statements.
    */
   private String createUrl() {
     return String.format("jdbc:postgresql://localhost:%d/", pgServer.getLocalPort());
