@@ -50,7 +50,7 @@ public class CopyDoneMessage extends ControlMessage {
         this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
       } catch (Exception e) {
         // Spanner returned an error when trying to commit the batch of mutations.
-        mw.writeMutationsToErrorFile();
+        mw.writeCopyDataToErrorFile();
         mw.closeErrorFile();
         // TODO: enable in next PR
         // this.connection.setStatus(ConnectionStatus.IDLE);

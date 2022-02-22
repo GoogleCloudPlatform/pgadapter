@@ -224,17 +224,11 @@ public class MutationWriter {
   }
 
   /**
-   * The list of mutaitons will be written to the error file if a problem was encountered while
-   * generating the mutaiton list or if Spanner returns an error upon commiting the mutations.
+   * Copy data will be written to an error file if a problem was encountered while generating the
+   * mutaiton list or if Spanner returns an error upon commiting the mutations.
    */
-  public void writeMutationsToErrorFile() throws IOException {
-    if (this.fileWriter == null) {
-      createErrorFile();
-    }
-
-    for (Mutation mutation : this.mutations) {
-      this.fileWriter.write(mutation.toString());
-    }
+  public void writeCopyDataToErrorFile() throws IOException {
+    writeCopyDataToErrorFile(this.payload.toByteArray());
   }
 
   public void closeErrorFile() throws IOException {
