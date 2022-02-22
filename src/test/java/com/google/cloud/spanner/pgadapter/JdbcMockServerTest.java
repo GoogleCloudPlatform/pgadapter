@@ -23,18 +23,9 @@ import com.google.cloud.ByteArray;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
-import com.google.protobuf.ListValue;
-import com.google.protobuf.NullValue;
-import com.google.protobuf.Value;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
-import com.google.spanner.v1.ResultSetMetadata;
-import com.google.spanner.v1.StructType;
-import com.google.spanner.v1.StructType.Field;
-import com.google.spanner.v1.Type;
-import com.google.spanner.v1.TypeAnnotationCode;
-import com.google.spanner.v1.TypeCode;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -48,7 +39,6 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import org.bouncycastle.util.encoders.Base64;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -57,77 +47,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
-  private static final ResultSetMetadata ALL_TYPES_METADATA =
-      ResultSetMetadata.newBuilder()
-          .setRowType(
-              StructType.newBuilder()
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_bigint")
-                          .setType(Type.newBuilder().setCode(TypeCode.INT64).build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_bool")
-                          .setType(Type.newBuilder().setCode(TypeCode.BOOL).build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_bytea")
-                          .setType(Type.newBuilder().setCode(TypeCode.BYTES).build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_float8")
-                          .setType(Type.newBuilder().setCode(TypeCode.FLOAT64).build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_numeric")
-                          .setType(
-                              Type.newBuilder()
-                                  .setCode(TypeCode.NUMERIC)
-                                  .setTypeAnnotation(TypeAnnotationCode.PG_NUMERIC)
-                                  .build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_timestamptz")
-                          .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_varchar")
-                          .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
-                  .build())
-          .build();
-  private static final com.google.spanner.v1.ResultSet ALL_TYPES_RESULTSET =
-      com.google.spanner.v1.ResultSet.newBuilder()
-          .setMetadata(ALL_TYPES_METADATA)
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setStringValue("1").build())
-                  .addValues(Value.newBuilder().setBoolValue(true).build())
-                  .addValues(
-                      Value.newBuilder()
-                          .setStringValue(
-                              Base64.toBase64String("test".getBytes(StandardCharsets.UTF_8)))
-                          .build())
-                  .addValues(Value.newBuilder().setNumberValue(3.14d).build())
-                  .addValues(Value.newBuilder().setStringValue("6.626").build())
-                  .addValues(
-                      Value.newBuilder().setStringValue("2022-02-16T13:18:02.123456789Z").build())
-                  .addValues(Value.newBuilder().setStringValue("test").build())
-                  .build())
-          .build();
-  private static final com.google.spanner.v1.ResultSet ALL_TYPES_NULLS_RESULTSET =
-      com.google.spanner.v1.ResultSet.newBuilder()
-          .setMetadata(ALL_TYPES_METADATA)
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .build())
-          .build();
 
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
