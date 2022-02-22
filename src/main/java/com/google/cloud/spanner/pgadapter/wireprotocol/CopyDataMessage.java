@@ -50,14 +50,14 @@ public class CopyDataMessage extends ControlMessage {
     MutationWriter mw = this.statement.getMutationWriter();
     if (!statement.hasException()) {
       try {
-        mw.buildMutation(this.connection, this.payload);
+        mw.addCopyData(this.connection, this.payload);
       } catch (SQLException e) {
-        mw.writeToErrorFile(this.payload);
+        mw.writeCopyDataToErrorFile();
         statement.handleExecutionException(e);
         throw e;
       }
     } else {
-      mw.writeToErrorFile(this.payload);
+      mw.writeCopyDataToErrorFile();
     }
   }
 
