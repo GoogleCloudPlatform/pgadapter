@@ -56,6 +56,8 @@ public abstract class ControlMessage extends WireMessage {
           return new CopyDoneMessage(connection);
         case CopyDataMessage.IDENTIFIER:
           return new CopyDataMessage(connection);
+        case CopyFailMessage.IDENTIFIER:
+          return new CopyFailMessage(connection);
         default:
           throw new IllegalStateException("Expected 0 or more Copy Data messages.");
       }
@@ -77,12 +79,6 @@ public abstract class ControlMessage extends WireMessage {
           return new SyncMessage(connection);
         case TerminateMessage.IDENTIFIER:
           return new TerminateMessage(connection);
-        case CopyDoneMessage.IDENTIFIER:
-          return new CopyDoneMessage(connection);
-        case CopyDataMessage.IDENTIFIER:
-          return new CopyDataMessage(connection);
-        case CopyFailMessage.IDENTIFIER:
-          return new CopyFailMessage(connection);
         case FunctionCallMessage.IDENTIFIER:
           return new FunctionCallMessage(connection);
         case FlushMessage.IDENTIFIER:
