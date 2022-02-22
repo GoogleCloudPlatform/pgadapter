@@ -22,12 +22,6 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import java.io.DataOutputStream;
-import java.math.BigDecimal;
-import java.sql.Date;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.sql.Types;
 import java.text.MessageFormat;
 import org.postgresql.core.Oid;
 
