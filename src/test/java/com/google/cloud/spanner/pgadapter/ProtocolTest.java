@@ -1223,8 +1223,8 @@ public class ProtocolTest {
 
     byte[] messageMetadata = {'d'};
     byte[] payload1 = "1\t'one'\n2\t".getBytes();
-    byte[] payload2 = "'two'\n3".getBytes();
-    byte[] payload3 = "\t'three'\n4\t'four'\n".getBytes();
+    byte[] payload2 = "'two'\n3\t'th".getBytes();
+    byte[] payload3 = "ree'\n4\t'four'\n".getBytes();
     byte[] length1 = intToBytes(4 + payload1.length);
     byte[] length2 = intToBytes(4 + payload2.length);
     byte[] length3 = intToBytes(4 + payload3.length);
