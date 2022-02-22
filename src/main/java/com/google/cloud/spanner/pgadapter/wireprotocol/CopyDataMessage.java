@@ -52,12 +52,12 @@ public class CopyDataMessage extends ControlMessage {
       try {
         mw.addCopyData(this.connection, this.payload);
       } catch (SQLException e) {
-        mw.writeCopyDataToErrorFile(this.payload);
+        mw.writeCopyDataToErrorFile();
         statement.handleExecutionException(e);
         throw e;
       }
     } else {
-      mw.writeCopyDataToErrorFile(this.payload);
+      mw.writeCopyDataToErrorFile();
     }
   }
 

@@ -1486,7 +1486,7 @@ public class ProtocolTest {
             });
     Assert.assertEquals(thrown.getMessage(), "Invalid input syntax for type INT64:\"'5'\"");
 
-    Mockito.verify(mwSpy, Mockito.times(1)).writeCopyDataToErrorFile(payload);
+    Mockito.verify(mwSpy, Mockito.times(1)).writeCopyDataToErrorFile();
     File outputFile = new File("output.txt");
     Assert.assertTrue(outputFile.exists());
     Assert.assertTrue(outputFile.isFile());
@@ -1531,7 +1531,7 @@ public class ProtocolTest {
             });
     Assert.assertEquals(thrown.getMessage(), "Invalid input syntax for type INT64:\"'1'\"");
 
-    Mockito.verify(mwSpy, Mockito.times(1)).writeCopyDataToErrorFile(payload);
+    Mockito.verify(mwSpy, Mockito.times(1)).writeCopyDataToErrorFile();
     File outputFile = new File("output.txt");
     Assert.assertTrue(outputFile.exists());
     Assert.assertTrue(outputFile.isFile());

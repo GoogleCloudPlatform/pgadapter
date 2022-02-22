@@ -203,7 +203,7 @@ public class MutationWriter {
     connection.rollback();
     this.mutations = new ArrayList<>();
     this.mutationCount = 0;
-    writeCopyDataToErrorFile(this.payload.toByteArray());
+    writeCopyDataToErrorFile();
     this.payload.reset();
   }
 
@@ -214,21 +214,15 @@ public class MutationWriter {
 
   /**
    * Copy data will be written to an error file if size limits were exceeded or a problem was
-   * encountered.
-   */
-  public void writeCopyDataToErrorFile(byte[] payload) throws IOException {
-    if (this.fileWriter == null) {
-      createErrorFile();
-    }
-    this.fileWriter.write(new String(payload, StandardCharsets.UTF_8).trim() + "\n");
-  }
-
-  /**
-   * Copy data will be written to an error file if a problem was encountered while generating the
+   * encountered. Copy data will also written if an error was encountered while generating the
    * mutaiton list or if Spanner returns an error upon commiting the mutations.
    */
   public void writeCopyDataToErrorFile() throws IOException {
-    writeCopyDataToErrorFile(this.payload.toByteArray());
+    if (this.fileWriter == null) {
+      createErrorFile();
+    }
+    this.fileWriter.write(
+        new String(this.payload.toByteArray(), StandardCharsets.UTF_8).trim() + "\n");
   }
 
   public void closeErrorFile() throws IOException {
