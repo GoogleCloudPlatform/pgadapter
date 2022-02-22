@@ -1,12 +1,12 @@
 echo "Running tests with $(/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -V)"
 
 # add psql version
-sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-dt.txt
-sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-dt-param.txt
-sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-di.txt
-sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-di-param.txt
-sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-dn.txt
-sed -i "s/testdb_e2e_psql_v../testdb_e2e_psql_v$PSQL_VERSION/" .ci/e2e-expected/backslash-dn-param.txt
+sed -i "s/testdb_e2e_psql_v../$GOOGLE_CLOUD_DATABASE_WITH_VERSION/" .ci/e2e-expected/backslash-dt.txt
+sed -i "s/testdb_e2e_psql_v../$GOOGLE_CLOUD_DATABASE_WITH_VERSION/" .ci/e2e-expected/backslash-dt-param.txt
+sed -i "s/testdb_e2e_psql_v../$GOOGLE_CLOUD_DATABASE_WITH_VERSION/" .ci/e2e-expected/backslash-di.txt
+sed -i "s/testdb_e2e_psql_v../$GOOGLE_CLOUD_DATABASE_WITH_VERSION/" .ci/e2e-expected/backslash-di-param.txt
+sed -i "s/testdb_e2e_psql_v../$GOOGLE_CLOUD_DATABASE_WITH_VERSION/" .ci/e2e-expected/backslash-dn.txt
+sed -i "s/testdb_e2e_psql_v../$GOOGLE_CLOUD_DATABASE_WITH_VERSION/" .ci/e2e-expected/backslash-dn-param.txt
 # remove --- hyphenated formatting lines for diff comparison
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dt.txt
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dt-param.txt
