@@ -65,7 +65,7 @@ docker-push)
   ;;
 e2e-psql)
   PSQL_VERSION="$2"
-  GOOGLE_CLOUD_DATABASE_WITH_VERSION="${GOOGLE_CLOUD_DATABASE}_v${PSQL_VERSION}"
+  GOOGLE_CLOUD_DATABASE_WITH_VERSION="${GOOGLE_CLOUD_DATABASE}_v${PSQL_VERSION}_${RANDOM}"
 #  create testing database
   gcloud config set api_endpoint_overrides/spanner "https://${GOOGLE_CLOUD_ENDPOINT}/"
   gcloud alpha spanner databases create "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --instance="${GOOGLE_CLOUD_INSTANCE}" --database-dialect=POSTGRESQL
