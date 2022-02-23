@@ -158,7 +158,6 @@ public class ProxyServer extends Thread {
           "Socket exception on port {0}: {1}. This is normal when the server is stopped.",
           new Object[] {getLocalPort(), e});
     } catch (SpannerException e) {
-      e.printStackTrace();
       logger.log(
           Level.SEVERE,
           "Something went wrong in establishing a Spanner connection: {0}",
