@@ -98,6 +98,9 @@ public class QueryMessage extends ControlMessage {
                 copyStatement.getFormatCode())
             .send();
         this.connection.setStatus(ConnectionStatus.COPY_IN);
+
+        // Return early as we do not respond with CommandComplete after a COPY command.
+        return;
       } else if (this.statement.containsResultSet()) {
         new RowDescriptionResponse(
                 this.outputStream,
