@@ -44,13 +44,14 @@ public class CopyDoneMessage extends ControlMessage {
     MutationWriter mw = this.statement.getMutationWriter();
     if (!statement.hasException()) {
       try {
+        mw.buildMutationList(this.connection);
         int rowCount =
             mw.writeToSpanner(this.connection); // Write any remaining mutations to Spanner
         statement.addUpdateCount(rowCount); // Increase the row count of number of rows copied.
         this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
       } catch (Exception e) {
         // Spanner returned an error when trying to commit the batch of mutations.
-        mw.writeMutationsToErrorFile();
+        mw.writeCopyDataToErrorFile();
         mw.closeErrorFile();
         this.connection.setStatus(ConnectionStatus.IDLE);
         this.connection.removeActiveStatement(this.statement);
