@@ -113,12 +113,12 @@ RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"COPY FROM STDIN\"------"
 /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "COPY users FROM STDIN;" <<EOF
-5	5	5
-6	6	6
-7	7	7
-8	8	8
-9	9	9
-10	10	10
+12	12	12
+13	13	13
+14	14	14
+15	15	15
+16	16	16
+17	17	17
 \.
 EOF
 echo "SELECT * FROM users;" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/copy-from-stdin.txt
