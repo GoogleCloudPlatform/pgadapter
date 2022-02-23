@@ -173,7 +173,7 @@ public class CopyStatement extends IntermediateStatement {
                 + COLUMN_NAME
                 + ", "
                 + SPANNER_TYPE
-                + " FROM information_schema.columns WHERE table_name = \"?\"");
+                + " FROM information_schema.columns WHERE table_name = ?");
     statement.setString(1, getTableName());
     ResultSet result = statement.executeQuery();
 

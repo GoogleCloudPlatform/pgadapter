@@ -1221,6 +1221,7 @@ public class ProtocolTest {
     Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
         .thenReturn(preparedStatement);
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
 
     byte[] messageMetadata = {'d'};
