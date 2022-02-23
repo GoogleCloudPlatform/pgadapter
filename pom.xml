@@ -47,7 +47,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
-      <version>6.19.1</version>
+      <version>6.20.0</version>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
@@ -78,7 +78,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
-      <version>6.19.1</version>
+      <version>6.20.0</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>

@@ -23,9 +23,13 @@ import com.google.cloud.ByteArray;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.protobuf.Value;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
+import com.google.spanner.v1.Type;
+import com.google.spanner.v1.TypeAnnotationCode;
+import com.google.spanner.v1.TypeCode;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -38,9 +42,10 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -154,10 +159,42 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         }
       }
     }
+
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(2, requests.size());
+
+    ExecuteSqlRequest planRequest = requests.get(0);
+    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    assertEquals(pgSql, planRequest.getSql());
+
+    ExecuteSqlRequest executeRequest = requests.get(1);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(pgSql, executeRequest.getSql());
+
+    for (ExecuteSqlRequest request : requests) {
+      Map<String, Value> params = request.getParams().getFieldsMap();
+      Map<String, Type> types = request.getParamTypesMap();
+
+      assertEquals(TypeCode.INT64, types.get("p1").getCode());
+      assertEquals("1", params.get("p1").getStringValue());
+      assertEquals(TypeCode.BOOL, types.get("p2").getCode());
+      assertTrue(params.get("p2").getBoolValue());
+      assertEquals(TypeCode.BYTES, types.get("p3").getCode());
+      assertEquals(
+          Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)),
+          params.get("p3").getStringValue());
+      assertEquals(TypeCode.FLOAT64, types.get("p4").getCode());
+      assertEquals(3.14d, params.get("p4").getNumberValue(), 0.0d);
+      assertEquals(TypeCode.NUMERIC, types.get("p5").getCode());
+      assertEquals(TypeAnnotationCode.PG_NUMERIC, types.get("p5").getTypeAnnotation());
+      assertEquals("6.626", params.get("p5").getStringValue());
+      assertEquals(TypeCode.TIMESTAMP, types.get("p6").getCode());
+      assertEquals("2022-02-16T13:18:02.123457000Z", params.get("p6").getStringValue());
+      assertEquals(TypeCode.STRING, types.get("p7").getCode());
+      assertEquals("test", params.get("p7").getStringValue());
+    }
   }
 
-  // TODO: Enable test when possible.
-  @Ignore("Requires https://github.com/googleapis/java-spanner/pull/1707")
   @Test
   public void testNullValues() throws SQLException {
     mockSpanner.putStatementResult(
