@@ -128,6 +128,11 @@ public class CopyStatement extends IntermediateStatement {
     return this.mutationWriter;
   }
 
+  /** @return 0 for text/csv formatting and 1 for binary */
+  public int getFormatCode() {
+    return (options.getFormat() == CopyTreeParser.CopyOptions.Format.BINARY) ? 1 : 0;
+  }
+
   private void verifyCopyColumns() {
     if (options.getColumnNames().size() == 0) {
       // Use all columns if none were specified.

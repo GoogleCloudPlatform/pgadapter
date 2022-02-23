@@ -21,6 +21,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.spanner.v1.TypeCode;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -42,18 +43,17 @@ public class MutationWriter {
   private boolean hasHeader;
   private boolean isHeaderParsed;
   private int mutationCount;
-  private int batchSize;
   private int rowCount;
   private List<Mutation> mutations;
   private String tableName;
   private Map<String, TypeCode> tableColumns;
   private CSVFormat format;
   private FileWriter fileWriter;
+  private ByteArrayOutputStream payload = new ByteArrayOutputStream();
 
   public MutationWriter(
       String tableName, Map<String, TypeCode> tableColumns, CSVFormat format, boolean hasHeader) {
     this.mutationCount = 0;
-    this.batchSize = 0;
     this.hasHeader = hasHeader;
     this.isHeaderParsed = false;
     this.tableName = tableName;
@@ -72,26 +72,23 @@ public class MutationWriter {
     return this.rowCount;
   }
 
-  /** Build mutation to add to mutations list with data contained within a CopyData payload */
-  public void buildMutation(ConnectionHandler connectionHandler, byte[] payload) throws Exception {
-    List<CSVRecord> records = parsePayloadData(payload);
-    if (!records.isEmpty()
-        && !payloadFitsInCurrentBatch(records.size() * records.get(0).size(), payload.length)) {
-      rollback(connectionHandler, payload);
-      long mutationCount = this.mutationCount + records.size() * records.get(0).size();
-      long commitSize = this.batchSize + payload.length;
+  public void addCopyData(ConnectionHandler connectionHandler, byte[] payload) throws Exception {
+    this.payload.write(payload, 0, payload.length);
+    if (!commitSizeIsWithinLimit()) {
+      rollback(connectionHandler);
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.FAILED_PRECONDITION,
-          "Mutation count: "
-              + mutationCount
-              + " or mutation commit size: "
-              + commitSize
-              + " has exceeded the limit.");
+          "Commit size: " + this.payload.size() + " has exceeded the limit: " + COMMIT_LIMIT);
     }
+  }
+
+  /** Build mutation to add to mutations list with data contained within a CopyData payload */
+  public void buildMutationList(ConnectionHandler connectionHandler) throws Exception {
+    List<CSVRecord> records = parsePayloadData(this.payload.toByteArray());
     for (CSVRecord record : records) {
       // Check that the number of columns in a record matches the number of columns in the table
       if (record.size() != this.tableColumns.keySet().size()) {
-        rollback(connectionHandler, payload);
+        rollback(connectionHandler);
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT,
             "Invalid COPY data: Row length mismatched. Expected "
@@ -127,7 +124,7 @@ public class MutationWriter {
               break;
           }
         } catch (NumberFormatException | DateTimeParseException e) {
-          rollback(connectionHandler, payload);
+          rollback(connectionHandler);
           throw SpannerExceptionFactory.newSpannerException(
               ErrorCode.INVALID_ARGUMENT,
               "Invalid input syntax for type "
@@ -137,11 +134,11 @@ public class MutationWriter {
                   + recordValue
                   + "\"");
         } catch (IllegalArgumentException e) {
-          rollback(connectionHandler, payload);
+          rollback(connectionHandler);
           throw SpannerExceptionFactory.newSpannerException(
               ErrorCode.INVALID_ARGUMENT, "Invalid input syntax for column \"" + columnName + "\"");
         } catch (Exception e) {
-          rollback(connectionHandler, payload);
+          rollback(connectionHandler);
           throw e;
         }
       }
@@ -149,16 +146,29 @@ public class MutationWriter {
       this.mutationCount += record.size(); // Increment the number of mutations being added
       this.rowCount++; // Increment the number of COPY rows by one
     }
-    this.batchSize += payload.length; // Increment the batch size based on payload length
+    if (!mutationCountIsWithinLimit()) {
+      rollback(connectionHandler);
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.FAILED_PRECONDITION,
+          "Mutation count: " + mutationCount + " has exceeded the limit: " + MUTATION_LIMIT);
+    }
   }
 
   /**
-   * @return True if adding payload to current batch will fit under mutation limit and batch size
-   *     limit, false otherwise.
+   * @return True if current payload will fit within COMMIT_LIMIT. This is only an estimate and the
+   *     actual commit size may still be rejected by Spanner.
    */
-  private boolean payloadFitsInCurrentBatch(int rowMutationCount, int payloadLength) {
-    return (this.mutationCount + rowMutationCount <= MUTATION_LIMIT
-        && this.batchSize + payloadLength <= COMMIT_LIMIT);
+  private boolean commitSizeIsWithinLimit() {
+    return this.payload.size() <= COMMIT_LIMIT;
+  }
+
+  /**
+   * @return True if current mutation count will fit within MUTATION_LIMIT. This is only an estimate
+   *     and the actual number of mutations may be different which could result in spanner rejecting
+   *     the transaction.
+   */
+  private boolean mutationCountIsWithinLimit() {
+    return this.mutationCount <= MUTATION_LIMIT;
   }
 
   /** @return list of CSVRecord rows parsed with CSVParser from CopyData payload byte array */
@@ -188,44 +198,34 @@ public class MutationWriter {
     // Reset mutations, mutation counter, and batch size count for a new batch
     this.mutations = new ArrayList<>();
     this.mutationCount = 0;
-    this.batchSize = 0;
     return this.rowCount;
   }
 
-  public void rollback(ConnectionHandler connectionHandler, byte[] payload) throws Exception {
+  public void rollback(ConnectionHandler connectionHandler) throws Exception {
     Connection connection = connectionHandler.getSpannerConnection();
     connection.rollback();
     this.mutations = new ArrayList<>();
     this.mutationCount = 0;
-    this.batchSize = 0;
-    createErrorFile(payload);
+    writeCopyDataToErrorFile();
+    this.payload.reset();
   }
 
-  public void createErrorFile(byte[] payload) throws IOException {
+  private void createErrorFile() throws IOException {
     File unsuccessfulCopy = new File(ERROR_FILE);
-    if (unsuccessfulCopy.createNewFile()) {
-      this.fileWriter = new FileWriter(ERROR_FILE);
-      writeToErrorFile(payload);
-    } else {
-      System.err.println("File " + unsuccessfulCopy.getName() + " already exists");
-    }
+    this.fileWriter = new FileWriter(unsuccessfulCopy, false);
   }
 
-  public void writeToErrorFile(byte[] payload) throws IOException {
-    if (this.fileWriter != null) {
-      this.fileWriter.write(new String(payload, StandardCharsets.UTF_8).trim() + "\n");
+  /**
+   * Copy data will be written to an error file if size limits were exceeded or a problem was
+   * encountered. Copy data will also written if an error was encountered while generating the
+   * mutaiton list or if Spanner returns an error upon commiting the mutations.
+   */
+  public void writeCopyDataToErrorFile() throws IOException {
+    if (this.fileWriter == null) {
+      createErrorFile();
     }
-  }
-
-  public void writeMutationsToErrorFile() throws IOException {
-    File unsuccessfulCopy = new File(ERROR_FILE);
-    if (unsuccessfulCopy.createNewFile()) {
-      this.fileWriter = new FileWriter(ERROR_FILE);
-    }
-
-    for (Mutation mutation : this.mutations) {
-      this.fileWriter.write(mutation.toString());
-    }
+    this.fileWriter.write(
+        new String(this.payload.toByteArray(), StandardCharsets.UTF_8).trim() + "\n");
   }
 
   public void closeErrorFile() throws IOException {

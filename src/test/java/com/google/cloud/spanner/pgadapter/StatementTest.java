@@ -447,7 +447,8 @@ public class StatementTest {
 
     byte[] payload = "2\t3\n".getBytes();
     MutationWriter mw = statement.getMutationWriter();
-    mw.buildMutation(connectionHandler, payload);
+    mw.addCopyData(connectionHandler, payload);
+    mw.buildMutationList(connectionHandler);
 
     Assert.assertEquals(statement.getFormatType(), "TEXT");
     Assert.assertEquals(statement.getDelimiterChar(), '\t');
@@ -482,7 +483,8 @@ public class StatementTest {
         Assert.assertThrows(
             SpannerException.class,
             () -> {
-              mw.buildMutation(connectionHandler, payload);
+              mw.addCopyData(connectionHandler, payload);
+              mw.buildMutationList(connectionHandler);
             });
     Assert.assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
     Assert.assertEquals(
