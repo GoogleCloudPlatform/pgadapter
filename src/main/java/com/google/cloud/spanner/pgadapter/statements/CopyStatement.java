@@ -169,7 +169,7 @@ public class CopyStatement extends IntermediateStatement {
     Map<String, TypeCode> tableColumns = new LinkedHashMap<>();
     PreparedStatement statement =
         this.connection.prepareStatement(
-            "SELECT "
+            "/*GSQL*/SELECT "
                 + COLUMN_NAME
                 + ", "
                 + SPANNER_TYPE

@@ -157,7 +157,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_name = $1")
+                    "/*GSQL*/SELECT column_name, spanner_type FROM information_schema.columns WHERE table_name = @p1")
                 .bind("p1")
                 .to("users")
                 .build(),
