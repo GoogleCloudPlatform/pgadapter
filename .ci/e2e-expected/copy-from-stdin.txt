@@ -1,4 +1,5 @@
- id | age | name 
+COPY
+ id | age | name
 ----+-----+------
   1 |   1 | John
   2 |  20 | Joe 
@@ -15,4 +16,3 @@
  16 |  16 | 16
  17 |  17 | 17
 (14 rows)
-COPY
