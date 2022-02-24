@@ -30,7 +30,9 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.json.simple.JSONObject;
 
-/** Metadata extractor for CLI. */
+/**
+ * Metadata extractor for CLI.
+ */
 public class OptionsMetadata {
 
   private static final Logger logger = Logger.getLogger(OptionsMetadata.class.getName());
@@ -177,7 +179,6 @@ public class OptionsMetadata {
     }
 
     // Note that Credentials here is the credentials file, not the actual credentials
-
     String url =
         String.format(
             jdbcEndpoint
@@ -207,7 +208,7 @@ public class OptionsMetadata {
    *
    * @param commandLine The parsed options for CLI
    * @return The JSON object corresponding to the string contained within the specified (or default)
-   *     command file.
+   * command file.
    */
   private JSONObject buildCommandMetadataJSON(CommandLine commandLine) {
     if (commandLine.hasOption(OPTION_COMMAND_METADATA_FILE)
