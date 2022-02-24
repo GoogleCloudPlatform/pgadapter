@@ -167,13 +167,16 @@ public class CopyStatement extends IntermediateStatement {
 
   private void queryInformationSchema() throws SQLException {
     Map<String, TypeCode> tableColumns = new LinkedHashMap<>();
+    // The mutation API requires GoogleSQL type names instead of PostgreSQL type names for the table
+    // column types. Issue the information_schema table query as a GoogleSQL query so that it will
+    // return GoogleSQL type names.
     PreparedStatement statement =
         this.connection.prepareStatement(
-            "SELECT "
+            "/*GSQL*/SELECT "
                 + COLUMN_NAME
                 + ", "
                 + SPANNER_TYPE
-                + " FROM information_schema.columns WHERE table_name = \"?\"");
+                + " FROM information_schema.columns WHERE table_name = ?");
     statement.setString(1, getTableName());
     ResultSet result = statement.executeQuery();
 

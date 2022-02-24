@@ -16,10 +16,25 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.protobuf.ListValue;
+import com.google.protobuf.Value;
+import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.Mutation;
+import com.google.spanner.v1.Mutation.OperationCase;
+import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.StructType;
+import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.Type;
+import com.google.spanner.v1.TypeCode;
+import java.io.File;
+import java.io.IOException;
+import java.io.StringReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -29,6 +44,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.copy.CopyManager;
+import org.postgresql.core.BaseConnection;
 
 @RunWith(JUnit4.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
@@ -56,6 +73,95 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertFalse(resultSet.next());
       }
     }
+  }
+
+  @Test
+  public void testCopyIn() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\t5\t5\n6\t6\t6\n7\t7\t7\n"));
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsert().getValuesCount());
+  }
+
+  @Test
+  public void testCopyInWithInvalidRow() throws SQLException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      // This row does not contain all the necessary columns.
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\n")));
+      assertTrue(
+          exception
+              .getMessage()
+              .contains("Row length mismatched. Expected 3 columns, but only found 1"));
+    } finally {
+      assertTrue(new File("output.txt").delete());
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertTrue(commitRequests.isEmpty());
+  }
+
+  private void setupCopyInformationSchemaResults() {
+    ResultSetMetadata metadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("column_name")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("spanner_type")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .build())
+            .build();
+    com.google.spanner.v1.ResultSet resultSet =
+        com.google.spanner.v1.ResultSet.newBuilder()
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("id").build())
+                    .addValues(Value.newBuilder().setStringValue("INT64").build())
+                    .build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("age").build())
+                    .addValues(Value.newBuilder().setStringValue("INT64").build())
+                    .build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("name").build())
+                    .addValues(Value.newBuilder().setStringValue("STRING(MAX)").build())
+                    .build())
+            .setMetadata(metadata)
+            .build();
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.newBuilder(
+                    "/*GSQL*/SELECT column_name, spanner_type FROM information_schema.columns WHERE table_name = @p1")
+                .bind("p1")
+                .to("users")
+                .build(),
+            resultSet));
   }
 
   @Test
