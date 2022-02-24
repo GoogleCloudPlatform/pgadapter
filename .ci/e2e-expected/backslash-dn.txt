@@ -3,7 +3,6 @@
 +++++++
  testdb_e2e_psql_v?? | public             |              |                               |                              |                            |          |   
  testdb_e2e_psql_v?? | information_schema |              |                               |                              |                            |          |
- testdb_e2e_psql_v?? | pg_catalog         |              |                               |                              |                            |          |                    
  testdb_e2e_psql_v?? | spanner_sys        |              |                               |                              |                            |          |                    
 (4 rows)
 
