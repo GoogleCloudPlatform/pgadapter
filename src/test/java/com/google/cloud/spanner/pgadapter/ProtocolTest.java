@@ -23,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
@@ -1197,6 +1198,7 @@ public class ProtocolTest {
     CopyStatement copyStatement = Mockito.mock(CopyStatement.class);
     Mockito.when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -1219,6 +1221,7 @@ public class ProtocolTest {
     Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
         .thenReturn(preparedStatement);
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
 
     byte[] messageMetadata = {'d'};
@@ -1295,6 +1298,7 @@ public class ProtocolTest {
     CopyStatement copyStatement = Mockito.mock(CopyStatement.class);
     Mockito.when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -1330,6 +1334,7 @@ public class ProtocolTest {
     CopyStatement copyStatement = Mockito.mock(CopyStatement.class);
     Mockito.when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 

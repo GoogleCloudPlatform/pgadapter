@@ -110,3 +110,17 @@ echo "------Test \"-c option invalid begin/commit batching\"------"
 /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/invalid-commit-batch.txt)" &> .ci/e2e-result/invalid-commit-batching.txt
 diff -i -w -s .ci/e2e-result/invalid-commit-batching.txt .ci/e2e-expected/invalid-commit-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"COPY FROM STDIN\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "COPY users FROM STDIN;" <<EOF
+12	12	12
+13	13	13
+14	14	14
+15	15	15
+16	16	16
+17	17	17
+\.
+EOF
+echo "SELECT * FROM users;" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/copy-from-stdin.txt
+diff -i -w -s .ci/e2e-result/copy-from-stdin.txt .ci/e2e-expected/copy-from-stdin.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))

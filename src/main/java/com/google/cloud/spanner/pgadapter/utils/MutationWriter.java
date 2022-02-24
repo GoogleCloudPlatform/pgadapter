@@ -75,7 +75,7 @@ public class MutationWriter {
   public void addCopyData(ConnectionHandler connectionHandler, byte[] payload) throws Exception {
     this.payload.write(payload, 0, payload.length);
     if (!commitSizeIsWithinLimit()) {
-      rollback(connectionHandler);
+      handleError(connectionHandler);
       throw new SQLException(
           "Commit size: " + this.payload.size() + " has exceeded the limit: " + COMMIT_LIMIT);
     }
@@ -87,7 +87,7 @@ public class MutationWriter {
     for (CSVRecord record : records) {
       // Check that the number of columns in a record matches the number of columns in the table
       if (record.size() != this.tableColumns.keySet().size()) {
-        rollback(connectionHandler);
+        handleError(connectionHandler);
         throw new SQLException(
             "Invalid COPY data: Row length mismatched. Expected "
                 + this.tableColumns.keySet().size()
@@ -122,7 +122,7 @@ public class MutationWriter {
               break;
           }
         } catch (NumberFormatException | DateTimeParseException e) {
-          rollback(connectionHandler);
+          handleError(connectionHandler);
           throw new SQLException(
               "Invalid input syntax for type "
                   + columnType.toString()
@@ -131,10 +131,10 @@ public class MutationWriter {
                   + recordValue
                   + "\"");
         } catch (IllegalArgumentException e) {
-          rollback(connectionHandler);
+          handleError(connectionHandler);
           throw new SQLException("Invalid input syntax for column \"" + columnName + "\"");
         } catch (Exception e) {
-          rollback(connectionHandler);
+          handleError(connectionHandler);
           throw e;
         }
       }
@@ -143,7 +143,7 @@ public class MutationWriter {
       this.rowCount++; // Increment the number of COPY rows by one
     }
     if (!mutationCountIsWithinLimit()) {
-      rollback(connectionHandler);
+      handleError(connectionHandler);
       throw new SQLException(
           "Mutation count: " + mutationCount + " has exceeded the limit: " + MUTATION_LIMIT);
     }
@@ -176,7 +176,14 @@ public class MutationWriter {
     } else {
       parser = CSVParser.parse(copyData, this.format);
     }
-    return parser.getRecords();
+    // Skip the last record if that is the '\.' end of file indicator.
+    List<CSVRecord> records = parser.getRecords();
+    if (!records.isEmpty()
+        && records.get(records.size() - 1).size() == 1
+        && "\\.".equals(records.get(records.size() - 1).get(0))) {
+      return records.subList(0, records.size() - 1);
+    }
+    return records;
   }
 
   /**
@@ -198,9 +205,7 @@ public class MutationWriter {
     return this.rowCount;
   }
 
-  public void rollback(ConnectionHandler connectionHandler) throws Exception {
-    Connection connection = connectionHandler.getJdbcConnection();
-    connection.rollback();
+  public void handleError(ConnectionHandler connectionHandler) throws Exception {
     this.mutations = new ArrayList<>();
     this.mutationCount = 0;
     writeCopyDataToErrorFile();
