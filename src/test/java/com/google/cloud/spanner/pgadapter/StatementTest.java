@@ -43,6 +43,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -248,9 +249,9 @@ public class StatementTest {
         intermediateStatement.bind(
             parameters, Arrays.asList((short) 0, (short) 0, (short) 0), new ArrayList<>());
 
-    Mockito.verify(preparedStatement, Mockito.times(1)).setObject(1, 20L);
-    Mockito.verify(preparedStatement, Mockito.times(1)).setObject(2, 30);
-    Mockito.verify(preparedStatement, Mockito.times(1)).setObject(3, "userName");
+    Mockito.verify(preparedStatement, Mockito.times(1)).setObject(1, 20L, Types.BIGINT);
+    Mockito.verify(preparedStatement, Mockito.times(1)).setObject(2, 30, Types.INTEGER);
+    Mockito.verify(preparedStatement, Mockito.times(1)).setObject(3, "userName", Types.VARCHAR);
 
     assertEquals(intermediatePortalStatement.getSql(), expectedSQL);
     assertEquals(intermediatePortalStatement.getCommand(), "SELECT");
@@ -452,7 +453,8 @@ public class StatementTest {
 
     byte[] payload = "2\t3\n".getBytes();
     MutationWriter mw = statement.getMutationWriter();
-    mw.buildMutation(connectionHandler, payload);
+    mw.addCopyData(connectionHandler, payload);
+    mw.buildMutationList(connectionHandler);
 
     Assert.assertEquals(statement.getFormatType(), "TEXT");
     Assert.assertEquals(statement.getDelimiterChar(), '\t');
@@ -488,7 +490,8 @@ public class StatementTest {
         Assert.assertThrows(
             SQLException.class,
             () -> {
-              mw.buildMutation(connectionHandler, payload);
+              mw.addCopyData(connectionHandler, payload);
+              mw.buildMutationList(connectionHandler);
             });
     Assert.assertEquals(
         thrown.getMessage(),

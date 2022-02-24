@@ -17,7 +17,9 @@ package com.google.cloud.spanner.pgadapter.statements;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.SQLMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
+import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.collect.SetMultimap;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -42,7 +44,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     this.parameterCount = parsedSQL.getParameterCount();
     this.sql = parsedSQL.getSqlString();
     this.parameterIndexToPositions = parsedSQL.getParameterIndexToPositions();
-    this.command = parseCommand(sql);
+    this.command = StatementParser.parseCommand(sql);
     this.connection = connection;
     this.statement = this.connection.prepareStatement(this.sql);
     this.parameterDataTypes = null;
@@ -56,7 +58,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       Connection connection) {
     super(sql);
     this.sql = sql;
-    this.command = parseCommand(sql);
+    this.command = StatementParser.parseCommand(sql);
     this.parameterCount = totalParameters;
     this.parameterIndexToPositions = parameterIndexToPositions;
     this.statement = statement;
@@ -140,13 +142,10 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     for (int index = 0; index < parameters.length; index++) {
       short formatCode = portal.getParameterFormatCode(index);
       int type = this.parseType(parameters, index);
-      if (formatCode == 0) {
-        for (Integer position : parameterIndexToPositions.get(index)) {
-          ((PreparedStatement) portal.statement)
-              .setObject(position, Parser.create(parameters[index], type).getItem());
-        }
-      } else {
-        throw new IllegalStateException("Unimplemented");
+      for (Integer position : parameterIndexToPositions.get(index)) {
+        Parser<?> parser = Parser.create(parameters[index], type, FormatCode.of(formatCode));
+        ((PreparedStatement) portal.statement)
+            .setObject(position, parser.getItem(), parser.getSqlType());
       }
     }
     return portal;

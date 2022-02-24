@@ -19,8 +19,11 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import java.io.DataOutputStream;
+import java.math.BigDecimal;
+import java.sql.Date;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
 import java.text.MessageFormat;
 import org.postgresql.core.Oid;
@@ -157,6 +160,35 @@ public class RowDescriptionResponse extends WireOutput {
         return Oid.TIME;
       case Types.TIMESTAMP:
         return Oid.TIMESTAMP;
+      case Types.ARRAY:
+        // TODO: Rewrite to use Cloud Spanner ResultSetMetaData when refactored to use the
+        // Connection API instead of the JDBC driver, instead of checking the class name.
+        String typeName = metadata.getColumnClassName(column_index);
+        if (Boolean[].class.getName().equals(typeName)) {
+          return Oid.BOOL_ARRAY;
+        }
+        if (Long[].class.getName().equals(typeName)) {
+          return Oid.INT8_ARRAY;
+        }
+        if (Double[].class.getName().equals(typeName)) {
+          return Oid.FLOAT8_ARRAY;
+        }
+        if (BigDecimal[].class.getName().equals(typeName)) {
+          return Oid.NUMERIC_ARRAY;
+        }
+        if (String[].class.getName().equals(typeName)) {
+          return Oid.VARCHAR_ARRAY;
+        }
+        if (byte[][].class.getName().equals(typeName)) {
+          return Oid.BYTEA_ARRAY;
+        }
+        if (Date[].class.getName().equals(typeName)) {
+          return Oid.DATE_ARRAY;
+        }
+        if (Timestamp[].class.getName().equals(typeName)) {
+          return Oid.TIMESTAMP_ARRAY;
+        }
+        return Oid.UNSPECIFIED;
       default:
         return Oid.UNSPECIFIED;
     }

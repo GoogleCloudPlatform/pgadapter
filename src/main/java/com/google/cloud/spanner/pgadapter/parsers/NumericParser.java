@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,39 +14,37 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
-import org.postgresql.util.PGbytea;
+import org.postgresql.util.ByteConverter;
 
-/**
- * Parse specified type to binary (generally this is the simplest parse class, as items are
- * generally represented in binary for wire format).
- */
-public class BinaryParser extends Parser<byte[]> {
-
-  public BinaryParser(ResultSet item, int position) throws SQLException {
-    this.item = item.getBytes(position);
+/** Translate from wire protocol to {@link Number}. */
+public class NumericParser extends Parser<Number> {
+  public NumericParser(ResultSet item, int position) throws SQLException {
+    // This should be either a BigDecimal value or a Double.NaN.
+    this.item = (Number) item.getObject(position);
   }
 
-  public BinaryParser(Object item) {
-    this.item = (byte[]) item;
+  public NumericParser(Object item) {
+    this.item = (Number) item;
   }
 
-  public BinaryParser(byte[] item, FormatCode formatCode) {
+  public NumericParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          try {
-            this.item = PGbytea.toBytes(item);
-            break;
-          } catch (SQLException e) {
-            throw new IllegalArgumentException(
-                "Invalid binary value: " + new String(item, StandardCharsets.UTF_8), e);
+          String stringValue = new String(item);
+          if (stringValue.equalsIgnoreCase("NaN")) {
+            this.item = Double.NaN;
+          } else {
+            this.item = new BigDecimal(new String(item));
           }
+          break;
         case BINARY:
-          this.item = item;
+          this.item = ByteConverter.numeric(item, 0, item.length);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
@@ -56,21 +54,19 @@ public class BinaryParser extends Parser<byte[]> {
 
   @Override
   public int getSqlType() {
-    return Types.BINARY;
+    return Types.NUMERIC;
   }
 
   @Override
   protected String stringParse() {
-    return PGbytea.toPGString(this.item);
-  }
-
-  @Override
-  protected byte[] spannerBinaryParse() {
-    return this.item;
+    return Double.isNaN(this.item.doubleValue()) ? "NaN" : ((BigDecimal) this.item).toPlainString();
   }
 
   @Override
   protected byte[] binaryParse() {
-    return this.item;
+    if (Double.isNaN(this.item.doubleValue())) {
+      return "NaN".getBytes(StandardCharsets.UTF_8);
+    }
+    return ByteConverter.numeric((BigDecimal) this.item);
   }
 }

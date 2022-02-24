@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to int. */
 public class IntegerParser extends Parser<Integer> {
@@ -29,13 +30,24 @@ public class IntegerParser extends Parser<Integer> {
     this.item = (Integer) item;
   }
 
-  public IntegerParser(byte[] item) {
-    this.item = Integer.valueOf(new String(item));
+  public IntegerParser(byte[] item, FormatCode formatCode) {
+    if (item != null) {
+      switch (formatCode) {
+        case TEXT:
+          this.item = Integer.valueOf(new String(item));
+          break;
+        case BINARY:
+          this.item = ByteConverter.int4(item, 0);
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported format: " + formatCode);
+      }
+    }
   }
 
   @Override
-  public Integer getItem() {
-    return this.item;
+  public int getSqlType() {
+    return Types.INTEGER;
   }
 
   @Override
@@ -45,6 +57,12 @@ public class IntegerParser extends Parser<Integer> {
 
   @Override
   protected byte[] binaryParse() {
-    return toBinary(this.item, Types.INTEGER);
+    return binaryParse(this.item);
+  }
+
+  public static byte[] binaryParse(int value) {
+    byte[] result = new byte[4];
+    ByteConverter.int4(result, 0, value);
+    return result;
   }
 }

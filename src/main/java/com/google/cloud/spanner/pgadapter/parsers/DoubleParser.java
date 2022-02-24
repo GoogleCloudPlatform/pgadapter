@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to double. */
 public class DoubleParser extends Parser<Double> {
@@ -29,13 +30,24 @@ public class DoubleParser extends Parser<Double> {
     this.item = (Double) item;
   }
 
-  public DoubleParser(byte[] item) {
-    this.item = Double.valueOf(new String(item));
+  public DoubleParser(byte[] item, FormatCode formatCode) {
+    if (item != null) {
+      switch (formatCode) {
+        case TEXT:
+          this.item = Double.valueOf(new String(item));
+          break;
+        case BINARY:
+          this.item = ByteConverter.float8(item, 0);
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported format: " + formatCode);
+      }
+    }
   }
 
   @Override
-  public Double getItem() {
-    return this.item;
+  public int getSqlType() {
+    return Types.DOUBLE;
   }
 
   @Override
@@ -45,6 +57,8 @@ public class DoubleParser extends Parser<Double> {
 
   @Override
   protected byte[] binaryParse() {
-    return toBinary(this.item, Types.DOUBLE);
+    byte[] result = new byte[8];
+    ByteConverter.float8(result, 0, this.item);
+    return result;
   }
 }

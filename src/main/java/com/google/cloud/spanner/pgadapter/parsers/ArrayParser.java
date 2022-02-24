@@ -39,19 +39,21 @@ public class ArrayParser extends Parser<List> {
   boolean isStringEquivalent;
 
   public ArrayParser(ResultSet item, int position) throws SQLException {
-    this.item = Arrays.asList((Object[]) item.getArray(position).getArray());
-    this.arrayType = item.getArray(position).getBaseType();
-    if (this.arrayType == Types.ARRAY) {
-      throw new IllegalArgumentException(
-          "Spanner does not support embedded Arrays."
-              + " If you are seeing this, something went wrong!");
+    if (item != null) {
+      this.item = Arrays.asList((Object[]) item.getArray(position).getArray());
+      this.arrayType = item.getArray(position).getBaseType();
+      if (this.arrayType == Types.ARRAY) {
+        throw new IllegalArgumentException(
+            "Spanner does not support embedded Arrays."
+                + " If you are seeing this, something went wrong!");
+      }
+      this.isStringEquivalent = stringEquivalence(this.arrayType);
     }
-    this.isStringEquivalent = stringEquivalence(this.arrayType);
   }
 
   @Override
-  public List getItem() {
-    return this.item;
+  public int getSqlType() {
+    return Types.ARRAY;
   }
 
   /**
@@ -104,17 +106,17 @@ public class ArrayParser extends Parser<List> {
   protected byte[] binaryParse() {
     ByteArrayOutputStream arrayStream = new ByteArrayOutputStream();
     try {
-      arrayStream.write(toBinary(1, Types.INTEGER)); // dimension
-      arrayStream.write(toBinary(1, Types.INTEGER)); // Set null flag
-      arrayStream.write(toBinary(this.arrayType, Types.INTEGER)); // Set type
-      arrayStream.write(toBinary(this.item.size(), Types.INTEGER)); // Set array length
-      arrayStream.write(toBinary(0, Types.INTEGER)); // Lower bound (?)
+      arrayStream.write(IntegerParser.binaryParse(1)); // dimension
+      arrayStream.write(IntegerParser.binaryParse(1)); // Set null flag
+      arrayStream.write(IntegerParser.binaryParse(this.arrayType)); // Set type
+      arrayStream.write(IntegerParser.binaryParse(this.item.size())); // Set array length
+      arrayStream.write(IntegerParser.binaryParse(0)); // Lower bound (?)
       for (Object currentItem : this.item) {
         if (currentItem == null) {
-          arrayStream.write(toBinary(-1, Types.INTEGER));
+          arrayStream.write(IntegerParser.binaryParse(-1));
         } else {
           byte[] data = Parser.create(currentItem, this.arrayType).binaryParse();
-          arrayStream.write(toBinary(data.length, Types.INTEGER));
+          arrayStream.write(IntegerParser.binaryParse(data.length));
           arrayStream.write(data);
         }
       }
