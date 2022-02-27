@@ -283,9 +283,11 @@ public class StatementTest {
     intermediateStatement.bind(parameters, new ArrayList<>(), new ArrayList<>());
   }
 
-  @Test(expected = IllegalStateException.class)
-  public void testPreparedStatementDescribeThrowsException() throws Exception {
+  @Test
+  public void testPreparedStatementDescribeDoesNotThrowException() throws Exception {
     String sqlStatement = "SELECT * FROM users WHERE name = $1 AND age > $2 AND age < $3";
+    when(connection.analyzeQuery(Statement.of(sqlStatement), QueryAnalyzeMode.PLAN))
+        .thenReturn(resultSet);
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(sqlStatement, connection);

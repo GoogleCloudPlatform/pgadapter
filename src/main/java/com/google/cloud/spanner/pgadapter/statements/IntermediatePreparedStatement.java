@@ -14,16 +14,20 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
+import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 import org.postgresql.core.Oid;
 
@@ -107,20 +111,13 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   }
 
   @Override
-  public DescribeMetadata describe() throws Exception {
-    /* Currently, Spanner does not support description of prepared statements which may return
-        result sets (that is to say, SELECT statements). We could return here the describe only for
-        non-SELECT statements, but due to the difficulty in determining the statement type in proxy-
-        side, as well as the unlikelihood of this method being used in production, we just return
-        an exception. If at any point we are able to determine statement types, we can simply return
-        "new DescribeStatementMetadata(
-            Converter.getParams(
-                this.parameterDataTypes,
-                this.totalParameters)
-            );"
-        for non-SELECTs.
-    */
-    throw new IllegalStateException(
-        "Describe statements for non-bound statements are not allowed in spanner.");
+  public DescribeMetadata describe() {
+    Statement statement = Statement.of(this.sql);
+    try (ResultSet resultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN)) {
+      // TODO: Remove ResultSet.next() call once this is supported in the client library.
+      // See https://github.com/googleapis/java-spanner/pull/1691
+      resultSet.next();
+      return new DescribeStatementMetadata(Collections.emptyList(), resultSet);
+    }
   }
 }

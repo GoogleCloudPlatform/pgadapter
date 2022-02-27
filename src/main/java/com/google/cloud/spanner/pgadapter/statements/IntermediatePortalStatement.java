@@ -78,7 +78,7 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   }
 
   @Override
-  public DescribeMetadata describe() throws Exception {
+  public DescribeMetadata describe() {
     // TODO: Consider replacing this with an execute call, so we don't take two round-trips to the
     // backend just to first describe and then execute a query.
     try (ResultSet resultSet = connection.analyzeQuery(this.statement, QueryAnalyzeMode.PLAN)) {

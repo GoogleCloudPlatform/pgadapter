@@ -274,7 +274,7 @@ public class IntermediateStatement {
    * Moreso meant for inherited classes, allows one to call describe on a statement. Since raw
    * statements cannot be described, throw an error.
    */
-  public DescribeMetadata describe() throws Exception {
+  public DescribeMetadata describe() {
     throw new IllegalStateException(
         "Cannot describe a simple statement " + "(only prepared statements and portals)");
   }
