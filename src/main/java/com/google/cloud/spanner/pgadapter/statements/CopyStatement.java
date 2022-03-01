@@ -35,7 +35,7 @@ import org.apache.commons.csv.CSVFormat;
 public class CopyStatement extends IntermediateStatement {
 
   private static final String COLUMN_NAME = "column_name";
-  private static final String SPANNER_TYPE = "spanner_type";
+  private static final String DATA_TYPE = "data_type";
   private static final String CSV = "CSV";
 
   private CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
@@ -152,16 +152,34 @@ public class CopyStatement extends IntermediateStatement {
     this.tableColumns = tempTableColumns;
   }
 
-  private static TypeCode parseSpannerDataType(String columnType) {
-    // Eliminate size modifiers in column type (e.g. STRING(100), BYTES(50), etc.)
+  private static TypeCode parsePostgreSQLDataType(String columnType) {
+    // Eliminate size modifiers in column type (e.g. character varying(100), etc.)
     int index = columnType.indexOf("(");
     columnType = (index > 0) ? columnType.substring(0, index) : columnType;
-    TypeCode type = TypeCode.valueOf(columnType);
-    if (type == null) {
-      throw new IllegalArgumentException(
-          "Unrecognized or unsupported column data type: " + columnType);
+    switch (columnType) {
+      case "boolean":
+        return TypeCode.BOOL;
+      case "bigint":
+        return TypeCode.INT64;
+      case "float8":
+        return TypeCode.FLOAT64;
+      case "numeric":
+        return TypeCode.NUMERIC;
+      case "bytea":
+        return TypeCode.BYTES;
+      case "character varying":
+      case "text":
+        return TypeCode.STRING;
+      case "date":
+        return TypeCode.DATE;
+      case "timestamp with time zone":
+        return TypeCode.TIMESTAMP;
+      case "jsonb":
+        return TypeCode.JSON;
+      default:
+        throw new IllegalArgumentException(
+            "Unrecognized or unsupported column data type: " + columnType);
     }
-    return type;
   }
 
   private void queryInformationSchema() throws SQLException {
@@ -171,17 +189,17 @@ public class CopyStatement extends IntermediateStatement {
     // return GoogleSQL type names.
     PreparedStatement statement =
         this.connection.prepareStatement(
-            "/*GSQL*/SELECT "
+            "SELECT "
                 + COLUMN_NAME
                 + ", "
-                + SPANNER_TYPE
+                + DATA_TYPE
                 + " FROM information_schema.columns WHERE table_name = ?");
     statement.setString(1, getTableName());
     ResultSet result = statement.executeQuery();
 
     while (result.next()) {
       String columnName = result.getString(COLUMN_NAME);
-      TypeCode type = parseSpannerDataType(result.getString(SPANNER_TYPE));
+      TypeCode type = parsePostgreSQLDataType(result.getString(DATA_TYPE));
       tableColumns.put(columnName, type);
     }
 
@@ -222,6 +240,8 @@ public class CopyStatement extends IntermediateStatement {
     try {
       parse(sql, this.options);
     } catch (Exception | TokenMgrError e) {
+      throw new SQLException("Invalid COPY statement syntax: " + e.toString());
+    } catch (TokenMgrError e) {
       throw new SQLException("Invalid COPY statement syntax: " + e.toString());
     }
   }

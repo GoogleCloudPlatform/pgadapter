@@ -694,8 +694,7 @@ public class ParserTest {
         String sql = "COPY users FROM STDIN (QUOTE '" + value + "');";
         parse(sql, options);
         // These characters are not currently allowed since removeCommentsAndTrim() has special
-        // cases
-        // for their use: [' " \] ('\'' and '\"' are actually allowed if they are wrapped by the
+        // cases for their use: [' " \]  ('\'' and '\"' are actually allowed if they are wrapped by the
         // other character)
         if (value == '\'' || value == '\\') {
           assertThrows(

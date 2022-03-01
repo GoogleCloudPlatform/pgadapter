@@ -129,7 +129,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                             .build())
                     .addFields(
                         Field.newBuilder()
-                            .setName("spanner_type")
+                            .setName("data_type")
                             .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
                             .build())
                     .build())
@@ -139,17 +139,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             .addRows(
                 ListValue.newBuilder()
                     .addValues(Value.newBuilder().setStringValue("id").build())
-                    .addValues(Value.newBuilder().setStringValue("INT64").build())
+                    .addValues(Value.newBuilder().setStringValue("bigint").build())
                     .build())
             .addRows(
                 ListValue.newBuilder()
                     .addValues(Value.newBuilder().setStringValue("age").build())
-                    .addValues(Value.newBuilder().setStringValue("INT64").build())
+                    .addValues(Value.newBuilder().setStringValue("bigint").build())
                     .build())
             .addRows(
                 ListValue.newBuilder()
                     .addValues(Value.newBuilder().setStringValue("name").build())
-                    .addValues(Value.newBuilder().setStringValue("STRING(MAX)").build())
+                    .addValues(Value.newBuilder().setStringValue("character varying").build())
                     .build())
             .setMetadata(metadata)
             .build();
@@ -157,7 +157,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "/*GSQL*/SELECT column_name, spanner_type FROM information_schema.columns WHERE table_name = @p1")
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = @p1")
                 .bind("p1")
                 .to("users")
                 .build(),
