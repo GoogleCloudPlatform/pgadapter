@@ -241,8 +241,6 @@ public class CopyStatement extends IntermediateStatement {
       parse(sql, this.options);
     } catch (Exception | TokenMgrError e) {
       throw new SQLException("Invalid COPY statement syntax: " + e.toString());
-    } catch (TokenMgrError e) {
-      throw new SQLException("Invalid COPY statement syntax: " + e.toString());
     }
   }
 }
