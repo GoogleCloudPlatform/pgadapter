@@ -685,6 +685,43 @@ public class ParserTest {
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
       assertThat(options.getNullString(), is(equalTo("null")));
     }
+
+    {
+      char value;
+      for (value = '!'; value <= '~'; value++) {
+        CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+        String sql = "COPY users FROM STDIN (QUOTE '" + value + "');";
+        parse(sql, options);
+        assertThat(options.getTableName(), is(equalTo("users")));
+        assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+        assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+        assertThat(options.getQuote(), is(equalTo(value)));
+      }
+    }
+
+    {
+      char value;
+      for (value = '!'; value <= '|'; value++) {
+        char value1 = (char) (value + 1);
+        char value2 = (char) (value + 2);
+        CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+        String sql =
+            "COPY users FROM STDIN (DELIMITER '"
+                + value
+                + "', QUOTE '"
+                + value1
+                + "', ESCAPE '"
+                + value2
+                + "');";
+        parse(sql, options);
+        assertThat(options.getTableName(), is(equalTo("users")));
+        assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+        assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+        assertThat(options.getDelimiter(), is(equalTo(value)));
+        assertThat(options.getQuote(), is(equalTo(value1)));
+        assertThat(options.getEscape(), is(equalTo(value2)));
+      }
+    }
   }
 
   @Test
