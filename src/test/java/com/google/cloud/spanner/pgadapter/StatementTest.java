@@ -438,7 +438,7 @@ public class StatementTest {
 
     ResultSet spannerType = Mockito.mock(ResultSet.class);
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
     Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
@@ -469,7 +469,7 @@ public class StatementTest {
 
     ResultSet spannerType = Mockito.mock(ResultSet.class);
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
     Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
