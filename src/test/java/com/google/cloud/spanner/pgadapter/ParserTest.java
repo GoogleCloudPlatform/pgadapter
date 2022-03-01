@@ -42,6 +42,7 @@ import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOption
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.FromTo;
 import com.google.cloud.spanner.pgadapter.parsers.copy.ParseException;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
+import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Array;
@@ -692,6 +693,18 @@ public class ParserTest {
         CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
         String sql = "COPY users FROM STDIN (QUOTE '" + value + "');";
         parse(sql, options);
+        // These characters are not currently allowed since removeCommentsAndTrim() has special
+        // cases
+        // for their use: [' " \] ('\'' and '\"' are actually allowed if they are wrapped by the
+        // other character)
+        if (value == '\'' || value == '\\') {
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)));
+        } else {
+          assertEquals(
+              StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+        }
         assertThat(options.getTableName(), is(equalTo("users")));
         assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
         assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -714,6 +727,14 @@ public class ParserTest {
                 + value2
                 + "');";
         parse(sql, options);
+        if (value >= '%' && value <= '\'' || value >= 'Z' && value <= '\\') {
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)));
+        } else {
+          assertEquals(
+              StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+        }
         assertThat(options.getTableName(), is(equalTo("users")));
         assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
         assertThat(options.getFormat(), is(equalTo(Format.TEXT)));

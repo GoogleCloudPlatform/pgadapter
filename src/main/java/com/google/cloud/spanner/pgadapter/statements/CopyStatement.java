@@ -221,9 +221,7 @@ public class CopyStatement extends IntermediateStatement {
   private void parseCopyStatement() throws Exception {
     try {
       parse(sql, this.options);
-    } catch (Exception e) {
-      throw new SQLException("Invalid COPY statement syntax: " + e.toString());
-    } catch (TokenMgrError e) {
+    } catch (Exception | TokenMgrError e) {
       throw new SQLException("Invalid COPY statement syntax: " + e.toString());
     }
   }
