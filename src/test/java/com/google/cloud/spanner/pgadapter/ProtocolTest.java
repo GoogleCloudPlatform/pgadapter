@@ -1218,11 +1218,9 @@ public class ProtocolTest {
   @Test
   public void testMultipleCopyDataMessages() throws Exception {
     Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
-    Mockito.when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
+    Mockito.when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
+    setupQueryInformationSchemaResults();
 
     byte[] messageMetadata = {'d'};
     byte[] payload1 = "1\t'one'\n2\t".getBytes();
@@ -1347,19 +1345,12 @@ public class ProtocolTest {
 
   @Test
   public void testCopyFromFilePipe() throws Exception {
-    Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connection.createStatement()).thenReturn(statement);
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
+    setupQueryInformationSchemaResults();
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));
-
-    ResultSet spannerType = Mockito.mock(ResultSet.class);
-    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
-    Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
 
     CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
     copyStatement.execute();
@@ -1383,16 +1374,9 @@ public class ProtocolTest {
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(connection.createStatement()).thenReturn(statement);
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
+    setupQueryInformationSchemaResults();
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
-
-    ResultSet spannerType = Mockito.mock(ResultSet.class);
-    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
-    Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
 
     CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
 
@@ -1421,16 +1405,9 @@ public class ProtocolTest {
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(connection.createStatement()).thenReturn(statement);
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
+    setupQueryInformationSchemaResults();
 
     byte[] payload = "1\t'one'\n2".getBytes();
-
-    ResultSet spannerType = Mockito.mock(ResultSet.class);
-    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
-    Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
 
     CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
 
@@ -1461,16 +1438,9 @@ public class ProtocolTest {
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(connection.createStatement()).thenReturn(statement);
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
+    setupQueryInformationSchemaResults();
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/test-copy-output.txt"));
-
-    ResultSet spannerType = Mockito.mock(ResultSet.class);
-    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
-    Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
 
     CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
     Assert.assertFalse(copyStatement.isExecuted());
@@ -1505,17 +1475,10 @@ public class ProtocolTest {
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(connection.createStatement()).thenReturn(statement);
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
+    setupQueryInformationSchemaResults();
 
     byte[] payload =
         Files.readAllBytes(Paths.get("./src/test/resources/test-copy-start-output.txt"));
-
-    ResultSet spannerType = Mockito.mock(ResultSet.class);
-    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
-    Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
 
     CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
     Assert.assertFalse(copyStatement.isExecuted());
@@ -1796,5 +1759,27 @@ public class ProtocolTest {
     Assert.assertEquals(outputResult.readByte(), 'N');
 
     message.send();
+  }
+
+  private void setupQueryInformationSchemaResults() throws SQLException {
+    Mockito.when(connection.prepareStatement(ArgumentMatchers.contains("SELECT column_name")))
+        .thenReturn(preparedStatement);
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    when(connection.unwrap(CloudSpannerJdbcConnection.class))
+        .thenReturn(mock(CloudSpannerJdbcConnection.class));
+
+    ResultSet spannerType = Mockito.mock(ResultSet.class);
+    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
+    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
+    Mockito.when(spannerType.next()).thenReturn(true, true, false);
+    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+
+    PreparedStatement countPreparedStatement = mock(PreparedStatement.class);
+    when(connection.prepareStatement(ArgumentMatchers.contains("SELECT COUNT(*)")))
+        .thenReturn(countPreparedStatement);
+    ResultSet countResult = Mockito.mock(ResultSet.class);
+    when(countResult.getInt(1)).thenReturn(2);
+    when(countResult.next()).thenReturn(true, false);
+    when(countPreparedStatement.executeQuery()).thenReturn(countResult);
   }
 }

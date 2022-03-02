@@ -20,6 +20,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
 import com.google.cloud.spanner.jdbc.JdbcConstants;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -437,16 +438,9 @@ public class StatementTest {
   @Test
   public void testCopyBuildMutation() throws Exception {
     Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
-
-    ResultSet spannerType = Mockito.mock(ResultSet.class);
-    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
-    Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    setupQueryInformationSchemaResults();
 
     CopyStatement statement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
     statement.execute();
@@ -469,16 +463,9 @@ public class StatementTest {
   @Test
   public void testCopyInvalidBuildMutation() throws Exception {
     Mockito.when(connection.createStatement()).thenReturn(statement);
-    Mockito.when(connection.prepareStatement(ArgumentMatchers.anyString()))
-        .thenReturn(preparedStatement);
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
     Mockito.when(statement.getUpdateCount()).thenReturn(1);
-
-    ResultSet spannerType = Mockito.mock(ResultSet.class);
-    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
-    Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+    setupQueryInformationSchemaResults();
 
     CopyStatement statement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
     statement.execute();
@@ -499,5 +486,27 @@ public class StatementTest {
 
     statement.close();
     Mockito.verify(resultSet, Mockito.times(0)).close();
+  }
+
+  private void setupQueryInformationSchemaResults() throws SQLException {
+    Mockito.when(connection.prepareStatement(ArgumentMatchers.contains("SELECT column_name")))
+        .thenReturn(preparedStatement);
+    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    when(connection.unwrap(CloudSpannerJdbcConnection.class))
+        .thenReturn(mock(CloudSpannerJdbcConnection.class));
+
+    ResultSet spannerType = Mockito.mock(ResultSet.class);
+    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
+    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
+    Mockito.when(spannerType.next()).thenReturn(true, true, false);
+    Mockito.when(preparedStatement.executeQuery()).thenReturn(spannerType);
+
+    PreparedStatement countPreparedStatement = mock(PreparedStatement.class);
+    when(connection.prepareStatement(ArgumentMatchers.contains("SELECT COUNT(*)")))
+        .thenReturn(countPreparedStatement);
+    ResultSet countResult = Mockito.mock(ResultSet.class);
+    when(countResult.getInt(1)).thenReturn(2);
+    when(countResult.next()).thenReturn(true, false);
+    when(countPreparedStatement.executeQuery()).thenReturn(countResult);
   }
 }

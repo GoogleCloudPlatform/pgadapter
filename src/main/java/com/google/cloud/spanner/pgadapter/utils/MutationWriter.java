@@ -14,10 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import com.google.cloud.Date;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Mutation.WriteBuilder;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.common.collect.Iterables;
 import com.google.spanner.v1.TypeCode;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -35,29 +38,51 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 
 public class MutationWriter {
+  public enum CopyTransactionMode {
+    ImplicitAtomic,
+    ImplicitNonAtomic,
+    Explicit,
+  }
 
-  private static final long MUTATION_LIMIT = 20000; // 20k mutation count limit
-  private static final long COMMIT_LIMIT = 100000000; // 100MB mutation API commit size limit
+  private static final int MUTATION_LIMIT = 20_000; // 20k mutation count limit
+  private static final long COMMIT_LIMIT = 100_000_000; // 100MB mutation API commit size limit
   private static final String ERROR_FILE = "output.txt";
 
-  private boolean hasHeader;
+  /**
+   * The factor that the size of the incoming payload is multiplied with to estimate whether the
+   * current commit size will exceed the maximum commit size. The factor is chosen conservatively to
+   * ensure that a COPY operation of a large file does not unnecessarily break because of an
+   * exceeded commit size.
+   */
+  private static final float COMMIT_LIMIT_MULTIPLIER_FACTOR = 2.0f;
+
+  private final CopyTransactionMode transactionMode;
+  private final boolean hasHeader;
   private boolean isHeaderParsed;
   private int mutationCount;
   private int rowCount;
   private List<Mutation> mutations;
-  private String tableName;
-  private Map<String, TypeCode> tableColumns;
-  private CSVFormat format;
+  private final String tableName;
+  private final Map<String, TypeCode> tableColumns;
+  private final int indexedColumnsCount;
+  private final CSVFormat format;
   private FileWriter fileWriter;
-  private ByteArrayOutputStream payload = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream payload = new ByteArrayOutputStream();
 
   public MutationWriter(
-      String tableName, Map<String, TypeCode> tableColumns, CSVFormat format, boolean hasHeader) {
+      CopyTransactionMode transactionMode,
+      String tableName,
+      Map<String, TypeCode> tableColumns,
+      int indexedColumnsCount,
+      CSVFormat format,
+      boolean hasHeader) {
+    this.transactionMode = transactionMode;
     this.mutationCount = 0;
     this.hasHeader = hasHeader;
     this.isHeaderParsed = false;
     this.tableName = tableName;
     this.tableColumns = tableColumns;
+    this.indexedColumnsCount = indexedColumnsCount;
     this.format = format;
     this.mutations = new ArrayList<>();
   }
@@ -73,8 +98,14 @@ public class MutationWriter {
   }
 
   public void addCopyData(ConnectionHandler connectionHandler, byte[] payload) throws Exception {
+    if (transactionMode == CopyTransactionMode.ImplicitNonAtomic
+        && (commitSizeIsWillExceedLimit(payload))) {
+      // Flush the current mutations to Spanner and start a new batch.
+      buildMutationList(connectionHandler);
+      writeToSpanner(connectionHandler);
+    }
     this.payload.write(payload, 0, payload.length);
-    if (!commitSizeIsWithinLimit()) {
+    if (transactionMode != CopyTransactionMode.ImplicitNonAtomic && !commitSizeIsWithinLimit()) {
       handleError(connectionHandler);
       throw new SQLException(
           "Commit size: " + this.payload.size() + " has exceeded the limit: " + COMMIT_LIMIT);
@@ -105,6 +136,9 @@ public class MutationWriter {
             case STRING:
               builder.set(columnName).to(recordValue);
               break;
+            case JSON:
+              builder.set(columnName).to(Value.json(recordValue));
+              break;
             case BOOL:
               builder.set(columnName).to(Boolean.parseBoolean(recordValue));
               break;
@@ -114,8 +148,14 @@ public class MutationWriter {
             case FLOAT64:
               builder.set(columnName).to(Double.parseDouble(recordValue));
               break;
+            case NUMERIC:
+              builder.set(columnName).to(Value.pgNumeric(recordValue));
+              break;
             case BYTES:
               builder.set(columnName).to(Byte.parseByte(recordValue));
+              break;
+            case DATE:
+              builder.set(columnName).to(Date.parseDate(recordValue));
               break;
             case TIMESTAMP:
               builder.set(columnName).to(com.google.cloud.Timestamp.parseTimestamp(recordValue));
@@ -142,7 +182,7 @@ public class MutationWriter {
       this.mutationCount += record.size(); // Increment the number of mutations being added
       this.rowCount++; // Increment the number of COPY rows by one
     }
-    if (!mutationCountIsWithinLimit()) {
+    if (transactionMode != CopyTransactionMode.ImplicitNonAtomic && !mutationCountIsWithinLimit()) {
       handleError(connectionHandler);
       throw new SQLException(
           "Mutation count: " + mutationCount + " has exceeded the limit: " + MUTATION_LIMIT);
@@ -155,6 +195,15 @@ public class MutationWriter {
    */
   private boolean commitSizeIsWithinLimit() {
     return this.payload.size() <= COMMIT_LIMIT;
+  }
+
+  /**
+   * @return True if the current payload + next payload will exceed COMMIT_LIMIT. This estimate is
+   *     adjusted using the COMMIT_LIMIT_MULTIPLIER_FACTOR to be on the safe side.
+   */
+  private boolean commitSizeIsWillExceedLimit(byte[] nextPayload) {
+    return (this.payload.size() + nextPayload.length) * COMMIT_LIMIT_MULTIPLIER_FACTOR
+        >= COMMIT_LIMIT;
   }
 
   /**
@@ -198,11 +247,30 @@ public class MutationWriter {
     Connection connection = connectionHandler.getJdbcConnection();
     CloudSpannerJdbcConnection spannerConnection =
         connection.unwrap(CloudSpannerJdbcConnection.class);
-    spannerConnection.write(this.mutations); // Write mutation to spanner
+    switch (transactionMode) {
+      case ImplicitAtomic:
+        spannerConnection.write(this.mutations);
+        break;
+      case ImplicitNonAtomic:
+        batchedWriteToSpanner(spannerConnection);
+        break;
+      case Explicit:
+        spannerConnection.bufferedWrite(this.mutations);
+        break;
+    }
     // Reset mutations, mutation counter, and batch size count for a new batch
     this.mutations = new ArrayList<>();
     this.mutationCount = 0;
+    this.payload.reset();
     return this.rowCount;
+  }
+
+  private void batchedWriteToSpanner(CloudSpannerJdbcConnection spannerConnection)
+      throws SQLException {
+    int batchSize = MUTATION_LIMIT / (tableColumns.size() + indexedColumnsCount);
+    for (List<Mutation> mutations : Iterables.partition(this.mutations, batchSize)) {
+      spannerConnection.write(mutations);
+    }
   }
 
   public void handleError(ConnectionHandler connectionHandler) throws Exception {
@@ -219,8 +287,8 @@ public class MutationWriter {
 
   /**
    * Copy data will be written to an error file if size limits were exceeded or a problem was
-   * encountered. Copy data will also written if an error was encountered while generating the
-   * mutaiton list or if Spanner returns an error upon commiting the mutations.
+   * encountered. Copy data will also be written if an error was encountered while generating the
+   * mutation list or if Spanner returns an error upon committing the mutations.
    */
   public void writeCopyDataToErrorFile() throws IOException {
     if (this.fileWriter == null) {

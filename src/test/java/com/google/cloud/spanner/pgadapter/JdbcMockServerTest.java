@@ -162,6 +162,41 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .to("users")
                 .build(),
             resultSet));
+
+    String indexedColumnsCountSql =
+        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=@p1 and column_name in (@p2, @p3, @p4)";
+    ResultSetMetadata indexedColumnsCountMetadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .build())
+            .build();
+    com.google.spanner.v1.ResultSet indexedColumnsCountResultSet =
+        com.google.spanner.v1.ResultSet.newBuilder()
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("2").build())
+                    .build())
+            .setMetadata(indexedColumnsCountMetadata)
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.newBuilder(indexedColumnsCountSql)
+                .bind("p1")
+                .to("users")
+                .bind("p2")
+                .to("id")
+                .bind("p3")
+                .to("age")
+                .bind("p4")
+                .to("name")
+                .build(),
+            indexedColumnsCountResultSet));
   }
 
   @Test
