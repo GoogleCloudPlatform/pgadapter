@@ -71,13 +71,13 @@ public class ArrayParser extends Parser<List<?>> {
         return value.getInt64Array();
       case STRING:
         return value.getStringArray();
-      case NUMERIC:
       case PG_NUMERIC:
         return value.getNumericArray();
       case TIMESTAMP:
         return value.getTimestampArray();
       case FLOAT64:
         return value.getFloat64Array();
+      case NUMERIC: // Only PG_NUMERIC is supported
       case ARRAY:
       case STRUCT:
       default:

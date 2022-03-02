@@ -182,7 +182,8 @@ public class ProxyServer extends Thread {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT,
           String.format(
-              "The database uses dialect %s. Only databases using dialect %s are allowed.",
+              "The database uses dialect %s. Currently PGAdapter only supports connections to %s dialect databases. "
+                  + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
               handler.getSpannerConnection().getDialect(), Dialect.POSTGRESQL));
     }
     register(handler);
