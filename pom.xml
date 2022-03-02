@@ -26,16 +26,20 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.1.0-pg-SNAPSHOT</version>
-  <name>Google Cloud Spanner PostgreSQL Adaptor</name>
+  <version>0.1.0-SNAPSHOT</version>
+  <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
-    The Adapter server implements the PostgreSQL wire-protocol, but sends all
-    received statements
-    to a Spanner database instead of a PostgreSQL database. This makes it
-    possible to use tools
-    developed for PostgreSQL to be used with Spanner.
+    The PGAdapter server implements the PostgreSQL wire-protocol, but sends all received statements
+    to a Cloud Spanner database instead of a PostgreSQL database. The Cloud Spanner database must
+    have been created using the PostgreSQL dialect. See https://cloud.google.com/spanner/docs/quickstart-console#postgresql
+    for more information on how to create PostgreSQL dialect databases on Cloud Spanner.
   </description>
+  <parent>
+    <groupId>com.google.cloud</groupId>
+    <artifactId>google-cloud-shared-config</artifactId>
+    <version>1.2.7</version>
+  </parent>
 
   <dependencies>
     <dependency>
