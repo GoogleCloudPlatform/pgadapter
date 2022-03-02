@@ -23,31 +23,31 @@ public class CopyTokenManager implements CopyConstants {
     switch (curChar) {
       case 9:
         jjmatchedKind = 2;
-        return jjMoveNfa_0(27, 0);
+        return jjMoveNfa_0(0, 0);
       case 10:
         jjmatchedKind = 3;
-        return jjMoveNfa_0(27, 0);
+        return jjMoveNfa_0(0, 0);
       case 13:
         jjmatchedKind = 4;
-        return jjMoveNfa_0(27, 0);
+        return jjMoveNfa_0(0, 0);
       case 32:
         jjmatchedKind = 1;
-        return jjMoveNfa_0(27, 0);
+        return jjMoveNfa_0(0, 0);
       case 40:
         jjmatchedKind = 42;
-        return jjMoveNfa_0(27, 0);
+        return jjMoveNfa_0(0, 0);
       case 41:
         jjmatchedKind = 43;
-        return jjMoveNfa_0(27, 0);
+        return jjMoveNfa_0(0, 0);
       case 44:
         jjmatchedKind = 44;
-        return jjMoveNfa_0(27, 0);
+        return jjMoveNfa_0(0, 0);
       case 46:
         jjmatchedKind = 41;
-        return jjMoveNfa_0(27, 0);
+        return jjMoveNfa_0(0, 0);
       case 59:
         jjmatchedKind = 40;
-        return jjMoveNfa_0(27, 0);
+        return jjMoveNfa_0(0, 0);
       case 66:
         return jjMoveStringLiteralDfa1_0(0x2000L);
       case 67:
@@ -93,7 +93,7 @@ public class CopyTokenManager implements CopyConstants {
       case 119:
         return jjMoveStringLiteralDfa1_0(0x1000L);
       default:
-        return jjMoveNfa_0(27, 0);
+        return jjMoveNfa_0(0, 0);
     }
   }
 
@@ -101,7 +101,7 @@ public class CopyTokenManager implements CopyConstants {
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 0);
+      return jjMoveNfa_0(0, 0);
     }
     switch (curChar) {
       case 65:
@@ -151,15 +151,15 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 1);
+    return jjMoveNfa_0(0, 1);
   }
 
   private int jjMoveStringLiteralDfa2_0(long old0, long active0) {
-    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(27, 1);
+    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(0, 1);
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 1);
+      return jjMoveNfa_0(0, 1);
     }
     switch (curChar) {
       case 65:
@@ -225,15 +225,15 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 2);
+    return jjMoveNfa_0(0, 2);
   }
 
   private int jjMoveStringLiteralDfa3_0(long old0, long active0) {
-    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(27, 2);
+    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(0, 2);
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 2);
+      return jjMoveNfa_0(0, 2);
     }
     switch (curChar) {
       case 65:
@@ -335,15 +335,15 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 3);
+    return jjMoveNfa_0(0, 3);
   }
 
   private int jjMoveStringLiteralDfa4_0(long old0, long active0) {
-    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(27, 3);
+    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(0, 3);
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 3);
+      return jjMoveNfa_0(0, 3);
     }
     switch (curChar) {
       case 65:
@@ -407,15 +407,15 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 4);
+    return jjMoveNfa_0(0, 4);
   }
 
   private int jjMoveStringLiteralDfa5_0(long old0, long active0) {
-    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(27, 4);
+    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(0, 4);
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 4);
+      return jjMoveNfa_0(0, 4);
     }
     switch (curChar) {
       case 69:
@@ -487,15 +487,15 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 5);
+    return jjMoveNfa_0(0, 5);
   }
 
   private int jjMoveStringLiteralDfa6_0(long old0, long active0) {
-    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(27, 5);
+    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(0, 5);
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 5);
+      return jjMoveNfa_0(0, 5);
     }
     switch (curChar) {
       case 78:
@@ -513,15 +513,15 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 6);
+    return jjMoveNfa_0(0, 6);
   }
 
   private int jjMoveStringLiteralDfa7_0(long old0, long active0) {
-    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(27, 6);
+    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(0, 6);
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 6);
+      return jjMoveNfa_0(0, 6);
     }
     switch (curChar) {
       case 69:
@@ -551,15 +551,15 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 7);
+    return jjMoveNfa_0(0, 7);
   }
 
   private int jjMoveStringLiteralDfa8_0(long old0, long active0) {
-    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(27, 7);
+    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(0, 7);
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 7);
+      return jjMoveNfa_0(0, 7);
     }
     switch (curChar) {
       case 76:
@@ -589,15 +589,15 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 8);
+    return jjMoveNfa_0(0, 8);
   }
 
   private int jjMoveStringLiteralDfa9_0(long old0, long active0) {
-    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(27, 8);
+    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(0, 8);
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 8);
+      return jjMoveNfa_0(0, 8);
     }
     switch (curChar) {
       case 76:
@@ -621,15 +621,15 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 9);
+    return jjMoveNfa_0(0, 9);
   }
 
   private int jjMoveStringLiteralDfa10_0(long old0, long active0) {
-    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(27, 9);
+    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(0, 9);
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 9);
+      return jjMoveNfa_0(0, 9);
     }
     switch (curChar) {
       case 69:
@@ -651,15 +651,15 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 10);
+    return jjMoveNfa_0(0, 10);
   }
 
   private int jjMoveStringLiteralDfa11_0(long old0, long active0) {
-    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(27, 10);
+    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(0, 10);
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 10);
+      return jjMoveNfa_0(0, 10);
     }
     switch (curChar) {
       case 85:
@@ -669,15 +669,15 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 11);
+    return jjMoveNfa_0(0, 11);
   }
 
   private int jjMoveStringLiteralDfa12_0(long old0, long active0) {
-    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(27, 11);
+    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(0, 11);
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 11);
+      return jjMoveNfa_0(0, 11);
     }
     switch (curChar) {
       case 76:
@@ -687,15 +687,15 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 12);
+    return jjMoveNfa_0(0, 12);
   }
 
   private int jjMoveStringLiteralDfa13_0(long old0, long active0) {
-    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(27, 12);
+    if (((active0 &= old0)) == 0L) return jjMoveNfa_0(0, 12);
     try {
       curChar = input_stream.readChar();
     } catch (java.io.IOException e) {
-      return jjMoveNfa_0(27, 12);
+      return jjMoveNfa_0(0, 12);
     }
     switch (curChar) {
       case 76:
@@ -713,7 +713,7 @@ public class CopyTokenManager implements CopyConstants {
       default:
         break;
     }
-    return jjMoveNfa_0(27, 13);
+    return jjMoveNfa_0(0, 13);
   }
 
   static final long[] jjbitVec0 = {0x0L, 0x0L, 0xffffffffffffffffL, 0xffffffffffffffffL};
@@ -730,7 +730,7 @@ public class CopyTokenManager implements CopyConstants {
     }
     curPos = 0;
     int startsAt = 0;
-    jjnewStateCnt = 80;
+    jjnewStateCnt = 76;
     int i = 1;
     jjstateSet[0] = startState;
     int kind = 0x7fffffff;
@@ -740,7 +740,7 @@ public class CopyTokenManager implements CopyConstants {
         long l = 1L << curChar;
         do {
           switch (jjstateSet[--i]) {
-            case 27:
+            case 0:
               if (curChar == 39) {
                 jjAddStates(0, 1);
               } else if (curChar == 34) {
@@ -749,24 +749,20 @@ public class CopyTokenManager implements CopyConstants {
                 jjAddStates(4, 5);
               }
               break;
-            case 0:
+            case 1:
+              if ((0x3ff000000000000L & l) == 0L) break;
+              if (kind > 31) kind = 31;
+              jjstateSet[jjnewStateCnt++] = 1;
+              break;
+            case 2:
               if (curChar == 38) {
                 jjAddStates(6, 7);
               }
               break;
-            case 1:
-              if (curChar == 34) {
-                jjCheckNAddTwoStates(2, 4);
-              }
-              break;
-            case 2:
-            case 10:
-              if ((0x3ff000000000000L & l) != 0L) {
-                jjCheckNAddStates(8, 10);
-              }
-              break;
             case 3:
-              if (curChar == 34 && kind > 29) kind = 29;
+              if (curChar == 34) {
+                jjCheckNAdd(4);
+              }
               break;
             case 5:
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 6;
@@ -775,16 +771,21 @@ public class CopyTokenManager implements CopyConstants {
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 7;
               break;
             case 7:
-              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 8;
+            case 14:
+              if ((0x3ff000000000000L & l) != 0L) {
+                jjCheckNAdd(8);
+              }
               break;
             case 8:
-              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 9;
+              if ((0x3ff000000000000L & l) != 0L) {
+                jjCheckNAddTwoStates(9, 4);
+              }
               break;
             case 9:
-            case 13:
-              if ((0x3ff000000000000L & l) != 0L) {
-                jjCheckNAdd(10);
-              }
+              if (curChar == 34 && kind > 36) kind = 36;
+              break;
+            case 10:
+              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 11;
               break;
             case 11:
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 12;
@@ -792,37 +793,39 @@ public class CopyTokenManager implements CopyConstants {
             case 12:
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 13;
               break;
-            case 14:
-              if (curChar == 39) {
-                jjCheckNAddTwoStates(15, 17);
-              }
+            case 13:
+              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 14;
               break;
             case 15:
-            case 23:
-              if ((0x3ff000000000000L & l) != 0L) {
-                jjCheckNAddStates(11, 13);
+              if (curChar == 39) {
+                jjCheckNAdd(16);
               }
               break;
-            case 16:
-              if (curChar == 39 && kind > 29) kind = 29;
+            case 17:
+              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 18;
               break;
             case 18:
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 19;
               break;
             case 19:
-              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 20;
-              break;
-            case 20:
-              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 21;
-              break;
-            case 21:
-              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 22;
-              break;
-            case 22:
             case 26:
               if ((0x3ff000000000000L & l) != 0L) {
-                jjCheckNAdd(23);
+                jjCheckNAdd(20);
               }
+              break;
+            case 20:
+              if ((0x3ff000000000000L & l) != 0L) {
+                jjCheckNAddTwoStates(21, 16);
+              }
+              break;
+            case 21:
+              if (curChar == 39 && kind > 36) kind = 36;
+              break;
+            case 22:
+              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 23;
+              break;
+            case 23:
+              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 24;
               break;
             case 24:
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 25;
@@ -832,60 +835,64 @@ public class CopyTokenManager implements CopyConstants {
               break;
             case 28:
               if (curChar == 38) {
-                jjAddStates(14, 15);
+                jjAddStates(8, 9);
               }
               break;
             case 29:
               if (curChar == 34) {
-                jjCheckNAddTwoStates(30, 31);
+                jjCheckNAdd(30);
               }
               break;
-            case 30:
-            case 37:
-              if ((0x3ff000000000000L & l) != 0L) {
-                jjCheckNAddStates(16, 18);
-              }
+            case 31:
+              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 32;
               break;
             case 32:
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 33;
               break;
             case 33:
-              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 34;
+            case 39:
+              if ((0x3ff000000000000L & l) != 0L) {
+                jjCheckNAdd(34);
+              }
               break;
             case 34:
-              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 35;
+              if ((0x3ff000000000000L & l) != 0L) {
+                jjCheckNAddTwoStates(9, 30);
+              }
               break;
             case 35:
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 36;
               break;
             case 36:
-            case 40:
-              if ((0x3ff000000000000L & l) != 0L) {
-                jjCheckNAdd(37);
-              }
+              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 37;
+              break;
+            case 37:
+              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 38;
               break;
             case 38:
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 39;
               break;
-            case 39:
-              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 40;
-              break;
-            case 41:
+            case 40:
               if (curChar == 39) {
-                jjCheckNAddTwoStates(42, 43);
+                jjCheckNAdd(41);
               }
               break;
             case 42:
-            case 49:
-              if ((0x3ff000000000000L & l) != 0L) {
-                jjCheckNAddStates(19, 21);
-              }
+              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 43;
+              break;
+            case 43:
+              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 44;
               break;
             case 44:
-              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 45;
+            case 50:
+              if ((0x3ff000000000000L & l) != 0L) {
+                jjCheckNAdd(45);
+              }
               break;
             case 45:
-              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 46;
+              if ((0x3ff000000000000L & l) != 0L) {
+                jjCheckNAddTwoStates(21, 41);
+              }
               break;
             case 46:
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 47;
@@ -894,111 +901,100 @@ public class CopyTokenManager implements CopyConstants {
               if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 48;
               break;
             case 48:
+              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 49;
+              break;
+            case 49:
+              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 50;
+              break;
             case 52:
-              if ((0x3ff000000000000L & l) != 0L) {
-                jjCheckNAdd(49);
-              }
-              break;
-            case 50:
-              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 51;
-              break;
-            case 51:
-              if ((0x3ff000000000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 52;
-              break;
-            case 55:
-              if ((0x3ff000000000000L & l) == 0L) break;
-              if (kind > 34) kind = 34;
-              jjstateSet[jjnewStateCnt++] = 55;
-              break;
-            case 56:
               if (curChar == 47) {
                 jjAddStates(4, 5);
               }
               break;
-            case 57:
+            case 53:
               if (curChar == 47) {
-                jjCheckNAddStates(22, 24);
+                jjCheckNAddStates(10, 12);
               }
               break;
-            case 58:
+            case 54:
               if ((0xffffffffffffdbffL & l) != 0L) {
-                jjCheckNAddStates(22, 24);
+                jjCheckNAddStates(10, 12);
+              }
+              break;
+            case 55:
+              if ((0x2400L & l) != 0L && kind > 5) kind = 5;
+              break;
+            case 56:
+              if (curChar == 10 && kind > 5) kind = 5;
+              break;
+            case 57:
+              if (curChar == 13) jjstateSet[jjnewStateCnt++] = 56;
+              break;
+            case 58:
+              if (curChar == 42) {
+                jjCheckNAddTwoStates(59, 60);
               }
               break;
             case 59:
-              if ((0x2400L & l) != 0L && kind > 5) kind = 5;
+              if ((0xfffffbffffffffffL & l) != 0L) {
+                jjCheckNAddTwoStates(59, 60);
+              }
               break;
             case 60:
-              if (curChar == 10 && kind > 5) kind = 5;
+              if (curChar == 42) {
+                jjAddStates(13, 14);
+              }
               break;
             case 61:
-              if (curChar == 13) jjstateSet[jjnewStateCnt++] = 60;
+              if ((0xffff7fffffffffffL & l) != 0L) {
+                jjCheckNAddTwoStates(62, 60);
+              }
               break;
             case 62:
-              if (curChar == 42) {
-                jjCheckNAddTwoStates(63, 64);
+              if ((0xfffffbffffffffffL & l) != 0L) {
+                jjCheckNAddTwoStates(62, 60);
               }
               break;
             case 63:
-              if ((0xfffffbffffffffffL & l) != 0L) {
-                jjCheckNAddTwoStates(63, 64);
-              }
-              break;
-            case 64:
-              if (curChar == 42) {
-                jjAddStates(25, 26);
-              }
-              break;
-            case 65:
-              if ((0xffff7fffffffffffL & l) != 0L) {
-                jjCheckNAddTwoStates(66, 64);
-              }
-              break;
-            case 66:
-              if ((0xfffffbffffffffffL & l) != 0L) {
-                jjCheckNAddTwoStates(66, 64);
-              }
-              break;
-            case 67:
               if (curChar == 47 && kind > 6) kind = 6;
               break;
-            case 68:
+            case 64:
               if (curChar == 34) {
                 jjAddStates(2, 3);
               }
               break;
-            case 70:
+            case 65:
+              if ((0xfffffffe00000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 66;
+              break;
+            case 66:
+              if (curChar == 34 && kind > 29) kind = 29;
+              break;
+            case 68:
               if ((0x3ff000000000000L & l) != 0L) {
-                jjAddStates(27, 28);
+                jjAddStates(15, 16);
               }
               break;
-            case 71:
-              if (curChar == 34 && kind > 33) kind = 33;
+            case 69:
+              if (curChar == 34 && kind > 30) kind = 30;
               break;
-            case 72:
-              if ((0xf400fcfe00000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 73;
-              break;
-            case 73:
-              if (curChar == 34 && kind > 35) kind = 35;
-              break;
-            case 74:
+            case 70:
               if (curChar == 39) {
                 jjAddStates(0, 1);
               }
               break;
-            case 76:
+            case 71:
+              if ((0xfffffffe00000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 72;
+              break;
+            case 72:
+              if (curChar == 39 && kind > 29) kind = 29;
+              break;
+            case 74:
               if ((0x3ff000000000000L & l) != 0L) {
-                jjAddStates(29, 30);
+                jjAddStates(17, 18);
               }
               break;
-            case 77:
-              if (curChar == 39 && kind > 33) kind = 33;
-              break;
-            case 78:
-              if ((0xf400fcfe00000000L & l) != 0L) jjstateSet[jjnewStateCnt++] = 79;
-              break;
-            case 79:
-              if (curChar == 39 && kind > 35) kind = 35;
+            case 75:
+              if (curChar == 39 && kind > 30) kind = 30;
               break;
             default:
               break;
@@ -1008,24 +1004,26 @@ public class CopyTokenManager implements CopyConstants {
         long l = 1L << (curChar & 077);
         do {
           switch (jjstateSet[--i]) {
-            case 27:
+            case 0:
               if ((0x7fffffe87fffffeL & l) != 0L) {
-                if (kind > 34) kind = 34;
+                if (kind > 31) kind = 31;
                 {
-                  jjCheckNAdd(55);
+                  jjCheckNAdd(1);
                 }
               }
               if (curChar == 117) jjstateSet[jjnewStateCnt++] = 28;
-              else if (curChar == 85) jjstateSet[jjnewStateCnt++] = 0;
+              else if (curChar == 85) jjstateSet[jjnewStateCnt++] = 2;
               break;
-            case 2:
-              if ((0x7fffffe87fffffeL & l) != 0L) {
-                jjCheckNAddStates(8, 10);
+            case 1:
+              if ((0x7fffffe87fffffeL & l) == 0L) break;
+              if (kind > 31) kind = 31;
+              {
+                jjCheckNAdd(1);
               }
               break;
             case 4:
               if (curChar == 92) {
-                jjAddStates(31, 32);
+                jjAddStates(19, 20);
               }
               break;
             case 5:
@@ -1035,21 +1033,18 @@ public class CopyTokenManager implements CopyConstants {
               if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 7;
               break;
             case 7:
-              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 8;
+            case 14:
+              if ((0x7e0000007eL & l) != 0L) {
+                jjCheckNAdd(8);
+              }
               break;
             case 8:
-              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 9;
-              break;
-            case 9:
-            case 13:
               if ((0x7e0000007eL & l) != 0L) {
-                jjCheckNAdd(10);
+                jjCheckNAddTwoStates(9, 4);
               }
               break;
             case 10:
-              if ((0x7e0000007eL & l) != 0L) {
-                jjCheckNAddStates(8, 10);
-              }
+              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 11;
               break;
             case 11:
               if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 12;
@@ -1057,38 +1052,36 @@ public class CopyTokenManager implements CopyConstants {
             case 12:
               if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 13;
               break;
-            case 15:
-              if ((0x7fffffe87fffffeL & l) != 0L) {
-                jjCheckNAddStates(11, 13);
+            case 13:
+              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 14;
+              break;
+            case 16:
+              if (curChar == 92) {
+                jjAddStates(21, 22);
               }
               break;
             case 17:
-              if (curChar == 92) {
-                jjAddStates(33, 34);
-              }
+              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 18;
               break;
             case 18:
               if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 19;
               break;
             case 19:
-              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 20;
-              break;
-            case 20:
-              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 21;
-              break;
-            case 21:
-              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 22;
-              break;
-            case 22:
             case 26:
               if ((0x7e0000007eL & l) != 0L) {
-                jjCheckNAdd(23);
+                jjCheckNAdd(20);
               }
               break;
-            case 23:
+            case 20:
               if ((0x7e0000007eL & l) != 0L) {
-                jjCheckNAddStates(11, 13);
+                jjCheckNAddTwoStates(21, 16);
               }
+              break;
+            case 22:
+              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 23;
+              break;
+            case 23:
+              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 24;
               break;
             case 24:
               if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 25;
@@ -1096,60 +1089,64 @@ public class CopyTokenManager implements CopyConstants {
             case 25:
               if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 26;
               break;
+            case 27:
+              if (curChar == 85) jjstateSet[jjnewStateCnt++] = 2;
+              break;
             case 30:
-              if ((0x7fffffe87fffffeL & l) != 0L) {
-                jjCheckNAddStates(16, 18);
+              if (curChar == 92) {
+                jjAddStates(23, 24);
               }
               break;
             case 31:
-              if (curChar == 92) {
-                jjAddStates(35, 36);
-              }
+              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 32;
               break;
             case 32:
               if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 33;
               break;
             case 33:
-              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 34;
+            case 39:
+              if ((0x7e0000007eL & l) != 0L) {
+                jjCheckNAdd(34);
+              }
               break;
             case 34:
-              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 35;
+              if ((0x7e0000007eL & l) != 0L) {
+                jjCheckNAddTwoStates(9, 30);
+              }
               break;
             case 35:
               if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 36;
               break;
             case 36:
-            case 40:
-              if ((0x7e0000007eL & l) != 0L) {
-                jjCheckNAdd(37);
-              }
+              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 37;
               break;
             case 37:
-              if ((0x7e0000007eL & l) != 0L) {
-                jjCheckNAddStates(16, 18);
-              }
+              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 38;
               break;
             case 38:
               if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 39;
               break;
-            case 39:
-              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 40;
+            case 41:
+              if (curChar == 92) {
+                jjAddStates(25, 26);
+              }
               break;
             case 42:
-              if ((0x7fffffe87fffffeL & l) != 0L) {
-                jjCheckNAddStates(19, 21);
-              }
+              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 43;
               break;
             case 43:
-              if (curChar == 92) {
-                jjAddStates(37, 38);
-              }
+              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 44;
               break;
             case 44:
-              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 45;
+            case 50:
+              if ((0x7e0000007eL & l) != 0L) {
+                jjCheckNAdd(45);
+              }
               break;
             case 45:
-              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 46;
+              if ((0x7e0000007eL & l) != 0L) {
+                jjCheckNAddTwoStates(21, 41);
+              }
               break;
             case 46:
               if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 47;
@@ -1158,66 +1155,47 @@ public class CopyTokenManager implements CopyConstants {
               if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 48;
               break;
             case 48:
-            case 52:
-              if ((0x7e0000007eL & l) != 0L) {
-                jjCheckNAdd(49);
-              }
+              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 49;
               break;
             case 49:
-              if ((0x7e0000007eL & l) != 0L) {
-                jjCheckNAddStates(19, 21);
-              }
-              break;
-            case 50:
-              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 51;
+              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 50;
               break;
             case 51:
-              if ((0x7e0000007eL & l) != 0L) jjstateSet[jjnewStateCnt++] = 52;
-              break;
-            case 53:
               if (curChar == 117) jjstateSet[jjnewStateCnt++] = 28;
               break;
             case 54:
-            case 55:
-              if ((0x7fffffe87fffffeL & l) == 0L) break;
-              if (kind > 34) kind = 34;
               {
-                jjCheckNAdd(55);
+                jjAddStates(10, 12);
               }
               break;
-            case 58:
+            case 59:
               {
-                jjAddStates(22, 24);
+                jjCheckNAddTwoStates(59, 60);
               }
               break;
-            case 63:
+            case 61:
+            case 62:
               {
-                jjCheckNAddTwoStates(63, 64);
+                jjCheckNAddTwoStates(62, 60);
               }
               break;
             case 65:
-            case 66:
-              {
-                jjCheckNAddTwoStates(66, 64);
-              }
+              if ((0x7fffffffffffffffL & l) != 0L) jjstateSet[jjnewStateCnt++] = 66;
               break;
-            case 69:
-            case 70:
+            case 67:
+            case 68:
               if ((0x7fffffe87fffffeL & l) != 0L) {
-                jjCheckNAddTwoStates(70, 71);
+                jjCheckNAddTwoStates(68, 69);
               }
               break;
-            case 72:
-              if ((0x1f8000001L & l) != 0L) jjstateSet[jjnewStateCnt++] = 73;
+            case 71:
+              if ((0x7fffffffffffffffL & l) != 0L) jjstateSet[jjnewStateCnt++] = 72;
               break;
-            case 75:
-            case 76:
+            case 73:
+            case 74:
               if ((0x7fffffe87fffffeL & l) != 0L) {
-                jjCheckNAddTwoStates(76, 77);
+                jjCheckNAddTwoStates(74, 75);
               }
-              break;
-            case 78:
-              if ((0x1f8000001L & l) != 0L) jjstateSet[jjnewStateCnt++] = 79;
               break;
             default:
               break;
@@ -1228,20 +1206,20 @@ public class CopyTokenManager implements CopyConstants {
         long l2 = 1L << (curChar & 077);
         do {
           switch (jjstateSet[--i]) {
-            case 58:
+            case 54:
               if ((jjbitVec0[i2] & l2) != 0L) {
-                jjAddStates(22, 24);
+                jjAddStates(10, 12);
               }
               break;
-            case 63:
+            case 59:
               if ((jjbitVec0[i2] & l2) != 0L) {
-                jjCheckNAddTwoStates(63, 64);
+                jjCheckNAddTwoStates(59, 60);
               }
               break;
-            case 65:
-            case 66:
+            case 61:
+            case 62:
               if ((jjbitVec0[i2] & l2) != 0L) {
-                jjCheckNAddTwoStates(66, 64);
+                jjCheckNAddTwoStates(62, 60);
               }
               break;
             default:
@@ -1255,7 +1233,7 @@ public class CopyTokenManager implements CopyConstants {
         kind = 0x7fffffff;
       }
       ++curPos;
-      if ((i = jjnewStateCnt) == (startsAt = 80 - (jjnewStateCnt = startsAt))) break;
+      if ((i = jjnewStateCnt) == (startsAt = 76 - (jjnewStateCnt = startsAt))) break;
       try {
         curChar = input_stream.readChar();
       } catch (java.io.IOException e) {
@@ -1313,9 +1291,8 @@ public class CopyTokenManager implements CopyConstants {
   }
 
   static final int[] jjnextStates = {
-    75, 78, 69, 72, 57, 62, 1, 14, 2, 3, 4, 15, 16, 17, 29, 41,
-    30, 3, 31, 42, 16, 43, 58, 59, 61, 65, 67, 70, 71, 76, 77, 5,
-    11, 18, 24, 32, 38, 44, 50,
+    71, 73, 65, 67, 53, 58, 3, 15, 29, 40, 54, 55, 57, 61, 63, 68, 69, 74, 75, 5, 10, 17, 22, 31,
+    35, 42, 46,
   };
 
   int curLexState = 0;
@@ -1457,7 +1434,7 @@ public class CopyTokenManager implements CopyConstants {
   private void ReInitRounds() {
     int i;
     jjround = 0x80000001;
-    for (i = 80; i-- > 0; ) jjrounds[i] = 0x80000000;
+    for (i = 76; i-- > 0; ) jjrounds[i] = 0x80000000;
   }
 
   /** Reinitialise parser. */
@@ -1488,7 +1465,7 @@ public class CopyTokenManager implements CopyConstants {
   };
 
   static final long[] jjtoToken = {
-    0x1f0e3fffff81L,
+    0x1f10ffffff81L,
   };
   static final long[] jjtoSkip = {
     0x7eL,
@@ -1501,8 +1478,8 @@ public class CopyTokenManager implements CopyConstants {
   };
   protected SimpleCharStream input_stream;
 
-  private final int[] jjrounds = new int[80];
-  private final int[] jjstateSet = new int[2 * 80];
+  private final int[] jjrounds = new int[76];
+  private final int[] jjstateSet = new int[2 * 76];
   private final StringBuilder jjimage = new StringBuilder();
   private StringBuilder image = jjimage;
   private int jjimageLen;
