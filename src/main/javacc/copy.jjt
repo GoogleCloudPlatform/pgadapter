@@ -71,26 +71,15 @@ TOKEN [IGNORE_CASE] : /* COPY OPTIONS */
 | <O_FALSE: "FALSE">
 }
 
-TOKEN : /* UNICODE */
-{
-  < UNICODE: ("U&" <CODEPOINT_LIST> | "u&" <CODEPOINT_LIST>) >
-|
-  < #CODEPOINT_LIST: ("\"" (<CODEPOINT>|<LETTER>|<DIGIT>)+ "\"" | "\'" (<CODEPOINT>|<LETTER>|<DIGIT>)+ "\'") >
-|
-  < #CODEPOINT: ("\\" <HEX><HEX><HEX><HEX> | "\\" <HEX><HEX><HEX><HEX><HEX><HEX>) >
-|
-  < #HEX: ["0"-"9","A"-"F","a"-"f"] >
-}
-
 TOKEN : /* IDENTIFIERS */
 {
+  < QUOTED_CHAR: ("\"" <SINGLE_CHAR> "\"" | "\'" <SINGLE_CHAR> "\'") >
+|
   < QUOTED_IDENTIFIER: ("\"" <IDENTIFIER> "\"" | "\'" <IDENTIFIER> "\'") >
 |
   < IDENTIFIER: <LETTER> (<LETTER>|<DIGIT>)* >
 |
-  < QUOTED_CHAR: ("\"" <SINGLE_CHAR> "\"" | "\'" <SINGLE_CHAR> "\'") >
-|
-  < #SINGLE_CHAR: (["!"-"'","*"-"/",":","<"-"@","["-"`"]) >
+  < #SINGLE_CHAR: (["!"-"~"]) >
 |
   < #DIGIT: ["0"-"9"] >
 |
@@ -99,17 +88,29 @@ TOKEN : /* IDENTIFIERS */
   < #LOWER_CASE_LETTER: ["_","a"-"z"] >
 }
 
+TOKEN : /* UNICODE */
+{
+  < UNICODE: ("U&" <CODEPOINT_LIST> | "u&" <CODEPOINT_LIST>) >
+|
+  < #CODEPOINT_LIST: ("\"" (<CODEPOINT>)+ "\"" | "\'" (<CODEPOINT>)+ "\'") >
+|
+  < #CODEPOINT: ("\\" <HEX><HEX><HEX><HEX> | "\\" <HEX><HEX><HEX><HEX><HEX><HEX>) >
+|
+  < #HEX: ["0"-"9","A"-"F","a"-"f"] >
+}
+
 /** Main production. */
 ASTStart Start() #Start : {}
 {
-  Expression() ";"
+  Stmt()
   { return jjtThis; }
 }
 
-/** An Expression. */
-void Expression() : {}
+void Stmt() : {}
 {
-  CopyStmt()
+    CopyStmt()
+  | LOOKAHEAD(2)
+    CopyStmt() ";"
 }
 
 /** Copy Statement. */
@@ -187,9 +188,16 @@ void optWith() : {}
 /** Optional list of copy options */
 void copyOptions() #CopyOptions : {}
 {
-  LOOKAHEAD(2)
-  "(" copyOptionList() ")"
+  LOOKAHEAD(3)
+  "(" copyOptionGenericList() ")"
   | copyOptionList()
+}
+
+void copyOptionGenericList() #CopyOptionList : {}
+{
+  LOOKAHEAD(3)
+  copyOptionElement() "," copyOptionGenericList()
+  | copyOptionElement()
 }
 
 void copyOptionList() #CopyOptionList : {}
@@ -205,7 +213,7 @@ void copyOptionElement() #CopyOptionElement : {}
     }
   | formatType() {
       jjtThis.setName("FORMAT");
-  }
+    }
   | <O_FREEZE> {
       jjtThis.setName("FREEZE");
       throw new ParseException("FREEZE is not supported.");
