@@ -20,6 +20,7 @@ import static com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.Cop
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
+import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
@@ -114,9 +115,7 @@ public class CopyStatement extends IntermediateStatement {
     if (options.getQuote() != '\0') {
       this.format = this.format.withQuote(options.getQuote());
     }
-    // if(options.hasHeader()) {
     this.format = this.format.withHeader(this.tableColumns.keySet().toArray(new String[0]));
-    // }
   }
 
   public CSVFormat getParserFormat() {
@@ -324,7 +323,7 @@ public class CopyStatement extends IntermediateStatement {
   private void parseCopyStatement() throws Exception {
     try {
       parse(sql, this.options);
-    } catch (Exception e) {
+    } catch (Exception | TokenMgrError e) {
       throw new SQLException("Invalid COPY statement syntax: " + e.toString());
     }
   }

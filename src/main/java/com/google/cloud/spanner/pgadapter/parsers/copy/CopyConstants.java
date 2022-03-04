@@ -51,27 +51,27 @@ public interface CopyConstants {
   /** RegularExpression Id. */
   int O_FALSE = 28;
   /** RegularExpression Id. */
-  int UNICODE = 29;
+  int QUOTED_CHAR = 29;
   /** RegularExpression Id. */
-  int CODEPOINT_LIST = 30;
+  int QUOTED_IDENTIFIER = 30;
   /** RegularExpression Id. */
-  int CODEPOINT = 31;
+  int IDENTIFIER = 31;
   /** RegularExpression Id. */
-  int HEX = 32;
+  int SINGLE_CHAR = 32;
   /** RegularExpression Id. */
-  int QUOTED_IDENTIFIER = 33;
+  int DIGIT = 33;
   /** RegularExpression Id. */
-  int IDENTIFIER = 34;
+  int LETTER = 34;
   /** RegularExpression Id. */
-  int QUOTED_CHAR = 35;
+  int LOWER_CASE_LETTER = 35;
   /** RegularExpression Id. */
-  int SINGLE_CHAR = 36;
+  int UNICODE = 36;
   /** RegularExpression Id. */
-  int DIGIT = 37;
+  int CODEPOINT_LIST = 37;
   /** RegularExpression Id. */
-  int LETTER = 38;
+  int CODEPOINT = 38;
   /** RegularExpression Id. */
-  int LOWER_CASE_LETTER = 39;
+  int HEX = 39;
 
   /** Lexical state. */
   int DEFAULT = 0;
@@ -107,17 +107,17 @@ public interface CopyConstants {
     "\"ENCODING\"",
     "\"TRUE\"",
     "\"FALSE\"",
-    "<UNICODE>",
-    "<CODEPOINT_LIST>",
-    "<CODEPOINT>",
-    "<HEX>",
+    "<QUOTED_CHAR>",
     "<QUOTED_IDENTIFIER>",
     "<IDENTIFIER>",
-    "<QUOTED_CHAR>",
     "<SINGLE_CHAR>",
     "<DIGIT>",
     "<LETTER>",
     "<LOWER_CASE_LETTER>",
+    "<UNICODE>",
+    "<CODEPOINT_LIST>",
+    "<CODEPOINT>",
+    "<HEX>",
     "\";\"",
     "\".\"",
     "\"(\"",
