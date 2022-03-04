@@ -44,7 +44,7 @@ public class IntermediateStatement {
   protected String command;
   protected boolean executed;
   protected Connection connection;
-  protected Integer updateCount;
+  protected Long updateCount;
   protected List<String> statements;
 
   private static final char STATEMENT_DELIMITER = ';';
@@ -148,11 +148,11 @@ public class IntermediateStatement {
   }
 
   /** @return The number of items that were modified by this execution. */
-  public Integer getUpdateCount() {
+  public Long getUpdateCount() {
     return this.updateCount;
   }
 
-  public void addUpdateCount(int count) {
+  public void addUpdateCount(long count) {
     this.updateCount += count;
   }
 
@@ -208,14 +208,14 @@ public class IntermediateStatement {
       this.statementResult = this.statement.getResultSet();
       this.hasMoreData = this.statementResult.next();
     } else {
-      this.updateCount = this.statement.getUpdateCount();
+      this.updateCount = (long) this.statement.getUpdateCount();
       this.hasMoreData = false;
       this.statementResult = null;
     }
   }
 
   protected void updateBatchResultCount(int[] updateCounts) throws SQLException {
-    this.updateCount = 0;
+    this.updateCount = 0L;
     for (int i = 0; i < updateCounts.length; ++i) {
       this.updateCount += updateCounts[i];
     }

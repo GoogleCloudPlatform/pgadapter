@@ -21,6 +21,7 @@ import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import java.text.MessageFormat;
+import java.util.logging.Logger;
 
 /**
  * Normally used to signal a copy command is done. Spanner does not currently support copies, so
@@ -29,9 +30,10 @@ import java.text.MessageFormat;
  * to continue receiving properly)
  */
 public class CopyDoneMessage extends ControlMessage {
+  private static final Logger logger = Logger.getLogger(CopyDoneMessage.class.getName());
 
   protected static final char IDENTIFIER = 'c';
-  private CopyStatement statement;
+  private final CopyStatement statement;
 
   public CopyDoneMessage(ConnectionHandler connection) throws Exception {
     super(connection);
@@ -40,18 +42,18 @@ public class CopyDoneMessage extends ControlMessage {
 
   @Override
   protected void sendPayload() throws Exception {
+    logger.info("Received CopyDone message");
     // If backend error occurred during copy-in mode, drop any subsequent CopyDone messages.
     MutationWriter mw = this.statement.getMutationWriter();
+    statement.close();
     if (!statement.hasException()) {
       try {
-        mw.buildMutationList(this.connection);
-        int rowCount =
-            mw.writeToSpanner(this.connection); // Write any remaining mutations to Spanner
+        long rowCount = this.statement.getUpdateCount();
         statement.addUpdateCount(rowCount); // Increase the row count of number of rows copied.
         this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
       } catch (Exception e) {
         // Spanner returned an error when trying to commit the batch of mutations.
-        mw.writeCopyDataToErrorFile();
+        mw.writeErrorFile(e);
         mw.closeErrorFile();
         this.connection.setStatus(ConnectionStatus.IDLE);
         this.connection.removeActiveStatement(this.statement);
@@ -60,9 +62,9 @@ public class CopyDoneMessage extends ControlMessage {
     } else {
       mw.closeErrorFile();
     }
-    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
     this.connection.setStatus(ConnectionStatus.IDLE);
     this.connection.removeActiveStatement(this.statement);
+    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
   }
 
   @Override

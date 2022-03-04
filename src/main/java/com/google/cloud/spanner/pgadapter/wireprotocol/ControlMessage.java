@@ -59,7 +59,10 @@ public abstract class ControlMessage extends WireMessage {
         case CopyFailMessage.IDENTIFIER:
           return new CopyFailMessage(connection);
         default:
-          throw new IllegalStateException("Expected 0 or more Copy Data messages.");
+          return new InvalidMessage(
+              connection,
+              new IllegalStateException(
+                  String.format("Expected 0 or more Copy Data messages, got: %c", nextMsg)));
       }
     } else {
       switch (nextMsg) {
@@ -84,7 +87,8 @@ public abstract class ControlMessage extends WireMessage {
         case FlushMessage.IDENTIFIER:
           return new FlushMessage(connection);
         default:
-          throw new IllegalStateException("Unknown message");
+          return new InvalidMessage(
+              connection, new IllegalStateException(String.format("Unknown message: %c", nextMsg)));
       }
     }
   }

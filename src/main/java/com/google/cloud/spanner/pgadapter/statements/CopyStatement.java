@@ -33,6 +33,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.apache.commons.csv.CSVFormat;
 
@@ -49,6 +53,8 @@ public class CopyStatement extends IntermediateStatement {
   private Map<String, TypeCode> tableColumns;
   private int indexedColumnsCount;
   private MutationWriter mutationWriter;
+  private Future<Long> updateCount;
+  private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
   public CopyStatement(String sql, Connection connection) throws SQLException {
     super(sql);
@@ -56,6 +62,33 @@ public class CopyStatement extends IntermediateStatement {
     this.command = StatementParser.parseCommand(sql);
     this.connection = connection;
     this.statement = connection.createStatement();
+  }
+
+  @Override
+  public void close() throws Exception {
+    if (this.mutationWriter != null) {
+      this.mutationWriter.close();
+    }
+    this.executor.shutdown();
+    super.close();
+  }
+
+  @Override
+  public Long getUpdateCount() {
+    try {
+      return updateCount.get();
+    } catch (ExecutionException e) {
+      // TODO: Switch to SpannerException when connection API is used
+      throw new RuntimeException(e.getCause());
+    } catch (InterruptedException e) {
+      // TODO: Switch to SpannerException when connection API is used
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public ResultType getResultType() {
+    return ResultType.UPDATE_COUNT;
   }
 
   /** @return Mapping of table column names to column type. */
@@ -169,6 +202,7 @@ public class CopyStatement extends IntermediateStatement {
       case "bigint":
         return TypeCode.INT64;
       case "float8":
+      case "double precision":
         return TypeCode.FLOAT64;
       case "numeric":
         return TypeCode.NUMERIC;
@@ -259,11 +293,13 @@ public class CopyStatement extends IntermediateStatement {
       mutationWriter =
           new MutationWriter(
               getTransactionMode(),
+              connection.unwrap(CloudSpannerJdbcConnection.class),
               options.getTableName(),
               getTableColumns(),
               indexedColumnsCount,
               getParserFormat(),
               hasHeader());
+      updateCount = executor.submit(mutationWriter);
       updateResultCount(); // Gets update count, set hasMoreData false and statement result
     } catch (Exception e) {
       SQLException se = new SQLException(e.toString());

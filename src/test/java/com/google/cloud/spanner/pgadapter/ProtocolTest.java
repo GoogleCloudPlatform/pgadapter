@@ -16,12 +16,15 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -61,8 +64,10 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -1170,7 +1175,7 @@ public class ProtocolTest {
     Assert.assertEquals(message.getClass(), TerminateMessage.class);
   }
 
-  @Test(expected = IllegalStateException.class)
+  @Test(expected = EOFException.class)
   public void testUnknownMessageTypeCausesException() throws Exception {
     byte[] messageMetadata = {'Y'};
 
@@ -1212,7 +1217,7 @@ public class ProtocolTest {
     CopyDataMessage messageSpy = (CopyDataMessage) Mockito.spy(message);
     messageSpy.send();
 
-    Mockito.verify(mw, Mockito.times(1)).addCopyData(connectionHandler, payload);
+    Mockito.verify(mw, Mockito.times(1)).addCopyData(payload);
   }
 
   @Test
@@ -1274,13 +1279,6 @@ public class ProtocolTest {
       CopyDataMessage copyDataMessage = (CopyDataMessage) message;
       copyDataMessage.send();
     }
-
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.buildMutationList(connectionHandler);
-    Assert.assertEquals(
-        mw.getMutations().toString(),
-        "[insert(keyvalue{key=1,value='one'}), insert(keyvalue{key=2,value='two'}), "
-            + "insert(keyvalue{key=3,value='three'}), insert(keyvalue{key=4,value='four'})]");
   }
 
   @Test
@@ -1313,7 +1311,6 @@ public class ProtocolTest {
     messageSpy.send();
     Mockito.verify(messageSpy, Mockito.times(1))
         .sendSpannerResult(copyStatement, QueryMode.SIMPLE, 0L);
-    Mockito.verify(mb, Mockito.times(1)).writeToSpanner(connectionHandler);
   }
 
   @Test
@@ -1330,6 +1327,8 @@ public class ProtocolTest {
     String expectedErrorMessage = "Error Message";
 
     CopyStatement copyStatement = Mockito.mock(CopyStatement.class);
+    MutationWriter mutationWriter = Mockito.mock(MutationWriter.class);
+    Mockito.when(copyStatement.getMutationWriter()).thenReturn(mutationWriter);
     Mockito.when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
@@ -1341,6 +1340,8 @@ public class ProtocolTest {
     Assert.assertEquals(message.getClass(), CopyFailMessage.class);
     Assert.assertEquals(((CopyFailMessage) message).getErrorMessage(), expectedErrorMessage);
     message.send();
+
+    verify(mutationWriter).rollback();
   }
 
   @Test
@@ -1356,14 +1357,10 @@ public class ProtocolTest {
     copyStatement.execute();
 
     MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(connectionHandler, payload);
-    mw.buildMutationList(connectionHandler);
+    mw.addCopyData(payload);
 
     Assert.assertEquals(copyStatement.getFormatType(), "TEXT");
     Assert.assertEquals(copyStatement.getDelimiterChar(), '\t');
-    Assert.assertEquals(
-        copyStatement.getMutationWriter().getMutations().toString(),
-        "[insert(keyvalue{key=1,value='one'})]");
 
     copyStatement.close();
     Mockito.verify(resultSet, Mockito.times(0)).close();
@@ -1382,21 +1379,23 @@ public class ProtocolTest {
 
     Assert.assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
-    Assert.assertTrue(copyStatement.isExecuted());
+    assertTrue(copyStatement.isExecuted());
 
     MutationWriter mw = copyStatement.getMutationWriter();
-    MutationWriter mwSpy = Mockito.spy(mw);
-    Mockito.when(mwSpy.writeToSpanner(connectionHandler)).thenReturn(10, 2);
-    mwSpy.addCopyData(connectionHandler, payload);
-    mwSpy.buildMutationList(connectionHandler);
-    mwSpy.writeToSpanner(connectionHandler);
+    // Inject a mock DatabaseClient for now.
+    // TODO: Fix this once we can use the Connection API.
+    Field databaseClientField = MutationWriter.class.getDeclaredField("databaseClient");
+    databaseClientField.setAccessible(true);
+    databaseClientField.set(mw, mock(DatabaseClient.class));
+    mw.addCopyData(payload);
+    mw.close();
 
     Assert.assertEquals(copyStatement.getFormatType(), "TEXT");
     Assert.assertEquals(copyStatement.getDelimiterChar(), '\t');
-    Assert.assertEquals(copyStatement.hasException(), false);
-    Assert.assertEquals(mwSpy.getRowCount(), 12);
+    Assert.assertFalse(copyStatement.hasException());
+    Assert.assertEquals(12L, copyStatement.getUpdateCount().longValue());
+    Assert.assertEquals(12L, mw.getRowCount());
 
-    Mockito.verify(mwSpy, Mockito.times(1)).writeToSpanner(connectionHandler);
     copyStatement.close();
   }
 
@@ -1413,23 +1412,17 @@ public class ProtocolTest {
 
     Assert.assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
-    Assert.assertTrue(copyStatement.isExecuted());
+    assertTrue(copyStatement.isExecuted());
 
     MutationWriter mw = copyStatement.getMutationWriter();
-    MutationWriter mwSpy = Mockito.spy(mw);
-    Mockito.when(mwSpy.writeToSpanner(Mockito.any(ConnectionHandler.class))).thenReturn(1);
+    mw.addCopyData(payload);
+    mw.close();
 
-    Exception thrown =
-        Assert.assertThrows(
-            SQLException.class,
-            () -> {
-              mwSpy.addCopyData(connectionHandler, payload);
-              mwSpy.buildMutationList(connectionHandler);
-              ;
-            });
+    RuntimeException thrown =
+        Assert.assertThrows(RuntimeException.class, copyStatement::getUpdateCount);
     Assert.assertEquals(
         thrown.getMessage(),
-        "Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1");
+        "java.sql.SQLException: Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1");
     copyStatement.close();
   }
 
@@ -1445,28 +1438,21 @@ public class ProtocolTest {
     CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
     Assert.assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
-    Assert.assertTrue(copyStatement.isExecuted());
+    assertTrue(copyStatement.isExecuted());
 
     MutationWriter mw = copyStatement.getMutationWriter();
-    MutationWriter mwSpy = Mockito.spy(mw);
-    Mockito.when(mwSpy.writeToSpanner(connectionHandler)).thenReturn(4);
+    mw.addCopyData(payload);
 
-    Exception thrown =
-        Assert.assertThrows(
-            SQLException.class,
-            () -> {
-              mwSpy.addCopyData(connectionHandler, payload);
-              mwSpy.buildMutationList(connectionHandler);
-              mwSpy.writeToSpanner(connectionHandler);
-            });
-    Assert.assertEquals(thrown.getMessage(), "Invalid input syntax for type INT64:\"'5'\"");
+    RuntimeException thrown =
+        Assert.assertThrows(RuntimeException.class, copyStatement::getUpdateCount);
+    Assert.assertEquals(
+        thrown.getMessage(), "java.sql.SQLException: Invalid input syntax for type INT64:\"'5'\"");
 
-    Mockito.verify(mwSpy, Mockito.times(1)).writeCopyDataToErrorFile();
     File outputFile = new File("output.txt");
-    Assert.assertTrue(outputFile.exists());
-    Assert.assertTrue(outputFile.isFile());
+    assertTrue(outputFile.exists());
+    assertTrue(outputFile.isFile());
 
-    outputFile.delete();
+    assertTrue(outputFile.delete());
     copyStatement.close();
   }
 
@@ -1483,28 +1469,21 @@ public class ProtocolTest {
     CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
     Assert.assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
-    Assert.assertTrue(copyStatement.isExecuted());
+    assertTrue(copyStatement.isExecuted());
 
     MutationWriter mw = copyStatement.getMutationWriter();
-    MutationWriter mwSpy = Mockito.spy(mw);
-    Mockito.when(mwSpy.writeToSpanner(connectionHandler)).thenReturn(1);
+    mw.addCopyData(payload);
 
-    Exception thrown =
-        Assert.assertThrows(
-            SQLException.class,
-            () -> {
-              mwSpy.addCopyData(connectionHandler, payload);
-              mwSpy.buildMutationList(connectionHandler);
-              mwSpy.writeToSpanner(connectionHandler);
-            });
-    Assert.assertEquals(thrown.getMessage(), "Invalid input syntax for type INT64:\"'1'\"");
+    RuntimeException thrown =
+        Assert.assertThrows(RuntimeException.class, copyStatement::getUpdateCount);
+    Assert.assertEquals(
+        thrown.getMessage(), "java.sql.SQLException: Invalid input syntax for type INT64:\"'1'\"");
 
-    Mockito.verify(mwSpy, Mockito.times(1)).writeCopyDataToErrorFile();
     File outputFile = new File("output.txt");
-    Assert.assertTrue(outputFile.exists());
-    Assert.assertTrue(outputFile.isFile());
+    assertTrue(outputFile.exists());
+    assertTrue(outputFile.isFile());
 
-    outputFile.delete();
+    assertTrue(outputFile.delete());
     copyStatement.close();
   }
 

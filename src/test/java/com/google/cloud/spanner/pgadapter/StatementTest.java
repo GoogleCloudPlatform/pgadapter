@@ -126,7 +126,7 @@ public class StatementTest {
     Mockito.verify(statement, Mockito.times(1))
         .execute("UPDATE users SET name = someName WHERE id = 10");
     assertFalse(intermediateStatement.containsResultSet());
-    assertEquals((int) intermediateStatement.getUpdateCount(), 1);
+    assertEquals((long) intermediateStatement.getUpdateCount(), 1L);
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(intermediateStatement.getResultType(), ResultType.UPDATE_COUNT);
     Assert.assertNull(intermediateStatement.getStatementResult());
@@ -155,7 +155,7 @@ public class StatementTest {
     Mockito.verify(statement, Mockito.times(1))
         .execute("UPDATE users SET name = someName WHERE id = -1");
     assertFalse(intermediateStatement.containsResultSet());
-    assertEquals((int) intermediateStatement.getUpdateCount(), 0);
+    assertEquals((long) intermediateStatement.getUpdateCount(), 0L);
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(intermediateStatement.getResultType(), ResultType.UPDATE_COUNT);
     Assert.assertNull(intermediateStatement.getStatementResult());
@@ -184,7 +184,7 @@ public class StatementTest {
     Mockito.verify(statement, Mockito.times(1))
         .execute("CREATE TABLE users (name varchar(100) primary key)");
     assertFalse(intermediateStatement.containsResultSet());
-    assertEquals((int) intermediateStatement.getUpdateCount(), 0);
+    assertEquals((long) intermediateStatement.getUpdateCount(), 0L);
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(intermediateStatement.getResultType(), ResultType.NO_RESULT);
     Assert.assertNull(intermediateStatement.getStatementResult());
@@ -447,14 +447,11 @@ public class StatementTest {
 
     byte[] payload = "2\t3\n".getBytes();
     MutationWriter mw = statement.getMutationWriter();
-    mw.addCopyData(connectionHandler, payload);
-    mw.buildMutationList(connectionHandler);
+    mw.addCopyData(payload);
+    //    mw.buildMutationList(connectionHandler);
 
     Assert.assertEquals(statement.getFormatType(), "TEXT");
     Assert.assertEquals(statement.getDelimiterChar(), '\t');
-    Assert.assertEquals(
-        statement.getMutationWriter().getMutations().toString(),
-        "[insert(keyvalue{key=2,value=3})]");
 
     statement.close();
     Mockito.verify(resultSet, Mockito.times(0)).close();
@@ -472,17 +469,13 @@ public class StatementTest {
 
     byte[] payload = "2 3\n".getBytes();
     MutationWriter mw = statement.getMutationWriter();
+    mw.addCopyData(payload);
 
-    Exception thrown =
-        Assert.assertThrows(
-            SQLException.class,
-            () -> {
-              mw.addCopyData(connectionHandler, payload);
-              mw.buildMutationList(connectionHandler);
-            });
+    RuntimeException thrown =
+        Assert.assertThrows(RuntimeException.class, statement::getUpdateCount);
     Assert.assertEquals(
-        thrown.getMessage(),
-        "Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1");
+        "java.sql.SQLException: Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
+        thrown.getMessage());
 
     statement.close();
     Mockito.verify(resultSet, Mockito.times(0)).close();

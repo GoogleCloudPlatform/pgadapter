@@ -70,7 +70,7 @@ public final class ControlMessageTest {
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(intermediateStatement.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
     Mockito.when(intermediateStatement.getCommand()).thenReturn("INSERT");
-    Mockito.when(intermediateStatement.getUpdateCount()).thenReturn(1);
+    Mockito.when(intermediateStatement.getUpdateCount()).thenReturn(1L);
     Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
 
     JSONParser parser = new JSONParser();
