@@ -138,7 +138,6 @@ public abstract class Parser<T> {
         return new DoubleParser(result, columnarPosition);
       case INT64:
         return new LongParser(result, columnarPosition);
-      case NUMERIC:
       case PG_NUMERIC:
         return new NumericParser(result, columnarPosition);
       case STRING:
@@ -147,6 +146,7 @@ public abstract class Parser<T> {
         return new TimestampParser(result, columnarPosition);
       case ARRAY:
         return new ArrayParser(result, columnarPosition);
+      case NUMERIC:
       case STRUCT:
       default:
         throw new IllegalArgumentException("Illegal or unknown element type: " + type);
@@ -172,13 +172,13 @@ public abstract class Parser<T> {
         return new DoubleParser(result);
       case INT64:
         return new LongParser(result);
-      case NUMERIC:
       case PG_NUMERIC:
         return new NumericParser(result);
       case STRING:
         return new StringParser(result);
       case TIMESTAMP:
         return new TimestampParser(result);
+      case NUMERIC:
       case ARRAY:
       case STRUCT:
       default:
@@ -198,7 +198,6 @@ public abstract class Parser<T> {
         return Oid.BOOL;
       case INT64:
         return Oid.INT8;
-      case NUMERIC:
       case PG_NUMERIC:
         return Oid.NUMERIC;
       case FLOAT64:
@@ -219,7 +218,6 @@ public abstract class Parser<T> {
             return Oid.BOOL_ARRAY;
           case INT64:
             return Oid.INT8_ARRAY;
-          case NUMERIC:
           case PG_NUMERIC:
             return Oid.NUMERIC_ARRAY;
           case FLOAT64:
@@ -234,12 +232,14 @@ public abstract class Parser<T> {
             return Oid.TIMESTAMP_ARRAY;
           case DATE:
             return Oid.DATE_ARRAY;
+          case NUMERIC:
           case ARRAY:
           case STRUCT:
           default:
             throw SpannerExceptionFactory.newSpannerException(
                 ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown array type: " + type);
         }
+      case NUMERIC:
       case STRUCT:
       default:
         throw SpannerExceptionFactory.newSpannerException(
