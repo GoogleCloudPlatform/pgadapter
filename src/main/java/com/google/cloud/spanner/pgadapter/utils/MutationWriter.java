@@ -55,7 +55,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.GuardedBy;
 import org.apache.commons.codec.binary.Hex;
@@ -66,11 +68,25 @@ import org.postgresql.jdbc.TimestampUtils;
 
 public class MutationWriter implements Callable<Long>, Closeable {
   public enum CopyTransactionMode {
+    /**
+     * 'Normal' auto-commit mode. The entire COPY operation is atomic. If the number of mutations
+     * exceeds any of the transaction limits of Cloud Spanner, the COPY operation will fail.
+     */
     ImplicitAtomic,
+    /**
+     * The COPY operation is executed as a series of (partly parallel) transactions. The COPY
+     * operation is not atomic, and an error halfway the operation can mean that some data was
+     * persisted to the database.
+     */
     ImplicitNonAtomic,
+    /**
+     * There is an explicit transaction on the connection. The COPY will be part of that
+     * transaction.
+     */
     Explicit,
   }
 
+  private static final Logger logger = Logger.getLogger(MutationWriter.class.getName());
   private static final String ERROR_FILE = "output.txt";
 
   private static final int DEFAULT_MUTATION_LIMIT = 20_000; // 20k mutation count limit
@@ -228,13 +244,27 @@ public class MutationWriter implements Callable<Long>, Closeable {
 
   @Override
   public Long call() throws Exception {
+    // This LinkedBlockingDeque holds a reference to all transactions that are currently active. The
+    // max capacity of this deque is what ensures that we never have more than maxParallelism
+    // transactions running at the same time. We could also achieve that by using a thread pool with
+    // a fixed number of threads. The problem with that is however that Java does not have a thread
+    // pool implementation that will block if a new task is offered and all threads are currently in
+    // use. The only options are 'fail or add to queue'. We want to block our worker thread in this
+    // case when the max parallel transactions has been reached, as that automatically creates back-
+    // pressure in our entire pipeline that consists of:
+    // Client app (psql) -> CopyData message -> CSVParser -> Transaction.
     LinkedBlockingDeque<ApiFuture<Void>> activeCommitFutures =
         new LinkedBlockingDeque<>(maxParallelism);
+    // This list holds all transactions that we have started. We will wait on this entire list
+    // before finishing, to ensure that all data has been written before we signal that we are done.
     List<ApiFuture<Void>> allCommitFutures = new ArrayList<>();
     try {
       Iterator<CSVRecord> iterator = this.parser.iterator();
       List<Mutation> mutations = new ArrayList<>();
       long currentBufferByteSize = 0L;
+      // Note: iterator.hasNext() blocks if there is not enough data in the pipeline to construct a
+      // complete record. It returns false if the stream has been closed and all records have been
+      // returned.
       while (!rollback.get() && iterator.hasNext()) {
         CSVRecord record = iterator.next();
         if (record.size() != this.tableColumns.keySet().size()) {
@@ -251,7 +281,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
 
         if (transactionMode == CopyTransactionMode.ImplicitNonAtomic) {
           currentBufferByteSize =
-              addAndMaybeFlush(
+              addMutationAndMaybeFlushTransaction(
                   activeCommitFutures,
                   allCommitFutures,
                   mutations,
@@ -286,14 +316,15 @@ public class MutationWriter implements Callable<Long>, Closeable {
                     + "This will make the COPY operation non-atomic.\n\n");
           }
         }
-      }
+      } // end of iterator.hasNext()
 
-      // Write any remaining mutations.
+      // There are no more CSVRecords in the pipeline.
+      // Write any remaining mutations in the buffer.
       if (!rollback.get() && !mutations.isEmpty()) {
         if (transactionMode == CopyTransactionMode.Explicit) {
           connection.bufferedWrite(mutations);
         } else {
-          allCommitFutures.add(writeAsync(activeCommitFutures, mutations));
+          allCommitFutures.add(writeToSpannerAsync(activeCommitFutures, mutations));
         }
       }
       // Wait for all commits to finish. We do this even if something went wrong, as it ensures two
@@ -320,13 +351,16 @@ public class MutationWriter implements Callable<Long>, Closeable {
       }
     } finally {
       this.executorService.shutdown();
+      if (!this.executorService.awaitTermination(60L, TimeUnit.SECONDS)) {
+        logger.warning("Timeout while waiting for MutationWriter executor to shutdown.");
+      }
       this.payload.close();
       this.parser.close();
     }
     return rowCount;
   }
 
-  private long addAndMaybeFlush(
+  private long addMutationAndMaybeFlushTransaction(
       LinkedBlockingDeque<ApiFuture<Void>> activeCommitFutures,
       List<ApiFuture<Void>> allCommitFutures,
       List<Mutation> mutations,
@@ -334,9 +368,9 @@ public class MutationWriter implements Callable<Long>, Closeable {
       long currentBufferByteSize,
       int mutationSize)
       throws Exception {
-    // Flush before adding if the commit size would be exceeded.
+    // Flush before adding to the buffer if the commit size would be exceeded.
     if (!mutations.isEmpty() && currentBufferByteSize + mutationSize > commitSizeLimitForBatching) {
-      allCommitFutures.add(writeAsync(activeCommitFutures, mutations));
+      allCommitFutures.add(writeToSpannerAsync(activeCommitFutures, mutations));
       mutations.clear();
       mutations.add(mutation);
       return mutationSize;
@@ -344,20 +378,20 @@ public class MutationWriter implements Callable<Long>, Closeable {
 
     mutations.add(mutation);
     if (mutations.size() == maxBatchSize) {
-      allCommitFutures.add(writeAsync(activeCommitFutures, mutations));
+      allCommitFutures.add(writeToSpannerAsync(activeCommitFutures, mutations));
       mutations.clear();
-      return 0L;
+      return 0L; // Buffer is empty, so the batch size in bytes is now back to zero.
     }
     return currentBufferByteSize + mutationSize;
   }
 
-  private ApiFuture<Void> writeAsync(
+  private ApiFuture<Void> writeToSpannerAsync(
       LinkedBlockingDeque<ApiFuture<Void>> activeCommitFutures, Iterable<Mutation> mutations)
       throws Exception {
 
     SettableApiFuture<Void> settableApiFuture = SettableApiFuture.create();
     // Add this future to the list of active commit futures. This will block if the deque is full,
-    // and this will effectively apply back pressure to the entire stream as the worker thread is
+    // and this will effectively apply back-pressure to the entire stream as the worker thread is
     // blocked until there is room in the deque.
     activeCommitFutures.put(settableApiFuture);
 
@@ -489,6 +523,10 @@ public class MutationWriter implements Callable<Long>, Closeable {
   private Mutation buildMutation(CSVRecord record) throws SQLException, IOException {
     TimestampUtils timestampUtils = new TimestampUtils(false, () -> null);
     WriteBuilder builder;
+    // The default is to use Insert, but PGAdapter also supports InsertOrUpdate. This can be very
+    // useful for importing large datasets using PartitionedNonAtomic mode. If an import attempt
+    // fails halfway, it can easily be retried with InsertOrUpdate as it will just overwrite
+    // existing records instead of failing on a UniqueKeyConstraint violation.
     if (this.insertOrUpdate) {
       builder = Mutation.newInsertOrUpdateBuilder(this.tableName);
     } else {
@@ -555,6 +593,10 @@ public class MutationWriter implements Callable<Long>, Closeable {
   }
 
   private CSVParser createParser() throws IOException {
+    // Construct the CSVParser directly on the stream of incoming CopyData messages, so we don't
+    // store more data in memory than necessary. Loading all data into memory first before starting
+    // to parse and write the CSVRecords could otherwise cause an out-of-memory exception for large
+    // files.
     Reader reader =
         new InputStreamReader(
             new PipedInputStream(this.payload, this.pipeBufferSize), StandardCharsets.UTF_8);

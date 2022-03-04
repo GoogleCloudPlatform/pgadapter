@@ -269,7 +269,7 @@ The following examples assume that a real PostgreSQL server is running on `local
 PGAdapter is running on `localhost:5433`.
 
 ```shell
-psql -h localhost -p 5432 -d knut-test-db \
+psql -h localhost -p 5432 -d my-local-db \
   -c "copy (select i, to_char(i, 'fm000') from generate_series(1, 10) s(i)) to stdout" \
   | psql -h localhost -p 5433 -d my-spanner-db \
   -c "copy numbers from stdin;"
@@ -278,7 +278,7 @@ psql -h localhost -p 5432 -d knut-test-db \
 Larger datasets require that the Cloud Spanner database is set to `PARTITIONED_NON_ATOMIC` mode:
 
 ```shell
-psql -h localhost -p 5432 -d knut-test-db \
+psql -h localhost -p 5432 -d my-local-db \
   -c "copy (select i, to_char(i, 'fm000') from generate_series(1, 1000000) s(i)) to stdout" \
   | psql -h localhost -p 5433 -d my-spanner-db \
   -c "set autocommit_dml_mode='partitioned_non_atomic'" \
