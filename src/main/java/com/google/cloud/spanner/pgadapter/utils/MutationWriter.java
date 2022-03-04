@@ -56,7 +56,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.GuardedBy;
 import org.apache.commons.codec.binary.Hex;
@@ -72,7 +71,6 @@ public class MutationWriter implements Callable<Long>, Closeable {
     Explicit,
   }
 
-  private static final Logger logger = Logger.getLogger(MutationWriter.class.getName());
   private static final String ERROR_FILE = "output.txt";
 
   private static final int DEFAULT_MUTATION_LIMIT = 20_000; // 20k mutation count limit
@@ -304,7 +302,6 @@ public class MutationWriter implements Callable<Long>, Closeable {
       //    an error to the client application. This prevents commits still being added to the
       //    database after we have returned an error, which could cause confusion.
       // 2. This will throw the underlying exception, so we can catch and register it.
-      logger.info(String.format("Waiting for %d commits to finish", allCommitFutures.size()));
       ApiFutures.allAsList(allCommitFutures).get();
     } catch (SQLException e) {
       synchronized (lock) {
@@ -322,7 +319,9 @@ public class MutationWriter implements Callable<Long>, Closeable {
         throw this.exception;
       }
     } finally {
-      executorService.shutdown();
+      this.executorService.shutdown();
+      this.payload.close();
+      this.parser.close();
     }
     return rowCount;
   }
@@ -396,8 +395,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
     if (databaseClient == null) {
       try {
         // TODO: Replace with just getting the DatabaseClient from the Connection when we can use
-        // the
-        // Connection API.
+        // the Connection API.
         Class<?> abstractJdbcConnectionClass =
             Class.forName("com.google.cloud.spanner.jdbc.AbstractJdbcConnection");
         Field spannerField = abstractJdbcConnectionClass.getDeclaredField("spanner");

@@ -19,7 +19,9 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import java.io.BufferedInputStream;
@@ -161,9 +163,16 @@ public class ConnectionHandler extends Thread {
         Level.WARNING,
         "Exception on connection handler with ID {0}: {1}",
         new Object[] {getName(), e});
-    this.status = ConnectionStatus.IDLE;
-    new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
-    new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
+    if (this.status == ConnectionStatus.TERMINATED) {
+      new ErrorResponse(output, e, ErrorResponse.State.InternalError, Severity.FATAL).send();
+      new TerminateResponse(output).send();
+    } else if (this.status == ConnectionStatus.COPY_IN) {
+      new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
+    } else {
+      this.status = ConnectionStatus.IDLE;
+      new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
+      new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
+    }
   }
 
   /** Closes portals and statements if the result of an execute was the end of a transaction. */

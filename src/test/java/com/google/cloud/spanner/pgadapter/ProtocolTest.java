@@ -64,7 +64,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -1175,7 +1174,7 @@ public class ProtocolTest {
     Assert.assertEquals(message.getClass(), TerminateMessage.class);
   }
 
-  @Test(expected = EOFException.class)
+  @Test(expected = IllegalStateException.class)
   public void testUnknownMessageTypeCausesException() throws Exception {
     byte[] messageMetadata = {'Y'};
 

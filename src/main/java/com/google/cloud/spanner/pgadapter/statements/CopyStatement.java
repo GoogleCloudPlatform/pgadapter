@@ -66,6 +66,12 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   @Override
+  public Exception getException() {
+    // Do not clear exceptions on a CopyStatement.
+    return this.exception;
+  }
+
+  @Override
   public void close() throws Exception {
     if (this.mutationWriter != null) {
       this.mutationWriter.close();
@@ -279,6 +285,7 @@ public class CopyStatement extends IntermediateStatement {
 
   @Override
   public void handleExecutionException(SQLException e) {
+    executor.shutdownNow();
     super.handleExecutionException(e);
   }
 

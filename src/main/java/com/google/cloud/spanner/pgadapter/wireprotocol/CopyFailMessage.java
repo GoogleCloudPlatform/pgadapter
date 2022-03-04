@@ -45,12 +45,15 @@ public class CopyFailMessage extends ControlMessage {
   @Override
   protected void sendPayload() throws Exception {
     // If backend error occurred during copy-in mode, drop any subsequent CopyFail messages.
-    MutationWriter mutationWriter = this.statement.getMutationWriter();
-    mutationWriter.rollback();
-    mutationWriter.closeErrorFile();
-    statement.close();
-    if (!statement.hasException()) {
-      new ErrorResponse(this.outputStream, new Exception(this.errorMessage), State.IOError).send();
+    if (this.statement != null) {
+      MutationWriter mutationWriter = this.statement.getMutationWriter();
+      mutationWriter.rollback();
+      mutationWriter.closeErrorFile();
+      statement.close();
+      if (!statement.hasException()) {
+        new ErrorResponse(this.outputStream, new Exception(this.errorMessage), State.IOError)
+            .send();
+      }
     }
     this.connection.setStatus(ConnectionStatus.IDLE);
     this.connection.removeActiveStatement(this.statement);

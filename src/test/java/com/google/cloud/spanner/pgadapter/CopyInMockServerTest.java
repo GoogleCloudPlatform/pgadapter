@@ -120,7 +120,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCopyIn_TableNotFound() throws SQLException, IOException {
+  public void testCopyIn_TableNotFound() throws SQLException {
     setupCopyInformationSchemaResults(false);
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
@@ -269,8 +269,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCopyIn_QueryDuringCopy()
-      throws SQLException, NoSuchFieldException, IllegalAccessException, IOException,
-          InterruptedException {
+      throws SQLException, NoSuchFieldException, IllegalAccessException, IOException {
     setupCopyInformationSchemaResults();
 
     byte[] payload = "5\t5\t5\n".getBytes(StandardCharsets.UTF_8);
@@ -297,32 +296,16 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar(0);
       stream.flush();
 
-      String expectedErrorMessage = "Expected 0 or more Copy Data messages, got: Q";
-      assertEquals('E', stream.receiveChar());
-      int length = stream.receiveInteger4();
-      assertEquals('S', stream.receiveChar()); // Severity
-      assertEquals("ERROR", stream.receiveString());
-      assertEquals('C', stream.receiveChar());
-      assertEquals("XX000", stream.receiveString());
-      assertEquals('M', stream.receiveChar());
-      assertEquals(expectedErrorMessage, stream.receiveString());
-      assertEquals(0, stream.receiveChar());
-      assertEquals(
-          4 + 1 + "ERROR".length() + 2 + "XX000".length() + 2 + expectedErrorMessage.length() + 2,
-          length);
-
-      // Ending the copy operation should be possible.
-      copyOperation.endCopy();
+      // PGAdapter drops the connection if an invalid message is received during a COPY. This is a
+      // safety measure as there is no other error handling in the COPY protocol, and the server
+      // could otherwise have been completely flushed with garbage if it continued to receive
+      // messages after receiving an invalid message.
+      SQLException exception = assertThrows(SQLException.class, copyOperation::endCopy);
+      assertEquals("Database connection failed when ending copy", exception.getMessage());
     }
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertEquals(1, commitRequests.size());
-    CommitRequest commitRequest = commitRequests.get(0);
-    assertEquals(1, commitRequest.getMutationsCount());
-
-    Mutation mutation = commitRequest.getMutations(0);
-    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
-    assertEquals(1, mutation.getInsert().getValuesCount());
+    assertTrue(commitRequests.isEmpty());
   }
 
   private void setupCopyInformationSchemaResults() {
