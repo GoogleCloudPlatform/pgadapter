@@ -39,7 +39,6 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -156,7 +155,11 @@ public class ConnectionHandler extends Thread {
         }
         this.socket.close();
       } catch (SpannerException | IOException e) {
-        logger.log(Level.WARNING, e, () -> String.format("Exception while closing connection handler with ID %s", getName()));
+        logger.log(
+            Level.WARNING,
+            e,
+            () ->
+                String.format("Exception while closing connection handler with ID %s", getName()));
       }
       this.server.deregister(this);
       logger.log(Level.INFO, "Connection handler with ID {0} closed", getName());

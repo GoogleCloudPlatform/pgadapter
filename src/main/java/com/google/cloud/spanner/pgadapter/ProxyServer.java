@@ -172,7 +172,8 @@ public class ProxyServer extends Thread {
    * Creates and runs the {@link ConnectionHandler}, saving an instance of it locally.
    *
    * @param socket The socket the {@link ConnectionHandler} will read from.
-   * @throws SpannerException if the {@link ConnectionHandler} is unable to connect to Cloud Spanner or if the dialect of the database is not PostgreSQL.
+   * @throws SpannerException if the {@link ConnectionHandler} is unable to connect to Cloud Spanner
+   *     or if the dialect of the database is not PostgreSQL.
    */
   void createConnectionHandler(Socket socket) {
     ConnectionHandler handler = new ConnectionHandler(this, socket);
