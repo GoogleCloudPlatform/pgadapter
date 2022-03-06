@@ -24,6 +24,7 @@ import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
+import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
@@ -66,6 +67,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     String TestHelloWorld(GoString connString);
 
     String TestSelect1(GoString connString);
+
+    String TestQueryWithParameter(GoString connString);
   }
 
   private static PgxTest pgxTest;
@@ -144,6 +147,60 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     String sql = "SELECT 1";
 
     String res = pgxTest.TestSelect1(createConnString());
+
+    assertNull(res);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // pgx sends the query three times:
+    // 1. DESCRIBE statement
+    // 2. DESCRIBE portal
+    // 3. EXECUTE portal
+    assertEquals(3, requests.size());
+    int index = 0;
+    for (ExecuteSqlRequest request : requests) {
+      assertEquals(sql, request.getSql());
+      if (index < 2) {
+        assertEquals(QueryMode.PLAN, request.getQueryMode());
+      } else {
+        assertEquals(QueryMode.NORMAL, request.getQueryMode());
+      }
+      index++;
+    }
+  }
+
+  @Test
+  public void testQueryWithParameter() {
+    String sql = "SELECT * FROM FOO WHERE BAR=$1";
+    Statement statement = Statement.newBuilder(sql).bind("p1").to("baz").build();
+
+    ResultSetMetadata metadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("BAR")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .build())
+            .build();
+
+    // Add a query result with only the metadata for the query without parameter values.
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql), ResultSet.newBuilder().setMetadata(metadata).build()));
+    // Also add a query result with both metadata and rows for the statement with parameter values.
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            statement,
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("baz").build())
+                        .build())
+                .build()));
+
+    String res = pgxTest.TestQueryWithParameter(createConnString());
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);

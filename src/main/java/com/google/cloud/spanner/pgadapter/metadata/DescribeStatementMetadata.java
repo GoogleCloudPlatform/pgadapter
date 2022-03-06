@@ -16,16 +16,15 @@ package com.google.cloud.spanner.pgadapter.metadata;
 
 import com.google.cloud.Tuple;
 import com.google.cloud.spanner.ResultSet;
-import java.util.List;
 
 /** Simple POJO to hold describe metadata specific to prepared statements. */
-public class DescribeStatementMetadata extends DescribeMetadata<Tuple<List<Integer>, ResultSet>> {
+public class DescribeStatementMetadata extends DescribeMetadata<Tuple<int[], ResultSet>> {
 
-  public DescribeStatementMetadata(List<Integer> parameters, ResultSet resultMetaData) {
+  public DescribeStatementMetadata(int[] parameters, ResultSet resultMetaData) {
     this.metadata = Tuple.of(parameters, resultMetaData);
   }
 
-  public List<Integer> getParameters() {
+  public int[] getParameters() {
     return metadata.x();
   }
 

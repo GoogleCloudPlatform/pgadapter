@@ -73,3 +73,24 @@ func TestSelect1(connString string) *C.char {
 
 	return nil
 }
+
+//export TestQueryWithParameter
+func TestQueryWithParameter(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	var value string
+	err = conn.QueryRow(ctx, "SELECT * FROM FOO WHERE BAR=$1", "baz").Scan(&value)
+	if err != nil {
+		return C.CString(fmt.Sprintf("Failed to execute query: %v", err.Error()))
+	}
+	if g, w := value, "baz"; g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+
+	return nil
+}

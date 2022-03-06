@@ -27,7 +27,6 @@ import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.List;
 import org.postgresql.core.Oid;
 
@@ -117,7 +116,21 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       // TODO: Remove ResultSet.next() call once this is supported in the client library.
       // See https://github.com/googleapis/java-spanner/pull/1691
       resultSet.next();
-      return new DescribeStatementMetadata(Collections.emptyList(), resultSet);
+      return new DescribeStatementMetadata(getParameterTypes(), resultSet);
     }
+  }
+
+  // TODO: Replace this method with a real parser.
+  // This implementation is purely for testing purposes to verify that the protocol implementation
+  // actually works. It returns the wrong result if the sql string contains parameter like
+  // characters in strings, comments, quoted identifiers, etc.
+  private int[] getParameterTypes() {
+    int count = 0;
+    for (int i = 0; i < this.sql.length() - 1; i++) {
+      if (this.sql.charAt(i) == '$' && Character.isDigit(this.sql.charAt(i + 1))) {
+        count++;
+      }
+    }
+    return new int[count];
   }
 }
