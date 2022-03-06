@@ -39,7 +39,7 @@ public class QueryMessage extends ControlMessage {
     super(connection);
     String query = StatementParser.removeCommentsAndTrim(this.readAll());
     String command = StatementParser.parseCommand(query);
-    if (command.equalsIgnoreCase(COPY)) {
+    if (COPY.equalsIgnoreCase(command)) {
       this.statement = new CopyStatement(query, this.connection.getSpannerConnection());
     } else if (!connection.getServer().getOptions().requiresMatcher()) {
       this.statement = new IntermediateStatement(query, this.connection.getSpannerConnection());

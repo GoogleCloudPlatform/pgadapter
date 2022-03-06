@@ -77,6 +77,6 @@ public class BinaryParser extends Parser<ByteArray> {
   }
 
   public void bind(Statement.Builder statementBuilder, String name) {
-    statementBuilder.bind(name).to(this.item == null ? null : this.item);
+    statementBuilder.bind(name).to(this.item);
   }
 }

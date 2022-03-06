@@ -72,7 +72,7 @@ public final class RowDescriptionTest {
   public void OidTest() throws Exception {
     when(metadata.getColumnCount()).thenReturn(0);
     when(metadata.getColumnType(0)).thenReturn(Type.int64());
-    when(metadata.getColumnType(1)).thenReturn(Type.numeric());
+    when(metadata.getColumnType(1)).thenReturn(Type.pgNumeric());
     when(metadata.getColumnType(2)).thenReturn(Type.float64());
     when(metadata.getColumnType(3)).thenReturn(Type.string());
     when(metadata.getColumnType(4)).thenReturn(Type.bytes());

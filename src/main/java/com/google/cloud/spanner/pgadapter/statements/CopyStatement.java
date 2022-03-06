@@ -24,6 +24,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
+import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Strings;
@@ -243,7 +244,7 @@ public class CopyStatement extends IntermediateStatement {
   private void parseCopyStatement() throws Exception {
     try {
       parse(sql, this.options);
-    } catch (Exception e) {
+    } catch (Exception | TokenMgrError e) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT, "Invalid COPY statement syntax: " + e);
     }

@@ -27,7 +27,7 @@ public class NumericParser extends Parser<Number> {
   public NumericParser(ResultSet item, int position) {
     // This should be either a BigDecimal value or a Double.NaN.
     Value value = item.getValue(position);
-    if (Value.NAN.equals(value.getString())) {
+    if (Value.NAN.equalsIgnoreCase(value.getString())) {
       this.item = Double.NaN;
     } else {
       this.item = value.getNumeric();

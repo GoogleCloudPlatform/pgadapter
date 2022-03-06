@@ -1222,10 +1222,10 @@ public class ProtocolTest {
 
   @Test
   public void testMultipleCopyDataMessages() throws Exception {
-    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connection.execute(any(Statement.class))).thenReturn(statementResult);
     when(statementResult.getUpdateCount()).thenReturn(1L);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
 
     byte[] messageMetadata = {'d'};
     byte[] payload1 = "1\t'one'\n2\t".getBytes();
