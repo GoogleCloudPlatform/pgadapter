@@ -181,7 +181,14 @@ public class MutationWriter {
     } else {
       parser = CSVParser.parse(copyData, this.format);
     }
-    return parser.getRecords();
+    // Skip the last record if that is the '\.' end of file indicator.
+    List<CSVRecord> records = parser.getRecords();
+    if (!records.isEmpty()
+        && records.get(records.size() - 1).size() == 1
+        && "\\.".equals(records.get(records.size() - 1).get(0))) {
+      return records.subList(0, records.size() - 1);
+    }
+    return records;
   }
 
   /**
@@ -203,7 +210,9 @@ public class MutationWriter {
 
   public void rollback(ConnectionHandler connectionHandler) throws Exception {
     Connection connection = connectionHandler.getSpannerConnection();
-    connection.rollback();
+    if (connection.isInTransaction()) {
+      connection.rollback();
+    }
     this.mutations = new ArrayList<>();
     this.mutationCount = 0;
     writeCopyDataToErrorFile();

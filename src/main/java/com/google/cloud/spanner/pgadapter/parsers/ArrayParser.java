@@ -133,8 +133,7 @@ public class ArrayParser extends Parser<List<?>> {
       results.add(
           stringify(Parser.create(currentItem, this.arrayElementType.getCode()).stringParse()));
     }
-    return results
-        .stream()
+    return results.stream()
         .collect(Collectors.joining(ARRAY_DELIMITER, PG_ARRAY_OPEN, PG_ARRAY_CLOSE));
   }
 
@@ -148,8 +147,7 @@ public class ArrayParser extends Parser<List<?>> {
       results.add(
           stringify(Parser.create(currentItem, this.arrayElementType.getCode()).spannerParse()));
     }
-    return results
-        .stream()
+    return results.stream()
         .collect(Collectors.joining(ARRAY_DELIMITER, SPANNER_ARRAY_OPEN, SPANNER_ARRAY_CLOSE));
   }
 

@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
@@ -52,8 +53,7 @@ public class CopyDoneMessage extends ControlMessage {
         // Spanner returned an error when trying to commit the batch of mutations.
         mw.writeCopyDataToErrorFile();
         mw.closeErrorFile();
-        // TODO: enable in next PR
-        // this.connection.setStatus(ConnectionStatus.IDLE);
+        this.connection.setStatus(ConnectionStatus.IDLE);
         this.connection.removeActiveStatement(this.statement);
         throw e;
       }
@@ -61,8 +61,7 @@ public class CopyDoneMessage extends ControlMessage {
       mw.closeErrorFile();
     }
     new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
-    // TODO: enable in next PR
-    // this.connection.setStatus(ConnectionStatus.IDLE);
+    this.connection.setStatus(ConnectionStatus.IDLE);
     this.connection.removeActiveStatement(this.statement);
   }
 

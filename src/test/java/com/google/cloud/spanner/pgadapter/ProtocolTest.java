@@ -28,6 +28,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
@@ -1202,6 +1203,7 @@ public class ProtocolTest {
     CopyStatement copyStatement = Mockito.mock(CopyStatement.class);
     Mockito.when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -1220,6 +1222,7 @@ public class ProtocolTest {
 
   @Test
   public void testMultipleCopyDataMessages() throws Exception {
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connection.execute(any(Statement.class))).thenReturn(statementResult);
     when(statementResult.getUpdateCount()).thenReturn(1L);
@@ -1241,7 +1244,7 @@ public class ProtocolTest {
 
     ResultSet spannerType = Mockito.mock(ResultSet.class);
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
     Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
@@ -1298,6 +1301,7 @@ public class ProtocolTest {
     CopyStatement copyStatement = Mockito.mock(CopyStatement.class);
     Mockito.when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -1333,6 +1337,7 @@ public class ProtocolTest {
     CopyStatement copyStatement = Mockito.mock(CopyStatement.class);
     Mockito.when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Mockito.when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -1353,7 +1358,7 @@ public class ProtocolTest {
 
     ResultSet spannerType = Mockito.mock(ResultSet.class);
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
     Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
@@ -1384,7 +1389,7 @@ public class ProtocolTest {
 
     ResultSet spannerType = Mockito.mock(ResultSet.class);
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
     Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
@@ -1420,7 +1425,7 @@ public class ProtocolTest {
 
     ResultSet spannerType = Mockito.mock(ResultSet.class);
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
     Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
@@ -1461,7 +1466,7 @@ public class ProtocolTest {
 
     ResultSet spannerType = Mockito.mock(ResultSet.class);
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
     Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
@@ -1508,7 +1513,7 @@ public class ProtocolTest {
 
     ResultSet spannerType = Mockito.mock(ResultSet.class);
     Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("spanner_type")).thenReturn("INT64", "STRING");
+    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
     Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
