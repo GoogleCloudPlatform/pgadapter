@@ -42,7 +42,8 @@ public class ParseMessage extends ControlMessage {
       int type = this.inputStream.readInt();
       this.parameterDataTypes.add(type);
     }
-    this.statement = new IntermediatePreparedStatement(queryString, connection.getJdbcConnection());
+    this.statement =
+        new IntermediatePreparedStatement(queryString, connection.getSpannerConnection());
     this.statement.setParameterDataTypes(this.parameterDataTypes);
   }
 

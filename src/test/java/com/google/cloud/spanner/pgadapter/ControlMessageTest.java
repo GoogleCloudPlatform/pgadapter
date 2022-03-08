@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -27,7 +28,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.sql.Connection;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.junit.Assert;
@@ -71,7 +71,7 @@ public final class ControlMessageTest {
     Mockito.when(intermediateStatement.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
     Mockito.when(intermediateStatement.getCommand()).thenReturn("INSERT");
     Mockito.when(intermediateStatement.getUpdateCount()).thenReturn(1L);
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
 
     JSONParser parser = new JSONParser();
     JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);

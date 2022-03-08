@@ -23,7 +23,14 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
+import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Type;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.parsers.ArrayParser;
 import com.google.cloud.spanner.pgadapter.parsers.BinaryParser;
@@ -45,12 +52,6 @@ import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.sql.Array;
-import java.sql.Date;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.sql.Types;
 import java.util.Arrays;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -208,7 +209,7 @@ public class ParserTest {
 
   @Test
   public void testDateParsing() {
-    Date value = new Date(904910400000L); // Google founding date :)
+    Date value = Date.fromYearMonthDay(1998, 9, 4); // Google founding date :)
 
     byte[] byteResult = {-1, -1, -2, 28};
     byte[] stringResult = {'1', '9', '9', '8', '-', '0', '9', '-', '0', '4'};
@@ -258,7 +259,7 @@ public class ParserTest {
 
   @Test
   public void testTimestampParsingBytePart() {
-    Timestamp value = new Timestamp(904910400000L);
+    Timestamp value = Timestamp.ofTimeMicroseconds(904910400000000L);
 
     byte[] byteResult = {-1, -1, -38, 1, -93, -70, 48, 0};
 
@@ -298,7 +299,7 @@ public class ParserTest {
 
   @Test
   public void testBinaryParsing() {
-    byte[] value = {(byte) 0b01010101, (byte) 0b10101010};
+    ByteArray value = ByteArray.copyFrom(new byte[] {(byte) 0b01010101, (byte) 0b10101010});
     byte[] byteResult = {(byte) 0b01010101, (byte) 0b10101010};
     byte[] stringResult = {'U', '\\', '2', '5', '2'};
 
@@ -310,11 +311,18 @@ public class ParserTest {
   }
 
   @Test
-  public void testStringArrayParsing() throws SQLException {
+  public void testStringArrayParsing() {
     String[] value = {"abc", "def", "jhi"};
+    // The binary format of a PG array should contain the OID of the element type and not the array
+    // OID. For VARCHAR that means 1043 and not 1015
+    // See
+    // https://github.com/pgjdbc/pgjdbc/blob/60a81034fd003551fc863033f491b2d0ed1dfa80/pgjdbc/src/main/java/org/postgresql/jdbc/ArrayDecoding.java#L505
+    // We can test this more thoroughly when
+    // https://github.com/GoogleCloudPlatform/pgadapter/pull/36
+    // has been merged.
     byte[] byteResult = {
-      0, 0, 0, 1, 0, 0, 0, 1, -1, -1, -1, -9, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 97, 98, 99, 0, 0,
-      0, 3, 100, 101, 102, 0, 0, 0, 3, 106, 104, 105
+      0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4, 19, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 97, 98, 99, 0, 0, 0,
+      3, 100, 101, 102, 0, 0, 0, 3, 106, 104, 105
     };
     byte[] stringResult = {
       '{', '"', 'a', 'b', 'c', '"', ',', '"', 'd', 'e', 'f', '"', ',', '"', 'j', 'h', 'i', '"', '}'
@@ -323,56 +331,53 @@ public class ParserTest {
       '[', '"', 'a', 'b', 'c', '"', ',', '"', 'd', 'e', 'f', '"', ',', '"', 'j', 'h', 'i', '"', ']'
     };
 
-    Array sqlArray = Mockito.mock(Array.class);
     ResultSet resultSet = Mockito.mock(ResultSet.class);
+    when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.string()));
+    when(resultSet.getValue(0)).thenReturn(Value.stringArray(Arrays.asList(value)));
 
-    Mockito.when(sqlArray.getBaseType()).thenReturn(Types.NVARCHAR);
-    Mockito.when(sqlArray.getArray()).thenReturn(value);
-    Mockito.when(resultSet.getArray(0)).thenReturn(sqlArray);
-
-    Parser parser = new ArrayParser(resultSet, 0);
+    ArrayParser parser = new ArrayParser(resultSet, 0);
 
     validate(parser, byteResult, stringResult, spannerResult);
   }
 
   @Test
-  public void testLongArrayParsing() throws SQLException {
+  public void testLongArrayParsing() {
     Long[] value = {1L, 2L, 3L};
+    // The binary format of a PG array should contain the OID of the element type and not the array
+    // OID. For INT8 that means 20 and not 1016
+    // See
+    // https://github.com/pgjdbc/pgjdbc/blob/60a81034fd003551fc863033f491b2d0ed1dfa80/pgjdbc/src/main/java/org/postgresql/jdbc/ArrayDecoding.java#L505
+    // We can test this more thoroughly when
+    // https://github.com/GoogleCloudPlatform/pgadapter/pull/36
+    // has been merged.
     byte[] byteResult = {
-      0, 0, 0, 1, 0, 0, 0, 1, -1, -1, -1, -5, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0,
-      0, 1, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 3
+      0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 20, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
+      1, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 3
     };
     byte[] stringResult = {'{', '1', ',', '2', ',', '3', '}'};
     byte[] spannerResult = {'[', '1', ',', '2', ',', '3', ']'};
 
-    Array sqlArray = Mockito.mock(Array.class);
     ResultSet resultSet = Mockito.mock(ResultSet.class);
+    when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.int64()));
+    when(resultSet.getValue(0)).thenReturn(Value.int64Array(Arrays.asList(value)));
 
-    Mockito.when(sqlArray.getBaseType()).thenReturn(Types.BIGINT);
-    Mockito.when(sqlArray.getArray()).thenReturn(value);
-    Mockito.when(resultSet.getArray(0)).thenReturn(sqlArray);
-
-    Parser parser = new ArrayParser(resultSet, 0);
+    ArrayParser parser = new ArrayParser(resultSet, 0);
 
     validate(parser, byteResult, stringResult, spannerResult);
   }
 
   @Test(expected = IllegalArgumentException.class)
-  public void testArrayArrayParsingFails() throws SQLException {
+  public void testArrayArrayParsingFails() {
     Long[] value = {1L, 2L, 3L};
 
-    Array sqlArray = Mockito.mock(Array.class);
     ResultSet resultSet = Mockito.mock(ResultSet.class);
-
-    Mockito.when(sqlArray.getBaseType()).thenReturn(Types.ARRAY);
-    Mockito.when(sqlArray.getArray()).thenReturn(value);
-    Mockito.when(resultSet.getArray(0)).thenReturn(sqlArray);
+    when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.array(Type.int64())));
 
     new ArrayParser(resultSet, 0);
   }
 
   @Test
-  public void testNumericParsing() throws SQLException {
+  public void testNumericParsing() {
     BigDecimal value = new BigDecimal("1234567890.1234567890");
 
     byte[] byteResult = ByteConverter.numeric(new BigDecimal("1234567890.1234567890"));
@@ -390,7 +395,7 @@ public class ParserTest {
   }
 
   @Test
-  public void testNumericParsingNaN() throws SQLException {
+  public void testNumericParsingNaN() {
     Number value = Double.NaN;
 
     byte[] stringResult = {'N', 'a', 'N'};

@@ -20,11 +20,13 @@ import com.google.api.core.SettableApiFuture;
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Mutation.WriteBuilder;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.FutureCallback;
@@ -44,7 +46,6 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -119,7 +120,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
   private final boolean hasHeader;
   private boolean isHeaderParsed;
   private long rowCount;
-  private final CloudSpannerJdbcConnection connection;
+  private final Connection connection;
   private DatabaseClient databaseClient;
   private final String tableName;
   private final Map<String, TypeCode> tableColumns;
@@ -138,11 +139,11 @@ public class MutationWriter implements Callable<Long>, Closeable {
   private final Object lock = new Object();
 
   @GuardedBy("lock")
-  private SQLException exception;
+  private SpannerException exception;
 
   public MutationWriter(
       CopyTransactionMode transactionMode,
-      CloudSpannerJdbcConnection connection,
+      Connection connection,
       String tableName,
       Map<String, TypeCode> tableColumns,
       int indexedColumnsCount,
@@ -163,7 +164,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
   @VisibleForTesting
   MutationWriter(
       CopyTransactionMode transactionMode,
-      CloudSpannerJdbcConnection connection,
+      Connection connection,
       DatabaseClient databaseClient,
       String tableName,
       Map<String, TypeCode> tableColumns,
@@ -215,7 +216,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
     return this.rowCount;
   }
 
-  public void addCopyData(byte[] payload) throws SQLException {
+  public void addCopyData(byte[] payload) {
     synchronized (lock) {
       if (this.exception != null) {
         throw this.exception;
@@ -224,7 +225,8 @@ public class MutationWriter implements Callable<Long>, Closeable {
     try {
       this.payload.write(payload);
     } catch (IOException e) {
-      throw new SQLException(e);
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INTERNAL, "Could not write copy data to buffer", e);
     }
   }
 
@@ -268,7 +270,8 @@ public class MutationWriter implements Callable<Long>, Closeable {
       while (!rollback.get() && iterator.hasNext()) {
         CSVRecord record = iterator.next();
         if (record.size() != this.tableColumns.keySet().size()) {
-          throw new SQLException(
+          throw SpannerExceptionFactory.newSpannerException(
+              ErrorCode.INVALID_ARGUMENT,
               "Invalid COPY data: Row length mismatched. Expected "
                   + this.tableColumns.keySet().size()
                   + " columns, but only found "
@@ -292,7 +295,8 @@ public class MutationWriter implements Callable<Long>, Closeable {
           mutations.add(mutation);
           currentBufferByteSize += mutationSize;
           if (mutations.size() > maxBatchSize) {
-            throw new SQLException(
+            throw SpannerExceptionFactory.newSpannerException(
+                ErrorCode.FAILED_PRECONDITION,
                 "Record count: "
                     + mutations.size()
                     + " has exceeded the limit: "
@@ -306,7 +310,8 @@ public class MutationWriter implements Callable<Long>, Closeable {
                     + "This will make the COPY operation non-atomic.\n\n");
           }
           if (currentBufferByteSize > commitSizeLimit) {
-            throw new SQLException(
+            throw SpannerExceptionFactory.newSpannerException(
+                ErrorCode.FAILED_PRECONDITION,
                 "Commit size: "
                     + currentBufferByteSize
                     + " has exceeded the limit: "
@@ -334,19 +339,19 @@ public class MutationWriter implements Callable<Long>, Closeable {
       //    database after we have returned an error, which could cause confusion.
       // 2. This will throw the underlying exception, so we can catch and register it.
       ApiFutures.allAsList(allCommitFutures).get();
-    } catch (SQLException e) {
+    } catch (SpannerException e) {
       synchronized (lock) {
         this.exception = e;
         throw this.exception;
       }
     } catch (ExecutionException e) {
       synchronized (lock) {
-        this.exception = new SQLException(e.getCause());
+        this.exception = SpannerExceptionFactory.asSpannerException(e.getCause());
         throw this.exception;
       }
     } catch (Exception e) {
       synchronized (lock) {
-        this.exception = new SQLException(e);
+        this.exception = SpannerExceptionFactory.asSpannerException(e);
         throw this.exception;
       }
     } finally {
@@ -425,23 +430,18 @@ public class MutationWriter implements Callable<Long>, Closeable {
     return settableApiFuture;
   }
 
-  private DatabaseClient getDatabaseClient() throws SQLException {
+  private DatabaseClient getDatabaseClient() {
     if (databaseClient == null) {
       try {
-        // TODO: Replace with just getting the DatabaseClient from the Connection when we can use
-        // the Connection API.
-        Class<?> abstractJdbcConnectionClass =
-            Class.forName("com.google.cloud.spanner.jdbc.AbstractJdbcConnection");
-        Field spannerField = abstractJdbcConnectionClass.getDeclaredField("spanner");
-        spannerField.setAccessible(true);
-        Connection spannerConnection = (Connection) spannerField.get(this.connection);
+        // TODO: Replace with connection.getDatabaseClient() when 6.21 has been released.
         Class<?> connectionImplClass =
             Class.forName("com.google.cloud.spanner.connection.ConnectionImpl");
         Field dbClientField = connectionImplClass.getDeclaredField("dbClient");
         dbClientField.setAccessible(true);
-        databaseClient = (DatabaseClient) dbClientField.get(spannerConnection);
+        databaseClient = (DatabaseClient) dbClientField.get(this.connection);
       } catch (Exception e) {
-        throw new SQLException(e);
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INTERNAL, "Failed to get database client from connection", e);
       }
     }
     return databaseClient;
@@ -520,7 +520,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
     return size;
   }
 
-  private Mutation buildMutation(CSVRecord record) throws SQLException, IOException {
+  private Mutation buildMutation(CSVRecord record) {
     TimestampUtils timestampUtils = new TimestampUtils(false, () -> null);
     WriteBuilder builder;
     // The default is to use Insert, but PGAdapter also supports InsertOrUpdate. This can be very
@@ -574,19 +574,24 @@ public class MutationWriter implements Callable<Long>, Closeable {
         }
       } catch (NumberFormatException | DateTimeParseException e) {
         handleError(e);
-        throw new SQLException(
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
             "Invalid input syntax for type "
                 + columnType.toString()
                 + ":"
                 + "\""
                 + recordValue
-                + "\"");
+                + "\"",
+            e);
       } catch (IllegalArgumentException e) {
         handleError(e);
-        throw new SQLException("Invalid input syntax for column \"" + columnName + "\"");
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "Invalid input syntax for column \"" + columnName + "\"",
+            e);
       } catch (Exception e) {
         handleError(e);
-        throw new SQLException(e);
+        throw SpannerExceptionFactory.asSpannerException(e);
       }
     }
     return builder.build();
@@ -610,17 +615,21 @@ public class MutationWriter implements Callable<Long>, Closeable {
     return parser;
   }
 
-  public void handleError(Exception exception) throws IOException {
+  public void handleError(Exception exception) {
     writeErrorFile(exception);
   }
 
-  private void createErrorFile() throws IOException {
+  private void createErrorFile() {
     File unsuccessfulCopy = new File(ERROR_FILE);
-    this.errorFileWriter = new PrintWriter(new FileWriter(unsuccessfulCopy, false));
+    try {
+      this.errorFileWriter = new PrintWriter(new FileWriter(unsuccessfulCopy, false));
+    } catch (IOException e) {
+      throw SpannerExceptionFactory.asSpannerException(e);
+    }
   }
 
   /** Writes any error that occurred during a COPY operation to the error file. */
-  public void writeErrorFile(Exception exception) throws IOException {
+  public void writeErrorFile(Exception exception) {
     if (this.errorFileWriter == null) {
       createErrorFile();
     }

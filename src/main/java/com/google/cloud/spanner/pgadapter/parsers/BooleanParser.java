@@ -14,9 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import com.google.common.collect.ImmutableSet;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Locale;
 import java.util.Set;
@@ -35,7 +35,7 @@ public class BooleanParser extends Parser<Boolean> {
   private static final Set<String> FALSE_VALUES =
       ImmutableSet.of("f", "fa", "fal", "fals", "false", "n", "no", "of", "off");
 
-  public BooleanParser(ResultSet item, int position) throws SQLException {
+  public BooleanParser(ResultSet item, int position) {
     this.item = item.getBoolean(position);
   }
 
@@ -72,18 +72,28 @@ public class BooleanParser extends Parser<Boolean> {
 
   @Override
   protected String stringParse() {
+    if (this.item == null) {
+      return null;
+    }
     return this.item ? TRUE_VALUE : FALSE_VALUE;
   }
 
   @Override
   protected String spannerParse() {
-    return Boolean.toString(this.item);
+    return this.item == null ? null : Boolean.toString(this.item);
   }
 
   @Override
   protected byte[] binaryParse() {
+    if (this.item == null) {
+      return null;
+    }
     byte[] result = new byte[1];
     ByteConverter.bool(result, 0, this.item);
     return result;
+  }
+
+  public void bind(Statement.Builder statementBuilder, String name) {
+    statementBuilder.bind(name).to(this.item);
   }
 }

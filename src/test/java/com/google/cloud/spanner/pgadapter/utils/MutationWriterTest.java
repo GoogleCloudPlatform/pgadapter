@@ -26,7 +26,8 @@ import static org.mockito.Mockito.verify;
 
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Mutation;
-import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -38,7 +39,6 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -108,7 +108,7 @@ public class MutationWriterTest {
             .builder()
             .setHeader(tableColumns.keySet().toArray(new String[0]))
             .build();
-    CloudSpannerJdbcConnection connection = mock(CloudSpannerJdbcConnection.class);
+    Connection connection = mock(Connection.class);
     DatabaseClient databaseClient = mock(DatabaseClient.class);
     MutationWriter mutationWriter =
         new MutationWriter(
@@ -150,7 +150,7 @@ public class MutationWriterTest {
               .builder()
               .setHeader(tableColumns.keySet().toArray(new String[0]))
               .build();
-      CloudSpannerJdbcConnection connection = mock(CloudSpannerJdbcConnection.class);
+      Connection connection = mock(Connection.class);
       MutationWriter mutationWriter =
           new MutationWriter(
               CopyTransactionMode.ImplicitAtomic,
@@ -164,7 +164,7 @@ public class MutationWriterTest {
       mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
       mutationWriter.close();
 
-      SQLException exception = assertThrows(SQLException.class, mutationWriter::call);
+      SpannerException exception = assertThrows(SpannerException.class, mutationWriter::call);
       assertTrue(exception.getMessage().contains("Record count: 2 has exceeded the limit: 1"));
 
       verify(connection, never()).write(anyIterable());
@@ -185,7 +185,7 @@ public class MutationWriterTest {
               .builder()
               .setHeader(tableColumns.keySet().toArray(new String[0]))
               .build();
-      CloudSpannerJdbcConnection connection = mock(CloudSpannerJdbcConnection.class);
+      Connection connection = mock(Connection.class);
       DatabaseClient databaseClient = mock(DatabaseClient.class);
 
       MutationWriter mutationWriter =
@@ -224,7 +224,7 @@ public class MutationWriterTest {
               .builder()
               .setHeader(tableColumns.keySet().toArray(new String[0]))
               .build();
-      CloudSpannerJdbcConnection connection = mock(CloudSpannerJdbcConnection.class);
+      Connection connection = mock(Connection.class);
       MutationWriter mutationWriter =
           new MutationWriter(
               CopyTransactionMode.ImplicitAtomic,
@@ -242,7 +242,7 @@ public class MutationWriterTest {
       mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
       mutationWriter.close();
 
-      SQLException exception = assertThrows(SQLException.class, mutationWriter::call);
+      SpannerException exception = assertThrows(SpannerException.class, mutationWriter::call);
       assertTrue(exception.getMessage().contains("Commit size: 40 has exceeded the limit: 30"));
 
       verify(connection, never()).write(anyIterable());
@@ -262,7 +262,7 @@ public class MutationWriterTest {
               .builder()
               .setHeader(tableColumns.keySet().toArray(new String[0]))
               .build();
-      CloudSpannerJdbcConnection connection = mock(CloudSpannerJdbcConnection.class);
+      Connection connection = mock(Connection.class);
       DatabaseClient databaseClient = mock(DatabaseClient.class);
 
       MutationWriter mutationWriter =
@@ -306,7 +306,7 @@ public class MutationWriterTest {
             .builder()
             .setHeader(tableColumns.keySet().toArray(new String[0]))
             .build();
-    CloudSpannerJdbcConnection connection = mock(CloudSpannerJdbcConnection.class);
+    Connection connection = mock(Connection.class);
     DatabaseClient databaseClient = mock(DatabaseClient.class);
 
     MutationWriter mutationWriter =

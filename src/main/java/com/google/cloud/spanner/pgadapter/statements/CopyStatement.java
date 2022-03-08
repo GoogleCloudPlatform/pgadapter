@@ -17,8 +17,14 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
 import static com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
 
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
-import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
+import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
@@ -26,10 +32,6 @@ import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMo
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Strings;
 import com.google.spanner.v1.TypeCode;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.commons.csv.CSVFormat;
 
 public class CopyStatement extends IntermediateStatement {
@@ -57,12 +60,11 @@ public class CopyStatement extends IntermediateStatement {
   private Future<Long> updateCount;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  public CopyStatement(String sql, Connection connection) throws SQLException {
+  public CopyStatement(String sql, Connection connection) {
     super(sql);
     this.sql = sql;
     this.command = StatementParser.parseCommand(sql);
     this.connection = connection;
-    this.statement = connection.createStatement();
   }
 
   @Override
@@ -85,11 +87,9 @@ public class CopyStatement extends IntermediateStatement {
     try {
       return updateCount.get();
     } catch (ExecutionException e) {
-      // TODO: Switch to SpannerException when connection API is used
-      throw new RuntimeException(e.getCause());
+      throw SpannerExceptionFactory.asSpannerException(e.getCause());
     } catch (InterruptedException e) {
-      // TODO: Switch to SpannerException when connection API is used
-      throw new RuntimeException(e);
+      throw SpannerExceptionFactory.propagateInterrupt(e);
     }
   }
 
@@ -176,19 +176,21 @@ public class CopyStatement extends IntermediateStatement {
     return (options.getFormat() == CopyTreeParser.CopyOptions.Format.BINARY) ? 1 : 0;
   }
 
-  private void verifyCopyColumns() throws SQLException {
+  private void verifyCopyColumns() {
     if (options.getColumnNames().size() == 0) {
       // Use all columns if none were specified.
       return;
     }
     if (options.getColumnNames().size() > this.tableColumns.size()) {
-      throw new SQLException("Number of copy columns provided exceed table column count");
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Number of copy columns provided exceed table column count");
     }
     LinkedHashMap<String, TypeCode> tempTableColumns = new LinkedHashMap<>();
     // Verify that every copy column given is a valid table column name
     for (String copyColumn : options.getColumnNames()) {
       if (!this.tableColumns.containsKey(copyColumn)) {
-        throw new SQLException(
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
             "Column \"" + copyColumn + "\" of relation \"" + getTableName() + "\" does not exist");
       }
       // Update table column ordering with the copy column ordering
@@ -228,29 +230,30 @@ public class CopyStatement extends IntermediateStatement {
     }
   }
 
-  private void queryInformationSchema() throws SQLException {
+  private void queryInformationSchema() {
     Map<String, TypeCode> tableColumns = new LinkedHashMap<>();
-    // The mutation API requires GoogleSQL type names instead of PostgreSQL type names for the table
-    // column types. Issue the information_schema table query as a GoogleSQL query so that it will
-    // return GoogleSQL type names.
-    PreparedStatement statement =
-        this.connection.prepareStatement(
-            "SELECT "
-                + COLUMN_NAME
-                + ", "
-                + DATA_TYPE
-                + " FROM information_schema.columns WHERE table_name = ?");
-    statement.setString(1, getTableName());
-    ResultSet result = statement.executeQuery();
-
-    while (result.next()) {
-      String columnName = result.getString(COLUMN_NAME);
-      TypeCode type = parsePostgreSQLDataType(result.getString(DATA_TYPE));
-      tableColumns.put(columnName, type);
+    Statement statement =
+        Statement.newBuilder(
+                "SELECT "
+                    + COLUMN_NAME
+                    + ", "
+                    + DATA_TYPE
+                    + " FROM information_schema.columns WHERE table_name = $1")
+            .bind("p1")
+            .to(getTableName())
+            .build();
+    try (ResultSet result = connection.executeQuery(statement)) {
+      while (result.next()) {
+        String columnName = result.getString(COLUMN_NAME);
+        TypeCode type = parsePostgreSQLDataType(result.getString(DATA_TYPE));
+        tableColumns.put(columnName, type);
+      }
     }
 
     if (tableColumns.isEmpty()) {
-      throw new SQLException("Table " + getTableName() + " is not found in information_schema");
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          "Table " + getTableName() + " is not found in information_schema");
     }
 
     this.tableColumns = tableColumns;
@@ -261,30 +264,33 @@ public class CopyStatement extends IntermediateStatement {
     this.indexedColumnsCount = queryIndexedColumnsCount(tableColumns.keySet());
   }
 
-  private int queryIndexedColumnsCount(Set<String> columnNames) throws SQLException {
+  private int queryIndexedColumnsCount(Set<String> columnNames) {
     String sql =
         "SELECT COUNT(*) FROM information_schema.index_columns "
             + "WHERE table_schema='public' "
-            + "and table_name=? "
+            + "and table_name=$1 "
             + "and column_name in "
-            + columnNames.stream().map(s -> "?").collect(Collectors.joining(", ", "(", ")"));
-    try (PreparedStatement statement = connection.prepareStatement(sql)) {
-      statement.setString(1, getTableName());
-      int index = 1;
-      for (String column : columnNames) {
-        statement.setString(++index, column);
-      }
-      try (ResultSet resultSet = statement.executeQuery()) {
-        if (resultSet.next()) {
-          return resultSet.getInt(1);
-        }
+            + IntStream.rangeClosed(2, columnNames.size() + 1)
+                .mapToObj(i -> String.format("$%d", i))
+                .collect(Collectors.joining(", ", "(", ")"));
+    Statement.Builder builder = Statement.newBuilder(sql);
+    builder.bind("p1").to(getTableName());
+    int paramIndex = 2;
+    for (String columnName : columnNames) {
+      builder.bind(String.format("p%d", paramIndex)).to(columnName);
+      paramIndex++;
+    }
+    Statement statement = builder.build();
+    try (ResultSet resultSet = connection.executeQuery(statement)) {
+      if (resultSet.next()) {
+        return (int) resultSet.getLong(0);
       }
     }
     return 0;
   }
 
   @Override
-  public void handleExecutionException(SQLException e) {
+  public void handleExecutionException(SpannerException e) {
     executor.shutdownNow();
     super.handleExecutionException(e);
   }
@@ -299,28 +305,24 @@ public class CopyStatement extends IntermediateStatement {
       mutationWriter =
           new MutationWriter(
               getTransactionMode(),
-              connection.unwrap(CloudSpannerJdbcConnection.class),
+              connection,
               options.getTableName(),
               getTableColumns(),
               indexedColumnsCount,
               getParserFormat(),
               hasHeader());
       updateCount = executor.submit(mutationWriter);
-      updateResultCount(); // Gets update count, set hasMoreData false and statement result
     } catch (Exception e) {
-      SQLException se = new SQLException(e.toString());
-      handleExecutionException(se);
+      SpannerException spannerException = SpannerExceptionFactory.asSpannerException(e);
+      handleExecutionException(spannerException);
     }
   }
 
-  private CopyTransactionMode getTransactionMode() throws SQLException {
-    CloudSpannerJdbcConnection spannerJdbcConnection =
-        this.connection.unwrap(CloudSpannerJdbcConnection.class);
-    if (spannerJdbcConnection.isInTransaction()) {
+  private CopyTransactionMode getTransactionMode() {
+    if (connection.isInTransaction()) {
       return CopyTransactionMode.Explicit;
     } else {
-      if (spannerJdbcConnection.getAutocommitDmlMode()
-          == AutocommitDmlMode.PARTITIONED_NON_ATOMIC) {
+      if (connection.getAutocommitDmlMode() == AutocommitDmlMode.PARTITIONED_NON_ATOMIC) {
         return CopyTransactionMode.ImplicitNonAtomic;
       }
       return CopyTransactionMode.ImplicitAtomic;
@@ -331,7 +333,8 @@ public class CopyStatement extends IntermediateStatement {
     try {
       parse(sql, this.options);
     } catch (Exception | TokenMgrError e) {
-      throw new SQLException("Invalid COPY statement syntax: " + e.toString());
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Invalid COPY statement syntax: " + e);
     }
   }
 }

@@ -130,7 +130,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               SQLException.class,
               () -> copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\t5\t5\n")));
       assertEquals(
-          "ERROR: java.sql.SQLException: Table users is not found in information_schema",
+          "ERROR: INVALID_ARGUMENT: Table users is not found in information_schema",
           exception.getMessage());
 
       // Verify that we can use the connection for normal queries.
@@ -357,14 +357,14 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = @p1")
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1")
                 .bind("p1")
                 .to("users")
                 .build(),
             resultSet));
 
     String indexedColumnsCountSql =
-        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=@p1 and column_name in (@p2, @p3, @p4)";
+        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3, $4)";
     ResultSetMetadata indexedColumnsCountMetadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
@@ -372,7 +372,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                     .addFields(
                         Field.newBuilder()
                             .setName("")
-                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
                             .build())
                     .build())
             .build();
