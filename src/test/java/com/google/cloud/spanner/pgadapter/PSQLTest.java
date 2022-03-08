@@ -437,7 +437,8 @@ public class PSQLTest {
             + "      AND n.nspname !~ '^pg_toast'\n"
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
-    String result = "SELECT * FROM information_schema.indexes;";
+    String result =
+        "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes;";
 
     MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
 
@@ -466,7 +467,8 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String result =
-        "SELECT * FROM information_schema.indexes WHERE LOWER(index_name) =" + " LOWER('index');";
+        "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE LOWER(index_name) ="
+            + " LOWER('index');";
 
     MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
 
@@ -495,7 +497,7 @@ public class PSQLTest {
             + "  AND pg_catalog.pg_table_is_visible(c.oid)\n"
             + "ORDER BY 1,2;";
     String result =
-        "SELECT * FROM information_schema.indexes WHERE LOWER(index_name) ="
+        "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE LOWER(index_name) ="
             + " LOWER('bobby\\'; DROP TABLE USERS; SELECT\\'');";
 
     MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
