@@ -14,15 +14,15 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import java.sql.Types;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to long. */
 public class LongParser extends Parser<Long> {
 
-  public LongParser(ResultSet item, int position) throws SQLException {
+  public LongParser(ResultSet item, int position) {
     this.item = item.getLong(position);
   }
 
@@ -52,13 +52,20 @@ public class LongParser extends Parser<Long> {
 
   @Override
   protected String stringParse() {
-    return Long.toString(this.item);
+    return this.item == null ? null : Long.toString(this.item);
   }
 
   @Override
   protected byte[] binaryParse() {
+    if (this.item == null) {
+      return null;
+    }
     byte[] result = new byte[8];
     ByteConverter.int8(result, 0, this.item);
     return result;
+  }
+
+  public void bind(Statement.Builder statementBuilder, String name) {
+    statementBuilder.bind(name).to(this.item);
   }
 }

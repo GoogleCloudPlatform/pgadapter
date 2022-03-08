@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -27,7 +28,6 @@ import com.google.cloud.spanner.pgadapter.wireoutput.PortalSuspendedResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 

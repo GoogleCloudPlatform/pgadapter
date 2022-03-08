@@ -28,6 +28,7 @@ import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
+import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -48,6 +49,15 @@ import org.junit.runners.JUnit4;
 public class ArraysMockServerTest extends AbstractMockServerTest {
   private static com.google.spanner.v1.ResultSet createResultSet(
       String columnName, TypeCode arrayElementType, Iterable<Value> values) {
+    return createResultSet(
+        columnName, arrayElementType, TypeAnnotationCode.TYPE_ANNOTATION_CODE_UNSPECIFIED, values);
+  }
+
+  private static com.google.spanner.v1.ResultSet createResultSet(
+      String columnName,
+      TypeCode arrayElementType,
+      TypeAnnotationCode arrayElementAnnotationCode,
+      Iterable<Value> values) {
     com.google.spanner.v1.ResultSet.Builder builder = com.google.spanner.v1.ResultSet.newBuilder();
     builder.setMetadata(
         ResultSetMetadata.newBuilder()
@@ -60,7 +70,10 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
                                 Type.newBuilder()
                                     .setCode(TypeCode.ARRAY)
                                     .setArrayElementType(
-                                        Type.newBuilder().setCode(arrayElementType).build())
+                                        Type.newBuilder()
+                                            .setCode(arrayElementType)
+                                            .setTypeAnnotation(arrayElementAnnotationCode)
+                                            .build())
                                     .build())
                             .build())
                     .build())
@@ -161,6 +174,7 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
             createResultSet(
                 "NUMERIC_ARRAY",
                 TypeCode.NUMERIC,
+                TypeAnnotationCode.PG_NUMERIC,
                 ImmutableList.of(
                     Values.of("3.14"), Values.of("1000.0"), Values.of("-0.123456789")))));
 
@@ -278,14 +292,15 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         assertTrue(resultSet.next());
         Array array = resultSet.getArray("TIMESTAMP_ARRAY");
-        assertArrayEquals(
+        Timestamp[] expected =
             new Timestamp[] {
               com.google.cloud.Timestamp.parseTimestamp("2022-02-14T11:47:10.123456700Z")
                   .toSqlTimestamp(),
               com.google.cloud.Timestamp.parseTimestamp("2000-02-29T00:00:01.00000100Z")
                   .toSqlTimestamp()
-            },
-            (Timestamp[]) array.getArray());
+            };
+        Timestamp[] actual = (Timestamp[]) array.getArray();
+        assertArrayEquals(expected, actual);
         assertFalse(resultSet.next());
       }
     }

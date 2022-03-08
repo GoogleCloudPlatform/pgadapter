@@ -14,8 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.ByteArray;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import java.nio.charset.StandardCharsets;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import org.postgresql.util.PGbytea;
@@ -24,14 +26,14 @@ import org.postgresql.util.PGbytea;
  * Parse specified type to binary (generally this is the simplest parse class, as items are
  * generally represented in binary for wire format).
  */
-public class BinaryParser extends Parser<byte[]> {
+public class BinaryParser extends Parser<ByteArray> {
 
-  public BinaryParser(ResultSet item, int position) throws SQLException {
+  public BinaryParser(ResultSet item, int position) {
     this.item = item.getBytes(position);
   }
 
   public BinaryParser(Object item) {
-    this.item = (byte[]) item;
+    this.item = (ByteArray) item;
   }
 
   public BinaryParser(byte[] item, FormatCode formatCode) {
@@ -39,14 +41,14 @@ public class BinaryParser extends Parser<byte[]> {
       switch (formatCode) {
         case TEXT:
           try {
-            this.item = PGbytea.toBytes(item);
+            this.item = ByteArray.copyFrom(PGbytea.toBytes(item));
             break;
           } catch (SQLException e) {
             throw new IllegalArgumentException(
                 "Invalid binary value: " + new String(item, StandardCharsets.UTF_8), e);
           }
         case BINARY:
-          this.item = item;
+          this.item = ByteArray.copyFrom(item);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
@@ -61,16 +63,20 @@ public class BinaryParser extends Parser<byte[]> {
 
   @Override
   protected String stringParse() {
-    return PGbytea.toPGString(this.item);
+    return this.item == null ? null : PGbytea.toPGString(this.item.toByteArray());
   }
 
   @Override
   protected byte[] spannerBinaryParse() {
-    return this.item;
+    return this.item == null ? null : this.item.toByteArray();
   }
 
   @Override
   protected byte[] binaryParse() {
-    return this.item;
+    return this.item == null ? null : this.item.toByteArray();
+  }
+
+  public void bind(Statement.Builder statementBuilder, String name) {
+    statementBuilder.bind(name).to(this.item);
   }
 }

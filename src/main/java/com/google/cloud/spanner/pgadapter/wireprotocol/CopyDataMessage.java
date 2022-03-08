@@ -14,11 +14,11 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import java.io.IOException;
-import java.sql.SQLException;
 import java.text.MessageFormat;
 
 /**
@@ -51,7 +51,7 @@ public class CopyDataMessage extends ControlMessage {
     if (!statement.hasException()) {
       try {
         mw.addCopyData(this.connection, this.payload);
-      } catch (SQLException e) {
+      } catch (SpannerException e) {
         mw.writeCopyDataToErrorFile();
         statement.handleExecutionException(e);
         throw e;

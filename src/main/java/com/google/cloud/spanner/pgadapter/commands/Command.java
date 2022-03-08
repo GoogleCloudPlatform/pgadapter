@@ -14,8 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.commands;
 
+import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.metadata.DynamicCommandMetadata;
-import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

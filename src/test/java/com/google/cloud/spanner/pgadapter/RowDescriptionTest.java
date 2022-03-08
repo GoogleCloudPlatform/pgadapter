@@ -16,7 +16,11 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Type;
+import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
@@ -27,8 +31,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.sql.ResultSetMetaData;
-import java.sql.Types;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.junit.Assert;
@@ -54,27 +56,29 @@ public final class RowDescriptionTest {
   private ByteArrayOutputStream buffer = new ByteArrayOutputStream();
   private DataOutputStream output = new DataOutputStream(buffer);
   @Mock private IntermediateStatement statement;
-  @Mock private ResultSetMetaData metadata;
+  @Mock private ResultSet metadata;
+  private Type rowType;
 
   @Before
-  public void setUp() {}
+  public void setUp() {
+    rowType =
+        Type.struct(
+            StructField.of("default-column-name", Type.int64()),
+            StructField.of("default-column-name", Type.int64()));
+    when(metadata.getType()).thenReturn(rowType);
+  }
 
   @Test
   public void OidTest() throws Exception {
-    Mockito.when(metadata.getColumnCount()).thenReturn(0);
-    Mockito.when(metadata.getColumnType(1)).thenReturn(Types.SMALLINT);
-    Mockito.when(metadata.getColumnType(2)).thenReturn(Types.INTEGER);
-    Mockito.when(metadata.getColumnType(3)).thenReturn(Types.BIGINT);
-    Mockito.when(metadata.getColumnType(4)).thenReturn(Types.NUMERIC);
-    Mockito.when(metadata.getColumnType(5)).thenReturn(Types.REAL);
-    Mockito.when(metadata.getColumnType(6)).thenReturn(Types.DOUBLE);
-    Mockito.when(metadata.getColumnType(7)).thenReturn(Types.CHAR);
-    Mockito.when(metadata.getColumnType(8)).thenReturn(Types.VARCHAR);
-    Mockito.when(metadata.getColumnType(9)).thenReturn(Types.BINARY);
-    Mockito.when(metadata.getColumnType(10)).thenReturn(Types.BIT);
-    Mockito.when(metadata.getColumnType(11)).thenReturn(Types.DATE);
-    Mockito.when(metadata.getColumnType(12)).thenReturn(Types.TIME);
-    Mockito.when(metadata.getColumnType(13)).thenReturn(Types.TIMESTAMP);
+    when(metadata.getColumnCount()).thenReturn(0);
+    when(metadata.getColumnType(0)).thenReturn(Type.int64());
+    when(metadata.getColumnType(1)).thenReturn(Type.pgNumeric());
+    when(metadata.getColumnType(2)).thenReturn(Type.float64());
+    when(metadata.getColumnType(3)).thenReturn(Type.string());
+    when(metadata.getColumnType(4)).thenReturn(Type.bytes());
+    when(metadata.getColumnType(5)).thenReturn(Type.bool());
+    when(metadata.getColumnType(6)).thenReturn(Type.date());
+    when(metadata.getColumnType(7)).thenReturn(Type.timestamp());
 
     JSONParser parser = new JSONParser();
     JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
@@ -91,44 +95,29 @@ public final class RowDescriptionTest {
     RowDescriptionResponse response =
         new RowDescriptionResponse(output, statement, metadata, options, mode);
 
-    // Types.SMALLINT
-    Assert.assertEquals(response.getOidType(1), Oid.INT2);
-    Assert.assertEquals(response.getOidTypeSize(Oid.INT2), 2);
-    // Types.INTEGER
-    Assert.assertEquals(response.getOidType(2), Oid.INT4);
-    Assert.assertEquals(response.getOidTypeSize(Oid.INT4), 4);
     // Types.BIGINT
-    Assert.assertEquals(response.getOidType(3), Oid.INT8);
+    Assert.assertEquals(response.getOidType(0), Oid.INT8);
     Assert.assertEquals(response.getOidTypeSize(Oid.INT8), 8);
     // Types.NUMERIC
-    Assert.assertEquals(response.getOidType(4), Oid.NUMERIC);
+    Assert.assertEquals(response.getOidType(1), Oid.NUMERIC);
     Assert.assertEquals(response.getOidTypeSize(Oid.NUMERIC), -1);
-    // Types.REAL
-    Assert.assertEquals(response.getOidType(5), Oid.FLOAT4);
-    Assert.assertEquals(response.getOidTypeSize(Oid.FLOAT4), 4);
     // Types.DOUBLE
-    Assert.assertEquals(response.getOidType(6), Oid.FLOAT8);
+    Assert.assertEquals(response.getOidType(2), Oid.FLOAT8);
     Assert.assertEquals(response.getOidTypeSize(Oid.FLOAT8), 8);
-    // Types.CHAR
-    Assert.assertEquals(response.getOidType(7), Oid.CHAR);
-    Assert.assertEquals(response.getOidTypeSize(Oid.CHAR), 1);
     // Types.VARCHAR
-    Assert.assertEquals(response.getOidType(8), Oid.VARCHAR);
+    Assert.assertEquals(response.getOidType(3), Oid.VARCHAR);
     Assert.assertEquals(response.getOidTypeSize(Oid.VARCHAR), -1);
     // Types.BINARY
-    Assert.assertEquals(response.getOidType(9), Oid.BYTEA);
+    Assert.assertEquals(response.getOidType(4), Oid.BYTEA);
     Assert.assertEquals(response.getOidTypeSize(Oid.BYTEA), -1);
     // Types.BIT
-    Assert.assertEquals(response.getOidType(10), Oid.BOOL);
+    Assert.assertEquals(response.getOidType(5), Oid.BOOL);
     Assert.assertEquals(response.getOidTypeSize(Oid.BOOL), 1);
     // Types.DATE
-    Assert.assertEquals(response.getOidType(11), Oid.DATE);
+    Assert.assertEquals(response.getOidType(6), Oid.DATE);
     Assert.assertEquals(response.getOidTypeSize(Oid.DATE), 8);
-    // Types.TIME
-    Assert.assertEquals(response.getOidType(12), Oid.TIME);
-    Assert.assertEquals(response.getOidTypeSize(Oid.TIME), 8);
     // Types.TIMESTAMP
-    Assert.assertEquals(response.getOidType(13), Oid.TIMESTAMP);
+    Assert.assertEquals(response.getOidType(7), Oid.TIMESTAMP);
     Assert.assertEquals(response.getOidTypeSize(Oid.TIMESTAMP), 12);
   }
 
@@ -136,9 +125,11 @@ public final class RowDescriptionTest {
   public void SendPayloadNullStatementTest() throws Exception {
     int COLUMN_COUNT = 1;
     String COLUMN_NAME = "default-column-name";
-    Mockito.when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
-    Mockito.when(metadata.getColumnName(Mockito.anyInt())).thenReturn(COLUMN_NAME);
-    Mockito.when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Types.SMALLINT);
+    Type rowType = Type.struct(StructField.of(COLUMN_NAME, Type.string()));
+    when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
+    when(metadata.getType()).thenReturn(rowType);
+    when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Type.int64());
+
     JSONParser parser = new JSONParser();
     JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
     OptionsMetadata options =
@@ -171,9 +162,9 @@ public final class RowDescriptionTest {
     // column index
     Assert.assertThat(outputReader.readShort(), is(equalTo((short) DEFAULT_FLAG)));
     // type oid
-    Assert.assertEquals(outputReader.readInt(), Oid.INT2);
+    Assert.assertEquals(outputReader.readInt(), Oid.INT8);
     // type size
-    Assert.assertThat(outputReader.readShort(), is(equalTo((short) 2)));
+    Assert.assertThat(outputReader.readShort(), is(equalTo((short) 8)));
     // type modifier
     Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
     // format code
@@ -184,10 +175,11 @@ public final class RowDescriptionTest {
   public void SendPayloadStatementWithBinaryOptionTest() throws Exception {
     int COLUMN_COUNT = 1;
     String COLUMN_NAME = "default-column-name";
-    Mockito.when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
-    Mockito.when(metadata.getColumnName(Mockito.anyInt())).thenReturn(COLUMN_NAME);
-    Mockito.when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Types.SMALLINT);
-    Mockito.when(statement.getResultFormatCode(Mockito.anyInt())).thenReturn((short) 0);
+    Type rowType = Type.struct(StructField.of(COLUMN_NAME, Type.string()));
+    when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
+    when(metadata.getType()).thenReturn(rowType);
+    when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Type.int64());
+    when(statement.getResultFormatCode(Mockito.anyInt())).thenReturn((short) 0);
     JSONParser parser = new JSONParser();
     JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
     OptionsMetadata options =
@@ -220,9 +212,9 @@ public final class RowDescriptionTest {
     // column index
     Assert.assertThat(outputReader.readShort(), is(equalTo((short) DEFAULT_FLAG)));
     // type oid
-    Assert.assertEquals(outputReader.readInt(), Oid.INT2);
+    Assert.assertEquals(outputReader.readInt(), Oid.INT8);
     // type size
-    Assert.assertThat(outputReader.readShort(), is(equalTo((short) 2)));
+    Assert.assertThat(outputReader.readShort(), is(equalTo((short) 8)));
     // type modifier
     Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
     // format code
@@ -233,10 +225,13 @@ public final class RowDescriptionTest {
   public void SendPayloadStatementTest() throws Exception {
     int COLUMN_COUNT = 2;
     String COLUMN_NAME = "default-column-name";
-    Mockito.when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
-    Mockito.when(metadata.getColumnName(Mockito.anyInt())).thenReturn(COLUMN_NAME);
-    Mockito.when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Types.SMALLINT);
-    Mockito.when(statement.getResultFormatCode(Mockito.anyInt()))
+    Type rowType =
+        Type.struct(
+            StructField.of(COLUMN_NAME, Type.string()), StructField.of(COLUMN_NAME, Type.string()));
+    when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
+    when(metadata.getType()).thenReturn(rowType);
+    when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Type.int64());
+    when(statement.getResultFormatCode(Mockito.anyInt()))
         .thenReturn((short) 0)
         .thenReturn((short) 0)
         .thenReturn((short) 1);
@@ -272,9 +267,9 @@ public final class RowDescriptionTest {
       // column index
       Assert.assertThat(outputReader.readShort(), is(equalTo((short) DEFAULT_FLAG)));
       // type oid
-      Assert.assertEquals(outputReader.readInt(), Oid.INT2);
+      Assert.assertEquals(outputReader.readInt(), Oid.INT8);
       // type size
-      Assert.assertThat(outputReader.readShort(), is(equalTo((short) 2)));
+      Assert.assertThat(outputReader.readShort(), is(equalTo((short) 8)));
       // type modifier
       Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
       // format code

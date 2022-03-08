@@ -17,16 +17,18 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
 import static com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
 
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Strings;
 import com.google.spanner.v1.TypeCode;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,12 +47,11 @@ public class CopyStatement extends IntermediateStatement {
   private Map<String, TypeCode> tableColumns;
   private MutationWriter mutationWriter;
 
-  public CopyStatement(String sql, Connection connection) throws SQLException {
+  public CopyStatement(String sql, Connection connection) {
     super(sql);
     this.sql = sql;
     this.command = StatementParser.parseCommand(sql);
     this.connection = connection;
-    this.statement = connection.createStatement();
   }
 
   /** @return Mapping of table column names to column type. */
@@ -131,19 +132,21 @@ public class CopyStatement extends IntermediateStatement {
     return (options.getFormat() == CopyTreeParser.CopyOptions.Format.BINARY) ? 1 : 0;
   }
 
-  private void verifyCopyColumns() throws SQLException {
+  private void verifyCopyColumns() {
     if (options.getColumnNames().size() == 0) {
       // Use all columns if none were specified.
       return;
     }
     if (options.getColumnNames().size() > this.tableColumns.size()) {
-      throw new SQLException("Number of copy columns provided exceed table column count");
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Number of copy columns provided exceed table column count");
     }
     LinkedHashMap<String, TypeCode> tempTableColumns = new LinkedHashMap<>();
     // Verify that every copy column given is a valid table column name
     for (String copyColumn : options.getColumnNames()) {
       if (!this.tableColumns.containsKey(copyColumn)) {
-        throw new SQLException(
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
             "Column \"" + copyColumn + "\" of relation \"" + getTableName() + "\" does not exist");
       }
       // Update table column ordering with the copy column ordering
@@ -182,29 +185,30 @@ public class CopyStatement extends IntermediateStatement {
     }
   }
 
-  private void queryInformationSchema() throws SQLException {
+  private void queryInformationSchema() {
     Map<String, TypeCode> tableColumns = new LinkedHashMap<>();
-    // The mutation API requires GoogleSQL type names instead of PostgreSQL type names for the table
-    // column types. Issue the information_schema table query as a GoogleSQL query so that it will
-    // return GoogleSQL type names.
-    PreparedStatement statement =
-        this.connection.prepareStatement(
-            "SELECT "
-                + COLUMN_NAME
-                + ", "
-                + DATA_TYPE
-                + " FROM information_schema.columns WHERE table_name = ?");
-    statement.setString(1, getTableName());
-    ResultSet result = statement.executeQuery();
-
-    while (result.next()) {
-      String columnName = result.getString(COLUMN_NAME);
-      TypeCode type = parsePostgreSQLDataType(result.getString(DATA_TYPE));
-      tableColumns.put(columnName, type);
+    Statement statement =
+        Statement.newBuilder(
+                "SELECT "
+                    + COLUMN_NAME
+                    + ", "
+                    + DATA_TYPE
+                    + " FROM information_schema.columns WHERE table_name = $1")
+            .bind("p1")
+            .to(getTableName())
+            .build();
+    try (ResultSet result = connection.executeQuery(statement)) {
+      while (result.next()) {
+        String columnName = result.getString(COLUMN_NAME);
+        TypeCode type = parsePostgreSQLDataType(result.getString(DATA_TYPE));
+        tableColumns.put(columnName, type);
+      }
     }
 
     if (tableColumns.isEmpty()) {
-      throw new SQLException("Table " + getTableName() + " is not found in information_schema");
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          "Table " + getTableName() + " is not found in information_schema");
     }
 
     this.tableColumns = tableColumns;
@@ -215,7 +219,7 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   @Override
-  public void handleExecutionException(SQLException e) {
+  public void handleExecutionException(SpannerException e) {
     super.handleExecutionException(e);
   }
 
@@ -229,9 +233,10 @@ public class CopyStatement extends IntermediateStatement {
       mutationWriter =
           new MutationWriter(
               options.getTableName(), getTableColumns(), getParserFormat(), hasHeader());
-      updateResultCount(); // Gets update count, set hasMoreData false and statement result
+      updateCount = (long) mutationWriter.getRowCount();
     } catch (Exception e) {
-      SQLException se = new SQLException(e.toString());
+      SpannerException se =
+          SpannerExceptionFactory.newSpannerException(ErrorCode.UNKNOWN, e.getMessage(), e);
       handleExecutionException(se);
     }
   }
@@ -240,7 +245,8 @@ public class CopyStatement extends IntermediateStatement {
     try {
       parse(sql, this.options);
     } catch (Exception | TokenMgrError e) {
-      throw new SQLException("Invalid COPY statement syntax: " + e.toString());
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Invalid COPY statement syntax: " + e);
     }
   }
 }

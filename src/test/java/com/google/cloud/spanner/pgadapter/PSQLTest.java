@@ -14,12 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.metadata.CommandMetadataParser;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.MatcherStatement;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.junit.Assert;
@@ -46,20 +44,17 @@ public class PSQLTest {
 
   @Mock private OptionsMetadata options;
 
-  @Mock private Statement statement;
-
   @Before
   public void setup() throws Exception {
     final JSONObject defaultCommands = new CommandMetadataParser().defaultCommands();
-    Mockito.when(connectionHandler.getJdbcConnection()).thenReturn(connection);
+    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
     Mockito.when(options.getCommandMetadataJSON()).thenReturn(defaultCommands);
-    Mockito.when(connection.createStatement()).thenReturn(statement);
   }
 
   @Test
-  public void testDescribeTranslates() throws SQLException {
+  public void testDescribeTranslates() {
     // PSQL equivalent: \d
     String sql =
         "SELECT n.nspname as \"Schema\",\n"
@@ -94,7 +89,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeTableMatchTranslates() throws SQLException {
+  public void testDescribeTableMatchTranslates() {
     // PSQL equivalent: \d <table> (1)
     String sql =
         "SELECT c.oid,\n"
@@ -123,7 +118,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeTableMatchHandlesBobbyTables() throws SQLException {
+  public void testDescribeTableMatchHandlesBobbyTables() {
     // PSQL equivalent: \d <table> (1)
     String sql =
         "SELECT c.oid,\n"
@@ -152,7 +147,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeTableCatalogTranslates() throws SQLException {
+  public void testDescribeTableCatalogTranslates() {
     // PSQL equivalent: \d <table> (2)
     String sql =
         "SELECT relchecks, relkind, relhasindex, relhasrules, reltriggers <> 0, false, false,"
@@ -177,7 +172,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeTableMetadataTranslates() throws SQLException {
+  public void testDescribeTableMetadataTranslates() {
     // PSQL equivalent: \d <table> (3)
     String sql =
         "SELECT a.attname,\n"
@@ -213,7 +208,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeTableMetadataHandlesBobbyTables() throws SQLException {
+  public void testDescribeTableMetadataHandlesBobbyTables() {
     // PSQL equivalent: \d <table> (3)
     String sql =
         "SELECT a.attname,\n"
@@ -250,7 +245,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeTableAttributesTranslates() throws SQLException {
+  public void testDescribeTableAttributesTranslates() {
     // PSQL equivalent: \d <table> (4)
     String sql =
         "SELECT c.oid::pg_catalog.regclass FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i"
@@ -264,7 +259,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeMoreTableAttributesTranslates() throws SQLException {
+  public void testDescribeMoreTableAttributesTranslates() {
     // PSQL equivalent: \d <table> (5)
     String sql =
         "SELECT c.oid::pg_catalog.regclass FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i"
@@ -278,7 +273,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testListCommandTranslates() throws SQLException {
+  public void testListCommandTranslates() {
     // PSQL equivalent: \l
     String sql =
         "SELECT d.datname as \"Name\",\n"
@@ -287,9 +282,7 @@ public class PSQLTest {
             + "       pg_catalog.array_to_string(d.datacl, '\\n') AS \"Access privileges\"\n"
             + "FROM pg_catalog.pg_database d\n"
             + "ORDER BY 1;";
-    String result = "SELECT 'users' AS Name;";
-
-    Mockito.when(connection.getCatalog()).thenReturn("users");
+    String result = "SELECT '' AS Name;";
 
     MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
 
@@ -297,7 +290,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testListDatabaseCommandTranslates() throws SQLException {
+  public void testListDatabaseCommandTranslates() {
     // PSQL equivalent: \l <table>
     String sql =
         "SELECT d.datname as \"Name\",\n"
@@ -307,9 +300,7 @@ public class PSQLTest {
             + "FROM pg_catalog.pg_database d\n"
             + "WHERE d.datname OPERATOR(pg_catalog.~) '^(users)$'\n"
             + "ORDER BY 1;";
-    String result = "SELECT 'users' AS Name;";
-
-    Mockito.when(connection.getCatalog()).thenReturn("users");
+    String result = "SELECT '' AS Name;";
 
     MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
 
@@ -317,7 +308,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testListDatabaseCommandFailsButPrintsUnknown() throws SQLException {
+  public void testListDatabaseCommandFailsButPrintsUnknown() {
     // PSQL equivalent: \l <table>
     String sql =
         "SELECT d.datname as \"Name\",\n"
@@ -327,17 +318,17 @@ public class PSQLTest {
             + "FROM pg_catalog.pg_database d\n"
             + "WHERE d.datname OPERATOR(pg_catalog.~) '^(users)$'\n"
             + "ORDER BY 1;";
-    String result = "SELECT 'UNKNOWN' AS Name;";
+    String result = "SELECT '' AS Name;";
 
-    Mockito.when(connection.getCatalog()).thenThrow(SQLException.class);
-
+    // TODO: Add Connection#getDatabase() to Connection API and test here what happens if that
+    // method throws an exception.
     MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
 
   @Test
-  public void testDescribeAllTableMetadataTranslates() throws SQLException {
+  public void testDescribeAllTableMetadataTranslates() {
     // PSQL equivalent: \dt
     String sql =
         "SELECT n.nspname as \"Schema\",\n"
@@ -363,7 +354,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeSelectedTableMetadataTranslates() throws SQLException {
+  public void testDescribeSelectedTableMetadataTranslates() {
     // PSQL equivalent: \dt <table>
     String sql =
         "SELECT n.nspname as \"Schema\",\n"
@@ -389,7 +380,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeSelectedTableMetadataHandlesBobbyTables() throws SQLException {
+  public void testDescribeSelectedTableMetadataHandlesBobbyTables() {
     // PSQL equivalent: \dt <table>
     String sql =
         "SELECT n.nspname as \"Schema\",\n"
@@ -416,7 +407,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeAllIndexMetadataTranslates() throws SQLException {
+  public void testDescribeAllIndexMetadataTranslates() {
     // PSQL equivalent: \di
     String sql =
         "SELECT n.nspname as \"Schema\",\n"
@@ -446,7 +437,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeSelectedIndexMetadataTranslates() throws SQLException {
+  public void testDescribeSelectedIndexMetadataTranslates() {
     // PSQL equivalent: \di <index>
     String sql =
         "SELECT n.nspname as \"Schema\",\n"
@@ -476,7 +467,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeSelectedIndexMetadataHandlesBobbyTables() throws SQLException {
+  public void testDescribeSelectedIndexMetadataHandlesBobbyTables() {
     // PSQL equivalent: \di <index>
     String sql =
         "SELECT n.nspname as \"Schema\",\n"
@@ -506,7 +497,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeAllSchemaMetadataTranslates() throws SQLException {
+  public void testDescribeAllSchemaMetadataTranslates() {
     // PSQL equivalent: \dn
     String sql =
         "SELECT n.nspname AS \"Name\",\n"
@@ -522,7 +513,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeSelectedSchemaMetadataTranslates() throws SQLException {
+  public void testDescribeSelectedSchemaMetadataTranslates() {
     // PSQL equivalent: \dn <schema>
     String sql =
         "SELECT n.nspname AS \"Name\",\n"
@@ -539,7 +530,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeSelectedSchemaMetadataHandlesBobbyTables() throws SQLException {
+  public void testDescribeSelectedSchemaMetadataHandlesBobbyTables() {
     // PSQL equivalent: \dn <schema>
     String sql =
         "SELECT n.nspname AS \"Name\",\n"
@@ -557,7 +548,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testTableSelectAutocomplete() throws SQLException {
+  public void testTableSelectAutocomplete() {
     // PSQL equivalent: SELECT <table>
     String sql =
         "SELECT pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c WHERE c.relkind IN"
@@ -594,7 +585,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testTableInsertAutocomplete() throws SQLException {
+  public void testTableInsertAutocomplete() {
     // PSQL equivalent: INSERT INTO <table>
     String sql =
         "SELECT pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c WHERE c.relkind IN"
@@ -630,7 +621,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testTableAttributesAutocomplete() throws SQLException {
+  public void testTableAttributesAutocomplete() {
     // PSQL equivalent: INSERT INTO table_name (<attribute>)
     // PSQL equivalent: SELECT * FROM table_name WHERE <attribute>
     String sql =
@@ -650,7 +641,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeTableAutocomplete() throws SQLException {
+  public void testDescribeTableAutocomplete() {
     // PSQL equivalent: \\d <table>
     String sql =
         "SELECT pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c WHERE"
@@ -684,7 +675,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeTableMetadataAutocomplete() throws SQLException {
+  public void testDescribeTableMetadataAutocomplete() {
     // PSQL equivalent: \\dt <table>
     String sql =
         "SELECT pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c WHERE c.relkind IN"
@@ -718,7 +709,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeIndexMetadataAutocomplete() throws SQLException {
+  public void testDescribeIndexMetadataAutocomplete() {
     // PSQL equivalent: \\di <index>
     String sql =
         "SELECT pg_catalog.quote_ident(c.relname) FROM pg_catalog.pg_class c WHERE c.relkind IN"
@@ -752,7 +743,7 @@ public class PSQLTest {
   }
 
   @Test
-  public void testDescribeSchemaMetadataAutocomplete() throws SQLException {
+  public void testDescribeSchemaMetadataAutocomplete() {
     // PSQL equivalent: \\dn <schema>
     String sql =
         "SELECT pg_catalog.quote_ident(nspname) FROM pg_catalog.pg_namespace  WHERE"
