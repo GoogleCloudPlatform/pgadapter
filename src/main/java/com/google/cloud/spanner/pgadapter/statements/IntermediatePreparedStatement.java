@@ -120,7 +120,8 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     }
   }
 
-  // TODO: Replace this method with a real parser.
+  // TODO: Use the statement parser in the Connection API for getting parameter info once 6.21 has
+  // been released.
   // This implementation is purely for testing purposes to verify that the protocol implementation
   // actually works. It returns the wrong result if the sql string contains parameter like
   // characters in strings, comments, quoted identifiers, etc.
