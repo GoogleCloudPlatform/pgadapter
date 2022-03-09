@@ -23,6 +23,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
@@ -47,8 +48,8 @@ public class CopyStatement extends IntermediateStatement {
   private Map<String, TypeCode> tableColumns;
   private MutationWriter mutationWriter;
 
-  public CopyStatement(String sql, Connection connection) {
-    super(sql);
+  public CopyStatement(OptionsMetadata options, String sql, Connection connection) {
+    super(options, sql);
     this.sql = sql;
     this.command = StatementParser.parseCommand(sql);
     this.connection = connection;

@@ -44,6 +44,7 @@ public class OptionsMetadata {
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
   private static final String OPTION_PSQL_MODE = "q";
+  private static final String OPTION_JDBC_MODE = "jdbc";
   private static final String OPTION_COMMAND_METADATA_FILE = "j";
   private static final String OPTION_DISABLE_LOCALHOST_CHECK = "x";
   private static final String CLI_ARGS =
@@ -63,6 +64,7 @@ public class OptionsMetadata {
   private final boolean binaryFormat;
   private final boolean authenticate;
   private final boolean requiresMatcher;
+  private final boolean replaceJdbcMetadataQueries;
   private final boolean disableLocalhostCheck;
   private final JSONObject commandMetadataJSON;
   private final Map<String, String> propertyMap;
@@ -79,6 +81,7 @@ public class OptionsMetadata {
     this.requiresMatcher =
         commandLine.hasOption(OPTION_PSQL_MODE)
             || commandLine.hasOption(OPTION_COMMAND_METADATA_FILE);
+    this.replaceJdbcMetadataQueries = commandLine.hasOption(OPTION_JDBC_MODE);
     this.commandMetadataJSON = buildCommandMetadataJSON(commandLine);
     this.propertyMap = parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
@@ -92,6 +95,7 @@ public class OptionsMetadata {
       boolean forceBinary,
       boolean authenticate,
       boolean requiresMatcher,
+      boolean replaceJdbcMetadataQueries,
       JSONObject commandMetadata) {
     this.commandMetadataParser = new CommandMetadataParser();
     this.connectionURL = connectionURL;
@@ -100,6 +104,7 @@ public class OptionsMetadata {
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
     this.requiresMatcher = requiresMatcher;
+    this.replaceJdbcMetadataQueries = replaceJdbcMetadataQueries;
     this.commandMetadataJSON = commandMetadata;
     this.propertyMap = new HashMap<>();
     this.disableLocalhostCheck = false;
@@ -283,6 +288,15 @@ public class OptionsMetadata {
             + " and as such cannot be used with the option -j. This mode should not be used for"
             + " production, and we do not guarantee its functionality beyond the basics.");
     options.addOption(
+        OPTION_JDBC_MODE,
+        "jdbc-mode",
+        false,
+        "This option turns on JDBC mode. This mode allows better compatibility with the "
+            + "PostgreSQL JDBC driver. It will automatically inspect incoming queries to look for "
+            + "known JDBC metadata queries, and replace these with queries that are compatible with "
+            + "Cloud Spanner. JDBC mode is implemented using predefined fixed matchers. It should "
+            + "be enabled if you intend to connect to PgAdapter using the PostgreSQL JDBC driver.");
+    options.addOption(
         OPTION_COMMAND_METADATA_FILE,
         "options-metadata",
         true,
@@ -369,6 +383,10 @@ public class OptionsMetadata {
 
   public boolean requiresMatcher() {
     return this.requiresMatcher;
+  }
+
+  public boolean isReplaceJdbcMetadataQueries() {
+    return this.replaceJdbcMetadataQueries;
   }
 
   public boolean disableLocalhostCheck() {
