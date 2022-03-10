@@ -136,7 +136,10 @@ class JdbcMetadataStatementHelper {
         .replaceAll("'pg_class'::regclass", "0");
   }
 
-  /** Replaces the getPrimaryKeys query in PG JDBC 42.3.x with the one in 42.2.x, so we can base the further query replacement on the 42.2.x version. */
+  /**
+   * Replaces the getPrimaryKeys query in PG JDBC 42.3.x with the one in 42.2.x, so we can base the
+   * further query replacement on the 42.2.x version.
+   */
   private static String replacePG42_3_PkQuery_With_42_2_Query(String sql) {
     String replacedSql = PgJdbcCatalog.PG_JDBC_PK_QUERY_PREFIX;
     String whereClause = "";

@@ -229,6 +229,7 @@ abstract class AbstractMockServerTest {
                 "i",
                 "-d",
                 "d",
+                "-jdbc",
                 "-c",
                 "", // empty credentials file, as we are using a plain text connection.
                 "-s",

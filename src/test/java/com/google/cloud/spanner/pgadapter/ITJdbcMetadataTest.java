@@ -1,3 +1,17 @@
+// Copyright 2022 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
@@ -5,10 +19,17 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.pgadapter.JdbcMetadataMockServerTest.TestRunner;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -17,15 +38,13 @@ import java.sql.Types;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameter;
-import org.junit.runners.Parameterized.Parameters;
 
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
@@ -33,12 +52,13 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static ProxyServer server;
   private static Database database;
+  private static final String[] VERSIONS =
+      new String[] {
+        "42.3.3", "42.3.2", "42.3.1", "42.3.0", "42.2.25", "42.2.24",
+      };
 
   @BeforeClass
   public static void setup() throws Exception {
-    // Make sure the PG JDBC driver is loaded.
-    Class.forName("org.postgresql.Driver");
-
     // TODO: Refactor the integration tests to use a common subclass, as this is repeated in each
     // class.
     testEnv.setUp();
@@ -112,15 +132,63 @@ public class ITJdbcMetadataTest implements IntegrationTest {
     testEnv.cleanUp();
   }
 
-  @Test
-  public void testDatabaseMetaDataVersion() throws SQLException {
-    try (Connection connection =
-        DriverManager.getConnection(
-            String.format("jdbc:postgresql://localhost:%d/", testEnv.getPort()))) {
-      DatabaseMetaData metadata = connection.getMetaData();
+  private String createUrl() {
+    return String.format("jdbc:postgresql://localhost:%d/", testEnv.getPort());
+  }
 
-      assertEquals(server.getOptions().getServerVersion(), metadata.getDatabaseProductVersion());
+  private void runForAllVersions(Consumer<Connection> runnable) throws Exception {
+    for (String version : VERSIONS) {
+      String mavenUrl =
+          String.format(
+              "https://repo1.maven.org/maven2/org/postgresql/postgresql/%s/postgresql-%s.jar",
+              version, version);
+      ClassLoader defaultClassLoader = Thread.currentThread().getContextClassLoader();
+      try {
+        ClassLoader classLoader =
+            new URLClassLoader(
+                new URL[] {
+                  new URL(mavenUrl),
+                  JdbcMetadataMockServerTest.class
+                      .getProtectionDomain()
+                      .getCodeSource()
+                      .getLocation()
+                },
+                defaultClassLoader.getParent());
+        Thread.currentThread().setContextClassLoader(classLoader);
+        Class<?> runnerClass = classLoader.loadClass(TestRunner.class.getName());
+        Constructor<?> constructor = runnerClass.getDeclaredConstructor();
+        Object runner = constructor.newInstance();
+        Method runMethod = runner.getClass().getDeclaredMethod("run", String.class, Consumer.class);
+        runMethod.invoke(runner, createUrl(), runnable);
+      } finally {
+        Thread.currentThread().setContextClassLoader(defaultClassLoader);
+      }
     }
+  }
+
+  public static class TestRunner {
+    public void run(String url, Consumer<Connection> runnable) throws Exception {
+      Class.forName("org.postgresql.Driver");
+      try (Connection connection = DriverManager.getConnection(url)) {
+        runnable.accept(connection);
+      }
+      Driver driver = DriverManager.getDriver(url);
+      DriverManager.deregisterDriver(driver);
+    }
+  }
+
+  @Test
+  public void testDatabaseMetaDataVersion() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            assertEquals(
+                server.getOptions().getServerVersion(), metadata.getDatabaseProductVersion());
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
   }
 
   @Test
@@ -768,5 +836,4 @@ public class ITJdbcMetadataTest implements IntegrationTest {
       assertTrue(metadata.getSQLKeywords().length() > 0);
     }
   }
-
 }
