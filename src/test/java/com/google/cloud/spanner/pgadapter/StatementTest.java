@@ -181,6 +181,7 @@ public class StatementTest {
   @Test
   public void testBasicNoResultStatement() throws Exception {
     when(statementResult.getResultType()).thenReturn(StatementResult.ResultType.NO_RESULT);
+    when(statementResult.getUpdateCount()).thenThrow(new IllegalStateException());
     when(connection.execute(Statement.of("CREATE TABLE users (name varchar(100) primary key)")))
         .thenReturn(statementResult);
 

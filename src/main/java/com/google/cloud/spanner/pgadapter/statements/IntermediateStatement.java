@@ -223,8 +223,7 @@ public class IntermediateStatement {
         break;
       default:
         throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            "Unknown or unsupported result type: " + result.getResultType());
+            ErrorCode.INTERNAL, "Unknown or unsupported result type: " + result.getResultType());
     }
   }
 
