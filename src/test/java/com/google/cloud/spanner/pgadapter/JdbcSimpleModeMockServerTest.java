@@ -157,7 +157,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
         assertEquals(
             String.format(
                 "ERROR: FAILED_PRECONDITION: Executing updates is not allowed for DDL batches. \"%s\"",
-                sql),
+                sql.substring(0, sql.length() - 1)),
             exception.getMessage());
       }
     }
@@ -174,7 +174,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
         assertEquals(
             String.format(
                 "ERROR: FAILED_PRECONDITION: Executing queries is not allowed for DDL batches. \"%s\"",
-                sql),
+                sql.substring(0, sql.length() - 1)),
             exception.getMessage());
       }
     }
@@ -191,7 +191,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
         assertEquals(
             String.format(
                 "ERROR: FAILED_PRECONDITION: This connection has an active batch and cannot begin a transaction \"%s\"",
-                sql),
+                sql.substring(0, sql.length() - 1)),
             exception.getMessage());
       }
     }
@@ -208,7 +208,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
         assertEquals(
             String.format(
                 "ERROR: INVALID_ARGUMENT: Statement type is not supported for batching \"%s\"",
-                sql),
+                sql.substring(0, sql.length() - 1)),
             exception.getMessage());
       }
     }
