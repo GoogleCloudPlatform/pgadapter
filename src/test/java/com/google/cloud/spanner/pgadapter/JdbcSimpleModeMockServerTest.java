@@ -20,6 +20,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import java.math.BigDecimal;
@@ -33,7 +34,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.TimeZone;
+import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -212,5 +215,28 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
             exception.getMessage());
       }
     }
+  }
+
+  @Test
+  public void testDdl() throws SQLException {
+    String sql = "CREATE TABLE foo (id bigint primary key)";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result was either an update count or there
+        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(0));
   }
 }

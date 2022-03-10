@@ -203,13 +203,23 @@ public class IntermediateStatement {
    * of updateBatchResultCount.
    */
   protected void updateResultCount(StatementResult result) {
-    if (result.getResultType() == StatementResult.ResultType.RESULT_SET) {
-      this.statementResult = result.getResultSet();
-      this.hasMoreData = this.statementResult.next();
-    } else {
-      this.updateCount = result.getUpdateCount();
-      this.hasMoreData = false;
-      this.statementResult = null;
+    switch (result.getResultType()) {
+      case RESULT_SET:
+        this.statementResult = result.getResultSet();
+        this.hasMoreData = this.statementResult.next();
+        break;
+      case UPDATE_COUNT:
+        this.updateCount = result.getUpdateCount();
+        this.hasMoreData = false;
+        this.statementResult = null;
+        break;
+      case NO_RESULT:
+        this.hasMoreData = false;
+        this.statementResult = null;
+        break;
+      default:
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INTERNAL, "Unknown or unsupported result type: " + result.getResultType());
     }
   }
 

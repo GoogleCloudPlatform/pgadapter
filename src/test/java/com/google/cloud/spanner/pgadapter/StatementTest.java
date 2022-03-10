@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -136,7 +137,7 @@ public class StatementTest {
     assertEquals(intermediateStatement.getUpdateCount().longValue(), 1L);
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(intermediateStatement.getResultType(), ResultType.UPDATE_COUNT);
-    Assert.assertNull(intermediateStatement.getStatementResult());
+    assertNull(intermediateStatement.getStatementResult());
     assertFalse(intermediateStatement.isHasMoreData());
     assertFalse(intermediateStatement.hasException());
     assertEquals(intermediateStatement.getResultFormatCode(0), 0);
@@ -167,7 +168,7 @@ public class StatementTest {
     assertEquals(intermediateStatement.getUpdateCount().longValue(), 0L);
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(intermediateStatement.getResultType(), ResultType.UPDATE_COUNT);
-    Assert.assertNull(intermediateStatement.getStatementResult());
+    assertNull(intermediateStatement.getStatementResult());
     assertFalse(intermediateStatement.isHasMoreData());
     assertFalse(intermediateStatement.hasException());
     assertEquals(intermediateStatement.getResultFormatCode(0), 0);
@@ -180,7 +181,7 @@ public class StatementTest {
   @Test
   public void testBasicNoResultStatement() throws Exception {
     when(statementResult.getResultType()).thenReturn(StatementResult.ResultType.NO_RESULT);
-    when(statementResult.getUpdateCount()).thenReturn(0L);
+    when(statementResult.getUpdateCount()).thenThrow(new IllegalStateException());
     when(connection.execute(Statement.of("CREATE TABLE users (name varchar(100) primary key)")))
         .thenReturn(statementResult);
 
@@ -195,10 +196,10 @@ public class StatementTest {
     Mockito.verify(connection, Mockito.times(1))
         .execute(Statement.of("CREATE TABLE users (name varchar(100) primary key)"));
     assertFalse(intermediateStatement.containsResultSet());
-    assertEquals(intermediateStatement.getUpdateCount().longValue(), 0L);
+    assertNull(intermediateStatement.getUpdateCount());
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(intermediateStatement.getResultType(), ResultType.NO_RESULT);
-    Assert.assertNull(intermediateStatement.getStatementResult());
+    assertNull(intermediateStatement.getStatementResult());
     assertFalse(intermediateStatement.isHasMoreData());
     assertFalse(intermediateStatement.hasException());
     assertEquals(intermediateStatement.getResultFormatCode(0), 0);
