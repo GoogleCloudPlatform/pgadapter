@@ -53,11 +53,6 @@ import org.postgresql.jdbc.TimestampUtils;
  */
 @RunWith(JUnit4.class)
 public class JdbcMetadataMockServerTest extends AbstractMockServerTest {
-  @BeforeClass
-  public static void loadPgJdbcDriver() throws Exception {
-    // Make sure the PG JDBC driver is loaded.
-
-  }
 
   private String createUrl() {
     return String.format(
@@ -83,21 +78,25 @@ public class JdbcMetadataMockServerTest extends AbstractMockServerTest {
     org.postgresql.Driver.deregister();
 
     ClassLoader defaultClassLoader = Thread.currentThread().getContextClassLoader();
-    ClassLoader classLoader = new URLClassLoader(new URL[]{
-        new URL("https://repo1.maven.org/maven2/org/postgresql/postgresql/42.2.25/postgresql-42.2.25.jar"),
-        JdbcMetadataMockServerTest.class.getProtectionDomain().getCodeSource().getLocation()
-    }, defaultClassLoader.getParent());
-//    Thread.currentThread().setContextClassLoader(classLoader);
-    Class<?> driverClass = classLoader.loadClass("org.postgresql.Driver");
-    Class<?> runnerClass = classLoader.loadClass(TestRunner.class.getName());
-    Constructor<?> constructor = runnerClass.getDeclaredConstructor();
-    Object runner = constructor.newInstance();
-    Method runMethod = runner.getClass().getDeclaredMethod("run", String.class);
-    runMethod.invoke(runner, createUrl());
+    try {
+      ClassLoader classLoader = new URLClassLoader(new URL[]{
+          new URL("https://repo1.maven.org/maven2/org/postgresql/postgresql/42.2.25/postgresql-42.2.25.jar"),
+          JdbcMetadataMockServerTest.class.getProtectionDomain().getCodeSource().getLocation()
+      }, defaultClassLoader.getParent());
+      Thread.currentThread().setContextClassLoader(classLoader);
+      Class<?> runnerClass = classLoader.loadClass(TestRunner.class.getName());
+      Constructor<?> constructor = runnerClass.getDeclaredConstructor();
+      Object runner = constructor.newInstance();
+      Method runMethod = runner.getClass().getDeclaredMethod("run", String.class);
+      runMethod.invoke(runner, createUrl());
+    } finally {
+      Thread.currentThread().setContextClassLoader(defaultClassLoader);
+    }
   }
 
   public static class TestRunner {
-    public void run(String url) throws SQLException {
+    public void run(String url) throws Exception {
+      Class.forName("org.postgresql.Driver");
       try (Connection connection = DriverManager.getConnection(url)) {
         try (ResultSet resultSet = connection.getMetaData().getTables(null, null, null, null)) {
           while (resultSet.next()) {
