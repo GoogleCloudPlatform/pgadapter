@@ -76,7 +76,7 @@ public class IntermediateStatement {
   protected String replaceKnownUnsupportedQueries(String sql) {
     if (this.options.isReplaceJdbcMetadataQueries()
         && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(sql)) {
-      return JdbcMetadataStatementHelper.replaceJdbcMetadtaStatement(sql);
+      return JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(sql);
     }
     return sql;
   }
