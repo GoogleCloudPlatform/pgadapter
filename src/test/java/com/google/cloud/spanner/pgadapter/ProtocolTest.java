@@ -28,6 +28,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
@@ -155,6 +156,7 @@ public class ProtocolTest {
     String expectedSQL = "SELECT * FROM users";
 
     Mockito.when(connection.execute(Statement.of(expectedSQL))).thenReturn(statementResult);
+    when(statementResult.getResultType()).thenReturn(ResultType.RESULT_SET);
     when(statementResult.getResultSet()).thenReturn(resultSet);
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
@@ -189,6 +191,7 @@ public class ProtocolTest {
     String expectedSQL = "SELECT * FROM users";
 
     when(connection.execute(Statement.of(expectedSQL))).thenReturn(statementResult);
+    when(statementResult.getResultType()).thenReturn(ResultType.RESULT_SET);
     Mockito.when(statementResult.getResultSet()).thenReturn(resultSet);
     Mockito.when(connectionHandler.getServer()).thenReturn(server);
     Mockito.when(server.getOptions()).thenReturn(options);
@@ -1134,8 +1137,8 @@ public class ProtocolTest {
 
     when(connection.isInTransaction()).thenReturn(true);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
-    ResultSet resultSet = mock(ResultSet.class);
-    when(statementResult.getResultSet()).thenReturn(resultSet);
+    when(statementResult.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
+    when(statementResult.getUpdateCount()).thenReturn(1L);
     when(connection.execute(Statement.of(expectedSQL))).thenReturn(statementResult);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
@@ -1157,11 +1160,11 @@ public class ProtocolTest {
     assertEquals('\0', outputResult.readByte());
     assertEquals('\0', outputResult.readByte());
     assertEquals('\0', outputResult.readByte());
-    // 15 = 4 + "INSERT".length() + " 0 0".length() + 1 (header + command length + null terminator)
+    // 15 = 4 + "INSERT".length() + " 0 1".length() + 1 (header + command length + null terminator)
     assertEquals(15, outputResult.readByte());
     byte[] command = new byte[10];
     assertEquals(10, outputResult.read(command, 0, 10));
-    assertEquals("INSERT 0 0", new String(command));
+    assertEquals("INSERT 0 1", new String(command));
     assertEquals('\0', outputResult.readByte());
     // ReadyResponse in transaction ('T')
     assertEquals('Z', outputResult.readByte());
