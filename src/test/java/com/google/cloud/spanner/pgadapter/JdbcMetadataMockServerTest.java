@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;

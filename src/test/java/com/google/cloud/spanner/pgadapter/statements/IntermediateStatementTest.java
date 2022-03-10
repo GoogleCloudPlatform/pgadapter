@@ -26,6 +26,7 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -37,7 +38,8 @@ public class IntermediateStatementTest {
 
   @Test
   public void testUpdateResultCount_ResultSet() {
-    IntermediateStatement statement = new IntermediateStatement("select foo from bar", connection);
+    IntermediateStatement statement =
+        new IntermediateStatement(mock(OptionsMetadata.class), "select foo from bar", connection);
     ResultSet resultSet = mock(ResultSet.class);
     when(resultSet.next()).thenReturn(true, false);
     StatementResult result = mock(StatementResult.class);
@@ -54,7 +56,8 @@ public class IntermediateStatementTest {
 
   @Test
   public void testUpdateResultCount_UpdateCount() {
-    IntermediateStatement statement = new IntermediateStatement("update bar set foo=1", connection);
+    IntermediateStatement statement =
+        new IntermediateStatement(mock(OptionsMetadata.class), "update bar set foo=1", connection);
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
     when(result.getResultSet()).thenThrow(new IllegalStateException());
@@ -70,7 +73,8 @@ public class IntermediateStatementTest {
   @Test
   public void testUpdateResultCount_NoResult() {
     IntermediateStatement statement =
-        new IntermediateStatement("create table bar (foo bigint primary key)", connection);
+        new IntermediateStatement(
+            mock(OptionsMetadata.class), "create table bar (foo bigint primary key)", connection);
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.NO_RESULT);
     when(result.getResultSet()).thenThrow(new IllegalStateException());
