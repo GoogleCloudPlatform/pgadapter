@@ -28,9 +28,13 @@ import static org.mockito.Mockito.when;
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.parsers.ArrayParser;
 import com.google.cloud.spanner.pgadapter.parsers.BinaryParser;
@@ -66,6 +70,8 @@ import org.postgresql.util.ByteConverter;
  */
 @RunWith(JUnit4.class)
 public class ParserTest {
+  private static final AbstractStatementParser PARSER =
+      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
   private void validate(
       Parser parser, byte[] byteResult, byte[] stringResult, byte[] spannerResult) {
@@ -414,8 +420,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -427,8 +432,7 @@ public class ParserTest {
       String sql = "COPY Users FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -440,8 +444,7 @@ public class ParserTest {
       String sql = "COPY UsErS FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -453,8 +456,7 @@ public class ParserTest {
       String sql = "COPY USERS FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -466,8 +468,7 @@ public class ParserTest {
       String sql = "COPY \'Users\' FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("Users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -479,8 +480,7 @@ public class ParserTest {
       String sql = "COPY \"UsErS\" FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("UsErS")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -492,8 +492,7 @@ public class ParserTest {
       String sql = "COPY \'USERS\' FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("USERS")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -505,8 +504,7 @@ public class ParserTest {
       String sql = "COPY users (id) FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -518,8 +516,7 @@ public class ParserTest {
       String sql = "COPY users (id, age) FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -531,8 +528,7 @@ public class ParserTest {
       String sql = "COPY users (id, age, name) FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -544,8 +540,7 @@ public class ParserTest {
       String sql = "COPY users (ID, AGE, NAME) FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -557,8 +552,7 @@ public class ParserTest {
       String sql = "COPY users (Id, Age, Name) FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -570,8 +564,7 @@ public class ParserTest {
       String sql = "COPY users (iD, aGe, nAMe) FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -583,8 +576,7 @@ public class ParserTest {
       String sql = "COPY users (\'ID\', \"AGE\", \'NAME\') FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -596,8 +588,7 @@ public class ParserTest {
       String sql = "COPY users (\'Id\', \'Age\', \'Name\') FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -609,8 +600,7 @@ public class ParserTest {
       String sql = "COPY users (\"iD\", \"aGe\", \"nAMe\") FROM STDIN;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -625,8 +615,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN WITH FORMAT CSV;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.CSV)));
@@ -637,8 +626,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN WITH FORMAT BINARY;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.BINARY)));
@@ -649,8 +637,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN WITH FORMAT TEXT;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -661,8 +648,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN CSV;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.CSV)));
@@ -673,8 +659,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN BINARY;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.BINARY)));
@@ -685,8 +670,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN TEXT;";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -697,8 +681,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN DELIMITER '*';";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -710,9 +693,14 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN ESCAPE '\\';";
       parse(sql, options);
 
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)));
+      SpannerException exception =
+          assertThrows(
+              SpannerException.class,
+              () -> StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)));
+      assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
+      assertEquals(
+          "INVALID_ARGUMENT: SQL statement contains an unclosed literal: COPY users FROM STDIN ESCAPE '\\';",
+          exception.getMessage());
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -724,9 +712,14 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN QUOTE '\'';";
       parse(sql, options);
 
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)));
+      SpannerException exception =
+          assertThrows(
+              SpannerException.class,
+              () -> StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)));
+      assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
+      assertEquals(
+          "INVALID_ARGUMENT: SQL statement contains an unclosed literal: COPY users FROM STDIN QUOTE ''';",
+          exception.getMessage());
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -738,8 +731,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN NULL 'null';";
       parse(sql, options);
 
-      assertEquals(
-          StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -756,12 +748,13 @@ public class ParserTest {
         // cases for their use: [' " \]  ('\'' and '\"' are actually allowed if they are wrapped by
         // the other character)
         if (value == '\'' || value == '\\') {
-          assertThrows(
-              IllegalArgumentException.class,
-              () -> StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)));
+          SpannerException exception =
+              assertThrows(
+                  SpannerException.class,
+                  () -> StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)));
+          assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
         } else {
-          assertEquals(
-              StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+          assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
         }
         assertThat(options.getTableName(), is(equalTo("users")));
         assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
@@ -786,12 +779,13 @@ public class ParserTest {
                 + "');";
         parse(sql, options);
         if (value >= '%' && value <= '\'' || value >= 'Z' && value <= '\\') {
-          assertThrows(
-              IllegalArgumentException.class,
-              () -> StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)));
+          SpannerException exception =
+              assertThrows(
+                  SpannerException.class,
+                  () -> StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)));
+          assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
         } else {
-          assertEquals(
-              StatementParser.parseCommand(StatementParser.removeCommentsAndTrim(sql)), "COPY");
+          assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
         }
         assertThat(options.getTableName(), is(equalTo("users")));
         assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));

@@ -24,7 +24,6 @@
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
@@ -41,6 +40,21 @@
     <version>1.2.7</version>
   </parent>
 
+  <distributionManagement>
+    <snapshotRepository>
+      <id>artifact-registry</id>
+      <url>
+        artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts
+      </url>
+    </snapshotRepository>
+    <repository>
+      <id>artifact-registry</id>
+      <url>
+        artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts
+      </url>
+    </repository>
+  </distributionManagement>
+
   <dependencies>
     <dependency>
       <groupId>com.googlecode.json-simple</groupId>
@@ -50,7 +64,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
-      <version>6.20.0</version>
+      <version>6.21.0</version>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
@@ -81,14 +95,14 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
-      <version>6.20.0</version>
+      <version>6.21.0</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>com.google.api</groupId>
       <artifactId>gax-grpc</artifactId>
-      <version>2.11.0</version>
+      <version>2.12.2</version>
       <classifier>testlib</classifier>
       <scope>test</scope>
     </dependency>
@@ -100,13 +114,13 @@
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.13</version>
+      <version>4.13.2</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
-      <version>3.2.4</version>
+      <version>4.3.1</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
