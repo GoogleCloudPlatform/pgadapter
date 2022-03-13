@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -29,7 +31,8 @@ import java.text.MessageFormat;
 
 /** Executes a simple statement. */
 public class QueryMessage extends ControlMessage {
-
+  private static final AbstractStatementParser PARSER =
+      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   protected static final char IDENTIFIER = 'Q';
   protected static final String COPY = "COPY";
 
@@ -37,7 +40,7 @@ public class QueryMessage extends ControlMessage {
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
-    String query = StatementParser.removeCommentsAndTrim(this.readAll());
+    String query = PARSER.removeCommentsAndTrim(this.readAll());
     String command = StatementParser.parseCommand(query);
     if (COPY.equalsIgnoreCase(command)) {
       this.statement =

@@ -1,1 +1,1 @@
-ERROR: FAILED_PRECONDITION: Executing updates is not allowed for DDL batches. "CREATE TABLE testtable (id integer PRIMARY KEY, data integer); INSERT INTO testtable (id, data) VALUES (1, 2); INSERT INTO testtable (id, data) VALUES (3, 4);"
+ERROR: FAILED_PRECONDITION: Executing updates is not allowed for DDL batches. "CREATE TABLE testtable (id integer PRIMARY KEY, data integer); INSERT INTO testtable (id, data) VALUES (1, 2); INSERT INTO testtable (id, data) VALUES (3, 4)"

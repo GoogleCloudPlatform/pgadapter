@@ -235,10 +235,10 @@ public class ProtocolTest {
   }
 
   @Test
-  public void testParseMessageGsqlException() throws Exception {
+  public void testParseMessageException() throws Exception {
     byte[] messageMetadata = {'P'};
     String statementName = "some statement\0";
-    String payload = "/*GSQL*/ SELECT * FROM users WHERE name = $1\0";
+    String payload = "SELECT * FROM users WHERE name = $1\0";
 
     byte[] parameterCount = {0, 1};
     byte[] parameters = intToBytes(1002);
@@ -261,7 +261,7 @@ public class ProtocolTest {
             parameters);
 
     List<Integer> expectedParameterDataTypes = Arrays.asList(1002);
-    String expectedSQL = "/*GSQL*/SELECT * FROM users WHERE name = $1";
+    String expectedSQL = "SELECT * FROM users WHERE name = $1";
     String expectedMessageName = "some statement";
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
