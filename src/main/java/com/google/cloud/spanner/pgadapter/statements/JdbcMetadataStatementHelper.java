@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -42,6 +42,8 @@ class JdbcMetadataStatementHelper {
   }
 
   static String replaceJdbcMetadataStatement(String sql) {
+    // First we look for a number of fixed query prefixes for queries that are completely replaced
+    // with Spangres-compatible queries.
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_EXPORTED_IMPORTED_KEYS_PREFIX)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_EXPORTED_IMPORTED_KEYS_42_0_PREFIX)) {
       return replaceImportedExportedKeysQuery(sql);
@@ -81,7 +83,9 @@ class JdbcMetadataStatementHelper {
       return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_REPLACEMENT_42_3;
     }
 
-    // Rewrite the 42.3.x PK query to the version in 42.2.x.
+    // The query that is used to fetch the primary keys of a table was re-written when the PG driver
+    // went from 42.2.x to 42.3.x. We translate the 42.3.x query back to the 42.2.x version here,
+    // so we can use the same query replacement for both versions.
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_PK_QUERY_PREFIX_42_3)) {
       sql = replacePG42_3_PkQuery_With_42_2_Query(sql);
     }
@@ -94,7 +98,7 @@ class JdbcMetadataStatementHelper {
             PgJdbcCatalog.PG_JDBC_BEST_ROW_IDENTIFIER_PREFIX,
             PgJdbcCatalog.PG_JDBC_PK_QUERY_REPLACEMENT)
 
-        // Replace unsupported pg_catalog tables with fixed sub-selects.
+        // Replace unsupported pg_catalog tables with fixed (empty) sub-selects.
         .replace(
             " JOIN pg_catalog.pg_description",
             String.format(" JOIN (%s)", PgJdbcCatalog.PG_DESCRIPTION))
@@ -104,7 +108,7 @@ class JdbcMetadataStatementHelper {
             "\\s+FROM\\s+pg_catalog\\.pg_settings",
             String.format(" FROM (%s) pg_settings", PgJdbcCatalog.PG_SETTINGS))
 
-        // Add joins for tables that miss information.
+        // Add joins for tables that miss information to get the required information.
         .replace(
             " JOIN pg_catalog.pg_attribute a",
             String.format(

@@ -20,7 +20,6 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.pgadapter.JdbcMetadataMockServerTest.TestRunner;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
@@ -152,10 +151,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             new URLClassLoader(
                 new URL[] {
                   new URL(mavenUrl),
-                  JdbcMetadataMockServerTest.class
-                      .getProtectionDomain()
-                      .getCodeSource()
-                      .getLocation()
+                  ITJdbcMetadataTest.class.getProtectionDomain().getCodeSource().getLocation()
                 },
                 defaultClassLoader.getParent());
         Thread.currentThread().setContextClassLoader(classLoader);

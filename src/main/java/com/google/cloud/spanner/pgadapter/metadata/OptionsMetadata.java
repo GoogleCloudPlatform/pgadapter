@@ -294,8 +294,10 @@ public class OptionsMetadata {
         "This option turns on JDBC mode. This mode allows better compatibility with the "
             + "PostgreSQL JDBC driver. It will automatically inspect incoming queries to look for "
             + "known JDBC metadata queries, and replace these with queries that are compatible with "
-            + "Cloud Spanner. JDBC mode is implemented using predefined fixed matchers. It should "
-            + "be enabled if you intend to connect to PgAdapter using the PostgreSQL JDBC driver.");
+            + "Cloud Spanner. JDBC mode is implemented using predefined fixed matchers and should "
+            + "not be used in combination with options -q (psql mode) or -j (custom matchers). It "
+            + "should be enabled if you intend to connect to PGAdapter using the PostgreSQL JDBC "
+            + "driver.");
     options.addOption(
         OPTION_COMMAND_METADATA_FILE,
         "options-metadata",
