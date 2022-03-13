@@ -145,6 +145,17 @@ public class ITJdbcMetadataTest implements IntegrationTest {
           String.format(
               "https://repo1.maven.org/maven2/org/postgresql/postgresql/%s/postgresql-%s.jar",
               version, version);
+      // Create a class loader that will search the PostgreSQL JDBC driver jar that we download from
+      // Maven and this class file for classes. In addition, we set the parent class loader of this
+      // new class loader to be the same as the parent of the default class loader. This is the
+      // class loader that will be used to load system classes. We do this because:
+      // 1. We want to use a specific JDBC driver version that we download from Maven.
+      // 2. We want to have access to the classes in this file.
+      // 3. We do not want to have access to any of the other classes that are defined in this
+      // repository (specifically: we do not want to have access to the PostgreSQL driver that is
+      // included in the repository as a dependency). This is why we set the parent class loader to
+      // be the system class loader (i.e. the parent of the default class loader), and we do not use
+      // the default class loader as the parent for our custom class loader.
       ClassLoader defaultClassLoader = Thread.currentThread().getContextClassLoader();
       try {
         ClassLoader classLoader =
@@ -168,10 +179,13 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   public static class TestRunner {
     public void run(String url, Consumer<Connection> runnable) throws Exception {
+      // Dynamically load the PG JDBC driver using the defautl class loader of the current thread.
       Class.forName("org.postgresql.Driver");
       try (Connection connection = DriverManager.getConnection(url)) {
         runnable.accept(connection);
       }
+      // Deregister the current driver from the DriverManager to prevent 'the driver has already
+      // been registered' errors.
       Driver driver = DriverManager.getDriver(url);
       DriverManager.deregisterDriver(driver);
     }
