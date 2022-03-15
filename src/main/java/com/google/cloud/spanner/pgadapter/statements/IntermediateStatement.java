@@ -23,6 +23,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
@@ -165,7 +166,10 @@ public class IntermediateStatement {
     return this.updateCount;
   }
 
-  public void addUpdateCount(int count) {
+  public void addUpdateCount(long count) {
+    if (this.updateCount == null) {
+      this.updateCount = 0L;
+    }
     this.updateCount += count;
   }
 
