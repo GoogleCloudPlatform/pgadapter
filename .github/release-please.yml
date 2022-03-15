@@ -1,3 +1,4 @@
+branch: postgresql-dialect
 releaseType: java-yoshi
 bumpMinorPreMajor: true
 handleGHRelease: true
