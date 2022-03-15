@@ -19,6 +19,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
@@ -36,10 +37,10 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   protected List<Integer> parameterDataTypes;
   protected Statement statement;
 
-  public IntermediatePreparedStatement(String sql, Connection connection) {
-    super(sql);
-    this.sql = sql;
-    this.command = StatementParser.parseCommand(sql);
+  public IntermediatePreparedStatement(OptionsMetadata options, String sql, Connection connection) {
+    super(options, sql);
+    this.sql = replaceKnownUnsupportedQueries(sql);
+    this.command = StatementParser.parseCommand(this.sql);
     this.connection = connection;
     this.parameterDataTypes = null;
   }
@@ -90,7 +91,8 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    */
   public IntermediatePortalStatement bind(
       byte[][] parameters, List<Short> parameterFormatCodes, List<Short> resultFormatCodes) {
-    IntermediatePortalStatement portal = new IntermediatePortalStatement(this.sql, this.connection);
+    IntermediatePortalStatement portal =
+        new IntermediatePortalStatement(this.options, this.sql, this.connection);
     portal.setParameterFormatCodes(parameterFormatCodes);
     portal.setResultFormatCodes(resultFormatCodes);
     Statement.Builder builder = Statement.newBuilder(sql);

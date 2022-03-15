@@ -43,11 +43,16 @@ public class QueryMessage extends ControlMessage {
     String query = PARSER.removeCommentsAndTrim(this.readAll());
     String command = StatementParser.parseCommand(query);
     if (COPY.equalsIgnoreCase(command)) {
-      this.statement = new CopyStatement(query, this.connection.getSpannerConnection());
+      this.statement =
+          new CopyStatement(
+              connection.getServer().getOptions(), query, this.connection.getSpannerConnection());
     } else if (!connection.getServer().getOptions().requiresMatcher()) {
-      this.statement = new IntermediateStatement(query, this.connection.getSpannerConnection());
+      this.statement =
+          new IntermediateStatement(
+              connection.getServer().getOptions(), query, this.connection.getSpannerConnection());
     } else {
-      this.statement = new MatcherStatement(query, this.connection);
+      this.statement =
+          new MatcherStatement(connection.getServer().getOptions(), query, this.connection);
     }
     this.connection.addActiveStatement(this.statement);
   }

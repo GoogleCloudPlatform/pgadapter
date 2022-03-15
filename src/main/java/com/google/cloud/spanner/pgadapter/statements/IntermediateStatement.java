@@ -25,6 +25,7 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -39,6 +40,7 @@ public class IntermediateStatement {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
+  protected final OptionsMetadata options;
   private final ResultType resultType;
   protected ResultSet statementResult;
   protected boolean hasMoreData;
@@ -53,21 +55,31 @@ public class IntermediateStatement {
   private static final char STATEMENT_DELIMITER = ';';
   private static final char SINGLE_QUOTE = '\'';
 
-  public IntermediateStatement(String sql, Connection connection) {
-    this.sql = sql;
+  public IntermediateStatement(OptionsMetadata options, String sql, Connection connection) {
+    this.options = options;
+    this.sql = replaceKnownUnsupportedQueries(sql);
     this.statements = parseStatements(sql);
-    this.command = StatementParser.parseCommand(sql);
+    this.command = StatementParser.parseCommand(this.sql);
     this.connection = connection;
     // Note: This determines the result type based on the first statement in the SQL statement. That
     // means that it assumes that if this is a batch of statements, all the statements in the batch
     // will have the same type of result (that is; they are all DML statements, all DDL statements,
     // all queries, etc.). That is a safe assumption for now, as PgAdapter currently only supports
     // all-DML and all-DDL batches.
+    this.resultType = determineResultType(this.sql);
+  }
+
+  protected IntermediateStatement(OptionsMetadata options, String sql) {
+    this.options = options;
     this.resultType = determineResultType(sql);
   }
 
-  protected IntermediateStatement(String sql) {
-    this.resultType = determineResultType(sql);
+  protected String replaceKnownUnsupportedQueries(String sql) {
+    if (this.options.isReplaceJdbcMetadataQueries()
+        && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(sql)) {
+      return JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(sql);
+    }
+    return sql;
   }
 
   /**

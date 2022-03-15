@@ -272,6 +272,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -331,6 +333,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -391,6 +395,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -436,6 +442,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -489,6 +497,8 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -531,6 +541,8 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -576,6 +588,8 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
     Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1256,7 +1270,8 @@ public class ProtocolTest {
     Mockito.when(spannerType.next()).thenReturn(true, true, false);
     Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
-    CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+    CopyStatement copyStatement =
+        new CopyStatement(options, "COPY keyvalue FROM STDIN;", connection);
     copyStatement.execute();
 
     Mockito.when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
@@ -1361,7 +1376,8 @@ public class ProtocolTest {
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));
 
-    CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+    CopyStatement copyStatement =
+        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
     copyStatement.execute();
 
     MutationWriter mw = copyStatement.getMutationWriter();
@@ -1383,7 +1399,8 @@ public class ProtocolTest {
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
 
-    CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+    CopyStatement copyStatement =
+        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
 
     Assert.assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
@@ -1416,7 +1433,8 @@ public class ProtocolTest {
 
     byte[] payload = "1\t'one'\n2".getBytes();
 
-    CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+    CopyStatement copyStatement =
+        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
 
     Assert.assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
@@ -1448,7 +1466,8 @@ public class ProtocolTest {
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/test-copy-output.txt"));
 
-    CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+    CopyStatement copyStatement =
+        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
     Assert.assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
     assertTrue(copyStatement.isExecuted());
@@ -1488,7 +1507,8 @@ public class ProtocolTest {
     File outputFile = new File("output.txt");
     outputFile.delete();
 
-    CopyStatement copyStatement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
+    CopyStatement copyStatement =
+        new CopyStatement(options, "COPY keyvalue FROM STDIN;", connection);
     Assert.assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
     assertTrue(copyStatement.isExecuted());
