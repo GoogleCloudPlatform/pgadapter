@@ -82,7 +82,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.swing.text.html.Option;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.junit.AfterClass;
@@ -1377,7 +1376,8 @@ public class ProtocolTest {
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));
 
-    CopyStatement copyStatement = new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
+    CopyStatement copyStatement =
+        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
     copyStatement.execute();
 
     MutationWriter mw = copyStatement.getMutationWriter();
@@ -1399,7 +1399,8 @@ public class ProtocolTest {
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
 
-    CopyStatement copyStatement = new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
+    CopyStatement copyStatement =
+        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
 
     Assert.assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
@@ -1432,7 +1433,8 @@ public class ProtocolTest {
 
     byte[] payload = "1\t'one'\n2".getBytes();
 
-    CopyStatement copyStatement = new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
+    CopyStatement copyStatement =
+        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
 
     Assert.assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
@@ -1464,7 +1466,8 @@ public class ProtocolTest {
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/test-copy-output.txt"));
 
-    CopyStatement copyStatement = new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
+    CopyStatement copyStatement =
+        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
     Assert.assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
     assertTrue(copyStatement.isExecuted());

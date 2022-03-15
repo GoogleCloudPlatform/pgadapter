@@ -446,7 +446,8 @@ public class StatementTest {
         .thenReturn(StatementResult.ResultType.UPDATE_COUNT);
     Mockito.when(statementResult.getUpdateCount()).thenReturn(1L);
 
-    CopyStatement statement = new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
+    CopyStatement statement =
+        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
     statement.execute();
 
     byte[] payload = "2 3\n".getBytes();
