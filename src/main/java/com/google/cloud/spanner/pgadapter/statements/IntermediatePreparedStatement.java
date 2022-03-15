@@ -28,6 +28,7 @@ import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Set;
 import org.postgresql.core.Oid;
 
 /**
@@ -120,18 +121,13 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     }
   }
 
-  // TODO: Use the statement parser in the Connection API for getting parameter info once 6.21 has
-  // been released.
-  // This implementation is purely for testing purposes to verify that the protocol implementation
-  // actually works. It returns the wrong result if the sql string contains parameter like
-  // characters in strings, comments, quoted identifiers, etc.
+  /**
+   * Returns the parameter types in the SQL string of this statement. The current implementation
+   * always returns Oid.UNSPECIFIED for all parameters, as we have no way to actually determine the
+   * parameter types.
+   */
   private int[] getParameterTypes() {
-    int count = 0;
-    for (int i = 0; i < this.sql.length() - 1; i++) {
-      if (this.sql.charAt(i) == '$' && Character.isDigit(this.sql.charAt(i + 1))) {
-        count++;
-      }
-    }
-    return new int[count];
+    Set<String> parameters = PARSER.getQueryParameters(this.sql);
+    return new int[parameters.size()];
   }
 }

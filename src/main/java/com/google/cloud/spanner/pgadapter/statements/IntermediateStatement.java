@@ -22,6 +22,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
@@ -36,8 +37,8 @@ import java.util.List;
  * statements which does not belong directly to Postgres, Spanner, etc.
  */
 public class IntermediateStatement {
-  private static final AbstractStatementParser PARSER =
-      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+  protected static final PostgreSQLStatementParser PARSER =
+      (PostgreSQLStatementParser) AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
   private final ResultType resultType;
   protected ResultSet statementResult;
