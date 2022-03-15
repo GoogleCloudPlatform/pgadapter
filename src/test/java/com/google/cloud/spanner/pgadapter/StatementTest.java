@@ -18,7 +18,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.ErrorCode;
@@ -54,6 +53,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnit;
@@ -433,62 +433,22 @@ public class StatementTest {
   }
 
   @Test
-  public void testCopyBuildMutation() throws Exception {
-    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
-    Mockito.when(statementResult.getResultType())
-        .thenReturn(StatementResult.ResultType.UPDATE_COUNT);
-    Mockito.when(statementResult.getUpdateCount()).thenReturn(1L);
-
-    ResultSet spannerType = Mockito.mock(ResultSet.class);
-    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
-    Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
-
-    CopyStatement statement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
-    statement.execute();
-
-    byte[] payload = "2\t3\n".getBytes();
-    MutationWriter mw = statement.getMutationWriter();
-    mw.addCopyData(connectionHandler, payload);
-    mw.buildMutationList(connectionHandler);
-
-    Assert.assertEquals(statement.getFormatType(), "TEXT");
-    Assert.assertEquals(statement.getDelimiterChar(), '\t');
-    Assert.assertEquals(
-        statement.getMutationWriter().getMutations().toString(),
-        "[insert(keyvalue{key=2,value=3})]");
-
-    statement.close();
-    Mockito.verify(resultSet, Mockito.times(0)).close();
-  }
-
-  @Test
   public void testCopyInvalidBuildMutation() throws Exception {
+    setupQueryInformationSchemaResults();
     Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     Mockito.when(statementResult.getResultType())
         .thenReturn(StatementResult.ResultType.UPDATE_COUNT);
     Mockito.when(statementResult.getUpdateCount()).thenReturn(1L);
-
-    ResultSet spannerType = Mockito.mock(ResultSet.class);
-    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
-    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
-    Mockito.when(spannerType.next()).thenReturn(true, true, false);
-    Mockito.when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
     CopyStatement statement = new CopyStatement("COPY keyvalue FROM STDIN;", connection);
     statement.execute();
 
     byte[] payload = "2 3\n".getBytes();
-    MutationWriter mw = statement.getMutationWriter();
+    MutationWriter mutationWriter = statement.getMutationWriter();
+    mutationWriter.addCopyData(payload);
 
     SpannerException thrown =
-        Assert.assertThrows(
-            SpannerException.class,
-            () -> {
-              mw.addCopyData(connectionHandler, payload);
-              mw.buildMutationList(connectionHandler);
-            });
+        Assert.assertThrows(SpannerException.class, statement::getUpdateCount);
     Assert.assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
     Assert.assertEquals(
         "INVALID_ARGUMENT: Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
@@ -496,5 +456,28 @@ public class StatementTest {
 
     statement.close();
     Mockito.verify(resultSet, Mockito.times(0)).close();
+  }
+
+  private void setupQueryInformationSchemaResults() {
+    ResultSet spannerType = Mockito.mock(ResultSet.class);
+    Mockito.when(spannerType.getString("column_name")).thenReturn("key", "value");
+    Mockito.when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
+    Mockito.when(spannerType.next()).thenReturn(true, true, false);
+    Mockito.when(
+            connection.executeQuery(
+                ArgumentMatchers.argThat(
+                    statement ->
+                        statement != null && statement.getSql().startsWith("SELECT column_name"))))
+        .thenReturn(spannerType);
+
+    ResultSet countResult = Mockito.mock(ResultSet.class);
+    when(countResult.getLong(0)).thenReturn(2L);
+    when(countResult.next()).thenReturn(true, false);
+    Mockito.when(
+            connection.executeQuery(
+                ArgumentMatchers.argThat(
+                    statement ->
+                        statement != null && statement.getSql().startsWith("SELECT COUNT(*)"))))
+        .thenReturn(countResult);
   }
 }

@@ -16,10 +16,16 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 
 /** Sends error information back to client. */
 public class ErrorResponse extends WireOutput {
+  public enum Severity {
+    ERROR,
+    FATAL,
+    PANIC,
+  }
 
   private static final byte[] SEVERITY = "ERROR".getBytes(UTF8);
   private static final byte[] SQL_STATE = "XX000".getBytes(UTF8);
@@ -32,10 +38,15 @@ public class ErrorResponse extends WireOutput {
   private static final byte SEVERITY_FLAG = 'S';
   private static final byte NULL_TERMINATOR = 0;
 
+  private final byte[] severity;
   private final byte[] errorMessage;
   private final byte[] errorState; // TODO pull state from exception itself.
 
   public ErrorResponse(DataOutputStream output, Exception e, State errorState) {
+    this(output, e, errorState, Severity.ERROR);
+  }
+
+  public ErrorResponse(DataOutputStream output, Exception e, State errorState, Severity severity) {
     super(
         output,
         HEADER_LENGTH
@@ -51,12 +62,13 @@ public class ErrorResponse extends WireOutput {
             + NULL_TERMINATOR_LENGTH);
     this.errorMessage = getMessageFromException(e);
     this.errorState = errorState.getBytes();
+    this.severity = severity.name().getBytes(StandardCharsets.UTF_8);
   }
 
   @Override
   protected void sendPayload() throws IOException {
     this.outputStream.writeByte(SEVERITY_FLAG);
-    this.outputStream.write(SEVERITY);
+    this.outputStream.write(severity);
     this.outputStream.writeByte(NULL_TERMINATOR);
     this.outputStream.writeByte(CODE_FLAG);
     this.outputStream.write(this.errorState);
