@@ -22,6 +22,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
@@ -37,8 +38,8 @@ import java.util.List;
  * statements which does not belong directly to Postgres, Spanner, etc.
  */
 public class IntermediateStatement {
-  private static final AbstractStatementParser PARSER =
-      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+  protected static final PostgreSQLStatementParser PARSER =
+      (PostgreSQLStatementParser) AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
   protected final OptionsMetadata options;
   private final ResultType resultType;
@@ -300,7 +301,7 @@ public class IntermediateStatement {
    * Moreso meant for inherited classes, allows one to call describe on a statement. Since raw
    * statements cannot be described, throw an error.
    */
-  public DescribeMetadata describe() throws Exception {
+  public DescribeMetadata describe() {
     throw new IllegalStateException(
         "Cannot describe a simple statement " + "(only prepared statements and portals)");
   }

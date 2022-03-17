@@ -111,10 +111,18 @@ public class DescribeMessage extends ControlMessage {
    * @throws Exception if sending the message back to the client causes an error.
    */
   public void handleDescribeStatement() throws Exception {
-    new ParameterDescriptionResponse(
-            this.outputStream,
-            ((DescribeStatementMetadata) this.statement.describe()).getMetadata())
-        .send();
-    new NoDataResponse(this.outputStream).send();
+    DescribeStatementMetadata metadata = (DescribeStatementMetadata) this.statement.describe();
+    new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send();
+    if (metadata.getResultSet() != null) {
+      new RowDescriptionResponse(
+              this.outputStream,
+              this.statement,
+              metadata.getResultSet(),
+              this.connection.getServer().getOptions(),
+              QueryMode.EXTENDED)
+          .send();
+    } else {
+      new NoDataResponse(this.outputStream).send();
+    }
   }
 }
