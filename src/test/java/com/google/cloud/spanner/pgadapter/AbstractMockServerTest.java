@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-
 import com.google.api.gax.core.NoCredentialsProvider;
 import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
 import com.google.api.gax.longrunning.OperationSnapshot;
