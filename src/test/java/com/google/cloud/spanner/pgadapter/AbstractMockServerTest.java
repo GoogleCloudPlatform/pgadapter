@@ -230,7 +230,7 @@ abstract class AbstractMockServerTest {
                       ServerCallHandler<ReqT, RespT> serverCallHandler) {
 
                     String userAgent = metadata.get(Metadata.Key.of("user-agent", Metadata.ASCII_STRING_MARSHALLER));
-                    //assertEquals(userAgent, "pg-adapter");
+                    assertEquals(userAgent, "pg-adapter");
                     return Contexts.interceptCall(Context.current(), serverCall, metadata, serverCallHandler);
                   }
                 }
