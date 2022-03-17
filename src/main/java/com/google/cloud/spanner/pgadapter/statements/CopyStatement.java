@@ -25,6 +25,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
@@ -60,8 +61,8 @@ public class CopyStatement extends IntermediateStatement {
   private Future<Long> updateCount;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  public CopyStatement(String sql, Connection connection) {
-    super(sql);
+  public CopyStatement(OptionsMetadata options, String sql, Connection connection) {
+    super(options, sql);
     this.sql = sql;
     this.command = StatementParser.parseCommand(sql);
     this.connection = connection;
