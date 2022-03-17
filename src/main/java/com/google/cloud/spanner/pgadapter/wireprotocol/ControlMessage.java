@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -27,7 +28,6 @@ import com.google.cloud.spanner.pgadapter.wireoutput.PortalSuspendedResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -59,7 +59,15 @@ public abstract class ControlMessage extends WireMessage {
         case CopyFailMessage.IDENTIFIER:
           return new CopyFailMessage(connection);
         default:
-          throw new IllegalStateException("Expected 0 or more Copy Data messages.");
+          // Drop the connection if we receive an invalid message to prevent further CopyData
+          // messages from coming in. There is no error handling in the COPY protocol, and some
+          // clients will blindly continue to send data and never check any possible responses from
+          // the server during a (large) copy operation, so this is the safest option.
+          connection.setStatus(ConnectionStatus.TERMINATED);
+          throw new IllegalStateException(
+              String.format(
+                  "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: '%c'",
+                  nextMsg));
       }
     } else {
       switch (nextMsg) {
@@ -84,7 +92,7 @@ public abstract class ControlMessage extends WireMessage {
         case FlushMessage.IDENTIFIER:
           return new FlushMessage(connection);
         default:
-          throw new IllegalStateException("Unknown message");
+          throw new IllegalStateException(String.format("Unknown message: %c", nextMsg));
       }
     }
   }

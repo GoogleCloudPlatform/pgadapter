@@ -14,7 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
-import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -30,7 +31,8 @@ import java.text.MessageFormat;
 
 /** Executes a simple statement. */
 public class QueryMessage extends ControlMessage {
-
+  private static final AbstractStatementParser PARSER =
+      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   protected static final char IDENTIFIER = 'Q';
   protected static final String COPY = "COPY";
 
@@ -38,14 +40,19 @@ public class QueryMessage extends ControlMessage {
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
-    String query = StatementParser.removeCommentsAndTrim(this.readAll());
+    String query = PARSER.removeCommentsAndTrim(this.readAll());
     String command = StatementParser.parseCommand(query);
-    if (command.equalsIgnoreCase(COPY)) {
-      this.statement = new CopyStatement(query, this.connection.getJdbcConnection());
+    if (COPY.equalsIgnoreCase(command)) {
+      this.statement =
+          new CopyStatement(
+              connection.getServer().getOptions(), query, this.connection.getSpannerConnection());
     } else if (!connection.getServer().getOptions().requiresMatcher()) {
-      this.statement = new IntermediateStatement(query, this.connection.getJdbcConnection());
+      this.statement =
+          new IntermediateStatement(
+              connection.getServer().getOptions(), query, this.connection.getSpannerConnection());
     } else {
-      this.statement = new MatcherStatement(query, this.connection);
+      this.statement =
+          new MatcherStatement(connection.getServer().getOptions(), query, this.connection);
     }
     this.connection.addActiveStatement(this.statement);
   }
@@ -105,14 +112,13 @@ public class QueryMessage extends ControlMessage {
         new RowDescriptionResponse(
                 this.outputStream,
                 this.statement,
-                this.statement.getStatementResult().getMetaData(),
+                this.statement.getStatementResult(),
                 this.connection.getServer().getOptions(),
                 QueryMode.SIMPLE)
             .send();
       }
       this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
-      boolean inTransaction =
-          connection.getJdbcConnection().unwrap(CloudSpannerJdbcConnection.class).isInTransaction();
+      boolean inTransaction = connection.getSpannerConnection().isInTransaction();
       new ReadyResponse(
               this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
           .send();

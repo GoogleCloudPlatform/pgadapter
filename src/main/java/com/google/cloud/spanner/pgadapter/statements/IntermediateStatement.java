@@ -15,14 +15,20 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
+import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Preconditions;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,40 +38,49 @@ import java.util.List;
  * statements which does not belong directly to Postgres, Spanner, etc.
  */
 public class IntermediateStatement {
-  private static final AbstractStatementParser PARSER =
-      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+  protected static final PostgreSQLStatementParser PARSER =
+      (PostgreSQLStatementParser) AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
-  protected Statement statement;
+  protected final OptionsMetadata options;
   private final ResultType resultType;
   protected ResultSet statementResult;
   protected boolean hasMoreData;
-  protected Exception exception;
+  protected SpannerException exception;
   protected String sql;
   protected String command;
   protected boolean executed;
   protected Connection connection;
-  protected Integer updateCount;
+  protected Long updateCount;
   protected List<String> statements;
 
   private static final char STATEMENT_DELIMITER = ';';
   private static final char SINGLE_QUOTE = '\'';
 
-  public IntermediateStatement(String sql, Connection connection) throws SQLException {
-    this.sql = sql;
+  public IntermediateStatement(OptionsMetadata options, String sql, Connection connection) {
+    this.options = options;
+    this.sql = replaceKnownUnsupportedQueries(sql);
     this.statements = parseStatements(sql);
-    this.command = StatementParser.parseCommand(sql);
+    this.command = StatementParser.parseCommand(this.sql);
     this.connection = connection;
-    this.statement = connection.createStatement();
     // Note: This determines the result type based on the first statement in the SQL statement. That
     // means that it assumes that if this is a batch of statements, all the statements in the batch
     // will have the same type of result (that is; they are all DML statements, all DDL statements,
     // all queries, etc.). That is a safe assumption for now, as PgAdapter currently only supports
     // all-DML and all-DDL batches.
+    this.resultType = determineResultType(this.sql);
+  }
+
+  protected IntermediateStatement(OptionsMetadata options, String sql) {
+    this.options = options;
     this.resultType = determineResultType(sql);
   }
 
-  protected IntermediateStatement(String sql) {
-    this.resultType = determineResultType(sql);
+  protected String replaceKnownUnsupportedQueries(String sql) {
+    if (this.options.isReplaceJdbcMetadataQueries()
+        && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(sql)) {
+      return JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(sql);
+    }
+    return sql;
   }
 
   /**
@@ -148,11 +163,14 @@ public class IntermediateStatement {
   }
 
   /** @return The number of items that were modified by this execution. */
-  public Integer getUpdateCount() {
+  public Long getUpdateCount() {
     return this.updateCount;
   }
 
-  public void addUpdateCount(int count) {
+  public void addUpdateCount(long count) {
+    if (this.updateCount == null) {
+      this.updateCount = 0L;
+    }
     this.updateCount += count;
   }
 
@@ -170,8 +188,8 @@ public class IntermediateStatement {
     this.hasMoreData = hasMoreData;
   }
 
-  public Statement getStatement() {
-    return this.statement;
+  public Connection getConnection() {
+    return this.connection;
   }
 
   public List<String> getStatements() {
@@ -200,22 +218,30 @@ public class IntermediateStatement {
    * Processes the results from an execute/executeBatch execution, extracting metadata from that
    * execution (including results and update counts). An array of updateCounts is needed in the case
    * of updateBatchResultCount.
-   *
-   * @throws SQLException If an issue occurred in extracting result metadata.
    */
-  protected void updateResultCount() throws SQLException {
-    if (this.containsResultSet()) {
-      this.statementResult = this.statement.getResultSet();
-      this.hasMoreData = this.statementResult.next();
-    } else {
-      this.updateCount = this.statement.getUpdateCount();
-      this.hasMoreData = false;
-      this.statementResult = null;
+  protected void updateResultCount(StatementResult result) {
+    switch (result.getResultType()) {
+      case RESULT_SET:
+        this.statementResult = result.getResultSet();
+        this.hasMoreData = this.statementResult.next();
+        break;
+      case UPDATE_COUNT:
+        this.updateCount = result.getUpdateCount();
+        this.hasMoreData = false;
+        this.statementResult = null;
+        break;
+      case NO_RESULT:
+        this.hasMoreData = false;
+        this.statementResult = null;
+        break;
+      default:
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INTERNAL, "Unknown or unsupported result type: " + result.getResultType());
     }
   }
 
-  protected void updateBatchResultCount(int[] updateCounts) throws SQLException {
-    this.updateCount = 0;
+  protected void updateBatchResultCount(long[] updateCounts) {
+    this.updateCount = 0L;
     for (int i = 0; i < updateCounts.length; ++i) {
       this.updateCount += updateCounts[i];
     }
@@ -228,7 +254,7 @@ public class IntermediateStatement {
    *
    * @param e The exception to store.
    */
-  protected void handleExecutionException(SQLException e) {
+  protected void handleExecutionException(SpannerException e) {
     this.exception = e;
     this.hasMoreData = false;
     this.statementResult = null;
@@ -237,21 +263,33 @@ public class IntermediateStatement {
   /** Execute the SQL statement, storing metadata. */
   public void execute() {
     this.executed = true;
-    int[] updateCounts = null;
     try {
       if (statements.size() > 1) {
-        for (String stmt : statements) {
-          this.statement.addBatch(stmt);
+        // TODO: Clean this up a little once the statement parsing in the client library has been
+        // released: https://github.com/googleapis/java-spanner/pull/1690
+        // Also, the restriction that mixed batches are not allowed will be removed in a future PR.
+        if (resultType == ResultType.UPDATE_COUNT) {
+          connection.startBatchDml();
+        } else if (resultType == ResultType.NO_RESULT) {
+          connection.startBatchDdl();
+        } else {
+          throw SpannerExceptionFactory.newSpannerException(
+              ErrorCode.INVALID_ARGUMENT, "Statement type is not supported for batching");
         }
-        updateCounts = this.statement.executeBatch();
-        this.updateBatchResultCount(updateCounts);
+        for (String stmt : statements) {
+          connection.execute(Statement.of(stmt));
+        }
+        long[] updateCounts = connection.runBatch();
+        updateBatchResultCount(updateCounts);
       } else {
-        this.statement.execute(this.sql);
-        this.updateResultCount();
+        StatementResult result = connection.execute(Statement.of(this.sql));
+        updateResultCount(result);
       }
-    } catch (SQLException e) {
+    } catch (SpannerException e) {
       if (statements.size() > 1) {
-        SQLException exception = new SQLException(e.getMessage() + " \"" + this.sql + "\"", e);
+        SpannerException exception =
+            SpannerExceptionFactory.newSpannerException(
+                e.getErrorCode(), e.getMessage() + " \"" + this.sql + "\"", e);
         handleExecutionException(exception);
       } else {
         handleExecutionException(e);
@@ -263,7 +301,7 @@ public class IntermediateStatement {
    * Moreso meant for inherited classes, allows one to call describe on a statement. Since raw
    * statements cannot be described, throw an error.
    */
-  public DescribeMetadata describe() throws Exception {
+  public DescribeMetadata describe() {
     throw new IllegalStateException(
         "Cannot describe a simple statement " + "(only prepared statements and portals)");
   }

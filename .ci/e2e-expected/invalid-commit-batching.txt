@@ -1,1 +1,1 @@
-ERROR:  INVALID_ARGUMENT: The statement is not suitable for batching. Only DML and DDL statements are allowed for batching. "BEGIN TRANSACTION; INSERT INTO users (id, age, name) VALUES (99, 99, 'test'); COMMIT;"
+ERROR: FAILED_PRECONDITION: This connection has an active batch and cannot begin a transaction "BEGIN TRANSACTION; INSERT INTO users (id, age, name) VALUES (99, 99, 'test'); COMMIT"

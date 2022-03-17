@@ -14,9 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
 import java.text.MessageFormat;
@@ -25,7 +26,8 @@ import java.util.List;
 
 /** Creates a prepared statement. */
 public class ParseMessage extends ControlMessage {
-
+  private static final AbstractStatementParser PARSER =
+      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   protected static final char IDENTIFIER = 'P';
 
   private String name;
@@ -35,14 +37,16 @@ public class ParseMessage extends ControlMessage {
   public ParseMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.name = this.readString();
-    String queryString = StatementParser.removeCommentsAndTrim(this.readString());
+    String queryString = PARSER.removeCommentsAndTrim(this.readString());
     this.parameterDataTypes = new ArrayList<>();
     short numberOfParameters = this.inputStream.readShort();
     for (int i = 0; i < numberOfParameters; i++) {
       int type = this.inputStream.readInt();
       this.parameterDataTypes.add(type);
     }
-    this.statement = new IntermediatePreparedStatement(queryString, connection.getJdbcConnection());
+    this.statement =
+        new IntermediatePreparedStatement(
+            connection.getServer().getOptions(), queryString, connection.getSpannerConnection());
     this.statement.setParameterDataTypes(this.parameterDataTypes);
   }
 

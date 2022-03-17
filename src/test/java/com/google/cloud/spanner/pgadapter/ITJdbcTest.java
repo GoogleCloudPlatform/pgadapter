@@ -18,6 +18,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
@@ -27,6 +28,8 @@ import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -46,6 +49,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+import org.postgresql.PGConnection;
+import org.postgresql.copy.CopyManager;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
@@ -54,9 +59,9 @@ public class ITJdbcTest implements IntegrationTest {
   private static ProxyServer server;
   private static Database database;
 
-  @Parameter public String preferredQueryMode;
+  @Parameter public String preferQueryMode;
 
-  @Parameters(name = "preferredQueryMode = {0}")
+  @Parameters(name = "preferQueryMode = {0}")
   public static Object[] data() {
     return new Object[] {"extended", "simple"};
   }
@@ -148,8 +153,8 @@ public class ITJdbcTest implements IntegrationTest {
 
   private String getConnectionUrl() {
     return String.format(
-        "jdbc:postgresql://localhost:%d/?preferredQueryMode=%s",
-        server.getLocalPort(), preferredQueryMode);
+        "jdbc:postgresql://localhost:%d/?preferQueryMode=%s",
+        server.getLocalPort(), preferQueryMode);
   }
 
   @Test
@@ -166,24 +171,29 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testSelectWithParameters() throws SQLException {
+    boolean isSimpleMode = "simple".equalsIgnoreCase(preferQueryMode);
+    String sql =
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar "
+            + "from all_types "
+            + "where col_bigint=? "
+            + "and col_bool=? "
+            // The PG JDBC driver does not support bytea parameters in simple mode.
+            + (isSimpleMode ? "" : "and col_bytea=? ")
+            + "and col_float8=? "
+            + "and col_int=? "
+            + "and col_numeric=? "
+            + "and col_timestamptz=? "
+            + "and col_varchar=?";
+
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
-      try (PreparedStatement statement =
-          connection.prepareStatement(
-              "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar "
-                  + "from all_types "
-                  + "where col_bigint=? "
-                  + "and col_bool=? "
-                  + "and col_bytea=? "
-                  + "and col_float8=? "
-                  + "and col_int=? "
-                  + "and col_numeric=? "
-                  + "and col_timestamptz=? "
-                  + "and col_varchar=?")) {
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
 
         int index = 0;
         statement.setLong(++index, 1);
         statement.setBoolean(++index, true);
-        statement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
+        if (!isSimpleMode) {
+          statement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
+        }
         statement.setDouble(++index, 3.14d);
         statement.setInt(++index, 1);
         statement.setBigDecimal(++index, new BigDecimal("3.14"));
@@ -196,7 +206,9 @@ public class ITJdbcTest implements IntegrationTest {
 
           assertEquals(1, resultSet.getLong(1));
           assertTrue(resultSet.getBoolean(2));
-          assertArrayEquals("test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(3));
+          if (!isSimpleMode) {
+            assertArrayEquals("test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(3));
+          }
           assertEquals(3.14d, resultSet.getDouble(4), 0.0d);
           assertEquals(1, resultSet.getInt(5));
           assertEquals(new BigDecimal("3.14"), resultSet.getBigDecimal(6));
@@ -213,6 +225,7 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testInsertWithParameters() throws SQLException {
+    boolean isSimpleMode = "simple".equalsIgnoreCase(preferQueryMode);
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement =
           connection.prepareStatement(
@@ -222,7 +235,12 @@ public class ITJdbcTest implements IntegrationTest {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setBoolean(++index, true);
-        statement.setBytes(++index, "bytes_test".getBytes(StandardCharsets.UTF_8));
+        // The PG JDBC driver does not support bytea parameters in simple mode.
+        if (isSimpleMode) {
+          statement.setNull(++index, Types.BINARY);
+        } else {
+          statement.setBytes(++index, "bytes_test".getBytes(StandardCharsets.UTF_8));
+        }
         statement.setDouble(++index, 10.1);
         statement.setInt(++index, 100);
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
@@ -239,7 +257,9 @@ public class ITJdbcTest implements IntegrationTest {
 
         assertEquals(2, resultSet.getLong(1));
         assertTrue(resultSet.getBoolean(2));
-        assertArrayEquals("bytes_test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(3));
+        if (!isSimpleMode) {
+          assertArrayEquals("bytes_test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(3));
+        }
         assertEquals(10.1d, resultSet.getDouble(4), 0.0d);
         assertEquals(100, resultSet.getInt(5));
         assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(6));
@@ -255,21 +275,26 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testUpdateWithParameters() throws SQLException {
+    boolean isSimpleMode = "simple".equalsIgnoreCase(preferQueryMode);
+    String sql =
+        "update all_types set "
+            + "col_bool=?, "
+            // The PG JDBC driver does not support bytea parameters in simple mode.
+            + (isSimpleMode ? "" : "col_bytea=?, ")
+            + "col_float8=?, "
+            + "col_int=?, "
+            + "col_numeric=?, "
+            + "col_timestamptz=?, "
+            + "col_varchar=? "
+            + "where col_bigint=?";
+
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
-      try (PreparedStatement statement =
-          connection.prepareStatement(
-              "update all_types set "
-                  + "col_bool=?, "
-                  + "col_bytea=?, "
-                  + "col_float8=?, "
-                  + "col_int=?, "
-                  + "col_numeric=?, "
-                  + "col_timestamptz=?, "
-                  + "col_varchar=? "
-                  + "where col_bigint=?")) {
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
         int index = 0;
         statement.setBoolean(++index, false);
-        statement.setBytes(++index, "updated".getBytes(StandardCharsets.UTF_8));
+        if (!isSimpleMode) {
+          statement.setBytes(++index, "updated".getBytes(StandardCharsets.UTF_8));
+        }
         statement.setDouble(++index, 3.14d * 2d);
         statement.setInt(++index, 2);
         statement.setBigDecimal(++index, new BigDecimal("10.0"));
@@ -290,7 +315,9 @@ public class ITJdbcTest implements IntegrationTest {
 
         assertEquals(1, resultSet.getLong(1));
         assertFalse(resultSet.getBoolean(2));
-        assertArrayEquals("updated".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(3));
+        if (!isSimpleMode) {
+          assertArrayEquals("updated".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(3));
+        }
         assertEquals(3.14d * 2d, resultSet.getDouble(4), 0.0d);
         assertEquals(2, resultSet.getInt(5));
         assertEquals(new BigDecimal("10.0"), resultSet.getBigDecimal(6));
@@ -389,6 +416,115 @@ public class ITJdbcTest implements IntegrationTest {
               .createStatement()
               .executeUpdate("update numbers set name='Two - updated' where num=2");
       assertEquals(0, noUpdateCount);
+    }
+  }
+
+  /**
+   * ---------------------------------------------------------------------------------------------/*
+   * COPY tests
+   *
+   * <p>The data that is used for the COPY tests were generated using this statement:
+   *
+   * <p><code>
+   * select (random()*1000000000)::bigint, random()<0.5, md5(random()::text ||
+   * clock_timestamp()::text)::bytea, random()*123456789, (random()*999999)::int,
+   * (random()*999999)::numeric, now()-random()*interval '50 year', md5(random()::text ||
+   * clock_timestamp()::text)::varchar from generate_series(1, 1000000) s(i);
+   * </code> Example for streaming large amounts of random data from PostgreSQL to Cloud Spanner.
+   * This must be run with the system property -Dcopy_in_insert_or_update=true set, or otherwise it
+   * will eventually fail on a unique key constraint violation, as the primary key value is a random
+   * number. <code>
+   *   psql -h localhost -d knut-test-db -c "copy (select (random()*1000000000)::bigint, random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, (random()*999999)::int, (random()*999999)::numeric, now()-random()*interval '50 year', md5(random()::text || clock_timestamp()::text)::varchar from generate_series(1, 1000000) s(i)) to stdout" | psql -h localhost -p 5433 -d test -c "set autocommit_dml_mode='partitioned_non_atomic'" -c "copy all_types from stdin;"
+   * </code>
+   */
+  @Test
+  public void testCopyIn_Small() throws SQLException, IOException {
+    // Empty all data in the table.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
+
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      long copyCount =
+          copyManager.copyIn(
+              "copy all_types from stdin;",
+              new FileInputStream("./src/test/resources/all_types_data_small.txt"));
+      assertEquals(100L, copyCount);
+
+      // Verify that there are actually 100 rows in the table.
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select count(*) from all_types")) {
+        assertTrue(resultSet.next());
+        assertEquals(100L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testCopyIn_Large_FailsWhenAtomic() throws SQLException {
+    // Empty all data in the table.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
+
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  copyManager.copyIn(
+                      "copy all_types from stdin;",
+                      new FileInputStream("./src/test/resources/all_types_data.txt")));
+      // The JDBC driver CopyManager takes the COPY protocol quite literally, and as the COPY
+      // protocol does not include any error handling, the JDBC driver will just send all data to
+      // the server and ignore any error messages the server might send during the copy operation.
+      // PGAdapter therefore drops the connection if it continues to receive CopyData messages after
+      // it sent back an error message.
+      assertTrue(exception.getMessage().contains("Database connection failed"));
+    }
+
+    // Verify that the table is still empty.
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select count(*) from all_types")) {
+        assertTrue(resultSet.next());
+        assertEquals(0L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testCopyIn_Large_SucceedsWhenNonAtomic() throws SQLException, IOException {
+    // Empty all data in the table.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
+
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      connection.createStatement().execute("set autocommit_dml_mode='partitioned_non_atomic'");
+
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      long copyCount =
+          copyManager.copyIn(
+              "copy all_types from stdin;",
+              new FileInputStream("./src/test/resources/all_types_data.txt"));
+      assertEquals(10_000L, copyCount);
+
+      // Verify that the table is still empty.
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select count(*) from all_types")) {
+        assertTrue(resultSet.next());
+        assertEquals(10_000L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Delete the imported data to prevent the cleanup method to fail on 'Too many mutations' when
+      // it tries to delete all data using a normal transaction.
+      connection.createStatement().execute("delete from all_types");
     }
   }
 }

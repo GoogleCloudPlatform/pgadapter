@@ -23,7 +23,18 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
+import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.Type;
+import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.parsers.ArrayParser;
 import com.google.cloud.spanner.pgadapter.parsers.BinaryParser;
@@ -42,14 +53,9 @@ import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOption
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.FromTo;
 import com.google.cloud.spanner.pgadapter.parsers.copy.ParseException;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
+import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.sql.Array;
-import java.sql.Date;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.sql.Types;
 import java.util.Arrays;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -64,6 +70,8 @@ import org.postgresql.util.ByteConverter;
  */
 @RunWith(JUnit4.class)
 public class ParserTest {
+  private static final AbstractStatementParser PARSER =
+      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
   private void validate(
       Parser parser, byte[] byteResult, byte[] stringResult, byte[] spannerResult) {
@@ -207,7 +215,7 @@ public class ParserTest {
 
   @Test
   public void testDateParsing() {
-    Date value = new Date(904910400000L); // Google founding date :)
+    Date value = Date.fromYearMonthDay(1998, 9, 4); // Google founding date :)
 
     byte[] byteResult = {-1, -1, -2, 28};
     byte[] stringResult = {'1', '9', '9', '8', '-', '0', '9', '-', '0', '4'};
@@ -257,7 +265,7 @@ public class ParserTest {
 
   @Test
   public void testTimestampParsingBytePart() {
-    Timestamp value = new Timestamp(904910400000L);
+    Timestamp value = Timestamp.ofTimeMicroseconds(904910400000000L);
 
     byte[] byteResult = {-1, -1, -38, 1, -93, -70, 48, 0};
 
@@ -297,7 +305,7 @@ public class ParserTest {
 
   @Test
   public void testBinaryParsing() {
-    byte[] value = {(byte) 0b01010101, (byte) 0b10101010};
+    ByteArray value = ByteArray.copyFrom(new byte[] {(byte) 0b01010101, (byte) 0b10101010});
     byte[] byteResult = {(byte) 0b01010101, (byte) 0b10101010};
     byte[] stringResult = {'U', '\\', '2', '5', '2'};
 
@@ -309,11 +317,18 @@ public class ParserTest {
   }
 
   @Test
-  public void testStringArrayParsing() throws SQLException {
+  public void testStringArrayParsing() {
     String[] value = {"abc", "def", "jhi"};
+    // The binary format of a PG array should contain the OID of the element type and not the array
+    // OID. For VARCHAR that means 1043 and not 1015
+    // See
+    // https://github.com/pgjdbc/pgjdbc/blob/60a81034fd003551fc863033f491b2d0ed1dfa80/pgjdbc/src/main/java/org/postgresql/jdbc/ArrayDecoding.java#L505
+    // We can test this more thoroughly when
+    // https://github.com/GoogleCloudPlatform/pgadapter/pull/36
+    // has been merged.
     byte[] byteResult = {
-      0, 0, 0, 1, 0, 0, 0, 1, -1, -1, -1, -9, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 97, 98, 99, 0, 0,
-      0, 3, 100, 101, 102, 0, 0, 0, 3, 106, 104, 105
+      0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 4, 19, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 97, 98, 99, 0, 0, 0,
+      3, 100, 101, 102, 0, 0, 0, 3, 106, 104, 105
     };
     byte[] stringResult = {
       '{', '"', 'a', 'b', 'c', '"', ',', '"', 'd', 'e', 'f', '"', ',', '"', 'j', 'h', 'i', '"', '}'
@@ -322,56 +337,53 @@ public class ParserTest {
       '[', '"', 'a', 'b', 'c', '"', ',', '"', 'd', 'e', 'f', '"', ',', '"', 'j', 'h', 'i', '"', ']'
     };
 
-    Array sqlArray = Mockito.mock(Array.class);
     ResultSet resultSet = Mockito.mock(ResultSet.class);
+    when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.string()));
+    when(resultSet.getValue(0)).thenReturn(Value.stringArray(Arrays.asList(value)));
 
-    Mockito.when(sqlArray.getBaseType()).thenReturn(Types.NVARCHAR);
-    Mockito.when(sqlArray.getArray()).thenReturn(value);
-    Mockito.when(resultSet.getArray(0)).thenReturn(sqlArray);
-
-    Parser parser = new ArrayParser(resultSet, 0);
+    ArrayParser parser = new ArrayParser(resultSet, 0);
 
     validate(parser, byteResult, stringResult, spannerResult);
   }
 
   @Test
-  public void testLongArrayParsing() throws SQLException {
+  public void testLongArrayParsing() {
     Long[] value = {1L, 2L, 3L};
+    // The binary format of a PG array should contain the OID of the element type and not the array
+    // OID. For INT8 that means 20 and not 1016
+    // See
+    // https://github.com/pgjdbc/pgjdbc/blob/60a81034fd003551fc863033f491b2d0ed1dfa80/pgjdbc/src/main/java/org/postgresql/jdbc/ArrayDecoding.java#L505
+    // We can test this more thoroughly when
+    // https://github.com/GoogleCloudPlatform/pgadapter/pull/36
+    // has been merged.
     byte[] byteResult = {
-      0, 0, 0, 1, 0, 0, 0, 1, -1, -1, -1, -5, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0,
-      0, 1, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 3
+      0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 20, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
+      1, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 3
     };
     byte[] stringResult = {'{', '1', ',', '2', ',', '3', '}'};
     byte[] spannerResult = {'[', '1', ',', '2', ',', '3', ']'};
 
-    Array sqlArray = Mockito.mock(Array.class);
     ResultSet resultSet = Mockito.mock(ResultSet.class);
+    when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.int64()));
+    when(resultSet.getValue(0)).thenReturn(Value.int64Array(Arrays.asList(value)));
 
-    Mockito.when(sqlArray.getBaseType()).thenReturn(Types.BIGINT);
-    Mockito.when(sqlArray.getArray()).thenReturn(value);
-    Mockito.when(resultSet.getArray(0)).thenReturn(sqlArray);
-
-    Parser parser = new ArrayParser(resultSet, 0);
+    ArrayParser parser = new ArrayParser(resultSet, 0);
 
     validate(parser, byteResult, stringResult, spannerResult);
   }
 
   @Test(expected = IllegalArgumentException.class)
-  public void testArrayArrayParsingFails() throws SQLException {
+  public void testArrayArrayParsingFails() {
     Long[] value = {1L, 2L, 3L};
 
-    Array sqlArray = Mockito.mock(Array.class);
     ResultSet resultSet = Mockito.mock(ResultSet.class);
-
-    Mockito.when(sqlArray.getBaseType()).thenReturn(Types.ARRAY);
-    Mockito.when(sqlArray.getArray()).thenReturn(value);
-    Mockito.when(resultSet.getArray(0)).thenReturn(sqlArray);
+    when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.array(Type.int64())));
 
     new ArrayParser(resultSet, 0);
   }
 
   @Test
-  public void testNumericParsing() throws SQLException {
+  public void testNumericParsing() {
     BigDecimal value = new BigDecimal("1234567890.1234567890");
 
     byte[] byteResult = ByteConverter.numeric(new BigDecimal("1234567890.1234567890"));
@@ -389,7 +401,7 @@ public class ParserTest {
   }
 
   @Test
-  public void testNumericParsingNaN() throws SQLException {
+  public void testNumericParsingNaN() {
     Number value = Double.NaN;
 
     byte[] stringResult = {'N', 'a', 'N'};
@@ -408,6 +420,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -419,6 +432,7 @@ public class ParserTest {
       String sql = "COPY Users FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -430,6 +444,7 @@ public class ParserTest {
       String sql = "COPY UsErS FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -441,6 +456,7 @@ public class ParserTest {
       String sql = "COPY USERS FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -452,6 +468,7 @@ public class ParserTest {
       String sql = "COPY \'Users\' FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("Users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -463,6 +480,7 @@ public class ParserTest {
       String sql = "COPY \"UsErS\" FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("UsErS")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -474,6 +492,7 @@ public class ParserTest {
       String sql = "COPY \'USERS\' FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("USERS")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -485,6 +504,7 @@ public class ParserTest {
       String sql = "COPY users (id) FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -496,6 +516,7 @@ public class ParserTest {
       String sql = "COPY users (id, age) FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -507,6 +528,7 @@ public class ParserTest {
       String sql = "COPY users (id, age, name) FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -518,6 +540,7 @@ public class ParserTest {
       String sql = "COPY users (ID, AGE, NAME) FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -529,6 +552,7 @@ public class ParserTest {
       String sql = "COPY users (Id, Age, Name) FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -540,6 +564,7 @@ public class ParserTest {
       String sql = "COPY users (iD, aGe, nAMe) FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -551,6 +576,7 @@ public class ParserTest {
       String sql = "COPY users (\'ID\', \"AGE\", \'NAME\') FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -562,6 +588,7 @@ public class ParserTest {
       String sql = "COPY users (\'Id\', \'Age\', \'Name\') FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -573,6 +600,7 @@ public class ParserTest {
       String sql = "COPY users (\"iD\", \"aGe\", \"nAMe\") FROM STDIN;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -587,6 +615,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN WITH FORMAT CSV;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.CSV)));
@@ -597,6 +626,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN WITH FORMAT BINARY;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.BINARY)));
@@ -607,6 +637,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN WITH FORMAT TEXT;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -617,6 +648,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN CSV;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.CSV)));
@@ -627,6 +659,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN BINARY;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.BINARY)));
@@ -637,6 +670,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN TEXT;";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -647,6 +681,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN DELIMITER '*';";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -658,6 +693,14 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN ESCAPE '\\';";
       parse(sql, options);
 
+      SpannerException exception =
+          assertThrows(
+              SpannerException.class,
+              () -> StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)));
+      assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
+      assertEquals(
+          "INVALID_ARGUMENT: SQL statement contains an unclosed literal: COPY users FROM STDIN ESCAPE '\\';",
+          exception.getMessage());
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -669,6 +712,14 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN QUOTE '\'';";
       parse(sql, options);
 
+      SpannerException exception =
+          assertThrows(
+              SpannerException.class,
+              () -> StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)));
+      assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
+      assertEquals(
+          "INVALID_ARGUMENT: SQL statement contains an unclosed literal: COPY users FROM STDIN QUOTE ''';",
+          exception.getMessage());
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
@@ -680,10 +731,69 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN NULL 'null';";
       parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertThat(options.getTableName(), is(equalTo("users")));
       assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
       assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
       assertThat(options.getNullString(), is(equalTo("null")));
+    }
+
+    {
+      char value;
+      for (value = '!'; value <= '~'; value++) {
+        CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+        String sql = "COPY users FROM STDIN (QUOTE '" + value + "');";
+        parse(sql, options);
+        // These characters are not currently allowed since removeCommentsAndTrim() has special
+        // cases for their use: [' " \]  ('\'' and '\"' are actually allowed if they are wrapped by
+        // the other character)
+        if (value == '\'' || value == '\\') {
+          SpannerException exception =
+              assertThrows(
+                  SpannerException.class,
+                  () -> StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)));
+          assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
+        } else {
+          assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+        }
+        assertThat(options.getTableName(), is(equalTo("users")));
+        assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+        assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+        assertThat(options.getQuote(), is(equalTo(value)));
+      }
+    }
+
+    {
+      char value;
+      for (value = '!'; value <= '|'; value++) {
+        char value1 = (char) (value + 1);
+        char value2 = (char) (value + 2);
+        CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+        String sql =
+            "COPY users FROM STDIN (DELIMITER '"
+                + value
+                + "', QUOTE '"
+                + value1
+                + "', ESCAPE '"
+                + value2
+                + "');";
+        parse(sql, options);
+        if (value >= '%' && value <= '\'' || value >= 'Z' && value <= '\\') {
+          SpannerException exception =
+              assertThrows(
+                  SpannerException.class,
+                  () -> StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)));
+          assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
+        } else {
+          assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+        }
+        assertThat(options.getTableName(), is(equalTo("users")));
+        assertThat(options.getFromTo(), is(equalTo(FromTo.FROM)));
+        assertThat(options.getFormat(), is(equalTo(Format.TEXT)));
+        assertThat(options.getDelimiter(), is(equalTo(value)));
+        assertThat(options.getQuote(), is(equalTo(value1)));
+        assertThat(options.getEscape(), is(equalTo(value2)));
+      }
     }
   }
 

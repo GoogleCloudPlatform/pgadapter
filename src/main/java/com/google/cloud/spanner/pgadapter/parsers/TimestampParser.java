@@ -14,13 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.sql.Types;
-import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
@@ -35,8 +34,9 @@ public class TimestampParser extends Parser<Timestamp> {
   public static final int MICROSECONDS_IN_SECOND = 1000000;
   public static final long NANOSECONDS_IN_MICROSECONDS = 1000L;
   private static final char TIMESTAMP_SEPARATOR = 'T';
-  private static final char ZERO_TIMEZONE = 'Z';
   private static final char EMPTY_SPACE = ' ';
+  private static final String ZERO_TIMEZONE = "Z";
+  private static final String PG_ZERO_TIMEZONE = "+00";
 
   /** Regular expression for parsing timestamps. */
   private static final String TIMESTAMP_REGEX =
@@ -56,7 +56,7 @@ public class TimestampParser extends Parser<Timestamp> {
           .appendOffset("+HH:mm", "Z")
           .toFormatter();
 
-  public TimestampParser(ResultSet item, int position) throws SQLException {
+  public TimestampParser(ResultSet item, int position) {
     this.item = item.getTimestamp(position);
   }
 
@@ -70,16 +70,17 @@ public class TimestampParser extends Parser<Timestamp> {
         case TEXT:
           String stringValue = new String(item, StandardCharsets.UTF_8);
           TemporalAccessor temporalAccessor = TIMESTAMP_FORMATTER.parse(stringValue);
-          this.item = Timestamp.from(Instant.from(temporalAccessor));
+          this.item =
+              Timestamp.ofTimeSecondsAndNanos(
+                  temporalAccessor.getLong(ChronoField.INSTANT_SECONDS),
+                  temporalAccessor.get(ChronoField.NANO_OF_SECOND));
           break;
         case BINARY:
           long pgMicros = ByteConverter.int8(item, 0);
           com.google.cloud.Timestamp ts = com.google.cloud.Timestamp.ofTimeMicroseconds(pgMicros);
           long javaSeconds = ts.getSeconds() + PG_EPOCH_SECONDS;
           int javaNanos = ts.getNanos();
-          this.item =
-              com.google.cloud.Timestamp.ofTimeSecondsAndNanos(javaSeconds, javaNanos)
-                  .toSqlTimestamp();
+          this.item = Timestamp.ofTimeSecondsAndNanos(javaSeconds, javaNanos);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
@@ -105,18 +106,21 @@ public class TimestampParser extends Parser<Timestamp> {
 
   @Override
   protected String stringParse() {
-    return toPGString();
+    return this.item == null ? null : toPGString();
   }
 
   @Override
   protected String spannerParse() {
-    return item.toString();
+    return this.item == null ? null : item.toString();
   }
 
   @Override
   protected byte[] binaryParse() {
+    if (this.item == null) {
+      return null;
+    }
     long microseconds =
-        ((this.item.getTime() / MILLISECONDS_IN_SECOND - PG_EPOCH_SECONDS) * MICROSECONDS_IN_SECOND)
+        ((this.item.getSeconds() - PG_EPOCH_SECONDS) * MICROSECONDS_IN_SECOND)
             + (this.item.getNanos() / NANOSECONDS_IN_MICROSECONDS);
     byte[] result = new byte[8];
     ByteConverter.int8(result, 0, microseconds);
@@ -133,6 +137,10 @@ public class TimestampParser extends Parser<Timestamp> {
     return this.item
         .toString()
         .replace(TIMESTAMP_SEPARATOR, EMPTY_SPACE)
-        .replace(ZERO_TIMEZONE, EMPTY_SPACE);
+        .replace(ZERO_TIMEZONE, PG_ZERO_TIMEZONE);
+  }
+
+  public void bind(Statement.Builder statementBuilder, String name) {
+    statementBuilder.bind(name).to(this.item);
   }
 }

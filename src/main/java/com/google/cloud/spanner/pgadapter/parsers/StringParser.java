@@ -14,15 +14,15 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import java.nio.charset.StandardCharsets;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Types;
 
 /** Translate from wire protocol to string. */
 public class StringParser extends Parser<String> {
 
-  public StringParser(ResultSet item, int position) throws SQLException {
+  public StringParser(ResultSet item, int position) {
     this.item = item.getString(position);
   }
 
@@ -48,6 +48,10 @@ public class StringParser extends Parser<String> {
 
   @Override
   protected byte[] binaryParse() {
-    return this.item.getBytes(StandardCharsets.UTF_8);
+    return this.item == null ? null : this.item.getBytes(StandardCharsets.UTF_8);
+  }
+
+  public void bind(Statement.Builder statementBuilder, String name) {
+    statementBuilder.bind(name).to(this.item);
   }
 }
