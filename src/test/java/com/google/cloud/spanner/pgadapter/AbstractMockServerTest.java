@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static org.junit.Assert.assertEquals;
+
 import com.google.api.gax.core.NoCredentialsProvider;
 import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
 import com.google.api.gax.longrunning.OperationSnapshot;
@@ -231,7 +233,7 @@ abstract class AbstractMockServerTest {
                     String userAgent =
                         metadata.get(
                             Metadata.Key.of("user-agent", Metadata.ASCII_STRING_MARSHALLER));
-                    // assertEquals(userAgent, "pg-adapter");
+                    assertEquals(userAgent, "pg-adapter");
                     return Contexts.interceptCall(
                         Context.current(), serverCall, metadata, serverCallHandler);
                   }
