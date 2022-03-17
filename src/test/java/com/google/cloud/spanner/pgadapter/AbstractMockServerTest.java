@@ -14,7 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import com.google.api.gax.core.NoCredentialsProvider;
 import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
@@ -42,6 +43,7 @@ import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.CreateDatabaseRequest;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.SpannerGrpc;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
@@ -230,10 +232,16 @@ abstract class AbstractMockServerTest {
                       Metadata metadata,
                       ServerCallHandler<ReqT, RespT> serverCallHandler) {
 
-                    String userAgent =
-                        metadata.get(
-                            Metadata.Key.of("user-agent", Metadata.ASCII_STRING_MARSHALLER));
-                    assertEquals(userAgent, "pg-adapter");
+                    if (SpannerGrpc.getExecuteStreamingSqlMethod()
+                        .getFullMethodName()
+                        .equals(serverCall.getMethodDescriptor().getFullMethodName())) {
+                      String userAgent =
+                          metadata.get(
+                              Metadata.Key.of(
+                                  "x-goog-api-client", Metadata.ASCII_STRING_MARSHALLER));
+                      assertNotNull(userAgent);
+                      assertTrue(userAgent.contains("pg-adapter"));
+                    }
                     return Contexts.interceptCall(
                         Context.current(), serverCall, metadata, serverCallHandler);
                   }
