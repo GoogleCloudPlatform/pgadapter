@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static org.junit.Assert.assertEquals;
+
 import com.google.api.gax.core.NoCredentialsProvider;
 import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
 import com.google.api.gax.longrunning.OperationSnapshot;
@@ -42,8 +44,15 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.Context;
+import io.grpc.Contexts;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Metadata;
 import io.grpc.Server;
+import io.grpc.ServerCall;
+import io.grpc.ServerCall.Listener;
+import io.grpc.ServerCallHandler;
+import io.grpc.ServerInterceptor;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.net.InetSocketAddress;
 import java.util.logging.Logger;
@@ -133,6 +142,20 @@ abstract class AbstractMockServerTest {
             .addService(mockSpanner)
             .addService(mockDatabaseAdmin)
             .addService(mockOperationsService)
+            .intercept(
+                new ServerInterceptor() {
+                  @Override
+                  public <ReqT, RespT> Listener<ReqT> interceptCall(
+                      ServerCall<ReqT, RespT> serverCall, Metadata metadata,
+                      ServerCallHandler<ReqT, RespT> serverCallHandler) {
+
+                    String userAgent = metadata.get(Metadata.Key.of("user-agent", Metadata.ASCII_STRING_MARSHALLER));
+                    //assertEquals(userAgent, "pg-adapter");
+                    return Contexts.interceptCall(Context.current(), serverCall, metadata, serverCallHandler);
+                  }
+                }
+
+            )
             .build()
             .start();
 
