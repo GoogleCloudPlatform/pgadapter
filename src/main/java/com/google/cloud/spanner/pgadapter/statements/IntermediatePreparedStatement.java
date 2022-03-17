@@ -14,19 +14,23 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
-import com.google.cloud.spanner.pgadapter.metadata.SQLMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
-import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
-import com.google.common.collect.SetMultimap;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.util.List;
+import java.util.Set;
+import org.postgresql.core.Oid;
 
 /**
  * Intermediate representation for prepared statements (i.e.: statements before they become portals)
@@ -34,34 +38,13 @@ import java.util.List;
 public class IntermediatePreparedStatement extends IntermediateStatement {
 
   private static final Charset UTF8 = StandardCharsets.UTF_8;
-  protected final int parameterCount;
-  protected final SetMultimap<Integer, Integer> parameterIndexToPositions;
   protected List<Integer> parameterDataTypes;
+  protected Statement statement;
 
-  public IntermediatePreparedStatement(String sql, Connection connection) throws SQLException {
-    super(sql);
-    SQLMetadata parsedSQL = Converter.toJDBCParams(sql);
-    this.parameterCount = parsedSQL.getParameterCount();
-    this.sql = parsedSQL.getSqlString();
-    this.parameterIndexToPositions = parsedSQL.getParameterIndexToPositions();
-    this.command = StatementParser.parseCommand(sql);
-    this.connection = connection;
-    this.statement = this.connection.prepareStatement(this.sql);
-    this.parameterDataTypes = null;
-  }
-
-  protected IntermediatePreparedStatement(
-      PreparedStatement statement,
-      String sql,
-      int totalParameters,
-      SetMultimap<Integer, Integer> parameterIndexToPositions,
-      Connection connection) {
-    super(sql);
-    this.sql = sql;
-    this.command = StatementParser.parseCommand(sql);
-    this.parameterCount = totalParameters;
-    this.parameterIndexToPositions = parameterIndexToPositions;
-    this.statement = statement;
+  public IntermediatePreparedStatement(OptionsMetadata options, String sql, Connection connection) {
+    super(options, sql);
+    this.sql = replaceKnownUnsupportedQueries(sql);
+    this.command = StatementParser.parseCommand(this.sql);
     this.connection = connection;
     this.parameterDataTypes = null;
   }
@@ -78,7 +61,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     if (this.parameterDataTypes.size() > index) {
       return this.parameterDataTypes.get(index);
     } else {
-      throw new IllegalArgumentException("PgAdapter does not support untyped parameters.");
+      return Oid.UNSPECIFIED;
     }
   }
 
@@ -86,26 +69,17 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     return this.parameterDataTypes;
   }
 
-  public void setParameterDataTypes(List<Integer> parameterDataTypes)
-      throws IllegalArgumentException {
+  public void setParameterDataTypes(List<Integer> parameterDataTypes) {
     this.parameterDataTypes = parameterDataTypes;
-    if (this.parameterDataTypes.size() != this.parameterCount) {
-      throw new IllegalArgumentException(
-          "Number of supplied parameter data types must match number of parameters. PgAdapter does not support untyped parameters.");
-    }
-  }
-
-  public int getParameterCount() {
-    return this.parameterCount;
   }
 
   @Override
   public void execute() {
     this.executed = true;
     try {
-      ((PreparedStatement) this.statement).execute();
-      this.updateResultCount();
-    } catch (SQLException e) {
+      StatementResult result = connection.execute(this.statement);
+      this.updateResultCount(result);
+    } catch (SpannerException e) {
       handleExecutionException(e);
     }
   }
@@ -118,54 +92,44 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * @param parameterFormatCodes A list of the format of each parameter.
    * @param resultFormatCodes A list of the desired format of each result.
    * @return An Intermediate Portal Statement (or rather a bound version of this statement)
-   * @throws SQLException If the binding fails.
    */
   public IntermediatePortalStatement bind(
-      byte[][] parameters, List<Short> parameterFormatCodes, List<Short> resultFormatCodes)
-      throws SQLException {
+      byte[][] parameters, List<Short> parameterFormatCodes, List<Short> resultFormatCodes) {
     IntermediatePortalStatement portal =
-        new IntermediatePortalStatement(
-            this.connection.prepareStatement(this.sql),
-            this.sql,
-            this.parameterCount,
-            this.parameterIndexToPositions,
-            this.connection);
+        new IntermediatePortalStatement(this.options, this.sql, this.connection);
     portal.setParameterFormatCodes(parameterFormatCodes);
     portal.setResultFormatCodes(resultFormatCodes);
-    if (parameters.length != parameterCount) {
-      throw new IllegalArgumentException(
-          "Wrong number of parameters for prepared statement, expected: "
-              + parameterCount
-              + " but got: "
-              + parameters.length);
-    }
+    Statement.Builder builder = Statement.newBuilder(sql);
     for (int index = 0; index < parameters.length; index++) {
       short formatCode = portal.getParameterFormatCode(index);
       int type = this.parseType(parameters, index);
-      for (Integer position : parameterIndexToPositions.get(index)) {
-        Parser<?> parser = Parser.create(parameters[index], type, FormatCode.of(formatCode));
-        ((PreparedStatement) portal.statement)
-            .setObject(position, parser.getItem(), parser.getSqlType());
-      }
+      Parser<?> parser = Parser.create(parameters[index], type, FormatCode.of(formatCode));
+      parser.bind(builder, "p" + (index + 1));
     }
+    this.statement = builder.build();
+    portal.setBoundStatement(statement);
+
     return portal;
   }
 
   @Override
-  public DescribeMetadata describe() throws Exception {
-    /* Currently, Spanner does not support description of prepared statements which may return
-        result sets (that is to say, SELECT statements). We could return here the describe only for
-        non-SELECT statements, but due to the difficulty in determining the statement type in proxy-
-        side, as well as the unlikelihood of this method being used in production, we just return
-        an exception. If at any point we are able to determine statement types, we can simply return
-        "new DescribeStatementMetadata(
-            Converter.getParams(
-                this.parameterDataTypes,
-                this.totalParameters)
-            );"
-        for non-SELECTs.
-    */
-    throw new IllegalStateException(
-        "Describe statements for non-bound statements are not allowed in spanner.");
+  public DescribeMetadata describe() {
+    Statement statement = Statement.of(this.sql);
+    try (ResultSet resultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN)) {
+      // TODO: Remove ResultSet.next() call once this is supported in the client library.
+      // See https://github.com/googleapis/java-spanner/pull/1691
+      resultSet.next();
+      return new DescribeStatementMetadata(getParameterTypes(), resultSet);
+    }
+  }
+
+  /**
+   * Returns the parameter types in the SQL string of this statement. The current implementation
+   * always returns Oid.UNSPECIFIED for all parameters, as we have no way to actually determine the
+   * parameter types.
+   */
+  private int[] getParameterTypes() {
+    Set<String> parameters = PARSER.getQueryParameters(this.sql);
+    return new int[parameters.size()];
   }
 }

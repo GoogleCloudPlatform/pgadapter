@@ -1,13 +1,13 @@
 {
   "commands": [
     {
-      "input_pattern": "SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relkind IN \\('r'(?:,'p')?,'v','m','S','f',''\\)[ \n]+AND n\\.nspname <> 'pg_catalog'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?n\\.nspname !~ '\\^pg_toast'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;$",
+      "input_pattern": "SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relkind IN \\('r'(?:,'p')?,'v','m','S','f',''\\)[ \n]+AND n\\.nspname <> 'pg_catalog'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?n\\.nspname !~ '\\^pg_toast'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;?$",
       "output_pattern": "SELECT t.table_schema as \"Schema\", t.table_name as \"Name\", 'table' as \"Type\", 'me' as \"Owner\" FROM information_schema.tables AS t WHERE t.table_schema = 'public';",
       "matcher_array": [],
       "blurb": "This command is equivalent to the PSQL \\d meta-command."
     },
     {
-      "input_pattern": "^SELECT c\\.oid,[ \n]+n\\.nspname,[ \n]+c\\.relname\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<tablename>.*)\\)\\$'[ \n]+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 2, 3;$",
+      "input_pattern": "^SELECT c\\.oid,[ \n]+n\\.nspname,[ \n]+c\\.relname\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<tablename>.*)\\)\\$'[ \n]+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 2, 3;?$",
       "output_pattern": "SELECT t.table_name as oid, 'public' as nspname, t.table_name as relname FROM information_schema.tables AS t WHERE t.table_schema='public' AND LOWER(t.table_name) = LOWER('%s');",
       "matcher_array": [
         "tablename"
@@ -15,13 +15,13 @@
       "blurb": "This command is equivalent to the PSQL \\d <param> meta-command. This command is split up among multiple parts, this being the first. Here we just fetch basic metadata used to fetch the table schema in earnest in the next step."
     },
     {
-      "input_pattern": "^SELECT relchecks, relkind, relhasindex, relhasrules, reltriggers <> 0, false, false, relhasoids, (?:false as relispartition, )?'', ''\nFROM pg_catalog\\.pg_class WHERE oid = '.*';$",
+      "input_pattern": "^SELECT relchecks, relkind, relhasindex, relhasrules, reltriggers <> 0, false, false, relhasoids, (?:false as relispartition, )?'', ''\nFROM pg_catalog\\.pg_class WHERE oid = '.*';?$",
       "output_pattern": "SELECT 0 as relcheck, 'r' as relkind, false as relhasindex, false as relhasrules, false as reltriggers, false as bool1, false as bool2, false as relhasoids, '' as str1, '' as str2;",
       "matcher_array": [],
       "blurb": "This command is equivalent to the PSQL \\d <param> meta-command. This command is split up among multiple parts, this being the second. Here normally would fetch catalogue metadata, but due to Spanner structure, we expect it to be static, and thus just hardcode it."
     },
     {
-      "input_pattern": "^SELECT a\\.attname,[ \n]+pg_catalog\\.format_type\\(a\\.atttypid, a\\.atttypmod\\),[ \n]+\\(SELECT (substring\\()?pg_catalog\\.pg_get_expr\\(d\\.adbin, d\\.adrelid(?:, true)?\\)( for 128\\))?[ \n]+FROM pg_catalog\\.pg_attrdef d[ \n]+WHERE d\\.adrelid = a\\.attrelid AND d\\.adnum = a\\.attnum AND a\\.atthasdef\\),[ \n]+a\\.attnotnull,(?: a\\.attnum,)?[ \n]+NULL AS attcollation,[ \n]+(?:''::pg_catalog\\.char AS attidentity,[ \n]+''::pg_catalog\\.char AS attgenerated\n|  NULL AS indexdef,[ \n]+NULL AS attfdwoptions\n)?([ ]*''::pg_catalog.char AS attidentity)?[ \n]*FROM pg_catalog\\.pg_attribute a\nWHERE a\\.attrelid = '(?<tablename>.*)' AND a\\.attnum > 0 AND NOT a\\.attisdropped\nORDER BY a\\.attnum;$",
+      "input_pattern": "^SELECT a\\.attname,[ \n]+pg_catalog\\.format_type\\(a\\.atttypid, a\\.atttypmod\\),[ \n]+\\(SELECT (substring\\()?pg_catalog\\.pg_get_expr\\(d\\.adbin, d\\.adrelid(?:, true)?\\)( for 128\\))?[ \n]+FROM pg_catalog\\.pg_attrdef d[ \n]+WHERE d\\.adrelid = a\\.attrelid AND d\\.adnum = a\\.attnum AND a\\.atthasdef\\),[ \n]+a\\.attnotnull,(?: a\\.attnum,)?[ \n]+NULL AS attcollation,[ \n]+(?:''::pg_catalog\\.char AS attidentity,[ \n]+''::pg_catalog\\.char AS attgenerated\n|  NULL AS indexdef,[ \n]+NULL AS attfdwoptions\n)?([ ]*''::pg_catalog.char AS attidentity)?[ \n]*FROM pg_catalog\\.pg_attribute a\nWHERE a\\.attrelid = '(?<tablename>.*)' AND a\\.attnum > 0 AND NOT a\\.attisdropped\nORDER BY a\\.attnum;?$",
       "output_pattern": "SELECT t.column_name as attname, t.data_type as format_type, '' as substring, t.is_nullable = 'NO' as attnotnull, null::INTEGER as attcollation, null::INTEGER as indexdef, null::INTEGER as attfdwoptions FROM information_schema.columns AS t WHERE t.table_schema='public' AND t.table_name = '%s';",
       "matcher_array": [
         "tablename"
@@ -29,25 +29,25 @@
       "blurb": "This command is equivalent to the PSQL \\d <param> meta-command. This command is split up among multiple parts, this being the third. Here we fetch the actual schema."
     },
     {
-      "input_pattern": "^SELECT c\\.oid::pg_catalog\\.regclass[ \n]+FROM pg_catalog\\.pg_class c, pg_catalog\\.pg_inherits i[ \n]+WHERE c\\.oid( )?=( )?i\\.inhparent AND i\\.inhrelid = '.*'[ \n]+(?:AND c\\.relkind != 'p')?[ \n]+(?:AND c\\.relkind != 'I')?[ \n]*ORDER BY inhseqno;$",
+      "input_pattern": "^SELECT c\\.oid::pg_catalog\\.regclass[ \n]+FROM pg_catalog\\.pg_class c, pg_catalog\\.pg_inherits i[ \n]+WHERE c\\.oid( )?=( )?i\\.inhparent AND i\\.inhrelid = '.*'[ \n]+(?:AND c\\.relkind != 'p')?[ \n]+(?:AND c\\.relkind != 'I')?[ \n]*ORDER BY inhseqno;?$",
       "output_pattern": "SELECT 1 LIMIT 0;",
       "matcher_array": [],
       "blurb": "This command is equivalent to the PSQL \\d <param> meta-command. This command is split up among multiple parts, this being the fourth. The Spanner fetch does not require a similar step so we just hardcode it."
     },
     {
-      "input_pattern": "^SELECT c\\.oid::pg_catalog\\.regclass(, c\\.relkind(, false AS inhdetachpending)?, NULL)?[ \n]+FROM pg_catalog\\.pg_class c, pg_catalog\\.pg_inherits i[ \n]+WHERE c\\.oid( )?=( )?i\\.inhrelid AND i\\.inhparent = '.*'[ \n]+ORDER BY c\\.relname;$",
+      "input_pattern": "^SELECT c\\.oid::pg_catalog\\.regclass(, c\\.relkind(, false AS inhdetachpending)?, NULL)?[ \n]+FROM pg_catalog\\.pg_class c, pg_catalog\\.pg_inherits i[ \n]+WHERE c\\.oid( )?=( )?i\\.inhrelid AND i\\.inhparent = '.*'[ \n]+ORDER BY c\\.relname;?$",
       "output_pattern": "SELECT 1 LIMIT 0;",
       "matcher_array": [],
       "blurb": "This command is equivalent to the PSQL \\d <param> meta-command. This command is split up among multiple parts, this being the fifth. The Spanner fetch does not require a similar step so we just hardcode it."
     },
     {
-      "input_pattern": "^SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relkind IN \\('r'(?:,'p')?,''\\)[ \n]+AND n\\.nspname <> 'pg_catalog'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?n\\.nspname !~ '\\^pg_toast'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;$",
+      "input_pattern": "^SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relkind IN \\('r'(?:,'p')?,''\\)[ \n]+AND n\\.nspname <> 'pg_catalog'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?n\\.nspname !~ '\\^pg_toast'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;?$",
       "output_pattern": "SELECT * FROM information_schema.tables;",
       "matcher_array": [],
       "blurb": "This command is equivalent to the PSQL \\dt meta-command."
     },
     {
-      "input_pattern": "^SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relkind IN \\('r'(?:,'p')?(?:,'t')?,'s',''\\)[ \n]+AND (?:n\\.nspname !~ '\\^pg_toast'[ \n]+AND )?c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<tablename>.*)\\)\\$'[ \n]+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;$",
+      "input_pattern": "^SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relkind IN \\('r'(?:,'p')?(?:,'t')?,'s',''\\)[ \n]+AND (?:n\\.nspname !~ '\\^pg_toast'[ \n]+AND )?c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<tablename>.*)\\)\\$'[ \n]+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;?$",
       "output_pattern": "SELECT * FROM information_schema.tables WHERE LOWER(table_name) = LOWER('%s');",
       "matcher_array": [
         "tablename"
@@ -55,27 +55,27 @@
       "blurb": "This command is equivalent to the PSQL \\dt <param> meta-command."
     },
     {
-      "input_pattern": "^SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\",[ \n]+c2\\.relname as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace[ \n]+LEFT JOIN pg_catalog\\.pg_index i ON i\\.indexrelid = c\\.oid[ \n]+LEFT JOIN pg_catalog\\.pg_class c2 ON i\\.indrelid = c2\\.oid\nWHERE c\\.relkind IN \\('i'(?:,'I')?,''\\)[ \n]+AND n\\.nspname <> 'pg_catalog'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?n\\.nspname !~ '\\^pg_toast'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;$",
-      "output_pattern": "SELECT * FROM information_schema.indexes;",
+      "input_pattern": "^SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\",[ \n]+c2\\.relname as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace[ \n]+LEFT JOIN pg_catalog\\.pg_index i ON i\\.indexrelid = c\\.oid[ \n]+LEFT JOIN pg_catalog\\.pg_class c2 ON i\\.indrelid = c2\\.oid\nWHERE c\\.relkind IN \\('i'(?:,'I')?,''\\)[ \n]+AND n\\.nspname <> 'pg_catalog'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?n\\.nspname !~ '\\^pg_toast'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;?$",
+      "output_pattern": "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes;",
       "matcher_array": [],
       "blurb": "This command is equivalent to the PSQL \\di meta-command."
     },
     {
-      "input_pattern": "^SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\",[ \n]+c2\\.relname as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace[ \n]+LEFT JOIN pg_catalog\\.pg_index i ON i\\.indexrelid = c\\.oid[ \n]+LEFT JOIN pg_catalog\\.pg_class c2 ON i\\.indrelid = c2\\.oid\nWHERE c\\.relkind IN \\('i'(?:,'I')?,'s',''\\)[ \n]+AND (?:n\\.nspname !~ '\\^pg_toast'[ \n]+AND )?c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<indexname>.*)\\)\\$'[ \n]+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;$",
-      "output_pattern": "SELECT * FROM information_schema.indexes WHERE LOWER(index_name) = LOWER('%s');",
+      "input_pattern": "^SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\",[ \n]+c2\\.relname as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace[ \n]+LEFT JOIN pg_catalog\\.pg_index i ON i\\.indexrelid = c\\.oid[ \n]+LEFT JOIN pg_catalog\\.pg_class c2 ON i\\.indrelid = c2\\.oid\nWHERE c\\.relkind IN \\('i'(?:,'I')?,'s',''\\)[ \n]+AND (?:n\\.nspname !~ '\\^pg_toast'[ \n]+AND )?c\\.relname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<indexname>.*)\\)\\$'[ \n]+AND pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;?$",
+      "output_pattern": "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE LOWER(index_name) = LOWER('%s');",
       "matcher_array": [
         "indexname"
       ],
       "blurb": "This command is equivalent to the PSQL \\di <param> meta-command."
     },
     {
-      "input_pattern": "^SELECT n\\.nspname AS \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(n\\.nspowner\\) AS \"[^\"]*\"\nFROM pg_catalog\\.pg_namespace n\nWHERE n\\.nspname !~ '\\^pg_' AND n\\.nspname <> 'information_schema'\nORDER BY 1;$",
+      "input_pattern": "^SELECT n\\.nspname AS \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(n\\.nspowner\\) AS \"[^\"]*\"\nFROM pg_catalog\\.pg_namespace n\nWHERE n\\.nspname !~ '\\^pg_' AND n\\.nspname <> 'information_schema'\nORDER BY 1;?$",
       "output_pattern": "SELECT * FROM information_schema.schemata;",
       "matcher_array": [],
       "blurb": "This command is equivalent to the PSQL \\dn meta-command."
     },
     {
-      "input_pattern": "^SELECT n\\.nspname AS \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(n\\.nspowner\\) AS \"[^\"]*\"\nFROM pg_catalog\\.pg_namespace n\nWHERE n\\.nspname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<schemaname>.*)\\)\\$'\nORDER BY 1;$",
+      "input_pattern": "^SELECT n\\.nspname AS \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(n\\.nspowner\\) AS \"[^\"]*\"\nFROM pg_catalog\\.pg_namespace n\nWHERE n\\.nspname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<schemaname>.*)\\)\\$'\nORDER BY 1;?$",
       "output_pattern": "SELECT * FROM information_schema.schemata WHERE LOWER(schema_name) = LOWER('%s');",
       "matcher_array": [
         "schemaname"

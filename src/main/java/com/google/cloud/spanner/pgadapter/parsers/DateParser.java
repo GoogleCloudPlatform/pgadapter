@@ -14,9 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.Date;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import com.google.common.base.Preconditions;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Types;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -24,14 +25,14 @@ import java.time.LocalDate;
 import org.postgresql.util.ByteConverter;
 
 /** Translate wire protocol dates to desired formats. */
-public class DateParser extends Parser<java.sql.Date> {
+public class DateParser extends Parser<Date> {
 
-  public DateParser(ResultSet item, int position) throws SQLException {
+  public DateParser(ResultSet item, int position) {
     this.item = item.getDate(position);
   }
 
   public DateParser(Object item) {
-    this.item = (java.sql.Date) item;
+    this.item = (Date) item;
   }
 
   public DateParser(byte[] item, FormatCode formatCode) {
@@ -39,12 +40,15 @@ public class DateParser extends Parser<java.sql.Date> {
       switch (formatCode) {
         case TEXT:
           String stringValue = new String(item, UTF8);
-          this.item = java.sql.Date.valueOf(stringValue);
+          this.item = Date.parseDate(stringValue);
           break;
         case BINARY:
           long days = ByteConverter.int4(item, 0) + PG_EPOCH_DAYS;
           this.validateRange(days);
-          this.item = java.sql.Date.valueOf(LocalDate.ofEpochDay(days));
+          LocalDate localDate = LocalDate.ofEpochDay(days);
+          this.item =
+              Date.fromYearMonthDay(
+                  localDate.getYear(), localDate.getMonthValue(), localDate.getDayOfMonth());
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
@@ -86,12 +90,17 @@ public class DateParser extends Parser<java.sql.Date> {
 
   @Override
   protected String stringParse() {
-    return item.toString();
+    return this.item == null ? null : item.toString();
   }
 
   @Override
   protected byte[] binaryParse() {
-    long days = this.item.toLocalDate().toEpochDay() - PG_EPOCH_DAYS;
+    if (this.item == null) {
+      return null;
+    }
+    LocalDate localDate =
+        LocalDate.of(this.item.getYear(), this.item.getMonth(), this.item.getDayOfMonth());
+    long days = localDate.toEpochDay() - PG_EPOCH_DAYS;
     int daysAsInt = validateRange(days);
     return IntegerParser.binaryParse(daysAsInt);
   }
@@ -107,5 +116,9 @@ public class DateParser extends Parser<java.sql.Date> {
       throw new IllegalArgumentException("Date is out of range, epoch day=" + days);
     }
     return (int) days;
+  }
+
+  public void bind(Statement.Builder statementBuilder, String name) {
+    statementBuilder.bind(name).to(this.item);
   }
 }

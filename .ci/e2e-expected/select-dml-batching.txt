@@ -1,1 +1,1 @@
-ERROR:  INVALID_ARGUMENT: The statement is not suitable for batching. Only DML and DDL statements are allowed for batching. "SELECT * FROM users; INSERT INTO users (id, age, name) VALUES (99, 99, 'person'); SELECT * FROM users;"
+ERROR: INVALID_ARGUMENT: Statement type is not supported for batching "SELECT * FROM users; INSERT INTO users (id, age, name) VALUES (99, 99, 'person'); SELECT * FROM users"

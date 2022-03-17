@@ -14,18 +14,24 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Types;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to {@link Number}. */
 public class NumericParser extends Parser<Number> {
-  public NumericParser(ResultSet item, int position) throws SQLException {
+  public NumericParser(ResultSet item, int position) {
     // This should be either a BigDecimal value or a Double.NaN.
-    this.item = (Number) item.getObject(position);
+    Value value = item.getValue(position);
+    if (Value.NAN.equalsIgnoreCase(value.getString())) {
+      this.item = Double.NaN;
+    } else {
+      this.item = value.getNumeric();
+    }
   }
 
   public NumericParser(Object item) {
@@ -59,14 +65,24 @@ public class NumericParser extends Parser<Number> {
 
   @Override
   protected String stringParse() {
+    if (this.item == null) {
+      return null;
+    }
     return Double.isNaN(this.item.doubleValue()) ? "NaN" : ((BigDecimal) this.item).toPlainString();
   }
 
   @Override
   protected byte[] binaryParse() {
+    if (this.item == null) {
+      return null;
+    }
     if (Double.isNaN(this.item.doubleValue())) {
       return "NaN".getBytes(StandardCharsets.UTF_8);
     }
     return ByteConverter.numeric((BigDecimal) this.item);
+  }
+
+  public void bind(Statement.Builder statementBuilder, String name) {
+    statementBuilder.bind(name).to(Value.pgNumeric(stringParse()));
   }
 }

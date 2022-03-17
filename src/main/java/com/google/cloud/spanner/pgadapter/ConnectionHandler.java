@@ -14,12 +14,17 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import java.io.BufferedInputStream;
@@ -29,12 +34,11 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.security.SecureRandom;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -67,20 +71,38 @@ public class ConnectionHandler extends Thread {
   private static AtomicInteger incrementingConnectionId = new AtomicInteger(0);
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
-  private Connection jdbcConnection;
+  private Connection spannerConnection;
 
-  ConnectionHandler(ProxyServer server, Socket socket) throws SQLException {
+  ConnectionHandler(ProxyServer server, Socket socket) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
-    this.jdbcConnection =
-        DriverManager.getConnection(server.getOptions().getConnectionURL(), server.getProperties());
+    String uri = server.getOptions().getConnectionURL();
+    if (uri.startsWith("jdbc:")) {
+      uri = uri.substring("jdbc:".length());
+    }
+    uri = appendPropertiesToUrl(uri, server.getProperties());
+    ConnectionOptions connectionOptions = ConnectionOptions.newBuilder().setUri(uri).build();
+    this.spannerConnection = connectionOptions.getConnection();
     setDaemon(true);
     logger.log(
         Level.INFO,
         "Connection handler with ID {0} created for client {1}",
         new Object[] {getName(), socket.getInetAddress().getHostAddress()});
+  }
+
+  private String appendPropertiesToUrl(String url, Properties info) {
+    if (info == null || info.isEmpty()) {
+      return url;
+    }
+    StringBuilder result = new StringBuilder(url);
+    for (Entry<Object, Object> entry : info.entrySet()) {
+      if (entry.getValue() != null && !"".equals(entry.getValue())) {
+        result.append(";").append(entry.getKey()).append("=").append(entry.getValue());
+      }
+    }
+    return result.toString();
   }
 
   /**
@@ -130,13 +152,16 @@ public class ConnectionHandler extends Thread {
     } finally {
       logger.log(Level.INFO, "Closing connection handler with ID {0}", getName());
       try {
-        if (this.jdbcConnection != null) {
-          this.jdbcConnection.close();
+        if (this.spannerConnection != null) {
+          this.spannerConnection.close();
         }
         this.socket.close();
-      } catch (SQLException | IOException e) {
+      } catch (SpannerException | IOException e) {
         logger.log(
-            Level.WARNING, "Exception while closing connection handler with ID {0}", getName());
+            Level.WARNING,
+            e,
+            () ->
+                String.format("Exception while closing connection handler with ID %s", getName()));
       }
       this.server.deregister(this);
       logger.log(Level.INFO, "Connection handler with ID {0} closed", getName());
@@ -146,7 +171,7 @@ public class ConnectionHandler extends Thread {
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
   public void handleTerminate() throws Exception {
     closeAllPortals();
-    this.jdbcConnection.close();
+    this.spannerConnection.close();
     this.status = ConnectionStatus.TERMINATED;
   }
 
@@ -161,9 +186,16 @@ public class ConnectionHandler extends Thread {
         Level.WARNING,
         "Exception on connection handler with ID {0}: {1}",
         new Object[] {getName(), e});
-    this.status = ConnectionStatus.IDLE;
-    new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
-    new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
+    if (this.status == ConnectionStatus.TERMINATED) {
+      new ErrorResponse(output, e, ErrorResponse.State.InternalError, Severity.FATAL).send();
+      new TerminateResponse(output).send();
+    } else if (this.status == ConnectionStatus.COPY_IN) {
+      new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
+    } else {
+      this.status = ConnectionStatus.IDLE;
+      new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
+      new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
+    }
   }
 
   /** Closes portals and statements if the result of an execute was the end of a transaction. */
@@ -261,7 +293,7 @@ public class ConnectionHandler extends Thread {
       IntermediateStatement statement = activeStatementsMap.remove(connectionId);
       // We can mostly ignore the exception since cancel does not expect any result (positive or
       // otherwise)
-      statement.getStatement().cancel();
+      statement.getConnection().cancel();
     }
   }
 
@@ -291,8 +323,8 @@ public class ConnectionHandler extends Thread {
     return this.server;
   }
 
-  public Connection getJdbcConnection() {
-    return this.jdbcConnection;
+  public Connection getSpannerConnection() {
+    return this.spannerConnection;
   }
 
   public int getConnectionId() {
@@ -319,12 +351,16 @@ public class ConnectionHandler extends Thread {
     return activeStatementsMap.get(this.connectionId);
   }
 
+  public synchronized ConnectionStatus getStatus() {
+    return status;
+  }
+
   public synchronized void setStatus(ConnectionStatus status) {
     this.status = status;
   }
 
   /** Status of a {@link ConnectionHandler} */
-  private enum ConnectionStatus {
+  public enum ConnectionStatus {
     UNAUTHENTICATED,
     IDLE,
     COPY_IN,

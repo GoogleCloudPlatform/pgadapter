@@ -14,7 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.SendResultSetState;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
@@ -26,7 +28,6 @@ import com.google.cloud.spanner.pgadapter.wireoutput.PortalSuspendedResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,35 +50,50 @@ public abstract class ControlMessage extends WireMessage {
    */
   public static ControlMessage create(ConnectionHandler connection) throws Exception {
     char nextMsg = (char) connection.getConnectionMetadata().getInputStream().readUnsignedByte();
-    switch (nextMsg) {
-      case QueryMessage.IDENTIFIER:
-        return new QueryMessage(connection);
-      case ParseMessage.IDENTIFIER:
-        return new ParseMessage(connection);
-      case BindMessage.IDENTIFIER:
-        return new BindMessage(connection);
-      case DescribeMessage.IDENTIFIER:
-        return new DescribeMessage(connection);
-      case ExecuteMessage.IDENTIFIER:
-        return new ExecuteMessage(connection);
-      case CloseMessage.IDENTIFIER:
-        return new CloseMessage(connection);
-      case SyncMessage.IDENTIFIER:
-        return new SyncMessage(connection);
-      case TerminateMessage.IDENTIFIER:
-        return new TerminateMessage(connection);
-      case CopyDoneMessage.IDENTIFIER:
-        return new CopyDoneMessage(connection);
-      case CopyDataMessage.IDENTIFIER:
-        return new CopyDataMessage(connection);
-      case CopyFailMessage.IDENTIFIER:
-        return new CopyFailMessage(connection);
-      case FunctionCallMessage.IDENTIFIER:
-        return new FunctionCallMessage(connection);
-      case FlushMessage.IDENTIFIER:
-        return new FlushMessage(connection);
-      default:
-        throw new IllegalStateException("Unknown message");
+    if (connection.getStatus() == ConnectionStatus.COPY_IN) {
+      switch (nextMsg) {
+        case CopyDoneMessage.IDENTIFIER:
+          return new CopyDoneMessage(connection);
+        case CopyDataMessage.IDENTIFIER:
+          return new CopyDataMessage(connection);
+        case CopyFailMessage.IDENTIFIER:
+          return new CopyFailMessage(connection);
+        default:
+          // Drop the connection if we receive an invalid message to prevent further CopyData
+          // messages from coming in. There is no error handling in the COPY protocol, and some
+          // clients will blindly continue to send data and never check any possible responses from
+          // the server during a (large) copy operation, so this is the safest option.
+          connection.setStatus(ConnectionStatus.TERMINATED);
+          throw new IllegalStateException(
+              String.format(
+                  "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: '%c'",
+                  nextMsg));
+      }
+    } else {
+      switch (nextMsg) {
+        case QueryMessage.IDENTIFIER:
+          return new QueryMessage(connection);
+        case ParseMessage.IDENTIFIER:
+          return new ParseMessage(connection);
+        case BindMessage.IDENTIFIER:
+          return new BindMessage(connection);
+        case DescribeMessage.IDENTIFIER:
+          return new DescribeMessage(connection);
+        case ExecuteMessage.IDENTIFIER:
+          return new ExecuteMessage(connection);
+        case CloseMessage.IDENTIFIER:
+          return new CloseMessage(connection);
+        case SyncMessage.IDENTIFIER:
+          return new SyncMessage(connection);
+        case TerminateMessage.IDENTIFIER:
+          return new TerminateMessage(connection);
+        case FunctionCallMessage.IDENTIFIER:
+          return new FunctionCallMessage(connection);
+        case FlushMessage.IDENTIFIER:
+          return new FlushMessage(connection);
+        default:
+          throw new IllegalStateException(String.format("Unknown message: %c", nextMsg));
+      }
     }
   }
 

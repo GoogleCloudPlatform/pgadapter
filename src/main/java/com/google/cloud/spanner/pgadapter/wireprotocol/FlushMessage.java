@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
-import com.google.cloud.spanner.jdbc.CloudSpannerJdbcConnection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
@@ -34,8 +33,7 @@ public class FlushMessage extends ControlMessage {
 
   @Override
   protected void sendPayload() throws Exception {
-    boolean inTransaction =
-        connection.getJdbcConnection().unwrap(CloudSpannerJdbcConnection.class).isInTransaction();
+    boolean inTransaction = connection.getSpannerConnection().isInTransaction();
     new ReadyResponse(
             this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
         .send();

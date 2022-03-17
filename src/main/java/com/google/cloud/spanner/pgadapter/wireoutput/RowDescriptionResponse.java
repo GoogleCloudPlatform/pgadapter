@@ -14,17 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import java.io.DataOutputStream;
-import java.math.BigDecimal;
-import java.sql.Date;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.sql.Types;
 import java.text.MessageFormat;
 import org.postgresql.core.Oid;
 
@@ -44,7 +41,7 @@ public class RowDescriptionResponse extends WireOutput {
   private static final byte DEFAULT_FLAG = 0;
 
   private final IntermediateStatement statement;
-  private final ResultSetMetaData metadata;
+  private final ResultSet resultSet;
   private final QueryMode mode;
   private final OptionsMetadata options;
   private final int columnCount;
@@ -52,25 +49,25 @@ public class RowDescriptionResponse extends WireOutput {
   public RowDescriptionResponse(
       DataOutputStream output,
       IntermediateStatement statement,
-      ResultSetMetaData metadata,
+      ResultSet resultSet,
       OptionsMetadata options,
       QueryMode mode)
       throws Exception {
-    super(output, calculateLength(metadata));
+    super(output, calculateLength(resultSet));
     this.statement = statement;
-    this.metadata = metadata;
+    this.resultSet = resultSet;
     this.options = options;
     this.mode = mode;
-    this.columnCount = metadata.getColumnCount();
+    this.columnCount = resultSet.getColumnCount();
   }
 
-  private static int calculateLength(ResultSetMetaData metadata) throws Exception {
+  private static int calculateLength(ResultSet resultSet) throws Exception {
     int length = HEADER_LENGTH + FIELD_NUMBER_LENGTH;
-    for (int column_index = 1; /* columns start at 1 */
-        column_index <= metadata.getColumnCount();
+    for (int column_index = 0; /* columns start at 0 */
+        column_index < resultSet.getColumnCount();
         column_index++) {
       length +=
-          metadata.getColumnName(column_index).length()
+          resultSet.getType().getStructFields().get(column_index).getName().length()
               + NULL_TERMINATOR_LENGTH
               + TABLE_OID_LENGTH
               + COLUMN_INDEX_LENGTH
@@ -86,10 +83,11 @@ public class RowDescriptionResponse extends WireOutput {
   protected void sendPayload() throws Exception {
     this.outputStream.writeShort(this.columnCount);
     DataFormat defaultFormat = DataFormat.getDataFormat(0, this.statement, this.mode, this.options);
-    for (int column_index = 1; /* columns start at 1 */
-        column_index <= this.columnCount;
+    for (int column_index = 0; /* columns start at 0 */
+        column_index < this.columnCount;
         column_index++) {
-      this.outputStream.write(this.metadata.getColumnName(column_index).getBytes(UTF8));
+      this.outputStream.write(
+          this.resultSet.getType().getStructFields().get(column_index).getName().getBytes(UTF8));
       // If it can be identified as a column of a table, the object ID of the table.
       this.outputStream.writeByte(DEFAULT_FLAG);
       // TODO: pass through Postgres types
@@ -107,7 +105,7 @@ public class RowDescriptionResponse extends WireOutput {
               ? defaultFormat.getCode()
               : this.statement.getResultFormatCode(column_index) == 0
                   ? defaultFormat.getCode()
-                  : this.statement.getResultFormatCode(column_index - 1);
+                  : this.statement.getResultFormatCode(column_index);
       this.outputStream.writeShort(format);
     }
   }
@@ -131,67 +129,9 @@ public class RowDescriptionResponse extends WireOutput {
             });
   }
 
-  int getOidType(int column_index) throws SQLException {
-    int type = this.metadata.getColumnType(column_index);
-    switch (type) {
-      case Types.SMALLINT:
-        return Oid.INT2;
-      case Types.INTEGER:
-        return Oid.INT4;
-      case Types.BIGINT:
-        return Oid.INT8;
-      case Types.NUMERIC:
-        return Oid.NUMERIC;
-      case Types.REAL:
-        return Oid.FLOAT4;
-      case Types.DOUBLE:
-        return Oid.FLOAT8;
-      case Types.CHAR:
-        return Oid.CHAR;
-      case Types.VARCHAR:
-        return Oid.VARCHAR;
-      case Types.BINARY:
-        return Oid.BYTEA;
-      case Types.BIT:
-        return Oid.BOOL;
-      case Types.DATE:
-        return Oid.DATE;
-      case Types.TIME:
-        return Oid.TIME;
-      case Types.TIMESTAMP:
-        return Oid.TIMESTAMP;
-      case Types.ARRAY:
-        // TODO: Rewrite to use Cloud Spanner ResultSetMetaData when refactored to use the
-        // Connection API instead of the JDBC driver, instead of checking the class name.
-        String typeName = metadata.getColumnClassName(column_index);
-        if (Boolean[].class.getName().equals(typeName)) {
-          return Oid.BOOL_ARRAY;
-        }
-        if (Long[].class.getName().equals(typeName)) {
-          return Oid.INT8_ARRAY;
-        }
-        if (Double[].class.getName().equals(typeName)) {
-          return Oid.FLOAT8_ARRAY;
-        }
-        if (BigDecimal[].class.getName().equals(typeName)) {
-          return Oid.NUMERIC_ARRAY;
-        }
-        if (String[].class.getName().equals(typeName)) {
-          return Oid.VARCHAR_ARRAY;
-        }
-        if (byte[][].class.getName().equals(typeName)) {
-          return Oid.BYTEA_ARRAY;
-        }
-        if (Date[].class.getName().equals(typeName)) {
-          return Oid.DATE_ARRAY;
-        }
-        if (Timestamp[].class.getName().equals(typeName)) {
-          return Oid.TIMESTAMP_ARRAY;
-        }
-        return Oid.UNSPECIFIED;
-      default:
-        return Oid.UNSPECIFIED;
-    }
+  int getOidType(int column_index) {
+    Type type = this.resultSet.getColumnType(column_index);
+    return Parser.toOid(type);
   }
 
   int getOidTypeSize(int oid_type) {

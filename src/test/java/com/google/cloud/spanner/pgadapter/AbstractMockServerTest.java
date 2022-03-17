@@ -23,6 +23,7 @@ import com.google.api.gax.longrunning.OperationTimedPollAlgorithm;
 import com.google.api.gax.retrying.RetrySettings;
 import com.google.api.gax.rpc.UnaryCallSettings;
 import com.google.cloud.NoCredentials;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockDatabaseAdminServiceImpl;
 import com.google.cloud.spanner.MockOperationsServiceImpl;
@@ -36,6 +37,7 @@ import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
+import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.CreateDatabaseRequest;
 import com.google.spanner.admin.database.v1.InstanceName;
@@ -43,6 +45,7 @@ import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
+import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Context;
 import io.grpc.Contexts;
@@ -55,6 +58,8 @@ import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.logging.Logger;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -118,6 +123,79 @@ abstract class AbstractMockServerTest {
   protected static final Statement INSERT_STATEMENT = Statement.of("INSERT INTO FOO VALUES (1)");
   protected static final int INSERT_COUNT = 1;
 
+  protected static final ResultSetMetadata ALL_TYPES_METADATA =
+      ResultSetMetadata.newBuilder()
+          .setRowType(
+              StructType.newBuilder()
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("col_bigint")
+                          .setType(Type.newBuilder().setCode(TypeCode.INT64).build()))
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("col_bool")
+                          .setType(Type.newBuilder().setCode(TypeCode.BOOL).build()))
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("col_bytea")
+                          .setType(Type.newBuilder().setCode(TypeCode.BYTES).build()))
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("col_float8")
+                          .setType(Type.newBuilder().setCode(TypeCode.FLOAT64).build()))
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("col_numeric")
+                          .setType(
+                              Type.newBuilder()
+                                  .setCode(TypeCode.NUMERIC)
+                                  .setTypeAnnotation(TypeAnnotationCode.PG_NUMERIC)
+                                  .build()))
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("col_timestamptz")
+                          .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build()))
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("col_varchar")
+                          .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
+                  .build())
+          .build();
+  protected static final com.google.spanner.v1.ResultSet ALL_TYPES_RESULTSET =
+      com.google.spanner.v1.ResultSet.newBuilder()
+          .setMetadata(ALL_TYPES_METADATA)
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("1").build())
+                  .addValues(Value.newBuilder().setBoolValue(true).build())
+                  .addValues(
+                      Value.newBuilder()
+                          .setStringValue(
+                              Base64.getEncoder()
+                                  .encodeToString("test".getBytes(StandardCharsets.UTF_8)))
+                          .build())
+                  .addValues(Value.newBuilder().setNumberValue(3.14d).build())
+                  .addValues(Value.newBuilder().setStringValue("6.626").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue("2022-02-16T13:18:02.123456789Z").build())
+                  .addValues(Value.newBuilder().setStringValue("test").build())
+                  .build())
+          .build();
+  protected static final com.google.spanner.v1.ResultSet ALL_TYPES_NULLS_RESULTSET =
+      com.google.spanner.v1.ResultSet.newBuilder()
+          .setMetadata(ALL_TYPES_METADATA)
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .build();
+
   protected static MockSpannerServiceImpl mockSpanner;
   protected static MockOperationsServiceImpl mockOperationsService;
   protected static MockDatabaseAdminServiceImpl mockDatabaseAdmin;
@@ -132,6 +210,8 @@ abstract class AbstractMockServerTest {
     mockSpanner.putStatementResult(StatementResult.query(SELECT2, SELECT2_RESULTSET));
     mockSpanner.putStatementResult(StatementResult.update(UPDATE_STATEMENT, UPDATE_COUNT));
     mockSpanner.putStatementResult(StatementResult.update(INSERT_STATEMENT, INSERT_COUNT));
+    mockSpanner.putStatementResult(
+        MockSpannerServiceImpl.StatementResult.detectDialectResult(Dialect.POSTGRESQL));
 
     mockOperationsService = new MockOperationsServiceImpl();
     mockDatabaseAdmin = new MockDatabaseAdminServiceImpl(mockOperationsService);
@@ -172,6 +252,7 @@ abstract class AbstractMockServerTest {
                 "i",
                 "-d",
                 "d",
+                "-jdbc",
                 "-c",
                 "", // empty credentials file, as we are using a plain text connection.
                 "-s",
@@ -241,6 +322,11 @@ abstract class AbstractMockServerTest {
   @AfterClass
   public static void stopMockSpannerAndPgAdapterServers() throws Exception {
     pgServer.stopServer();
+    while (pgServer.isAlive()) {
+      // TODO: Remove once the pgServer.stopServer() is blocking until it has actually stopped (or
+      // there is some other way to block until it has stopped).
+      Thread.sleep(1L);
+    }
     try {
       SpannerPool.closeSpannerPool();
     } catch (SpannerException e) {

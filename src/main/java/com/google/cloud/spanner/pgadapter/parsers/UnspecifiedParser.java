@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.spanner.Statement.Builder;
 import com.google.cloud.spanner.Value;
 import java.nio.charset.StandardCharsets;
 import java.sql.Types;
@@ -25,7 +26,7 @@ import java.sql.Types;
 public class UnspecifiedParser extends Parser<Value> {
 
   public UnspecifiedParser(byte[] item, FormatCode formatCode) {
-    this.item = Value.string(item == null ? null : new String(item, UTF8));
+    this.item = item == null ? null : Value.string(new String(item, UTF8));
   }
 
   @Override
@@ -35,11 +36,18 @@ public class UnspecifiedParser extends Parser<Value> {
 
   @Override
   protected String stringParse() {
-    return this.item.isNull() ? null : this.item.getString();
+    return this.item == null || this.item.isNull() ? null : this.item.getString();
   }
 
   @Override
   protected byte[] binaryParse() {
-    return this.item.isNull() ? null : this.item.getString().getBytes(StandardCharsets.UTF_8);
+    return this.item == null || this.item.isNull()
+        ? null
+        : this.item.getString().getBytes(StandardCharsets.UTF_8);
+  }
+
+  @Override
+  public void bind(Builder statementBuilder, String name) {
+    statementBuilder.bind(name).to(this.item);
   }
 }
