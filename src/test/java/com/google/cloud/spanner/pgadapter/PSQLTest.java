@@ -83,7 +83,7 @@ public class PSQLTest {
             + "WHERE"
             + " t.table_schema = 'public';";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -112,7 +112,7 @@ public class PSQLTest {
             + " AND"
             + " LOWER(t.table_name) = LOWER('users');";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -141,7 +141,7 @@ public class PSQLTest {
             + " AND"
             + " LOWER(t.table_name) = LOWER('bobby\\'; DROP TABLE USERS; SELECT\\'');";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -166,7 +166,7 @@ public class PSQLTest {
             + " '' as str1,"
             + " '' as str2;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -202,7 +202,7 @@ public class PSQLTest {
             + " t.table_schema='public'"
             + " AND t.table_name = '-1';";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -239,7 +239,7 @@ public class PSQLTest {
             + " t.table_schema='public'"
             + " AND t.table_name = 'bobby\\'; DROP TABLE USERS; SELECT\\'';";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -253,7 +253,7 @@ public class PSQLTest {
             + " 'p' ORDER BY inhseqno;";
     String result = "SELECT 1 LIMIT 0;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -267,7 +267,7 @@ public class PSQLTest {
             + " c.relname;";
     String result = "SELECT 1 LIMIT 0;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -284,7 +284,7 @@ public class PSQLTest {
             + "ORDER BY 1;";
     String result = "SELECT '' AS Name;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -302,7 +302,7 @@ public class PSQLTest {
             + "ORDER BY 1;";
     String result = "SELECT '' AS Name;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -322,7 +322,7 @@ public class PSQLTest {
 
     // TODO: Add Connection#getDatabase() to Connection API and test here what happens if that
     // method throws an exception.
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -348,7 +348,7 @@ public class PSQLTest {
             + "ORDER BY 1,2;";
     String result = "SELECT * FROM information_schema.tables;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -374,7 +374,7 @@ public class PSQLTest {
     String result =
         "SELECT * FROM information_schema.tables WHERE LOWER(table_name) = LOWER('users');";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -401,7 +401,7 @@ public class PSQLTest {
         "SELECT * FROM information_schema.tables WHERE LOWER(table_name) ="
             + " LOWER('bobby\\'; DROP TABLE USERS; SELECT\\'');";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -431,7 +431,7 @@ public class PSQLTest {
     String result =
         "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -461,7 +461,7 @@ public class PSQLTest {
         "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE LOWER(index_name) ="
             + " LOWER('index');";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -491,7 +491,7 @@ public class PSQLTest {
         "SELECT table_catalog, table_schema, table_name, index_name, index_type, parent_table_name, is_unique, is_null_filtered, index_state, spanner_is_managed FROM information_schema.indexes WHERE LOWER(index_name) ="
             + " LOWER('bobby\\'; DROP TABLE USERS; SELECT\\'');";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -507,7 +507,7 @@ public class PSQLTest {
             + "ORDER BY 1;";
     String result = "SELECT * FROM information_schema.schemata;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -524,7 +524,7 @@ public class PSQLTest {
     String result =
         "SELECT * FROM information_schema.schemata WHERE LOWER(schema_name) = LOWER('schema');";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -542,7 +542,7 @@ public class PSQLTest {
         "SELECT * FROM information_schema.schemata WHERE LOWER(schema_name) = LOWER('bobby\\'; DROP"
             + " TABLE USERS; SELECT\\'');";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -579,7 +579,7 @@ public class PSQLTest {
             + " table_schema = 'public' and STARTS_WITH(LOWER(table_name),"
             + " LOWER('user')) LIMIT 1000;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -615,7 +615,7 @@ public class PSQLTest {
             + " table_schema = 'public' and STARTS_WITH(LOWER(table_name),"
             + " LOWER('user')) LIMIT 1000;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -635,7 +635,7 @@ public class PSQLTest {
         "SELECT column_name AS quote_ident FROM information_schema.columns WHERE"
             + " table_name = 'user' AND STARTS_WITH(LOWER(COLUMN_NAME), LOWER('age')) LIMIT 1000;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -669,7 +669,7 @@ public class PSQLTest {
         "SELECT table_name AS quote_ident FROM information_schema.tables WHERE "
             + "table_schema = 'public' AND STARTS_WITH(LOWER(table_name), LOWER('user')) LIMIT 1000;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -703,7 +703,7 @@ public class PSQLTest {
         "SELECT table_name AS quote_ident FROM INFORMATION_SCHEMA.TABLES WHERE"
             + " STARTS_WITH(LOWER(table_name), LOWER('user')) LIMIT 1000;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -737,7 +737,7 @@ public class PSQLTest {
         "SELECT index_name AS quote_ident FROM INFORMATION_SCHEMA.INDEXES WHERE"
             + " STARTS_WITH(LOWER(index_name), LOWER('index')) LIMIT 1000;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -753,7 +753,7 @@ public class PSQLTest {
         "SELECT schema_name AS quote_ident FROM INFORMATION_SCHEMA.SCHEMATA WHERE"
             + " STARTS_WITH(LOWER(schema_name), LOWER('schema')) LIMIT 1000;";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
 
     Assert.assertEquals(matcherStatement.getSql(), result);
   }
@@ -787,10 +787,10 @@ public class PSQLTest {
     String secondSQL = "SELECT name FROM USERS WHERE age = 30;";
     String expectedSecondResult = "RESULT 2: selector=name, arg2=30, arg1=age";
 
-    MatcherStatement matcherStatement = new MatcherStatement(firstSQL, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, firstSQL, connectionHandler);
     Assert.assertEquals(matcherStatement.getSql(), expectedFirstResult);
 
-    matcherStatement = new MatcherStatement(secondSQL, connectionHandler);
+    matcherStatement = new MatcherStatement(options, secondSQL, connectionHandler);
     Assert.assertEquals(matcherStatement.getSql(), expectedSecondResult);
   }
 
@@ -816,7 +816,7 @@ public class PSQLTest {
     String sql = "SELECT * FROM USERS;";
     String expectedResult = "TABLE: USERS, EXPRESSION: *";
 
-    MatcherStatement matcherStatement = new MatcherStatement(sql, connectionHandler);
+    MatcherStatement matcherStatement = new MatcherStatement(options, sql, connectionHandler);
     Assert.assertEquals(matcherStatement.getSql(), expectedResult);
   }
 }

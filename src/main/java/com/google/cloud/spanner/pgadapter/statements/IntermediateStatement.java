@@ -22,8 +22,11 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -35,9 +38,10 @@ import java.util.List;
  * statements which does not belong directly to Postgres, Spanner, etc.
  */
 public class IntermediateStatement {
-  private static final AbstractStatementParser PARSER =
-      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+  protected static final PostgreSQLStatementParser PARSER =
+      (PostgreSQLStatementParser) AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
+  protected final OptionsMetadata options;
   private final ResultType resultType;
   protected ResultSet statementResult;
   protected boolean hasMoreData;
@@ -52,21 +56,31 @@ public class IntermediateStatement {
   private static final char STATEMENT_DELIMITER = ';';
   private static final char SINGLE_QUOTE = '\'';
 
-  public IntermediateStatement(String sql, Connection connection) {
-    this.sql = sql;
+  public IntermediateStatement(OptionsMetadata options, String sql, Connection connection) {
+    this.options = options;
+    this.sql = replaceKnownUnsupportedQueries(sql);
     this.statements = parseStatements(sql);
-    this.command = StatementParser.parseCommand(sql);
+    this.command = StatementParser.parseCommand(this.sql);
     this.connection = connection;
     // Note: This determines the result type based on the first statement in the SQL statement. That
     // means that it assumes that if this is a batch of statements, all the statements in the batch
     // will have the same type of result (that is; they are all DML statements, all DDL statements,
     // all queries, etc.). That is a safe assumption for now, as PgAdapter currently only supports
     // all-DML and all-DDL batches.
+    this.resultType = determineResultType(this.sql);
+  }
+
+  protected IntermediateStatement(OptionsMetadata options, String sql) {
+    this.options = options;
     this.resultType = determineResultType(sql);
   }
 
-  protected IntermediateStatement(String sql) {
-    this.resultType = determineResultType(sql);
+  protected String replaceKnownUnsupportedQueries(String sql) {
+    if (this.options.isReplaceJdbcMetadataQueries()
+        && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(sql)) {
+      return JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(sql);
+    }
+    return sql;
   }
 
   /**
@@ -153,7 +167,10 @@ public class IntermediateStatement {
     return this.updateCount;
   }
 
-  public void addUpdateCount(int count) {
+  public void addUpdateCount(long count) {
+    if (this.updateCount == null) {
+      this.updateCount = 0L;
+    }
     this.updateCount += count;
   }
 
@@ -203,13 +220,23 @@ public class IntermediateStatement {
    * of updateBatchResultCount.
    */
   protected void updateResultCount(StatementResult result) {
-    if (result.getResultType() == StatementResult.ResultType.RESULT_SET) {
-      this.statementResult = result.getResultSet();
-      this.hasMoreData = this.statementResult.next();
-    } else {
-      this.updateCount = result.getUpdateCount();
-      this.hasMoreData = false;
-      this.statementResult = null;
+    switch (result.getResultType()) {
+      case RESULT_SET:
+        this.statementResult = result.getResultSet();
+        this.hasMoreData = this.statementResult.next();
+        break;
+      case UPDATE_COUNT:
+        this.updateCount = result.getUpdateCount();
+        this.hasMoreData = false;
+        this.statementResult = null;
+        break;
+      case NO_RESULT:
+        this.hasMoreData = false;
+        this.statementResult = null;
+        break;
+      default:
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INTERNAL, "Unknown or unsupported result type: " + result.getResultType());
     }
   }
 
@@ -274,7 +301,7 @@ public class IntermediateStatement {
    * Moreso meant for inherited classes, allows one to call describe on a statement. Since raw
    * statements cannot be described, throw an error.
    */
-  public DescribeMetadata describe() throws Exception {
+  public DescribeMetadata describe() {
     throw new IllegalStateException(
         "Cannot describe a simple statement " + "(only prepared statements and portals)");
   }

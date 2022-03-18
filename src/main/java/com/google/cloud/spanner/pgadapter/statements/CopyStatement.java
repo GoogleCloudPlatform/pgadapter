@@ -22,16 +22,27 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
+import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Strings;
 import com.google.spanner.v1.TypeCode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.commons.csv.CSVFormat;
 
 public class CopyStatement extends IntermediateStatement {
@@ -45,13 +56,47 @@ public class CopyStatement extends IntermediateStatement {
 
   // Table columns read from information schema.
   private Map<String, TypeCode> tableColumns;
+  private int indexedColumnsCount;
   private MutationWriter mutationWriter;
+  private Future<Long> updateCount;
+  private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  public CopyStatement(String sql, Connection connection) {
-    super(sql);
+  public CopyStatement(OptionsMetadata options, String sql, Connection connection) {
+    super(options, sql);
     this.sql = sql;
     this.command = StatementParser.parseCommand(sql);
     this.connection = connection;
+  }
+
+  @Override
+  public Exception getException() {
+    // Do not clear exceptions on a CopyStatement.
+    return this.exception;
+  }
+
+  @Override
+  public void close() throws Exception {
+    if (this.mutationWriter != null) {
+      this.mutationWriter.close();
+    }
+    this.executor.shutdown();
+    super.close();
+  }
+
+  @Override
+  public Long getUpdateCount() {
+    try {
+      return updateCount.get();
+    } catch (ExecutionException e) {
+      throw SpannerExceptionFactory.asSpannerException(e.getCause());
+    } catch (InterruptedException e) {
+      throw SpannerExceptionFactory.propagateInterrupt(e);
+    }
+  }
+
+  @Override
+  public ResultType getResultType() {
+    return ResultType.UPDATE_COUNT;
   }
 
   /** @return Mapping of table column names to column type. */
@@ -165,6 +210,7 @@ public class CopyStatement extends IntermediateStatement {
       case "bigint":
         return TypeCode.INT64;
       case "float8":
+      case "double precision":
         return TypeCode.FLOAT64;
       case "numeric":
         return TypeCode.NUMERIC;
@@ -216,10 +262,37 @@ public class CopyStatement extends IntermediateStatement {
     if (options.getColumnNames() != null) {
       verifyCopyColumns();
     }
+    this.indexedColumnsCount = queryIndexedColumnsCount(tableColumns.keySet());
+  }
+
+  private int queryIndexedColumnsCount(Set<String> columnNames) {
+    String sql =
+        "SELECT COUNT(*) FROM information_schema.index_columns "
+            + "WHERE table_schema='public' "
+            + "and table_name=$1 "
+            + "and column_name in "
+            + IntStream.rangeClosed(2, columnNames.size() + 1)
+                .mapToObj(i -> String.format("$%d", i))
+                .collect(Collectors.joining(", ", "(", ")"));
+    Statement.Builder builder = Statement.newBuilder(sql);
+    builder.bind("p1").to(getTableName());
+    int paramIndex = 2;
+    for (String columnName : columnNames) {
+      builder.bind(String.format("p%d", paramIndex)).to(columnName);
+      paramIndex++;
+    }
+    Statement statement = builder.build();
+    try (ResultSet resultSet = connection.executeQuery(statement)) {
+      if (resultSet.next()) {
+        return (int) resultSet.getLong(0);
+      }
+    }
+    return 0;
   }
 
   @Override
   public void handleExecutionException(SpannerException e) {
+    executor.shutdownNow();
     super.handleExecutionException(e);
   }
 
@@ -232,12 +305,28 @@ public class CopyStatement extends IntermediateStatement {
       setParserFormat(this.options);
       mutationWriter =
           new MutationWriter(
-              options.getTableName(), getTableColumns(), getParserFormat(), hasHeader());
-      updateCount = (long) mutationWriter.getRowCount();
+              getTransactionMode(),
+              connection,
+              options.getTableName(),
+              getTableColumns(),
+              indexedColumnsCount,
+              getParserFormat(),
+              hasHeader());
+      updateCount = executor.submit(mutationWriter);
     } catch (Exception e) {
-      SpannerException se =
-          SpannerExceptionFactory.newSpannerException(ErrorCode.UNKNOWN, e.getMessage(), e);
-      handleExecutionException(se);
+      SpannerException spannerException = SpannerExceptionFactory.asSpannerException(e);
+      handleExecutionException(spannerException);
+    }
+  }
+
+  private CopyTransactionMode getTransactionMode() {
+    if (connection.isInTransaction()) {
+      return CopyTransactionMode.Explicit;
+    } else {
+      if (connection.getAutocommitDmlMode() == AutocommitDmlMode.PARTITIONED_NON_ATOMIC) {
+        return CopyTransactionMode.ImplicitNonAtomic;
+      }
+      return CopyTransactionMode.ImplicitAtomic;
     }
   }
 

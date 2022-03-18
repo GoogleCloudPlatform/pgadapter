@@ -18,6 +18,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
@@ -27,6 +28,8 @@ import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -46,6 +49,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+import org.postgresql.PGConnection;
+import org.postgresql.copy.CopyManager;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
@@ -411,6 +416,115 @@ public class ITJdbcTest implements IntegrationTest {
               .createStatement()
               .executeUpdate("update numbers set name='Two - updated' where num=2");
       assertEquals(0, noUpdateCount);
+    }
+  }
+
+  /**
+   * ---------------------------------------------------------------------------------------------/*
+   * COPY tests
+   *
+   * <p>The data that is used for the COPY tests were generated using this statement:
+   *
+   * <p><code>
+   * select (random()*1000000000)::bigint, random()<0.5, md5(random()::text ||
+   * clock_timestamp()::text)::bytea, random()*123456789, (random()*999999)::int,
+   * (random()*999999)::numeric, now()-random()*interval '50 year', md5(random()::text ||
+   * clock_timestamp()::text)::varchar from generate_series(1, 1000000) s(i);
+   * </code> Example for streaming large amounts of random data from PostgreSQL to Cloud Spanner.
+   * This must be run with the system property -Dcopy_in_insert_or_update=true set, or otherwise it
+   * will eventually fail on a unique key constraint violation, as the primary key value is a random
+   * number. <code>
+   *   psql -h localhost -d knut-test-db -c "copy (select (random()*1000000000)::bigint, random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, (random()*999999)::int, (random()*999999)::numeric, now()-random()*interval '50 year', md5(random()::text || clock_timestamp()::text)::varchar from generate_series(1, 1000000) s(i)) to stdout" | psql -h localhost -p 5433 -d test -c "set autocommit_dml_mode='partitioned_non_atomic'" -c "copy all_types from stdin;"
+   * </code>
+   */
+  @Test
+  public void testCopyIn_Small() throws SQLException, IOException {
+    // Empty all data in the table.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
+
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      long copyCount =
+          copyManager.copyIn(
+              "copy all_types from stdin;",
+              new FileInputStream("./src/test/resources/all_types_data_small.txt"));
+      assertEquals(100L, copyCount);
+
+      // Verify that there are actually 100 rows in the table.
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select count(*) from all_types")) {
+        assertTrue(resultSet.next());
+        assertEquals(100L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testCopyIn_Large_FailsWhenAtomic() throws SQLException {
+    // Empty all data in the table.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
+
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  copyManager.copyIn(
+                      "copy all_types from stdin;",
+                      new FileInputStream("./src/test/resources/all_types_data.txt")));
+      // The JDBC driver CopyManager takes the COPY protocol quite literally, and as the COPY
+      // protocol does not include any error handling, the JDBC driver will just send all data to
+      // the server and ignore any error messages the server might send during the copy operation.
+      // PGAdapter therefore drops the connection if it continues to receive CopyData messages after
+      // it sent back an error message.
+      assertTrue(exception.getMessage().contains("Database connection failed"));
+    }
+
+    // Verify that the table is still empty.
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select count(*) from all_types")) {
+        assertTrue(resultSet.next());
+        assertEquals(0L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testCopyIn_Large_SucceedsWhenNonAtomic() throws SQLException, IOException {
+    // Empty all data in the table.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
+
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      connection.createStatement().execute("set autocommit_dml_mode='partitioned_non_atomic'");
+
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      long copyCount =
+          copyManager.copyIn(
+              "copy all_types from stdin;",
+              new FileInputStream("./src/test/resources/all_types_data.txt"));
+      assertEquals(10_000L, copyCount);
+
+      // Verify that the table is still empty.
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select count(*) from all_types")) {
+        assertTrue(resultSet.next());
+        assertEquals(10_000L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Delete the imported data to prevent the cleanup method to fail on 'Too many mutations' when
+      // it tries to delete all data using a normal transaction.
+      connection.createStatement().execute("delete from all_types");
     }
   }
 }

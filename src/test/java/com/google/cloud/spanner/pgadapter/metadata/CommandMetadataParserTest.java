@@ -64,7 +64,7 @@ public class CommandMetadataParserTest {
     commands.add(
         ImmutableMap.of(
             "input_pattern", "SELECT 1",
-            "output_pattern", "/*GSQL*/ SELECT 1",
+            "output_pattern", "SELECT 1",
             "matcher_array", new JSONArray(),
             "blurb", "test command"));
     final JSONObject expected = new JSONObject(ImmutableMap.of("commands", commands));
