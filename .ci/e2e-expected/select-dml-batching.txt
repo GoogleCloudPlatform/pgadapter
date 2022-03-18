@@ -1,1 +1,1 @@
-ERROR: INVALID_ARGUMENT: Statement type is not supported for batching "SELECT * FROM users; INSERT INTO users (id, age, name) VALUES (99, 99, 'person'); SELECT * FROM users;"
+ERROR: INVALID_ARGUMENT: Statement type is not supported for batching "SELECT * FROM users; INSERT INTO users (id, age, name) VALUES (99, 99, 'person'); SELECT * FROM users"

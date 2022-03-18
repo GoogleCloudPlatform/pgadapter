@@ -4,3 +4,6 @@ target/
 *.iml
 *.class
 *.lst
+
+src/test/golang/*.h
+src/test/golang/*.so
