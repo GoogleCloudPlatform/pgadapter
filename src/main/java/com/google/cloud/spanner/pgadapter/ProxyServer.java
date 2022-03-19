@@ -149,7 +149,16 @@ public class ProxyServer extends Thread {
     this.status = ServerStatus.STARTED;
     try {
       while (this.status == ServerStatus.STARTED) {
-        createConnectionHandler(this.serverSocket.accept());
+        Socket socket = this.serverSocket.accept();
+        try {
+          createConnectionHandler(socket);
+        } catch (SpannerException e) {
+          logger.log(
+              Level.SEVERE,
+              "Something went wrong in establishing a Spanner connection: {0}",
+              e.getMessage());
+          socket.close();
+        }
       }
     } catch (SocketException e) {
       // This is a normal exception, as this will occur when Server#stopServer() is called.

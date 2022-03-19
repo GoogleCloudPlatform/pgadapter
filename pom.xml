@@ -21,6 +21,8 @@
     <skipITs>true</skipITs>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <jmh.version>1.34</jmh.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -113,6 +115,19 @@
       <version>4.3.1</version>
       <scope>test</scope>
     </dependency>
+    <!-- Benchmark dependencies -->
+    <dependency>
+      <groupId>org.openjdk.jmh</groupId>
+      <artifactId>jmh-core</artifactId>
+      <version>${jmh.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openjdk.jmh</groupId>
+      <artifactId>jmh-generator-annprocess</artifactId>
+      <version>${jmh.version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <profiles>
@@ -174,6 +189,18 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>benchmark</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>pw.krejci</groupId>
+            <artifactId>jmh-maven-plugin</artifactId>
+            <version>0.2.2</version>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 
   <build>
@@ -193,6 +220,12 @@
         <configuration>
           <excludedGroups>com.google.cloud.spanner.pgadapter.IntegrationTest</excludedGroups>
           <reportNameSuffix>sponge_log</reportNameSuffix>
+          <systemProperties>
+            <property>
+              <name>java.util.logging.config.file</name>
+              <value>src/test/resources/logging.properties</value>
+            </property>
+          </systemProperties>
         </configuration>
       </plugin>
       <plugin>

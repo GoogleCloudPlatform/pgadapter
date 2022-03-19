@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
@@ -75,6 +76,7 @@ public class ConnectionHandler extends Thread {
 
   ConnectionHandler(ProxyServer server, Socket socket) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
+    setDaemon(true);
     this.server = server;
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
@@ -85,7 +87,6 @@ public class ConnectionHandler extends Thread {
     uri = appendPropertiesToUrl(uri, server.getProperties());
     ConnectionOptions connectionOptions = ConnectionOptions.newBuilder().setUri(uri).build();
     this.spannerConnection = connectionOptions.getConnection();
-    setDaemon(true);
     logger.log(
         Level.INFO,
         "Connection handler with ID {0} created for client {1}",
