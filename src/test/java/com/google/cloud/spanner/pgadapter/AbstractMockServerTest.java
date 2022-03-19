@@ -299,11 +299,6 @@ abstract class AbstractMockServerTest {
   @AfterClass
   public static void stopMockSpannerAndPgAdapterServers() throws Exception {
     pgServer.stopServer();
-    while (pgServer.isAlive()) {
-      // TODO: Remove once the pgServer.stopServer() is blocking until it has actually stopped (or
-      // there is some other way to block until it has stopped).
-      Thread.sleep(1L);
-    }
     try {
       SpannerPool.closeSpannerPool();
     } catch (SpannerException e) {
