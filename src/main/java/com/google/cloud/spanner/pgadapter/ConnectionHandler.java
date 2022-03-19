@@ -175,6 +175,10 @@ public class ConnectionHandler extends Thread {
     this.status = ConnectionStatus.TERMINATED;
   }
 
+  /**
+   * Terminates this connection at the request of the server. This is called if the server is
+   * shutting down while the connection is still active.
+   */
   void terminate() throws IOException {
     if (this.status != ConnectionStatus.TERMINATED) {
       handleTerminate();

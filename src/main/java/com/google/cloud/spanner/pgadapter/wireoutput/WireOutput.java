@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import java.io.DataOutputStream;
-import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
@@ -68,7 +67,7 @@ public abstract class WireOutput {
    * Override this method to include post-processing and metadata in the sending process. Template
    * method for send.
    *
-   * @throws IOException
+   * @throws Exception
    */
   protected abstract void sendPayload() throws Exception;
 
