@@ -324,6 +324,17 @@ abstract class AbstractMockServerTest {
     spannerServer.awaitTermination();
   }
 
+  protected void closeSpannerPool() {
+    while (true) {
+      try {
+        SpannerPool.closeSpannerPool();
+        break;
+      } catch (SpannerException e) {
+        // ignore
+      }
+    }
+  }
+
   @Before
   public void clearRequests() {
     mockSpanner.clearRequests();

@@ -169,10 +169,17 @@ public class ConnectionHandler extends Thread {
   }
 
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
-  public void handleTerminate() throws Exception {
+  public void handleTerminate() {
     closeAllPortals();
     this.spannerConnection.close();
     this.status = ConnectionStatus.TERMINATED;
+  }
+
+  void terminate() throws IOException {
+    if (this.status != ConnectionStatus.TERMINATED) {
+      handleTerminate();
+      socket.close();
+    }
   }
 
   /**
