@@ -21,6 +21,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
@@ -30,6 +31,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -48,6 +50,7 @@ public class IntermediateStatement {
   protected SpannerException exception;
   protected String sql;
   protected String command;
+  protected final ParsedStatement parsedStatement;
   protected boolean executed;
   protected Connection connection;
   protected Long updateCount;
@@ -61,18 +64,20 @@ public class IntermediateStatement {
     this.sql = replaceKnownUnsupportedQueries(sql);
     this.statements = parseStatements(sql);
     this.command = StatementParser.parseCommand(this.sql);
+    this.parsedStatement = PARSER.parse(Statement.of(this.sql));
     this.connection = connection;
     // Note: This determines the result type based on the first statement in the SQL statement. That
     // means that it assumes that if this is a batch of statements, all the statements in the batch
     // will have the same type of result (that is; they are all DML statements, all DDL statements,
     // all queries, etc.). That is a safe assumption for now, as PgAdapter currently only supports
     // all-DML and all-DDL batches.
-    this.resultType = determineResultType(this.sql);
+    this.resultType = determineResultType(this.parsedStatement);
   }
 
   protected IntermediateStatement(OptionsMetadata options, String sql) {
     this.options = options;
-    this.resultType = determineResultType(sql);
+    this.parsedStatement = PARSER.parse(Statement.of(sql));
+    this.resultType = determineResultType(this.parsedStatement);
   }
 
   protected String replaceKnownUnsupportedQueries(String sql) {
@@ -87,13 +92,13 @@ public class IntermediateStatement {
    * Determines the result type based on the given sql string. The sql string must already been
    * stripped of any comments that might precede the actual sql string.
    *
-   * @param sql The sql string to determine the type of result for
+   * @param parsedStatement The parsed statement to determine the type of result for
    * @return The {@link ResultType} that the given sql string will produce
    */
-  protected static ResultType determineResultType(String sql) {
-    if (PARSER.isUpdateStatement(sql)) {
+  protected static ResultType determineResultType(ParsedStatement parsedStatement) {
+    if (parsedStatement.isUpdate()) {
       return ResultType.UPDATE_COUNT;
-    } else if (PARSER.isQuery(sql)) {
+    } else if (parsedStatement.isQuery()) {
       return ResultType.RESULT_SET;
     } else {
       return ResultType.NO_RESULT;
@@ -102,6 +107,11 @@ public class IntermediateStatement {
 
   // Split statements by ';' delimiter, but ignore anything that is nested with '' or "".
   private List<String> splitStatements(String sql) {
+    int indexOfFirstSeparator = sql.indexOf(STATEMENT_DELIMITER);
+    if (indexOfFirstSeparator == -1 || indexOfFirstSeparator == sql.length() - 1) {
+      return Collections.singletonList(sql);
+    }
+
     List<String> statements = new ArrayList<>();
     boolean quoteEsacpe = false;
     int index = 0;
@@ -120,15 +130,14 @@ public class IntermediateStatement {
     }
 
     if (index < sql.length()) {
-      statements.add(sql.substring(index, sql.length()).trim());
+      statements.add(sql.substring(index).trim());
     }
     return statements;
   }
 
   protected List<String> parseStatements(String sql) {
     Preconditions.checkNotNull(sql);
-    List<String> statements = splitStatements(sql);
-    return statements;
+    return splitStatements(sql);
   }
 
   /**

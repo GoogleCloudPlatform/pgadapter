@@ -46,7 +46,7 @@ public class AbstractBenchmark {
             //            .include(AbstractBenchmark.class.getPackage().getName())
             //            .addProfiler(GCProfiler.class)
             .include("PgAdapterJdbcSimpleModeBenchmark.testSelect1")
-            //            .include("ClientLibraryBenchmark.testSelect1")
+//            .include("ClientLibraryBenchmark.testSelect1")
             .forks(1)
             .jvmArgs("-ea")
             .build();

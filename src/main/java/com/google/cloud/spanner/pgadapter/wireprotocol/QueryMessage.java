@@ -36,13 +36,14 @@ public class QueryMessage extends ControlMessage {
   protected static final char IDENTIFIER = 'Q';
   protected static final String COPY = "COPY";
 
+  private final boolean isCopy;
   private IntermediateStatement statement;
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     String query = PARSER.removeCommentsAndTrim(this.readAll());
-    String command = StatementParser.parseCommand(query);
-    if (COPY.equalsIgnoreCase(command)) {
+    this.isCopy = StatementParser.isCommand(COPY, query);
+    if (isCopy) {
       this.statement =
           new CopyStatement(
               connection.getServer().getOptions(), query, this.connection.getSpannerConnection());
@@ -61,7 +62,7 @@ public class QueryMessage extends ControlMessage {
   protected void sendPayload() throws Exception {
     this.statement.execute();
     this.handleQuery();
-    if (!this.statement.getCommand().equalsIgnoreCase(COPY)) {
+    if (!isCopy) {
       this.connection.removeActiveStatement(this.statement);
     }
   }
@@ -97,7 +98,7 @@ public class QueryMessage extends ControlMessage {
     if (this.statement.hasException()) {
       this.handleError(this.statement.getException());
     } else {
-      if (this.statement.getCommand().equalsIgnoreCase(COPY)) {
+      if (isCopy) {
         CopyStatement copyStatement = (CopyStatement) this.statement;
         new CopyInResponse(
                 this.outputStream,

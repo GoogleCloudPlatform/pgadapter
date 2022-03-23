@@ -322,15 +322,18 @@ public class PgAdapterBenchmarkState {
     dataSource.close();
     pgServer.stopServer();
     pgServer.awaitTerminated();
-    try {
-      SpannerPool.closeSpannerPool();
-    } catch (SpannerException e) {
-      if (e.getErrorCode() == ErrorCode.FAILED_PRECONDITION
-          && e.getMessage()
-              .contains(
-                  "There is/are 1 connection(s) still open. Close all connections before calling closeSpanner()")) {
-      } else {
-        throw e;
+    while (true) {
+      try {
+        SpannerPool.closeSpannerPool();
+        break;
+      } catch (SpannerException e) {
+        if (e.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+            && e.getMessage()
+                .contains(
+                    "There is/are 1 connection(s) still open. Close all connections before calling closeSpanner()")) {
+        } else {
+          throw e;
+        }
       }
     }
     if (spannerServer != null) {
