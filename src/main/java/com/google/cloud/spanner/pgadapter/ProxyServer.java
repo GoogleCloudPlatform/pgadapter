@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.api.core.AbstractApiService;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
@@ -22,7 +23,10 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.common.base.Preconditions;
+import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
+import java.io.BufferedOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -33,23 +37,20 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.annotation.concurrent.GuardedBy;
 
 /**
  * The proxy server listens for incoming client connections and starts a new {@link
  * ConnectionHandler} for each incoming connection.
  */
-public class ProxyServer extends Thread {
+public class ProxyServer extends AbstractApiService {
 
   private static final Logger logger = Logger.getLogger(ProxyServer.class.getName());
   private final OptionsMetadata options;
   private final Properties properties;
   private final List<ConnectionHandler> handlers = new LinkedList<>();
 
-  @GuardedBy("itself")
-  private volatile ServerStatus status = ServerStatus.NEW;
-
   private ServerSocket serverSocket;
+  private int localPort;
 
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
@@ -57,8 +58,8 @@ public class ProxyServer extends Thread {
    * @param optionsMetadata Resulting metadata from CLI.
    */
   public ProxyServer(OptionsMetadata optionsMetadata) {
-    super("spanner-postgres-adapter-proxy-port-" + optionsMetadata.getProxyPort());
     this.options = optionsMetadata;
+    this.localPort = optionsMetadata.getProxyPort();
     this.properties = new Properties();
     addConnectionProperties();
   }
@@ -72,8 +73,8 @@ public class ProxyServer extends Thread {
    *     supported properties).
    */
   public ProxyServer(OptionsMetadata optionsMetadata, Properties properties) {
-    super("spanner-postgres-adapter-proxy-port-" + optionsMetadata.getProxyPort());
     this.options = optionsMetadata;
+    this.localPort = optionsMetadata.getProxyPort();
     this.properties = properties;
     addConnectionProperties();
   }
@@ -86,48 +87,50 @@ public class ProxyServer extends Thread {
 
   /** Starts the server by running the thread runnable and setting status. */
   public void startServer() {
-    synchronized (this.status) {
-      Preconditions.checkState(this.status == ServerStatus.NEW);
+    startAsync();
+    awaitRunning();
+    logger.log(Level.INFO, "Server started on port {0}", String.valueOf(getLocalPort()));
+  }
+
+  @Override
+  protected void doStart() {
+    Thread listenerThread =
+        new Thread("spanner-postgres-adapter-proxy-listener") {
+          @Override
+          public void run() {
+            try {
+              runServer();
+            } catch (IOException e) {
+              logger.log(
+                  Level.WARNING,
+                  "Server on port {0} stopped by exception: {1}",
+                  new Object[] {getLocalPort(), e});
+            }
+          }
+        };
+    listenerThread.start();
+  }
+
+  @Override
+  protected void doStop() {
+    try {
+      logger.log(Level.INFO, "Server on port {0} is stopping", String.valueOf(getLocalPort()));
+      this.serverSocket.close();
+      logger.log(Level.INFO, "Server socket on port {0} closed", String.valueOf(getLocalPort()));
+    } catch (IOException exception) {
       logger.log(
-          Level.INFO,
-          "Server is starting on port {0}",
-          String.valueOf(this.options.getProxyPort()));
-      this.status = ServerStatus.STARTING;
-      start();
-      // TODO: Consider changing the server to use ApiService, so we don't have to manage the state
-      //  of the server manually.
-      while (this.status == ServerStatus.STARTING) {
-        Thread.yield();
-      }
-      logger.log(Level.INFO, "Server started on port {0}", String.valueOf(getLocalPort()));
+          Level.WARNING,
+          "Closing server socket on port {0} failed: {1}",
+          new Object[] {String.valueOf(getLocalPort()), exception});
     }
   }
 
   /** Safely stops the server (iff started), closing specific socket and cleaning up. */
   public void stopServer() {
-    synchronized (status) {
-      Preconditions.checkState(status == ServerStatus.STARTED, "Server is not in state Started");
-      try {
-        logger.log(
-            Level.INFO,
-            "Server on port {0} is stopping",
-            String.valueOf(this.options.getProxyPort()));
-        this.status = ServerStatus.STOPPING;
-        this.serverSocket.close();
-        logger.log(
-            Level.INFO,
-            "Server socket on port {0} closed",
-            String.valueOf(this.options.getProxyPort()));
-      } catch (IOException e) {
-        logger.log(
-            Level.WARNING,
-            "Closing server socket on port {0} failed: {1}",
-            new Object[] {String.valueOf(this.options.getProxyPort()), e});
-      }
-    }
+    stopAsync();
+    awaitTerminated();
   }
 
-  @Override
   public void run() {
     try {
       runServer();
@@ -135,7 +138,7 @@ public class ProxyServer extends Thread {
       logger.log(
           Level.WARNING,
           "Server on port {0} stopped by exception: {1}",
-          new Object[] {this.options.getProxyPort(), e});
+          new Object[] {getLocalPort(), e});
     }
   }
 
@@ -146,18 +149,15 @@ public class ProxyServer extends Thread {
    */
   void runServer() throws IOException {
     this.serverSocket = new ServerSocket(this.options.getProxyPort());
-    this.status = ServerStatus.STARTED;
+    this.localPort = serverSocket.getLocalPort();
+    notifyStarted();
     try {
-      while (this.status == ServerStatus.STARTED) {
-        Socket socket = this.serverSocket.accept();
+      while (isRunning()) {
+        Socket socket = serverSocket.accept();
         try {
           createConnectionHandler(socket);
-        } catch (SpannerException e) {
-          logger.log(
-              Level.SEVERE,
-              "Something went wrong in establishing a Spanner connection: {0}",
-              e.getMessage());
-          socket.close();
+        } catch (SpannerException exception) {
+          handleConnectionError(exception, socket);
         }
       }
     } catch (SocketException e) {
@@ -166,14 +166,37 @@ public class ProxyServer extends Thread {
           Level.INFO,
           "Socket exception on port {0}: {1}. This is normal when the server is stopped.",
           new Object[] {getLocalPort(), e});
-    } catch (SpannerException e) {
-      logger.log(
-          Level.SEVERE,
-          "Something went wrong in establishing a Spanner connection: {0}",
-          e.getMessage());
     } finally {
-      this.status = ServerStatus.STOPPED;
+      for (ConnectionHandler handler : this.handlers) {
+        handler.terminate();
+      }
       logger.log(Level.INFO, "Socket on port {0} stopped", getLocalPort());
+      notifyStopped();
+    }
+  }
+
+  /**
+   * Sends a message to the client that the connection could not be established.
+   *
+   * @param exception The exception that caused the connection request to fail.
+   * @param socket The socket that was created for the connection.
+   */
+  private void handleConnectionError(SpannerException exception, Socket socket) {
+    logger.log(
+        Level.SEVERE,
+        "Something went wrong in establishing a Spanner connection: {0}",
+        exception.getMessage());
+    try {
+      DataOutputStream output =
+          new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+      new ErrorResponse(output, exception, ErrorResponse.State.ConnectionException, Severity.FATAL)
+          .send();
+      output.flush();
+    } catch (Exception e) {
+      logger.log(
+          Level.WARNING,
+          "Failed to send fatal error message to client: {0}",
+          exception.getMessage());
     }
   }
 
@@ -186,18 +209,23 @@ public class ProxyServer extends Thread {
    */
   void createConnectionHandler(Socket socket) {
     ConnectionHandler handler = new ConnectionHandler(this, socket);
-    // Note: Calling getDialect() will cause a SpannerException if the connection itself is
-    // invalid, for example as a result of the credentials being wrong.
-    if (handler.getSpannerConnection().getDialect() != Dialect.POSTGRESQL) {
-      throw SpannerExceptionFactory.newSpannerException(
-          ErrorCode.INVALID_ARGUMENT,
-          String.format(
-              "The database uses dialect %s. Currently PGAdapter only supports connections to PostgreSQL dialect databases. "
-                  + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
-              handler.getSpannerConnection().getDialect()));
+    try {
+      // Note: Calling getDialect() will cause a SpannerException if the connection itself is
+      // invalid, for example as a result of the credentials being wrong.
+      if (handler.getSpannerConnection().getDialect() != Dialect.POSTGRESQL) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            String.format(
+                "The database uses dialect %s. Currently PGAdapter only supports connections to PostgreSQL dialect databases. "
+                    + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
+                handler.getSpannerConnection().getDialect()));
+      }
+      register(handler);
+      handler.start();
+    } catch (Exception e) {
+      handler.getSpannerConnection().close();
+      throw e;
     }
-    register(handler);
-    handler.start();
   }
 
   /**
@@ -231,21 +259,12 @@ public class ProxyServer extends Thread {
   }
 
   public int getLocalPort() {
-    if (this.serverSocket != null) {
-      return this.serverSocket.getLocalPort();
-    }
-    return -1;
-  }
-
-  public ServerStatus getServerStatus() {
-    synchronized (this.status) {
-      return this.status;
-    }
+    return localPort;
   }
 
   @Override
   public String toString() {
-    return "ProxyServer[" + getName() + "]";
+    return String.format("ProxyServer[port: %d]", getLocalPort());
   }
 
   /**
@@ -321,14 +340,5 @@ public class ProxyServer extends Thread {
     public short getCode() {
       return code;
     }
-  }
-
-  /** Possible states of a {@link Server}. */
-  public enum ServerStatus {
-    NEW,
-    STARTING,
-    STARTED,
-    STOPPING,
-    STOPPED
   }
 }

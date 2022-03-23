@@ -17,7 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.List;
+import java.util.Arrays;
 
 /** Response (with data) for describe statement. */
 public class ParameterDescriptionResponse extends WireOutput {
@@ -26,16 +26,16 @@ public class ParameterDescriptionResponse extends WireOutput {
   private static final int PARAMETER_NUMBER_LENGTH = 2;
   private static final int PARAMETER_LENGTH = 4;
 
-  private final List<Integer> parameters;
+  private final int[] parameters;
 
-  public ParameterDescriptionResponse(DataOutputStream output, List<Integer> parameters) {
+  public ParameterDescriptionResponse(DataOutputStream output, int[] parameters) {
     super(output, calculateLength(parameters));
     this.parameters = parameters;
   }
 
   @Override
   protected void sendPayload() throws IOException {
-    this.outputStream.writeShort(this.parameters.size());
+    this.outputStream.writeShort(this.parameters.length);
     for (int parameter : this.parameters) {
       this.outputStream.writeInt(parameter);
     }
@@ -54,10 +54,10 @@ public class ParameterDescriptionResponse extends WireOutput {
   @Override
   protected String getPayloadString() {
     return new MessageFormat("Length: {0}, " + "Parameters: {1}")
-        .format(new Object[] {this.length, this.parameters.toString()});
+        .format(new Object[] {this.length, Arrays.toString(this.parameters)});
   }
 
-  private static int calculateLength(List<Integer> parameters) {
-    return HEADER_LENGTH + PARAMETER_NUMBER_LENGTH + (parameters.size() * PARAMETER_LENGTH);
+  private static int calculateLength(int[] parameters) {
+    return HEADER_LENGTH + PARAMETER_NUMBER_LENGTH + (parameters.length * PARAMETER_LENGTH);
   }
 }

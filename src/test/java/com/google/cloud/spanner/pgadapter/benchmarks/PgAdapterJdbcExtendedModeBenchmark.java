@@ -87,13 +87,13 @@ public class PgAdapterJdbcExtendedModeBenchmark {
   }
 
   public static void main(String[] args) throws RunnerException {
-    Options opt = new OptionsBuilder()
-        .include(PgAdapterJdbcExtendedModeBenchmark.class.getSimpleName())
-        .forks(1)
-        .jvmArgs("-ea")
-        .build();
+    Options opt =
+        new OptionsBuilder()
+            .include(PgAdapterJdbcExtendedModeBenchmark.class.getSimpleName())
+            .forks(1)
+            .jvmArgs("-ea")
+            .build();
 
     new Runner(opt).run();
   }
-
 }

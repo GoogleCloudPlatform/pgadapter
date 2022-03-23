@@ -21,6 +21,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -37,8 +38,8 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   protected List<Short> parameterFormatCodes;
   protected List<Short> resultFormatCodes;
 
-  public IntermediatePortalStatement(String sql, Connection connection) {
-    super(sql, connection);
+  public IntermediatePortalStatement(OptionsMetadata options, String sql, Connection connection) {
+    super(options, sql, connection);
     this.statement = Statement.of(sql);
     this.parameterFormatCodes = new ArrayList<>();
     this.resultFormatCodes = new ArrayList<>();
@@ -78,7 +79,7 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   }
 
   @Override
-  public DescribeMetadata describe() throws Exception {
+  public DescribeMetadata describe() {
     // TODO: Consider replacing this with an execute call, so we don't take two round-trips to the
     // backend just to first describe and then execute a query.
     try (ResultSet resultSet = connection.analyzeQuery(this.statement, QueryAnalyzeMode.PLAN)) {

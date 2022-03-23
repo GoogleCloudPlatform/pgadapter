@@ -177,7 +177,9 @@ public class PgAdapterBenchmarkState {
 
   @Setup(Level.Iteration)
   public void startMockSpannerAndPgAdapterServers() throws Exception {
-    System.setProperty("java.util.logging.config.file", ClassLoader.getSystemResource("logging.properties").getPath());
+    System.setProperty(
+        "java.util.logging.config.file",
+        ClassLoader.getSystemResource("logging.properties").getPath());
 
     mockSpanner = new MockSpannerServiceImpl();
     mockSpanner.setAbortProbability(0.0D); // We don't want any unpredictable aborted transactions.
@@ -185,8 +187,7 @@ public class PgAdapterBenchmarkState {
     mockSpanner.putStatementResult(StatementResult.query(SELECT2, SELECT2_RESULTSET));
     mockSpanner.putStatementResult(StatementResult.update(UPDATE_STATEMENT, UPDATE_COUNT));
     mockSpanner.putStatementResult(StatementResult.update(INSERT_STATEMENT, INSERT_COUNT));
-    mockSpanner.putStatementResult(
-        StatementResult.detectDialectResult(Dialect.POSTGRESQL));
+    mockSpanner.putStatementResult(StatementResult.detectDialectResult(Dialect.POSTGRESQL));
 
     mockOperationsService = new MockOperationsServiceImpl();
     mockDatabaseAdmin = new MockDatabaseAdminServiceImpl(mockOperationsService);
@@ -282,11 +283,7 @@ public class PgAdapterBenchmarkState {
   @TearDown(Level.Iteration)
   public void stopMockSpannerAndPgAdapterServers() throws Exception {
     pgServer.stopServer();
-    while (pgServer.isAlive()) {
-      // TODO: Remove once the pgServer.stopServer() is blocking until it has actually stopped (or
-      // there is some other way to block until it has stopped).
-      Thread.sleep(1L);
-    }
+    pgServer.awaitTerminated();
     try {
       SpannerPool.closeSpannerPool();
     } catch (SpannerException e) {

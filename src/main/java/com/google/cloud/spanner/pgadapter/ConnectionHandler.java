@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
@@ -170,10 +169,21 @@ public class ConnectionHandler extends Thread {
   }
 
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
-  public void handleTerminate() throws Exception {
+  public void handleTerminate() {
     closeAllPortals();
     this.spannerConnection.close();
     this.status = ConnectionStatus.TERMINATED;
+  }
+
+  /**
+   * Terminates this connection at the request of the server. This is called if the server is
+   * shutting down while the connection is still active.
+   */
+  void terminate() throws IOException {
+    if (this.status != ConnectionStatus.TERMINATED) {
+      handleTerminate();
+      socket.close();
+    }
   }
 
   /**

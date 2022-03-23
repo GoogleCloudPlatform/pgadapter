@@ -90,6 +90,7 @@ public final class RowDescriptionTest {
             false,
             false,
             false,
+            false,
             commandMetadata);
     QueryMode mode = QueryMode.SIMPLE;
     RowDescriptionResponse response =
@@ -137,6 +138,7 @@ public final class RowDescriptionTest {
             "jdbc:cloudspanner:/projects/test-project/instances/test-instance/databases/test-database",
             8888,
             TextFormat.POSTGRESQL,
+            false,
             false,
             false,
             false,
@@ -188,6 +190,7 @@ public final class RowDescriptionTest {
             8888,
             TextFormat.POSTGRESQL,
             true,
+            false,
             false,
             false,
             commandMetadata);
@@ -242,6 +245,7 @@ public final class RowDescriptionTest {
             "jdbc:cloudspanner:/projects/test-project/instances/test-instance/databases/test-database",
             8888,
             TextFormat.POSTGRESQL,
+            false,
             false,
             false,
             false,

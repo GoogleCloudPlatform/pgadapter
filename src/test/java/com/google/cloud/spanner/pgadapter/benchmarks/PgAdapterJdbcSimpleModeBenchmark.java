@@ -21,7 +21,6 @@ import static org.junit.Assert.assertTrue;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -29,9 +28,6 @@ import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.OutputTimeUnit;
-import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.Setup;
-import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
@@ -86,13 +82,13 @@ public class PgAdapterJdbcSimpleModeBenchmark {
   }
 
   public static void main(String[] args) throws RunnerException {
-    Options opt = new OptionsBuilder()
-        .include(PgAdapterJdbcSimpleModeBenchmark.class.getSimpleName())
-        .forks(1)
-        .jvmArgs("-ea")
-        .build();
+    Options opt =
+        new OptionsBuilder()
+            .include(PgAdapterJdbcSimpleModeBenchmark.class.getSimpleName())
+            .forks(1)
+            .jvmArgs("-ea")
+            .build();
 
     new Runner(opt).run();
   }
-
 }
