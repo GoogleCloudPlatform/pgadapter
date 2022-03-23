@@ -18,7 +18,10 @@ import "C"
 import (
 	"context"
 	"fmt"
+	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
+	"reflect"
+	"time"
 )
 
 // This file defines tests that can be called from Java and that will connect to any PGAdapter
@@ -89,6 +92,65 @@ func TestQueryWithParameter(connString string) *C.char {
 		return C.CString(fmt.Sprintf("Failed to execute query: %v", err.Error()))
 	}
 	if g, w := value, "baz"; g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
+//export TestQueryAllDataTypes
+func TestQueryAllDataTypes(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	var bigintValue int64
+	var boolValue bool
+	var byteaValue []byte
+	var float8Value float64
+	var numericValue pgtype.Numeric // pgx default maps numeric to string
+	var timestamptzValue time.Time
+	//var dateValue time.Time
+	var varcharValue string
+
+	err = conn.QueryRow(ctx, "SELECT * FROM AllTypes").Scan(
+		&bigintValue,
+		&boolValue,
+		&byteaValue,
+		&float8Value,
+		&numericValue,
+		&timestamptzValue,
+		//&dateValue,
+		&varcharValue,
+	)
+	if err != nil {
+		return C.CString(fmt.Sprintf("Failed to execute query: %v", err.Error()))
+	}
+	if g, w := bigintValue, int64(1); g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := boolValue, true; g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := byteaValue, []byte("test"); !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := float8Value, 3.14; g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	var wantNumericValue pgtype.Numeric
+	_ = wantNumericValue.Scan("6.626")
+	if g, w := numericValue, wantNumericValue; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	wantTimestamptzValue, _ := time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456000Z")
+	if g, w := timestamptzValue, wantTimestamptzValue; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := varcharValue, "test"; g != w {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 

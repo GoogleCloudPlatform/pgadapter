@@ -72,6 +72,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     String TestSelect1(GoString connString);
 
     String TestQueryWithParameter(GoString connString);
+
+    String TestQueryAllDataTypes(GoString connString);
   }
 
   private static PgxTest pgxTest;
@@ -82,7 +84,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     ProcessBuilder builder = new ProcessBuilder();
     String[] compileCommand = "go build -o pgx_test.so -buildmode=c-shared pgx.go".split(" ");
     builder.command(compileCommand);
-    builder.directory(new File("./src/test/golang"));
+    builder.directory(new File("./src/test/golang/pgadapter_pgx_tests"));
     Process process = builder.start();
     int res = process.waitFor();
     assertEquals(0, res);
@@ -91,7 +93,9 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     // standard library directories.
     String currentPath = new java.io.File(".").getCanonicalPath();
     pgxTest =
-        Native.load(String.format("%s/src/test/golang/pgx_test.so", currentPath), PgxTest.class);
+        Native.load(
+            String.format("%s/src/test/golang/pgadapter_pgx_tests/pgx_test.so", currentPath),
+            PgxTest.class);
   }
 
   private GoString createConnString() {
@@ -204,6 +208,32 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .build()));
 
     String res = pgxTest.TestQueryWithParameter(createConnString());
+
+    assertNull(res);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // pgx sends the query three times:
+    // 1. DESCRIBE statement
+    // 2. DESCRIBE portal
+    // 3. EXECUTE portal
+    assertEquals(3, requests.size());
+    int index = 0;
+    for (ExecuteSqlRequest request : requests) {
+      assertEquals(sql, request.getSql());
+      if (index < 2) {
+        assertEquals(QueryMode.PLAN, request.getQueryMode());
+      } else {
+        assertEquals(QueryMode.NORMAL, request.getQueryMode());
+      }
+      index++;
+    }
+  }
+
+  @Test
+  public void testQueryAllDataTypes() {
+    String sql = "SELECT * FROM AllTypes";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
+
+    String res = pgxTest.TestQueryAllDataTypes(createConnString());
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
