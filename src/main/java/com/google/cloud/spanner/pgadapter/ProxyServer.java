@@ -23,6 +23,10 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
+import java.io.BufferedOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -149,27 +153,50 @@ public class ProxyServer extends AbstractApiService {
     notifyStarted();
     try {
       while (isRunning()) {
-        createConnectionHandler(this.serverSocket.accept());
+        Socket socket = serverSocket.accept();
+        try {
+          createConnectionHandler(socket);
+        } catch (SpannerException exception) {
+          handleConnectionError(exception, socket);
+        }
       }
     } catch (SocketException e) {
-      if (state() == State.STOPPING) {
-        // This is a normal exception, as this will occur when Server#stopServer() is called.
-        logger.log(
-            Level.FINE,
-            "Socket exception on port {0}: {1} while stopping the server. This is normal.",
-            new Object[] {getLocalPort(), e});
-      } else {
-        logger.log(
-            Level.SEVERE, "Socket exception on port {0}: {1}.", new Object[] {getLocalPort(), e});
-      }
-    } catch (SpannerException e) {
+      // This is a normal exception, as this will occur when Server#stopServer() is called.
       logger.log(
-          Level.SEVERE,
-          "Something went wrong in establishing a Spanner connection: {0}",
-          e.getMessage());
+          Level.INFO,
+          "Socket exception on port {0}: {1}. This is normal when the server is stopped.",
+          new Object[] {getLocalPort(), e});
     } finally {
+      for (ConnectionHandler handler : this.handlers) {
+        handler.terminate();
+      }
       logger.log(Level.INFO, "Socket on port {0} stopped", getLocalPort());
       notifyStopped();
+    }
+  }
+
+  /**
+   * Sends a message to the client that the connection could not be established.
+   *
+   * @param exception The exception that caused the connection request to fail.
+   * @param socket The socket that was created for the connection.
+   */
+  private void handleConnectionError(SpannerException exception, Socket socket) {
+    logger.log(
+        Level.SEVERE,
+        "Something went wrong in establishing a Spanner connection: {0}",
+        exception.getMessage());
+    try {
+      DataOutputStream output =
+          new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+      new ErrorResponse(output, exception, ErrorResponse.State.ConnectionException, Severity.FATAL)
+          .send();
+      output.flush();
+    } catch (Exception e) {
+      logger.log(
+          Level.WARNING,
+          "Failed to send fatal error message to client: {0}",
+          exception.getMessage());
     }
   }
 
@@ -182,18 +209,23 @@ public class ProxyServer extends AbstractApiService {
    */
   void createConnectionHandler(Socket socket) {
     ConnectionHandler handler = new ConnectionHandler(this, socket);
-    // Note: Calling getDialect() will cause a SpannerException if the connection itself is
-    // invalid, for example as a result of the credentials being wrong.
-    if (handler.getSpannerConnection().getDialect() != Dialect.POSTGRESQL) {
-      throw SpannerExceptionFactory.newSpannerException(
-          ErrorCode.INVALID_ARGUMENT,
-          String.format(
-              "The database uses dialect %s. Currently PGAdapter only supports connections to PostgreSQL dialect databases. "
-                  + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
-              handler.getSpannerConnection().getDialect()));
+    try {
+      // Note: Calling getDialect() will cause a SpannerException if the connection itself is
+      // invalid, for example as a result of the credentials being wrong.
+      if (handler.getSpannerConnection().getDialect() != Dialect.POSTGRESQL) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            String.format(
+                "The database uses dialect %s. Currently PGAdapter only supports connections to PostgreSQL dialect databases. "
+                    + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
+                handler.getSpannerConnection().getDialect()));
+      }
+      register(handler);
+      handler.start();
+    } catch (Exception e) {
+      handler.getSpannerConnection().close();
+      throw e;
     }
-    register(handler);
-    handler.start();
   }
 
   /**
