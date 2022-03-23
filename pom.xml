@@ -21,6 +21,8 @@
     <skipITs>true</skipITs>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <excludedTests>com.google.cloud.spanner.pgadapter.IntegrationTest,com.google.cloud.spanner.pgadapter.golang.GolangTest</excludedTests>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -195,6 +197,12 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>test-all</id>
+      <properties>
+        <excludedTests>com.google.cloud.spanner.pgadapter.IntegrationTest</excludedTests>
+      </properties>
+    </profile>
   </profiles>
 
   <build>
@@ -224,7 +232,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.0.0-M5</version>
         <configuration>
-          <excludedGroups>com.google.cloud.spanner.pgadapter.IntegrationTest</excludedGroups>
+          <excludedGroups>${excludedTests}</excludedGroups>
           <reportNameSuffix>sponge_log</reportNameSuffix>
           <systemProperties>
             <property>

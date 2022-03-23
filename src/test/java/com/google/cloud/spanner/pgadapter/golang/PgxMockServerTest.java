@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.google.cloud.spanner.pgadapter;
+package com.google.cloud.spanner.pgadapter.golang;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
@@ -39,6 +40,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -46,6 +48,7 @@ import org.junit.runners.JUnit4;
  * Tests PGAdapter using the native Go pgx driver. The Go code can be found in
  * src/test/golang/pgx.go.
  */
+@Category(GolangTest.class)
 @RunWith(JUnit4.class)
 public class PgxMockServerTest extends AbstractMockServerTest {
   public static class GoString extends Structure implements Structure.ByValue {
