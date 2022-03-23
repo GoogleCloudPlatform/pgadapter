@@ -35,6 +35,7 @@ public class OptionsMetadata {
 
   private static final Logger logger = Logger.getLogger(OptionsMetadata.class.getName());
   private static final String DEFAULT_SERVER_VERSION = "1.0.0";
+  private static final String DEFAULT_USER_AGENT = "pg-adapter";
 
   private static final String OPTION_SERVER_PORT = "s";
   private static final String OPTION_PROJECT_ID = "p";
@@ -187,10 +188,12 @@ public class OptionsMetadata {
                 + "projects/%s/"
                 + "instances/%s/"
                 + "databases/%s"
-                + ";dialect=postgresql",
+                + ";dialect=postgresql"
+                + ";userAgent=%s",
             commandLine.getOptionValue(OPTION_PROJECT_ID),
             commandLine.getOptionValue(OPTION_INSTANCE_ID),
-            commandLine.getOptionValue(OPTION_DATABASE_NAME));
+            commandLine.getOptionValue(OPTION_DATABASE_NAME),
+            DEFAULT_USER_AGENT);
 
     String credentials = buildCredentialsFile(commandLine);
     if (!Strings.isNullOrEmpty(credentials)) {
