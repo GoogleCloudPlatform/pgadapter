@@ -177,8 +177,10 @@ public class OptionsMetadata {
       jdbcEndpoint = "jdbc:cloudspanner://" + host + "/";
       logger.log(
           Level.INFO,
-          "PG Adapter will connect to the following Cloud Spanner service endpoint {0}",
-          host);
+          () ->
+              String.format(
+                  "PG Adapter will connect to the following Cloud Spanner service endpoint %s",
+                  host));
     }
 
     // Note that Credentials here is the credentials file, not the actual credentials

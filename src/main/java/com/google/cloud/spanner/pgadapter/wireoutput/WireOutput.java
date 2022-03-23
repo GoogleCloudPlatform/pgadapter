@@ -54,7 +54,7 @@ public abstract class WireOutput {
    * @throws Exception
    */
   public void send() throws Exception {
-    logger.log(Level.FINE, this.toString());
+    logger.log(Level.FINE, this::toString);
     this.outputStream.writeByte(this.getIdentifier());
     if (this.isCompoundResponse()) {
       this.outputStream.writeInt(this.length);

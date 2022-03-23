@@ -89,7 +89,7 @@ public class ProxyServer extends AbstractApiService {
   public void startServer() {
     startAsync();
     awaitRunning();
-    logger.log(Level.INFO, "Server started on port {0}", String.valueOf(getLocalPort()));
+    logger.log(Level.INFO, () -> String.format("Server started on port %d", getLocalPort()));
   }
 
   @Override
@@ -103,8 +103,10 @@ public class ProxyServer extends AbstractApiService {
             } catch (IOException e) {
               logger.log(
                   Level.WARNING,
-                  "Server on port {0} stopped by exception: {1}",
-                  new Object[] {getLocalPort(), e});
+                  e,
+                  () ->
+                      String.format(
+                          "Server on port %s stopped by exception: %s", getLocalPort(), e));
             }
           }
         };
@@ -114,14 +116,17 @@ public class ProxyServer extends AbstractApiService {
   @Override
   protected void doStop() {
     try {
-      logger.log(Level.INFO, "Server on port {0} is stopping", String.valueOf(getLocalPort()));
+      logger.log(Level.INFO, () -> String.format("Server on port %d is stopping", getLocalPort()));
       this.serverSocket.close();
-      logger.log(Level.INFO, "Server socket on port {0} closed", String.valueOf(getLocalPort()));
+      logger.log(
+          Level.INFO, () -> String.format("Server socket on port %d closed", getLocalPort()));
     } catch (IOException exception) {
       logger.log(
           Level.WARNING,
-          "Closing server socket on port {0} failed: {1}",
-          new Object[] {String.valueOf(getLocalPort()), exception});
+          exception,
+          () ->
+              String.format(
+                  "Closing server socket on port %d failed: %s", getLocalPort(), exception));
     }
   }
 
@@ -137,8 +142,8 @@ public class ProxyServer extends AbstractApiService {
     } catch (IOException e) {
       logger.log(
           Level.WARNING,
-          "Server on port {0} stopped by exception: {1}",
-          new Object[] {getLocalPort(), e});
+          e,
+          () -> String.format("Server on port %d stopped by exception: %s", getLocalPort(), e));
     }
   }
 
@@ -164,13 +169,15 @@ public class ProxyServer extends AbstractApiService {
       // This is a normal exception, as this will occur when Server#stopServer() is called.
       logger.log(
           Level.INFO,
-          "Socket exception on port {0}: {1}. This is normal when the server is stopped.",
-          new Object[] {getLocalPort(), e});
+          () ->
+              String.format(
+                  "Socket exception on port %d: %s. This is normal when the server is stopped.",
+                  getLocalPort(), e));
     } finally {
       for (ConnectionHandler handler : this.handlers) {
         handler.terminate();
       }
-      logger.log(Level.INFO, "Socket on port {0} stopped", getLocalPort());
+      logger.log(Level.INFO, () -> String.format("Socket on port %d stopped", getLocalPort()));
       notifyStopped();
     }
   }
@@ -184,8 +191,11 @@ public class ProxyServer extends AbstractApiService {
   private void handleConnectionError(SpannerException exception, Socket socket) {
     logger.log(
         Level.SEVERE,
-        "Something went wrong in establishing a Spanner connection: {0}",
-        exception.getMessage());
+        exception,
+        () ->
+            String.format(
+                "Something went wrong in establishing a Spanner connection: %s",
+                exception.getMessage()));
     try {
       DataOutputStream output =
           new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
@@ -195,8 +205,8 @@ public class ProxyServer extends AbstractApiService {
     } catch (Exception e) {
       logger.log(
           Level.WARNING,
-          "Failed to send fatal error message to client: {0}",
-          exception.getMessage());
+          e,
+          () -> String.format("Failed to send fatal error message to client: %s", e.getMessage()));
     }
   }
 
