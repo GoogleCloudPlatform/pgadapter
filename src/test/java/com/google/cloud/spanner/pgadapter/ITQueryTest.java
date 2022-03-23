@@ -14,9 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -29,8 +28,8 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -43,10 +42,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public final class ITQueryTest implements IntegrationTest {
 
-  private static final Logger logger = Logger.getLogger(ITQueryTest.class.getName());
-
   private ProxyServer server;
-  private static PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
+  private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static String[] args;
 
   @Before
@@ -67,8 +64,8 @@ public final class ITQueryTest implements IntegrationTest {
     // class.
     testEnv.setUp();
     Database db = testEnv.createDatabase();
-    testEnv.updateDdl(db.getId().getDatabase(), Arrays.asList(ddl));
-    testEnv.updateTables(db.getId().getDatabase(), Arrays.asList(dml));
+    testEnv.updateDdl(db.getId().getDatabase(), Collections.singletonList(ddl));
+    testEnv.updateTables(db.getId().getDatabase(), Collections.singletonList(dml));
     String credentials = testEnv.getCredentials();
     ImmutableList.Builder<String> argsListBuilder =
         ImmutableList.<String>builder()
@@ -90,18 +87,18 @@ public final class ITQueryTest implements IntegrationTest {
   }
 
   @Before
-  public void startServer() throws Exception {
+  public void startServer() {
     server = new ProxyServer(new OptionsMetadata(args));
     server.startServer();
   }
 
   @After
-  public void stopServer() throws Exception {
+  public void stopServer() {
     if (server != null) server.stopServer();
   }
 
   @AfterClass
-  public static void cleanUp() throws Exception {
+  public static void cleanUp() {
     testEnv.cleanUp();
   }
 
@@ -132,12 +129,12 @@ public final class ITQueryTest implements IntegrationTest {
     // see here: https://www.postgresql.org/docs/13/protocol-message-formats.html
     DataInputStream dataRowIn = new DataInputStream(new ByteArrayInputStream(dataRow.getPayload()));
     // Number of column values.
-    assertThat((int) dataRowIn.readShort(), is(equalTo(1)));
+    assertEquals(1, dataRowIn.readShort());
     // Column value length (2 bytes expected)
-    assertThat(dataRowIn.readInt(), is(equalTo(2)));
+    assertEquals(2, dataRowIn.readInt());
     // Value of the column: '42'
-    assertThat(dataRowIn.readByte(), is(equalTo((byte) '4')));
-    assertThat(dataRowIn.readByte(), is(equalTo((byte) '2')));
+    assertEquals('4', dataRowIn.readByte());
+    assertEquals('2', dataRowIn.readByte());
   }
 
   @Test
@@ -172,16 +169,16 @@ public final class ITQueryTest implements IntegrationTest {
     DataInputStream rowDescIn =
         new DataInputStream(new ByteArrayInputStream(rowDescription.getPayload()));
     short fieldCount = rowDescIn.readShort();
-    assertThat(fieldCount, is(equalTo((short) 4)));
+    assertEquals(4, fieldCount);
     for (String expectedFieldName : new String[] {"id", "name", "age", "data"}) {
       // Read a null-terminated string.
-      StringBuilder builder = new StringBuilder("");
+      StringBuilder builder = new StringBuilder();
       byte b;
       while ((b = rowDescIn.readByte()) != (byte) 0) {
         builder.append((char) b);
       }
       String fieldName = builder.toString();
-      assertThat(fieldName, is(equalTo(expectedFieldName)));
+      assertEquals(expectedFieldName, fieldName);
       byte[] unusedBytes = new byte[18];
       rowDescIn.readFully(unusedBytes);
     }
@@ -206,11 +203,11 @@ public final class ITQueryTest implements IntegrationTest {
     byte[] commandCompleteData = {83, 69, 76, 69, 67, 84, 32, 51, 0};
     byte[] readyForQueryData = {73};
 
-    assertThat(rowDescription.getPayload(), is(equalTo(rowDescriptionData)));
-    assertThat(dataRows[0].getPayload(), is(equalTo(dataRow0)));
-    assertThat(dataRows[1].getPayload(), is(equalTo(dataRow1)));
-    assertThat(dataRows[2].getPayload(), is(equalTo(dataRow2)));
-    assertThat(commandComplete.getPayload(), is(equalTo(commandCompleteData)));
-    assertThat(readyForQuery.getPayload(), is(equalTo(readyForQueryData)));
+    assertArrayEquals(rowDescriptionData, rowDescription.getPayload());
+    assertArrayEquals(dataRow0, dataRows[0].getPayload());
+    assertArrayEquals(dataRow1, dataRows[1].getPayload());
+    assertArrayEquals(dataRow2, dataRows[2].getPayload());
+    assertArrayEquals(commandCompleteData, commandComplete.getPayload());
+    assertArrayEquals(readyForQueryData, readyForQuery.getPayload());
   }
 }
