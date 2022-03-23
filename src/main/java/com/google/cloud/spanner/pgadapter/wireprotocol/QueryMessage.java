@@ -115,13 +115,14 @@ public class QueryMessage extends ControlMessage {
                 this.statement.getStatementResult(),
                 this.connection.getServer().getOptions(),
                 QueryMode.SIMPLE)
-            .send();
+            .send(false);
       }
       this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
       boolean inTransaction = connection.getSpannerConnection().isInTransaction();
       new ReadyResponse(
               this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
-          .send();
+          .send(false);
+      this.outputStream.flush();
     }
     this.connection.cleanUp(this.statement);
   }
