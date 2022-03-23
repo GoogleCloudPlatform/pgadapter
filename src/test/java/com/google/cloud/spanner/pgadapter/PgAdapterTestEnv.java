@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static com.google.cloud.spanner.pgadapter.ProxyServer.ServerStatus;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
@@ -45,6 +44,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -342,15 +342,7 @@ public final class PgAdapterTestEnv {
   }
 
   void waitForServer(ProxyServer server) throws Exception {
-    // Wait for up to 1 second if server has not started.
-    for (int i = 0; i < 10; ++i) {
-      if (server.getServerStatus() == ServerStatus.STARTED) {
-        return;
-      }
-      Thread.sleep(100);
-    }
-    // Throw exception if server has still not started.
-    throw new IllegalStateException("ProxyServer failed to start.");
+    server.awaitRunning(1L, TimeUnit.SECONDS);
   }
 
   void initializeConnection(DataOutputStream out) throws Exception {
