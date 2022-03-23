@@ -31,10 +31,9 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -47,7 +46,8 @@ public class ProxyServer extends AbstractApiService {
   private static final Logger logger = Logger.getLogger(ProxyServer.class.getName());
   private final OptionsMetadata options;
   private final Properties properties;
-  private final List<ConnectionHandler> handlers = new LinkedList<>();
+  private final ConcurrentLinkedQueue<ConnectionHandler> handlers = new ConcurrentLinkedQueue<>();
+  private int numConnectionsCreated;
 
   private ServerSocket serverSocket;
   private int localPort;
@@ -156,6 +156,7 @@ public class ProxyServer extends AbstractApiService {
         Socket socket = serverSocket.accept();
         try {
           createConnectionHandler(socket);
+          numConnectionsCreated++;
         } catch (SpannerException exception) {
           handleConnectionError(exception, socket);
         }
@@ -171,6 +172,8 @@ public class ProxyServer extends AbstractApiService {
         handler.terminate();
       }
       logger.log(Level.INFO, "Socket on port {0} stopped", getLocalPort());
+      System.out.printf(
+          "Stopping server. Server received %d connection requests.\n", numConnectionsCreated);
       notifyStopped();
     }
   }

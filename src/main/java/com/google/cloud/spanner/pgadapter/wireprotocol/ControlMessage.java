@@ -158,11 +158,11 @@ public abstract class ControlMessage extends WireMessage {
         SendResultSetState state = sendResultSet(statement, mode, maxRows);
         statement.setHasMoreData(state.hasMoreRows());
         if (state.hasMoreRows()) {
-          new PortalSuspendedResponse(this.outputStream).send();
+          new PortalSuspendedResponse(this.outputStream).send(false);
         } else {
           statement.getStatementResult().close();
           new CommandCompleteResponse(this.outputStream, "SELECT " + state.getNumberOfRowsSent())
-              .send();
+              .send(false);
         }
         return state.hasMoreRows();
       case UPDATE_COUNT:
@@ -197,7 +197,7 @@ public abstract class ControlMessage extends WireMessage {
     while (hasData) {
       new DataRowResponse(
               this.outputStream, describedResult, this.connection.getServer().getOptions(), mode)
-          .send();
+          .send(false);
       rows++;
       try {
         hasData = resultSet.next();

@@ -120,7 +120,7 @@ public class ConnectionHandler extends Thread {
     try (DataInputStream input =
             new DataInputStream(new BufferedInputStream(this.socket.getInputStream()));
         DataOutputStream output =
-            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream())); ) {
+            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream()))) {
       if (!server.getOptions().disableLocalhostCheck()
           && !this.socket.getInetAddress().isAnyLocalAddress()
           && !this.socket.getInetAddress().isLoopbackAddress()) {

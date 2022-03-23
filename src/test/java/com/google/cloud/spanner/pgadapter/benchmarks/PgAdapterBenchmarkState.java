@@ -46,12 +46,17 @@ import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.Base64;
+import java.util.Objects;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
@@ -59,7 +64,7 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.threeten.bp.Duration;
 
-@State(Scope.Thread)
+@State(Scope.Benchmark)
 public class PgAdapterBenchmarkState {
   protected static final Statement SELECT1 = Statement.of("SELECT 1");
   protected static final Statement SELECT2 = Statement.of("SELECT 2");
@@ -175,56 +180,88 @@ public class PgAdapterBenchmarkState {
   private volatile Server spannerServer;
   protected volatile ProxyServer pgServer;
 
-  @Setup(Level.Iteration)
+  private HikariDataSource dataSource;
+
+  @Setup(Level.Trial)
   public void startMockSpannerAndPgAdapterServers() throws Exception {
     System.setProperty(
         "java.util.logging.config.file",
         ClassLoader.getSystemResource("logging.properties").getPath());
+    System.setProperty("useMockServer", "true");
 
-    mockSpanner = new MockSpannerServiceImpl();
-    mockSpanner.setAbortProbability(0.0D); // We don't want any unpredictable aborted transactions.
-    mockSpanner.putStatementResult(StatementResult.query(SELECT1, SELECT1_RESULTSET));
-    mockSpanner.putStatementResult(StatementResult.query(SELECT2, SELECT2_RESULTSET));
-    mockSpanner.putStatementResult(StatementResult.update(UPDATE_STATEMENT, UPDATE_COUNT));
-    mockSpanner.putStatementResult(StatementResult.update(INSERT_STATEMENT, INSERT_COUNT));
-    mockSpanner.putStatementResult(StatementResult.detectDialectResult(Dialect.POSTGRESQL));
+    ImmutableList.Builder<String> argsListBuilder;
+    if (Objects.equals("true", System.getProperty("useMockServer"))) {
+      mockSpanner = new MockSpannerServiceImpl();
+      mockSpanner.setAbortProbability(
+          0.0D); // We don't want any unpredictable aborted transactions.
+      mockSpanner.putStatementResult(StatementResult.query(SELECT1, SELECT1_RESULTSET));
+      mockSpanner.putStatementResult(StatementResult.query(SELECT2, SELECT2_RESULTSET));
+      mockSpanner.putStatementResult(StatementResult.update(UPDATE_STATEMENT, UPDATE_COUNT));
+      mockSpanner.putStatementResult(StatementResult.update(INSERT_STATEMENT, INSERT_COUNT));
+      mockSpanner.putStatementResult(StatementResult.detectDialectResult(Dialect.POSTGRESQL));
 
-    mockOperationsService = new MockOperationsServiceImpl();
-    mockDatabaseAdmin = new MockDatabaseAdminServiceImpl(mockOperationsService);
+      mockOperationsService = new MockOperationsServiceImpl();
+      mockDatabaseAdmin = new MockDatabaseAdminServiceImpl(mockOperationsService);
 
-    InetSocketAddress address = new InetSocketAddress("localhost", 0);
-    spannerServer =
-        NettyServerBuilder.forAddress(address)
-            .addService(mockSpanner)
-            .addService(mockDatabaseAdmin)
-            .addService(mockOperationsService)
-            .build()
-            .start();
+      InetSocketAddress address = new InetSocketAddress("localhost", 0);
+      spannerServer =
+          NettyServerBuilder.forAddress(address)
+              .addService(mockSpanner)
+              .addService(mockDatabaseAdmin)
+              .addService(mockOperationsService)
+              .build()
+              .start();
+      // Create the test database on the mock server. This should be replaced by a simple feature in
+      // the mock server to just add a database instead of having to simulate the creation of it.
+      createDatabase();
 
-    // Create the test database on the mock server. This should be replaced by a simple feature in
-    // the mock server to just add a database instead of having to simulate the creation of it.
-    createDatabase();
-
-    ImmutableList.Builder<String> argsListBuilder =
-        ImmutableList.<String>builder()
-            .add(
-                "-p",
-                "p",
-                "-i",
-                "i",
-                "-d",
-                "d",
-                "-c",
-                "", // empty credentials file, as we are using a plain text connection.
-                "-s",
-                "0", // port 0 to let the OS pick an available port
-                "-e",
-                String.format("localhost:%d", spannerServer.getPort()),
-                "-r",
-                "usePlainText=true;");
+      argsListBuilder =
+          ImmutableList.<String>builder()
+              .add(
+                  "-p",
+                  "p",
+                  "-i",
+                  "i",
+                  "-d",
+                  "d",
+                  "-c",
+                  "", // empty credentials file, as we are using a plain text connection.
+                  "-s",
+                  "0", // port 0 to let the OS pick an available port
+                  "-e",
+                  String.format("localhost:%d", spannerServer.getPort()),
+                  "-r",
+                  "usePlainText=true;");
+    } else {
+      argsListBuilder =
+          ImmutableList.<String>builder()
+              .add(
+                  "-p",
+                  "spanner-pg-preview-internal",
+                  "-i",
+                  "europe-north1",
+                  "-d",
+                  "knut-test-db",
+                  "-s",
+                  "0");
+    }
     String[] args = argsListBuilder.build().toArray(new String[0]);
     pgServer = new ProxyServer(new OptionsMetadata(args));
     pgServer.startServer();
+
+    HikariConfig hikariConfig = new HikariConfig();
+    hikariConfig.setJdbcUrl(
+        String.format(
+            "jdbc:postgresql://localhost:%d/?preferQueryMode=simple", pgServer.getLocalPort()));
+    hikariConfig.addDataSourceProperty("cachePrepStmts", "true");
+    hikariConfig.addDataSourceProperty("prepStmtCacheSize", "250");
+    hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+    hikariConfig.setMaximumPoolSize(150);
+    dataSource = new HikariDataSource(hikariConfig);
+  }
+
+  public Connection getConnection() throws SQLException {
+    return dataSource.getConnection();
   }
 
   private void createDatabase() throws Exception {
@@ -280,8 +317,9 @@ public class PgAdapterBenchmarkState {
     client.close();
   }
 
-  @TearDown(Level.Iteration)
+  @TearDown(Level.Trial)
   public void stopMockSpannerAndPgAdapterServers() throws Exception {
+    dataSource.close();
     pgServer.stopServer();
     pgServer.awaitTerminated();
     try {
@@ -295,7 +333,9 @@ public class PgAdapterBenchmarkState {
         throw e;
       }
     }
-    spannerServer.shutdown();
-    spannerServer.awaitTermination();
+    if (spannerServer != null) {
+      spannerServer.shutdown();
+      spannerServer.awaitTermination();
+    }
   }
 }
