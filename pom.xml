@@ -226,6 +226,12 @@
         <configuration>
           <excludedGroups>com.google.cloud.spanner.pgadapter.IntegrationTest</excludedGroups>
           <reportNameSuffix>sponge_log</reportNameSuffix>
+          <systemProperties>
+            <property>
+              <name>java.util.logging.config.file</name>
+              <value>src/test/resources/logging.properties</value>
+            </property>
+          </systemProperties>
         </configuration>
       </plugin>
       <plugin>
