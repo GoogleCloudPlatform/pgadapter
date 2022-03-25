@@ -238,18 +238,11 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         assertTrue(resultSet.next());
         Array array = resultSet.getArray("BYTEA_ARRAY");
-        ResultSet arrayResultSet = array.getResultSet();
-        assertTrue(arrayResultSet.next());
-        byte[][] bytesArray = (byte[][]) array.getArray();
         assertArrayEquals(
             new byte[][] {
               "test1".getBytes(StandardCharsets.UTF_8), "test2".getBytes(StandardCharsets.UTF_8)
             },
-            bytesArray
-            //            new byte[][] {
-            //                PGbytea.toBytes(bytesArray[0]), PGbytea.toBytes(bytesArray[1])
-            //            }
-            );
+            (byte[][]) array.getArray());
         assertFalse(resultSet.next());
       }
     }
