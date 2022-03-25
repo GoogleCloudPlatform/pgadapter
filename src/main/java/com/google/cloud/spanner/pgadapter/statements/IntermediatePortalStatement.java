@@ -80,10 +80,10 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   public DescribeMetadata describe() {
     try {
       // Pre-emptively execute the statement, even though it is only asked to be described. This is
-      // a
-      // lot more efficient than taking two round trips to the server, and getting a DescribePortal
-      // message without a following Execute message is extremely rare, as that would only happen if
-      // the client is ill-behaved, or if the client crashes between the DescribePortal and Execute.
+      // a lot more efficient than taking two round trips to the server, and getting a
+      // DescribePortal message without a following Execute message is extremely rare, as that would
+      // only happen if the client is ill-behaved, or if the client crashes between the
+      // DescribePortal and Execute.
       this.statementResult = connection.executeQuery(this.statement);
       this.hasMoreData = this.statementResult.next();
       return new DescribePortalMetadata(statementResult);
