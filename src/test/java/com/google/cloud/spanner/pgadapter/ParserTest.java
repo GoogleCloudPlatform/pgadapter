@@ -305,7 +305,7 @@ public class ParserTest {
   public void testBinaryParsing() {
     ByteArray value = ByteArray.copyFrom(new byte[] {(byte) 0b01010101, (byte) 0b10101010});
     byte[] byteResult = {(byte) 0b01010101, (byte) 0b10101010};
-    byte[] stringResult = {'U', '\\', '2', '5', '2'};
+    byte[] stringResult = {'\\', 'x', '5', '5', 'a', 'a'};
 
     BinaryParser parsedValue = new BinaryParser(value);
 

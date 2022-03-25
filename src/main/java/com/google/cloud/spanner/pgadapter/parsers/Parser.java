@@ -209,7 +209,7 @@ public abstract class Parser<T> {
       case BYTES:
         return Oid.BYTEA;
       case TIMESTAMP:
-        return Oid.TIMESTAMP;
+        return Oid.TIMESTAMPTZ;
       case DATE:
         return Oid.DATE;
       case ARRAY:

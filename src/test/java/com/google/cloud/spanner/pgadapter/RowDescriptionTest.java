@@ -118,8 +118,8 @@ public final class RowDescriptionTest {
     Assert.assertEquals(response.getOidType(6), Oid.DATE);
     Assert.assertEquals(response.getOidTypeSize(Oid.DATE), 8);
     // Types.TIMESTAMP
-    Assert.assertEquals(response.getOidType(7), Oid.TIMESTAMP);
-    Assert.assertEquals(response.getOidTypeSize(Oid.TIMESTAMP), 12);
+    Assert.assertEquals(response.getOidType(7), Oid.TIMESTAMPTZ);
+    Assert.assertEquals(response.getOidTypeSize(Oid.TIMESTAMPTZ), 12);
   }
 
   @Test
