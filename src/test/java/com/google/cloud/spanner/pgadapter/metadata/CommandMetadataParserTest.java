@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.metadata;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;
@@ -94,9 +95,8 @@ public class CommandMetadataParserTest {
     parser.parse(tempFile.getAbsolutePath());
   }
 
-  @Test(expected = IllegalArgumentException.class)
-  public void testThrowsIllegalArgumentExceptionWhenJsonIsNull()
-      throws IOException, ParseException {
+  @Test
+  public void testThrowsIllegalArgumentExceptionWhenJsonIsNull() throws IOException {
     final File tempFile = File.createTempFile("pgadapter-", ".json");
     tempFile.deleteOnExit();
 
@@ -106,6 +106,6 @@ public class CommandMetadataParserTest {
       writer.write("null");
     }
 
-    parser.parse(tempFile.getAbsolutePath());
+    assertThrows(IllegalArgumentException.class, () -> parser.parse(tempFile.getAbsolutePath()));
   }
 }

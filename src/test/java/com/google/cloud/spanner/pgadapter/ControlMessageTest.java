@@ -14,6 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.when;
+
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
@@ -30,13 +33,11 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
-import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
@@ -47,10 +48,6 @@ public final class ControlMessageTest {
   private static final String EMPTY_COMMAND_JSON = "{\"commands\":[]}";
   private static final char QUERY_IDENTIFIER = 'Q';
 
-  private ControlMessage controlMessage;
-  private DataOutputStream outputStream;
-  private DataInputStream inputStream;
-
   @Rule public MockitoRule rule = MockitoJUnit.rule();
   @Mock private ConnectionHandler connectionHandler;
   @Mock private IntermediateStatement intermediateStatement;
@@ -60,18 +57,18 @@ public final class ControlMessageTest {
   @Test
   public void testInsertResult() throws Exception {
     ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-    outputStream = new DataOutputStream(buffer);
-    inputStream =
+    DataOutputStream outputStream = new DataOutputStream(buffer);
+    DataInputStream inputStream =
         new DataInputStream(
             new ByteArrayInputStream(new byte[] {(byte) QUERY_IDENTIFIER, 0, 0, 0, 5, 0}));
 
-    Mockito.when(connectionMetadata.getInputStream()).thenReturn(inputStream);
-    Mockito.when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
-    Mockito.when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    Mockito.when(intermediateStatement.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
-    Mockito.when(intermediateStatement.getCommand()).thenReturn("INSERT");
-    Mockito.when(intermediateStatement.getUpdateCount()).thenReturn(1L);
-    Mockito.when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(intermediateStatement.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
+    when(intermediateStatement.getCommand()).thenReturn("INSERT");
+    when(intermediateStatement.getUpdateCount()).thenReturn(1L);
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
 
     JSONParser parser = new JSONParser();
     JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
@@ -86,9 +83,9 @@ public final class ControlMessageTest {
             false,
             commandMetadata);
     ProxyServer server = new ProxyServer(options);
-    Mockito.when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getServer()).thenReturn(server);
 
-    controlMessage = ControlMessage.create(connectionHandler);
+    ControlMessage controlMessage = ControlMessage.create(connectionHandler);
     controlMessage.sendSpannerResult(intermediateStatement, QueryMode.SIMPLE, 0L);
 
     DataInputStream outputReader =
@@ -100,7 +97,7 @@ public final class ControlMessageTest {
     final String resultMessage = "INSERT 0 1";
     int numOfBytes = resultMessage.getBytes(UTF8).length;
     byte[] bytes = new byte[numOfBytes];
-    outputReader.read(bytes, 0, numOfBytes);
-    Assert.assertEquals(new String(bytes, UTF8), resultMessage);
+    assertEquals(numOfBytes, outputReader.read(bytes, 0, numOfBytes));
+    assertEquals(resultMessage, new String(bytes, UTF8));
   }
 }

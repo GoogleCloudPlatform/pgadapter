@@ -14,13 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static org.junit.Assert.assertEquals;
+
 import com.google.cloud.spanner.pgadapter.metadata.DynamicCommandMetadata;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
-import org.junit.Assert;
 import org.junit.Test;
 
 public class MetadataTest {
@@ -44,10 +45,10 @@ public class MetadataTest {
 
     List<DynamicCommandMetadata> result =
         DynamicCommandMetadata.fromJSON((JSONObject) parser.parse(inputJSON));
-    Assert.assertEquals(1, result.size());
-    Assert.assertEquals("this is the output SQL query", result.get(0).getOutputPattern());
-    Assert.assertEquals("this is the input SQL query", result.get(0).getInputPattern());
-    Assert.assertEquals(new ArrayList<>(), result.get(0).getMatcherOrder());
+    assertEquals(1, result.size());
+    assertEquals("this is the output SQL query", result.get(0).getOutputPattern());
+    assertEquals("this is the input SQL query", result.get(0).getInputPattern());
+    assertEquals(new ArrayList<>(), result.get(0).getMatcherOrder());
   }
 
   @Test
@@ -77,12 +78,12 @@ public class MetadataTest {
 
     List<DynamicCommandMetadata> result =
         DynamicCommandMetadata.fromJSON((JSONObject) parser.parse(inputJSON));
-    Assert.assertEquals(2, result.size());
-    Assert.assertEquals("this is the output SQL query", result.get(0).getOutputPattern());
-    Assert.assertEquals("this is the input SQL query", result.get(0).getInputPattern());
-    Assert.assertEquals(firstResult, result.get(0).getMatcherOrder());
-    Assert.assertEquals("this is another output SQL query", result.get(1).getOutputPattern());
-    Assert.assertEquals("this is another input SQL query", result.get(1).getInputPattern());
-    Assert.assertEquals(secondResult, result.get(1).getMatcherOrder());
+    assertEquals(2, result.size());
+    assertEquals("this is the output SQL query", result.get(0).getOutputPattern());
+    assertEquals("this is the input SQL query", result.get(0).getInputPattern());
+    assertEquals(firstResult, result.get(0).getMatcherOrder());
+    assertEquals("this is another output SQL query", result.get(1).getOutputPattern());
+    assertEquals("this is another input SQL query", result.get(1).getInputPattern());
+    assertEquals(secondResult, result.get(1).getMatcherOrder());
   }
 }

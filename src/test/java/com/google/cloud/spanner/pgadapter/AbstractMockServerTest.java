@@ -352,6 +352,23 @@ abstract class AbstractMockServerTest {
     spannerServer.awaitTermination();
   }
 
+  /**
+   * Closes all open Spanner instances in the pool. Use this to force the recreation of a Spanner
+   * instance for a test case. This method will ignore any errors and retry if closing fails.
+   */
+  protected void closeSpannerPool() {
+    SpannerException exception = null;
+    for (int attempt = 0; attempt < 1000; attempt++) {
+      try {
+        SpannerPool.closeSpannerPool();
+        return;
+      } catch (SpannerException e) {
+        exception = e;
+      }
+    }
+    throw exception;
+  }
+
   @Before
   public void clearRequests() {
     mockSpanner.clearRequests();
