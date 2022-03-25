@@ -81,16 +81,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
     }
 
-    // The statement is sent twice to the mock server:
-    // 1. The first time it is sent with the PLAN mode enabled.
-    // 2. The second time it is sent in normal execute mode.
-    // TODO: Consider skipping the PLAN step and always execute the query already when we receive a
-    // DESCRIBE portal message.
-    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    ExecuteSqlRequest planRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
-    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    // The statement is only sent once to the mock server. The DescribePortal message will trigger
+    // the execution of the query, and the result from that execution will be used for the Execute
+    // message.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest executeRequest =
-        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
 
     for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
@@ -163,38 +159,32 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
 
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(2, requests.size());
+    assertEquals(1, requests.size());
 
-    ExecuteSqlRequest planRequest = requests.get(0);
-    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
-    assertEquals(pgSql, planRequest.getSql());
-
-    ExecuteSqlRequest executeRequest = requests.get(1);
+    ExecuteSqlRequest executeRequest = requests.get(0);
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
     assertEquals(pgSql, executeRequest.getSql());
 
-    for (ExecuteSqlRequest request : requests) {
-      Map<String, Value> params = request.getParams().getFieldsMap();
-      Map<String, Type> types = request.getParamTypesMap();
+    Map<String, Value> params = executeRequest.getParams().getFieldsMap();
+    Map<String, Type> types = executeRequest.getParamTypesMap();
 
-      assertEquals(TypeCode.INT64, types.get("p1").getCode());
-      assertEquals("1", params.get("p1").getStringValue());
-      assertEquals(TypeCode.BOOL, types.get("p2").getCode());
-      assertTrue(params.get("p2").getBoolValue());
-      assertEquals(TypeCode.BYTES, types.get("p3").getCode());
-      assertEquals(
-          Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)),
-          params.get("p3").getStringValue());
-      assertEquals(TypeCode.FLOAT64, types.get("p4").getCode());
-      assertEquals(3.14d, params.get("p4").getNumberValue(), 0.0d);
-      assertEquals(TypeCode.NUMERIC, types.get("p5").getCode());
-      assertEquals(TypeAnnotationCode.PG_NUMERIC, types.get("p5").getTypeAnnotation());
-      assertEquals("6.626", params.get("p5").getStringValue());
-      assertEquals(TypeCode.TIMESTAMP, types.get("p6").getCode());
-      assertEquals("2022-02-16T13:18:02.123457000Z", params.get("p6").getStringValue());
-      assertEquals(TypeCode.STRING, types.get("p7").getCode());
-      assertEquals("test", params.get("p7").getStringValue());
-    }
+    assertEquals(TypeCode.INT64, types.get("p1").getCode());
+    assertEquals("1", params.get("p1").getStringValue());
+    assertEquals(TypeCode.BOOL, types.get("p2").getCode());
+    assertTrue(params.get("p2").getBoolValue());
+    assertEquals(TypeCode.BYTES, types.get("p3").getCode());
+    assertEquals(
+        Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)),
+        params.get("p3").getStringValue());
+    assertEquals(TypeCode.FLOAT64, types.get("p4").getCode());
+    assertEquals(3.14d, params.get("p4").getNumberValue(), 0.0d);
+    assertEquals(TypeCode.NUMERIC, types.get("p5").getCode());
+    assertEquals(TypeAnnotationCode.PG_NUMERIC, types.get("p5").getTypeAnnotation());
+    assertEquals("6.626", params.get("p5").getStringValue());
+    assertEquals(TypeCode.TIMESTAMP, types.get("p6").getCode());
+    assertEquals("2022-02-16T13:18:02.123457000Z", params.get("p6").getStringValue());
+    assertEquals(TypeCode.STRING, types.get("p7").getCode());
+    assertEquals("test", params.get("p7").getStringValue());
   }
 
   @Test
@@ -283,6 +273,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertFalse(resultSet.next());
       }
     }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test
@@ -376,6 +367,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(-1, statement.getUpdateCount());
       }
     }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test
