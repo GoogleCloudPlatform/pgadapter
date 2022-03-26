@@ -183,3 +183,15 @@ func TestInsertAllDataTypes(connString string) *C.char {
 
 	return nil
 }
+
+//export TestWrongDialect
+func TestWrongDialect(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to connect to PG: %v", err))
+	}
+	defer conn.Close(ctx)
+
+	return nil
+}

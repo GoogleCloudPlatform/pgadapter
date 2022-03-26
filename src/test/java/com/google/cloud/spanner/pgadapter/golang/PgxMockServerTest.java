@@ -15,10 +15,13 @@
 package com.google.cloud.spanner.pgadapter.golang;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
@@ -41,6 +44,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -78,6 +82,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     String TestQueryAllDataTypes(GoString connString);
 
     String TestInsertAllDataTypes(GoString connString);
+
+    String TestWrongDialect(GoString connString);
   }
 
   private static PgxTest pgxTest;
@@ -259,22 +265,32 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  @Ignore("Needs a patch in the pgx driver")
   public void testInsertAllDataTypes() {
-    String sql = "INSERT INTO AllTypes "
-        + "(col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamp, col_varchar) "
-        + "values ($1, $2, $3, $4, $5, $6, $7)";
+    String sql =
+        "INSERT INTO AllTypes "
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamp, col_varchar) "
+            + "values ($1, $2, $3, $4, $5, $6, $7)";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
-    mockSpanner.putStatementResult(StatementResult.update(
-        Statement.newBuilder(sql)
-            .bind("p1").to(100L)
-            .bind("p2").to(true)
-            .bind("p3").to(ByteArray.copyFrom("test_bytes"))
-            .bind("p4").to(3.14d)
-            .bind("p5").to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
-            .bind("p6").to(Timestamp.parseTimestamp("2022-03-24T07:39:10.123456789+01:00"))
-            .bind("p7").to("test_string")
-            .build(),
-        1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to(100L)
+                .bind("p2")
+                .to(true)
+                .bind("p3")
+                .to(ByteArray.copyFrom("test_bytes"))
+                .bind("p4")
+                .to(3.14d)
+                .bind("p5")
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .bind("p6")
+                .to(Timestamp.parseTimestamp("2022-03-24T07:39:10.123456789+01:00"))
+                .bind("p7")
+                .to("test_string")
+                .build(),
+            1L));
 
     String res = pgxTest.TestInsertAllDataTypes(createConnString());
 
@@ -294,6 +310,28 @@ public class PgxMockServerTest extends AbstractMockServerTest {
         assertEquals(QueryMode.NORMAL, request.getQueryMode());
       }
       index++;
+    }
+  }
+
+  @Test
+  public void testWrongDialect() {
+    // Let the mock server respond with the Google SQL dialect instead of PostgreSQL. The
+    // connection should be gracefully rejected. Close all open pooled Spanner objects so we know
+    // that we will get a fresh one for our connection. This ensures that it will execute a query to
+    // determine the dialect of the database.
+    closeSpannerPool();
+    try {
+      mockSpanner.putStatementResult(
+          StatementResult.detectDialectResult(Dialect.GOOGLE_STANDARD_SQL));
+
+      String result = pgxTest.TestWrongDialect(createConnString());
+
+      assertNotNull(result);
+      assertTrue(result, result.contains("failed to connect to PG"));
+      assertTrue(result, result.contains("The database uses dialect GOOGLE_STANDARD_SQL"));
+    } finally {
+      mockSpanner.putStatementResult(StatementResult.detectDialectResult(Dialect.POSTGRESQL));
+      closeSpannerPool();
     }
   }
 }
