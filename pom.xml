@@ -56,21 +56,6 @@
     </license>
   </licenses>
 
-  <distributionManagement>
-    <snapshotRepository>
-      <id>artifact-registry</id>
-      <url>
-        artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts
-      </url>
-    </snapshotRepository>
-    <repository>
-      <id>artifact-registry</id>
-      <url>
-        artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts
-      </url>
-    </repository>
-  </distributionManagement>
-
   <dependencies>
     <dependency>
       <groupId>com.googlecode.json-simple</groupId>
