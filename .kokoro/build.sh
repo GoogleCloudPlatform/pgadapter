@@ -122,7 +122,7 @@ bash .kokoro/coerce_logs.sh
 if [[ "${ENABLE_FLAKYBOT}" == "true" ]]
 then
     chmod +x ${KOKORO_GFILE_DIR}/linux_amd64/flakybot
-    ${KOKORO_GFILE_DIR}/linux_amd64/flakybot -repo=GoogleCloudPlatform/google-cloud-spanner-pgadapter
+    ${KOKORO_GFILE_DIR}/linux_amd64/flakybot -repo=GoogleCloudPlatform/pgadapter
 fi
 
 echo "exiting with ${RETURN_CODE}"

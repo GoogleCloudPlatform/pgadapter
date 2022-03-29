@@ -33,7 +33,7 @@ python3 -m pip install gcp-docuploader
 # compile all packages
 mvn clean install -B -q -DskipTests=true
 
-export NAME=google-cloud-spanner-pgadapter
+export NAME=java-spanner-pgadapter
 export VERSION=$(grep ${NAME}: versions.txt | cut -d: -f3)
 
 # cloud RAD generation
