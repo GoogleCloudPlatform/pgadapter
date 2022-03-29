@@ -15,8 +15,11 @@
 package com.google.cloud.spanner.pgadapter.golang;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
@@ -72,6 +75,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     String TestSelect1(GoString connString);
 
     String TestQueryWithParameter(GoString connString);
+
+    String TestWrongDialect(GoString connString);
   }
 
   private static PgxTest pgxTest;
@@ -221,6 +226,28 @@ public class PgxMockServerTest extends AbstractMockServerTest {
         assertEquals(QueryMode.NORMAL, request.getQueryMode());
       }
       index++;
+    }
+  }
+
+  @Test
+  public void testWrongDialect() {
+    // Let the mock server respond with the Google SQL dialect instead of PostgreSQL. The
+    // connection should be gracefully rejected. Close all open pooled Spanner objects so we know
+    // that we will get a fresh one for our connection. This ensures that it will execute a query to
+    // determine the dialect of the database.
+    closeSpannerPool();
+    try {
+      mockSpanner.putStatementResult(
+          StatementResult.detectDialectResult(Dialect.GOOGLE_STANDARD_SQL));
+
+      String result = pgxTest.TestWrongDialect(createConnString());
+
+      assertNotNull(result);
+      assertTrue(result, result.contains("failed to connect to PG"));
+      assertTrue(result, result.contains("The database uses dialect GOOGLE_STANDARD_SQL"));
+    } finally {
+      mockSpanner.putStatementResult(StatementResult.detectDialectResult(Dialect.POSTGRESQL));
+      closeSpannerPool();
     }
   }
 }

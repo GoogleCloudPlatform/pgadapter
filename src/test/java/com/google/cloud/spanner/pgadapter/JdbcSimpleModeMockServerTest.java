@@ -19,6 +19,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -84,6 +85,27 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(sql, request.getSql());
     assertTrue(request.getTransaction().hasSingleUse());
     assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+  }
+
+  @Test
+  public void testWrongDialect() {
+    // Let the mock server respond with the Google SQL dialect instead of PostgreSQL. The
+    // connection should be gracefully rejected. Close all open pooled Spanner objects so we know
+    // that we will get a fresh one for our connection. This ensures that it will execute a query to
+    // determine the dialect of the database.
+    closeSpannerPool();
+    try {
+      mockSpanner.putStatementResult(
+          StatementResult.detectDialectResult(Dialect.GOOGLE_STANDARD_SQL));
+
+      SQLException exception =
+          assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl()));
+
+      assertTrue(exception.getMessage().contains("The database uses dialect GOOGLE_STANDARD_SQL"));
+    } finally {
+      mockSpanner.putStatementResult(StatementResult.detectDialectResult(Dialect.POSTGRESQL));
+      closeSpannerPool();
+    }
   }
 
   @Test
