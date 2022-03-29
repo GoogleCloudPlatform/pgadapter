@@ -30,7 +30,7 @@ set +e
 
 case ${JOB_TYPE} in
 units)
-  mvn verify -Dclirr.skip=true -DskipITs=true
+  mvn verify -Dclirr.skip=true -DskipITs=true -Ptest-all
   ;;
 lint)
   mvn com.coveo:fmt-maven-plugin:check
