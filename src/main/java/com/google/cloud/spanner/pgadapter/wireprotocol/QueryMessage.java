@@ -121,8 +121,7 @@ public class QueryMessage extends ControlMessage {
       boolean inTransaction = connection.getSpannerConnection().isInTransaction();
       new ReadyResponse(
               this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
-          .send(false);
-      this.outputStream.flush();
+          .send();
     }
     this.connection.cleanUp(this.statement);
   }
