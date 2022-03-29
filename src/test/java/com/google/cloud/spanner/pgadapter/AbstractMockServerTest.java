@@ -87,7 +87,7 @@ import org.threeten.bp.Duration;
  * The tests can then inspect the requests that the mock Spanner server received to verify that the
  * server received the requests that the test expected.
  */
-abstract class AbstractMockServerTest {
+public abstract class AbstractMockServerTest {
   private static final Logger logger = Logger.getLogger(AbstractMockServerTest.class.getName());
 
   protected static final Statement SELECT1 = Statement.of("SELECT 1");
