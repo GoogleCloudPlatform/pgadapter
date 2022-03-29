@@ -54,13 +54,23 @@ public abstract class WireOutput {
    * @throws Exception
    */
   public void send() throws Exception {
+    send(true);
+  }
+
+  /**
+   * Same as {@link #send()}, but with the option to skip the flush at the end. This is more
+   * efficient for responses that contain multiple parts, such as query results.
+   */
+  public void send(boolean flush) throws Exception {
     logger.log(Level.FINE, this::toString);
     this.outputStream.writeByte(this.getIdentifier());
     if (this.isCompoundResponse()) {
       this.outputStream.writeInt(this.length);
     }
     sendPayload();
-    this.outputStream.flush();
+    if (flush) {
+      this.outputStream.flush();
+    }
   }
 
   /**
