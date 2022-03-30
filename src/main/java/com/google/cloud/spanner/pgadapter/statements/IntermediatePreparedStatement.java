@@ -114,13 +114,16 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   @Override
   public DescribeMetadata describe() {
-    Statement statement = Statement.of(this.sql);
-    try (ResultSet resultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN)) {
-      // TODO: Remove ResultSet.next() call once this is supported in the client library.
-      // See https://github.com/googleapis/java-spanner/pull/1691
-      resultSet.next();
-      return new DescribeStatementMetadata(getParameterTypes(), resultSet);
+    if (PARSER.isQuery(this.sql)) {
+      Statement statement = Statement.of(this.sql);
+      try (ResultSet resultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN)) {
+        // TODO: Remove ResultSet.next() call once this is supported in the client library.
+        // See https://github.com/googleapis/java-spanner/pull/1691
+        resultSet.next();
+        return new DescribeStatementMetadata(getParameterTypes(), resultSet);
+      }
     }
+    return new DescribeStatementMetadata(getParameterTypes(), null);
   }
 
   /**
