@@ -31,6 +31,7 @@ import com.google.cloud.spanner.MockOperationsServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient;
 import com.google.cloud.spanner.admin.database.v1.DatabaseAdminSettings;
@@ -363,6 +364,11 @@ public abstract class AbstractMockServerTest {
         SpannerPool.closeSpannerPool();
         return;
       } catch (SpannerException e) {
+        try {
+          Thread.sleep(1L);
+        } catch (InterruptedException interruptedException) {
+          throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+        }
         exception = e;
       }
     }
