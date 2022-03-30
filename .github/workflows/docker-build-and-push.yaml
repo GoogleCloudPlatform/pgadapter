@@ -12,7 +12,7 @@ env:
   GITHUB_SHA: ${{ github.sha }}
   GITHUB_REF: ${{ github.ref }}
   IMAGE: pgadapter
-  REGISTRY_HOSTNAME: us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter
+  REGISTRY_HOSTNAME: us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images
 
 jobs:
   setup-build-publish-deploy:
@@ -32,17 +32,16 @@ jobs:
         uses: 'google-github-actions/setup-gcloud@v0'
 
       # Configure docker to use the gcloud command-line tool as a credential helper
-      - run: gcloud auth configure-docker us-west1-docker.pkg.dev
+      - run: gcloud auth configure-docker gcr.io,us-west1-docker.pkg.dev
 
       # Build the Docker image
       - name: Build
         run: |
           export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $TAG
-          docker build . -t "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" \
-            -f build/Dockerfile \
+          docker build . -f build/Dockerfile -t "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" \
             --build-arg GITHUB_SHA="$GITHUB_SHA" \
-            --build-arg GITHUB_REF="$GITHUB_REF" .
+            --build-arg GITHUB_REF="$GITHUB_REF"
 
       # Push the Docker image to Google Artifact Registry
       - name: Publish
