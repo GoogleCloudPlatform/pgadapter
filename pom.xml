@@ -153,6 +153,7 @@
                   <goal>shade</goal>
                 </goals>
                 <configuration>
+                  <finalName>pgadapter</finalName>
                   <filters>
                     <filter>
                       <artifact>*:*</artifact>

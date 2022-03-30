@@ -17,6 +17,8 @@ COPY NOTIFICATIONS.md ./
 COPY logging.properties ./
 COPY src src/
 COPY pom.xml ./
+COPY license-checks.xml ./
+COPY java.header ./
 
 # Install google-cloud-sdk to get gcloud.
 RUN mkdir -p /usr/local/gcloud                                              && \
@@ -27,14 +29,8 @@ RUN mkdir -p /usr/local/gcloud                                              && \
     ln -s /usr/local/gcloud/google-cloud-sdk/bin/gcloud /usr/bin/gcloud     && \
     rm google-cloud-sdk-${CLOUD_SDK_VERSION}-linux-x86_64.tar.gz
 
-# Setup gcloud credentials. A copy of application_default_credentials.json needs to be placed in the build directory as well as the
-# span-cloud-testing credentials for running the integration tests.
-ADD build/application_default_credentials.json /root/.config/gcloud/application_default_credentials.json
-ADD build/span-cloud-testing.json /root/span-cloud-testing.json
-ENV GOOGLE_APPLICATION_CREDENTIALS=/root/span-cloud-testing.json
-
 # Build from source.
-RUN mvn clean package -P shade
+RUN mvn clean package -P shade -DskipTests
 
 ################################################################################
 #                                   RELEASE                                    #
@@ -42,12 +38,10 @@ RUN mvn clean package -P shade
 
 FROM gcr.io/cloud-marketplace/google/ubuntu1804:latest
 
-ENV PG_ADAPTER_VERSION=0.1.0-pg
-
 RUN apt-get update                                                          && \
     apt-get -qq -y install default-jre
 
-COPY --from=build target/google-cloud-spanner-pgadapter-${PG_ADAPTER_VERSION}-SNAPSHOT.jar /home/pgadapter/pgadapter.jar
+COPY --from=build target/pgadapter.jar /home/pgadapter/pgadapter.jar
 COPY --from=build LICENSE /home/pgadapter/
 COPY --from=build CONTRIBUTING.md /home/pgadapter/
 COPY --from=build README.md /home/pgadapter/

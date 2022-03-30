@@ -1,0 +1,54 @@
+name: Build and Push Docker Image to Google Artifact Registry
+
+on:
+  # This allows manual activation of this action for testing.
+  workflow_dispatch:
+  push:
+    tags:
+      # Automatically build and push Docker image when a release (version) tag is pushed.
+      - v*
+
+env:
+  GITHUB_SHA: ${{ github.sha }}
+  GITHUB_REF: ${{ github.ref }}
+  IMAGE: pgadapter
+  REGISTRY_HOSTNAME: us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter
+
+jobs:
+  setup-build-publish-deploy:
+    name: Setup, Build, and Publish
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v0'
+        with:
+          credentials_json: '${{ secrets.CLOUD_SPANNER_PG_ADAPTER_SERVICE_ACCOUNT }}'
+
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v0'
+
+      # Configure docker to use the gcloud command-line tool as a credential helper
+      - run: gcloud auth configure-docker us-west1-docker.pkg.dev
+
+      # Build the Docker image
+      - name: Build
+        run: |
+          export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
+          echo $TAG
+          docker build . -t "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" \
+            -f build/Dockerfile \
+            --build-arg GITHUB_SHA="$GITHUB_SHA" \
+            --build-arg GITHUB_REF="$GITHUB_REF" .
+
+      # Push the Docker image to Google Artifact Registry
+      - name: Publish
+        run: |
+          export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
+          echo $TAG
+          docker push "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG"
+          docker tag "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" "$REGISTRY_HOSTNAME"/"$IMAGE":latest
+          docker push "$REGISTRY_HOSTNAME"/"$IMAGE":latest
