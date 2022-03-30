@@ -94,7 +94,7 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
         proxy. As such, we send the user a descriptive message to help them understand the issue
         in case they misuse the method.
       */
-      logger.log(Level.SEVERE, e.toString());
+      logger.log(Level.SEVERE, e, e::toString);
       throw new IllegalStateException(
           "Something went wrong in Describing this statement."
               + "Note that non-SELECT result types in Spanner cannot be described.");

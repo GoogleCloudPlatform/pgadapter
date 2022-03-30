@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.google.cloud.spanner.pgadapter;
+package com.google.cloud.spanner.pgadapter.golang;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -24,6 +24,7 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
@@ -44,6 +45,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -51,6 +53,7 @@ import org.junit.runners.JUnit4;
  * Tests PGAdapter using the native Go pgx driver. The Go code can be found in
  * src/test/golang/pgx.go.
  */
+@Category(GolangTest.class)
 @RunWith(JUnit4.class)
 public class PgxMockServerTest extends AbstractMockServerTest {
   public static class GoString extends Structure implements Structure.ByValue {
@@ -75,13 +78,13 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     String TestQueryWithParameter(GoString connString);
 
-    String TestWrongDialect(GoString connString);
-
     String TestQueryAllDataTypes(GoString connString);
 
     String TestInsertAllDataTypes(GoString connString);
 
     String TestInsertNullsAllDataTypes(GoString connString);
+
+    String TestWrongDialect(GoString connString);
   }
 
   private static PgxTest pgxTest;
@@ -92,7 +95,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     ProcessBuilder builder = new ProcessBuilder();
     String[] compileCommand = "go build -o pgx_test.so -buildmode=c-shared pgx.go".split(" ");
     builder.command(compileCommand);
-    builder.directory(new File("./src/test/golang"));
+    builder.directory(new File("./src/test/golang/pgadapter_pgx_tests"));
     Process process = builder.start();
     int res = process.waitFor();
     assertEquals(0, res);
@@ -101,7 +104,9 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     // standard library directories.
     String currentPath = new java.io.File(".").getCanonicalPath();
     pgxTest =
-        Native.load(String.format("%s/src/test/golang/pgx_test.so", currentPath), PgxTest.class);
+        Native.load(
+            String.format("%s/src/test/golang/pgadapter_pgx_tests/pgx_test.so", currentPath),
+            PgxTest.class);
   }
 
   private GoString createConnString() {

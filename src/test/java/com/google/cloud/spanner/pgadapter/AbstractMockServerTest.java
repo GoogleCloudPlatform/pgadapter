@@ -31,6 +31,7 @@ import com.google.cloud.spanner.MockOperationsServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient;
 import com.google.cloud.spanner.admin.database.v1.DatabaseAdminSettings;
@@ -87,7 +88,7 @@ import org.threeten.bp.Duration;
  * The tests can then inspect the requests that the mock Spanner server received to verify that the
  * server received the requests that the test expected.
  */
-abstract class AbstractMockServerTest {
+public abstract class AbstractMockServerTest {
   private static final Logger logger = Logger.getLogger(AbstractMockServerTest.class.getName());
 
   protected static final Statement SELECT1 = Statement.of("SELECT 1");
@@ -363,6 +364,11 @@ abstract class AbstractMockServerTest {
         SpannerPool.closeSpannerPool();
         return;
       } catch (SpannerException e) {
+        try {
+          Thread.sleep(1L);
+        } catch (InterruptedException interruptedException) {
+          throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+        }
         exception = e;
       }
     }
