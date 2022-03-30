@@ -32,7 +32,7 @@ jobs:
         uses: 'google-github-actions/setup-gcloud@v0'
 
       # Configure docker to use the gcloud command-line tool as a credential helper
-      - run: gcloud auth configure-docker us-west1-docker.pkg.dev
+      - run: gcloud auth configure-docker gcr.io,us-west1-docker.pkg.dev
 
       # Build the Docker image
       - name: Build
