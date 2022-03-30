@@ -72,7 +72,7 @@ public abstract class WireMessage {
    * @throws Exception If the sending fails.
    */
   public void send() throws Exception {
-    logger.log(Level.FINE, this.toString());
+    logger.log(Level.FINE, this::toString);
     sendPayload();
   }
 
