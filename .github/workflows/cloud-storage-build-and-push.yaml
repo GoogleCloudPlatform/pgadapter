@@ -11,6 +11,7 @@ on:
 env:
   GITHUB_SHA: ${{ github.sha }}
   GITHUB_REF: ${{ github.ref }}
+  UBER_JAR: "pgadapter.jar"
 
 jobs:
   setup-build-publish-deploy:
@@ -33,7 +34,7 @@ jobs:
           export VERSION=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $VERSION
           mv "target/pgadapter.jar" "target/pgadapter-$VERSION.jar"
-          export UBER_JAR="target/pgadapter-$VERSION.jar"
+          UBER_JAR="target/pgadapter-$VERSION.jar"
           echo $UBER_JAR
 
       # Upload the jar to Google Cloud Storage
