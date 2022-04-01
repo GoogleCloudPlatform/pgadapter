@@ -112,7 +112,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   private GoString createConnString() {
     return new GoString(
         String.format(
-            "postgres://uid:pwd@localhost:%d/test-db?statement_cache_capacity=0",
+            "postgres://uid:pwd@localhost:%d/test-db?statement_cache_capacity=0&sslmode=disable",
             pgServer.getLocalPort()));
   }
 
