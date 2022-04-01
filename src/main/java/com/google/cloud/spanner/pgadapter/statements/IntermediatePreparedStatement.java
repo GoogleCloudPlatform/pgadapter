@@ -18,6 +18,7 @@ import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
@@ -25,9 +26,6 @@ import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 import org.postgresql.core.Oid;
@@ -37,15 +35,12 @@ import org.postgresql.core.Oid;
  */
 public class IntermediatePreparedStatement extends IntermediateStatement {
 
-  private static final Charset UTF8 = StandardCharsets.UTF_8;
   protected List<Integer> parameterDataTypes;
   protected Statement statement;
 
-  public IntermediatePreparedStatement(OptionsMetadata options, String sql, Connection connection) {
-    super(options, sql);
-    this.sql = replaceKnownUnsupportedQueries(sql);
-    this.command = StatementParser.parseCommand(this.sql);
-    this.connection = connection;
+  public IntermediatePreparedStatement(
+      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
+    super(options, parsedStatement, connection);
     this.parameterDataTypes = null;
   }
 
@@ -96,10 +91,10 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   public IntermediatePortalStatement bind(
       byte[][] parameters, List<Short> parameterFormatCodes, List<Short> resultFormatCodes) {
     IntermediatePortalStatement portal =
-        new IntermediatePortalStatement(this.options, this.sql, this.connection);
+        new IntermediatePortalStatement(this.options, this.parsedStatement, this.connection);
     portal.setParameterFormatCodes(parameterFormatCodes);
     portal.setResultFormatCodes(resultFormatCodes);
-    Statement.Builder builder = Statement.newBuilder(sql);
+    Statement.Builder builder = Statement.newBuilder(this.parsedStatement.getSqlWithoutComments());
     for (int index = 0; index < parameters.length; index++) {
       short formatCode = portal.getParameterFormatCode(index);
       int type = this.parseType(parameters, index);
@@ -114,8 +109,8 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   @Override
   public DescribeMetadata describe() {
-    if (PARSER.isQuery(this.sql)) {
-      Statement statement = Statement.of(this.sql);
+    if (this.parsedStatement.isQuery()) {
+      Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
       try (ResultSet resultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN)) {
         // TODO: Remove ResultSet.next() call once this is supported in the client library.
         // See https://github.com/googleapis/java-spanner/pull/1691
@@ -132,7 +127,8 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * parameter types.
    */
   private int[] getParameterTypes() {
-    Set<String> parameters = PARSER.getQueryParameters(this.sql);
+    Set<String> parameters =
+        PARSER.getQueryParameters(this.parsedStatement.getSqlWithoutComments());
     return new int[parameters.size()];
   }
 }
