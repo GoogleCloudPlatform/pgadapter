@@ -123,7 +123,7 @@ public class QueryMessage extends ControlMessage {
                 this.statement.getStatementResult(),
                 this.connection.getServer().getOptions(),
                 QueryMode.SIMPLE)
-            .send();
+            .send(false);
       }
       this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
       boolean inTransaction = connection.getSpannerConnection().isInTransaction();
