@@ -1,0 +1,45 @@
+name: Build and Push uber-jar to Google Cloud Storage
+
+on:
+  # This allows manual activation of this action for testing.
+  workflow_dispatch:
+  push:
+    tags:
+      # Automatically build and push Docker image when a release (version) tag is pushed.
+      - v*
+
+env:
+  GITHUB_SHA: ${{ github.sha }}
+  GITHUB_REF: ${{ github.ref }}
+
+jobs:
+  setup-build-publish-deploy:
+    name: Setup, Build, and Publish
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v0'
+        with:
+          credentials_json: '${{ secrets.CLOUD_SPANNER_PG_ADAPTER_SERVICE_ACCOUNT }}'
+
+      # Build the uber-jar
+      - name: Build
+        run: |
+          mvn package -Pshade -DskipTests
+          export VERSION=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
+          echo $VERSION
+          mv "target/pgadapter.jar" "target/pgadapter-$VERSION.jar"
+          echo "uber_jar=target/pgadapter-$VERSION.jar" >> $GITHUB_ENV
+          echo ${{ env.uber_jar }}
+
+      # Upload the jar to Google Cloud Storage
+      - id: 'upload-file'
+        uses: 'google-github-actions/upload-cloud-storage@v0'
+        with:
+          path: ${{ env.uber_jar }}
+          destination: 'pgadapter-jar-releases'
+          parent: false

@@ -117,6 +117,10 @@ public class ArrayParser extends Parser<List<?>> {
    * @return Value with quotes around if string, otherwise just the item.
    */
   private String stringify(String value) {
+    if (value == null) {
+      // This must be upper-case.
+      return "NULL";
+    }
     if (this.isStringEquivalent) {
       if (value.indexOf('\\') > -1) {
         value = value.replace("\\", "\\\\");

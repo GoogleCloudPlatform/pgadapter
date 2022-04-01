@@ -18,6 +18,7 @@ import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
@@ -38,9 +39,10 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   protected List<Short> parameterFormatCodes;
   protected List<Short> resultFormatCodes;
 
-  public IntermediatePortalStatement(OptionsMetadata options, String sql, Connection connection) {
-    super(options, sql, connection);
-    this.statement = Statement.of(sql);
+  public IntermediatePortalStatement(
+      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
+    super(options, parsedStatement, connection);
+    this.statement = Statement.of(parsedStatement.getSqlWithoutComments());
     this.parameterFormatCodes = new ArrayList<>();
     this.resultFormatCodes = new ArrayList<>();
   }

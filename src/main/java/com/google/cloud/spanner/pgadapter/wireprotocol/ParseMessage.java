@@ -15,14 +15,15 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
 
 /** Creates a prepared statement. */
 public class ParseMessage extends ControlMessage {
@@ -30,23 +31,26 @@ public class ParseMessage extends ControlMessage {
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   protected static final char IDENTIFIER = 'P';
 
-  private String name;
-  private IntermediatePreparedStatement statement;
-  private List<Integer> parameterDataTypes;
+  private final String name;
+  private final IntermediatePreparedStatement statement;
+  private final ImmutableList<Integer> parameterDataTypes;
 
   public ParseMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.name = this.readString();
-    String queryString = PARSER.removeCommentsAndTrim(this.readString());
-    this.parameterDataTypes = new ArrayList<>();
+    ParsedStatement parsedStatement = PARSER.parse(Statement.of(this.readString()));
+    ImmutableList.Builder<Integer> builder = ImmutableList.builder();
     short numberOfParameters = this.inputStream.readShort();
     for (int i = 0; i < numberOfParameters; i++) {
       int type = this.inputStream.readInt();
-      this.parameterDataTypes.add(type);
+      builder.add(type);
     }
+    this.parameterDataTypes = builder.build();
     this.statement =
         new IntermediatePreparedStatement(
-            connection.getServer().getOptions(), queryString, connection.getSpannerConnection());
+            connection.getServer().getOptions(),
+            parsedStatement,
+            connection.getSpannerConnection());
     this.statement.setParameterDataTypes(this.parameterDataTypes);
   }
 
