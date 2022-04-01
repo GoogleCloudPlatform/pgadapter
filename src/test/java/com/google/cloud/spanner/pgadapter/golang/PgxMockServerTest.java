@@ -145,22 +145,11 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // The patched version of pgx sends the query two times.
-    // This will be one time when https://github.com/GoogleCloudPlatform/pgadapter/pull/80 has been
-    // merged.
-    // 1. DESCRIBE portal
-    // 2. EXECUTE portal
-    assertEquals(2, requests.size());
-    int index = 0;
-    for (ExecuteSqlRequest request : requests) {
-      assertEquals(sql, request.getSql());
-      if (index < 1) {
-        assertEquals(QueryMode.PLAN, request.getQueryMode());
-      } else {
-        assertEquals(QueryMode.NORMAL, request.getQueryMode());
-      }
-      index++;
-    }
+    // The patched version of pgx sends the query one time.
+    assertEquals(1, requests.size());
+    ExecuteSqlRequest request = requests.get(0);
+    assertEquals(sql, request.getSql());
+    assertEquals(QueryMode.NORMAL, request.getQueryMode());
   }
 
   @Test
@@ -171,22 +160,11 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // The patched version of pgx sends the query two times.
-    // This will be one time when https://github.com/GoogleCloudPlatform/pgadapter/pull/80 has been
-    // merged.
-    // 1. DESCRIBE portal
-    // 2. EXECUTE portal
-    assertEquals(2, requests.size());
-    int index = 0;
-    for (ExecuteSqlRequest request : requests) {
-      assertEquals(sql, request.getSql());
-      if (index < 1) {
-        assertEquals(QueryMode.PLAN, request.getQueryMode());
-      } else {
-        assertEquals(QueryMode.NORMAL, request.getQueryMode());
-      }
-      index++;
-    }
+    // The patched version of pgx sends the query one time.
+    assertEquals(1, requests.size());
+    ExecuteSqlRequest request = requests.get(0);
+    assertEquals(sql, request.getSql());
+    assertEquals(QueryMode.NORMAL, request.getQueryMode());
   }
 
   @Test
@@ -226,22 +204,11 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // The patched version of pgx sends the query two times.
-    // This will be one time when https://github.com/GoogleCloudPlatform/pgadapter/pull/80 has been
-    // merged.
-    // 1. DESCRIBE portal
-    // 2. EXECUTE portal
-    assertEquals(2, requests.size());
-    int index = 0;
-    for (ExecuteSqlRequest request : requests) {
-      assertEquals(sql, request.getSql());
-      if (index < 1) {
-        assertEquals(QueryMode.PLAN, request.getQueryMode());
-      } else {
-        assertEquals(QueryMode.NORMAL, request.getQueryMode());
-      }
-      index++;
-    }
+    // The patched version of pgx sends the query one time.
+    assertEquals(1, requests.size());
+    ExecuteSqlRequest request = requests.get(0);
+    assertEquals(sql, request.getSql());
+    assertEquals(QueryMode.NORMAL, request.getQueryMode());
   }
 
   @Test
@@ -253,14 +220,10 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // The patched version of pgx sends the query twice.
-    // Once https://github.com/GoogleCloudPlatform/pgadapter/pull/80 has been merged, we will be
-    // down to one query.
-    assertEquals(2, requests.size());
-    ExecuteSqlRequest planRequest = requests.get(0);
-    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(1);
-    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    // The patched version of pgx sends the query one time.
+    assertEquals(1, requests.size());
+    ExecuteSqlRequest request = requests.get(0);
+    assertEquals(QueryMode.NORMAL, request.getQueryMode());
   }
 
   @Test
