@@ -1,41 +1,18 @@
 # Google Cloud Spanner PostgreSQL Adapter
 
-## Introduction
-Spanner-PGAdapter is a simple, MITM, forward, non-transparent proxy, which 
-translates Postgres wire protocol into the Cloud Spanner equivalent. By running
-this proxy locally, any Postgres client (including the SQL command-line client
-PSQL) should function seamlessly by simply pointing its outbound port to the 
-this proxy's inbound port. For the time being, we only support PSQL versions 11, 12, 13, and 14.
+Google Cloud Spanner PGAdapter is a proxy which translates the PostgreSQL wire-protocol into the
+Cloud Spanner equivalent for Cloud Spanner databases [that use the PostgreSQL dialect](https://cloud.google.com/spanner/docs/postgresql-interface).
 
-Additionally to translation, this proxy also concerns itself with authentication
-and to some extent, connection pooling. Translation for the most part is simply
-a transformation of the [PostgreSQL wire protocol](https://www.postgresql.org/docs/8.2/protocol-message-formats.html)
-except for some cases concerning PSQL, wherein the query itself is translated.
+PGAdapter has been tested and can be used with the following clients:
+1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
+2. `JDBC`: Versions 42.x and higher are partly supported. See [JDBC support](docs/jdbc.md) for more details.
+3. `pgx`: Version 4.15 and higher have limited support. See [pgx support](docs/pgx.md) for more details.
 
-Simple query mode and extended query mode are supported, and any data type
-supported by Spanner is also supported. Items, tables and language not native to
-Spanner are not supported, unless otherwise specified.
-
-Though the majority of functionality inherent in most PostgreSQL clients
-(including PSQL and JDBC) are included out of the box, the following items are
-not supported:
-* Functions
-* COPY <table_name> TO ...
-* COPY <table_name> FROM <filename | PROGRAM program>
-* Prepared Statement DESCRIBE
-* SSL
-* PSQL meta-commands not included in this list (i.e.: these are supported):
-  * `\d <table>` 
-  * `\dt <table>`
-  * `\dn <table>`
-  * `\di <table>`
-  * `\l`
-
-COPY <table_name> FROM STDIN is supported.
+Other drivers and tools have not been specifically tested and are not known to work with PGAdapter.
 
 ## Usage
-The PostgreSQL adapter can be started both as a Docker container, a standalone process as well as an in-process server.
-
+The PostgreSQL adapter can be started both as a Docker container, a standalone process as well as an
+in-process server (the latter is only supported for Java applications).
 
 ### Docker
 
@@ -57,12 +34,33 @@ The option `-v /local/path/to/credentials.json:/tmp/keys/key.json:ro` mounts the
 your local system to a file in the Docker container. The `-e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json`
 sets the file as the default credentials to use inside the container.
 
-See [Options](#Options) for an explanation of all further options. 
+The `-x` option tells PGAdapter to accept connections other hosts than `localhost`. This is required
+when running PGAdapter in a Docker container, as requests will not be seen as coming from `localhost`
+in the container. Choose a different host port than 5432 if you already have PostgreSQL running on
+your local system.
 
-### Standalone
+See [Options](#Options) for an explanation of all further options.
+
+### Standalone with pre-built jar
+
+A pre-built jar containing all dependencies can be downloaded from https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-<VERSION>.jar
+
+Example (replace `v0.2.1` with the version you want to download):
+
+```shell
+wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-v0.2.1.jar
+java -jar pgadapter-v0.2.1.jar -p my-project -i my-instance -d my-database
+```
+
+Use the `-s` option to specify a different local port than the default 5432 if you already have
+PostgreSQL running on your local system.
+
+See [Options](#Options) for an explanation of all further options.
+
+### Standalone with locally built jar
 1. Build a jar file containing all dependencies by running `mvn package -P shade`.
 2. Execute `java -jar <jar-file> <options>`.
-3. To get fine-grained logging messages, make sure that you have the logging.properties file and run the jar with `-Djava.util.logging.config.file=logging.properties`. You need to create one according to this sample if it's missing. 
+3. To get fine-grained logging messages, make sure that you have the logging.properties file and run the jar with `-Djava.util.logging.config.file=logging.properties`. You need to create one according to this sample if it's missing.
     ```
     handlers=java.util.logging.ConsoleHandler,java.util.logging.FileHandler
     com.google.cloud.spanner.pgadapter.level=FINEST
@@ -76,8 +74,12 @@ See [Options](#Options) for an explanation of all further options.
     java.util.logging.FileHandler.formatter=java.util.logging.SimpleFormatter
     ```
 
+See [Options](#Options) for an explanation of all further options.
+
 ### In-process
-1. Add google-cloud-spanner-pgadapter as a dependency to your project.
+This option is only available for Java/JVM-based applications.
+
+1. Add `google-cloud-spanner-pgadapter` as a dependency to your project.
 2. Build a server using the `com.google.cloud.spanner.pgadapter.ProxyServer`
    class:
 
@@ -86,9 +88,9 @@ class PGProxyRunner {
     public static void main() {
         ProxyServer server = new ProxyServer(
           new OptionsMetadata(
-                "jdbc:cloudspanner:/projects/my-project-name"
-                + "/instances/my-instance-id"
-                + "/databases/my-database-name"
+                "jdbc:cloudspanner:/projects/my-project"
+                + "/instances/my-instance"
+                + "/databases/my-database"
                 + ";credentials=/home/user/service-account-credentials.json",
                 portNumber,
                 textFormat,
@@ -108,7 +110,7 @@ path; All other items map directly to previously mentioned CLI options.
 
 ### Options
 The following options are required to run the proxy:
-  
+
 ```    
 -p <projectname>
   * The project name where the desired Spanner database is running.
@@ -120,16 +122,17 @@ The following options are required to run the proxy:
   * The Spanner database name.
 
 -c <credentialspath>
-  * The full path for the file containing the service account credentials in JSON 
-    format.
-  * Do remember to grant the service account sufficient credentials to access the
-    database.
+  * This is only required if you have not already set up default credentials on the system where you
+    are running PGAdapter.
+  * The full path for the file containing the service account credentials in JSON format.
+  * Do remember to grant the service account sufficient credentials to access the database.
 ```
 
 The following options are optional:
 ```    
 -s <port>
-  * The inbound port for the proxy. Defaults to 5432.
+  * The inbound port for the proxy. Defaults to 5432. Choose a different port if you already have
+    PostgreSQL running on your local system.
    
 -a
   * Use authentication when connecting. Currently authentication is not strictly
@@ -145,11 +148,18 @@ The following options are optional:
     performance penalties due to query matching and translation and as such is
     not recommended for production. It is further not guaranteed to perfectly
     match PSQL logic. Please only use this mode when using PSQL.
+    
+-jdbc
+  * JDBC Mode. Use this option when fronting the native PostgreSQL JDBC driver.
+    This option will inspect queries to look for native JDBC metadata queries and
+    replace these with queries that are suppported by Cloud Spanner PostgreSQL
+    databases.
 
 -f <POSTGRESQL|SPANNER>
   * The data result format coming back to the client from the proxy. By default,
     this is POSTGRESQL, but you can choose SPANNER format if you do not wish the
-    data to be modified and the client used can handle it.
+    data to be modified and the client used can handle it. This is generally only
+    useful when using `psql`.
     
 -c <multi-statementcommand>
     Runs a single command before exiting. This command can be comprised of multiple 
@@ -226,6 +236,44 @@ java -jar <jar-file> -p <project name> -i <instance id> -d <database name> -c
 <path to credentials file> -s 5432 
 ```
 
+## Details
+Google Cloud Spanner PGAdapter is a simple, MITM, forward, non-transparent proxy, which translates
+the PostgreSQL wire-protocol into the Cloud Spanner equivalent. It can only be used with Cloud
+Spanner databases that use the [PostgreSQL dialect](https://cloud.google.com/spanner/docs/postgresql-interface).
+By running this proxy locally, any PostgreSQL client (including the SQL command-line client PSQL)
+should function seamlessly by simply pointing its outbound port to this proxy's inbound port.
+The proxy does not support all parts of the PostgreSQL wire-protocol. See [Limitations](#Limitations)
+for a list of current limitations.
+
+In addition to translation, this proxy also concerns itself with authentication
+and to some extent, connection pooling. Translation for the most part is simply
+a transformation of the [PostgreSQL wire protocol](https://www.postgresql.org/docs/current/protocol-message-formats.html)
+except for some cases concerning PSQL, wherein the query itself is translated.
+
+Simple query mode and extended query mode are supported, and any data type
+supported by Spanner is also supported. Items, tables and language not native to
+Spanner are not supported, unless otherwise specified.
+
+Though the majority of functionality inherent in most PostgreSQL clients
+(including PSQL and JDBC) are included out of the box, the following items are
+not supported:
+* Prepared Statement DESCRIBE
+* SSL
+* Functions
+* COPY <table_name> TO ...
+* COPY <table_name> FROM <filename | PROGRAM program>
+
+COPY <table_name> FROM STDIN __is supported__.
+
+Only the following `psql` meta-commands are supported:
+  * `\d <table>` 
+  * `\dt <table>`
+  * `\dn <table>`
+  * `\di <table>`
+  * `\l`
+
+Other `psql` meta-commands are __not__ supported.
+
 ## COPY support
 `COPY <table-name> FROM STDIN` is supported. This option can be used to insert bulk data to a Cloud
 Spanner database. `COPY` operations are atomic by default, but the standard transaction limits of
@@ -290,14 +338,18 @@ psql -h localhost -p 5432 -d my-local-db \
   -c "copy numbers from stdin;"
 ```
 
+## Limitations
+
+PGAdapter has the following known limitations at this moment:
+- PostgreSQL prepared statements are not fully supported. It is recommended not to use this feature.
+  Note: This limitation relates specifically to server side PostgreSQL prepared statements.
+  The JDBC `java.sql.PreparedStatement` interface is supported.
+- DESCRIBE statement wire-protocol messages currently return `Oid.UNSPECIFIED` for all parameters in the query.
+- DESCRIBE statement wire-protocol messages return `NoData` as the row description of the statement.
+- The COPY protocol only supports COPY FROM STDIN.
 
 ## Support Level
 
 We are not currently accepting external code contributions to this project. 
 Please feel free to file feature requests using GitHub's issue tracker or 
 using the existing Cloud Spanner support channels.
-
-## Note
-
-Currently PGAdapter is in public preview. Please [sign-up](https://goo.gle/PostgreSQL-interface) 
-to get access to the Cloud Spanner PostgreSQL interface.
