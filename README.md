@@ -31,7 +31,7 @@ docker run \
   -d -p 5432:5432 \
   -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
   -e GOOGLE_APPLICATION_CREDENTIALS \
-  us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter/pgadapter \
+  us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter \
   -p my-project -i my-instance -d my-database \
   -x
 ```
