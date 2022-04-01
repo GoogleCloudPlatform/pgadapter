@@ -5,10 +5,13 @@ Cloud Spanner equivalent for Cloud Spanner databases [that use the PostgreSQL di
 
 PGAdapter has been tested and can be used with the following clients:
 1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
-2. `JDBC`: Versions 42.x and higher are partly supported. See [JDBC support](docs/jdbc.md) for more details.
-3. `pgx`: Version 4.15 and higher have limited support. See [pgx support](docs/pgx.md) for more details.
+2. `JDBC`: Versions 42.x and higher have __limited support__. See [JDBC support](docs/jdbc.md) for more details.
+3. `pgx`: Version 4.15 and higher have __limited support__. See [pgx support](docs/pgx.md) for more details.
 
-Other drivers and tools have not been specifically tested and are not known to work with PGAdapter.
+Other drivers and tools have __not been specifically tested__ and are not known to work with PGAdapter
+and are therefore __not supported__. Drivers and tools that use [simple query protocol](https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.5.7.4)
+are likely to work with PGAdapter. Drivers and tools that use the [extended query protocol](https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-EXT-QUERY)
+are more likely to at least have some issues when used with PGAdapter.
 
 ## Usage
 The PostgreSQL adapter can be started both as a Docker container, a standalone process as well as an
@@ -38,6 +41,8 @@ The `-x` option tells PGAdapter to accept connections other hosts than `localhos
 when running PGAdapter in a Docker container, as requests will not be seen as coming from `localhost`
 in the container. Choose a different host port than 5432 if you already have PostgreSQL running on
 your local system.
+
+See [running PGAdapter using Docker](docs/docker.md) for more examples for running PGAdapter in Docker.
 
 See [Options](#Options) for an explanation of all further options.
 

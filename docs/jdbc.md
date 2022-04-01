@@ -1,6 +1,6 @@
 # Google Cloud Spanner PostgreSQL Adapter - JDBC Support
 
-PGAdapter has partly support for the [PostgreSQL JDBC driver](https://github.com/pgjdbc/pgjdbc)
+PGAdapter has __limited support__ for the [PostgreSQL JDBC driver](https://github.com/pgjdbc/pgjdbc)
 version 42.0.0 and higher.
 
 ## Usage
