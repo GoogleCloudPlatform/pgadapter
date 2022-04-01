@@ -49,7 +49,7 @@ See [Options](#Options) for an explanation of all further options.
 
 ### Standalone with pre-built jar
 
-A pre-built jar containing all dependencies can be downloaded from https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-<VERSION>.jar
+A pre-built jar containing all dependencies can be downloaded from https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-&lt;VERSION&gt;.jar
 
 Example (replace `v0.2.1` with the version you want to download):
 
