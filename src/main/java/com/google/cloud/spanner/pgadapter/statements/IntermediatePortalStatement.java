@@ -14,8 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
-import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -82,24 +80,18 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
 
   @Override
   public DescribeMetadata describe() {
-    // TODO: Consider replacing this with an execute call, so we don't take two round-trips to the
-    // backend just to first describe and then execute a query.
-    try (ResultSet resultSet = connection.analyzeQuery(this.statement, QueryAnalyzeMode.PLAN)) {
-      // TODO: Remove ResultSet.next() call once this is supported in the client library.
-      // See https://github.com/googleapis/java-spanner/pull/1691
-      resultSet.next();
-      return new DescribePortalMetadata(resultSet);
+    try {
+      // Pre-emptively execute the statement, even though it is only asked to be described. This is
+      // a lot more efficient than taking two round trips to the server, and getting a
+      // DescribePortal message without a following Execute message is extremely rare, as that would
+      // only happen if the client is ill-behaved, or if the client crashes between the
+      // DescribePortal and Execute.
+      this.statementResult = connection.executeQuery(this.statement);
+      this.hasMoreData = this.statementResult.next();
+      return new DescribePortalMetadata(statementResult);
     } catch (SpannerException e) {
-      /* Generally this error will occur when a non-SELECT portal statement is described in Spanner,
-        however, it could occur when a statement is incorrectly formatted. Though we could catch
-        this early if we could parse the type of statement, it is a significant burden on the
-        proxy. As such, we send the user a descriptive message to help them understand the issue
-        in case they misuse the method.
-      */
-      logger.log(Level.SEVERE, e, e::toString);
-      throw new IllegalStateException(
-          "Something went wrong in Describing this statement."
-              + "Note that non-SELECT result types in Spanner cannot be described.");
+      logger.log(Level.SEVERE, e, e::getMessage);
+      throw e;
     }
   }
 }

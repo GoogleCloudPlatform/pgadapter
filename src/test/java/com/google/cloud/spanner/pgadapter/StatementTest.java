@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -310,18 +311,16 @@ public class StatementTest {
   }
 
   @Test
-  public void testPortalStatement() throws Exception {
+  public void testPortalStatement() {
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
-    when(connection.analyzeQuery(Statement.of(sqlStatement), QueryAnalyzeMode.PLAN))
-        .thenReturn(resultSet);
+    when(connection.executeQuery(Statement.of(sqlStatement))).thenReturn(resultSet);
 
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(options, parse(sqlStatement), connection);
 
     intermediateStatement.describe();
 
-    Mockito.verify(connection, Mockito.times(1))
-        .analyzeQuery(Statement.of(sqlStatement), QueryAnalyzeMode.PLAN);
+    Mockito.verify(connection, Mockito.times(1)).executeQuery(Statement.of(sqlStatement));
 
     assertEquals(intermediateStatement.getParameterFormatCode(0), 0);
     assertEquals(intermediateStatement.getParameterFormatCode(1), 0);
@@ -349,18 +348,20 @@ public class StatementTest {
     assertEquals(intermediateStatement.getResultFormatCode(2), 0);
   }
 
-  @Test(expected = IllegalStateException.class)
-  public void testPortalStatementDescribePropagatesFailure() throws Exception {
+  @Test
+  public void testPortalStatementDescribePropagatesFailure() {
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
 
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(options, parse(sqlStatement), connection);
 
-    when(connection.analyzeQuery(Statement.of(sqlStatement), QueryAnalyzeMode.PLAN))
+    when(connection.executeQuery(Statement.of(sqlStatement)))
         .thenThrow(
             SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT, "test error"));
 
-    intermediateStatement.describe();
+    SpannerException exception =
+        assertThrows(SpannerException.class, intermediateStatement::describe);
+    assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
   }
 
   @Test

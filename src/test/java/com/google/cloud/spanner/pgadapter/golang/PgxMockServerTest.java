@@ -142,15 +142,14 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx sends the query three times:
+    // pgx sends the query two times:
     // 1. DESCRIBE statement
-    // 2. DESCRIBE portal
-    // 3. EXECUTE portal
-    assertEquals(3, requests.size());
+    // 2. DESCRIBE/EXECUTE portal
+    assertEquals(2, requests.size());
     int index = 0;
     for (ExecuteSqlRequest request : requests) {
       assertEquals(sql, request.getSql());
-      if (index < 2) {
+      if (index < 1) {
         assertEquals(QueryMode.PLAN, request.getQueryMode());
       } else {
         assertEquals(QueryMode.NORMAL, request.getQueryMode());
@@ -167,15 +166,14 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx sends the query three times:
+    // pgx sends the query two times:
     // 1. DESCRIBE statement
-    // 2. DESCRIBE portal
-    // 3. EXECUTE portal
-    assertEquals(3, requests.size());
+    // 2. DESCRIBE/EXECUTE portal
+    assertEquals(2, requests.size());
     int index = 0;
     for (ExecuteSqlRequest request : requests) {
       assertEquals(sql, request.getSql());
-      if (index < 2) {
+      if (index < 1) {
         assertEquals(QueryMode.PLAN, request.getQueryMode());
       } else {
         assertEquals(QueryMode.NORMAL, request.getQueryMode());
@@ -221,15 +219,14 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx sends the query three times:
+    // pgx sends the query two times:
     // 1. DESCRIBE statement
-    // 2. DESCRIBE portal
-    // 3. EXECUTE portal
-    assertEquals(3, requests.size());
+    // 2. DESCRIBE/EXECUTE portal
+    assertEquals(2, requests.size());
     int index = 0;
     for (ExecuteSqlRequest request : requests) {
       assertEquals(sql, request.getSql());
-      if (index < 2) {
+      if (index < 1) {
         assertEquals(QueryMode.PLAN, request.getQueryMode());
       } else {
         assertEquals(QueryMode.NORMAL, request.getQueryMode());
@@ -247,15 +244,14 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx sends the query three times:
+    // pgx sends the query two times:
     // 1. DESCRIBE statement
-    // 2. DESCRIBE portal
-    // 3. EXECUTE portal
-    assertEquals(3, requests.size());
+    // 2. EXECUTE portal
+    assertEquals(2, requests.size());
     int index = 0;
     for (ExecuteSqlRequest request : requests) {
       assertEquals(sql, request.getSql());
-      if (index < 2) {
+      if (index < 1) {
         assertEquals(QueryMode.PLAN, request.getQueryMode());
       } else {
         assertEquals(QueryMode.NORMAL, request.getQueryMode());
