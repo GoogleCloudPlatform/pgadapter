@@ -1,4 +1,4 @@
-# Google Cloud Spanner PostgreSQL Adapter - JDBC Support
+# Google Cloud Spanner PostgreSQL Adapter - PSQL Support
 
 PGAdapter supports [psql](https://www.postgresql.org/docs/current/app-psql.html) versions 11, 12, 13 and 14.
 
@@ -8,11 +8,12 @@ First start PGAdapter in `psql` mode (see [README](../README.md) for more possib
 PGAdapter).
 
 ```shell
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 docker pull us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter
 docker run \
   -d -p 5432:5432 \
-  -v /local/path/to/credentials.json:/tmp/keys/key.json:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json \
+  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
+  -e GOOGLE_APPLICATION_CREDENTIALS \
   us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter/pgadapter \
   -p my-project -i my-instance -d my-database \
   -x -q
@@ -38,11 +39,12 @@ already using port 5432. You then need to run PGAdapter on a different port, and
 when starting `psql` to connect to PGAdapter instead of the local PostgreSQL server:
 
 ```shell
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 docker pull us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter
 docker run \
   -d -p 5433:5432 \
-  -v /local/path/to/credentials.json:/tmp/keys/key.json:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json \
+  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
+  -e GOOGLE_APPLICATION_CREDENTIALS \
   us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter/pgadapter \
   -p my-project -i my-instance -d my-database \
   -x -q

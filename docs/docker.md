@@ -6,11 +6,12 @@ Each version of PGAdapter is published as a pre-built Docker image. You can pull
 image without the need to build it yourself:
 
 ```shell
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 docker pull us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter
 docker run \
   -d -p 5432:5432 \
-  -v /local/path/to/credentials.json:/tmp/keys/key.json:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json \
+  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
+  -e GOOGLE_APPLICATION_CREDENTIALS \
   us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter/pgadapter \
   -p my-project -i my-instance -d my-database \
   -x
@@ -20,11 +21,11 @@ The Docker options in the `docker run` command that are used in the above exampl
 * `-d`: Start the Docker container in [detached mode](https://docs.docker.com/engine/reference/run/#detached--d).
 * `-p 5432:5432`: Map local port 5432 to port 5432 on the container. This will forward traffic to port
   5432 on localhost to port 5432 in the container where PGAdapter is running.
-* `-v`: Map the local file `/local/path/to/credentials.json` to the virtual file `/tmp/keys/key.json` in the container.
+* `-v`: Map the local file `/path/to/credentials.json` to the virtual file `/path/to/credentials.json` in the container.
   The `:ro` suffix indicates that the file should be read-only, preventing the container from ever modifying the file.
   The local file should contain the credentials that should be used by PGAdapter.
-* `-e`: Assign the environment variable `GOOGLE_APPLICATION_CREDENTIALS` the value `/tmp/keys/key.json`.
-  This will make the virtual file `/tmp/keys/key.json` the default credentials in the container.
+* `-e`: Copy the value of the environment variable `GOOGLE_APPLICATION_CREDENTIALS` to the container.
+  This will make the virtual file `/path/to/credentials.json` the default credentials in the container.
 
 The PGAdapter options in the `docker run` command that are used in the above example are:
 * `-p`: The Google Cloud project name where the Cloud Spanner database is located.
@@ -42,8 +43,8 @@ different host port to forward to the Docker container:
 ```shell
 docker run \
   -d -p 5433:5432 \
-  -v /local/path/to/credentials.json:/tmp/keys/key.json:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json \
+  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
+  -e GOOGLE_APPLICATION_CREDENTIALS \
   us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter/pgadapter \
   -p my-project -i my-instance -d my-database \
   -x

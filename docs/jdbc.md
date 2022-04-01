@@ -5,8 +5,9 @@ version 42.0.0 and higher.
 
 ## Usage
 
-First start PGAdapter in JDBC mode (see [README](../README.md) for more possibilities on how to run
-PGAdapter):
+First start PGAdapter in JDBC mode. This example uses the pre-built jar with dependencies to run
+PGAdapter as a standalone process. See [README](../README.md) for more possibilities on how to run
+PGAdapter:
 
 ```shell
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-v0.2.1.jar

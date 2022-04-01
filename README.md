@@ -19,30 +19,31 @@ in-process server (the latter is only supported for Java applications).
 
 ### Docker
 
+See [running PGAdapter using Docker](docs/docker.md) for more examples for running PGAdapter in Docker.
+
 Replace the project, instance and database names and the credentials file in the example below to
 run PGAdapter from a pre-built Docker image.
 
 ```shell
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 docker pull us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter
 docker run \
   -d -p 5432:5432 \
-  -v /local/path/to/credentials.json:/tmp/keys/key.json:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json \
+  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
+  -e GOOGLE_APPLICATION_CREDENTIALS \
   us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter/pgadapter \
   -p my-project -i my-instance -d my-database \
   -x
 ```
 
-The option `-v /local/path/to/credentials.json:/tmp/keys/key.json:ro` mounts the credentials file on
-your local system to a file in the Docker container. The `-e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json`
-sets the file as the default credentials to use inside the container.
+The option `-v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro` mounts the
+default credentials file on your local system to a virtual file with the same name in the Docker container.
+The `-e GOOGLE_APPLICATION_CREDENTIALS` sets the file as the default credentials to use inside the container.
 
 The `-x` option tells PGAdapter to accept connections other hosts than `localhost`. This is required
 when running PGAdapter in a Docker container, as requests will not be seen as coming from `localhost`
 in the container. Choose a different host port than 5432 if you already have PostgreSQL running on
 your local system.
-
-See [running PGAdapter using Docker](docs/docker.md) for more examples for running PGAdapter in Docker.
 
 See [Options](#Options) for an explanation of all further options.
 
