@@ -116,6 +116,9 @@ information regarding project id, instance id, database name, credentials file
 path; All other items map directly to previously mentioned CLI options.
 
 ### Options
+
+#### Required
+
 The following options are required to run the proxy:
 
 ```    
@@ -135,7 +138,10 @@ The following options are required to run the proxy:
   * Do remember to grant the service account sufficient credentials to access the database.
 ```
 
+#### Optional
+
 The following options are optional:
+
 ```    
 -s <port>
   * The inbound port for the proxy. Defaults to 5432. Choose a different port if you already have
