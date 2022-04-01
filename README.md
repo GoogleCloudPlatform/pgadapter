@@ -49,13 +49,14 @@ See [Options](#Options) for an explanation of all further options.
 
 ### Standalone with pre-built jar
 
-A pre-built jar containing all dependencies can be downloaded from https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-&lt;VERSION&gt;.jar
+A pre-built jar containing all dependencies can be downloaded from https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-VERSION.jar
 
 Example (replace `v0.2.1` with the version you want to download):
 
 ```shell
-wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-v0.2.1.jar
-java -jar pgadapter-v0.2.1.jar -p my-project -i my-instance -d my-database
+VERSION=v0.2.1
+wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.jar
+java -jar pgadapter-${VERSION}.jar -p my-project -i my-instance -d my-database
 ```
 
 Use the `-s` option to specify a different local port than the default 5432 if you already have
