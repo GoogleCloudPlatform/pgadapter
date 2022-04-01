@@ -48,6 +48,7 @@ public class CopyDoneMessage extends ControlMessage {
           long rowCount = this.statement.getUpdateCount();
           statement.addUpdateCount(rowCount); // Increase the row count of number of rows copied.
           this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
+          this.outputStream.flush();
         } catch (Exception e) {
           // Spanner returned an error when trying to commit the batch of mutations.
           mutationWriter.writeErrorFile(e);

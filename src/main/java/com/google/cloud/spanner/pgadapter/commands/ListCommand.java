@@ -31,7 +31,7 @@ public class ListCommand extends Command {
               + "       pg_catalog\\.pg_encoding_to_char\\(d\\.encoding\\) as \"Encoding\",\n"
               + "       pg_catalog\\.array_to_string\\(d\\.datacl, '\\\\n'\\) AS \"Access privileges\"\n"
               + "FROM pg_catalog\\.pg_database d\n.*\n?"
-              + "ORDER BY 1;$");
+              + "ORDER BY 1;?$");
 
   private static final String OUTPUT_QUERY = "SELECT '%s' AS Name;";
 

@@ -30,7 +30,7 @@ set +e
 
 case ${JOB_TYPE} in
 units)
-  mvn verify -Dclirr.skip=true -DskipITs=true
+  mvn verify -Dclirr.skip=true -DskipITs=true -Ptest-all
   ;;
 lint)
   mvn com.coveo:fmt-maven-plugin:check
@@ -50,15 +50,13 @@ uber-jar-build)
 uber-jar-release)
   PGADAPTER_VERSION="$(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=project.version -q -DforceStdout)"
   UBER_JAR="google-cloud-spanner-pgadapter-${PGADAPTER_VERSION}.jar"
-  gsutil cp target/"${UBER_JAR}" "gs://${UBER_JAR_GCS_BUCKET}/${UBER_JAR_GCS_PATH}/${UBER_JAR}"
+  gsutil cp target/"pgadapter.jar" "gs://${UBER_JAR_GCS_BUCKET}/${UBER_JAR_GCS_PATH}/${UBER_JAR}"
   ;;
 docker-configure)
   gcloud auth configure-docker "${DOCKER_HOSTNAME}" -q
   ;;
 docker-build)
-  PGADAPTER_VERSION="$(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=project.version -q -DforceStdout)"
-  UBER_JAR="google-cloud-spanner-pgadapter-${PGADAPTER_VERSION}.jar"
-  docker build -f "${DOCKERFILE}" -t "${DOCKER_HOSTNAME}/${GOOGLE_CLOUD_PROJECT}/${DOCKER_REPOSITORY}/${DOCKER_IMAGE}" --build-arg UBER_JAR_PATH="target/${UBER_JAR}" .
+  docker build -f "${DOCKERFILE}" -t "${DOCKER_HOSTNAME}/${GOOGLE_CLOUD_PROJECT}/${DOCKER_REPOSITORY}/${DOCKER_IMAGE}" .
   ;;
 docker-push)
   docker push "${DOCKER_HOSTNAME}/${GOOGLE_CLOUD_PROJECT}/${DOCKER_REPOSITORY}/${DOCKER_IMAGE}"
@@ -77,9 +75,8 @@ e2e-psql)
     sleep 3
   done
 
-#  start PgAdaptor
-  PGADAPTER_VERSION="$(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=project.version -q -DforceStdout)"
-  UBER_JAR="google-cloud-spanner-pgadapter-${PGADAPTER_VERSION}.jar"
+#  start PGAdapter
+  UBER_JAR="pgadapter.jar"
   (java -jar target/"${UBER_JAR}" -p "${GOOGLE_CLOUD_PROJECT}" -i "${GOOGLE_CLOUD_INSTANCE}" -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -e "${GOOGLE_CLOUD_ENDPOINT}" -s 4242 -q > /dev/null 2>&1) &
   BACK_PID=$!
   sleep 1
