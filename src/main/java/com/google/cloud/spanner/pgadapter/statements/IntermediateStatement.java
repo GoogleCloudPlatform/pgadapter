@@ -21,15 +21,15 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
-import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 
 /**
@@ -46,54 +46,66 @@ public class IntermediateStatement {
   protected ResultSet statementResult;
   protected boolean hasMoreData;
   protected SpannerException exception;
-  protected String sql;
-  protected String command;
+  protected final ParsedStatement parsedStatement;
+  protected final String command;
   protected boolean executed;
-  protected Connection connection;
+  protected final Connection connection;
   protected Long updateCount;
-  protected List<String> statements;
+  protected final ImmutableList<String> statements;
 
   private static final char STATEMENT_DELIMITER = ';';
   private static final char SINGLE_QUOTE = '\'';
 
-  public IntermediateStatement(OptionsMetadata options, String sql, Connection connection) {
+  public IntermediateStatement(
+      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
+    this(
+        options,
+        parsedStatement,
+        connection,
+        parseStatements(parsedStatement.getSqlWithoutComments()));
+  }
+
+  protected IntermediateStatement(
+      OptionsMetadata options,
+      ParsedStatement parsedStatement,
+      Connection connection,
+      ImmutableList<String> statements) {
     this.options = options;
-    this.sql = replaceKnownUnsupportedQueries(sql);
-    this.statements = parseStatements(sql);
-    this.command = StatementParser.parseCommand(this.sql);
+    this.parsedStatement = replaceKnownUnsupportedQueries(parsedStatement);
+    this.statements = statements;
+    this.command = StatementParser.parseCommand(this.parsedStatement.getSqlWithoutComments());
     this.connection = connection;
     // Note: This determines the result type based on the first statement in the SQL statement. That
     // means that it assumes that if this is a batch of statements, all the statements in the batch
     // will have the same type of result (that is; they are all DML statements, all DDL statements,
     // all queries, etc.). That is a safe assumption for now, as PgAdapter currently only supports
     // all-DML and all-DDL batches.
-    this.resultType = determineResultType(this.sql);
+    this.resultType = determineResultType(this.parsedStatement);
   }
 
-  protected IntermediateStatement(OptionsMetadata options, String sql) {
-    this.options = options;
-    this.resultType = determineResultType(sql);
-  }
-
-  protected String replaceKnownUnsupportedQueries(String sql) {
+  protected ParsedStatement replaceKnownUnsupportedQueries(ParsedStatement parsedStatement) {
     if (this.options.isReplaceJdbcMetadataQueries()
-        && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(sql)) {
-      return JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(sql);
+        && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(
+            parsedStatement.getSqlWithoutComments())) {
+      return PARSER.parse(
+          Statement.of(
+              JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(
+                  parsedStatement.getSqlWithoutComments())));
     }
-    return sql;
+    return parsedStatement;
   }
 
   /**
    * Determines the result type based on the given sql string. The sql string must already been
    * stripped of any comments that might precede the actual sql string.
    *
-   * @param sql The sql string to determine the type of result for
+   * @param parsedStatement The parsed statement to determine the type of result for
    * @return The {@link ResultType} that the given sql string will produce
    */
-  protected static ResultType determineResultType(String sql) {
-    if (PARSER.isUpdateStatement(sql)) {
+  protected static ResultType determineResultType(ParsedStatement parsedStatement) {
+    if (parsedStatement.isUpdate()) {
       return ResultType.UPDATE_COUNT;
-    } else if (PARSER.isQuery(sql)) {
+    } else if (parsedStatement.isQuery()) {
       return ResultType.RESULT_SET;
     } else {
       return ResultType.NO_RESULT;
@@ -101,34 +113,43 @@ public class IntermediateStatement {
   }
 
   // Split statements by ';' delimiter, but ignore anything that is nested with '' or "".
-  private List<String> splitStatements(String sql) {
-    List<String> statements = new ArrayList<>();
-    boolean quoteEsacpe = false;
+  private static ImmutableList<String> splitStatements(String sql) {
+    // First check trivial cases with only one statement.
+    int firstIndexOfDelimiter = sql.indexOf(STATEMENT_DELIMITER);
+    if (firstIndexOfDelimiter == -1) {
+      return ImmutableList.of(sql);
+    }
+    if (firstIndexOfDelimiter == sql.length() - 1) {
+      return ImmutableList.of(sql.substring(0, sql.length() - 1));
+    }
+
+    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    // TODO: Fix this parsing, as it does not take all types of quotes into consideration.
+    boolean quoteEscape = false;
     int index = 0;
     for (int i = 0; i < sql.length(); ++i) {
       if (sql.charAt(i) == SINGLE_QUOTE) {
-        quoteEsacpe = !quoteEsacpe;
+        quoteEscape = !quoteEscape;
       }
-      if (sql.charAt(i) == STATEMENT_DELIMITER && !quoteEsacpe) {
-        String stmt = sql.substring(index, i + 1).trim();
+      if (sql.charAt(i) == STATEMENT_DELIMITER && !quoteEscape) {
+        String stmt = sql.substring(index, i).trim();
         // Statements with only ';' character are empty and dropped.
-        if (stmt.length() > 1) {
-          statements.add(stmt);
+        if (stmt.length() > 0) {
+          builder.add(stmt);
         }
         index = i + 1;
       }
     }
 
     if (index < sql.length()) {
-      statements.add(sql.substring(index, sql.length()).trim());
+      builder.add(sql.substring(index).trim());
     }
-    return statements;
+    return builder.build();
   }
 
-  protected List<String> parseStatements(String sql) {
+  protected static ImmutableList<String> parseStatements(String sql) {
     Preconditions.checkNotNull(sql);
-    List<String> statements = splitStatements(sql);
-    return statements;
+    return splitStatements(sql);
   }
 
   /**
@@ -205,7 +226,7 @@ public class IntermediateStatement {
   }
 
   public String getSql() {
-    return this.sql;
+    return this.parsedStatement.getSqlWithoutComments();
   }
 
   public Exception getException() {
@@ -282,14 +303,17 @@ public class IntermediateStatement {
         long[] updateCounts = connection.runBatch();
         updateBatchResultCount(updateCounts);
       } else {
-        StatementResult result = connection.execute(Statement.of(this.sql));
+        StatementResult result =
+            connection.execute(Statement.of(this.parsedStatement.getSqlWithoutComments()));
         updateResultCount(result);
       }
     } catch (SpannerException e) {
       if (statements.size() > 1) {
         SpannerException exception =
             SpannerExceptionFactory.newSpannerException(
-                e.getErrorCode(), e.getMessage() + " \"" + this.sql + "\"", e);
+                e.getErrorCode(),
+                e.getMessage() + " \"" + this.parsedStatement.getSqlWithoutComments() + "\"",
+                e);
         handleExecutionException(exception);
       } else {
         handleExecutionException(e);
