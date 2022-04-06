@@ -18,6 +18,7 @@ import "C"
 import (
 	"context"
 	"fmt"
+	"github.com/jackc/pgconn"
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"reflect"
@@ -111,16 +112,18 @@ func TestQueryAllDataTypes(connString string) *C.char {
 	var boolValue bool
 	var byteaValue []byte
 	var float8Value float64
+	var intValue int
 	var numericValue pgtype.Numeric // pgx default maps numeric to string
 	var timestamptzValue time.Time
 	//var dateValue time.Time
 	var varcharValue string
 
-	err = conn.QueryRow(ctx, "SELECT * FROM AllTypes").Scan(
+	err = conn.QueryRow(ctx, "SELECT * FROM all_types WHERE col_bigint=1").Scan(
 		&bigintValue,
 		&boolValue,
 		&byteaValue,
 		&float8Value,
+		&intValue,
 		&numericValue,
 		&timestamptzValue,
 		//&dateValue,
@@ -141,6 +144,9 @@ func TestQueryAllDataTypes(connString string) *C.char {
 	if g, w := float8Value, 3.14; g != w {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
+	if g, w := intValue, 100; g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
 	var wantNumericValue pgtype.Numeric
 	_ = wantNumericValue.Scan("6.626")
 	if g, w := numericValue, wantNumericValue; !reflect.DeepEqual(g, w) {
@@ -158,7 +164,7 @@ func TestQueryAllDataTypes(connString string) *C.char {
 }
 
 //export TestInsertAllDataTypes
-func TestInsertAllDataTypes(connString string) *C.char {
+func TestInsertAllDataTypes(connString string, dateSupported bool) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -173,12 +179,27 @@ func TestInsertAllDataTypes(connString string) *C.char {
 	} else {
 		return C.CString("could not register default type for numeric")
 	}
+	if dt, ok := conn.ConnInfo().DataTypeForOID(pgtype.DateOID); ok {
+		conn.ConnInfo().RegisterDefaultPgType(pgtype.Date{}, dt.Name)
+	} else {
+		return C.CString("could not register default type for date")
+	}
 
-	sql := "INSERT INTO AllTypes (col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamp, col_varchar) values ($1, $2, $3, $4, $5, $6, $7)"
+	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8)"
+	if !dateSupported {
+		sql = "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar) values ($1, $2, $3, $4, $5, $6, $7)"
+	}
 	numeric := pgtype.Numeric{}
-	numeric.Scan("6.626")
+	_ = numeric.Set("6.626")
 	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T07:39:10.123456789+01:00")
-	tag, err := conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, numeric, timestamptz, "test_string")
+	var tag pgconn.CommandTag
+	if dateSupported {
+		date := pgtype.Date{}
+		_ = date.Set("2022-04-02")
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, numeric, timestamptz, date, "test_string")
+	} else {
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, numeric, timestamptz, "test_string")
+	}
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
 	}
@@ -193,7 +214,7 @@ func TestInsertAllDataTypes(connString string) *C.char {
 }
 
 //export TestInsertNullsAllDataTypes
-func TestInsertNullsAllDataTypes(connString string) *C.char {
+func TestInsertNullsAllDataTypes(connString string, dateSupported bool) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -201,8 +222,15 @@ func TestInsertNullsAllDataTypes(connString string) *C.char {
 	}
 	defer conn.Close(ctx)
 
-	sql := "INSERT INTO AllTypes (col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamp, col_varchar) values ($1, $2, $3, $4, $5, $6, $7)"
-	tag, err := conn.Exec(ctx, sql, nil, nil, nil, nil, nil, nil, nil)
+	var tag pgconn.CommandTag
+	if dateSupported {
+		sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+		tag, err = conn.Exec(ctx, sql, int64(100), nil, nil, nil, nil, nil, nil, nil, nil)
+	} else {
+		var b *bool
+		sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8)"
+		tag, err = conn.Exec(ctx, sql, int64(100), b, nil, nil, nil, nil, nil, nil, nil)
+	}
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
 	}
