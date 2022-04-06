@@ -52,4 +52,3 @@ jobs:
           path: ${{ env.uber_jar_latest }}
           destination: 'pgadapter-jar-releases'
           parent: false
-          overwrite: true
