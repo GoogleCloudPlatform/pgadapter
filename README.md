@@ -37,11 +37,11 @@ See [Options](#Options) for an explanation of all further options.
 
 ### Standalone with pre-built jar
 
-A pre-built jar containing all dependencies can be downloaded from https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-latest.jar
+A pre-built jar containing all dependencies can be downloaded from https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.jar
 
 ```shell
-wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-latest.jar
-java -jar pgadapter-latest.jar -p my-project -i my-instance -d my-database
+wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.jar
+java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 ```
 
 Use the `-s` option to specify a different local port than the default 5432 if you already have
@@ -260,7 +260,7 @@ not supported:
 * COPY <table_name> TO ...
 * COPY <table_name> FROM <filename | PROGRAM program>
 
-COPY <table_name> FROM STDIN __is supported__.
+See [COPY <table-name> FROM STDIN](#copy-support) for more information on COPY.
 
 Only the following `psql` meta-commands are supported:
   * `\d <table>` 

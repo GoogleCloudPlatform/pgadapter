@@ -8,8 +8,8 @@ version 42.0.0 and higher.
 First start PGAdapter in JDBC mode by adding `-jdbc` to the command line parameters:
 
 ```shell
-wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-latest.jar
-java -jar pgadapter-latest.jar -p my-project -i my-instance -d my-database -jdbc
+wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.jar
+java -jar pgadapter.jar -p my-project -i my-instance -d my-database -jdbc
 ```
 
 Connect to PGAdapter like this:
