@@ -1,20 +1,15 @@
-# Google Cloud Spanner PostgreSQL Adapter
+# Google Cloud Spanner PGAdapter
 
-Google Cloud Spanner PGAdapter is a proxy which translates the PostgreSQL wire-protocol into the
-Cloud Spanner equivalent for Cloud Spanner databases [that use the PostgreSQL dialect](https://cloud.google.com/spanner/docs/postgresql-interface).
+PGAdapter is a proxy which translates the PostgreSQL wire-protocol into the
+equivalent for Spanner databases [that use the PostgreSQL interface](https://cloud.google.com/spanner/docs/postgresql-interface).
 
-PGAdapter has been tested and can be used with the following clients:
+PGAdapter can be used with the following clients:
 1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
 2. `JDBC`: Versions 42.x and higher have __limited support__. See [JDBC support](docs/jdbc.md) for more details.
 3. `pgx`: Version 4.15 and higher have __limited support__. See [pgx support](docs/pgx.md) for more details.
 
-Other drivers and tools have __not been specifically tested__ and are not known to work with PGAdapter
-and are therefore __not supported__. Drivers and tools that use [simple query protocol](https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.5.7.4)
-are likely to work with PGAdapter. Drivers and tools that use the [extended query protocol](https://www.postgresql.org/docs/current/protocol-flow.html#PROTOCOL-FLOW-EXT-QUERY)
-are more likely to at least have some issues when used with PGAdapter.
-
 ## Usage
-The PostgreSQL adapter can be started both as a Docker container, a standalone process as well as an
+PGAdapter can be started both as a Docker container, a standalone process as well as an
 in-process server (the latter is only supported for Java applications).
 
 ### Docker
@@ -26,32 +21,33 @@ run PGAdapter from a pre-built Docker image.
 
 ```shell
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-docker pull us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter
+docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
 docker run \
   -d -p 5432:5432 \
   -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
   -e GOOGLE_APPLICATION_CREDENTIALS \
-  us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance -d my-database \
   -x
 ```
 
-The option `-v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro` mounts the
-default credentials file on your local system to a virtual file with the same name in the Docker container.
-The `-e GOOGLE_APPLICATION_CREDENTIALS` sets the file as the default credentials to use inside the container.
-
-The `-x` option tells PGAdapter to accept connections other hosts than `localhost`. This is required
-when running PGAdapter in a Docker container, as requests will not be seen as coming from `localhost`
-in the container. Choose a different host port than 5432 if you already have PostgreSQL running on
-your local system.
+See [Running in Docker](docs/docker.md) for more information.
 
 See [Options](#Options) for an explanation of all further options.
 
 ### Standalone with pre-built jar
 
-A pre-built jar containing all dependencies can be downloaded from https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-VERSION.jar
+A pre-built jar containing all dependencies can be downloaded from https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-latest.jar
 
-Example (replace `v0.2.1` with the version you want to download):
+```shell
+wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-latest.jar
+java -jar pgadapter-latest.jar -p my-project -i my-instance -d my-database
+```
+
+Use the `-s` option to specify a different local port than the default 5432 if you already have
+PostgreSQL running on your local system.
+
+You can also download a specific version of the jar. Example (replace `v0.2.1` with the version you want to download):
 
 ```shell
 VERSION=v0.2.1
@@ -59,27 +55,19 @@ wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.
 java -jar pgadapter-${VERSION}.jar -p my-project -i my-instance -d my-database
 ```
 
-Use the `-s` option to specify a different local port than the default 5432 if you already have
-PostgreSQL running on your local system.
-
 See [Options](#Options) for an explanation of all further options.
 
 ### Standalone with locally built jar
-1. Build a jar file containing all dependencies by running `mvn package -P shade`.
-2. Execute `java -jar <jar-file> <options>`.
-3. To get fine-grained logging messages, make sure that you have the logging.properties file and run the jar with `-Djava.util.logging.config.file=logging.properties`. You need to create one according to this sample if it's missing.
-    ```
-    handlers=java.util.logging.ConsoleHandler,java.util.logging.FileHandler
-    com.google.cloud.spanner.pgadapter.level=FINEST
-    java.util.logging.ConsoleHandler.level=FINEST
-    java.util.logging.FileHandler.level=INFO
-    java.util.logging.FileHandler.pattern=%h/spanner-pg-adapter-%u.log
-    java.util.logging.FileHandler.append=false
-    io.grpc.internal.level = WARNING
-    
-    java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS] [%4$s] (%2$s): %5$s%6$s%n
-    java.util.logging.FileHandler.formatter=java.util.logging.SimpleFormatter
-    ```
+1. Build a jar file containing all dependencies by running
+
+```shell
+mvn package -P shade
+```
+
+2. Execute
+```shell
+java -jar <jar-file> <options>
+```
 
 See [Options](#Options) for an explanation of all further options.
 
@@ -133,9 +121,11 @@ The following options are required to run the proxy:
 
 -c <credentialspath>
   * This is only required if you have not already set up default credentials on the system where you
-    are running PGAdapter.
+    are running PGAdapter. See https://cloud.google.com/spanner/docs/getting-started/set-up#set_up_authentication_and_authorization
+    for more information on setting up authentication for Cloud Spanner.
   * The full path for the file containing the service account credentials in JSON format.
-  * Do remember to grant the service account sufficient credentials to access the database.
+  * Do remember to grant the service account sufficient credentials to access the database. See
+    https://cloud.google.com/docs/authentication/production for more information.
 ```
 
 #### Optional
@@ -167,12 +157,6 @@ The following options are optional:
     This option will inspect queries to look for native JDBC metadata queries and
     replace these with queries that are suppported by Cloud Spanner PostgreSQL
     databases.
-
--f <POSTGRESQL|SPANNER>
-  * The data result format coming back to the client from the proxy. By default,
-    this is POSTGRESQL, but you can choose SPANNER format if you do not wish the
-    data to be modified and the client used can handle it. This is generally only
-    useful when using `psql`.
     
 -c <multi-statementcommand>
     Runs a single command before exiting. This command can be comprised of multiple 
@@ -244,7 +228,7 @@ The following options are optional:
 ```
 An example of a simple run string:
 
-``` 
+```shell
 java -jar <jar-file> -p <project name> -i <instance id> -d <database name> -c
 <path to credentials file> -s 5432 
 ```
@@ -252,7 +236,7 @@ java -jar <jar-file> -p <project name> -i <instance id> -d <database name> -c
 ## Details
 Google Cloud Spanner PGAdapter is a simple, MITM, forward, non-transparent proxy, which translates
 the PostgreSQL wire-protocol into the Cloud Spanner equivalent. It can only be used with Cloud
-Spanner databases that use the [PostgreSQL dialect](https://cloud.google.com/spanner/docs/postgresql-interface).
+Spanner databases that use the [PostgreSQL interface](https://cloud.google.com/spanner/docs/postgresql-interface).
 By running this proxy locally, any PostgreSQL client (including the SQL command-line client PSQL)
 should function seamlessly by simply pointing its outbound port to this proxy's inbound port.
 The proxy does not support all parts of the PostgreSQL wire-protocol. See [Limitations](#Limitations)
@@ -354,12 +338,72 @@ psql -h localhost -p 5432 -d my-local-db \
 ## Limitations
 
 PGAdapter has the following known limitations at this moment:
-- PostgreSQL prepared statements are not fully supported. It is recommended not to use this feature.
+- [PostgreSQL prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are not
+- fully supported. It is not recommended to use this feature.
   Note: This limitation relates specifically to server side PostgreSQL prepared statements.
   The JDBC `java.sql.PreparedStatement` interface is supported.
 - DESCRIBE statement wire-protocol messages currently return `Oid.UNSPECIFIED` for all parameters in the query.
 - DESCRIBE statement wire-protocol messages return `NoData` as the row description of the statement.
 - The COPY protocol only supports COPY FROM STDIN.
+
+## Logging
+
+PGAdapter uses `java.util.logging` for logging. Create a `logging.properties` file to configure
+logging messages. See the following example for an example to get fine-grained logging.
+
+```
+handlers=java.util.logging.ConsoleHandler,java.util.logging.FileHandler
+com.google.cloud.spanner.pgadapter.level=FINEST
+java.util.logging.ConsoleHandler.level=FINEST
+java.util.logging.FileHandler.level=INFO
+java.util.logging.FileHandler.pattern=%h/log/pgadapter-%u.log
+java.util.logging.FileHandler.append=false
+io.grpc.internal.level = WARNING
+
+java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS] [%4$s] (%2$s): %5$s%6$s%n
+java.util.logging.FileHandler.formatter=java.util.logging.SimpleFormatter
+```
+
+Start PGAdapter with `-Djava.util.logging.config.file=logging.properties` when running PGAdapter as
+a jar.
+
+### Logging in Docker
+
+You can configure PGAdapter to log to a file on your local system when running it in Docker by
+following these steps.
+
+1. Create a `logging.properties` on your local system like this:
+
+```
+handlers=java.util.logging.FileHandler
+java.util.logging.FileHandler.level=INFO
+java.util.logging.FileHandler.pattern=/home/pgadapter/log/pgadapter.log
+java.util.logging.FileHandler.append=true
+io.grpc.internal.level = WARNING
+
+java.util.logging.SimpleFormatter.format=[%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS] [%4$s] (%2$s): %5$s%6$s%n
+java.util.logging.FileHandler.formatter=java.util.logging.SimpleFormatter
+```
+
+2. Start the PGAdapter Docker container with these options:
+
+```shell
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+export LOGGING_PROPERTIES=/full/path/to/logging.properties
+docker run \
+    -d -p 5432:5432 \
+    -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
+    -v ${LOGGING_PROPERTIES}:${LOGGING_PROPERTIES}:ro \
+    -v /home/my-user-name/log:/home/pgadapter/log \
+    -e GOOGLE_APPLICATION_CREDENTIALS \
+    gcr.io/cloud-spanner-pg-adapter/pgadapter \
+    -Djava.util.logging.config.file=${LOGGING_PROPERTIES} \
+    -p my-project -i my-instance -d my-database \
+    -x
+```
+
+The directory `/home/my-user-name/log` will be created automatically and the log file will be
+placed in this directory.
 
 ## Support Level
 

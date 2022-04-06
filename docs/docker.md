@@ -1,4 +1,4 @@
-# Google Cloud Spanner PostgreSQL Adapter - Docker
+# Google Cloud Spanner PGAdapter - Docker
 
 ## Basic Usage
 
@@ -7,12 +7,12 @@ image without the need to build it yourself:
 
 ```shell
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-docker pull us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter
+docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
 docker run \
   -d -p 5432:5432 \
   -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
   -e GOOGLE_APPLICATION_CREDENTIALS \
-  us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance -d my-database \
   -x
 ```
@@ -45,7 +45,7 @@ docker run \
   -d -p 5433:5432 \
   -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
   -e GOOGLE_APPLICATION_CREDENTIALS \
-  us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance -d my-database \
   -x
 psql -h localhost -p 5433

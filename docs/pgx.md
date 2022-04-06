@@ -1,4 +1,4 @@
-# Google Cloud Spanner PostgreSQL Adapter - pgx Support
+# Google Cloud Spanner PGAdapter - pgx Support
 
 PGAdapter has limited support for the [Go pgx driver](https://github.com/jackc/pgx) version 4.15.0
 and higher. 
@@ -9,12 +9,12 @@ First start PGAdapter:
 
 ```shell
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-docker pull us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter
+docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
 docker run \
   -d -p 5432:5432 \
   -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
   -e GOOGLE_APPLICATION_CREDENTIALS \
-  us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance -d my-database \
   -x
 ```
@@ -42,3 +42,8 @@ if err != nil {
 }
 fmt.Printf("Greeting from Cloud Spanner PostgreSQL: %v\n", greeting)
 ```
+
+## Running PGAdapter
+
+This example uses the pre-built Docker image to run PGAdapter.
+See [README](../README.md) for more possibilities on how to run PGAdapter.
