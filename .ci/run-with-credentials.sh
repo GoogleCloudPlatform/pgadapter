@@ -41,9 +41,6 @@ clirr)
 integration)
   mvn verify -Dclirr.skip=true -DskipITs=false -DPG_ADAPTER_HOST="https://${GOOGLE_CLOUD_ENDPOINT}" -DPG_ADAPTER_INSTANCE="${GOOGLE_CLOUD_INSTANCE}" -DPG_ADAPTER_DATABASE="${GOOGLE_CLOUD_DATABASE}"
   ;;
-release)
-  mvn package org.apache.maven.plugins:maven-deploy-plugin:deploy -DskipTests -DskipITs
-  ;;
 uber-jar-build)
   mvn package -Pshade -DskipTests
   ;;
