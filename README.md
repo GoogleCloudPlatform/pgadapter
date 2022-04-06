@@ -34,8 +34,30 @@ not supported:
 COPY <table_name> FROM STDIN is supported.
 
 ## Usage
-The PostgreSQL adapter can be started both as a standalone process as well as an 
-in-process server.
+The PostgreSQL adapter can be started both as a Docker container, a standalone process as well as an in-process server.
+
+
+### Docker
+
+Replace the project, instance and database names and the credentials file in the example below to
+run PGAdapter from a pre-built Docker image.
+
+```shell
+docker pull us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images/pgadapter
+docker run \
+  -d -p 5432:5432 \
+  -v /local/path/to/credentials.json:/tmp/keys/key.json:ro \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json \
+  us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter/pgadapter \
+  -p my-project -i my-instance -d my-database \
+  -x
+```
+
+The option `-v /local/path/to/credentials.json:/tmp/keys/key.json:ro` mounts the credentials file on
+your local system to a file in the Docker container. The `-e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json`
+sets the file as the default credentials to use inside the container.
+
+See [Options](#Options) for an explanation of all further options. 
 
 ### Standalone
 1. Build a jar file containing all dependencies by running `mvn package -P shade`.
@@ -54,6 +76,37 @@ in-process server.
     java.util.logging.FileHandler.formatter=java.util.logging.SimpleFormatter
     ```
 
+### In-process
+1. Add google-cloud-spanner-pgadapter as a dependency to your project.
+2. Build a server using the `com.google.cloud.spanner.pgadapter.ProxyServer`
+   class:
+
+```java
+class PGProxyRunner {
+    public static void main() {
+        ProxyServer server = new ProxyServer(
+          new OptionsMetadata(
+                "jdbc:cloudspanner:/projects/my-project-name"
+                + "/instances/my-instance-id"
+                + "/databases/my-database-name"
+                + ";credentials=/home/user/service-account-credentials.json",
+                portNumber,
+                textFormat,
+                forceBinary,
+                authenticate,
+                requiresMatcher,
+                commandMetadataJSON)
+        );
+        server.startServer();
+    }
+}
+```
+
+Wherein the first item is the JDBC connection string containing pertinent
+information regarding project id, instance id, database name, credentials file
+path; All other items map directly to previously mentioned CLI options.
+
+### Options
 The following options are required to run the proxy:
   
 ```    
@@ -172,54 +225,6 @@ An example of a simple run string:
 java -jar <jar-file> -p <project name> -i <instance id> -d <database name> -c
 <path to credentials file> -s 5432 
 ```
-
-#### Standalone through docker
-
-1.  Build the docker image:
-
-    ```
-    docker build . -t "pgadapter" -f build/Dockerfile
-
-    ```
-
-2.  Run the docker image with environment variables set:
-
-    ```
-    docker run -d -p 127.0.0.1:HOST-PORT:DOCKER-PORT \
-    -v CREDENTIALS_FILE_PATH:/acct_credentials.json pgadapter:latest \
-    -p PROJECT -i INSTANCE -d DATABASE  \
-    -c /acct_credentials.json -q -x OTHER_OPTIONS
-    ```
-
-### In-process
-1. Add google-cloud-spanner-pgadapter as a dependency to your project.
-2. Build a server using the `com.google.cloud.spanner.pgadapter.ProxyServer` 
-class:
-
-```java
-class PGProxyRunner {
-    public static void main() {
-        ProxyServer server = new ProxyServer(
-          new OptionsMetadata(
-                "jdbc:cloudspanner:/projects/my-project-name"
-                + "/instances/my-instance-id"
-                + "/databases/my-database-name"
-                + ";credentials=/home/user/service-account-credentials.json",
-                portNumber,
-                textFormat,
-                forceBinary,
-                authenticate,
-                requiresMatcher,
-                commandMetadataJSON)
-        );
-        server.startServer();
-    }
-}
-```
-
-Wherein the first item is the JDBC connection string containing pertinent
-information regarding project id, instance id, database name, credentials file
-path; All other items map directly to previously mentioned CLI options.
 
 ## COPY support
 `COPY <table-name> FROM STDIN` is supported. This option can be used to insert bulk data to a Cloud

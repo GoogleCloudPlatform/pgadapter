@@ -58,6 +58,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.GuardedBy;
@@ -357,7 +358,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
     } finally {
       this.executorService.shutdown();
       if (!this.executorService.awaitTermination(60L, TimeUnit.SECONDS)) {
-        logger.warning("Timeout while waiting for MutationWriter executor to shutdown.");
+        logger.log(Level.WARNING, "Timeout while waiting for MutationWriter executor to shutdown.");
       }
       this.payload.close();
       this.parser.close();
