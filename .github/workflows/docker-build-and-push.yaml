@@ -12,7 +12,8 @@ env:
   GITHUB_SHA: ${{ github.sha }}
   GITHUB_REF: ${{ github.ref }}
   IMAGE: pgadapter
-  REGISTRY_HOSTNAME: us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images
+  # REGISTRY_HOSTNAME: us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images
+  REGISTRY_HOSTNAME: gcr.io/cloud-spanner-pg-adapter
 
 jobs:
   setup-build-publish-deploy:
