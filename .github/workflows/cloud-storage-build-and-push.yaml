@@ -32,14 +32,22 @@ jobs:
           mvn package -Pshade -DskipTests
           export VERSION=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $VERSION
-          mv "target/pgadapter.jar" "target/pgadapter-$VERSION.jar"
+          cp "target/pgadapter.jar" "target/pgadapter-$VERSION.jar"
           echo "uber_jar=target/pgadapter-$VERSION.jar" >> $GITHUB_ENV
+          echo "uber_jar_current=target/pgadapter.jar" >> $GITHUB_ENV
           echo ${{ env.uber_jar }}
+          echo ${{ env.uber_jar_current }}
 
       # Upload the jar to Google Cloud Storage
-      - id: 'upload-file'
+      - id: 'upload-versioned-file'
         uses: 'google-github-actions/upload-cloud-storage@v0'
         with:
           path: ${{ env.uber_jar }}
+          destination: 'pgadapter-jar-releases'
+          parent: false
+      - id: 'overwrite-current-file'
+        uses: 'google-github-actions/upload-cloud-storage@v0'
+        with:
+          path: ${{ env.uber_jar_current }}
           destination: 'pgadapter-jar-releases'
           parent: false
