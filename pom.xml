@@ -27,7 +27,7 @@
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.2.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.3.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -57,21 +57,6 @@
       <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
     </license>
   </licenses>
-
-  <distributionManagement>
-    <snapshotRepository>
-      <id>artifact-registry</id>
-      <url>
-        artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts
-      </url>
-    </snapshotRepository>
-    <repository>
-      <id>artifact-registry</id>
-      <url>
-        artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts
-      </url>
-    </repository>
-  </distributionManagement>
 
   <dependencies>
     <dependency>

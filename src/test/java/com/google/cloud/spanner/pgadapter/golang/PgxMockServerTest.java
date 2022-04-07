@@ -216,8 +216,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   @Test
   public void testInsertNullsAllDataTypes() {
     String sql =
-        "INSERT INTO AllTypes "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamp, col_date, col_varchar) "
+        "INSERT INTO all_types "
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
             + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
     mockSpanner.putStatementResult(
         StatementResult.update(

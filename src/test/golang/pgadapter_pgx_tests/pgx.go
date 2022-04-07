@@ -115,7 +115,7 @@ func TestQueryAllDataTypes(connString string) *C.char {
 	var intValue int
 	var numericValue pgtype.Numeric // pgx default maps numeric to string
 	var timestamptzValue time.Time
-	//var dateValue time.Time
+	var dateValue time.Time
 	var varcharValue string
 
 	err = conn.QueryRow(ctx, "SELECT * FROM all_types WHERE col_bigint=1").Scan(
@@ -126,7 +126,7 @@ func TestQueryAllDataTypes(connString string) *C.char {
 		&intValue,
 		&numericValue,
 		&timestamptzValue,
-		//&dateValue,
+		&dateValue,
 		&varcharValue,
 	)
 	if err != nil {
@@ -150,6 +150,10 @@ func TestQueryAllDataTypes(connString string) *C.char {
 	var wantNumericValue pgtype.Numeric
 	_ = wantNumericValue.Scan("6.626")
 	if g, w := numericValue, wantNumericValue; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	wantDateValue, _ := time.Parse("2006-01-02", "2022-03-29")
+	if g, w := dateValue, wantDateValue; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	wantTimestamptzValue, _ := time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456789+00:00")

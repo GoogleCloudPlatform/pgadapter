@@ -64,10 +64,14 @@ public abstract class Parser<T> {
    *     no type could be guessed.
    */
   private static int guessType(byte[] item, FormatCode formatCode) {
+    // TODO: Put 'guessType' behind a command line flag so it is only enabled when wanted.
     if (formatCode == FormatCode.TEXT && item != null) {
       String value = new String(item, StandardCharsets.UTF_8);
       if (TimestampParser.isTimestamp(value)) {
         return Oid.TIMESTAMPTZ;
+      }
+      if (DateParser.isDate(value)) {
+        return Oid.DATE;
       }
     }
     return Oid.UNSPECIFIED;
