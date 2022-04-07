@@ -12,7 +12,7 @@ env:
   GITHUB_SHA: ${{ github.sha }}
   GITHUB_REF: ${{ github.ref }}
   IMAGE: pgadapter
-  REGISTRY_HOSTNAME: us-west1-docker.pkg.dev/cloud-spanner-pg-adapter/pgadapter-docker-images
+  GCR_HOSTNAME: gcr.io/cloud-spanner-pg-adapter
 
 jobs:
   setup-build-publish-deploy:
@@ -32,14 +32,15 @@ jobs:
         uses: 'google-github-actions/setup-gcloud@v0'
 
       # Configure docker to use the gcloud command-line tool as a credential helper
-      - run: gcloud auth configure-docker gcr.io,us-west1-docker.pkg.dev
+      - run: gcloud auth configure-docker gcr.io
 
       # Build the Docker image
       - name: Build
         run: |
           export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $TAG
-          docker build . -f build/Dockerfile -t "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" \
+          docker build . -f build/Dockerfile \
+            -t "$GCR_HOSTNAME"/"$IMAGE":"$TAG" \
             --build-arg GITHUB_SHA="$GITHUB_SHA" \
             --build-arg GITHUB_REF="$GITHUB_REF"
 
@@ -48,6 +49,6 @@ jobs:
         run: |
           export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $TAG
-          docker push "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG"
-          docker tag "$REGISTRY_HOSTNAME"/"$IMAGE":"$TAG" "$REGISTRY_HOSTNAME"/"$IMAGE":latest
-          docker push "$REGISTRY_HOSTNAME"/"$IMAGE":latest
+          docker push "$GCR_HOSTNAME"/"$IMAGE":"$TAG"
+          docker tag "$GCR_HOSTNAME"/"$IMAGE":"$TAG" "$GCR_HOSTNAME"/"$IMAGE":latest
+          docker push "$GCR_HOSTNAME"/"$IMAGE":latest
