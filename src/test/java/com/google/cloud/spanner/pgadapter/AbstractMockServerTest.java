@@ -160,6 +160,10 @@ public abstract class AbstractMockServerTest {
                           .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build()))
                   .addFields(
                       Field.newBuilder()
+                          .setName("col_date")
+                          .setType(Type.newBuilder().setCode(TypeCode.DATE).build()))
+                  .addFields(
+                      Field.newBuilder()
                           .setName("col_varchar")
                           .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
                   .build())
@@ -181,6 +185,7 @@ public abstract class AbstractMockServerTest {
                   .addValues(Value.newBuilder().setStringValue("6.626").build())
                   .addValues(
                       Value.newBuilder().setStringValue("2022-02-16T13:18:02.123456789Z").build())
+                  .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
                   .addValues(Value.newBuilder().setStringValue("test").build())
                   .build())
           .build();
@@ -189,6 +194,7 @@ public abstract class AbstractMockServerTest {
           .setMetadata(ALL_TYPES_METADATA)
           .addRows(
               ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
