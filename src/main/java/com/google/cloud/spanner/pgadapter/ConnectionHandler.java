@@ -75,6 +75,7 @@ public class ConnectionHandler extends Thread {
 
   ConnectionHandler(ProxyServer server, Socket socket) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
+    setDaemon(true);
     this.server = server;
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
@@ -85,7 +86,6 @@ public class ConnectionHandler extends Thread {
     uri = appendPropertiesToUrl(uri, server.getProperties());
     ConnectionOptions connectionOptions = ConnectionOptions.newBuilder().setUri(uri).build();
     this.spannerConnection = connectionOptions.getConnection();
-    setDaemon(true);
     logger.log(
         Level.INFO,
         () ->
@@ -124,7 +124,7 @@ public class ConnectionHandler extends Thread {
     try (DataInputStream input =
             new DataInputStream(new BufferedInputStream(this.socket.getInputStream()));
         DataOutputStream output =
-            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream())); ) {
+            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream()))) {
       if (!server.getOptions().disableLocalhostCheck()
           && !this.socket.getInetAddress().isAnyLocalAddress()
           && !this.socket.getInetAddress().isLoopbackAddress()) {

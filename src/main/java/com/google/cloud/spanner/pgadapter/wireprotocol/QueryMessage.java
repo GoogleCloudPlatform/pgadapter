@@ -69,7 +69,7 @@ public class QueryMessage extends ControlMessage {
   protected void sendPayload() throws Exception {
     this.statement.execute();
     this.handleQuery();
-    if (!this.statement.getCommand().equalsIgnoreCase(COPY)) {
+    if (!isCopy) {
       this.connection.removeActiveStatement(this.statement);
     }
   }
@@ -105,7 +105,7 @@ public class QueryMessage extends ControlMessage {
     if (this.statement.hasException()) {
       this.handleError(this.statement.getException());
     } else {
-      if (this.statement.getCommand().equalsIgnoreCase(COPY)) {
+      if (isCopy) {
         CopyStatement copyStatement = (CopyStatement) this.statement;
         new CopyInResponse(
                 this.outputStream,
@@ -129,7 +129,8 @@ public class QueryMessage extends ControlMessage {
       boolean inTransaction = connection.getSpannerConnection().isInTransaction();
       new ReadyResponse(
               this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
-          .send();
+          .send(false);
+      this.outputStream.flush();
     }
     this.connection.cleanUp(this.statement);
   }

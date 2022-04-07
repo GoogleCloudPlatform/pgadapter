@@ -197,7 +197,9 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       System.setProperty("copy_in_commit_limit", "10");
-      connection.createStatement().execute("set autocommit_dml_mode='partitioned_non_atomic'");
+      connection
+          .createStatement()
+          .execute("set spanner.autocommit_dml_mode='partitioned_non_atomic'");
       CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
       copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\t5\t5\n6\t6\t6\n7\t7\t7\n"));
     } finally {
@@ -222,7 +224,9 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       System.setProperty("copy_in_commit_limit", "10");
-      connection.createStatement().execute("set autocommit_dml_mode='partitioned_non_atomic'");
+      connection
+          .createStatement()
+          .execute("set spanner.autocommit_dml_mode='partitioned_non_atomic'");
       CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
       SQLException exception =
           assertThrows(
