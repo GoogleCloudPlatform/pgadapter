@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
@@ -24,7 +25,11 @@ import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
+import com.google.protobuf.Empty;
 import com.google.protobuf.Value;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -32,6 +37,7 @@ import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.Status;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -386,6 +392,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testDdl() throws SQLException {
     String sql = "CREATE TABLE foo (id bigint primary key)";
+    mockDatabaseAdmin.addResponse(
+        Operation.newBuilder()
+            .setDone(true)
+            .setResponse(Any.pack(Empty.getDefaultInstance()))
+            .setMetadata(Any.pack(UpdateDatabaseDdlMetadata.getDefaultInstance()))
+            .build());
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
@@ -404,5 +416,19 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(1, updateDatabaseDdlRequests.size());
     assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
     assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(0));
+  }
+
+  @Test
+  public void testInvalidDdl() throws SQLException {
+    String sql = "CREATE TABLE foo (id int64 primary key)";
+    mockDatabaseAdmin.addException(
+        Status.INVALID_ARGUMENT.withDescription("Unknown data type: int64").asRuntimeException());
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
+        assertTrue(exception.getMessage().contains("Unknown data type: int64"));
+      }
+    }
   }
 }

@@ -21,9 +21,14 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
+import com.google.protobuf.Empty;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
+import io.grpc.Status;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -242,6 +247,12 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   @Test
   public void testDdl() throws SQLException {
     String sql = "CREATE TABLE foo (id bigint primary key)";
+    mockDatabaseAdmin.addResponse(
+        Operation.newBuilder()
+            .setDone(true)
+            .setResponse(Any.pack(Empty.getDefaultInstance()))
+            .setMetadata(Any.pack(UpdateDatabaseDdlMetadata.getDefaultInstance()))
+            .build());
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -260,5 +271,19 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(1, updateDatabaseDdlRequests.size());
     assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
     assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(0));
+  }
+
+  @Test
+  public void testInvalidDdl() throws SQLException {
+    String sql = "CREATE TABLE foo (id int64 primary key)";
+    mockDatabaseAdmin.addException(
+        Status.INVALID_ARGUMENT.withDescription("Unknown data type: int64").asRuntimeException());
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
+        assertTrue(exception.getMessage().contains("Unknown data type: int64"));
+      }
+    }
   }
 }
