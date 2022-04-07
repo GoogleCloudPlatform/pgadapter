@@ -15,7 +15,9 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -34,26 +36,31 @@ public class QueryMessage extends ControlMessage {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   protected static final char IDENTIFIER = 'Q';
-  protected static final String COPY = "COPY";
+  public static final String COPY = "COPY";
 
   private final boolean isCopy;
-  private IntermediateStatement statement;
+  private final IntermediateStatement statement;
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
-    String query = PARSER.removeCommentsAndTrim(this.readAll());
-    this.isCopy = StatementParser.isCommand(COPY, query);
+    ParsedStatement parsedStatement = PARSER.parse(Statement.of(this.readAll()));
+    this.isCopy = StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments());
     if (isCopy) {
       this.statement =
           new CopyStatement(
-              connection.getServer().getOptions(), query, this.connection.getSpannerConnection());
+              connection.getServer().getOptions(),
+              parsedStatement,
+              this.connection.getSpannerConnection());
     } else if (!connection.getServer().getOptions().requiresMatcher()) {
       this.statement =
           new IntermediateStatement(
-              connection.getServer().getOptions(), query, this.connection.getSpannerConnection());
+              connection.getServer().getOptions(),
+              parsedStatement,
+              this.connection.getSpannerConnection());
     } else {
       this.statement =
-          new MatcherStatement(connection.getServer().getOptions(), query, this.connection);
+          new MatcherStatement(
+              connection.getServer().getOptions(), parsedStatement, this.connection);
     }
     this.connection.addActiveStatement(this.statement);
   }

@@ -14,8 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.ResultSet;
@@ -33,8 +32,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
-import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -53,20 +50,10 @@ public final class RowDescriptionTest {
   private static final Charset UTF8 = StandardCharsets.UTF_8;
 
   @Rule public MockitoRule rule = MockitoJUnit.rule();
-  private ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-  private DataOutputStream output = new DataOutputStream(buffer);
+  private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+  private final DataOutputStream output = new DataOutputStream(buffer);
   @Mock private IntermediateStatement statement;
   @Mock private ResultSet metadata;
-  private Type rowType;
-
-  @Before
-  public void setUp() {
-    rowType =
-        Type.struct(
-            StructField.of("default-column-name", Type.int64()),
-            StructField.of("default-column-name", Type.int64()));
-    when(metadata.getType()).thenReturn(rowType);
-  }
 
   @Test
   public void OidTest() throws Exception {
@@ -97,29 +84,29 @@ public final class RowDescriptionTest {
         new RowDescriptionResponse(output, statement, metadata, options, mode);
 
     // Types.BIGINT
-    Assert.assertEquals(response.getOidType(0), Oid.INT8);
-    Assert.assertEquals(response.getOidTypeSize(Oid.INT8), 8);
+    assertEquals(Oid.INT8, response.getOidType(0));
+    assertEquals(8, response.getOidTypeSize(Oid.INT8));
     // Types.NUMERIC
-    Assert.assertEquals(response.getOidType(1), Oid.NUMERIC);
-    Assert.assertEquals(response.getOidTypeSize(Oid.NUMERIC), -1);
+    assertEquals(Oid.NUMERIC, response.getOidType(1));
+    assertEquals(-1, response.getOidTypeSize(Oid.NUMERIC));
     // Types.DOUBLE
-    Assert.assertEquals(response.getOidType(2), Oid.FLOAT8);
-    Assert.assertEquals(response.getOidTypeSize(Oid.FLOAT8), 8);
+    assertEquals(Oid.FLOAT8, response.getOidType(2));
+    assertEquals(8, response.getOidTypeSize(Oid.FLOAT8));
     // Types.VARCHAR
-    Assert.assertEquals(response.getOidType(3), Oid.VARCHAR);
-    Assert.assertEquals(response.getOidTypeSize(Oid.VARCHAR), -1);
+    assertEquals(Oid.VARCHAR, response.getOidType(3));
+    assertEquals(-1, response.getOidTypeSize(Oid.VARCHAR));
     // Types.BINARY
-    Assert.assertEquals(response.getOidType(4), Oid.BYTEA);
-    Assert.assertEquals(response.getOidTypeSize(Oid.BYTEA), -1);
+    assertEquals(Oid.BYTEA, response.getOidType(4));
+    assertEquals(-1, response.getOidTypeSize(Oid.BYTEA));
     // Types.BIT
-    Assert.assertEquals(response.getOidType(5), Oid.BOOL);
-    Assert.assertEquals(response.getOidTypeSize(Oid.BOOL), 1);
+    assertEquals(Oid.BOOL, response.getOidType(5));
+    assertEquals(1, response.getOidTypeSize(Oid.BOOL));
     // Types.DATE
-    Assert.assertEquals(response.getOidType(6), Oid.DATE);
-    Assert.assertEquals(response.getOidTypeSize(Oid.DATE), 8);
+    assertEquals(Oid.DATE, response.getOidType(6));
+    assertEquals(8, response.getOidTypeSize(Oid.DATE));
     // Types.TIMESTAMP
-    Assert.assertEquals(response.getOidType(7), Oid.TIMESTAMP);
-    Assert.assertEquals(response.getOidTypeSize(Oid.TIMESTAMP), 12);
+    assertEquals(Oid.TIMESTAMP, response.getOidType(7));
+    assertEquals(12, response.getOidTypeSize(Oid.TIMESTAMP));
   }
 
   @Test
@@ -151,26 +138,26 @@ public final class RowDescriptionTest {
         new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));
 
     // column count
-    Assert.assertThat(outputReader.readShort(), is(equalTo((short) COLUMN_COUNT)));
+    assertEquals(COLUMN_COUNT, outputReader.readShort());
     // column name
     int numOfBytes = COLUMN_NAME.getBytes(UTF8).length;
     byte[] bytes = new byte[numOfBytes];
-    outputReader.read(bytes, 0, numOfBytes);
-    Assert.assertEquals(new String(bytes, UTF8), COLUMN_NAME);
+    assertEquals(numOfBytes, outputReader.read(bytes, 0, numOfBytes));
+    assertEquals(new String(bytes, UTF8), COLUMN_NAME);
     // null terminator
-    Assert.assertThat(outputReader.readByte(), is(equalTo(DEFAULT_FLAG)));
+    assertEquals(DEFAULT_FLAG, outputReader.readByte());
     // table oid
-    Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
+    assertEquals(DEFAULT_FLAG, outputReader.readInt());
     // column index
-    Assert.assertThat(outputReader.readShort(), is(equalTo((short) DEFAULT_FLAG)));
+    assertEquals(DEFAULT_FLAG, outputReader.readShort());
     // type oid
-    Assert.assertEquals(outputReader.readInt(), Oid.INT8);
+    assertEquals(Oid.INT8, outputReader.readInt());
     // type size
-    Assert.assertThat(outputReader.readShort(), is(equalTo((short) 8)));
+    assertEquals(8, outputReader.readShort());
     // type modifier
-    Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
+    assertEquals(DEFAULT_FLAG, outputReader.readInt());
     // format code
-    Assert.assertThat(outputReader.readShort(), is(equalTo((short) 0)));
+    assertEquals(0, outputReader.readShort());
   }
 
   @Test
@@ -202,26 +189,26 @@ public final class RowDescriptionTest {
         new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));
 
     // column count
-    Assert.assertThat(outputReader.readShort(), is(equalTo((short) COLUMN_COUNT)));
+    assertEquals(COLUMN_COUNT, outputReader.readShort());
     // column name
     int numOfBytes = COLUMN_NAME.getBytes(UTF8).length;
     byte[] bytes = new byte[numOfBytes];
-    outputReader.read(bytes, 0, numOfBytes);
-    Assert.assertEquals(new String(bytes, UTF8), COLUMN_NAME);
+    assertEquals(numOfBytes, outputReader.read(bytes, 0, numOfBytes));
+    assertEquals(COLUMN_NAME, new String(bytes, UTF8));
     // null terminator
-    Assert.assertThat(outputReader.readByte(), is(equalTo(DEFAULT_FLAG)));
+    assertEquals(DEFAULT_FLAG, outputReader.readByte());
     // table oid
-    Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
+    assertEquals(DEFAULT_FLAG, outputReader.readInt());
     // column index
-    Assert.assertThat(outputReader.readShort(), is(equalTo((short) DEFAULT_FLAG)));
+    assertEquals(DEFAULT_FLAG, outputReader.readShort());
     // type oid
-    Assert.assertEquals(outputReader.readInt(), Oid.INT8);
+    assertEquals(Oid.INT8, outputReader.readInt());
     // type size
-    Assert.assertThat(outputReader.readShort(), is(equalTo((short) 8)));
+    assertEquals(8, outputReader.readShort());
     // type modifier
-    Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
+    assertEquals(DEFAULT_FLAG, outputReader.readInt());
     // format code
-    Assert.assertThat(outputReader.readShort(), is(equalTo((short) 1)));
+    assertEquals(1, outputReader.readShort());
   }
 
   @Test
@@ -257,27 +244,27 @@ public final class RowDescriptionTest {
     DataInputStream outputReader =
         new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));
     // column count
-    Assert.assertThat(outputReader.readShort(), is(equalTo((short) COLUMN_COUNT)));
+    assertEquals(COLUMN_COUNT, outputReader.readShort());
     for (int i = 0; i < COLUMN_COUNT; i++) {
       // column name
       int numOfBytes = COLUMN_NAME.getBytes(UTF8).length;
       byte[] bytes = new byte[numOfBytes];
-      outputReader.read(bytes, 0, numOfBytes);
-      Assert.assertEquals(new String(bytes, UTF8), COLUMN_NAME);
+      assertEquals(numOfBytes, outputReader.read(bytes, 0, numOfBytes));
+      assertEquals(new String(bytes, UTF8), COLUMN_NAME);
       // null terminator
-      Assert.assertThat(outputReader.readByte(), is(equalTo(DEFAULT_FLAG)));
+      assertEquals(DEFAULT_FLAG, outputReader.readByte());
       // table oid
-      Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
+      assertEquals(DEFAULT_FLAG, outputReader.readInt());
       // column index
-      Assert.assertThat(outputReader.readShort(), is(equalTo((short) DEFAULT_FLAG)));
+      assertEquals(DEFAULT_FLAG, outputReader.readShort());
       // type oid
-      Assert.assertEquals(outputReader.readInt(), Oid.INT8);
+      assertEquals(Oid.INT8, outputReader.readInt());
       // type size
-      Assert.assertThat(outputReader.readShort(), is(equalTo((short) 8)));
+      assertEquals(8, outputReader.readShort());
       // type modifier
-      Assert.assertThat(outputReader.readInt(), is(equalTo((int) DEFAULT_FLAG)));
+      assertEquals(DEFAULT_FLAG, outputReader.readInt());
       // format code
-      Assert.assertThat(outputReader.readShort(), is(equalTo((short) i)));
+      assertEquals(i, outputReader.readShort());
     }
   }
 }

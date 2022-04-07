@@ -58,11 +58,11 @@ public abstract class WireOutput {
   }
 
   /**
-   * Same as {@link #send()}, but with the option not to flush the buffer. This is more efficient
-   * for responses that contains multiple messages.
+   * Same as {@link #send()}, but with the option to skip the flush at the end. This is more
+   * efficient for responses that contain multiple parts, such as query results.
    */
   public void send(boolean flush) throws Exception {
-    logger.log(Level.FINE, this.toString());
+    logger.log(Level.FINE, this::toString);
     this.outputStream.writeByte(this.getIdentifier());
     if (this.isCompoundResponse()) {
       this.outputStream.writeInt(this.length);

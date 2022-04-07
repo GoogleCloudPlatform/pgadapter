@@ -23,11 +23,12 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <jmh.version>1.34</jmh.version>
+    <excludedTests>com.google.cloud.spanner.pgadapter.IntegrationTest,com.google.cloud.spanner.pgadapter.golang.GolangTest</excludedTests>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.2.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -57,21 +58,6 @@
       <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
     </license>
   </licenses>
-
-  <distributionManagement>
-    <snapshotRepository>
-      <id>artifact-registry</id>
-      <url>
-        artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts
-      </url>
-    </snapshotRepository>
-    <repository>
-      <id>artifact-registry</id>
-      <url>
-        artifactregistry://us-west1-maven.pkg.dev/span-cloud-testing/spangres-artifacts
-      </url>
-    </repository>
-  </distributionManagement>
 
   <dependencies>
     <dependency>
@@ -152,7 +138,7 @@
     <dependency>
       <groupId>com.zaxxer</groupId>
       <artifactId>HikariCP</artifactId>
-      <version>5.0.1</version>
+      <version>4.0.3</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -172,6 +158,7 @@
                   <goal>shade</goal>
                 </goals>
                 <configuration>
+                  <finalName>pgadapter</finalName>
                   <filters>
                     <filter>
                       <artifact>*:*</artifact>
@@ -228,6 +215,12 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>test-all</id>
+      <properties>
+        <excludedTests>com.google.cloud.spanner.pgadapter.IntegrationTest</excludedTests>
+      </properties>
+    </profile>
   </profiles>
 
   <build>
@@ -257,7 +250,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.0.0-M5</version>
         <configuration>
-          <excludedGroups>com.google.cloud.spanner.pgadapter.IntegrationTest</excludedGroups>
+          <excludedGroups>${excludedTests}</excludedGroups>
           <reportNameSuffix>sponge_log</reportNameSuffix>
           <systemProperties>
             <property>

@@ -31,6 +31,7 @@ import com.google.cloud.spanner.MockOperationsServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient;
 import com.google.cloud.spanner.admin.database.v1.DatabaseAdminSettings;
@@ -87,7 +88,7 @@ import org.threeten.bp.Duration;
  * The tests can then inspect the requests that the mock Spanner server received to verify that the
  * server received the requests that the test expected.
  */
-abstract class AbstractMockServerTest {
+public abstract class AbstractMockServerTest {
   private static final Logger logger = Logger.getLogger(AbstractMockServerTest.class.getName());
 
   protected static final Statement SELECT1 = Statement.of("SELECT 1");
@@ -159,6 +160,10 @@ abstract class AbstractMockServerTest {
                           .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build()))
                   .addFields(
                       Field.newBuilder()
+                          .setName("col_date")
+                          .setType(Type.newBuilder().setCode(TypeCode.DATE).build()))
+                  .addFields(
+                      Field.newBuilder()
                           .setName("col_varchar")
                           .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
                   .build())
@@ -180,6 +185,7 @@ abstract class AbstractMockServerTest {
                   .addValues(Value.newBuilder().setStringValue("6.626").build())
                   .addValues(
                       Value.newBuilder().setStringValue("2022-02-16T13:18:02.123456789Z").build())
+                  .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
                   .addValues(Value.newBuilder().setStringValue("test").build())
                   .build())
           .build();
@@ -188,6 +194,7 @@ abstract class AbstractMockServerTest {
           .setMetadata(ALL_TYPES_METADATA)
           .addRows(
               ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
@@ -363,6 +370,11 @@ abstract class AbstractMockServerTest {
         SpannerPool.closeSpannerPool();
         return;
       } catch (SpannerException e) {
+        try {
+          Thread.sleep(1L);
+        } catch (InterruptedException interruptedException) {
+          throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+        }
         exception = e;
       }
     }

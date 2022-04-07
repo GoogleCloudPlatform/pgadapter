@@ -43,7 +43,7 @@ public class StatementParser {
   /** Determines the (update) command that was received from the sql string. */
   public static String parseCommand(String sql) {
     Preconditions.checkNotNull(sql);
-    for (int i=0; i < sql.length(); i++) {
+    for (int i = 0; i < sql.length(); i++) {
       if (Character.isSpaceChar(sql.charAt(i))) {
         return sql.substring(0, i).toUpperCase();
       }
@@ -51,6 +51,7 @@ public class StatementParser {
     return sql;
   }
 
+  /** Returns true if the given sql string is the given command. */
   public static boolean isCommand(String command, String query) {
     Preconditions.checkNotNull(command);
     Preconditions.checkNotNull(query);
@@ -60,6 +61,7 @@ public class StatementParser {
     if (query.length() <= command.length()) {
       return false;
     }
-    return Character.isSpaceChar(query.charAt(command.length())) && query.substring(0, command.length()).equalsIgnoreCase(command);
+    return Character.isSpaceChar(query.charAt(command.length()))
+        && query.substring(0, command.length()).equalsIgnoreCase(command);
   }
 }
