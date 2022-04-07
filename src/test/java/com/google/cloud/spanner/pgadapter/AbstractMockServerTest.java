@@ -214,7 +214,6 @@ public abstract class AbstractMockServerTest {
         NettyServerBuilder.forAddress(address)
             .addService(mockSpanner)
             .addService(mockDatabaseAdmin)
-            //            .addService(mockOperationsService)
             .intercept(
                 new ServerInterceptor() {
                   @Override
@@ -239,10 +238,6 @@ public abstract class AbstractMockServerTest {
                 })
             .build()
             .start();
-
-    // Create the test database on the mock server. This should be replaced by a simple feature in
-    // the mock server to just add a database instead of having to simulate the creation of it.
-    //    createDatabase();
 
     ImmutableList.Builder<String> argsListBuilder =
         ImmutableList.<String>builder()
