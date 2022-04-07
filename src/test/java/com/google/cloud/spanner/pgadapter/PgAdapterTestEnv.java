@@ -14,9 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertEquals;
 
 import com.google.api.gax.longrunning.OperationFuture;
 import com.google.auth.oauth2.GoogleCredentials;
@@ -378,7 +376,7 @@ public final class PgAdapterTestEnv {
 
   PGMessage consumePGMessage(char expectedType, DataInputStream in) throws java.io.IOException {
     char type = (char) in.readByte();
-    assertThat(type, is(equalTo(expectedType)));
+    assertEquals(expectedType, type);
     int length = in.readInt();
     // The length of payload is total length - bytes to express length (4 bytes)
     byte[] payload = new byte[length - 4];
@@ -388,7 +386,7 @@ public final class PgAdapterTestEnv {
 
   void consumeStartUpMessages(DataInputStream in) throws java.io.IOException {
     // Get result from initialization request. Skip first byte since it is metadata ('N' character).
-    assertThat((char) in.readByte(), is(equalTo('N')));
+    assertEquals('N', in.readByte());
 
     // Check for correct message type identifiers.
     // See https://www.postgresql.org/docs/13/protocol-message-formats.html for more details.
