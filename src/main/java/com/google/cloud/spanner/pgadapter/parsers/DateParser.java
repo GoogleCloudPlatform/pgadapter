@@ -26,6 +26,17 @@ import org.postgresql.util.ByteConverter;
 
 /** Translate wire protocol dates to desired formats. */
 public class DateParser extends Parser<Date> {
+  // Valid format for date: 'yyyy-MM-dd [+-]HH[:mi]'.
+  // Timezone information is optional. Timezone may also be specified using only hour value.
+  // NOTE: Following algorithm might perform slowly due to exception handling; sadly, this seems
+  //       to be the accepted default method for date validation.
+  private static final SimpleDateFormat[] VALID_DATE_FORMATS = {
+    new SimpleDateFormat("yyyy-MM-dd HH:mm"),
+    new SimpleDateFormat("yyyy-MM-dd +HH:mm"),
+    new SimpleDateFormat("yyyy-MM-dd -HH:mm"),
+    new SimpleDateFormat("yyyy-MM-dd +HH"),
+    new SimpleDateFormat("yyyy-MM-dd -HH")
+  };
 
   public DateParser(ResultSet item, int position) {
     this.item = item.getDate(position);
@@ -40,12 +51,13 @@ public class DateParser extends Parser<Date> {
       switch (formatCode) {
         case TEXT:
           String stringValue = new String(item, UTF8);
-          this.item = Date.parseDate(stringValue);
+          // Use the first 10 characters of the date string, as the string might contain a timezone
+          // identifier, which is not supported by parseDate(String).
+          this.item = Date.parseDate(stringValue.substring(0, 10));
           break;
         case BINARY:
           long days = ByteConverter.int4(item, 0) + PG_EPOCH_DAYS;
-          this.validateRange(days);
-          LocalDate localDate = LocalDate.ofEpochDay(days);
+          LocalDate localDate = LocalDate.ofEpochDay(validateRange(days));
           this.item =
               Date.fromYearMonthDay(
                   localDate.getYear(), localDate.getMonthValue(), localDate.getDayOfMonth());
@@ -64,20 +76,12 @@ public class DateParser extends Parser<Date> {
    */
   public static boolean isDate(String value) {
     Preconditions.checkNotNull(value);
-    // Valid format for date: 'yyyy-mm-dd [+-]HH:mi'.
-    // Timezone information is optional. Timezone may also be specified using only hour value.
-    // NOTE: Following algorithm might perform slowly due to exception handling; sadly, this seems
-    //       to be the accepted default method for date validation.
-    SimpleDateFormat[] dateFormats = {
-      new SimpleDateFormat("yyyy-mm-dd HH:mm"),
-      new SimpleDateFormat("yyyy-mm-dd +HH:mm"),
-      new SimpleDateFormat("yyyy-mm-dd -HH:mm")
-    };
-    for (SimpleDateFormat dateFormat : dateFormats) {
+    for (SimpleDateFormat dateFormat : VALID_DATE_FORMATS) {
       try {
         dateFormat.parse(value);
         return true;
       } catch (ParseException e) {
+        // ignore and try the next
       }
     }
     return false;

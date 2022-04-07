@@ -156,19 +156,6 @@ jobs:
       run: gcloud components install alpha
     - run: .ci/run-with-credentials.sh uber-jar-build
     - run: .ci/run-with-credentials.sh e2e-psql 14
-  release:
-    runs-on: ubuntu-latest
-    # Only releases on the postgresql-dialect branch
-    if: github.head_ref == 'postgresql-dialect'
-    needs: [ units, lint, clirr, integration, e2e-psql-v11, e2e-psql-v12, e2e-psql-v13 ]
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-java@v1
-      with:
-        java-version: 8
-    - run: java -version
-    - name: "Releases jdbc library"
-      run: .ci/run-with-credentials.sh release
   release-docker:
     runs-on: ubuntu-latest
     # Only releases on the postgresql-dialect branch
