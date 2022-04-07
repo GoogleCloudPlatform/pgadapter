@@ -5,5 +5,5 @@ target/
 *.class
 *.lst
 
-src/test/golang/*.h
-src/test/golang/*.so
+src/test/golang/**/*.h
+src/test/golang/**/*.so

@@ -14,10 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
+import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.commands.Command;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import org.json.simple.JSONObject;
 
 /**
@@ -28,16 +30,17 @@ import org.json.simple.JSONObject;
  */
 public class MatcherStatement extends IntermediateStatement {
 
-  private JSONObject commandMetadataJSON;
-
   public MatcherStatement(
-      OptionsMetadata options, String sql, ConnectionHandler connectionHandler) {
-    super(options, sql);
-    this.connection = connectionHandler.getSpannerConnection();
-    this.commandMetadataJSON = connectionHandler.getServer().getOptions().getCommandMetadataJSON();
-    this.sql = translateSQL(sql);
-    this.statements = parseStatements(sql);
-    this.command = StatementParser.parseCommand(sql);
+      OptionsMetadata options,
+      ParsedStatement parsedStatement,
+      ConnectionHandler connectionHandler) {
+    super(
+        options,
+        translateSQL(
+            parsedStatement,
+            connectionHandler.getSpannerConnection(),
+            connectionHandler.getServer().getOptions().getCommandMetadataJSON()),
+        connectionHandler.getSpannerConnection());
   }
 
   @Override
@@ -49,17 +52,19 @@ public class MatcherStatement extends IntermediateStatement {
    * Translate a Postgres Specific command into something Spanner can handle. Currently, this is
    * only concerned with PSQL specific meta-commands.
    *
-   * @param sql The SQL statement to be translated.
+   * @param parsedStatement The SQL statement to be translated.
    * @return The translated SQL statement if it matches any {@link Command} statement. Otherwise
    *     gives out the original Statement.
    */
-  private String translateSQL(String sql) {
+  private static ParsedStatement translateSQL(
+      ParsedStatement parsedStatement, Connection connection, JSONObject commandMetadataJSON) {
     for (Command currentCommand :
-        Command.getCommands(sql, this.connection, this.commandMetadataJSON)) {
+        Command.getCommands(
+            parsedStatement.getSqlWithoutComments(), connection, commandMetadataJSON)) {
       if (currentCommand.is()) {
-        return currentCommand.translate();
+        return PARSER.parse(Statement.of(currentCommand.translate()));
       }
     }
-    return sql;
+    return parsedStatement;
   }
 }

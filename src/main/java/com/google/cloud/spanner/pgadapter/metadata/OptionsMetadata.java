@@ -49,7 +49,7 @@ public class OptionsMetadata {
   private static final String OPTION_COMMAND_METADATA_FILE = "j";
   private static final String OPTION_DISABLE_LOCALHOST_CHECK = "x";
   private static final String CLI_ARGS =
-      "gcpga -p <project> -i <instance> -d <database> -c <credentials_file>";
+      "pgadapter -p <project> -i <instance> -d <database> -c <credentials_file>";
   private static final String OPTION_HELP = "h";
   private static final String DEFAULT_PORT = "5432";
   private static final int MIN_PORT = 0, MAX_PORT = 65535;
@@ -177,8 +177,10 @@ public class OptionsMetadata {
       jdbcEndpoint = "jdbc:cloudspanner://" + host + "/";
       logger.log(
           Level.INFO,
-          "PG Adapter will connect to the following Cloud Spanner service endpoint {0}",
-          host);
+          () ->
+              String.format(
+                  "PG Adapter will connect to the following Cloud Spanner service endpoint %s",
+                  host));
     }
 
     // Note that Credentials here is the credentials file, not the actual credentials
