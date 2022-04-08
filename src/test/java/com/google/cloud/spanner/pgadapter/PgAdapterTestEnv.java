@@ -87,8 +87,7 @@ public final class PgAdapterTestEnv {
   private static final String DEFAULT_DATABASE_ID = "pgtest-db";
 
   // Default host url
-  private static final String DEFAULT_HOST_URL =
-      "https://staging-wrenchworks.sandbox.googleapis.com:443";
+  private static final String DEFAULT_HOST_URL = "https://spanner.googleapis.com:443";
 
   // The project Id. This can be overwritten.
   private String projectId;
