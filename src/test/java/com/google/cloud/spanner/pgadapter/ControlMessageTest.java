@@ -17,13 +17,13 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.ResultType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -65,9 +65,9 @@ public final class ControlMessageTest {
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    when(intermediateStatement.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
-    when(intermediateStatement.getCommand()).thenReturn("INSERT");
-    when(intermediateStatement.getUpdateCount()).thenReturn(1L);
+    when(intermediateStatement.getStatementType(0)).thenReturn(StatementType.UPDATE);
+    when(intermediateStatement.getCommand(0)).thenReturn("INSERT");
+    when(intermediateStatement.getUpdateCount(0)).thenReturn(1L);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
 
     JSONParser parser = new JSONParser();
@@ -86,7 +86,7 @@ public final class ControlMessageTest {
     when(connectionHandler.getServer()).thenReturn(server);
 
     ControlMessage controlMessage = ControlMessage.create(connectionHandler);
-    controlMessage.sendSpannerResult(intermediateStatement, QueryMode.SIMPLE, 0L);
+    controlMessage.sendSpannerResult(0, intermediateStatement, QueryMode.SIMPLE, 0L);
 
     DataInputStream outputReader =
         new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));

@@ -527,4 +527,80 @@ public class ITJdbcTest implements IntegrationTest {
       connection.createStatement().execute("delete from all_types");
     }
   }
+
+  @Test
+  public void testTwoDmlStatementsInSimpleMode() throws SQLException {
+    // This connection prefers the simple query mode. This makes the JDBC driver behave very similar
+    // to psql, and enables us to send multiple simple unparameterized statements in one batch.
+    try (Connection connection =
+        DriverManager.getConnection(
+            String.format(
+                "jdbc:postgresql://localhost:%d/?preferQueryMode=simple", server.getLocalPort()))) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result is an update count or no result.
+        assertFalse(
+            statement.execute(
+                "INSERT INTO numbers VALUES (2, 'Two'); UPDATE numbers SET name=name || ' - Updated';"));
+
+        // Note that we have sent two DML statements to the database in one string. These should be
+        // treated as separate statements, and there should therefore be two results coming back
+        // from the server. That is; The first update count should be 1 (the INSERT), and the second
+        // should be 2 (the UPDATE).
+        assertEquals(1, statement.getUpdateCount());
+
+        // The following is a prime example of how not to design an API, but this is how JDBC works.
+        // getMoreResults() returns true if the next result is a ResultSet. However, if the next
+        // result is an update count, it returns false, and we have to check getUpdateCount() to
+        // verify whether there were any more results.
+        assertFalse(statement.getMoreResults());
+        assertEquals(2, statement.getUpdateCount());
+
+        // There are no more results. This is indicated by getMoreResults returning false AND
+        // getUpdateCount returning -1.
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+
+        // Read back the data to verify.
+        try (ResultSet resultSet =
+            statement.executeQuery("SELECT name FROM numbers ORDER BY num")) {
+          assertTrue(resultSet.next());
+          assertEquals("One - Updated", resultSet.getString("name"));
+          assertTrue(resultSet.next());
+          assertEquals("Two - Updated", resultSet.getString("name"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testDmlAndQueryInBatchInSimpleMode() throws SQLException {
+    // This connection prefers the simple query mode. This makes the JDBC driver behave very similar
+    // to psql, and enables us to send multiple simple unparameterized statements in one batch.
+    try (Connection connection =
+        DriverManager.getConnection(
+            String.format(
+                "jdbc:postgresql://localhost:%d/?preferQueryMode=simple", server.getLocalPort()))) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertFalse(
+            statement.execute(
+                "INSERT INTO numbers VALUES (2, 'Two'); SELECT name FROM numbers ORDER BY num;"));
+        assertEquals(1, statement.getUpdateCount());
+
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals("One", resultSet.getString("name"));
+          assertTrue(resultSet.next());
+          assertEquals("Two", resultSet.getString("name"));
+          assertFalse(resultSet.next());
+        }
+
+        // There are no more results. This is indicated by getMoreResults returning false AND
+        // getUpdateCount returning -1.
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+      }
+    }
+  }
 }

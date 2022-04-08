@@ -194,7 +194,6 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   public void testCopyInExceedsCommitSizeLimit_BatchesInNonAtomicMode()
       throws SQLException, IOException {
     setupCopyInformationSchemaResults();
-
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       System.setProperty("copy_in_commit_limit", "10");
       connection.createStatement().execute("set autocommit_dml_mode='partitioned_non_atomic'");

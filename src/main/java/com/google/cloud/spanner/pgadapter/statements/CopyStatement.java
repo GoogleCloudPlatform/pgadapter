@@ -22,9 +22,9 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
@@ -32,6 +32,7 @@ import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.TypeCode;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,16 +63,15 @@ public class CopyStatement extends IntermediateStatement {
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
   public CopyStatement(OptionsMetadata options, String sql, Connection connection) {
-    super(options, sql);
+    super(options, ImmutableList.of(sql));
     this.sql = sql;
-    this.command = StatementParser.parseCommand(sql);
+    this.commands = StatementParser.parseCommands(ImmutableList.of(sql));
     this.connection = connection;
   }
 
-  @Override
   public Exception getException() {
     // Do not clear exceptions on a CopyStatement.
-    return this.exception;
+    return this.exceptions[0];
   }
 
   @Override
@@ -83,7 +83,6 @@ public class CopyStatement extends IntermediateStatement {
     super.close();
   }
 
-  @Override
   public Long getUpdateCount() {
     try {
       return updateCount.get();
@@ -95,8 +94,8 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   @Override
-  public ResultType getResultType() {
-    return ResultType.UPDATE_COUNT;
+  public StatementType getStatementType(int index) {
+    return StatementType.UPDATE;
   }
 
   /** @return Mapping of table column names to column type. */
@@ -290,15 +289,14 @@ public class CopyStatement extends IntermediateStatement {
     return 0;
   }
 
-  @Override
   public void handleExecutionException(SpannerException e) {
     executor.shutdownNow();
-    super.handleExecutionException(e);
+    super.handleExecutionException(0, e);
   }
 
   @Override
   public void execute() {
-    this.executed = true;
+    this.lastExecutedIndex = 0;
     try {
       parseCopyStatement();
       queryInformationSchema();

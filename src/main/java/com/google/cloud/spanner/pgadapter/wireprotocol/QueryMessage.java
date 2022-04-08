@@ -24,6 +24,8 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.statements.MatcherStatement;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
@@ -48,8 +50,7 @@ public class QueryMessage extends ControlMessage {
               connection.getServer().getOptions(), query, this.connection.getSpannerConnection());
     } else if (!connection.getServer().getOptions().requiresMatcher()) {
       this.statement =
-          new IntermediateStatement(
-              connection.getServer().getOptions(), query, this.connection.getSpannerConnection());
+          new IntermediateStatement(connection.getServer().getOptions(), query, this.connection);
     } else {
       this.statement =
           new MatcherStatement(connection.getServer().getOptions(), query, this.connection);
@@ -61,7 +62,7 @@ public class QueryMessage extends ControlMessage {
   protected void sendPayload() throws Exception {
     this.statement.execute();
     this.handleQuery();
-    if (!this.statement.getCommand().equalsIgnoreCase(COPY)) {
+    if (!this.statement.getCommand(0).equalsIgnoreCase(COPY)) {
       this.connection.removeActiveStatement(this.statement);
     }
   }
@@ -91,13 +92,16 @@ public class QueryMessage extends ControlMessage {
    * error, handle error, otherwise sends the result and if contains result set, send row
    * description)
    *
-   * @throws Exception
+   * @throws Exception if handling the query fails
    */
   public void handleQuery() throws Exception {
-    if (this.statement.hasException()) {
-      this.handleError(this.statement.getException());
-    } else {
-      if (this.statement.getCommand().equalsIgnoreCase(COPY)) {
+    // Skip unexecuted statements, as no response needs be returned
+    for (int index = 0; index <= statement.getLastExecutedIndex(); index++) {
+      if (this.statement.hasException(index)) {
+        new ErrorResponse(
+                this.outputStream, this.statement.getException(index), State.InternalError)
+            .send();
+      } else if (this.statement.getCommand(index).equalsIgnoreCase(COPY)) {
         CopyStatement copyStatement = (CopyStatement) this.statement;
         new CopyInResponse(
                 this.outputStream,
@@ -108,21 +112,29 @@ public class QueryMessage extends ControlMessage {
 
         // Return early as we do not respond with CommandComplete after a COPY command.
         return;
-      } else if (this.statement.containsResultSet()) {
-        new RowDescriptionResponse(
-                this.outputStream,
-                this.statement,
-                this.statement.getStatementResult(),
-                this.connection.getServer().getOptions(),
-                QueryMode.SIMPLE)
-            .send();
+      } else {
+        if (this.statement.containsResultSet(index)) {
+          new RowDescriptionResponse(
+                  this.outputStream,
+                  this.statement,
+                  this.statement.getStatementResult(index),
+                  this.connection.getServer().getOptions(),
+                  QueryMode.SIMPLE)
+              .send();
+        }
+        this.sendSpannerResult(index, this.statement, QueryMode.SIMPLE, 0L);
       }
-      this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
-      boolean inTransaction = connection.getSpannerConnection().isInTransaction();
-      new ReadyResponse(
-              this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
-          .send();
     }
+    boolean inTransaction = connection.getSpannerConnection().isInTransaction();
+    Status transactionStatus = Status.IDLE;
+    if (inTransaction) {
+      if (connection.getStatus() == ConnectionStatus.ABORTED) {
+        transactionStatus = Status.FAILED;
+      } else {
+        transactionStatus = Status.TRANSACTION;
+      }
+    }
+    new ReadyResponse(this.outputStream, transactionStatus).send();
     this.connection.cleanUp(this.statement);
   }
 }

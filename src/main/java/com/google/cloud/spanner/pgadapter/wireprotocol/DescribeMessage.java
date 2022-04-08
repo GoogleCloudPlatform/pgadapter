@@ -84,15 +84,16 @@ public class DescribeMessage extends ControlMessage {
    * @throws Exception if sending the message back to the client causes an error.
    */
   public void handleDescribePortal() throws Exception {
-    if (this.statement.hasException()) {
-      this.handleError(this.statement.getException());
+    if (this.statement.hasException(0)) {
+      this.handleError(this.statement.getException(0));
     } else {
-      switch (this.statement.getResultType()) {
-        case UPDATE_COUNT:
-        case NO_RESULT:
+      switch (this.statement.getStatementType(0)) {
+        case UPDATE:
+        case DDL:
+        case CLIENT_SIDE:
           new NoDataResponse(this.outputStream).send();
           break;
-        case RESULT_SET:
+        case QUERY:
           new RowDescriptionResponse(
                   this.outputStream,
                   this.statement,

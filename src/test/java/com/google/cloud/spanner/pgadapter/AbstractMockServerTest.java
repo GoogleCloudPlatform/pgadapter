@@ -17,31 +17,23 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-import com.google.api.gax.core.NoCredentialsProvider;
-import com.google.api.gax.grpc.InstantiatingGrpcChannelProvider;
-import com.google.api.gax.longrunning.OperationSnapshot;
-import com.google.api.gax.longrunning.OperationTimedPollAlgorithm;
-import com.google.api.gax.retrying.RetrySettings;
-import com.google.api.gax.rpc.UnaryCallSettings;
-import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
-import com.google.cloud.spanner.MockDatabaseAdminServiceImpl;
-import com.google.cloud.spanner.MockOperationsServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
-import com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient;
-import com.google.cloud.spanner.admin.database.v1.DatabaseAdminSettings;
+import com.google.cloud.spanner.admin.database.v1.MockDatabaseAdminImpl;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
+import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
+import com.google.protobuf.Empty;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
-import com.google.spanner.admin.database.v1.CreateDatabaseRequest;
-import com.google.spanner.admin.database.v1.InstanceName;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.SpannerGrpc;
 import com.google.spanner.v1.StructType;
@@ -51,13 +43,14 @@ import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Context;
 import io.grpc.Contexts;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.Server;
 import io.grpc.ServerCall;
 import io.grpc.ServerCall.Listener;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -66,7 +59,6 @@ import java.util.logging.Logger;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.threeten.bp.Duration;
 
 /**
  * Abstract base class for tests that verify that PgAdapter is receiving wire protocol requests
@@ -92,6 +84,7 @@ abstract class AbstractMockServerTest {
 
   protected static final Statement SELECT1 = Statement.of("SELECT 1");
   protected static final Statement SELECT2 = Statement.of("SELECT 2");
+  protected static final Statement INVALID_SELECT = Statement.of("SELECT foo");
   private static final ResultSetMetadata SELECT1_METADATA =
       ResultSetMetadata.newBuilder()
           .setRowType(
@@ -124,6 +117,8 @@ abstract class AbstractMockServerTest {
   protected static final int UPDATE_COUNT = 2;
   protected static final Statement INSERT_STATEMENT = Statement.of("INSERT INTO FOO VALUES (1)");
   protected static final int INSERT_COUNT = 1;
+  protected static final Statement INVALID_DML = Statement.of("INSERT INTO FOO VALUES ('abc')");
+  protected static final Statement INVALID_DDL = Statement.of("CREATE TABLE FOO (id int64)");
 
   protected static final ResultSetMetadata ALL_TYPES_METADATA =
       ResultSetMetadata.newBuilder()
@@ -198,9 +193,11 @@ abstract class AbstractMockServerTest {
                   .build())
           .build();
 
+  protected static final StatusRuntimeException EXCEPTION =
+      Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException();
+
   protected static MockSpannerServiceImpl mockSpanner;
-  protected static MockOperationsServiceImpl mockOperationsService;
-  protected static MockDatabaseAdminServiceImpl mockDatabaseAdmin;
+  protected static MockDatabaseAdminImpl mockDatabaseAdmin;
   private static Server spannerServer;
   protected static ProxyServer pgServer;
 
@@ -214,16 +211,17 @@ abstract class AbstractMockServerTest {
     mockSpanner.putStatementResult(StatementResult.update(INSERT_STATEMENT, INSERT_COUNT));
     mockSpanner.putStatementResult(
         MockSpannerServiceImpl.StatementResult.detectDialectResult(Dialect.POSTGRESQL));
+    mockSpanner.putStatementResult(StatementResult.exception(INVALID_SELECT, EXCEPTION));
+    mockSpanner.putStatementResult(StatementResult.exception(INVALID_DML, EXCEPTION));
+    mockSpanner.putStatementResult(StatementResult.exception(INVALID_DDL, EXCEPTION));
 
-    mockOperationsService = new MockOperationsServiceImpl();
-    mockDatabaseAdmin = new MockDatabaseAdminServiceImpl(mockOperationsService);
+    mockDatabaseAdmin = new MockDatabaseAdminImpl();
 
     InetSocketAddress address = new InetSocketAddress("localhost", 0);
     spannerServer =
         NettyServerBuilder.forAddress(address)
             .addService(mockSpanner)
             .addService(mockDatabaseAdmin)
-            .addService(mockOperationsService)
             .intercept(
                 new ServerInterceptor() {
                   @Override
@@ -249,10 +247,6 @@ abstract class AbstractMockServerTest {
             .build()
             .start();
 
-    // Create the test database on the mock server. This should be replaced by a simple feature in
-    // the mock server to just add a database instead of having to simulate the creation of it.
-    createDatabase();
-
     ImmutableList.Builder<String> argsListBuilder =
         ImmutableList.<String>builder()
             .add(
@@ -274,59 +268,6 @@ abstract class AbstractMockServerTest {
     String[] args = argsListBuilder.build().toArray(new String[0]);
     pgServer = new ProxyServer(new OptionsMetadata(args));
     pgServer.startServer();
-  }
-
-  private static void createDatabase() throws Exception {
-    // TODO: Replace this entire method with a feature in the test framework to just manually add a
-    // database instead of having to create it.
-    DatabaseAdminSettings.Builder builder =
-        DatabaseAdminSettings.newBuilder()
-            .setCredentialsProvider(NoCredentialsProvider.create())
-            .setTransportChannelProvider(
-                InstantiatingGrpcChannelProvider.newBuilder()
-                    .setEndpoint(String.format("localhost:%d", spannerServer.getPort()))
-                    .setCredentials(NoCredentials.getInstance())
-                    .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
-                    .build());
-
-    RetrySettings longRunningInitialRetrySettings =
-        RetrySettings.newBuilder()
-            .setInitialRpcTimeout(Duration.ofMillis(600L))
-            .setMaxRpcTimeout(Duration.ofMillis(6000L))
-            .setInitialRetryDelay(Duration.ofMillis(20L))
-            .setMaxRetryDelay(Duration.ofMillis(45L))
-            .setRetryDelayMultiplier(1.5)
-            .setRpcTimeoutMultiplier(1.5)
-            .setTotalTimeout(Duration.ofMinutes(48L))
-            .build();
-    builder
-        .createDatabaseOperationSettings()
-        .setInitialCallSettings(
-            UnaryCallSettings
-                .<CreateDatabaseRequest, OperationSnapshot>newUnaryCallSettingsBuilder()
-                .setRetrySettings(longRunningInitialRetrySettings)
-                .build());
-    builder
-        .createDatabaseOperationSettings()
-        .setPollingAlgorithm(
-            OperationTimedPollAlgorithm.create(
-                RetrySettings.newBuilder()
-                    .setInitialRpcTimeout(Duration.ofMillis(20L))
-                    .setInitialRetryDelay(Duration.ofMillis(10L))
-                    .setMaxRetryDelay(Duration.ofMillis(150L))
-                    .setMaxRpcTimeout(Duration.ofMillis(150L))
-                    .setMaxAttempts(10)
-                    .setTotalTimeout(Duration.ofMillis(5000L))
-                    .setRetryDelayMultiplier(1.3)
-                    .setRpcTimeoutMultiplier(1.3)
-                    .build()));
-
-    DatabaseAdminClient client = DatabaseAdminClient.create(builder.build());
-    client
-        .createDatabaseAsync(
-            InstanceName.newBuilder().setProject("p").setInstance("i").build(), "CREATE DATABASE d")
-        .get();
-    client.close();
   }
 
   @AfterClass
@@ -372,5 +313,20 @@ abstract class AbstractMockServerTest {
   @Before
   public void clearRequests() {
     mockSpanner.clearRequests();
+    mockDatabaseAdmin.reset();
+  }
+
+  protected void addDdlResponseToSpannerAdmin() {
+    mockDatabaseAdmin.addResponse(
+        Operation.newBuilder()
+            .setDone(true)
+            .setResponse(Any.pack(Empty.getDefaultInstance()))
+            .setMetadata(Any.pack(UpdateDatabaseDdlMetadata.getDefaultInstance()))
+            .build());
+  }
+
+  protected void addDdlExceptionToSpannerAdmin() {
+    mockDatabaseAdmin.addException(
+        Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException());
   }
 }

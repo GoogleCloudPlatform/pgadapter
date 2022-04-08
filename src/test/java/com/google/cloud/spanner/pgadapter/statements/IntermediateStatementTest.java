@@ -26,20 +26,31 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 
 @RunWith(JUnit4.class)
 public class IntermediateStatementTest {
+  @Rule public MockitoRule rule = MockitoJUnit.rule();
+
+  @Mock private ConnectionHandler connectionHandler;
+
   @Mock private Connection connection;
 
   @Test
   public void testUpdateResultCount_ResultSet() {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+
     IntermediateStatement statement =
-        new IntermediateStatement(mock(OptionsMetadata.class), "select foo from bar", connection);
+        new IntermediateStatement(
+            mock(OptionsMetadata.class), "select foo from bar", connectionHandler);
     ResultSet resultSet = mock(ResultSet.class);
     when(resultSet.next()).thenReturn(true, false);
     StatementResult result = mock(StatementResult.class);
@@ -47,43 +58,48 @@ public class IntermediateStatementTest {
     when(result.getResultSet()).thenReturn(resultSet);
     when(result.getUpdateCount()).thenThrow(new IllegalStateException());
 
-    statement.updateResultCount(result);
+    statement.updateResultCount(0, result);
 
-    assertTrue(statement.hasMoreData);
-    assertNull(statement.updateCount);
-    assertSame(resultSet, statement.statementResult);
+    assertTrue(statement.hasMoreData[0]);
+    assertEquals(0, statement.getUpdateCount(0));
+    assertSame(resultSet, statement.getStatementResult(0));
   }
 
   @Test
   public void testUpdateResultCount_UpdateCount() {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     IntermediateStatement statement =
-        new IntermediateStatement(mock(OptionsMetadata.class), "update bar set foo=1", connection);
+        new IntermediateStatement(
+            mock(OptionsMetadata.class), "update bar set foo=1", connectionHandler);
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
     when(result.getResultSet()).thenThrow(new IllegalStateException());
     when(result.getUpdateCount()).thenReturn(100L);
 
-    statement.updateResultCount(result);
+    statement.updateResultCount(0, result);
 
-    assertFalse(statement.hasMoreData);
-    assertEquals(100L, statement.updateCount.longValue());
-    assertNull(statement.statementResult);
+    assertFalse(statement.hasMoreData[0]);
+    assertEquals(100L, statement.getUpdateCount(0));
+    assertNull(statement.getStatementResult(0));
   }
 
   @Test
   public void testUpdateResultCount_NoResult() {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     IntermediateStatement statement =
         new IntermediateStatement(
-            mock(OptionsMetadata.class), "create table bar (foo bigint primary key)", connection);
+            mock(OptionsMetadata.class),
+            "create table bar (foo bigint primary key)",
+            connectionHandler);
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.NO_RESULT);
     when(result.getResultSet()).thenThrow(new IllegalStateException());
     when(result.getUpdateCount()).thenThrow(new IllegalStateException());
 
-    statement.updateResultCount(result);
+    statement.updateResultCount(0, result);
 
-    assertFalse(statement.hasMoreData);
-    assertNull(statement.updateCount);
-    assertNull(statement.statementResult);
+    assertFalse(statement.hasMoreData[0]);
+    assertEquals(0, statement.getUpdateCount(0));
+    assertNull(statement.getStatementResult(0));
   }
 }

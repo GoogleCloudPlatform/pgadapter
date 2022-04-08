@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
+import com.google.common.collect.ImmutableList;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -42,9 +43,9 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   protected Statement statement;
 
   public IntermediatePreparedStatement(OptionsMetadata options, String sql, Connection connection) {
-    super(options, sql);
+    super(options, ImmutableList.of(sql));
     this.sql = replaceKnownUnsupportedQueries(sql);
-    this.command = StatementParser.parseCommand(this.sql);
+    this.commands = StatementParser.parseCommands(ImmutableList.of(this.sql));
     this.connection = connection;
     this.parameterDataTypes = null;
   }
@@ -75,12 +76,12 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   @Override
   public void execute() {
-    this.executed = true;
+    this.lastExecutedIndex = 0;
     try {
       StatementResult result = connection.execute(this.statement);
-      this.updateResultCount(result);
+      this.updateResultCount(0, result);
     } catch (SpannerException e) {
-      handleExecutionException(e);
+      handleExecutionException(0, e);
     }
   }
 

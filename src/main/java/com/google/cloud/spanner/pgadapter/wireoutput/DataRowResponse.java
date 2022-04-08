@@ -31,21 +31,20 @@ public class DataRowResponse extends WireOutput {
   private static final int COLUMN_NUMBER_LENGTH = 2;
   private static final int COLUMN_SIZE_LENGTH = 4;
 
-  private final IntermediateStatement statement;
   private final QueryMode mode;
   private final ResultSet resultSet;
   private final List<byte[]> columns;
 
   public DataRowResponse(
       DataOutputStream output,
+      int resultIndex,
       IntermediateStatement statement,
       OptionsMetadata options,
       QueryMode mode)
       throws Exception {
     super(output, 0);
-    this.statement = statement;
     this.mode = mode;
-    this.resultSet = statement.getStatementResult();
+    this.resultSet = statement.getStatementResult(resultIndex);
     this.columns = new ArrayList<>(this.resultSet.getColumnCount());
     this.length = HEADER_LENGTH + COLUMN_NUMBER_LENGTH;
     // TODO profile this with immense rows/column count to see if it's an aread of optimization.

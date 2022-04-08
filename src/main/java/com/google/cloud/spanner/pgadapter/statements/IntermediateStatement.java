@@ -17,20 +17,24 @@ package com.google.cloud.spanner.pgadapter.statements;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerBatchUpdateException;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
-import com.google.cloud.spanner.connection.StatementResult.ResultType;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Data type to store simple SQL statement with designated metadata. Allows manipulation of
@@ -42,37 +46,46 @@ public class IntermediateStatement {
       (PostgreSQLStatementParser) AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
   protected final OptionsMetadata options;
-  private final ResultType resultType;
-  protected ResultSet statementResult;
-  protected boolean hasMoreData;
-  protected SpannerException exception;
+  private final List<StatementType> statementTypes;
+  protected ResultSet[] statementResults;
+  protected boolean[] hasMoreData;
+  protected SpannerException[] exceptions;
   protected String sql;
-  protected String command;
-  protected boolean executed;
+  protected List<String> commands;
+  protected int lastExecutedIndex = -1;
   protected Connection connection;
-  protected Long updateCount;
+  protected long[] updateCounts;
   protected List<String> statements;
+  private ConnectionHandler connectionHandler;
+  private ExecutionStatus executionStatus;
 
   private static final char STATEMENT_DELIMITER = ';';
   private static final char SINGLE_QUOTE = '\'';
 
-  public IntermediateStatement(OptionsMetadata options, String sql, Connection connection) {
+  public IntermediateStatement(
+      OptionsMetadata options, String sql, ConnectionHandler connectionHandler) {
     this.options = options;
     this.sql = replaceKnownUnsupportedQueries(sql);
     this.statements = parseStatements(sql);
-    this.command = StatementParser.parseCommand(this.sql);
-    this.connection = connection;
+    this.commands = StatementParser.parseCommands(this.statements);
+    this.connectionHandler = connectionHandler;
+    this.connection = connectionHandler.getSpannerConnection();
     // Note: This determines the result type based on the first statement in the SQL statement. That
     // means that it assumes that if this is a batch of statements, all the statements in the batch
     // will have the same type of result (that is; they are all DML statements, all DDL statements,
     // all queries, etc.). That is a safe assumption for now, as PgAdapter currently only supports
     // all-DML and all-DDL batches.
-    this.resultType = determineResultType(this.sql);
+    this.statementTypes = determineStatementTypes(this.statements);
+    this.hasMoreData = new boolean[this.statements.size()];
+    this.exceptions = new SpannerException[this.statements.size()];
   }
 
-  protected IntermediateStatement(OptionsMetadata options, String sql) {
+  protected IntermediateStatement(OptionsMetadata options, List<String> statements) {
+    this.statements = statements;
     this.options = options;
-    this.resultType = determineResultType(sql);
+    this.statementTypes = determineStatementTypes(this.statements);
+    this.hasMoreData = new boolean[this.statements.size()];
+    this.exceptions = new SpannerException[this.statements.size()];
   }
 
   protected String replaceKnownUnsupportedQueries(String sql) {
@@ -83,36 +96,47 @@ public class IntermediateStatement {
     return sql;
   }
 
+  /** @return The number of SQL statements in this {@link IntermediateStatement} */
+  public int getStatementCount() {
+    return statements.size();
+  }
+
   /**
-   * Determines the result type based on the given sql string. The sql string must already been
-   * stripped of any comments that might precede the actual sql string.
+   * Determines the statement types based on the given statement strings. The statement string must
+   * already been stripped of any comments that might precede the actual statement string.
    *
-   * @param sql The sql string to determine the type of result for
-   * @return The {@link ResultType} that the given sql string will produce
+   * @param statements The statement strings to determine the type for
+   * @return The list of {@link StatementType} that the given statement strings will produce
    */
-  protected static ResultType determineResultType(String sql) {
-    if (PARSER.isUpdateStatement(sql)) {
-      return ResultType.UPDATE_COUNT;
-    } else if (PARSER.isQuery(sql)) {
-      return ResultType.RESULT_SET;
-    } else {
-      return ResultType.NO_RESULT;
+  protected static List<StatementType> determineStatementTypes(List<String> statements) {
+    List<StatementType> statementTypes = new ArrayList<>();
+    for (String sql : statements) {
+      if (PARSER.isUpdateStatement(sql)) {
+        statementTypes.add(StatementType.UPDATE);
+      } else if (PARSER.isQuery(sql)) {
+        statementTypes.add(StatementType.QUERY);
+      } else if (PARSER.isDdlStatement(sql)) {
+        statementTypes.add(StatementType.DDL);
+      } else {
+        statementTypes.add(StatementType.CLIENT_SIDE);
+      }
     }
+    return statementTypes;
   }
 
   // Split statements by ';' delimiter, but ignore anything that is nested with '' or "".
   private List<String> splitStatements(String sql) {
     List<String> statements = new ArrayList<>();
-    boolean quoteEsacpe = false;
+    boolean quoteEscape = false;
     int index = 0;
     for (int i = 0; i < sql.length(); ++i) {
       if (sql.charAt(i) == SINGLE_QUOTE) {
-        quoteEsacpe = !quoteEsacpe;
+        quoteEscape = !quoteEscape;
       }
-      if (sql.charAt(i) == STATEMENT_DELIMITER && !quoteEsacpe) {
-        String stmt = sql.substring(index, i + 1).trim();
+      if (sql.charAt(i) == STATEMENT_DELIMITER && !quoteEscape) {
+        String stmt = sql.substring(index, i).trim();
         // Statements with only ';' character are empty and dropped.
-        if (stmt.length() > 1) {
+        if (stmt.length() > 0) {
           statements.add(stmt);
         }
         index = i + 1;
@@ -120,15 +144,14 @@ public class IntermediateStatement {
     }
 
     if (index < sql.length()) {
-      statements.add(sql.substring(index, sql.length()).trim());
+      statements.add(sql.substring(index).trim());
     }
     return statements;
   }
 
   protected List<String> parseStatements(String sql) {
     Preconditions.checkNotNull(sql);
-    List<String> statements = splitStatements(sql);
-    return statements;
+    return splitStatements(sql);
   }
 
   /**
@@ -147,45 +170,66 @@ public class IntermediateStatement {
    * @throws Exception if closing fails server-side.
    */
   public void close() throws Exception {
-    if (this.getStatementResult() != null) {
-      this.getStatementResult().close();
+    for (int index = 0; index < this.getStatementCount(); index++) {
+      close(index);
+    }
+  }
+
+  public void close(int index) throws Exception {
+    if (this.getStatementResult(index) != null) {
+      this.getStatementResult(index).close();
     }
   }
 
   /** @return True if this is a select statement, false otherwise. */
-  public boolean containsResultSet() {
-    return this.resultType == ResultType.RESULT_SET;
+  public boolean containsResultSet(int index) {
+    return this.statementTypes.get(index) == StatementType.QUERY;
   }
 
   /** @return True if this statement was executed, False otherwise. */
   public boolean isExecuted() {
-    return executed;
+    return lastExecutedIndex >= 0;
+  }
+
+  public int getLastExecutedIndex() {
+    return lastExecutedIndex;
   }
 
   /** @return The number of items that were modified by this execution. */
-  public Long getUpdateCount() {
-    return this.updateCount;
+  public long getUpdateCount(int index) {
+    if (this.updateCounts == null) {
+      return 0;
+    }
+    return this.updateCounts[index];
   }
 
-  public void addUpdateCount(long count) {
-    if (this.updateCount == null) {
-      this.updateCount = 0L;
+  public void addUpdateCount(int index, long count) {
+    if (this.updateCounts == null) {
+      this.updateCounts = new long[getStatementCount()];
     }
-    this.updateCount += count;
+    this.updateCounts[index] += count;
+  }
+
+  private void setUpdateCount(int index, long updateCount) {
+    if (this.updateCounts == null) {
+      this.updateCounts = new long[getStatementCount()];
+    }
+    this.updateCounts[index] = updateCount;
+    this.hasMoreData[index] = false;
   }
 
   /** @return True if at some point in execution, and exception was thrown. */
-  public boolean hasException() {
-    return this.exception != null;
+  public boolean hasException(int index) {
+    return this.exceptions[index] != null;
   }
 
   /** @return True if only a subset of the available data has been returned. */
-  public boolean isHasMoreData() {
-    return this.hasMoreData;
+  public boolean isHasMoreData(int index) {
+    return this.hasMoreData[index];
   }
 
-  public void setHasMoreData(boolean hasMoreData) {
-    this.hasMoreData = hasMoreData;
+  public void setHasMoreData(int index, boolean hasMoreData) {
+    this.hasMoreData[index] = hasMoreData;
   }
 
   public Connection getConnection() {
@@ -196,21 +240,32 @@ public class IntermediateStatement {
     return this.statements;
   }
 
-  public ResultSet getStatementResult() {
-    return this.statementResult;
+  public ResultSet getStatementResult(int index) {
+    if (this.statementResults == null) {
+      return null;
+    }
+    return this.statementResults[index];
   }
 
-  public ResultType getResultType() {
-    return this.resultType;
+  private void setStatementResult(int index, ResultSet resultSet) {
+    if (this.statementResults == null) {
+      this.statementResults = new ResultSet[getStatementCount()];
+    }
+    this.statementResults[index] = resultSet;
+    this.hasMoreData[index] = resultSet.next();
+  }
+
+  public StatementType getStatementType(int index) {
+    return this.statementTypes.get(index);
   }
 
   public String getSql() {
     return this.sql;
   }
 
-  public Exception getException() {
-    Exception e = this.exception;
-    this.exception = null;
+  public Exception getException(int index) {
+    Exception e = this.exceptions[index];
+    this.exceptions[index] = null;
     return e;
   }
 
@@ -219,20 +274,16 @@ public class IntermediateStatement {
    * execution (including results and update counts). An array of updateCounts is needed in the case
    * of updateBatchResultCount.
    */
-  protected void updateResultCount(StatementResult result) {
+  protected void updateResultCount(int index, StatementResult result) {
     switch (result.getResultType()) {
       case RESULT_SET:
-        this.statementResult = result.getResultSet();
-        this.hasMoreData = this.statementResult.next();
+        setStatementResult(index, result.getResultSet());
         break;
       case UPDATE_COUNT:
-        this.updateCount = result.getUpdateCount();
-        this.hasMoreData = false;
-        this.statementResult = null;
+        setUpdateCount(index, result.getUpdateCount());
         break;
       case NO_RESULT:
-        this.hasMoreData = false;
-        this.statementResult = null;
+        this.hasMoreData[index] = false;
         break;
       default:
         throw SpannerExceptionFactory.newSpannerException(
@@ -240,13 +291,10 @@ public class IntermediateStatement {
     }
   }
 
-  protected void updateBatchResultCount(long[] updateCounts) {
-    this.updateCount = 0L;
-    for (int i = 0; i < updateCounts.length; ++i) {
-      this.updateCount += updateCounts[i];
+  protected void updateBatchResultCount(int fromIndex, long[] updateCounts) {
+    for (int index = fromIndex; index < fromIndex + updateCounts.length; index++) {
+      setUpdateCount(index, updateCounts[index - fromIndex]);
     }
-    this.hasMoreData = false;
-    this.statementResult = null;
   }
 
   /**
@@ -254,47 +302,167 @@ public class IntermediateStatement {
    *
    * @param e The exception to store.
    */
-  protected void handleExecutionException(SpannerException e) {
-    this.exception = e;
-    this.hasMoreData = false;
-    this.statementResult = null;
+  protected void handleExecutionException(int index, SpannerException e) {
+    this.exceptions[index] = e;
+    this.hasMoreData[index] = false;
+  }
+
+  private void handleExecutionExceptionInTransaction(int index, SpannerException e) {
+    if (executionStatus == ExecutionStatus.IMPLICIT_TRANSACTION) {
+      connection.rollback();
+      executionStatus = ExecutionStatus.HALTED;
+    } else if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
+      connectionHandler.setStatus(ConnectionStatus.ABORTED);
+      executionStatus = ExecutionStatus.HALTED;
+    }
+    handleExecutionException(index, e);
   }
 
   /** Execute the SQL statement, storing metadata. */
   public void execute() {
-    this.executed = true;
-    try {
-      if (statements.size() > 1) {
-        // TODO: Clean this up a little once the statement parsing in the client library has been
-        // released: https://github.com/googleapis/java-spanner/pull/1690
-        // Also, the restriction that mixed batches are not allowed will be removed in a future PR.
-        if (resultType == ResultType.UPDATE_COUNT) {
-          connection.startBatchDml();
-        } else if (resultType == ResultType.NO_RESULT) {
-          connection.startBatchDdl();
-        } else {
-          throw SpannerExceptionFactory.newSpannerException(
-              ErrorCode.INVALID_ARGUMENT, "Statement type is not supported for batching");
+    if (connectionHandler.getStatus() == ConnectionStatus.ABORTED
+        && !"ROLLBACK".equals(getCommand(0))) {
+      lastExecutedIndex = 0;
+      handleExecutionException(
+          0,
+          SpannerExceptionFactory.newSpannerException(
+              ErrorCode.INVALID_ARGUMENT,
+              "Transaction is aborted and must be rolled back prior to further execution."));
+      return;
+    }
+    if (connection.isInTransaction()) {
+      executionStatus = ExecutionStatus.EXPLICIT_TRANSACTION;
+    } else if (statements.size() == 1 || "BEGIN".equals(getCommand(0))) {
+      // Do not begin an implicit transaction either if
+      // 1. There is only a single statement. Use autocommit mode instead.
+      // 2. The first statement is BEGIN. Directly begin an explicit transaction later.
+      executionStatus = ExecutionStatus.AUTOCOMMIT;
+    } else {
+      executionStatus = ExecutionStatus.IMPLICIT_TRANSACTION;
+      connection.beginTransaction();
+    }
+    int index = 0;
+    while (index < getStatementCount() && executionStatus != ExecutionStatus.HALTED) {
+      if (getStatementType(index) == StatementType.DDL) {
+        if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
+          handleExecutionExceptionInTransaction(
+              index,
+              SpannerExceptionFactory.newSpannerException(
+                  ErrorCode.INVALID_ARGUMENT,
+                  "DDL statements are only allowed outside explicit transactions."));
+          index++;
+          break;
+        } else if (executionStatus == ExecutionStatus.IMPLICIT_TRANSACTION) {
+          connection.commit();
+          executionStatus = ExecutionStatus.AUTOCOMMIT;
         }
-        for (String stmt : statements) {
-          connection.execute(Statement.of(stmt));
-        }
-        long[] updateCounts = connection.runBatch();
-        updateBatchResultCount(updateCounts);
-      } else {
-        StatementResult result = connection.execute(Statement.of(this.sql));
-        updateResultCount(result);
       }
-    } catch (SpannerException e) {
-      if (statements.size() > 1) {
-        SpannerException exception =
-            SpannerExceptionFactory.newSpannerException(
-                e.getErrorCode(), e.getMessage() + " \"" + this.sql + "\"", e);
-        handleExecutionException(exception);
+      boolean canUseBatch = false;
+      if (index < (getStatementCount() - 1)) {
+        StatementType statementType = getStatementType(index);
+        StatementType nextStatementType = getStatementType(index + 1);
+        canUseBatch = canBeBatchedTogether(statementType, nextStatementType);
+      }
+      if (canUseBatch) {
+        index += executeStatementsInBatch(index);
       } else {
-        handleExecutionException(e);
+        executeSingleStatement(index);
+        index++;
       }
     }
+    if (executionStatus == ExecutionStatus.IMPLICIT_TRANSACTION) {
+      connection.commit();
+    }
+    lastExecutedIndex = index - 1;
+  }
+
+  private void executeSingleStatement(int index) {
+    // Before executing the statement, handle specific statements that change the transaction status
+    String command = getCommand(index);
+    if ("BEGIN".equals(command)) {
+      if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
+        // Executing a BEGIN statement when an explicit transaction is already active is a no-op
+        return;
+      } else if (executionStatus == ExecutionStatus.IMPLICIT_TRANSACTION) {
+        // Executing a BEGIN statement when an implicit transaction is active causes the implicit
+        // transaction to be committed and a new explicit transaction to be started
+        connection.commit();
+      }
+      executionStatus = ExecutionStatus.EXPLICIT_TRANSACTION;
+    }
+    if ("COMMIT".equals(command) || "ROLLBACK".equals(command)) {
+      executionStatus = ExecutionStatus.AUTOCOMMIT;
+    }
+    if ("ROLLBACK".equals(command) && connectionHandler.getStatus() == ConnectionStatus.ABORTED) {
+      connectionHandler.setStatus(ConnectionStatus.IDLE);
+    }
+    try {
+      StatementResult result = this.connection.execute(Statement.of(statements.get(index)));
+      updateResultCount(index, result);
+    } catch (SpannerException e) {
+      handleExecutionExceptionInTransaction(index, e);
+    }
+  }
+
+  /**
+   * Executes the statements from fromIndex in a DML/DDL batch. The batch will consist of all
+   * statements from fromIndex till the first statement that is of a different type than the
+   * statement at fromIndex. That is; If the first statement is a DML statement, the batch will
+   * contain all statements that follow until it encounters a statement that is not a DML statement.
+   * The same also applies to DDL statements. Query statements and other statements can not be
+   * batched.
+   *
+   * @param fromIndex The index of the statements array where the batch should start
+   * @return The number of statements included in the batch.
+   */
+  private int executeStatementsInBatch(int fromIndex) {
+    Preconditions.checkArgument(fromIndex < getStatementCount() - 1);
+    Preconditions.checkArgument(
+        canBeBatchedTogether(getStatementType(fromIndex), getStatementType(fromIndex + 1)));
+    StatementType batchType = getStatementType(fromIndex);
+    switch (batchType) {
+      case UPDATE:
+        connection.startBatchDml();
+        break;
+      case DDL:
+        connection.startBatchDdl();
+        break;
+      default:
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT, "Statement type is not supported for batching");
+    }
+    int index = fromIndex;
+    while (index < getStatementCount()) {
+      StatementType statementType = getStatementType(index);
+      if (canBeBatchedTogether(batchType, statementType)) {
+        connection.execute(Statement.of(statements.get(index)));
+        index++;
+      } else {
+        // End the batch here, as the statement type on this index can not be batched together with
+        // the other statements in the batch.
+        break;
+      }
+    }
+    try {
+      long[] counts = connection.runBatch();
+      updateBatchResultCount(fromIndex, counts);
+    } catch (SpannerBatchUpdateException e) {
+      long[] counts = e.getUpdateCounts();
+      updateBatchResultCount(fromIndex, counts);
+      handleExecutionExceptionInTransaction(fromIndex + counts.length, e);
+      // TODO: May want to continue executing from the failure in order to be compatible with the
+      // behavior of PG when there is no transaction.
+      executionStatus = ExecutionStatus.HALTED;
+    }
+    return index - fromIndex;
+  }
+
+  private boolean canBeBatchedTogether(StatementType statement1, StatementType statement2) {
+    if (Objects.equals(statement1, StatementType.QUERY)
+        || Objects.equals(statement1, StatementType.CLIENT_SIDE)) {
+      return false;
+    }
+    return Objects.equals(statement1, statement2);
   }
 
   /**
@@ -315,8 +483,8 @@ public class IntermediateStatement {
   }
 
   /** @return the extracted command (first word) from the SQL statement. */
-  public String getCommand() {
-    return this.command;
+  public String getCommand(int index) {
+    return this.commands.get(index);
   }
 
   /* Used for testing purposes */
@@ -324,9 +492,10 @@ public class IntermediateStatement {
     return (statements.size() > 1);
   }
 
-  public enum ResultType {
-    UPDATE_COUNT,
-    RESULT_SET,
-    NO_RESULT
+  enum ExecutionStatus {
+    IMPLICIT_TRANSACTION,
+    EXPLICIT_TRANSACTION,
+    AUTOCOMMIT,
+    HALTED
   }
 }

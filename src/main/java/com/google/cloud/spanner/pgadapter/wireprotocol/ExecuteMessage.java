@@ -76,10 +76,10 @@ public class ExecuteMessage extends ControlMessage {
    * @throws Exception if sending the message back to the client causes an error.
    */
   private void handleExecute() throws Exception {
-    if (this.statement.hasException()) {
-      this.handleError(this.statement.getException());
+    if (this.statement.hasException(0)) {
+      this.handleError(this.statement.getException(0));
     } else {
-      this.sendSpannerResult(this.statement, QueryMode.EXTENDED, this.maxRows);
+      this.sendSpannerResult(0, this.statement, QueryMode.EXTENDED, this.maxRows);
     }
     this.connection.cleanUp(this.statement);
   }

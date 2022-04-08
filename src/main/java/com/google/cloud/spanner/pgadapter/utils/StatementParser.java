@@ -15,6 +15,8 @@
 package com.google.cloud.spanner.pgadapter.utils;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.List;
 
 public class StatementParser {
 
@@ -48,5 +50,14 @@ public class StatementParser {
       return tokens[0].toUpperCase();
     }
     return null;
+  }
+
+  public static List<String> parseCommands(List<String> statements) {
+    Preconditions.checkNotNull(statements);
+    List<String> commands = new ArrayList<>();
+    for (String sql : statements) {
+      commands.add(parseCommand(sql));
+    }
+    return commands;
   }
 }
