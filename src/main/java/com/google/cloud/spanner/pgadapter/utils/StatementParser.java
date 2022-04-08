@@ -15,8 +15,7 @@
 package com.google.cloud.spanner.pgadapter.utils;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.List;
+import com.google.common.collect.ImmutableList;
 
 public class StatementParser {
 
@@ -45,19 +44,35 @@ public class StatementParser {
   /** Determines the (update) command that was received from the sql string. */
   public static String parseCommand(String sql) {
     Preconditions.checkNotNull(sql);
-    String[] tokens = sql.split("\\s+", 2);
-    if (tokens.length > 0) {
-      return tokens[0].toUpperCase();
+    for (int i = 0; i < sql.length(); i++) {
+      if (Character.isSpaceChar(sql.charAt(i))) {
+        return sql.substring(0, i).toUpperCase();
+      }
     }
-    return null;
+    return sql;
   }
 
-  public static List<String> parseCommands(List<String> statements) {
-    Preconditions.checkNotNull(statements);
-    List<String> commands = new ArrayList<>();
-    for (String sql : statements) {
-      commands.add(parseCommand(sql));
+  /** Returns true if the given sql string is the given command. */
+  public static boolean isCommand(String command, String query) {
+    Preconditions.checkNotNull(command);
+    Preconditions.checkNotNull(query);
+    if (query.equalsIgnoreCase(command)) {
+      return true;
     }
-    return commands;
+    if (query.length() <= command.length()) {
+      return false;
+    }
+    return Character.isSpaceChar(query.charAt(command.length()))
+        && query.substring(0, command.length()).equalsIgnoreCase(command);
+  }
+
+  public static ImmutableList<String> parseCommands(ImmutableList<String> statements) {
+    Preconditions.checkNotNull(statements);
+
+    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    for (String sql : statements) {
+      builder.add(parseCommand(sql));
+    }
+    return builder.build();
   }
 }

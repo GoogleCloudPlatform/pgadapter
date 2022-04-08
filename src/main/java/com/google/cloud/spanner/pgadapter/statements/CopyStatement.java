@@ -22,6 +22,7 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
@@ -30,9 +31,7 @@ import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.TypeCode;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,11 +61,9 @@ public class CopyStatement extends IntermediateStatement {
   private Future<Long> updateCount;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-  public CopyStatement(OptionsMetadata options, String sql, Connection connection) {
-    super(options, ImmutableList.of(sql));
-    this.sql = sql;
-    this.commands = StatementParser.parseCommands(ImmutableList.of(sql));
-    this.connection = connection;
+  public CopyStatement(
+      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
+    super(options, parsedStatement, connection);
   }
 
   public Exception getException() {
@@ -330,7 +327,7 @@ public class CopyStatement extends IntermediateStatement {
 
   private void parseCopyStatement() throws Exception {
     try {
-      parse(sql, this.options);
+      parse(parsedStatement.getSqlWithoutComments(), this.options);
     } catch (Exception | TokenMgrError e) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT, "Invalid COPY statement syntax: " + e);

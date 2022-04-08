@@ -22,6 +22,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
@@ -32,7 +33,7 @@ import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Objects;
 
@@ -46,16 +47,16 @@ public class IntermediateStatement {
       (PostgreSQLStatementParser) AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
   protected final OptionsMetadata options;
-  private final List<StatementType> statementTypes;
+  private final ImmutableList<StatementType> statementTypes;
   protected ResultSet[] statementResults;
   protected boolean[] hasMoreData;
   protected SpannerException[] exceptions;
-  protected String sql;
-  protected List<String> commands;
+  protected final ParsedStatement parsedStatement;
+  protected ImmutableList<String> commands;
   protected int lastExecutedIndex = -1;
   protected Connection connection;
   protected long[] updateCounts;
-  protected List<String> statements;
+  protected ImmutableList<String> statements;
   private ConnectionHandler connectionHandler;
   private ExecutionStatus executionStatus;
 
@@ -63,37 +64,35 @@ public class IntermediateStatement {
   private static final char SINGLE_QUOTE = '\'';
 
   public IntermediateStatement(
-      OptionsMetadata options, String sql, ConnectionHandler connectionHandler) {
-    this.options = options;
-    this.sql = replaceKnownUnsupportedQueries(sql);
-    this.statements = parseStatements(sql);
-    this.commands = StatementParser.parseCommands(this.statements);
+      OptionsMetadata options,
+      ParsedStatement parsedStatement,
+      ConnectionHandler connectionHandler) {
+    this(options, parsedStatement, connectionHandler.getSpannerConnection());
     this.connectionHandler = connectionHandler;
-    this.connection = connectionHandler.getSpannerConnection();
-    // Note: This determines the result type based on the first statement in the SQL statement. That
-    // means that it assumes that if this is a batch of statements, all the statements in the batch
-    // will have the same type of result (that is; they are all DML statements, all DDL statements,
-    // all queries, etc.). That is a safe assumption for now, as PgAdapter currently only supports
-    // all-DML and all-DDL batches.
-    this.statementTypes = determineStatementTypes(this.statements);
-    this.hasMoreData = new boolean[this.statements.size()];
-    this.exceptions = new SpannerException[this.statements.size()];
   }
 
-  protected IntermediateStatement(OptionsMetadata options, List<String> statements) {
-    this.statements = statements;
+  protected IntermediateStatement(
+      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
     this.options = options;
+    this.parsedStatement = replaceKnownUnsupportedQueries(parsedStatement);
+    this.statements = parseStatements(parsedStatement.getSqlWithoutComments());
+    this.commands = StatementParser.parseCommands(this.statements);
+    this.connection = connection;
     this.statementTypes = determineStatementTypes(this.statements);
     this.hasMoreData = new boolean[this.statements.size()];
     this.exceptions = new SpannerException[this.statements.size()];
   }
 
-  protected String replaceKnownUnsupportedQueries(String sql) {
+  protected ParsedStatement replaceKnownUnsupportedQueries(ParsedStatement parsedStatement) {
     if (this.options.isReplaceJdbcMetadataQueries()
-        && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(sql)) {
-      return JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(sql);
+        && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(
+            parsedStatement.getSqlWithoutComments())) {
+      return PARSER.parse(
+          Statement.of(
+              JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(
+                  parsedStatement.getSqlWithoutComments())));
     }
-    return sql;
+    return parsedStatement;
   }
 
   /** @return The number of SQL statements in this {@link IntermediateStatement} */
@@ -108,25 +107,37 @@ public class IntermediateStatement {
    * @param statements The statement strings to determine the type for
    * @return The list of {@link StatementType} that the given statement strings will produce
    */
-  protected static List<StatementType> determineStatementTypes(List<String> statements) {
-    List<StatementType> statementTypes = new ArrayList<>();
+  protected static ImmutableList<StatementType> determineStatementTypes(
+      ImmutableList<String> statements) {
+    ImmutableList.Builder<StatementType> builder = ImmutableList.builder();
     for (String sql : statements) {
       if (PARSER.isUpdateStatement(sql)) {
-        statementTypes.add(StatementType.UPDATE);
+        builder.add(StatementType.UPDATE);
       } else if (PARSER.isQuery(sql)) {
-        statementTypes.add(StatementType.QUERY);
+        builder.add(StatementType.QUERY);
       } else if (PARSER.isDdlStatement(sql)) {
-        statementTypes.add(StatementType.DDL);
+        builder.add(StatementType.DDL);
       } else {
-        statementTypes.add(StatementType.CLIENT_SIDE);
+        builder.add(StatementType.CLIENT_SIDE);
       }
     }
-    return statementTypes;
+    return builder.build();
   }
 
   // Split statements by ';' delimiter, but ignore anything that is nested with '' or "".
-  private List<String> splitStatements(String sql) {
-    List<String> statements = new ArrayList<>();
+
+  private static ImmutableList<String> splitStatements(String sql) {
+    // First check trivial cases with only one statement.
+    int firstIndexOfDelimiter = sql.indexOf(STATEMENT_DELIMITER);
+    if (firstIndexOfDelimiter == -1) {
+      return ImmutableList.of(sql);
+    }
+    if (firstIndexOfDelimiter == sql.length() - 1) {
+      return ImmutableList.of(sql.substring(0, sql.length() - 1));
+    }
+
+    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    // TODO: Fix this parsing, as it does not take all types of quotes into consideration.
     boolean quoteEscape = false;
     int index = 0;
     for (int i = 0; i < sql.length(); ++i) {
@@ -137,19 +148,19 @@ public class IntermediateStatement {
         String stmt = sql.substring(index, i).trim();
         // Statements with only ';' character are empty and dropped.
         if (stmt.length() > 0) {
-          statements.add(stmt);
+          builder.add(stmt);
         }
         index = i + 1;
       }
     }
 
     if (index < sql.length()) {
-      statements.add(sql.substring(index).trim());
+      builder.add(sql.substring(index).trim());
     }
-    return statements;
+    return builder.build();
   }
 
-  protected List<String> parseStatements(String sql) {
+  protected static ImmutableList<String> parseStatements(String sql) {
     Preconditions.checkNotNull(sql);
     return splitStatements(sql);
   }
@@ -247,7 +258,7 @@ public class IntermediateStatement {
     return this.statementResults[index];
   }
 
-  private void setStatementResult(int index, ResultSet resultSet) {
+  protected void setStatementResult(int index, ResultSet resultSet) {
     if (this.statementResults == null) {
       this.statementResults = new ResultSet[getStatementCount()];
     }
@@ -260,7 +271,7 @@ public class IntermediateStatement {
   }
 
   public String getSql() {
-    return this.sql;
+    return this.parsedStatement.getSqlWithoutComments();
   }
 
   public Exception getException(int index) {

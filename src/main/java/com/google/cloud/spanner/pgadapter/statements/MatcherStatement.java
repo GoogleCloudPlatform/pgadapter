@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.commands.Command;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -27,8 +29,10 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 public class MatcherStatement extends IntermediateStatement {
 
   public MatcherStatement(
-      OptionsMetadata options, String sql, ConnectionHandler connectionHandler) {
-    super(options, translateSQL(sql, connectionHandler), connectionHandler);
+      OptionsMetadata options,
+      ParsedStatement parsedStatement,
+      ConnectionHandler connectionHandler) {
+    super(options, translateSQL(parsedStatement, connectionHandler), connectionHandler);
   }
 
   @Override
@@ -40,20 +44,21 @@ public class MatcherStatement extends IntermediateStatement {
    * Translate a Postgres Specific command into something Spanner can handle. Currently, this is
    * only concerned with PSQL specific meta-commands.
    *
-   * @param sql The SQL statement to be translated.
+   * @param parsedStatement The SQL statement to be translated.
    * @return The translated SQL statement if it matches any {@link Command} statement. Otherwise
    *     gives out the original Statement.
    */
-  private static String translateSQL(String sql, ConnectionHandler connectionHandler) {
+  private static ParsedStatement translateSQL(
+      ParsedStatement parsedStatement, ConnectionHandler connectionHandler) {
     for (Command currentCommand :
         Command.getCommands(
-            sql,
+            parsedStatement.getSqlWithoutComments(),
             connectionHandler.getSpannerConnection(),
             connectionHandler.getServer().getOptions().getCommandMetadataJSON())) {
       if (currentCommand.is()) {
-        return currentCommand.translate();
+        return PARSER.parse(Statement.of(currentCommand.translate()));
       }
     }
-    return sql;
+    return parsedStatement;
   }
 }

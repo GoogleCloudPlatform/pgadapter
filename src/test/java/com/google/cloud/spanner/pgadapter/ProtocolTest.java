@@ -32,10 +32,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
@@ -101,6 +104,8 @@ import org.postgresql.util.ByteConverter;
 
 @RunWith(JUnit4.class)
 public class ProtocolTest {
+  private static final AbstractStatementParser PARSER =
+      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
   @Rule public MockitoRule rule = MockitoJUnit.rule();
   @Mock private ConnectionHandler connectionHandler;
@@ -138,6 +143,10 @@ public class ProtocolTest {
     do {
       c = input.readByte();
     } while (c != '\0');
+  }
+
+  private static ParsedStatement parse(String sql) {
+    return PARSER.parse(Statement.of(sql));
   }
 
   @AfterClass
@@ -1245,7 +1254,7 @@ public class ProtocolTest {
     when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
     CopyStatement copyStatement =
-        new CopyStatement(options, "COPY keyvalue FROM STDIN;", connection);
+        new CopyStatement(options, parse("COPY keyvalue FROM STDIN;"), connection);
     copyStatement.execute();
 
     when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
@@ -1348,7 +1357,8 @@ public class ProtocolTest {
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));
 
     CopyStatement copyStatement =
-        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
+        new CopyStatement(
+            mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"), connection);
     copyStatement.execute();
 
     MutationWriter mw = copyStatement.getMutationWriter();
@@ -1368,7 +1378,8 @@ public class ProtocolTest {
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
 
     CopyStatement copyStatement =
-        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
+        new CopyStatement(
+            mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"), connection);
 
     assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
@@ -1399,7 +1410,8 @@ public class ProtocolTest {
     byte[] payload = "1\t'one'\n2".getBytes();
 
     CopyStatement copyStatement =
-        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
+        new CopyStatement(
+            mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"), connection);
 
     assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
@@ -1430,7 +1442,8 @@ public class ProtocolTest {
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/test-copy-output.txt"));
 
     CopyStatement copyStatement =
-        new CopyStatement(mock(OptionsMetadata.class), "COPY keyvalue FROM STDIN;", connection);
+        new CopyStatement(
+            mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"), connection);
     assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
     assertTrue(copyStatement.isExecuted());
@@ -1471,7 +1484,7 @@ public class ProtocolTest {
     }
 
     CopyStatement copyStatement =
-        new CopyStatement(options, "COPY keyvalue FROM STDIN;", connection);
+        new CopyStatement(options, parse("COPY keyvalue FROM STDIN;"), connection);
     assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
     assertTrue(copyStatement.isExecuted());

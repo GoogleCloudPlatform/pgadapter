@@ -136,8 +136,9 @@ public abstract class ControlMessage extends WireMessage {
    * @throws Exception if there is some issue in the sending of the error messages.
    */
   protected void handleError(Exception e) throws Exception {
-    new ErrorResponse(this.outputStream, e, State.InternalError).send();
-    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
+    new ErrorResponse(this.outputStream, e, State.InternalError).send(false);
+    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send(false);
+    this.outputStream.flush();
   }
 
   /**
@@ -146,6 +147,8 @@ public abstract class ControlMessage extends WireMessage {
    * client has set a max number of rows to fetch for each execute message. The {@link
    * IntermediateStatement} will cache the result in between calls and continue serving rows from
    * the position it was left off after the last execute message.
+   *
+   * <p>NOTE: This method does not flush the output stream.
    */
   public boolean sendSpannerResult(
       int resultIndex, IntermediateStatement statement, QueryMode mode, long maxRows)
@@ -154,17 +157,17 @@ public abstract class ControlMessage extends WireMessage {
     switch (statement.getStatementType(resultIndex)) {
       case DDL:
       case CLIENT_SIDE:
-        new CommandCompleteResponse(this.outputStream, command).send();
+        new CommandCompleteResponse(this.outputStream, command).send(false);
         return false;
       case QUERY:
         SendResultSetState state = sendResultSet(resultIndex, statement, mode, maxRows);
         statement.setHasMoreData(resultIndex, state.hasMoreRows());
         if (state.hasMoreRows()) {
-          new PortalSuspendedResponse(this.outputStream).send();
+          new PortalSuspendedResponse(this.outputStream).send(false);
         } else {
           statement.getStatementResult(resultIndex).close();
           new CommandCompleteResponse(this.outputStream, "SELECT " + state.getNumberOfRowsSent())
-              .send();
+              .send(false);
         }
         return state.hasMoreRows();
       case UPDATE:
@@ -173,7 +176,7 @@ public abstract class ControlMessage extends WireMessage {
         // table had OIDs, but OIDs system columns are not supported anymore; therefore oid is
         // always 0.
         command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount(resultIndex);
-        new CommandCompleteResponse(this.outputStream, command).send();
+        new CommandCompleteResponse(this.outputStream, command).send(false);
         return false;
       default:
         throw new IllegalStateException(
@@ -205,7 +208,7 @@ public abstract class ControlMessage extends WireMessage {
               describedResult,
               this.connection.getServer().getOptions(),
               mode)
-          .send();
+          .send(false);
       rows++;
       try {
         hasData = resultSet.next();

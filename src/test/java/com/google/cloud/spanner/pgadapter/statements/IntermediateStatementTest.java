@@ -22,7 +22,11 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
@@ -42,6 +46,13 @@ public class IntermediateStatementTest {
 
   @Mock private ConnectionHandler connectionHandler;
 
+  private static final AbstractStatementParser PARSER =
+      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+
+  private static ParsedStatement parse(String sql) {
+    return PARSER.parse(Statement.of(sql));
+  }
+
   @Mock private Connection connection;
 
   @Test
@@ -50,7 +61,7 @@ public class IntermediateStatementTest {
 
     IntermediateStatement statement =
         new IntermediateStatement(
-            mock(OptionsMetadata.class), "select foo from bar", connectionHandler);
+            mock(OptionsMetadata.class), parse("select foo from bar"), connectionHandler);
     ResultSet resultSet = mock(ResultSet.class);
     when(resultSet.next()).thenReturn(true, false);
     StatementResult result = mock(StatementResult.class);
@@ -70,7 +81,7 @@ public class IntermediateStatementTest {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     IntermediateStatement statement =
         new IntermediateStatement(
-            mock(OptionsMetadata.class), "update bar set foo=1", connectionHandler);
+            mock(OptionsMetadata.class), parse("update bar set foo=1"), connectionHandler);
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
     when(result.getResultSet()).thenThrow(new IllegalStateException());
@@ -89,7 +100,7 @@ public class IntermediateStatementTest {
     IntermediateStatement statement =
         new IntermediateStatement(
             mock(OptionsMetadata.class),
-            "create table bar (foo bigint primary key)",
+            parse("create table bar (foo bigint primary key)"),
             connectionHandler);
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.NO_RESULT);

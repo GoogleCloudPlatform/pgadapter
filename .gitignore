@@ -6,5 +6,5 @@ target/
 *.lst
 output.txt
 
-src/test/golang/*.h
-src/test/golang/*.so
+src/test/golang/**/*.h
+src/test/golang/**/*.so

@@ -20,6 +20,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
@@ -40,6 +41,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -51,6 +53,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.core.Oid;
 
 @RunWith(JUnit4.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
@@ -66,7 +69,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
    * mode for queries and DML statements.
    */
   private String createUrl() {
-    return String.format("jdbc:postgresql://localhost:%d/", pgServer.getLocalPort());
+    // Force binary transfer of date parameters to prevent PostgreSQL from sending them with type
+    // Oid.UNSPECIFIED. This setting is however at this moment ignored and depends on this PR:
+    // https://github.com/pgjdbc/pgjdbc/pull/2476
+    return String.format(
+        "jdbc:postgresql://localhost:%d/?binaryTransferEnable=%d",
+        pgServer.getLocalPort(), Oid.DATE);
   }
 
   @Test
@@ -81,16 +89,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
     }
 
-    // The statement is sent twice to the mock server:
-    // 1. The first time it is sent with the PLAN mode enabled.
-    // 2. The second time it is sent in normal execute mode.
-    // TODO: Consider skipping the PLAN step and always execute the query already when we receive a
-    // DESCRIBE portal message.
-    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    ExecuteSqlRequest planRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
-    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    // The statement is only sent once to the mock server. The DescribePortal message will trigger
+    // the execution of the query, and the result from that execution will be used for the Execute
+    // message.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest executeRequest =
-        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
 
     for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
@@ -103,7 +107,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testQueryWithParameters() throws SQLException {
     String jdbcSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
@@ -111,9 +115,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_float8=? "
             + "and col_numeric=? "
             + "and col_timestamptz=? "
+            + "and col_date=? "
             + "and col_varchar=?";
     String pgSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "
             + "where col_bigint=$1 "
             + "and col_bool=$2 "
@@ -121,7 +126,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_float8=$4 "
             + "and col_numeric=$5 "
             + "and col_timestamptz=$6 "
-            + "and col_varchar=$7";
+            + "and col_date=$7 "
+            + "and col_varchar=$8";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -139,6 +145,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p6")
                 .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
                 .bind("p7")
+                .to(Date.parseDate("2022-03-29"))
+                .bind("p8")
                 .to("test")
                 .build(),
             ALL_TYPES_RESULTSET));
@@ -147,13 +155,16 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         LocalDateTime.of(2022, 2, 16, 13, 18, 2, 123456789).atOffset(ZoneOffset.UTC);
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(jdbcSql)) {
-        preparedStatement.setLong(1, 1L);
-        preparedStatement.setBoolean(2, true);
-        preparedStatement.setBytes(3, "test".getBytes(StandardCharsets.UTF_8));
-        preparedStatement.setDouble(4, 3.14d);
-        preparedStatement.setBigDecimal(5, new BigDecimal("6.626"));
-        preparedStatement.setTimestamp(6, java.sql.Timestamp.from(Instant.from(zonedDateTime)));
-        preparedStatement.setString(7, "test");
+        int index = 0;
+        preparedStatement.setLong(++index, 1L);
+        preparedStatement.setBoolean(++index, true);
+        preparedStatement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
+        preparedStatement.setDouble(++index, 3.14d);
+        preparedStatement.setBigDecimal(++index, new BigDecimal("6.626"));
+        preparedStatement.setTimestamp(
+            ++index, java.sql.Timestamp.from(Instant.from(zonedDateTime)));
+        preparedStatement.setDate(++index, java.sql.Date.valueOf(LocalDate.of(2022, 3, 29)));
+        preparedStatement.setString(++index, "test");
         try (ResultSet resultSet = preparedStatement.executeQuery()) {
           assertTrue(resultSet.next());
           assertEquals(1L, resultSet.getLong(1));
@@ -163,38 +174,34 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
 
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(2, requests.size());
+    assertEquals(1, requests.size());
 
-    ExecuteSqlRequest planRequest = requests.get(0);
-    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
-    assertEquals(pgSql, planRequest.getSql());
-
-    ExecuteSqlRequest executeRequest = requests.get(1);
+    ExecuteSqlRequest executeRequest = requests.get(0);
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
     assertEquals(pgSql, executeRequest.getSql());
 
-    for (ExecuteSqlRequest request : requests) {
-      Map<String, Value> params = request.getParams().getFieldsMap();
-      Map<String, Type> types = request.getParamTypesMap();
+    Map<String, Value> params = executeRequest.getParams().getFieldsMap();
+    Map<String, Type> types = executeRequest.getParamTypesMap();
 
-      assertEquals(TypeCode.INT64, types.get("p1").getCode());
-      assertEquals("1", params.get("p1").getStringValue());
-      assertEquals(TypeCode.BOOL, types.get("p2").getCode());
-      assertTrue(params.get("p2").getBoolValue());
-      assertEquals(TypeCode.BYTES, types.get("p3").getCode());
-      assertEquals(
-          Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)),
-          params.get("p3").getStringValue());
-      assertEquals(TypeCode.FLOAT64, types.get("p4").getCode());
-      assertEquals(3.14d, params.get("p4").getNumberValue(), 0.0d);
-      assertEquals(TypeCode.NUMERIC, types.get("p5").getCode());
-      assertEquals(TypeAnnotationCode.PG_NUMERIC, types.get("p5").getTypeAnnotation());
-      assertEquals("6.626", params.get("p5").getStringValue());
-      assertEquals(TypeCode.TIMESTAMP, types.get("p6").getCode());
-      assertEquals("2022-02-16T13:18:02.123457000Z", params.get("p6").getStringValue());
-      assertEquals(TypeCode.STRING, types.get("p7").getCode());
-      assertEquals("test", params.get("p7").getStringValue());
-    }
+    assertEquals(TypeCode.INT64, types.get("p1").getCode());
+    assertEquals("1", params.get("p1").getStringValue());
+    assertEquals(TypeCode.BOOL, types.get("p2").getCode());
+    assertTrue(params.get("p2").getBoolValue());
+    assertEquals(TypeCode.BYTES, types.get("p3").getCode());
+    assertEquals(
+        Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)),
+        params.get("p3").getStringValue());
+    assertEquals(TypeCode.FLOAT64, types.get("p4").getCode());
+    assertEquals(3.14d, params.get("p4").getNumberValue(), 0.0d);
+    assertEquals(TypeCode.NUMERIC, types.get("p5").getCode());
+    assertEquals(TypeAnnotationCode.PG_NUMERIC, types.get("p5").getTypeAnnotation());
+    assertEquals("6.626", params.get("p5").getStringValue());
+    assertEquals(TypeCode.TIMESTAMP, types.get("p6").getCode());
+    assertEquals("2022-02-16T13:18:02.123457000Z", params.get("p6").getStringValue());
+    assertEquals(TypeCode.DATE, types.get("p7").getCode());
+    assertEquals("2022-03-29", params.get("p7").getStringValue());
+    assertEquals(TypeCode.STRING, types.get("p8").getCode());
+    assertEquals("test", params.get("p8").getStringValue());
   }
 
   @Test
@@ -203,8 +210,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         StatementResult.update(
             Statement.newBuilder(
                     "insert into all_types "
-                        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar) "
-                        + "values ($1, $2, $3, $4, $5, $6, $7, $8)")
+                        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
                 .bind("p1")
                 .to(2L)
                 .bind("p2")
@@ -220,6 +227,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p7")
                 .to((com.google.cloud.spanner.Value) null)
                 .bind("p8")
+                .to((Date) null)
+                .bind("p9")
                 .to((String) null)
                 .build(),
             1L));
@@ -229,28 +238,20 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             ALL_TYPES_NULLS_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
-      // TODO: Add col_timestamptz to the statement when PgAdapter allows untyped null values.
-      // The PG JDBC driver sends date and timestamp parameters with type code Oid.UNSPECIFIED.
-      // TODO: Add col_numeric to the statement when the mock serverr supports numeric parameters.
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setNull(++index, Types.BOOLEAN);
         statement.setNull(++index, Types.BINARY);
         statement.setNull(++index, Types.DOUBLE);
         statement.setNull(++index, Types.INTEGER);
-        // TODO: Enable the next line when the mock server supports numeric parameter values.
         statement.setNull(++index, Types.NUMERIC);
-        // TODO: Enable the next line when PgAdapter allows untyped null values.
-        // This is currently blocked on both the Spangres backend allowing untyped null values in
-        // SQL statements, as well as the Java client library and/or JDBC driver allowing untyped
-        // null values.
-        // See also https://github.com/googleapis/java-spanner/pull/1680
         statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
+        statement.setNull(++index, Types.DATE);
         statement.setNull(++index, Types.VARCHAR);
 
         assertEquals(1, statement.executeUpdate());
@@ -277,12 +278,15 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getTimestamp(++index));
         assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getDate(++index));
+        assertTrue(resultSet.wasNull());
         assertNull(resultSet.getString(++index));
         assertTrue(resultSet.wasNull());
 
         assertFalse(resultSet.next());
       }
     }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test
@@ -376,6 +380,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(-1, statement.getUpdateCount());
       }
     }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test

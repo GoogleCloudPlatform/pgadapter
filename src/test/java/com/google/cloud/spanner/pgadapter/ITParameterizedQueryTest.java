@@ -14,9 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -29,8 +27,8 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -43,11 +41,8 @@ import org.postgresql.core.Oid;
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
 public final class ITParameterizedQueryTest implements IntegrationTest {
-  private static final Logger logger = Logger.getLogger(ITParameterizedQueryTest.class.getName());
-
   private ProxyServer server;
-  private static PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
-  private static String[] args;
+  private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private Socket clientSocket;
   private DataOutputStream out;
   private DataInputStream in;
@@ -67,8 +62,8 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     // class.
     testEnv.setUp();
     Database db = testEnv.createDatabase();
-    testEnv.updateDdl(db.getId().getDatabase(), Arrays.asList(ddl));
-    testEnv.updateTables(db.getId().getDatabase(), Arrays.asList(dml));
+    testEnv.updateDdl(db.getId().getDatabase(), Collections.singletonList(ddl));
+    testEnv.updateTables(db.getId().getDatabase(), Collections.singletonList(dml));
     String credentials = testEnv.getCredentials();
     ImmutableList.Builder<String> argsListBuilder =
         ImmutableList.<String>builder()
@@ -86,7 +81,7 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     if (credentials != null) {
       argsListBuilder.add("-c", testEnv.getCredentials());
     }
-    args = argsListBuilder.build().toArray(new String[0]);
+    String[] args = argsListBuilder.build().toArray(new String[0]);
     server = new ProxyServer(new OptionsMetadata(args));
     server.startServer();
   }
@@ -100,13 +95,13 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
   }
 
   @AfterClass
-  public static void cleanUp() throws Exception {
+  public static void cleanUp() {
     testEnv.cleanUp();
   }
 
   // '\0' for name will refer to an unnamed statement.
-  protected byte[] constructParseMessage(
-      short parameters, String query, String name, ArrayList<Integer> oidTypes) throws Exception {
+  private byte[] constructParseMessage(
+      short parameters, String query, String name, ArrayList<Integer> oidTypes) {
     // Unnamed prepared statement = "\0"
     ByteBuffer metadata = ByteBuffer.allocate(5);
     metadata.put(0, (byte) 'P');
@@ -115,23 +110,22 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
 
     ByteBuffer typeBuffer = ByteBuffer.allocate(parameters * 4 + 2);
     typeBuffer.putShort(parameters);
-    for (int i = 0; i < oidTypes.size(); ++i) {
-      typeBuffer.putInt(oidTypes.get(i));
+    for (Integer oidType : oidTypes) {
+      typeBuffer.putInt(oidType);
     }
     return Bytes.concat(metadata.array(), name.getBytes(), query.getBytes(), typeBuffer.array());
   }
 
   // '\0' for statementName or portalName will refer to an unnamed statement.
-  protected byte[] constructBindMessage(
-      String statementName, String portalName, ArrayList<PgAdapterTestEnv.Parameter> values)
-      throws Exception {
+  private byte[] constructBindMessage(
+      String statementName, String portalName, ArrayList<PgAdapterTestEnv.Parameter> values) {
     // 5 bytes: 1 byte for message type + 4 for size
     ByteBuffer metadata = ByteBuffer.allocate(5);
     metadata.put(0, (byte) 'B');
     int valueSize = 0;
-    for (int i = 0; i < values.size(); ++i) {
+    for (PgAdapterTestEnv.Parameter value : values) {
       // 4 bytes for size field + parameter value size
-      valueSize += values.get(i).getSize() + 4;
+      valueSize += value.getSize() + 4;
     }
     // Message size:  4 bytes for size +
     //                total size of parameters (includes parameter sizes) +
@@ -156,9 +150,9 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
 
     // 4 bytes per parameter for size + size of paramter itself
     byte[] parameterValues = {};
-    for (int i = 0; i < values.size(); ++i) {
-      byte[] sizeArray = ByteBuffer.allocate(4).putInt(values.get(i).getSize()).array();
-      parameterValues = Bytes.concat(parameterValues, sizeArray, values.get(i).getValue());
+    for (PgAdapterTestEnv.Parameter value : values) {
+      byte[] sizeArray = ByteBuffer.allocate(4).putInt(value.getSize()).array();
+      parameterValues = Bytes.concat(parameterValues, sizeArray, value.getValue());
     }
     // 2 bytes for number of result column format codes (0 == use default for all)
     ByteBuffer trailingMetadata = ByteBuffer.allocate(2);
@@ -174,8 +168,8 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
   }
 
   // Constructs a Describe message that will describe either a portal (portal == true) or a prepared
-  // statment (portal == false)
-  protected byte[] constructDescribeMessage(boolean portal, String name) {
+  // statement (portal == false)
+  private byte[] constructDescribeMessage(boolean portal, String name) {
     // 6 bytes: 1 byte for message type + 4 for size + 1 for Portal/Statement type
     ByteBuffer metadata = ByteBuffer.allocate(6);
     metadata.put(0, (byte) 'D');
@@ -190,7 +184,7 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     return Bytes.concat(metadata.array(), name.getBytes());
   }
 
-  protected byte[] constructExecuteMessage(String portalName) {
+  private byte[] constructExecuteMessage(String portalName) {
     // 5 bytes: 1 byte for message type + 4 for size
     ByteBuffer metadata = ByteBuffer.allocate(5);
     metadata.put(0, (byte) 'E');
@@ -204,7 +198,7 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
 
   // If portal is true this will close the corresponding portal, if false this will close the
   // corresponding prepared statement.
-  protected byte[] constructCloseMessage(boolean portal, String name) {
+  private byte[] constructCloseMessage(boolean portal, String name) {
     // 6 bytes: 1 byte for message type + 4 for size + 1 for Portal/Statement type
     ByteBuffer metadata = ByteBuffer.allocate(6);
     metadata.put(0, (byte) 'C');
@@ -219,7 +213,7 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     return Bytes.concat(metadata.array(), name.getBytes());
   }
 
-  protected byte[] constructSyncMessage() {
+  private byte[] constructSyncMessage() {
     // 5 bytes: 1 byte for message type + 4 for size
     ByteBuffer metadata = ByteBuffer.allocate(5);
     metadata.put(0, (byte) 'S');
@@ -239,12 +233,12 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
 
     // Send Parse message.
     ArrayList<Integer> oidList = new ArrayList<>();
-    oidList.add(new Integer(Oid.INT8));
+    oidList.add(Oid.INT8);
     byte[] parseMessage =
         constructParseMessage((short) 1, "SELECT * FROM users WHERE id = $1\0", "\0", oidList);
     out.write(parseMessage, 0, parseMessage.length);
     // Check for parse complete message.
-    PgAdapterTestEnv.PGMessage parseComplete = testEnv.consumePGMessage('1', in);
+    testEnv.consumePGMessage('1', in);
 
     // Send Bind message.
     ArrayList<PgAdapterTestEnv.Parameter> paramList = new ArrayList<>();
@@ -253,7 +247,7 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     byte[] bindMessage = constructBindMessage("\0", "\0", paramList);
     out.write(bindMessage, 0, bindMessage.length);
     // Check for bind complete message.
-    PgAdapterTestEnv.PGMessage bindComplete = testEnv.consumePGMessage('2', in);
+    testEnv.consumePGMessage('2', in);
 
     // Send Execute message.
     byte[] exectueMessage = constructExecuteMessage("\0");
@@ -264,7 +258,7 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     // Send Close message.
     byte[] closeMessage = constructCloseMessage(true, "\0");
     out.write(closeMessage, 0, closeMessage.length);
-    PgAdapterTestEnv.PGMessage closeComplete = testEnv.consumePGMessage('3', in);
+    testEnv.consumePGMessage('3', in);
 
     // Send Sync message.
     byte[] syncMessage = constructSyncMessage();
@@ -276,9 +270,9 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     byte[] commandCompleteData = {83, 69, 76, 69, 67, 84, 32, 49, 0};
     byte[] readyForQueryData = {73};
 
-    assertThat(dataRows[0].getPayload(), is(equalTo(dataRow0)));
-    assertThat(commandComplete.getPayload(), is(equalTo(commandCompleteData)));
-    assertThat(readyForQuery.getPayload(), is(equalTo(readyForQueryData)));
+    assertEquals(dataRow0, dataRows[0].getPayload());
+    assertEquals(commandCompleteData, commandComplete.getPayload());
+    assertEquals(readyForQueryData, readyForQuery.getPayload());
   }
 
   @Test
@@ -295,13 +289,13 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
 
     // Send Parse message.
     ArrayList<Integer> oidList = new ArrayList<>();
-    oidList.add(new Integer(Oid.INT8));
+    oidList.add(Oid.INT8);
     byte[] parseMessage =
         constructParseMessage(
             (short) 1, "SELECT * FROM users WHERE id = $1\0", statementName, oidList);
     out.write(parseMessage, 0, parseMessage.length);
     // Check for parse complete message.
-    PgAdapterTestEnv.PGMessage parseComplete = testEnv.consumePGMessage('1', in);
+    testEnv.consumePGMessage('1', in);
 
     // Send Bind message.
     ArrayList<PgAdapterTestEnv.Parameter> paramList = new ArrayList<>();
@@ -310,7 +304,7 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     byte[] bindMessage = constructBindMessage(statementName, portalName, paramList);
     out.write(bindMessage, 0, bindMessage.length);
     // Check for bind complete message.
-    PgAdapterTestEnv.PGMessage bindComplete = testEnv.consumePGMessage('2', in);
+    testEnv.consumePGMessage('2', in);
 
     // Send Execute message.
     byte[] exectueMessage = constructExecuteMessage(portalName);
@@ -321,7 +315,7 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     // Send Close message.
     byte[] closeMessage = constructCloseMessage(true, portalName);
     out.write(closeMessage, 0, closeMessage.length);
-    PgAdapterTestEnv.PGMessage closeComplete = testEnv.consumePGMessage('3', in);
+    testEnv.consumePGMessage('3', in);
 
     // Send Sync message.
     byte[] syncMessage = constructSyncMessage();
@@ -333,8 +327,8 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     byte[] commandCompleteData = {83, 69, 76, 69, 67, 84, 32, 49, 0};
     byte[] readyForQueryData = {73};
 
-    assertThat(dataRows[0].getPayload(), is(equalTo(dataRow0)));
-    assertThat(commandComplete.getPayload(), is(equalTo(commandCompleteData)));
-    assertThat(readyForQuery.getPayload(), is(equalTo(readyForQueryData)));
+    assertEquals(dataRow0, dataRows[0].getPayload());
+    assertEquals(commandCompleteData, commandComplete.getPayload());
+    assertEquals(readyForQueryData, readyForQuery.getPayload());
   }
 }

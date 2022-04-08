@@ -95,19 +95,19 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
   @Test
   public void testBooleanArrayInResultSet() throws SQLException {
     String sql = "SELECT BOOL_ARRAY FROM FOO";
-    // TODO: Add NULL element to the array once null values are properly supported
-    // See https://github.com/GoogleCloudPlatform/pgadapter/pull/35
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
             createResultSet(
-                "BOOL_ARRAY", TypeCode.BOOL, ImmutableList.of(Values.of(true), Values.of(false)))));
+                "BOOL_ARRAY",
+                TypeCode.BOOL,
+                ImmutableList.of(Values.of(true), Values.ofNull(), Values.of(false)))));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         assertTrue(resultSet.next());
         Array array = resultSet.getArray("BOOL_ARRAY");
-        assertArrayEquals(new Boolean[] {true, false}, (Boolean[]) array.getArray());
+        assertArrayEquals(new Boolean[] {true, null, false}, (Boolean[]) array.getArray());
         assertFalse(resultSet.next());
       }
     }
@@ -116,19 +116,19 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
   @Test
   public void testBigintArrayInResultSet() throws SQLException {
     String sql = "SELECT BIGINT_ARRAY FROM FOO";
-    // TODO: Add NULL element to the array once null values are properly supported
-    // See https://github.com/GoogleCloudPlatform/pgadapter/pull/35
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
             createResultSet(
-                "BIGINT_ARRAY", TypeCode.INT64, ImmutableList.of(Values.of("1"), Values.of("2")))));
+                "BIGINT_ARRAY",
+                TypeCode.INT64,
+                ImmutableList.of(Values.of("1"), Values.ofNull(), Values.of("2")))));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         assertTrue(resultSet.next());
         Array array = resultSet.getArray("BIGINT_ARRAY");
-        assertArrayEquals(new Long[] {1L, 2L}, (Long[]) array.getArray());
+        assertArrayEquals(new Long[] {1L, null, 2L}, (Long[]) array.getArray());
         assertFalse(resultSet.next());
       }
     }
@@ -137,8 +137,6 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
   @Test
   public void testDoubleArrayInResultSet() throws SQLException {
     String sql = "SELECT DOUBLE_ARRAY FROM FOO";
-    // TODO: Add NULL element to the array once null values are properly supported
-    // See https://github.com/GoogleCloudPlatform/pgadapter/pull/35
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -149,6 +147,7 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
                     Values.of(3.14d),
                     Values.of(Double.MAX_VALUE),
                     Values.of(Double.MIN_VALUE),
+                    Values.ofNull(),
                     Values.of(Double.NaN)))));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
@@ -156,7 +155,7 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
         assertTrue(resultSet.next());
         Array array = resultSet.getArray("DOUBLE_ARRAY");
         assertArrayEquals(
-            new Double[] {3.14d, Double.MAX_VALUE, Double.MIN_VALUE, Double.NaN},
+            new Double[] {3.14d, Double.MAX_VALUE, Double.MIN_VALUE, null, Double.NaN},
             (Double[]) array.getArray());
         assertFalse(resultSet.next());
       }
@@ -166,8 +165,6 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
   @Test
   public void testNumericArrayInResultSet() throws SQLException {
     String sql = "SELECT NUMERIC_ARRAY FROM FOO";
-    // TODO: Add NULL element to the array once null values are properly supported
-    // See https://github.com/GoogleCloudPlatform/pgadapter/pull/35
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -176,7 +173,10 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
                 TypeCode.NUMERIC,
                 TypeAnnotationCode.PG_NUMERIC,
                 ImmutableList.of(
-                    Values.of("3.14"), Values.of("1000.0"), Values.of("-0.123456789")))));
+                    Values.of("3.14"),
+                    Values.of("1000.0"),
+                    Values.ofNull(),
+                    Values.of("-0.123456789")))));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
@@ -184,7 +184,7 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
         Array array = resultSet.getArray("NUMERIC_ARRAY");
         assertArrayEquals(
             new BigDecimal[] {
-              new BigDecimal("3.14"), new BigDecimal("1000.0"), new BigDecimal("-0.123456789")
+              new BigDecimal("3.14"), new BigDecimal("1000.0"), null, new BigDecimal("-0.123456789")
             },
             (BigDecimal[]) array.getArray());
         assertFalse(resultSet.next());
@@ -195,21 +195,19 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
   @Test
   public void testVarcharArrayInResultSet() throws SQLException {
     String sql = "SELECT VARCHAR_ARRAY FROM FOO";
-    // TODO: Add NULL element to the array once null values are properly supported
-    // See https://github.com/GoogleCloudPlatform/pgadapter/pull/35
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
             createResultSet(
                 "VARCHAR_ARRAY",
                 TypeCode.STRING,
-                ImmutableList.of(Values.of("test1"), Values.of("test2")))));
+                ImmutableList.of(Values.of("test1"), Values.ofNull(), Values.of("test2")))));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         assertTrue(resultSet.next());
         Array array = resultSet.getArray("VARCHAR_ARRAY");
-        assertArrayEquals(new String[] {"test1", "test2"}, (String[]) array.getArray());
+        assertArrayEquals(new String[] {"test1", null, "test2"}, (String[]) array.getArray());
         assertFalse(resultSet.next());
       }
     }
@@ -218,8 +216,6 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
   @Test
   public void testByteaArrayInResultSet() throws SQLException {
     String sql = "SELECT BYTEA_ARRAY FROM FOO";
-    // TODO: Add NULL element to the array once null values are properly supported
-    // See https://github.com/GoogleCloudPlatform/pgadapter/pull/35
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -230,6 +226,7 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
                     Values.of(
                         Base64.getEncoder()
                             .encodeToString("test1".getBytes(StandardCharsets.UTF_8))),
+                    Values.ofNull(),
                     Values.of(
                         Base64.getEncoder()
                             .encodeToString("test2".getBytes(StandardCharsets.UTF_8)))))));
@@ -240,7 +237,9 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
         Array array = resultSet.getArray("BYTEA_ARRAY");
         assertArrayEquals(
             new byte[][] {
-              "test1".getBytes(StandardCharsets.UTF_8), "test2".getBytes(StandardCharsets.UTF_8)
+              "test1".getBytes(StandardCharsets.UTF_8),
+              null,
+              "test2".getBytes(StandardCharsets.UTF_8)
             },
             (byte[][]) array.getArray());
         assertFalse(resultSet.next());
@@ -251,22 +250,21 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
   @Test
   public void testDateArrayInResultSet() throws SQLException {
     String sql = "SELECT DATE_ARRAY FROM FOO";
-    // TODO: Add NULL element to the array once null values are properly supported
-    // See https://github.com/GoogleCloudPlatform/pgadapter/pull/35
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
             createResultSet(
                 "DATE_ARRAY",
                 TypeCode.DATE,
-                ImmutableList.of(Values.of("2022-02-14"), Values.of("2000-02-29")))));
+                ImmutableList.of(
+                    Values.of("2022-02-14"), Values.ofNull(), Values.of("2000-02-29")))));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         assertTrue(resultSet.next());
         Array array = resultSet.getArray("DATE_ARRAY");
         assertArrayEquals(
-            new Date[] {Date.valueOf("2022-02-14"), Date.valueOf("2000-02-29")},
+            new Date[] {Date.valueOf("2022-02-14"), null, Date.valueOf("2000-02-29")},
             (Date[]) array.getArray());
         assertFalse(resultSet.next());
       }
@@ -276,8 +274,6 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
   @Test
   public void testTimestampArrayInResultSet() throws SQLException {
     String sql = "SELECT TIMESTAMP_ARRAY FROM FOO";
-    // TODO: Add NULL element to the array once null values are properly supported
-    // See https://github.com/GoogleCloudPlatform/pgadapter/pull/35
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -286,6 +282,7 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
                 TypeCode.TIMESTAMP,
                 ImmutableList.of(
                     Values.of("2022-02-14T11:47:10.123456700Z"),
+                    Values.ofNull(),
                     Values.of("2000-02-29T00:00:01.00000100Z")))));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
@@ -296,6 +293,7 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
             new Timestamp[] {
               com.google.cloud.Timestamp.parseTimestamp("2022-02-14T11:47:10.123456700Z")
                   .toSqlTimestamp(),
+              null,
               com.google.cloud.Timestamp.parseTimestamp("2000-02-29T00:00:01.00000100Z")
                   .toSqlTimestamp()
             };

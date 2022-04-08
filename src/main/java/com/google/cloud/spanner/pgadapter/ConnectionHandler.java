@@ -88,8 +88,10 @@ public class ConnectionHandler extends Thread {
     setDaemon(true);
     logger.log(
         Level.INFO,
-        "Connection handler with ID {0} created for client {1}",
-        new Object[] {getName(), socket.getInetAddress().getHostAddress()});
+        () ->
+            String.format(
+                "Connection handler with ID %s created for client %s",
+                getName(), socket.getInetAddress().getHostAddress()));
   }
 
   private String appendPropertiesToUrl(String url, Properties info) {
@@ -114,8 +116,10 @@ public class ConnectionHandler extends Thread {
   public void run() {
     logger.log(
         Level.INFO,
-        "Connection handler with ID {0} starting for client {1}",
-        new Object[] {getName(), socket.getInetAddress().getHostAddress()});
+        () ->
+            String.format(
+                "Connection handler with ID %s starting for client %s",
+                getName(), socket.getInetAddress().getHostAddress()));
 
     try (DataInputStream input =
             new DataInputStream(new BufferedInputStream(this.socket.getInputStream()));
@@ -147,10 +151,14 @@ public class ConnectionHandler extends Thread {
     } catch (Exception e) {
       logger.log(
           Level.WARNING,
-          "Exception on connection handler with ID {0} for client {1}: {2}",
-          new Object[] {getName(), socket.getInetAddress().getHostAddress(), e});
+          e,
+          () ->
+              String.format(
+                  "Exception on connection handler with ID %s for client %s: %s",
+                  getName(), socket.getInetAddress().getHostAddress(), e));
     } finally {
-      logger.log(Level.INFO, "Closing connection handler with ID {0}", getName());
+      logger.log(
+          Level.INFO, () -> String.format("Closing connection handler with ID %s", getName()));
       try {
         if (this.spannerConnection != null) {
           this.spannerConnection.close();
@@ -164,7 +172,8 @@ public class ConnectionHandler extends Thread {
                 String.format("Exception while closing connection handler with ID %s", getName()));
       }
       this.server.deregister(this);
-      logger.log(Level.INFO, "Connection handler with ID {0} closed", getName());
+      logger.log(
+          Level.INFO, () -> String.format("Connection handler with ID %s closed", getName()));
     }
   }
 
@@ -195,8 +204,8 @@ public class ConnectionHandler extends Thread {
   private void handleError(DataOutputStream output, Exception e) throws Exception {
     logger.log(
         Level.WARNING,
-        "Exception on connection handler with ID {0}: {1}",
-        new Object[] {getName(), e});
+        e,
+        () -> String.format("Exception on connection handler with ID %s: %s", getName(), e));
     if (this.status == ConnectionStatus.TERMINATED) {
       new ErrorResponse(output, e, ErrorResponse.State.InternalError, Severity.FATAL).send();
       new TerminateResponse(output).send();
@@ -225,7 +234,8 @@ public class ConnectionHandler extends Thread {
       try {
         statement.close();
       } catch (Exception e) {
-        logger.log(Level.SEVERE, "Unable to close portal: {0}", e.getMessage());
+        logger.log(
+            Level.SEVERE, e, () -> String.format("Unable to close portal: %s", e.getMessage()));
       }
     }
     this.portalsMap.clear();
@@ -293,12 +303,13 @@ public class ConnectionHandler extends Thread {
     if (secret != expectedSecret) {
       logger.log(
           Level.WARNING,
-          MessageFormat.format(
-              "User attempted to cancel a connection with the incorrect secret."
-                  + "Connection: {}, Secret: {}, Expected Secret: {}",
-              connectionId,
-              secret,
-              expectedSecret));
+          () ->
+              MessageFormat.format(
+                  "User attempted to cancel a connection with the incorrect secret."
+                      + "Connection: {}, Secret: {}, Expected Secret: {}",
+                  connectionId,
+                  secret,
+                  expectedSecret));
       // Since the user does not accept a response, there is no need to except here: simply return.
       return;
     }
