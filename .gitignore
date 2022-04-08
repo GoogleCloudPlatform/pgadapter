@@ -4,6 +4,7 @@ target/
 *.iml
 *.class
 *.lst
+output.txt
 
 src/test/golang/*.h
 src/test/golang/*.so
