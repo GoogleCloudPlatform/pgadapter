@@ -1,6 +1,7 @@
 on:
   pull_request:
-name: Integration Tests Against Docker
+    branches: [ postgresql-dialect ]
+name: integration-tests-against-docker
 env:
   GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
   GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"
