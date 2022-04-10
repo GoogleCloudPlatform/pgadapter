@@ -148,6 +148,10 @@ public abstract class AbstractMockServerTest {
                           .setType(Type.newBuilder().setCode(TypeCode.FLOAT64).build()))
                   .addFields(
                       Field.newBuilder()
+                          .setName("col_int")
+                          .setType(Type.newBuilder().setCode(TypeCode.INT64).build()))
+                  .addFields(
+                      Field.newBuilder()
                           .setName("col_numeric")
                           .setType(
                               Type.newBuilder()
@@ -182,6 +186,7 @@ public abstract class AbstractMockServerTest {
                                   .encodeToString("test".getBytes(StandardCharsets.UTF_8)))
                           .build())
                   .addValues(Value.newBuilder().setNumberValue(3.14d).build())
+                  .addValues(Value.newBuilder().setStringValue("100").build())
                   .addValues(Value.newBuilder().setStringValue("6.626").build())
                   .addValues(
                       Value.newBuilder().setStringValue("2022-02-16T13:18:02.123456789Z").build())
@@ -194,6 +199,7 @@ public abstract class AbstractMockServerTest {
           .setMetadata(ALL_TYPES_METADATA)
           .addRows(
               ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())

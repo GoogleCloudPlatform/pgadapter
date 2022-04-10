@@ -20,6 +20,7 @@ import com.google.cloud.spanner.Statement;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.sql.Types;
+import org.postgresql.core.Utils;
 import org.postgresql.util.PGbytea;
 
 /**
@@ -63,7 +64,7 @@ public class BinaryParser extends Parser<ByteArray> {
 
   @Override
   protected String stringParse() {
-    return this.item == null ? null : PGbytea.toPGString(this.item.toByteArray());
+    return this.item == null ? null : "\\x" + Utils.toHexString(this.item.toByteArray());
   }
 
   @Override
