@@ -23,11 +23,8 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Timestamp;
-import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.common.collect.ImmutableList;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -40,7 +37,6 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.Collections;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -54,10 +50,8 @@ import org.postgresql.copy.CopyManager;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
-public class ITJdbcTest implements IntegrationTest {
+public class ITJdbcTest extends AbstractIntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
-  private static ProxyServer server;
-  private static Database database;
 
   @Parameter public String preferQueryMode;
 
@@ -67,64 +61,14 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @BeforeClass
-  public static void setup() throws Exception {
+  public static void loadJdbcDriver() throws Exception {
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
-
-    // TODO: Refactor the integration tests to use a common subclass, as this is repeated in each
-    // class.
-    testEnv.setUp();
-    if (testEnv.isUseExistingDb()) {
-      database = testEnv.getExistingDatabase();
-    } else {
-      database = testEnv.createDatabase();
-      testEnv.updateDdl(
-          database.getId().getDatabase(),
-          Arrays.asList(
-              "create table numbers (num int not null primary key, name varchar(100))",
-              "create table all_types ("
-                  + "col_bigint bigint not null primary key, "
-                  + "col_bool bool, "
-                  + "col_bytea bytea, "
-                  + "col_float8 float8, "
-                  + "col_int int, "
-                  + "col_numeric numeric, "
-                  + "col_timestamptz timestamptz, "
-                  + "col_varchar varchar(100))"));
-    }
-    String credentials = testEnv.getCredentials();
-    ImmutableList.Builder<String> argsListBuilder =
-        ImmutableList.<String>builder()
-            .add(
-                "-p",
-                testEnv.getProjectId(),
-                "-i",
-                testEnv.getInstanceId(),
-                "-d",
-                database.getId().getDatabase(),
-                "-s",
-                String.valueOf(testEnv.getPort()),
-                "-e",
-                testEnv.getUrl().getHost());
-    if (credentials != null) {
-      argsListBuilder.add("-c", testEnv.getCredentials());
-    }
-    String[] args = argsListBuilder.build().toArray(new String[0]);
-    server = new ProxyServer(new OptionsMetadata(args));
-    server.startServer();
-  }
-
-  @AfterClass
-  public static void teardown() {
-    if (server != null) {
-      server.stopServer();
-    }
-    testEnv.cleanUp();
   }
 
   @Before
   public void insertTestData() {
-    String databaseId = database.getId().getDatabase();
+    String databaseId = getDatabase().getId().getDatabase();
     testEnv.write(databaseId, Collections.singleton(Mutation.delete("numbers", KeySet.all())));
     testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
     testEnv.write(
@@ -153,8 +97,7 @@ public class ITJdbcTest implements IntegrationTest {
 
   private String getConnectionUrl() {
     return String.format(
-        "jdbc:postgresql://localhost:%d/?preferQueryMode=%s",
-        server.getLocalPort(), preferQueryMode);
+        "jdbc:postgresql://%s/?preferQueryMode=%s", getPGAdapterHostAndPort(), preferQueryMode);
   }
 
   @Test
@@ -440,7 +383,7 @@ public class ITJdbcTest implements IntegrationTest {
   @Test
   public void testCopyIn_Small() throws SQLException, IOException {
     // Empty all data in the table.
-    String databaseId = database.getId().getDatabase();
+    String databaseId = getDatabase().getId().getDatabase();
     testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
@@ -465,7 +408,7 @@ public class ITJdbcTest implements IntegrationTest {
   @Test
   public void testCopyIn_Large_FailsWhenAtomic() throws SQLException {
     // Empty all data in the table.
-    String databaseId = database.getId().getDatabase();
+    String databaseId = getDatabase().getId().getDatabase();
     testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
@@ -500,7 +443,7 @@ public class ITJdbcTest implements IntegrationTest {
   @Test
   public void testCopyIn_Large_SucceedsWhenNonAtomic() throws SQLException, IOException {
     // Empty all data in the table.
-    String databaseId = database.getId().getDatabase();
+    String databaseId = getDatabase().getId().getDatabase();
     testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {

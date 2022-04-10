@@ -16,13 +16,10 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 
-import com.google.cloud.spanner.Database;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Bytes;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -30,73 +27,39 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 import org.postgresql.core.Oid;
 
-@Category(IntegrationTest.class)
-@RunWith(JUnit4.class)
-public final class ITParameterizedQueryTest implements IntegrationTest {
-  private ProxyServer server;
-  private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
+public final class ITParameterizedQueryTest extends AbstractIntegrationTest {
   private Socket clientSocket;
   private DataOutputStream out;
   private DataInputStream in;
 
   @Before
-  public void setUp() throws Exception {
-    final String ddl =
+  public void insertTestData() {
+    List<String> values =
+        new ArrayList<>(Arrays.asList("(1, 1, '1')", "(2, 20, 'Joe')", "(3, 23, 'Jack')"));
+    String dml = "INSERT INTO users (id, age, name) VALUES " + String.join(", ", values);
+    testEnv.updateTables(
+        getDatabase().getId().getDatabase(), ImmutableList.of("delete from users", dml));
+  }
+
+  @Override
+  protected Iterable<String> getDdlStatements() {
+    return Collections.singletonList(
         "CREATE TABLE users (\n"
             + "  id   bigint PRIMARY KEY,\n"
             + "  age  bigint,\n"
             + "  name   text\n"
-            + ");";
-    List<String> values =
-        new ArrayList<>(Arrays.asList("(1, 1, '1')", "(2, 20, 'Joe')", "(3, 23, 'Jack')"));
-    String dml = "INSERT INTO users (id, age, name) VALUES " + String.join(", ", values);
-    // TODO: Refactor the integration tests to use a common subclass, as this is repeated in each
-    // class.
-    testEnv.setUp();
-    Database db = testEnv.createDatabase();
-    testEnv.updateDdl(db.getId().getDatabase(), Collections.singletonList(ddl));
-    testEnv.updateTables(db.getId().getDatabase(), Collections.singletonList(dml));
-    String credentials = testEnv.getCredentials();
-    ImmutableList.Builder<String> argsListBuilder =
-        ImmutableList.<String>builder()
-            .add(
-                "-p",
-                testEnv.getProjectId(),
-                "-i",
-                testEnv.getInstanceId(),
-                "-d",
-                db.getId().getDatabase(),
-                "-s",
-                String.valueOf(testEnv.getPort()),
-                "-e",
-                testEnv.getUrl().getHost());
-    if (credentials != null) {
-      argsListBuilder.add("-c", testEnv.getCredentials());
-    }
-    String[] args = argsListBuilder.build().toArray(new String[0]);
-    server = new ProxyServer(new OptionsMetadata(args));
-    server.startServer();
+            + ");");
   }
 
   @After
-  public void stopServer() throws Exception {
+  public void closeSocket() throws Exception {
     clientSocket.close();
     out.close();
     in.close();
-    if (server != null) server.stopServer();
-  }
-
-  @AfterClass
-  public static void cleanUp() {
-    testEnv.cleanUp();
   }
 
   // '\0' for name will refer to an unnamed statement.
@@ -223,9 +186,9 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
 
   @Test
   public void unnamedParameterTest() throws Exception {
-    testEnv.waitForServer(server);
+    waitForServer();
 
-    clientSocket = new Socket(InetAddress.getByName(null), server.getLocalPort());
+    clientSocket = new Socket(getPGAdapterHost(), getPGAdapterPort());
     out = new DataOutputStream(clientSocket.getOutputStream());
     in = new DataInputStream(clientSocket.getInputStream());
     testEnv.initializeConnection(out);
@@ -277,11 +240,11 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
 
   @Test
   public void parameterTest() throws Exception {
-    testEnv.waitForServer(server);
+    waitForServer();
     String statementName = "test-statement\0";
     String portalName = "test-portal\0";
 
-    clientSocket = new Socket(InetAddress.getByName(null), server.getLocalPort());
+    clientSocket = new Socket(getPGAdapterHost(), getPGAdapterPort());
     out = new DataOutputStream(clientSocket.getOutputStream());
     in = new DataInputStream(clientSocket.getInputStream());
     testEnv.initializeConnection(out);

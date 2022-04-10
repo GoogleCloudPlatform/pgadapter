@@ -20,7 +20,6 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -38,16 +37,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 
-@Category(IntegrationTest.class)
-@RunWith(JUnit4.class)
-public class ITJdbcMetadataTest implements IntegrationTest {
+public class ITJdbcMetadataTest extends AbstractIntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static ProxyServer server;
   private static Database database;
@@ -60,83 +52,39 @@ public class ITJdbcMetadataTest implements IntegrationTest {
         "42.1.1", "42.1.0", "42.0.0"
       };
 
-  @BeforeClass
-  public static void setup() throws Exception {
-    // TODO: Refactor the integration tests to use a common subclass, as this is repeated in each
-    // class.
-    testEnv.setUp();
-    if (testEnv.isUseExistingDb()) {
-      database = testEnv.getExistingDatabase();
-    } else {
-      database = testEnv.createDatabase();
-      testEnv.updateDdl(
-          database.getId().getDatabase(),
-          Arrays.asList(
-              "create table numbers (num int not null primary key, name varchar(100))",
-              "create unique index idx_numbers_name on numbers (name)",
-              "create table all_types ("
-                  + "col_bigint bigint not null primary key, "
-                  + "col_bool bool, "
-                  + "col_bytea bytea, "
-                  + "col_float8 float8, "
-                  + "col_int int, "
-                  + "col_numeric numeric, "
-                  + "col_timestamptz timestamptz, "
-                  + "col_varchar varchar(100))",
-              "create index idx_col_varchar_int on all_types (col_varchar, col_int)",
-              "create table singers (singer_id int8 not null primary key, name varchar(200))",
-              "create table albums (\n"
-                  + "\talbum_id int8 not null primary key,\n"
-                  + "\tsinger_id int8 not null references singers (singer_id),\n"
-                  + "\ttitle varchar(100)\n"
-                  + ")",
-              "create table tracks (\n"
-                  + "\talbum_id int8 not null references albums (album_id),\n"
-                  + "\ttrack_number int8 not null,\n"
-                  + "\ttitle varchar(100),\n"
-                  + "\tprimary key (album_id, track_number)\n"
-                  + ")",
-              "create table recording_attempt (\n"
-                  + "\talbum int8 not null references albums (album_id),\n"
-                  + "\ttrack int8 not null,\n"
-                  + "\tattempt int8 not null,\n"
-                  + "\trecording_time timestamptz not null,\n"
-                  + "\tprimary key (album, track, attempt),\n"
-                  + "\tforeign key (album, track) references tracks (album_id, track_number)\n"
-                  + ")"));
-    }
-    String credentials = testEnv.getCredentials();
-    ImmutableList.Builder<String> argsListBuilder =
-        ImmutableList.<String>builder()
-            .add(
-                "-p",
-                testEnv.getProjectId(),
-                "-i",
-                testEnv.getInstanceId(),
-                "-d",
-                database.getId().getDatabase(),
-                "-s",
-                String.valueOf(testEnv.getPort()),
-                "-e",
-                testEnv.getUrl().getHost());
-    if (credentials != null) {
-      argsListBuilder.add("-c", testEnv.getCredentials());
-    }
-    String[] args = argsListBuilder.build().toArray(new String[0]);
-    server = new ProxyServer(new OptionsMetadata(args));
-    server.startServer();
-  }
-
-  @AfterClass
-  public static void teardown() {
-    if (server != null) {
-      server.stopServer();
-    }
-    testEnv.cleanUp();
+  @Override
+  protected Iterable<String> getDdlStatements() {
+    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    builder.addAll(super.getDdlStatements());
+    builder.addAll(
+        Arrays.asList(
+            "create unique index idx_numbers_name on numbers (name)",
+            "create index idx_col_varchar_int on all_types (col_varchar, col_int)",
+            "create table singers (singer_id int8 not null primary key, name varchar(200))",
+            "create table albums (\n"
+                + "\talbum_id int8 not null primary key,\n"
+                + "\tsinger_id int8 not null references singers (singer_id),\n"
+                + "\ttitle varchar(100)\n"
+                + ")",
+            "create table tracks (\n"
+                + "\talbum_id int8 not null references albums (album_id),\n"
+                + "\ttrack_number int8 not null,\n"
+                + "\ttitle varchar(100),\n"
+                + "\tprimary key (album_id, track_number)\n"
+                + ")",
+            "create table recording_attempt (\n"
+                + "\talbum int8 not null references albums (album_id),\n"
+                + "\ttrack int8 not null,\n"
+                + "\tattempt int8 not null,\n"
+                + "\trecording_time timestamptz not null,\n"
+                + "\tprimary key (album, track, attempt),\n"
+                + "\tforeign key (album, track) references tracks (album_id, track_number)\n"
+                + ")"));
+    return builder.build();
   }
 
   private String createUrl() {
-    return String.format("jdbc:postgresql://localhost:%d/", testEnv.getPort());
+    return String.format("jdbc:postgresql://%s/", getPGAdapterHostAndPort());
   }
 
   private void runForAllVersions(Consumer<Connection> runnable) throws Exception {
