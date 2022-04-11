@@ -24,13 +24,12 @@ jobs:
           export_environment_variables: true
       - name: Randomize database name
         run: echo GOOGLE_CLOUD_DATABASE=${GOOGLE_CLOUD_DATABASE}_$(date +%s) >> $GITHUB_ENV
-             echo Using database ${{env.GOOGLE_CLOUD_DATABASE}}
       - name: Build Docker image
         run: docker build . -f build/Dockerfile -t pgadapter
       - name: Start Docker container
         run: docker run \
                 -d -p 5432:5432 \
-                -v ${{env.GOOGLE_APPLICATION_CREDENTIALS}}:/credentials.json:ro \
+                -v "${{env.GOOGLE_APPLICATION_CREDENTIALS}}":/credentials.json:ro \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/credentials.json \
                 pgadapter \
                 -p ${{env.GOOGLE_CLOUD_PROJECT}} -i ${{env.GOOGLE_CLOUD_INSTANCE}} -d ${{env.GOOGLE_CLOUD_DATABASE}} \
