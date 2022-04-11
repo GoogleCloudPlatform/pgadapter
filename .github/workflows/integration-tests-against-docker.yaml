@@ -24,6 +24,7 @@ jobs:
           export_environment_variables: true
       - name: Randomize database name
         run: echo GOOGLE_CLOUD_DATABASE=${GOOGLE_CLOUD_DATABASE}_$(date +%s) >> $GITHUB_ENV
+             echo Using database ${{env.GOOGLE_CLOUD_DATABASE}}
       - name: Build Docker image
         run: docker build . -f build/Dockerfile -t pgadapter
       - name: Start Docker container
@@ -32,7 +33,7 @@ jobs:
                 -v ${{env.GOOGLE_APPLICATION_CREDENTIALS}}:/credentials.json:ro \
                 -e GOOGLE_APPLICATION_CREDENTIALS=/credentials.json \
                 pgadapter \
-                -p ${GOOGLE_CLOUD_PROJECT} -i ${GOOGLE_CLOUD_INSTANCE} -d ${GOOGLE_CLOUD_DATABASE} \
+                -p ${{env.GOOGLE_CLOUD_PROJECT}} -i ${{env.GOOGLE_CLOUD_INSTANCE}} -d ${{env.GOOGLE_CLOUD_DATABASE}} \
                 -x
       - name: Run integration tests
         run: mvn verify \
@@ -40,4 +41,4 @@ jobs:
                 -DskipITs=false \
                 -DPG_ADAPTER_ADDRESS="localhost" \
                 -DPG_ADAPTER_LOCAL_PORT="5432" \
-                -DPG_ADAPTER_DATABASE="${GOOGLE_CLOUD_DATABASE}"
+                -DPG_ADAPTER_DATABASE="${{env.GOOGLE_CLOUD_DATABASE}}"
