@@ -20,4 +20,4 @@ jobs:
         uses: 'google-github-actions/auth@v0'
         with:
           credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
-      - run: mvn verify Dclirr.skip=true -DskipITs=false DPG_ADAPTER_HOST="https://${GOOGLE_CLOUD_ENDPOINT}" DPG_ADAPTER_INSTANCE="${GOOGLE_CLOUD_INSTANCE}" DPG_ADAPTER_DATABASE="${GOOGLE_CLOUD_DATABASE}"
+      - run: mvn verify -Dclirr.skip=true -DskipITs=false -DPG_ADAPTER_HOST="https://${GOOGLE_CLOUD_ENDPOINT}" -DPG_ADAPTER_INSTANCE="${GOOGLE_CLOUD_INSTANCE}" -DPG_ADAPTER_DATABASE="${GOOGLE_CLOUD_DATABASE}"
