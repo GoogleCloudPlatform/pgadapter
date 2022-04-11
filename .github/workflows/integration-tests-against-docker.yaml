@@ -8,6 +8,7 @@ jobs:
   integration_tests:
     runs-on: ubuntu-latest
     env:
+      GOOGLE_APPLICATION_CREDENTIALS: ""
       GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"
       GOOGLE_CLOUD_DATABASE: "e2e_docker"
       GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
