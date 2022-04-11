@@ -28,7 +28,7 @@ jobs:
       - name: Start Docker container
         run: docker run \
                 -d -p 5432:5432 \
-                -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
+                -v ${{GOOGLE_APPLICATION_CREDENTIALS}}:${{GOOGLE_APPLICATION_CREDENTIALS}}:ro \
                 -e GOOGLE_APPLICATION_CREDENTIALS \
                 pgadapter \
                 -p ${GOOGLE_CLOUD_PROJECT} -i ${GOOGLE_CLOUD_INSTANCE} -d ${GOOGLE_CLOUD_DATABASE} \
