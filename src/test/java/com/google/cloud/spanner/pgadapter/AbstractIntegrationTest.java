@@ -28,7 +28,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class AbstractIntegrationTest implements IntegrationTest {
   private static final String PG_ADAPTER_ADDRESS = System.getProperty("PG_ADAPTER_ADDRESS", null);
-  private static final String PG_ADAPTER_LOCAL_PORT = System.getProperty("PG_ADAPTER_LOCAL_PORT", null);
+  private static final String PG_ADAPTER_LOCAL_PORT =
+      System.getProperty("PG_ADAPTER_LOCAL_PORT", null);
   protected static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static ProxyServer server;
   private static Database database;

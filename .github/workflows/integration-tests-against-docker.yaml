@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"
+      GOOGLE_CLOUD_DATABASE: "e2e_docker"
       GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
       DOCKERFILE: "build/Dockerfile.ci"
     steps:
@@ -20,4 +21,22 @@ jobs:
         uses: 'google-github-actions/auth@v0'
         with:
           credentials_json: '${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}'
-      - run: mvn verify -Dclirr.skip=true -DskipITs=false -DPG_ADAPTER_HOST="https://${GOOGLE_CLOUD_ENDPOINT}" -DPG_ADAPTER_INSTANCE="${GOOGLE_CLOUD_INSTANCE}" -DPG_ADAPTER_DATABASE="${GOOGLE_CLOUD_DATABASE}"
+      - name: Randomize database name
+        run: echo GOOGLE_CLOUD_DATABASE=${GOOGLE_CLOUD_DATABASE}_$(date +%s) >> $GITHUB_ENV
+      - name: Build Docker image
+        run: docker build . -f build/Dockerfile -t pgadapter
+      - name: Start Docker container
+        run: docker run \
+                -d -p 5432:5432 \
+                -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
+                -e GOOGLE_APPLICATION_CREDENTIALS \
+                pgadapter \
+                -p ${GOOGLE_CLOUD_PROJECT} -i ${GOOGLE_CLOUD_INSTANCE} -d ${GOOGLE_CLOUD_DATABASE} \
+                -x
+      - name: Run integration tests
+        run: mvn verify \
+                -Dclirr.skip=true \
+                -DskipITs=false \
+                -DPG_ADAPTER_ADDRESS="localhost" \
+                -DPG_ADAPTER_LOCAL_PORT="5432" \
+                -DPG_ADAPTER_DATABASE="${GOOGLE_CLOUD_DATABASE}"
