@@ -1,4 +1,6 @@
 on:
+  # This allows manual activation of this action for testing.
+  workflow_dispatch:
   pull_request:
     branches: [ postgresql-dialect ]
 name: integration-tests-against-docker
@@ -25,6 +27,9 @@ jobs:
         with:
           project_id: ${{ GOOGLE_CLOUD_PROJECT }}
           export_default_credentials: true
-      - run: mvn -B -Penable-integration-tests \
-              -DtrimStackTrace=false \
-              -fae verify
+      - run: mvn verify \
+              -Dclirr.skip=true -DskipITs=false \
+              -DPG_ADAPTER_HOST="https://${GOOGLE_CLOUD_ENDPOINT}" \
+              -DPG_ADAPTER_INSTANCE="${GOOGLE_CLOUD_INSTANCE}" \
+              -DPG_ADAPTER_DATABASE="${GOOGLE_CLOUD_DATABASE}"
+

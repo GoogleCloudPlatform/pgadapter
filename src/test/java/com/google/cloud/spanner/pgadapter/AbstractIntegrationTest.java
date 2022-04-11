@@ -27,8 +27,8 @@ import org.junit.runners.JUnit4;
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
 public class AbstractIntegrationTest implements IntegrationTest {
-  private static final String PG_ADAPTER_HOST = System.getProperty("PG_ADAPTER_HOST", null);
-  private static final String PG_ADAPTER_PORT = System.getProperty("PG_ADAPTER_PORT", null);
+  private static final String PG_ADAPTER_ADDRESS = System.getProperty("PG_ADAPTER_ADDRESS", null);
+  private static final String PG_ADAPTER_LOCAL_PORT = System.getProperty("PG_ADAPTER_LOCAL_PORT", null);
   protected static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static ProxyServer server;
   private static Database database;
@@ -42,7 +42,7 @@ public class AbstractIntegrationTest implements IntegrationTest {
     } else {
       database = testEnv.createDatabase();
     }
-    if (PG_ADAPTER_HOST == null || PG_ADAPTER_PORT == null) {
+    if (PG_ADAPTER_ADDRESS == null || PG_ADAPTER_LOCAL_PORT == null) {
       String credentials = testEnv.getCredentials();
       ImmutableList.Builder<String> argsListBuilder =
           ImmutableList.<String>builder()
@@ -104,21 +104,21 @@ public class AbstractIntegrationTest implements IntegrationTest {
     if (server != null) {
       return String.format("localhost:%d", server.getLocalPort());
     }
-    return String.format("%s:%s", PG_ADAPTER_HOST, PG_ADAPTER_PORT);
+    return String.format("%s:%s", PG_ADAPTER_ADDRESS, PG_ADAPTER_LOCAL_PORT);
   }
 
   protected static String getPGAdapterHost() {
     if (server != null) {
       return "localhost";
     }
-    return PG_ADAPTER_HOST;
+    return PG_ADAPTER_ADDRESS;
   }
 
   protected static int getPGAdapterPort() {
     if (server != null) {
       return server.getLocalPort();
     }
-    return Integer.parseInt(PG_ADAPTER_PORT);
+    return Integer.parseInt(PG_ADAPTER_LOCAL_PORT);
   }
 
   protected static void waitForServer() throws Exception {
