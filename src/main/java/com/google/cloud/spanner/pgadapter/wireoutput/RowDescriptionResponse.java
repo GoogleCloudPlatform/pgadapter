@@ -162,7 +162,7 @@ public class RowDescriptionResponse extends WireOutput {
         return 8;
       case Oid.TIME:
         return 8;
-      case Oid.TIMESTAMP:
+      case Oid.TIMESTAMPTZ:
         return 12;
       default:
         return -1;

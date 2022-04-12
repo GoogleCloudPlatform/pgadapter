@@ -31,6 +31,7 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
 import java.security.SecureRandom;
@@ -137,6 +138,18 @@ public class ConnectionHandler extends Thread {
         this.connectionMetadata = new ConnectionMetadata(input, output);
         this.message = BootstrapMessage.create(this);
         this.message.send();
+        while (this.status == ConnectionStatus.UNAUTHENTICATED) {
+          try {
+            message.nextHandler();
+            message.send();
+          } catch (EOFException eofException) {
+            // This indicates that the frontend terminated the connection before we got
+            // authenticated. This is in most cases an indication that the frontend killed the
+            // connection after having requested SSL and gotten an SSL denied message.
+            this.status = ConnectionStatus.TERMINATED;
+            break;
+          }
+        }
         while (this.status != ConnectionStatus.TERMINATED) {
           try {
             message.nextHandler();
