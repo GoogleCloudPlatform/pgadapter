@@ -72,7 +72,7 @@ public class IntermediateStatementTest {
     statement.updateResultCount(0, result);
 
     assertTrue(statement.hasMoreData[0]);
-    assertEquals(0, statement.getUpdateCount(0));
+    assertEquals(-1, statement.getUpdateCount(0));
     assertSame(resultSet, statement.getStatementResult(0));
   }
 

@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
@@ -66,12 +67,12 @@ public class StatementParser {
         && query.substring(0, command.length()).equalsIgnoreCase(command);
   }
 
-  public static ImmutableList<String> parseCommands(ImmutableList<String> statements) {
+  public static ImmutableList<String> parseCommands(ImmutableList<ParsedStatement> statements) {
     Preconditions.checkNotNull(statements);
 
     ImmutableList.Builder<String> builder = ImmutableList.builder();
-    for (String sql : statements) {
-      builder.add(parseCommand(sql));
+    for (ParsedStatement stat : statements) {
+      builder.add(parseCommand(stat.getSqlWithoutComments()));
     }
     return builder.build();
   }

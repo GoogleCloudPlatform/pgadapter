@@ -46,7 +46,7 @@ public class CopyDoneMessage extends ControlMessage {
       if (!statement.hasException(0)) {
         try {
           long rowCount = this.statement.getUpdateCount();
-          statement.addUpdateCount(0, rowCount); // Increase the row count of number of rows copied.
+          statement.setUpdateCount(0, rowCount); // Set the row count of number of rows copied.
           this.sendSpannerResult(0, this.statement, QueryMode.SIMPLE, 0L);
           this.outputStream.flush();
         } catch (Exception e) {

@@ -32,7 +32,7 @@ public class MatcherStatement extends IntermediateStatement {
       OptionsMetadata options,
       ParsedStatement parsedStatement,
       ConnectionHandler connectionHandler) {
-    super(options, translateSQL(parsedStatement, connectionHandler), connectionHandler);
+    super(options, translateSQL(parsedStatement, connectionHandler), connectionHandler, false);
   }
 
   @Override

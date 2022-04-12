@@ -109,7 +109,7 @@ public class StatementTest {
 
     intermediateStatement.execute();
 
-    Mockito.verify(connection, Mockito.times(1)).execute(Statement.of("SELECT * FROM users"));
+    verify(connection).execute(Statement.of("SELECT * FROM users"));
     assertTrue(intermediateStatement.containsResultSet(0));
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(StatementType.QUERY, intermediateStatement.getStatementType(0));
@@ -140,8 +140,7 @@ public class StatementTest {
 
     intermediateStatement.execute();
 
-    verify(connection, Mockito.times(1))
-        .execute(Statement.of("UPDATE users SET name = someName WHERE id = 10"));
+    verify(connection).execute(Statement.of("UPDATE users SET name = someName WHERE id = 10"));
     assertFalse(intermediateStatement.containsResultSet(0));
     assertEquals(1L, intermediateStatement.getUpdateCount(0));
     assertTrue(intermediateStatement.isExecuted());
@@ -173,7 +172,7 @@ public class StatementTest {
 
     intermediateStatement.execute();
 
-    Mockito.verify(connection, Mockito.times(1))
+    Mockito.verify(connection)
         .execute(Statement.of("UPDATE users SET name = someName WHERE id = -1"));
     assertFalse(intermediateStatement.containsResultSet(0));
     assertEquals(0L, intermediateStatement.getUpdateCount(0));
@@ -207,8 +206,7 @@ public class StatementTest {
 
     intermediateStatement.execute();
 
-    Mockito.verify(connection, Mockito.times(1))
-        .execute(Statement.of("CREATE TABLE users (name varchar(100) primary key)"));
+    verify(connection).execute(Statement.of("CREATE TABLE users (name varchar(100) primary key)"));
     assertFalse(intermediateStatement.containsResultSet(0));
     assertEquals(0, intermediateStatement.getUpdateCount(0));
     assertTrue(intermediateStatement.isExecuted());
@@ -220,7 +218,7 @@ public class StatementTest {
 
     intermediateStatement.close();
 
-    Mockito.verify(resultSet, Mockito.times(0)).close();
+    Mockito.verify(resultSet, never()).close();
   }
 
   @Test
@@ -377,11 +375,10 @@ public class StatementTest {
         new IntermediateStatement(options, parse(sql), connectionHandler);
 
     assertTrue(intermediateStatement.isBatchedQuery());
-    List<String> result = intermediateStatement.getStatements();
-    assertEquals(3, result.size(), 3);
-    assertEquals("INSERT INTO users (id) VALUES (1)", result.get(0));
-    assertEquals("INSERT INTO users (id) VALUES (2)", result.get(1));
-    assertEquals("INSERT INTO users (id) VALUES (3)", result.get(2));
+    assertEquals(3, intermediateStatement.getStatements().size(), 3);
+    assertEquals("INSERT INTO users (id) VALUES (1)", intermediateStatement.getStatement(0));
+    assertEquals("INSERT INTO users (id) VALUES (2)", intermediateStatement.getStatement(1));
+    assertEquals("INSERT INTO users (id) VALUES (3)", intermediateStatement.getStatement(2));
   }
 
   @Test
@@ -392,14 +389,13 @@ public class StatementTest {
         new IntermediateStatement(options, parse(sql), connectionHandler);
 
     assertTrue(intermediateStatement.isBatchedQuery());
-    List<String> result = intermediateStatement.getStatements();
 
-    assertEquals(5, result.size(), 5);
-    assertEquals("BEGIN TRANSACTION", result.get(0));
-    assertEquals("INSERT INTO users (id) VALUES (1)", result.get(1));
-    assertEquals("INSERT INTO users (id) VALUES (2)", result.get(2));
-    assertEquals("INSERT INTO users (id) VALUES (3)", result.get(3));
-    assertEquals("COMMIT", result.get(4));
+    assertEquals(5, intermediateStatement.getStatements().size(), 5);
+    assertEquals("BEGIN TRANSACTION", intermediateStatement.getStatement(0));
+    assertEquals("INSERT INTO users (id) VALUES (1)", intermediateStatement.getStatement(1));
+    assertEquals("INSERT INTO users (id) VALUES (2)", intermediateStatement.getStatement(2));
+    assertEquals("INSERT INTO users (id) VALUES (3)", intermediateStatement.getStatement(3));
+    assertEquals("COMMIT", intermediateStatement.getStatement(4));
   }
 
   @Test
@@ -409,10 +405,9 @@ public class StatementTest {
         new IntermediateStatement(options, parse(sql), connectionHandler);
 
     assertTrue(intermediateStatement.isBatchedQuery());
-    List<String> result = intermediateStatement.getStatements();
-    assertEquals(2, result.size());
-    assertEquals("INSERT INTO users (id) VALUES (1)", result.get(0));
-    assertEquals("INSERT INTO users (id) VALUES (2)", result.get(1));
+    assertEquals(2, intermediateStatement.getStatements().size());
+    assertEquals("INSERT INTO users (id) VALUES (1)", intermediateStatement.getStatement(0));
+    assertEquals("INSERT INTO users (id) VALUES (2)", intermediateStatement.getStatement(1));
   }
 
   @Test
@@ -423,10 +418,12 @@ public class StatementTest {
         new IntermediateStatement(options, parse(sql), connectionHandler);
 
     assertTrue(intermediateStatement.isBatchedQuery());
-    List<String> result = intermediateStatement.getStatements();
-    assertEquals(2, result.size());
-    assertEquals("INSERT INTO users (name) VALUES (';;test;;')", result.get(0));
-    assertEquals("INSERT INTO users (name1, name2) VALUES ('''''', ';'';')", result.get(1));
+    assertEquals(2, intermediateStatement.getStatements().size());
+    assertEquals(
+        "INSERT INTO users (name) VALUES (';;test;;')", intermediateStatement.getStatement(0));
+    assertEquals(
+        "INSERT INTO users (name1, name2) VALUES ('''''', ';'';')",
+        intermediateStatement.getStatement(1));
   }
 
   @Test
@@ -450,10 +447,12 @@ public class StatementTest {
     IntermediateStatement intermediateStatement = ((QueryMessage) message).getStatement();
 
     assertTrue(intermediateStatement.isBatchedQuery());
-    List<String> result = intermediateStatement.getStatements();
-    assertEquals(2, result.size());
-    assertEquals("INSERT INTO users (name) VALUES (';;test;;')", result.get(0));
-    assertEquals("INSERT INTO users (name1, name2) VALUES ('''''', ';'';')", result.get(1));
+    assertEquals(2, intermediateStatement.getStatements().size());
+    assertEquals(
+        "INSERT INTO users (name) VALUES (';;test;;')", intermediateStatement.getStatement(0));
+    assertEquals(
+        "INSERT INTO users (name1, name2) VALUES ('''''', ';'';')",
+        intermediateStatement.getStatement(1));
   }
 
   @Test

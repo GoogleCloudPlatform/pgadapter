@@ -56,7 +56,7 @@ public class QueryMessage extends ControlMessage {
     } else if (!connection.getServer().getOptions().requiresMatcher()) {
       this.statement =
           new IntermediateStatement(
-              connection.getServer().getOptions(), parsedStatement, this.connection);
+              connection.getServer().getOptions(), parsedStatement, this.connection, true);
     } else {
       this.statement =
           new MatcherStatement(
@@ -135,8 +135,11 @@ public class QueryMessage extends ControlMessage {
     boolean inTransaction = connection.getSpannerConnection().isInTransaction();
     Status transactionStatus = Status.IDLE;
     if (inTransaction) {
-      if (connection.getStatus() == ConnectionStatus.ABORTED) {
+      if (connection.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
         transactionStatus = Status.FAILED;
+        // Actively rollback the aborted transaction
+        connection.getSpannerConnection().rollback();
+        connection.setStatus(ConnectionStatus.IDLE);
       } else {
         transactionStatus = Status.TRANSACTION;
       }

@@ -63,7 +63,7 @@ public class CopyStatement extends IntermediateStatement {
 
   public CopyStatement(
       OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
-    super(options, parsedStatement, connection);
+    super(options, parsedStatement, connection, false);
   }
 
   public Exception getException() {
@@ -287,8 +287,13 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   public void handleExecutionException(SpannerException e) {
+    this.handleExecutionException(0, e);
+  }
+
+  @Override
+  public void handleExecutionException(int index, SpannerException e) {
     executor.shutdownNow();
-    super.handleExecutionException(0, e);
+    super.handleExecutionException(index, e);
   }
 
   @Override

@@ -389,7 +389,7 @@ public class ConnectionHandler extends Thread {
     IDLE,
     COPY_IN,
     TERMINATED,
-    ABORTED
+    TRANSACTION_ABORTED
   }
 
   /**

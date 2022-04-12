@@ -530,12 +530,7 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testTwoDmlStatementsInSimpleMode() throws SQLException {
-    // This connection prefers the simple query mode. This makes the JDBC driver behave very similar
-    // to psql, and enables us to send multiple simple unparameterized statements in one batch.
-    try (Connection connection =
-        DriverManager.getConnection(
-            String.format(
-                "jdbc:postgresql://localhost:%d/?preferQueryMode=simple", server.getLocalPort()))) {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // Statement#execute(String) returns false if the result is an update count or no result.
         assertFalse(
@@ -575,12 +570,7 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Test
   public void testDmlAndQueryInBatchInSimpleMode() throws SQLException {
-    // This connection prefers the simple query mode. This makes the JDBC driver behave very similar
-    // to psql, and enables us to send multiple simple unparameterized statements in one batch.
-    try (Connection connection =
-        DriverManager.getConnection(
-            String.format(
-                "jdbc:postgresql://localhost:%d/?preferQueryMode=simple", server.getLocalPort()))) {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         assertFalse(
             statement.execute(

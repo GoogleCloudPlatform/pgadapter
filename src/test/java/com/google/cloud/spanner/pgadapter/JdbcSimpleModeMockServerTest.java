@@ -212,6 +212,9 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(2, request.getStatementsCount());
     assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
   }
 
   @Test
@@ -233,7 +236,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
         assertFalse(statement.getMoreResults());
         assertEquals(-1, statement.getUpdateCount());
 
-        // Start Batch
+        // Execute Batch
         assertFalse(statement.execute(sql));
         assertEquals(1, statement.getUpdateCount());
 
@@ -255,6 +258,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     assertEquals(3, requests.size());
     assertEquals(SELECT1.getSql(), requests.get(0).getSql());
+    assertTrue(requests.get(0).getTransaction().hasBegin());
     assertEquals(INSERT_STATEMENT.getSql(), requests.get(1).getSql());
     assertFalse(requests.get(1).getTransaction().hasBegin());
     assertTrue(requests.get(1).getTransaction().hasId());
@@ -302,14 +306,6 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
         assertThat(
             exception.getMessage(), containsString("INVALID_ARGUMENT: Statement is invalid."));
-
-        // Verify that the explicit transaction is aborted due to the exception
-        SQLException exception2 =
-            assertThrows(SQLException.class, () -> statement.execute(SELECT1.getSql()));
-        assertThat(
-            exception2.getMessage(),
-            containsString(
-                "Transaction is aborted and must be rolled back prior to further execution."));
       }
     }
 
@@ -327,7 +323,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(INVALID_DML.getSql(), request.getStatements(1).getSql());
 
     List<RollbackRequest> rollbackRequests = mockSpanner.getRequestsOfType(RollbackRequest.class);
-    assertEquals(0, rollbackRequests.size());
+    assertEquals(1, rollbackRequests.size());
 
     // BEGIN statement commits the implicit transaction
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
@@ -343,14 +339,6 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
         assertThat(
             exception.getMessage(), containsString("INVALID_ARGUMENT: Statement is invalid."));
-
-        // Verify that the explicit transaction is aborted due to the exception
-        SQLException exception2 =
-            assertThrows(SQLException.class, () -> statement.execute(SELECT1.getSql()));
-        assertThat(
-            exception2.getMessage(),
-            containsString(
-                "Transaction is aborted and must be rolled back prior to further execution."));
       }
     }
 
@@ -368,7 +356,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(INVALID_DML.getSql(), request.getStatements(1).getSql());
 
     List<RollbackRequest> rollbackRequests = mockSpanner.getRequestsOfType(RollbackRequest.class);
-    assertEquals(0, rollbackRequests.size());
+    assertEquals(1, rollbackRequests.size());
 
     // BEGIN statement commits the implicit transaction
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
@@ -465,8 +453,6 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       }
     }
 
-    // The server will also receive a 'SELECT 1' statement from PgAdapter, as PgAdapter calls
-    // connection.isAlive() before using it.
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     assertEquals(2, requests.size());
     assertEquals(SELECT1.getSql(), requests.get(0).getSql());
@@ -520,6 +506,9 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(2, request.getStatementsCount());
     assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
   }
 
   @Test
@@ -539,6 +528,9 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(2, requests.size());
     assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
     assertEquals(UPDATE_STATEMENT.getSql(), requests.get(1).getSql());
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(2, commitRequests.size());
   }
 
   @Test
@@ -621,8 +613,6 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       }
     }
 
-    // The server will also receive a 'SELECT 1' statement from PgAdapter, as PgAdapter calls
-    // connection.isAlive() before using it. This should happen before the transaction is started.
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     assertEquals(2, requests.size());
     // The first statement in the transaction will include the BeginTransaction option.
@@ -763,6 +753,9 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       assertEquals(SELECT1.getSql(), requests.get(0).getSql());
       assertEquals(INSERT_STATEMENT.getSql(), requests.get(1).getSql());
       assertEquals(SELECT2.getSql(), requests.get(2).getSql());
+
+      List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+      assertEquals(1, commitRequests.size());
     }
   }
 

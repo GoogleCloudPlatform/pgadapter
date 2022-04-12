@@ -180,7 +180,7 @@ public abstract class ControlMessage extends WireMessage {
         return false;
       default:
         throw new IllegalStateException(
-            "Unknown statement type: " + statement.getStatements().get(resultIndex));
+            "Unknown statement type: " + statement.getStatement(resultIndex));
     }
   }
 
