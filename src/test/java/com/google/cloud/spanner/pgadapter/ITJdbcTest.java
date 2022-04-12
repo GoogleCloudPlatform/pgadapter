@@ -51,8 +51,6 @@ import org.postgresql.copy.CopyManager;
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
 public class ITJdbcTest extends AbstractIntegrationTest {
-  private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
-
   @Parameter public String preferQueryMode;
 
   @Parameters(name = "preferQueryMode = {0}")

@@ -33,7 +33,7 @@ public class AbstractIntegrationTest implements IntegrationTest {
   protected static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static ProxyServer server;
   private static Database database;
-  private boolean datamodelCreated;
+  private static boolean datamodelCreated;
 
   @BeforeClass
   public static void createDatabaseAndStartPGAdapter() throws Exception {
@@ -55,9 +55,10 @@ public class AbstractIntegrationTest implements IntegrationTest {
                   "-d",
                   database.getId().getDatabase(),
                   "-s",
-                  String.valueOf(testEnv.getPort()),
-                  "-e",
-                  testEnv.getUrl().getHost());
+                  String.valueOf(testEnv.getPort()));
+      if (testEnv.getSpannerUrl() != null) {
+        argsListBuilder.add("-e", testEnv.getSpannerUrl());
+      }
       if (credentials != null) {
         argsListBuilder.add("-c", testEnv.getCredentials());
       }
@@ -91,7 +92,7 @@ public class AbstractIntegrationTest implements IntegrationTest {
 
   @Before
   public void createDataModel() throws Exception {
-    if (!datamodelCreated) {
+    if (!testEnv.isUseExistingDb() && !datamodelCreated) {
       testEnv.updateDdl(database.getId().getDatabase(), getDdlStatements());
       datamodelCreated = true;
     }

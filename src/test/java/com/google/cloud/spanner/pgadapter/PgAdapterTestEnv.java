@@ -34,7 +34,6 @@ import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileInputStream;
-import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,8 +55,9 @@ public final class PgAdapterTestEnv {
   // variable.
   public static final String GCP_CREDENTIALS = "GOOGLE_APPLICATION_CREDENTIALS";
 
-  // HostUrl should be set through this system property.
-  public static final String TEST_HOST_PROPERTY = "PG_ADAPTER_HOST";
+  // Spanner host URL should be set through this system property. The default is the default Spanner
+  // host URL.
+  public static final String TEST_SPANNER_URL_PROPERTY = "PG_ADAPTER_HOST";
 
   // ProjectId should be set through this system property.
   public static final String TEST_PROJECT_PROPERTY = "PG_ADAPTER_PROJECT";
@@ -86,9 +86,8 @@ public final class PgAdapterTestEnv {
   // Default database id.
   private static final String DEFAULT_DATABASE_ID = "pgtest-db";
 
-  // Default host url
-  private static final String DEFAULT_HOST_URL =
-      "https://staging-wrenchworks.sandbox.googleapis.com:443";
+  // Default Spanner url
+  private static final String DEFAULT_SPANNER_URL = null;
 
   // The project Id. This can be overwritten.
   private String projectId;
@@ -115,7 +114,7 @@ public final class PgAdapterTestEnv {
   private SpannerOptions options;
 
   // Spanner URL.
-  private URL spannerURL;
+  private String spannerHost;
 
   // Log stream for the test process.
   private static final Logger logger = Logger.getLogger(PgAdapterTestEnv.class.getName());
@@ -123,7 +122,7 @@ public final class PgAdapterTestEnv {
   private final List<Database> databases = new ArrayList<>();
 
   public void setUp() throws Exception {
-    spannerURL = new URL(getHostUrl());
+    spannerHost = getSpannerUrl();
     options = createSpannerOptions();
   }
 
@@ -155,9 +154,9 @@ public final class PgAdapterTestEnv {
     return port;
   }
 
-  public String getHostUrl() {
+  public String getSpannerUrl() {
     if (hostUrl == null) {
-      hostUrl = System.getProperty(TEST_HOST_PROPERTY, DEFAULT_HOST_URL);
+      hostUrl = System.getProperty(TEST_SPANNER_URL_PROPERTY, DEFAULT_SPANNER_URL);
     }
     return hostUrl;
   }
@@ -193,10 +192,6 @@ public final class PgAdapterTestEnv {
       id = id.substring(0, id.length() - 1);
     }
     return id;
-  }
-
-  public URL getUrl() {
-    return spannerURL;
   }
 
   public boolean isUseExistingDb() {
@@ -287,8 +282,10 @@ public final class PgAdapterTestEnv {
     if (!Strings.isNullOrEmpty(gcpCredentials)) {
       credentials = GoogleCredentials.fromStream(new FileInputStream(gcpCredentials));
     }
-    SpannerOptions.Builder builder =
-        SpannerOptions.newBuilder().setProjectId(projectId).setHost(spannerURL.toString());
+    SpannerOptions.Builder builder = SpannerOptions.newBuilder().setProjectId(projectId);
+    if (spannerHost != null) {
+      builder.setHost(spannerHost);
+    }
     if (credentials != null) {
       builder.setCredentials(credentials);
     }

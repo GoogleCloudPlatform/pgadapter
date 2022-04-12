@@ -40,7 +40,6 @@ import java.util.function.Consumer;
 import org.junit.Test;
 
 public class ITJdbcMetadataTest extends AbstractIntegrationTest {
-  private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static ProxyServer server;
   private static Database database;
   private static final String[] VERSIONS =
