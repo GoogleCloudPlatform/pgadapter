@@ -13,6 +13,6 @@ do
 done
 
 cd /home/pgadapter
-COMMAND="java -jar ${JAVA_ARGUMENTS} /home/pgadapter/pgadapter.jar ${ARGUMENTS}"
+COMMAND="java ${JAVA_ARGUMENTS} -cp \"pgadapter.jar:lib/*\" com.google.cloud.spanner.pgadapter.Server ${ARGUMENTS}"
 echo $COMMAND
 eval " $COMMAND"

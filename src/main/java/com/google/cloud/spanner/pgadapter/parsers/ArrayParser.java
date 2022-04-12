@@ -122,6 +122,9 @@ public class ArrayParser extends Parser<List<?>> {
       return "NULL";
     }
     if (this.isStringEquivalent) {
+      if (value.indexOf('\\') > -1) {
+        value = value.replace("\\", "\\\\");
+      }
       return STRING_TOGGLE + value + STRING_TOGGLE;
     }
     return value;
