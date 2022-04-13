@@ -70,7 +70,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   @Override
   public void execute() {
-    this.lastExecutedIndex = 0;
+    this.executed = true;
     // If the portal has already been described, the statement has already been executed, and we
     // don't need to do that once more.
     if (getStatementResult(0) == null) {

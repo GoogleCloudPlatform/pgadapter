@@ -34,6 +34,8 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -52,11 +54,11 @@ public class IntermediateStatement {
   protected boolean[] hasMoreData;
   protected SpannerException[] exceptions;
   protected final ParsedStatement parsedStatement;
-  protected ImmutableList<String> commands;
-  protected int lastExecutedIndex = -1;
+  protected List<String> commands;
+  protected boolean executed = false;
   protected Connection connection;
   protected long[] updateCounts;
-  protected ImmutableList<ParsedStatement> statements;
+  protected List<ParsedStatement> statements;
   private ConnectionHandler connectionHandler;
   private ExecutionStatus executionStatus;
 
@@ -90,7 +92,7 @@ public class IntermediateStatement {
     if (canBatch) {
       this.statements = parseStatements(parsedStatement);
     } else {
-      this.statements = ImmutableList.of(this.parsedStatement);
+      this.statements = Collections.singletonList(this.parsedStatement);
     }
     this.commands = StatementParser.parseCommands(this.statements);
     this.statementTypes = determineStatementTypes(this.statements);
@@ -123,14 +125,14 @@ public class IntermediateStatement {
    * @return The list of {@link StatementType} that the given statement strings will produce
    */
   protected static ImmutableList<StatementType> determineStatementTypes(
-      ImmutableList<ParsedStatement> statements) {
+      List<ParsedStatement> statements) {
     ImmutableList.Builder<StatementType> builder = ImmutableList.builder();
-    for (ParsedStatement stat : statements) {
-      if (stat.isUpdate()) {
+    for (ParsedStatement stmt : statements) {
+      if (stmt.isUpdate()) {
         builder.add(StatementType.UPDATE);
-      } else if (stat.isQuery()) {
+      } else if (stmt.isQuery()) {
         builder.add(StatementType.QUERY);
-      } else if (stat.isDdl()) {
+      } else if (stmt.isDdl()) {
         builder.add(StatementType.DDL);
       } else {
         builder.add(StatementType.CLIENT_SIDE);
@@ -173,14 +175,14 @@ public class IntermediateStatement {
     return builder.build();
   }
 
-  protected static ImmutableList<ParsedStatement> parseStatements(ParsedStatement stmt) {
+  protected static List<ParsedStatement> parseStatements(ParsedStatement stmt) {
     String sql = stmt.getSqlWithoutComments();
     Preconditions.checkNotNull(sql);
-    ImmutableList.Builder<ParsedStatement> builder = ImmutableList.builder();
+    List<ParsedStatement> statements = new ArrayList<>();
     for (String statement : splitStatements(sql)) {
-      builder.add(PARSER.parse(Statement.of(statement)));
+      statements.add(PARSER.parse(Statement.of(statement)));
     }
-    return builder.build();
+    return statements;
   }
 
   /**
@@ -217,11 +219,7 @@ public class IntermediateStatement {
 
   /** @return True if this statement was executed, False otherwise. */
   public boolean isExecuted() {
-    return lastExecutedIndex >= 0;
-  }
-
-  public int getLastExecutedIndex() {
-    return lastExecutedIndex;
+    return executed;
   }
 
   /**
@@ -341,54 +339,42 @@ public class IntermediateStatement {
   }
 
   private void handleExecutionExceptionAndTransactionStatus(int index, SpannerException e) {
-    if (executionStatus == ExecutionStatus.IMPLICIT_TRANSACTION) {
-      connection.rollback();
-      executionStatus = ExecutionStatus.HALTED;
-    } else if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
+    if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
       connectionHandler.setStatus(ConnectionStatus.TRANSACTION_ABORTED);
-      executionStatus = ExecutionStatus.HALTED;
     }
     handleExecutionException(index, e);
   }
 
   /** Execute the SQL statement, storing metadata. */
   public void execute() {
-    if (connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED
-        && !"ROLLBACK".equals(getCommand(0))) {
-      lastExecutedIndex = 0;
-      handleExecutionException(
-          0,
-          SpannerExceptionFactory.newSpannerException(
-              ErrorCode.INVALID_ARGUMENT,
-              "ERROR: current transaction is aborted, commands ignored until end of transaction block"));
-      return;
-    }
+    executed = true;
     if (connection.isInTransaction()) {
       executionStatus = ExecutionStatus.EXPLICIT_TRANSACTION;
-    } else if (statements.size() == 1 || "BEGIN".equals(getCommand(0))) {
-      // Do not begin an implicit transaction either if
-      // 1. There is only a single statement. Use autocommit mode instead.
-      // 2. The first statement is BEGIN. Directly begin an explicit transaction later.
-      executionStatus = ExecutionStatus.AUTOCOMMIT;
     } else {
-      executionStatus = ExecutionStatus.IMPLICIT_TRANSACTION;
-      connection.beginTransaction();
+      executionStatus = ExecutionStatus.AUTOCOMMIT;
     }
     int index = 0;
-    while (index < getStatementCount() && executionStatus != ExecutionStatus.HALTED) {
-      if (getStatementType(index) == StatementType.DDL) {
-        if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
-          handleExecutionExceptionAndTransactionStatus(
-              index,
-              SpannerExceptionFactory.newSpannerException(
-                  ErrorCode.INVALID_ARGUMENT,
-                  "DDL statements are only allowed outside explicit transactions."));
-          index++;
-          break;
-        } else if (executionStatus == ExecutionStatus.IMPLICIT_TRANSACTION) {
-          connection.commit();
-          executionStatus = ExecutionStatus.AUTOCOMMIT;
-        }
+    while (index < getStatementCount()) {
+      if (connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED
+          && !"ROLLBACK".equals(getCommand(index))
+          && !"COMMIT".equals(getCommand(index))) {
+        handleExecutionException(
+            index,
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INVALID_ARGUMENT,
+                "ERROR: current transaction is aborted, commands ignored until end of transaction block"));
+        index++;
+        continue;
+      }
+      if (getStatementType(index) == StatementType.DDL
+          && executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
+        handleExecutionExceptionAndTransactionStatus(
+            index,
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INVALID_ARGUMENT,
+                "ERROR: DDL statements are only allowed outside explicit transactions."));
+        index++;
+        continue;
       }
       boolean canUseBatch = false;
       if (index < (getStatementCount() - 1)) {
@@ -403,10 +389,6 @@ public class IntermediateStatement {
         index++;
       }
     }
-    if (executionStatus == ExecutionStatus.IMPLICIT_TRANSACTION) {
-      connection.commit();
-    }
-    lastExecutedIndex = index - 1;
   }
 
   private void executeSingleStatement(int index) {
@@ -416,19 +398,22 @@ public class IntermediateStatement {
       if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
         // Executing a BEGIN statement when an explicit transaction is already active is a no-op
         return;
-      } else if (executionStatus == ExecutionStatus.IMPLICIT_TRANSACTION) {
-        // Executing a BEGIN statement when an implicit transaction is active causes the implicit
-        // transaction to be committed and a new explicit transaction to be started
-        connection.commit();
+      } else {
+        executionStatus = ExecutionStatus.EXPLICIT_TRANSACTION;
       }
-      executionStatus = ExecutionStatus.EXPLICIT_TRANSACTION;
     }
     if ("COMMIT".equals(command) || "ROLLBACK".equals(command)) {
+      if (executionStatus == ExecutionStatus.AUTOCOMMIT) {
+        // Executing a COMMIT/ROLLBACK statement in autocommit mode is a no-op
+        return;
+      }
       executionStatus = ExecutionStatus.AUTOCOMMIT;
-    }
-    if ("ROLLBACK".equals(command)
-        && connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
-      connectionHandler.setStatus(ConnectionStatus.IDLE);
+      if (connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
+        connectionHandler.setStatus(ConnectionStatus.IDLE);
+        // COMMIT rollbacks aborted transaction
+        statements.set(index, PARSER.parse(Statement.of("ROLLBACK")));
+        commands.set(index, "ROLLBACK");
+      }
     }
     try {
       StatementResult result = this.connection.execute(Statement.of(getStatement(index)));
@@ -484,9 +469,16 @@ public class IntermediateStatement {
       long[] counts = e.getUpdateCounts();
       updateBatchResultCount(fromIndex, counts);
       handleExecutionExceptionAndTransactionStatus(fromIndex + counts.length, e);
-      // TODO: May want to continue executing from the failure in order to be compatible with the
-      // behavior of PG when there is no transaction.
-      executionStatus = ExecutionStatus.HALTED;
+      // Skip remaining statements in DML/DDL batch
+      // TODO: May want to start off from the failure in order to be compatible with the
+      // behavior of PG.
+      for (int i = fromIndex + counts.length + 1; i < index; i++) {
+        handleExecutionException(
+            i,
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INTERNAL,
+                "ERROR: Statement is not executed due to the preceding error in DML/DDL batch."));
+      }
     }
     return index - fromIndex;
   }
@@ -527,9 +519,7 @@ public class IntermediateStatement {
   }
 
   enum ExecutionStatus {
-    IMPLICIT_TRANSACTION,
     EXPLICIT_TRANSACTION,
-    AUTOCOMMIT,
-    HALTED
+    AUTOCOMMIT
   }
 }

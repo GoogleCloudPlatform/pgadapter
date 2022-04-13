@@ -298,7 +298,7 @@ public class CopyStatement extends IntermediateStatement {
 
   @Override
   public void execute() {
-    this.lastExecutedIndex = 0;
+    this.executed = true;
     try {
       parseCopyStatement();
       queryInformationSchema();

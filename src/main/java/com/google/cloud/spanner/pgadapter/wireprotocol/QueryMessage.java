@@ -56,7 +56,7 @@ public class QueryMessage extends ControlMessage {
     } else if (!connection.getServer().getOptions().requiresMatcher()) {
       this.statement =
           new IntermediateStatement(
-              connection.getServer().getOptions(), parsedStatement, this.connection, true);
+              connection.getServer().getOptions(), parsedStatement, this.connection);
     } else {
       this.statement =
           new MatcherStatement(
@@ -103,7 +103,7 @@ public class QueryMessage extends ControlMessage {
    */
   public void handleQuery() throws Exception {
     // Skip unexecuted statements, as no response needs be returned
-    for (int index = 0; index <= statement.getLastExecutedIndex(); index++) {
+    for (int index = 0; index < statement.getStatements().size(); index++) {
       if (this.statement.hasException(index)) {
         new ErrorResponse(
                 this.outputStream, this.statement.getException(index), State.InternalError)

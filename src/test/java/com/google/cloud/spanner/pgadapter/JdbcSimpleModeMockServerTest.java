@@ -377,11 +377,10 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       }
     }
 
-    // Verify that last statement is not executed
-    // TODO: change this test when failing ddl/dml batch no long halts the execution
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(1, requests.size());
+    assertEquals(2, requests.size());
     assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
+    assertEquals(SELECT1.getSql(), requests.get(1).getSql());
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
     assertEquals(1, commitRequests.size());
@@ -456,8 +455,9 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     assertEquals(2, requests.size());
     assertEquals(SELECT1.getSql(), requests.get(0).getSql());
-    assertTrue(requests.get(0).getTransaction().hasBegin());
+    assertTrue(requests.get(0).getTransaction().hasSingleUse());
     assertEquals(SELECT2.getSql(), requests.get(1).getSql());
+    assertTrue(requests.get(1).getTransaction().hasSingleUse());
   }
 
   @Test
