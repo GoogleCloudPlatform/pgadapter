@@ -62,7 +62,7 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   @Override
   public short getResultFormatCode(int index) {
     if (this.resultFormatCodes == null || this.resultFormatCodes.isEmpty()) {
-      return 0;
+      return super.getResultFormatCode(index);
     } else if (this.resultFormatCodes.size() == 1) {
       return this.resultFormatCodes.get(0);
     } else {
