@@ -42,6 +42,7 @@ import java.util.function.Consumer;
 import org.junit.Ignore;
 import org.junit.Test;
 
+@Ignore("Seems to take a long time")
 public class ITJdbcMetadataTest extends AbstractIntegrationTest {
   private static final String[] VERSIONS =
       new String[] {
