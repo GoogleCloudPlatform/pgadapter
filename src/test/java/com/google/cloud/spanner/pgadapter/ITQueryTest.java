@@ -38,7 +38,7 @@ import org.junit.runners.JUnit4;
 
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
-public final class ITQueryTest extends AbstractIntegrationTest {
+public final class ITQueryTest implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
 
