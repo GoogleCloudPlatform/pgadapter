@@ -23,21 +23,22 @@ import com.google.cloud.spanner.Key;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
-import com.google.cloud.spanner.pgadapter.ProxyServer;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.common.collect.ImmutableList;
 import java.math.BigDecimal;
 import java.util.Collections;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
+@Category(IntegrationTest.class)
+@RunWith(JUnit4.class)
 public class ITPgxTest implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
-  private static ProxyServer server;
   private static Database database;
   private static PgxTest pgxTest;
 
@@ -52,61 +53,35 @@ public class ITPgxTest implements IntegrationTest {
   public static void setup() throws Exception {
     pgxTest = PgxTest.compile();
 
-    // TODO: Refactor the integration tests to use a common subclass, as this is repeated in each
-    // class.
     testEnv.setUp();
-    if (testEnv.isUseExistingDb()) {
-      database = testEnv.getExistingDatabase();
-    } else {
-      database = testEnv.createDatabase();
-      testEnv.updateDdl(
-          database.getId().getDatabase(),
-          Collections.singletonList(
-              "create table all_types ("
-                  + "col_bigint bigint not null primary key, "
-                  + "col_bool bool, "
-                  + "col_bytea bytea, "
-                  + "col_float8 float8, "
-                  + "col_int int, "
-                  + "col_numeric numeric, "
-                  + "col_timestamptz timestamptz, "
-                  + "col_varchar varchar(100))"));
-    }
-    String credentials = testEnv.getCredentials();
-    ImmutableList.Builder<String> argsListBuilder =
-        ImmutableList.<String>builder()
-            .add(
-                "-p",
-                testEnv.getProjectId(),
-                "-i",
-                testEnv.getInstanceId(),
-                "-d",
-                database.getId().getDatabase(),
-                "-s",
-                String.valueOf(testEnv.getPort()),
-                "-e",
-                testEnv.getSpannerUrl());
-    if (credentials != null) {
-      argsListBuilder.add("-c", testEnv.getCredentials());
-    }
-    String[] args = argsListBuilder.build().toArray(new String[0]);
-    server = new ProxyServer(new OptionsMetadata(args));
-    server.startServer();
+    database = testEnv.createDatabase(getDdlStatements());
+    testEnv.startPGAdapterServer(database.getId(), Collections.emptyList());
   }
 
   @AfterClass
   public static void teardown() {
-    if (server != null) {
-      server.stopServer();
-    }
+    testEnv.stopPGAdapterServer();
     testEnv.cleanUp();
+  }
+
+  private static Iterable<String> getDdlStatements() {
+    return Collections.singletonList(
+        "create table all_types ("
+            + "col_bigint bigint not null primary key, "
+            + "col_bool bool, "
+            + "col_bytea bytea, "
+            + "col_float8 float8, "
+            + "col_int int, "
+            + "col_numeric numeric, "
+            + "col_timestamptz timestamptz, "
+            + "col_varchar varchar(100))");
   }
 
   private GoString createConnString() {
     return new GoString(
         String.format(
             "postgres://uid:pwd@localhost:%d/?statement_cache_capacity=0&sslmode=disable",
-            server.getLocalPort()));
+            testEnv.getServer().getLocalPort()));
   }
 
   @Before

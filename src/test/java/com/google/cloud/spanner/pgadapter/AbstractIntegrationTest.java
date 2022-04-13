@@ -14,13 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import com.google.cloud.spanner.Database;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.common.collect.ImmutableList;
-import java.util.Collections;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -28,128 +21,106 @@ import org.junit.runners.JUnit4;
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
 public class AbstractIntegrationTest implements IntegrationTest {
-  private static final String PG_ADAPTER_ADDRESS = System.getProperty("PG_ADAPTER_ADDRESS", null);
-  private static final String PG_ADAPTER_LOCAL_PORT =
-      System.getProperty("PG_ADAPTER_LOCAL_PORT", null);
   protected static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
-  private static ProxyServer server;
-  private static Database database;
-  private static boolean initialized;
 
-  @BeforeClass
-  public static void resetInitialized() {
-    initialized = false;
-  }
-
-  @Before
-  public void createDatabaseAndStartPGAdapter() throws Exception {
-    if (initialized) {
-      return;
-    }
-    initialized = true;
-
-    configureTestEnv(testEnv);
-    testEnv.setUp();
-    if (testEnv.isUseExistingDb()) {
-      database = testEnv.getExistingDatabase();
-    } else {
-      database = testEnv.createDatabase();
-      testEnv.updateDdl(database.getId().getDatabase(), getDdlStatements());
-    }
-    if (PG_ADAPTER_ADDRESS == null || PG_ADAPTER_LOCAL_PORT == null) {
-      String credentials = testEnv.getCredentials();
-      ImmutableList.Builder<String> argsListBuilder =
-          ImmutableList.<String>builder()
-              .add(
-                  "-p",
-                  testEnv.getProjectId(),
-                  "-i",
-                  testEnv.getInstanceId(),
-                  "-d",
-                  database.getId().getDatabase(),
-                  "-s",
-                  String.valueOf(testEnv.getPort()));
-      if (testEnv.getSpannerUrl() != null) {
-        String host = testEnv.getSpannerUrl();
-        if (host.startsWith("https://")) {
-          host = host.substring("https://".length());
-        }
-        argsListBuilder.add("-e", host);
-      }
-      if (credentials != null) {
-        argsListBuilder.add("-c", testEnv.getCredentials());
-      }
-      argsListBuilder.addAll(getAdditionalPGAdapterOptions());
-      String[] args = argsListBuilder.build().toArray(new String[0]);
-      server = new ProxyServer(new OptionsMetadata(args));
-      server.startServer();
-    }
-  }
-
-  protected static ProxyServer getServer() {
-    return server;
-  }
-
-  protected static Database getDatabase() {
-    return database;
-  }
-
-  protected static String getPGAdapterHostAndPort() {
-    if (server != null) {
-      return String.format("localhost:%d", server.getLocalPort());
-    }
-    return String.format("%s:%s", PG_ADAPTER_ADDRESS, PG_ADAPTER_LOCAL_PORT);
-  }
-
-  protected static String getPGAdapterHost() {
-    if (server != null) {
-      return "localhost";
-    }
-    return PG_ADAPTER_ADDRESS;
-  }
-
-  protected static int getPGAdapterPort() {
-    if (server != null) {
-      return server.getLocalPort();
-    }
-    return Integer.parseInt(PG_ADAPTER_LOCAL_PORT);
-  }
-
-  protected static void waitForServer() throws Exception {
-    if (server != null) {
-      testEnv.waitForServer(server);
-    }
-  }
-
-  /**
-   * Returns the DDL statements that should be executed for this test. Override in a concrete
-   * subclass if you want a different data model than the default.
-   */
-  protected Iterable<String> getDdlStatements() {
-    return ImmutableList.of(
-        "create table numbers (num int not null primary key, name varchar(100))",
-        "create table all_types ("
-            + "col_bigint bigint not null primary key, "
-            + "col_bool bool, "
-            + "col_bytea bytea, "
-            + "col_float8 float8, "
-            + "col_int int, "
-            + "col_numeric numeric, "
-            + "col_timestamptz timestamptz, "
-            + "col_varchar varchar(100))");
-  }
-
-  protected Iterable<String> getAdditionalPGAdapterOptions() {
-    return Collections.emptyList();
-  }
-
-  protected void configureTestEnv(PgAdapterTestEnv testEnv) {}
-
-  @AfterClass
-  public static void teardown() {
-    if (server != null) {
-      server.stopServer();
-    }
-    testEnv.cleanUp();
-  }
+  //  @BeforeClass
+  //  public void createDatabaseAndStartPGAdapter() throws Exception {
+  //    configureTestEnv(testEnv);
+  //    testEnv.setUp();
+  //    if (testEnv.isUseExistingDb()) {
+  //      database = testEnv.getExistingDatabase();
+  //    } else {
+  //      database = testEnv.createDatabase();
+  //      testEnv.updateDdl(database.getId().getDatabase(), getDdlStatements());
+  //    }
+  //    if (PG_ADAPTER_ADDRESS == null || PG_ADAPTER_LOCAL_PORT == null) {
+  //      String credentials = testEnv.getCredentials();
+  //      ImmutableList.Builder<String> argsListBuilder =
+  //          ImmutableList.<String>builder()
+  //              .add(
+  //                  "-p",
+  //                  testEnv.getProjectId(),
+  //                  "-i",
+  //                  testEnv.getInstanceId(),
+  //                  "-d",
+  //                  database.getId().getDatabase(),
+  //                  "-s",
+  //                  String.valueOf(testEnv.getPort()));
+  //      if (testEnv.getSpannerUrl() != null) {
+  //        String host = testEnv.getSpannerUrl();
+  //        if (host.startsWith("https://")) {
+  //          host = host.substring("https://".length());
+  //        }
+  //        argsListBuilder.add("-e", host);
+  //      }
+  //      if (credentials != null) {
+  //        argsListBuilder.add("-c", testEnv.getCredentials());
+  //      }
+  //      argsListBuilder.addAll(getAdditionalPGAdapterOptions());
+  //      String[] args = argsListBuilder.build().toArray(new String[0]);
+  //      server = new ProxyServer(new OptionsMetadata(args));
+  //      server.startServer();
+  //    }
+  //  }
+  //
+  //  protected ProxyServer getServer() {
+  //    return server;
+  //  }
+  //
+  //  protected Database getDatabase() {
+  //    return database;
+  //  }
+  //
+  //  protected String getPGAdapterHostAndPort() {
+  //    if (server != null) {
+  //      return String.format("localhost:%d", server.getLocalPort());
+  //    }
+  //    return String.format("%s:%s", PG_ADAPTER_ADDRESS, PG_ADAPTER_LOCAL_PORT);
+  //  }
+  //
+  //  protected String getPGAdapterHost() {
+  //    if (server != null) {
+  //      return "localhost";
+  //    }
+  //    return PG_ADAPTER_ADDRESS;
+  //  }
+  //
+  //  protected int getPGAdapterPort() {
+  //    if (server != null) {
+  //      return server.getLocalPort();
+  //    }
+  //    return Integer.parseInt(PG_ADAPTER_LOCAL_PORT);
+  //  }
+  //
+  //  protected void waitForServer() throws Exception {
+  //    if (server != null) {
+  //      testEnv.waitForServer(server);
+  //    }
+  //  }
+  //
+  //  /**
+  //   * Returns the DDL statements that should be executed for this test. Override in a concrete
+  //   * subclass if you want a different data model than the default.
+  //   */
+  //  protected Iterable<String> getDdlStatements() {
+  //    return ImmutableList.of(
+  //        "create table numbers (num int not null primary key, name varchar(100))",
+  //        "create table all_types ("
+  //            + "col_bigint bigint not null primary key, "
+  //            + "col_bool bool, "
+  //            + "col_bytea bytea, "
+  //            + "col_float8 float8, "
+  //            + "col_int int, "
+  //            + "col_numeric numeric, "
+  //            + "col_timestamptz timestamptz, "
+  //            + "col_varchar varchar(100))");
+  //  }
+  //
+  //  @AfterClass
+  //  public static void teardown() {
+  //    if (server != null) {
+  //      server.stopServer();
+  //    }
+  //    testEnv.cleanUp();
+  //  }
 }

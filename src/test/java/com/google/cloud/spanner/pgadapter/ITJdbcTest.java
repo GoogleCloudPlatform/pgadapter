@@ -23,6 +23,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import java.io.FileInputStream;
@@ -37,6 +38,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.Collections;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -50,7 +52,10 @@ import org.postgresql.copy.CopyManager;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
-public class ITJdbcTest extends AbstractIntegrationTest {
+public class ITJdbcTest implements IntegrationTest {
+  private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
+  private static Database database;
+
   @Parameter public String preferQueryMode;
 
   @Parameters(name = "preferQueryMode = {0}")
@@ -59,14 +64,24 @@ public class ITJdbcTest extends AbstractIntegrationTest {
   }
 
   @BeforeClass
-  public static void loadJdbcDriver() throws Exception {
+  public static void setup() throws ClassNotFoundException {
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
+
+    testEnv.setUp();
+    database = testEnv.createDatabase(PgAdapterTestEnv.DEFAULT_DATA_MODEL);
+    testEnv.startPGAdapterServer(database.getId(), Collections.emptyList());
+  }
+
+  @AfterClass
+  public static void teardown() {
+    testEnv.stopPGAdapterServer();
+    testEnv.cleanUp();
   }
 
   @Before
   public void insertTestData() {
-    String databaseId = getDatabase().getId().getDatabase();
+    String databaseId = database.getId().getDatabase();
     testEnv.write(databaseId, Collections.singleton(Mutation.delete("numbers", KeySet.all())));
     testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
     testEnv.write(
@@ -95,7 +110,8 @@ public class ITJdbcTest extends AbstractIntegrationTest {
 
   private String getConnectionUrl() {
     return String.format(
-        "jdbc:postgresql://%s/?preferQueryMode=%s", getPGAdapterHostAndPort(), preferQueryMode);
+        "jdbc:postgresql://%s/?preferQueryMode=%s",
+        testEnv.getPGAdapterHostAndPort(), preferQueryMode);
   }
 
   @Test
@@ -381,7 +397,7 @@ public class ITJdbcTest extends AbstractIntegrationTest {
   @Test
   public void testCopyIn_Small() throws SQLException, IOException {
     // Empty all data in the table.
-    String databaseId = getDatabase().getId().getDatabase();
+    String databaseId = database.getId().getDatabase();
     testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
@@ -406,7 +422,7 @@ public class ITJdbcTest extends AbstractIntegrationTest {
   @Test
   public void testCopyIn_Large_FailsWhenAtomic() throws SQLException {
     // Empty all data in the table.
-    String databaseId = getDatabase().getId().getDatabase();
+    String databaseId = database.getId().getDatabase();
     testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
@@ -441,7 +457,7 @@ public class ITJdbcTest extends AbstractIntegrationTest {
   @Test
   public void testCopyIn_Large_SucceedsWhenNonAtomic() throws SQLException, IOException {
     // Empty all data in the table.
-    String databaseId = getDatabase().getId().getDatabase();
+    String databaseId = database.getId().getDatabase();
     testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {

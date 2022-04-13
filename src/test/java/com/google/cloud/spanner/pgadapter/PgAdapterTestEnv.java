@@ -25,15 +25,19 @@ import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Spanner;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Bytes;
 import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,6 +45,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -68,8 +73,11 @@ public final class PgAdapterTestEnv {
   // DatabaseId should be set through this system property.
   public static final String TEST_DATABASE_PROPERTY = "PG_ADAPTER_DATABASE";
 
+  // PgAdapter host address (when using an external PGAdapter instance).
+  public static final String PG_ADAPTER_ADDRESS = System.getProperty("PG_ADAPTER_ADDRESS", null);
+
   // PgAdapter port should be set through this system property.
-  public static final String SERVICE_PORT = "PG_ADAPTER_PORT";
+  public static final String PG_ADAPTER_PORT = "PG_ADAPTER_PORT";
 
   // Environment variable that can be used to force the test env to assume that the test database
   // already exists. This can be used to speed up local testing by manually creating the test
@@ -86,8 +94,21 @@ public final class PgAdapterTestEnv {
   // Default database id.
   private static final String DEFAULT_DATABASE_ID = "pgtest-db";
 
-  // Default Spanner url
+  // Default Spanner url. Null indicates that the default URL should be used.
   static final String DEFAULT_SPANNER_URL = null;
+
+  static final ImmutableList<String> DEFAULT_DATA_MODEL =
+      ImmutableList.of(
+          "create table numbers (num int not null primary key, name varchar(100))",
+          "create table all_types ("
+              + "col_bigint bigint not null primary key, "
+              + "col_bool bool, "
+              + "col_bytea bytea, "
+              + "col_float8 float8, "
+              + "col_int int, "
+              + "col_numeric numeric, "
+              + "col_timestamptz timestamptz, "
+              + "col_varchar varchar(100))");
 
   // The project Id. This can be overwritten.
   private String projectId;
@@ -121,9 +142,53 @@ public final class PgAdapterTestEnv {
 
   private final List<Database> databases = new ArrayList<>();
 
-  public void setUp() throws Exception {
+  private ProxyServer server;
+
+  public void setUp() {
     spannerHost = getSpannerUrl();
     options = createSpannerOptions();
+  }
+
+  public void startPGAdapterServer(
+      DatabaseId databaseId, Iterable<String> additionalPGAdapterOptions) {
+    if (PG_ADAPTER_ADDRESS == null) {
+      String credentials = getCredentials();
+      ImmutableList.Builder<String> argsListBuilder =
+          ImmutableList.<String>builder()
+              .add(
+                  "-p",
+                  getProjectId(),
+                  "-i",
+                  getInstanceId(),
+                  "-d",
+                  databaseId.getDatabase(),
+                  "-s",
+                  String.valueOf(0));
+      if (getSpannerUrl() != null) {
+        String host = getSpannerUrl();
+        if (host.startsWith("https://")) {
+          host = host.substring("https://".length());
+        }
+        argsListBuilder.add("-e", host);
+      }
+      if (credentials != null) {
+        argsListBuilder.add("-c", getCredentials());
+      }
+      argsListBuilder.addAll(additionalPGAdapterOptions);
+      String[] args = argsListBuilder.build().toArray(new String[0]);
+      server = new ProxyServer(new OptionsMetadata(args));
+      server.startServer();
+    }
+  }
+
+  public void stopPGAdapterServer() {
+    if (server != null) {
+      server.stopServer();
+    }
+  }
+
+  public ProxyServer getServer() {
+    return server;
   }
 
   public Spanner getSpanner() {
@@ -147,11 +212,25 @@ public final class PgAdapterTestEnv {
     return gcpCredentials;
   }
 
-  public int getPort() {
-    if (port == -1) {
-      port = Integer.parseInt(System.getProperty(SERVICE_PORT, "0"));
+  public String getPGAdapterHostAndPort() {
+    if (server != null) {
+      return String.format("localhost:%d", server.getLocalPort());
     }
-    return port;
+    return String.format("%s:%s", PG_ADAPTER_ADDRESS, PG_ADAPTER_PORT);
+  }
+
+  public String getPGAdapterHost() {
+    if (server != null) {
+      return "localhost";
+    }
+    return PG_ADAPTER_ADDRESS;
+  }
+
+  public int getPGAdapterPort() {
+    if (server != null) {
+      return server.getLocalPort();
+    }
+    return Integer.parseInt(PG_ADAPTER_PORT);
   }
 
   public String getSpannerUrl() {
@@ -210,7 +289,11 @@ public final class PgAdapterTestEnv {
   }
 
   // Create database.
-  public Database createDatabase() throws Exception {
+  public Database createDatabase(Iterable<String> ddlStatements) {
+    if (isUseExistingDb()) {
+      return getExistingDatabase();
+    }
+
     if (isUseExistingDb()) {
       throw new IllegalStateException(
           "Cannot create a new test database if " + USE_EXISTING_DB + " is true.");
@@ -225,13 +308,22 @@ public final class PgAdapterTestEnv {
                 .setDialect(Dialect.POSTGRESQL)
                 .build(),
             Collections.emptyList());
-    Database db = op.get();
-    databases.add(db);
-    logger.log(Level.INFO, "Created database [" + db.getId() + "]");
-    return db;
+    try {
+      Database db = op.get();
+      databases.add(db);
+      logger.log(Level.INFO, "Created database [" + db.getId() + "]");
+      updateDdl(databaseId, ddlStatements);
+
+      return db;
+    } catch (ExecutionException e) {
+      throw SpannerExceptionFactory.asSpannerException(e.getCause());
+    } catch (InterruptedException e) {
+      throw SpannerExceptionFactory.propagateInterrupt(e);
+    }
   }
 
-  public void updateDdl(String databaseId, Iterable<String> statements) throws Exception {
+  public void updateDdl(String databaseId, Iterable<String> statements)
+      throws ExecutionException, InterruptedException {
     Spanner spanner = getSpanner();
     DatabaseAdminClient client = spanner.getDatabaseAdminClient();
     OperationFuture<Void, UpdateDatabaseDdlMetadata> op =
@@ -276,7 +368,7 @@ public final class PgAdapterTestEnv {
   }
 
   // Setup spanner options.
-  private SpannerOptions createSpannerOptions() throws Exception {
+  private SpannerOptions createSpannerOptions() {
     projectId = getProjectId();
     instanceId = getInstanceId();
 
@@ -284,7 +376,11 @@ public final class PgAdapterTestEnv {
     gcpCredentials = env.get(GCP_CREDENTIALS);
     GoogleCredentials credentials = null;
     if (!Strings.isNullOrEmpty(gcpCredentials)) {
-      credentials = GoogleCredentials.fromStream(new FileInputStream(gcpCredentials));
+      try {
+        credentials = GoogleCredentials.fromStream(new FileInputStream(gcpCredentials));
+      } catch (IOException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
+      }
     }
     SpannerOptions.Builder builder = SpannerOptions.newBuilder().setProjectId(projectId);
     if (spannerHost != null) {
@@ -340,8 +436,10 @@ public final class PgAdapterTestEnv {
     byte[] value;
   }
 
-  void waitForServer(ProxyServer server) throws Exception {
-    server.awaitRunning(1L, TimeUnit.SECONDS);
+  void waitForServer() throws Exception {
+    if (server != null) {
+      server.awaitRunning(1L, TimeUnit.SECONDS);
+    }
   }
 
   void initializeConnection(DataOutputStream out) throws Exception {

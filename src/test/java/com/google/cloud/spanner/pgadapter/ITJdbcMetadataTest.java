@@ -20,6 +20,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
@@ -39,11 +40,17 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
-@Ignore("Seems to take a long time")
-public class ITJdbcMetadataTest extends AbstractIntegrationTest {
+@Category(IntegrationTest.class)
+@RunWith(JUnit4.class)
+public class ITJdbcMetadataTest implements IntegrationTest {
   private static final String[] VERSIONS =
       new String[] {
         "42.3.3", "42.3.2", "42.3.1", "42.3.0", "42.2.25", "42.2.24", "42.2.23", "42.2.22",
@@ -53,15 +60,29 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
         "42.1.1", "42.1.0", "42.0.0"
       };
 
-  @Override
-  protected Iterable<String> getAdditionalPGAdapterOptions() {
+  private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
+  private static Database database;
+
+  @BeforeClass
+  public static void setup() {
+    testEnv.setUp();
+    database = testEnv.createDatabase(getDdlStatements());
+    testEnv.startPGAdapterServer(database.getId(), getAdditionalPGAdapterOptions());
+  }
+
+  @AfterClass
+  public static void teardown() {
+    testEnv.stopPGAdapterServer();
+    testEnv.cleanUp();
+  }
+
+  private static Iterable<String> getAdditionalPGAdapterOptions() {
     return Collections.singleton("-jdbc");
   }
 
-  @Override
-  protected Iterable<String> getDdlStatements() {
+  private static Iterable<String> getDdlStatements() {
     ImmutableList.Builder<String> builder = ImmutableList.builder();
-    builder.addAll(super.getDdlStatements());
+    builder.addAll(PgAdapterTestEnv.DEFAULT_DATA_MODEL);
     builder.addAll(
         Arrays.asList(
             "create unique index idx_numbers_name on numbers (name)",
@@ -90,7 +111,7 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
   }
 
   private String createUrl() {
-    return String.format("jdbc:postgresql://%s/", getPGAdapterHostAndPort());
+    return String.format("jdbc:postgresql://%s/", testEnv.getPGAdapterHostAndPort());
   }
 
   private void runForAllVersions(Consumer<Connection> runnable) throws Exception {
@@ -153,8 +174,11 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
         connection -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
-            assertEquals(
-                getServer().getOptions().getServerVersion(), metadata.getDatabaseProductVersion());
+            if (testEnv.getServer() != null) {
+              assertEquals(
+                  testEnv.getServer().getOptions().getServerVersion(),
+                  metadata.getDatabaseProductVersion());
+            }
           } catch (SQLException e) {
             throw SpannerExceptionFactory.asSpannerException(e);
           }
@@ -811,16 +835,14 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
               assertTrue(schemas.next());
               // TODO: Remove once TABLE_CATALOG is always filled.
               if (schemas.getString("TABLE_CATALOG") != null) {
-                assertEquals(
-                    getDatabase().getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
               }
               assertEquals("information_schema", schemas.getString("TABLE_SCHEM"));
 
               assertTrue(schemas.next());
               // TODO: Remove once TABLE_CATALOG is always filled.
               if (schemas.getString("TABLE_CATALOG") != null) {
-                assertEquals(
-                    getDatabase().getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
               }
               // TODO: Remove once pg_catalog is always present.
               if ("pg_catalog".equals(schemas.getString("TABLE_SCHEM"))) {
@@ -831,16 +853,14 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
 
               // TODO: Remove once TABLE_CATALOG is always filled.
               if (schemas.getString("TABLE_CATALOG") != null) {
-                assertEquals(
-                    getDatabase().getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
               }
               assertEquals("public", schemas.getString("TABLE_SCHEM"));
 
               assertTrue(schemas.next());
               // TODO: Remove once TABLE_CATALOG is always filled.
               if (schemas.getString("TABLE_CATALOG") != null) {
-                assertEquals(
-                    getDatabase().getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
               }
               assertEquals("spanner_sys", schemas.getString("TABLE_SCHEM"));
 
@@ -851,8 +871,7 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
               assertTrue(schemas.next());
               // TODO: Remove once TABLE_CATALOG is always filled.
               if (schemas.getString("TABLE_CATALOG") != null) {
-                assertEquals(
-                    getDatabase().getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
               }
               assertEquals("public", schemas.getString("TABLE_SCHEM"));
 

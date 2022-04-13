@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 
+import com.google.cloud.spanner.Database;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Bytes;
 import java.io.DataInputStream;
@@ -27,14 +28,36 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 import org.postgresql.core.Oid;
 
-public final class ITParameterizedQueryTest extends AbstractIntegrationTest {
+@Category(IntegrationTest.class)
+@RunWith(JUnit4.class)
+public final class ITParameterizedQueryTest implements IntegrationTest {
+  private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
+  private static Database database;
+
   private Socket clientSocket;
   private DataOutputStream out;
   private DataInputStream in;
+
+  @BeforeClass
+  public static void setup() {
+    database = testEnv.createDatabase(getDdlStatements());
+    testEnv.startPGAdapterServer(database.getId(), Collections.emptyList());
+  }
+
+  @AfterClass
+  public static void teardown() {
+    testEnv.stopPGAdapterServer();
+    testEnv.cleanUp();
+  }
 
   @Before
   public void insertTestData() {
@@ -42,11 +65,10 @@ public final class ITParameterizedQueryTest extends AbstractIntegrationTest {
         new ArrayList<>(Arrays.asList("(1, 1, '1')", "(2, 20, 'Joe')", "(3, 23, 'Jack')"));
     String dml = "INSERT INTO users (id, age, name) VALUES " + String.join(", ", values);
     testEnv.updateTables(
-        getDatabase().getId().getDatabase(), ImmutableList.of("delete from users", dml));
+        database.getId().getDatabase(), ImmutableList.of("delete from users", dml));
   }
 
-  @Override
-  protected Iterable<String> getDdlStatements() {
+  private static Iterable<String> getDdlStatements() {
     return Collections.singletonList(
         "CREATE TABLE users (\n"
             + "  id   bigint PRIMARY KEY,\n"
@@ -186,9 +208,9 @@ public final class ITParameterizedQueryTest extends AbstractIntegrationTest {
 
   @Test
   public void unnamedParameterTest() throws Exception {
-    waitForServer();
+    testEnv.waitForServer();
 
-    clientSocket = new Socket(getPGAdapterHost(), getPGAdapterPort());
+    clientSocket = new Socket(testEnv.getPGAdapterHost(), testEnv.getPGAdapterPort());
     out = new DataOutputStream(clientSocket.getOutputStream());
     in = new DataInputStream(clientSocket.getInputStream());
     testEnv.initializeConnection(out);
@@ -240,11 +262,11 @@ public final class ITParameterizedQueryTest extends AbstractIntegrationTest {
 
   @Test
   public void parameterTest() throws Exception {
-    waitForServer();
+    testEnv.waitForServer();
     String statementName = "test-statement\0";
     String portalName = "test-portal\0";
 
-    clientSocket = new Socket(getPGAdapterHost(), getPGAdapterPort());
+    clientSocket = new Socket(testEnv.getPGAdapterHost(), testEnv.getPGAdapterPort());
     out = new DataOutputStream(clientSocket.getOutputStream());
     in = new DataInputStream(clientSocket.getInputStream());
     testEnv.initializeConnection(out);
