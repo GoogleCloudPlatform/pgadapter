@@ -325,7 +325,6 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     List<RollbackRequest> rollbackRequests = mockSpanner.getRequestsOfType(RollbackRequest.class);
     assertEquals(1, rollbackRequests.size());
 
-    // BEGIN statement commits the implicit transaction
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
     assertEquals(1, commitRequests.size());
   }
@@ -355,6 +354,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(INVALID_DML.getSql(), request.getStatements(1).getSql());
 
+    // The aborted transaction should be rolled back by pgadapter
     List<RollbackRequest> rollbackRequests = mockSpanner.getRequestsOfType(RollbackRequest.class);
     assertEquals(1, rollbackRequests.size());
 
@@ -751,8 +751,11 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
       assertEquals(3, requests.size());
       assertEquals(SELECT1.getSql(), requests.get(0).getSql());
+      assertTrue(requests.get(0).getTransaction().hasSingleUse());
       assertEquals(INSERT_STATEMENT.getSql(), requests.get(1).getSql());
+      assertTrue(requests.get(1).getTransaction().hasBegin());
       assertEquals(SELECT2.getSql(), requests.get(2).getSql());
+      assertTrue(requests.get(2).getTransaction().hasSingleUse());
 
       List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
       assertEquals(1, commitRequests.size());
