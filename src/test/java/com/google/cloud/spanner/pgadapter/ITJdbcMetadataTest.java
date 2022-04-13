@@ -16,9 +16,10 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
-import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
@@ -34,14 +35,14 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Types;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class ITJdbcMetadataTest extends AbstractIntegrationTest {
-  private static ProxyServer server;
-  private static Database database;
   private static final String[] VERSIONS =
       new String[] {
         "42.3.3", "42.3.2", "42.3.1", "42.3.0", "42.2.25", "42.2.24", "42.2.23", "42.2.22",
@@ -50,6 +51,11 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
         "42.2.5", "42.2.4", "42.2.3", "42.2.2", "42.2.1", "42.2.0", "42.1.4", "42.1.3", "42.1.2",
         "42.1.1", "42.1.0", "42.0.0"
       };
+
+  @Override
+  protected Iterable<String> getAdditionalPGAdapterOptions() {
+    return Collections.singleton("-jdbc");
+  }
 
   @Override
   protected Iterable<String> getDdlStatements() {
@@ -118,6 +124,8 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
         Object runner = constructor.newInstance();
         Method runMethod = runner.getClass().getDeclaredMethod("run", String.class, Consumer.class);
         runMethod.invoke(runner, createUrl(), runnable);
+      } catch (Throwable t) {
+        throw new Exception(String.format("Error for version %s:", version) + t.getMessage(), t);
       } finally {
         Thread.currentThread().setContextClassLoader(defaultClassLoader);
       }
@@ -126,7 +134,7 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
 
   public static class TestRunner {
     public void run(String url, Consumer<Connection> runnable) throws Exception {
-      // Dynamically load the PG JDBC driver using the defautl class loader of the current thread.
+      // Dynamically load the PG JDBC driver using the default class loader of the current thread.
       Class.forName("org.postgresql.Driver");
       try (Connection connection = DriverManager.getConnection(url)) {
         runnable.accept(connection);
@@ -145,7 +153,7 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             assertEquals(
-                server.getOptions().getServerVersion(), metadata.getDatabaseProductVersion());
+                getServer().getOptions().getServerVersion(), metadata.getDatabaseProductVersion());
           } catch (SQLException e) {
             throw SpannerExceptionFactory.asSpannerException(e);
           }
@@ -182,6 +190,24 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
   }
 
   @Test
+  public void testDatabaseMetaDataTables_Unfiltered() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            try (ResultSet tables = metadata.getTables(null, null, null, null)) {
+              // Just assert that there is at least one result.
+              assertTrue(tables.next());
+              //noinspection StatementWithEmptyBody
+              while (tables.next()) {}
+            }
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
+  }
+
+  @Test
   public void testDatabaseMetaDataTables_FilteredByName() throws Exception {
     runForAllVersions(
         connection -> {
@@ -189,6 +215,31 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet tables =
                 metadata.getTables(null, "public", "%a%", new String[] {"TABLE"})) {
+              assertTrue(tables.next());
+              assertEquals("albums", tables.getString("TABLE_NAME"));
+              assertTrue(tables.next());
+              assertEquals("all_types", tables.getString("TABLE_NAME"));
+              assertTrue(tables.next());
+              assertEquals("recording_attempt", tables.getString("TABLE_NAME"));
+              assertTrue(tables.next());
+              assertEquals("tracks", tables.getString("TABLE_NAME"));
+
+              assertFalse(tables.next());
+            }
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
+  }
+
+  @Test
+  public void testDatabaseMetaDataTables_TablesAndViews() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            try (ResultSet tables =
+                metadata.getTables(null, "public", "%a%", new String[] {"TABLE", "VIEW"})) {
               assertTrue(tables.next());
               assertEquals("albums", tables.getString("TABLE_NAME"));
               assertTrue(tables.next());
@@ -307,9 +358,14 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
             try (ResultSet indexInfo =
                 metadata.getIndexInfo(null, "public", "all_types", false, false)) {
               assertTrue(indexInfo.next());
+              assertEquals("col_bigint", indexInfo.getString("COLUMN_NAME"));
+              assertEquals("PRIMARY_KEY", indexInfo.getString("INDEX_NAME"));
+              assertTrue(indexInfo.next());
               assertEquals("col_varchar", indexInfo.getString("COLUMN_NAME"));
+              assertEquals("idx_col_varchar_int", indexInfo.getString("INDEX_NAME"));
               assertTrue(indexInfo.next());
               assertEquals("col_int", indexInfo.getString("COLUMN_NAME"));
+              assertEquals("idx_col_varchar_int", indexInfo.getString("INDEX_NAME"));
 
               assertFalse(indexInfo.next());
             }
@@ -328,7 +384,11 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
             try (ResultSet indexInfo =
                 metadata.getIndexInfo(null, "public", "numbers", true, false)) {
               assertTrue(indexInfo.next());
+              assertEquals("num", indexInfo.getString("COLUMN_NAME"));
+              assertEquals("PRIMARY_KEY", indexInfo.getString("INDEX_NAME"));
+              assertTrue(indexInfo.next());
               assertEquals("name", indexInfo.getString("COLUMN_NAME"));
+              assertEquals("idx_numbers_name", indexInfo.getString("INDEX_NAME"));
 
               assertFalse(indexInfo.next());
             }
@@ -570,17 +630,20 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
         });
   }
 
-  @Test(expected = SQLFeatureNotSupportedException.class)
-  public void testDatabaseMetaDataSuperTypes() throws SQLException {
-    try (Connection connection =
-        DriverManager.getConnection(
-            String.format("jdbc:postgresql://localhost:%d/", testEnv.getPort()))) {
-      DatabaseMetaData metadata = connection.getMetaData();
-      // This method is not supported by the PG JDBC driver.
-      try (ResultSet types = metadata.getSuperTypes(null, null, null)) {
-        assertFalse(types.next());
-      }
-    }
+  @Test
+  public void testDatabaseMetaDataSuperTypes() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            // This method is not supported by the PG JDBC driver.
+            assertThrows(
+                SQLFeatureNotSupportedException.class,
+                () -> metadata.getSuperTypes(null, null, null));
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
   }
 
   @Test
@@ -614,6 +677,10 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
             try (ResultSet tablePrivileges = metadata.getTablePrivileges(null, null, null)) {
               assertFalse(tablePrivileges.next());
             }
+            try (ResultSet tablePrivileges =
+                metadata.getTablePrivileges(null, "public", "all_types")) {
+              assertFalse(tablePrivileges.next());
+            }
           } catch (SQLException e) {
             throw SpannerExceptionFactory.asSpannerException(e);
           }
@@ -630,25 +697,37 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
                 metadata.getColumnPrivileges(null, null, null, null)) {
               assertFalse(columnPrivileges.next());
             }
+            try (ResultSet columnPrivileges =
+                metadata.getColumnPrivileges(null, "public", "all_types", null)) {
+              assertFalse(columnPrivileges.next());
+            }
+            try (ResultSet columnPrivileges =
+                metadata.getColumnPrivileges(null, null, null, "col_bigint")) {
+              assertFalse(columnPrivileges.next());
+            }
           } catch (SQLException e) {
             throw SpannerExceptionFactory.asSpannerException(e);
           }
         });
   }
 
-  @Test(expected = SQLFeatureNotSupportedException.class)
-  public void testDatabaseMetaDataAttributes() throws SQLException {
-    try (Connection connection =
-        DriverManager.getConnection(
-            String.format("jdbc:postgresql://localhost:%d/", testEnv.getPort()))) {
-      DatabaseMetaData metadata = connection.getMetaData();
-      // This method is not supported by the PG JDBC driver.
-      try (ResultSet attributes = metadata.getAttributes(null, null, null, null)) {
-        assertFalse(attributes.next());
-      }
-    }
+  @Test
+  public void testDatabaseMetaDataAttributes() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            // This method is not supported by the PG JDBC driver.
+            assertThrows(
+                SQLFeatureNotSupportedException.class,
+                () -> metadata.getAttributes(null, null, null, null));
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
   }
 
+  @Ignore("Not yet supported")
   @Test
   public void testDatabaseMetaDataBestRowIdentifier() throws Exception {
     runForAllVersions(
@@ -682,6 +761,29 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
   }
 
   @Test
+  public void testDatabaseMetaDataBestRowIdentifier_NoData() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            // The current replacement returns an empty result set.
+            try (ResultSet rowIdentifiers =
+                metadata.getBestRowIdentifier(
+                    null, "public", "singers", DatabaseMetaData.bestRowTransaction, false)) {
+              assertFalse(rowIdentifiers.next());
+            }
+            try (ResultSet rowIdentifiers =
+                metadata.getBestRowIdentifier(
+                    null, "public", "tracks", DatabaseMetaData.bestRowTransaction, false)) {
+              assertFalse(rowIdentifiers.next());
+            }
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
+  }
+
+  @Test
   public void testDatabaseMetaDataCatalogs() throws Exception {
     runForAllVersions(
         connection -> {
@@ -689,7 +791,7 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet catalogs = metadata.getCatalogs()) {
               assertTrue(catalogs.next());
-              assertEquals("", catalogs.getString("TABLE_CAT"));
+              assertNotNull(catalogs.getString("TABLE_CAT"));
               assertFalse(catalogs.next());
             }
           } catch (SQLException e) {
@@ -706,19 +808,39 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet schemas = metadata.getSchemas()) {
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              // TODO: Remove once TABLE_CATALOG is always filled.
+              if (schemas.getString("TABLE_CATALOG") != null) {
+                assertEquals(
+                    getDatabase().getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              }
               assertEquals("information_schema", schemas.getString("TABLE_SCHEM"));
 
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
-              assertEquals("pg_catalog", schemas.getString("TABLE_SCHEM"));
+              // TODO: Remove once TABLE_CATALOG is always filled.
+              if (schemas.getString("TABLE_CATALOG") != null) {
+                assertEquals(
+                    getDatabase().getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              }
+              // TODO: Remove once pg_catalog is always present.
+              if ("pg_catalog".equals(schemas.getString("TABLE_SCHEM"))) {
+                assertEquals("pg_catalog", schemas.getString("TABLE_SCHEM"));
 
-              assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+                assertTrue(schemas.next());
+              }
+
+              // TODO: Remove once TABLE_CATALOG is always filled.
+              if (schemas.getString("TABLE_CATALOG") != null) {
+                assertEquals(
+                    getDatabase().getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              }
               assertEquals("public", schemas.getString("TABLE_SCHEM"));
 
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              // TODO: Remove once TABLE_CATALOG is always filled.
+              if (schemas.getString("TABLE_CATALOG") != null) {
+                assertEquals(
+                    getDatabase().getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              }
               assertEquals("spanner_sys", schemas.getString("TABLE_SCHEM"));
 
               assertFalse(schemas.next());
@@ -726,7 +848,11 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
 
             try (ResultSet schemas = metadata.getSchemas(null, "public")) {
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              // TODO: Remove once TABLE_CATALOG is always filled.
+              if (schemas.getString("TABLE_CATALOG") != null) {
+                assertEquals(
+                    getDatabase().getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              }
               assertEquals("public", schemas.getString("TABLE_SCHEM"));
 
               assertFalse(schemas.next());
@@ -814,16 +940,19 @@ public class ITJdbcMetadataTest extends AbstractIntegrationTest {
         });
   }
 
-  @Test(expected = SQLFeatureNotSupportedException.class)
-  public void testDatabaseMetaDataPseudoColumns() throws SQLException {
-    try (Connection connection =
-        DriverManager.getConnection(
-            String.format("jdbc:postgresql://localhost:%d/", testEnv.getPort()))) {
-      DatabaseMetaData metadata = connection.getMetaData();
-      try (ResultSet pseudoColumns = metadata.getPseudoColumns(null, null, null, null)) {
-        assertFalse(pseudoColumns.next());
-      }
-    }
+  @Test
+  public void testDatabaseMetaDataPseudoColumns() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            assertThrows(
+                SQLFeatureNotSupportedException.class,
+                () -> metadata.getPseudoColumns(null, null, null, null));
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
   }
 
   @Test

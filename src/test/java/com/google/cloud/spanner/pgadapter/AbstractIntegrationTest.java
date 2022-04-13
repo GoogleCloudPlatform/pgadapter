@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
+import java.util.Collections;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -33,15 +34,27 @@ public class AbstractIntegrationTest implements IntegrationTest {
   protected static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static ProxyServer server;
   private static Database database;
-  private static boolean datamodelCreated;
+  private static boolean initialized;
 
   @BeforeClass
-  public static void createDatabaseAndStartPGAdapter() throws Exception {
+  public static void resetInitialized() {
+    initialized = false;
+  }
+
+  @Before
+  public void createDatabaseAndStartPGAdapter() throws Exception {
+    if (initialized) {
+      return;
+    }
+    initialized = true;
+
+    configureTestEnv(testEnv);
     testEnv.setUp();
     if (testEnv.isUseExistingDb()) {
       database = testEnv.getExistingDatabase();
     } else {
       database = testEnv.createDatabase();
+      testEnv.updateDdl(database.getId().getDatabase(), getDdlStatements());
     }
     if (PG_ADAPTER_ADDRESS == null || PG_ADAPTER_LOCAL_PORT == null) {
       String credentials = testEnv.getCredentials();
@@ -57,11 +70,16 @@ public class AbstractIntegrationTest implements IntegrationTest {
                   "-s",
                   String.valueOf(testEnv.getPort()));
       if (testEnv.getSpannerUrl() != null) {
-        argsListBuilder.add("-e", testEnv.getSpannerUrl());
+        String host = testEnv.getSpannerUrl();
+        if (host.startsWith("https://")) {
+          host = host.substring("https://".length());
+        }
+        argsListBuilder.add("-e", host);
       }
       if (credentials != null) {
         argsListBuilder.add("-c", testEnv.getCredentials());
       }
+      argsListBuilder.addAll(getAdditionalPGAdapterOptions());
       String[] args = argsListBuilder.build().toArray(new String[0]);
       server = new ProxyServer(new OptionsMetadata(args));
       server.startServer();
@@ -70,32 +88,6 @@ public class AbstractIntegrationTest implements IntegrationTest {
 
   protected static ProxyServer getServer() {
     return server;
-  }
-
-  /**
-   * Returns the DDL statements that should be executed for this test. Override in a concrete
-   * subclass if you want a different data model than the default.
-   */
-  protected Iterable<String> getDdlStatements() {
-    return ImmutableList.of(
-        "create table numbers (num int not null primary key, name varchar(100))",
-        "create table all_types ("
-            + "col_bigint bigint not null primary key, "
-            + "col_bool bool, "
-            + "col_bytea bytea, "
-            + "col_float8 float8, "
-            + "col_int int, "
-            + "col_numeric numeric, "
-            + "col_timestamptz timestamptz, "
-            + "col_varchar varchar(100))");
-  }
-
-  @Before
-  public void createDataModel() throws Exception {
-    if (!testEnv.isUseExistingDb() && !datamodelCreated) {
-      testEnv.updateDdl(database.getId().getDatabase(), getDdlStatements());
-      datamodelCreated = true;
-    }
   }
 
   protected static Database getDatabase() {
@@ -128,6 +120,30 @@ public class AbstractIntegrationTest implements IntegrationTest {
       testEnv.waitForServer(server);
     }
   }
+
+  /**
+   * Returns the DDL statements that should be executed for this test. Override in a concrete
+   * subclass if you want a different data model than the default.
+   */
+  protected Iterable<String> getDdlStatements() {
+    return ImmutableList.of(
+        "create table numbers (num int not null primary key, name varchar(100))",
+        "create table all_types ("
+            + "col_bigint bigint not null primary key, "
+            + "col_bool bool, "
+            + "col_bytea bytea, "
+            + "col_float8 float8, "
+            + "col_int int, "
+            + "col_numeric numeric, "
+            + "col_timestamptz timestamptz, "
+            + "col_varchar varchar(100))");
+  }
+
+  protected Iterable<String> getAdditionalPGAdapterOptions() {
+    return Collections.emptyList();
+  }
+
+  protected void configureTestEnv(PgAdapterTestEnv testEnv) {}
 
   @AfterClass
   public static void teardown() {

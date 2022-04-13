@@ -87,7 +87,7 @@ public final class PgAdapterTestEnv {
   private static final String DEFAULT_DATABASE_ID = "pgtest-db";
 
   // Default Spanner url
-  private static final String DEFAULT_SPANNER_URL = null;
+  static final String DEFAULT_SPANNER_URL = null;
 
   // The project Id. This can be overwritten.
   private String projectId;
@@ -159,6 +159,10 @@ public final class PgAdapterTestEnv {
       hostUrl = System.getProperty(TEST_SPANNER_URL_PROPERTY, DEFAULT_SPANNER_URL);
     }
     return hostUrl;
+  }
+
+  void setSpannerUrl(String spannerUrl) {
+    this.hostUrl = spannerUrl;
   }
 
   public String getProjectId() {
