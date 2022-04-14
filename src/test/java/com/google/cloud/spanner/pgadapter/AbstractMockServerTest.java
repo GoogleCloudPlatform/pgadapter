@@ -56,6 +56,7 @@ import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.logging.Logger;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -216,6 +217,11 @@ public abstract class AbstractMockServerTest {
 
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
+    doStartMockSpannerAndPgAdapterServers(Collections.emptyList());
+  }
+
+  protected static void doStartMockSpannerAndPgAdapterServers(
+      Iterable<String> extraPGAdapterOptions) throws Exception {
     mockSpanner = new MockSpannerServiceImpl();
     mockSpanner.setAbortProbability(0.0D); // We don't want any unpredictable aborted transactions.
     mockSpanner.putStatementResult(StatementResult.query(SELECT1, SELECT1_RESULTSET));
@@ -278,6 +284,7 @@ public abstract class AbstractMockServerTest {
                 String.format("localhost:%d", spannerServer.getPort()),
                 "-r",
                 "usePlainText=true;");
+    argsListBuilder.addAll(extraPGAdapterOptions);
     String[] args = argsListBuilder.build().toArray(new String[0]);
     pgServer = new ProxyServer(new OptionsMetadata(args));
     pgServer.startServer();
