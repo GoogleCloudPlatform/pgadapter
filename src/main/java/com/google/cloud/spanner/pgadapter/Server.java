@@ -26,9 +26,6 @@ public class Server {
   public static void main(String[] args) {
     try {
       OptionsMetadata optionsMetadata = new OptionsMetadata(args);
-      if (optionsMetadata.requiresMatcher()) {
-        throw new IllegalArgumentException("Starting PGAdapter with matcher!");
-      }
       ProxyServer server = new ProxyServer(optionsMetadata);
       server.startServer();
     } catch (Exception e) {
