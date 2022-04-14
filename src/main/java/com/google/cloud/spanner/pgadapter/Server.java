@@ -24,6 +24,7 @@ public class Server {
    * application. Here we call for parameter parsing and start the Proxy Server.
    */
   public static void main(String[] args) {
+    System.out.println("Starting PGAdapter with batching support");
     try {
       OptionsMetadata optionsMetadata = new OptionsMetadata(args);
       ProxyServer server = new ProxyServer(optionsMetadata);
