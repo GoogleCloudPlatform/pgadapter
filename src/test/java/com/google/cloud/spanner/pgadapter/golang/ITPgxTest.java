@@ -28,6 +28,7 @@ import java.util.Collections;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -117,7 +118,7 @@ public class ITPgxTest implements IntegrationTest {
 
   @Test
   public void testQueryAllDataTypes() {
-    assertNull(pgxTest.TestQueryAllDataTypes(createConnString()));
+    assertNull(pgxTest.TestQueryAllDataTypes(createConnString(), false));
   }
 
   @Test
@@ -130,6 +131,7 @@ public class ITPgxTest implements IntegrationTest {
     assertNull(pgxTest.TestInsertAllDataTypes(createConnString(), false));
   }
 
+  @Ignore("Untyped null values are not supported by the backend yet")
   @Test
   public void testInsertNullsAllDataTypes() {
     // Make sure there is no row that already exists with col_bigint=100

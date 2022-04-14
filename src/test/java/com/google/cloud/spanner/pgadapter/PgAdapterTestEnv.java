@@ -518,6 +518,7 @@ public final class PgAdapterTestEnv {
     }
     if (spanner != null) {
       spanner.close();
+      spanner = null;
     }
   }
 }

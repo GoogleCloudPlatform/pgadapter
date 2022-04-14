@@ -49,6 +49,7 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() {
+    testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
     testEnv.startPGAdapterServer(database.getId(), Collections.emptyList());
   }

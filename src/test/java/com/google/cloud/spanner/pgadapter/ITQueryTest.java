@@ -44,6 +44,7 @@ public final class ITQueryTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() {
+    testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
     testEnv.startPGAdapterServer(database.getId(), Collections.emptyList());
   }
