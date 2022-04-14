@@ -14,7 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 
 import com.google.cloud.spanner.Database;
 import com.google.common.collect.ImmutableList;
@@ -256,9 +256,9 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     byte[] commandCompleteData = {83, 69, 76, 69, 67, 84, 32, 49, 0};
     byte[] readyForQueryData = {73};
 
-    assertEquals(dataRow0, dataRows[0].getPayload());
-    assertEquals(commandCompleteData, commandComplete.getPayload());
-    assertEquals(readyForQueryData, readyForQuery.getPayload());
+    assertArrayEquals(dataRow0, dataRows[0].getPayload());
+    assertArrayEquals(commandCompleteData, commandComplete.getPayload());
+    assertArrayEquals(readyForQueryData, readyForQuery.getPayload());
   }
 
   @Test
@@ -313,8 +313,8 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     byte[] commandCompleteData = {83, 69, 76, 69, 67, 84, 32, 49, 0};
     byte[] readyForQueryData = {73};
 
-    assertEquals(dataRow0, dataRows[0].getPayload());
-    assertEquals(commandCompleteData, commandComplete.getPayload());
-    assertEquals(readyForQueryData, readyForQuery.getPayload());
+    assertArrayEquals(dataRow0, dataRows[0].getPayload());
+    assertArrayEquals(commandCompleteData, commandComplete.getPayload());
+    assertArrayEquals(readyForQueryData, readyForQuery.getPayload());
   }
 }

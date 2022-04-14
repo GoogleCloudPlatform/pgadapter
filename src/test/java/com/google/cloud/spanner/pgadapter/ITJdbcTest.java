@@ -60,7 +60,7 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Parameters(name = "preferQueryMode = {0}")
   public static Object[] data() {
-    return new Object[] {"extended", "simple"};
+    return new Object[] {"extended"};
   }
 
   @BeforeClass
@@ -479,7 +479,8 @@ public class ITJdbcTest implements IntegrationTest {
         assertFalse(resultSet.next());
       }
 
-      // Delete the imported data to prevent the cleanup method to fail on 'Too many mutations' when
+      // Delete the imported data to prevent the cleanup method to fail on 'Too many mutations'
+      // when
       // it tries to delete all data using a normal transaction.
       connection.createStatement().execute("delete from all_types");
     }
