@@ -63,7 +63,7 @@ public class CopyStatement extends IntermediateStatement {
 
   public CopyStatement(
       OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
-    super(options, parsedStatement, connection, false);
+    super(options, parsedStatement, connection);
   }
 
   public Exception getException() {

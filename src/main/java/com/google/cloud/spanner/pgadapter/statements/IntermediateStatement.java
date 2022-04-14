@@ -35,7 +35,6 @@ import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -68,32 +67,17 @@ public class IntermediateStatement {
   public IntermediateStatement(
       OptionsMetadata options,
       ParsedStatement parsedStatement,
-      ConnectionHandler connectionHandler,
-      boolean canBatch) {
-    this(options, parsedStatement, connectionHandler.getSpannerConnection(), canBatch);
+      ConnectionHandler connectionHandler) {
+    this(options, parsedStatement, connectionHandler.getSpannerConnection());
     this.connectionHandler = connectionHandler;
   }
 
-  public IntermediateStatement(
-      OptionsMetadata options,
-      ParsedStatement parsedStatement,
-      ConnectionHandler connectionHandler) {
-    this(options, parsedStatement, connectionHandler, true);
-  }
-
   protected IntermediateStatement(
-      OptionsMetadata options,
-      ParsedStatement parsedStatement,
-      Connection connection,
-      boolean canBatch) {
+      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
     this.options = options;
     this.parsedStatement = replaceKnownUnsupportedQueries(parsedStatement);
     this.connection = connection;
-    if (canBatch) {
-      this.statements = parseStatements(parsedStatement);
-    } else {
-      this.statements = Collections.singletonList(this.parsedStatement);
-    }
+    this.statements = parseStatements(parsedStatement);
     this.commands = StatementParser.parseCommands(this.statements);
     this.statementTypes = determineStatementTypes(this.statements);
     this.hasMoreData = new boolean[this.statements.size()];
@@ -156,9 +140,11 @@ public class IntermediateStatement {
     boolean quoteEscape = false;
     int index = 0;
     for (int i = 0; i < sql.length(); ++i) {
-      if (sql.charAt(i) == SINGLE_QUOTE) {
+      // skip escaped quotes
+      if (sql.charAt(i) == SINGLE_QUOTE && (i == 0 || sql.charAt(i - 1) != '\\')) {
         quoteEscape = !quoteEscape;
       }
+      // skip semicolon inside quotes
       if (sql.charAt(i) == STATEMENT_DELIMITER && !quoteEscape) {
         String stmt = sql.substring(index, i).trim();
         // Statements with only ';' character are empty and dropped.
