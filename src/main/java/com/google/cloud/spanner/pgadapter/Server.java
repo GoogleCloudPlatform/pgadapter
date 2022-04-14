@@ -24,9 +24,11 @@ public class Server {
    * application. Here we call for parameter parsing and start the Proxy Server.
    */
   public static void main(String[] args) {
-    System.out.println("Starting PGAdapter with batching support");
     try {
       OptionsMetadata optionsMetadata = new OptionsMetadata(args);
+      if (optionsMetadata.requiresMatcher()) {
+        throw new IllegalArgumentException("Starting PGAdapter with matcher!");
+      }
       ProxyServer server = new ProxyServer(optionsMetadata);
       server.startServer();
     } catch (Exception e) {
