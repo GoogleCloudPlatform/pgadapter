@@ -74,9 +74,17 @@ See [Options](#Options) for an explanation of all further options.
 ### In-process
 This option is only available for Java/JVM-based applications.
 
-1. Add `google-cloud-spanner-pgadapter` as a dependency to your project.
-2. Build a server using the `com.google.cloud.spanner.pgadapter.ProxyServer`
-   class:
+1. Add `google-cloud-spanner-pgadapter` as a dependency to your project by adding this to your `pom.xml` file:
+
+```xml
+<dependency>
+  <groupId>com.google.cloud</groupId>
+  <artifactId>google-cloud-spanner-pgadapter</artifactId>
+  <version>0.3.0</version>
+</dependency>
+```
+
+2. Build a server using the `com.google.cloud.spanner.pgadapter.ProxyServer` class:
 
 ```java
 class PGProxyRunner {
