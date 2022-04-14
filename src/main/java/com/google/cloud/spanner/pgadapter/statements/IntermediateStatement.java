@@ -137,21 +137,27 @@ public class IntermediateStatement {
 
     ImmutableList.Builder<String> builder = ImmutableList.builder();
     // TODO: Fix this parsing, as it does not take all types of quotes into consideration.
-    boolean quoteEscape = false;
+    boolean insideQuotes = false;
+    boolean currentCharacterIsEscaped = false;
     int index = 0;
     for (int i = 0; i < sql.length(); ++i) {
-      // skip escaped quotes
-      if (sql.charAt(i) == SINGLE_QUOTE && (i == 0 || sql.charAt(i - 1) != '\\')) {
-        quoteEscape = !quoteEscape;
+      // ignore escaped quotes
+      if (sql.charAt(i) == SINGLE_QUOTE && !currentCharacterIsEscaped) {
+        insideQuotes = !insideQuotes;
       }
       // skip semicolon inside quotes
-      if (sql.charAt(i) == STATEMENT_DELIMITER && !quoteEscape) {
+      if (sql.charAt(i) == STATEMENT_DELIMITER && !insideQuotes) {
         String stmt = sql.substring(index, i).trim();
         // Statements with only ';' character are empty and dropped.
         if (stmt.length() > 0) {
           builder.add(stmt);
         }
         index = i + 1;
+      }
+      if (currentCharacterIsEscaped) {
+        currentCharacterIsEscaped = false;
+      } else if (sql.charAt(i) == '\\') {
+        currentCharacterIsEscaped = true;
       }
     }
 
