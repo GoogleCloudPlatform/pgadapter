@@ -42,7 +42,8 @@ integration)
   mvn verify -B -Dclirr.skip=true -DskipITs=false -DPG_ADAPTER_HOST="https://${GOOGLE_CLOUD_ENDPOINT}" -DPG_ADAPTER_INSTANCE="${GOOGLE_CLOUD_INSTANCE}" -DPG_ADAPTER_DATABASE="${GOOGLE_CLOUD_DATABASE}"
   ;;
 uber-jar-build)
-  mvn clean package -B -Pshade -DskipTests
+  mvn install -DskipTests -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
+  mvn package -Pshade -DskipTests -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
   ;;
 uber-jar-release)
   PGADAPTER_VERSION="$(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=project.version -q -DforceStdout)"
