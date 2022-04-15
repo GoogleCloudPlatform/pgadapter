@@ -100,7 +100,7 @@ func TestQueryWithParameter(connString string) *C.char {
 }
 
 //export TestQueryAllDataTypes
-func TestQueryAllDataTypes(connString string) *C.char {
+func TestQueryAllDataTypes(connString string, dateSupported bool) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -118,17 +118,31 @@ func TestQueryAllDataTypes(connString string) *C.char {
 	var dateValue time.Time
 	var varcharValue string
 
-	err = conn.QueryRow(ctx, "SELECT * FROM all_types WHERE col_bigint=1").Scan(
-		&bigintValue,
-		&boolValue,
-		&byteaValue,
-		&float8Value,
-		&intValue,
-		&numericValue,
-		&timestamptzValue,
-		&dateValue,
-		&varcharValue,
-	)
+	row := conn.QueryRow(ctx, "SELECT * FROM all_types WHERE col_bigint=1")
+	if dateSupported {
+		err = row.Scan(
+			&bigintValue,
+			&boolValue,
+			&byteaValue,
+			&float8Value,
+			&intValue,
+			&numericValue,
+			&timestamptzValue,
+			&dateValue,
+			&varcharValue,
+		)
+	} else {
+		err = row.Scan(
+			&bigintValue,
+			&boolValue,
+			&byteaValue,
+			&float8Value,
+			&intValue,
+			&numericValue,
+			&timestamptzValue,
+			&varcharValue,
+		)
+	}
 	if err != nil {
 		return C.CString(fmt.Sprintf("Failed to execute query: %v", err.Error()))
 	}
@@ -152,9 +166,11 @@ func TestQueryAllDataTypes(connString string) *C.char {
 	if g, w := numericValue, wantNumericValue; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
-	wantDateValue, _ := time.Parse("2006-01-02", "2022-03-29")
-	if g, w := dateValue, wantDateValue; !reflect.DeepEqual(g, w) {
-		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	if dateSupported {
+		wantDateValue, _ := time.Parse("2006-01-02", "2022-03-29")
+		if g, w := dateValue, wantDateValue; !reflect.DeepEqual(g, w) {
+			return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+		}
 	}
 	wantTimestamptzValue, _ := time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456789+00:00")
 	if g, w := timestamptzValue.String(), wantTimestamptzValue.String(); g != w {
@@ -231,9 +247,8 @@ func TestInsertNullsAllDataTypes(connString string, dateSupported bool) *C.char 
 		sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
 		tag, err = conn.Exec(ctx, sql, int64(100), nil, nil, nil, nil, nil, nil, nil, nil)
 	} else {
-		var b *bool
 		sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8)"
-		tag, err = conn.Exec(ctx, sql, int64(100), b, nil, nil, nil, nil, nil, nil, nil)
+		tag, err = conn.Exec(ctx, sql, int64(100), nil, nil, nil, nil, nil, nil, nil)
 	}
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
