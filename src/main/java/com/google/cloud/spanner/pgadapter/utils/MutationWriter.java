@@ -362,6 +362,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
       }
       this.payload.close();
       this.parser.close();
+      closeErrorFile();
     }
     return rowCount;
   }

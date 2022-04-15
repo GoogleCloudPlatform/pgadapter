@@ -174,6 +174,285 @@ public class PgJdbcCatalog {
   public static final String PG_JDBC_GET_SCHEMAS_REPLACEMENT =
       "select schema_name as TABLE_SCHEM, catalog_name AS TABLE_CATALOG from information_schema.schemata WHERE true ";
 
+  public static final String PG_JDBC_GET_TABLES_PREFIX_1 =
+      "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME,  CASE n.nspname ~ '^pg_' OR n.nspname = 'information_schema'  WHEN true THEN CASE  WHEN n.nspname = 'pg_catalog' OR n.nspname = 'information_schema' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TABLE'   WHEN 'v' THEN 'SYSTEM VIEW'   WHEN 'i' THEN 'SYSTEM INDEX'   ELSE NULL   END  WHEN n.nspname = 'pg_toast' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TOAST TABLE'   WHEN 'i' THEN 'SYSTEM TOAST INDEX'   ELSE NULL   END  ELSE CASE c.relkind   WHEN 'r' THEN 'TEMPORARY TABLE'   WHEN 'p' THEN 'TEMPORARY TABLE'   WHEN 'i' THEN 'TEMPORARY INDEX'   WHEN 'S' THEN 'TEMPORARY SEQUENCE'   WHEN 'v' THEN 'TEMPORARY VIEW'   ELSE NULL   END  END  WHEN false THEN CASE c.relkind  WHEN 'r' THEN 'TABLE'  WHEN 'p' THEN 'PARTITIONED TABLE'  WHEN 'i' THEN 'INDEX'  WHEN 'P' then 'PARTITIONED INDEX'  WHEN 'S' THEN 'SEQUENCE'  WHEN 'v' THEN 'VIEW'  WHEN 'c' THEN 'TYPE'  WHEN 'f' THEN 'FOREIGN TABLE'  WHEN 'm' THEN 'MATERIALIZED VIEW'  ELSE NULL  END  ELSE NULL  END  AS TABLE_TYPE, d.description AS REMARKS,  '' as TYPE_CAT, '' as TYPE_SCHEM, '' as TYPE_NAME, '' AS SELF_REFERENCING_COL_NAME, '' AS REF_GENERATION  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c  LEFT JOIN (select * from (select 0 as objoid, 0 as classoid, 0 as objsubid, '' as description) pg_description where false) d ON (c.oid = d.objoid AND d.objsubid = 0  and d.classoid = 0)  WHERE c.relnamespace = n.oid";
+  public static final String PG_JDBC_GET_TABLES_PREFIX_2 =
+      "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME,  CASE n.nspname ~ '^pg_' OR n.nspname = 'information_schema'  WHEN true THEN CASE  WHEN n.nspname = 'pg_catalog' OR n.nspname = 'information_schema' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TABLE'   WHEN 'v' THEN 'SYSTEM VIEW'   WHEN 'i' THEN 'SYSTEM INDEX'   ELSE NULL   END  WHEN n.nspname = 'pg_toast' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TOAST TABLE'   WHEN 'i' THEN 'SYSTEM TOAST INDEX'   ELSE NULL   END  ELSE CASE c.relkind   WHEN 'r' THEN 'TEMPORARY TABLE'   WHEN 'p' THEN 'TEMPORARY TABLE'   WHEN 'i' THEN 'TEMPORARY INDEX'   WHEN 'S' THEN 'TEMPORARY SEQUENCE'   WHEN 'v' THEN 'TEMPORARY VIEW'   ELSE NULL   END  END  WHEN false THEN CASE c.relkind  WHEN 'r' THEN 'TABLE'  WHEN 'p' THEN 'PARTITIONED TABLE'  WHEN 'i' THEN 'INDEX'  WHEN 'P' then 'PARTITIONED INDEX'  WHEN 'S' THEN 'SEQUENCE'  WHEN 'v' THEN 'VIEW'  WHEN 'c' THEN 'TYPE'  WHEN 'f' THEN 'FOREIGN TABLE'  WHEN 'm' THEN 'MATERIALIZED VIEW'  ELSE NULL  END  ELSE NULL  END  AS TABLE_TYPE, d.description AS REMARKS,  '' as TYPE_CAT, '' as TYPE_SCHEM, '' as TYPE_NAME, '' AS SELF_REFERENCING_COL_NAME, '' AS REF_GENERATION  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c  LEFT JOIN pg_catalog.pg_description d ON (c.oid = d.objoid AND d.objsubid = 0  and d.classoid = 'pg_class'::regclass)  WHERE c.relnamespace = n.oid  ";
+  public static final String PG_JDBC_GET_TABLES_PREFIX_3 =
+      "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME,  CASE n.nspname ~ '^pg_' OR n.nspname = 'information_schema'  WHEN true THEN CASE  WHEN n.nspname = 'pg_catalog' OR n.nspname = 'information_schema' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TABLE'   WHEN 'v' THEN 'SYSTEM VIEW'   WHEN 'i' THEN 'SYSTEM INDEX'   ELSE NULL   END  WHEN n.nspname = 'pg_toast' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TOAST TABLE'   WHEN 'i' THEN 'SYSTEM TOAST INDEX'   ELSE NULL   END  ELSE CASE c.relkind   WHEN 'r' THEN 'TEMPORARY TABLE'   WHEN 'p' THEN 'TEMPORARY TABLE'   WHEN 'i' THEN 'TEMPORARY INDEX'   WHEN 'S' THEN 'TEMPORARY SEQUENCE'   WHEN 'v' THEN 'TEMPORARY VIEW'   ELSE NULL   END  END  WHEN false THEN CASE c.relkind  WHEN 'r' THEN 'TABLE'  WHEN 'p' THEN 'PARTITIONED TABLE'  WHEN 'i' THEN 'INDEX'  WHEN 'P' then 'PARTITIONED INDEX'  WHEN 'S' THEN 'SEQUENCE'  WHEN 'v' THEN 'VIEW'  WHEN 'c' THEN 'TYPE'  WHEN 'f' THEN 'FOREIGN TABLE'  WHEN 'm' THEN 'MATERIALIZED VIEW'  ELSE NULL  END  ELSE NULL  END  AS TABLE_TYPE, d.description AS REMARKS,  '' as TYPE_CAT, '' as TYPE_SCHEM, '' as TYPE_NAME, '' AS SELF_REFERENCING_COL_NAME, '' AS REF_GENERATION  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c  LEFT JOIN (select * from (select 0 as objoid, 0 as classoid, 0 as objsubid, '' as description) pg_description where false) d ON (c.oid = d.objoid AND d.objsubid = 0)  LEFT JOIN pg_catalog.pg_class dc ON (d.classoid=dc.oid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dn.oid=dc.relnamespace AND dn.nspname='pg_catalog')  WHERE c.relnamespace = n.oid  ";
+  public static final String PG_JDBC_GET_TABLES_PREFIX_4 =
+      "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME,  CASE n.nspname ~ '^pg_' OR n.nspname = 'information_schema'  WHEN true THEN CASE  WHEN n.nspname = 'pg_catalog' OR n.nspname = 'information_schema' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TABLE'   WHEN 'v' THEN 'SYSTEM VIEW'   WHEN 'i' THEN 'SYSTEM INDEX'   ELSE NULL   END  WHEN n.nspname = 'pg_toast' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TOAST TABLE'   WHEN 'i' THEN 'SYSTEM TOAST INDEX'   ELSE NULL   END  ELSE CASE c.relkind   WHEN 'r' THEN 'TEMPORARY TABLE'   WHEN 'p' THEN 'TEMPORARY TABLE'   WHEN 'i' THEN 'TEMPORARY INDEX'   WHEN 'S' THEN 'TEMPORARY SEQUENCE'   WHEN 'v' THEN 'TEMPORARY VIEW'   ELSE NULL   END  END  WHEN false THEN CASE c.relkind  WHEN 'r' THEN 'TABLE'  WHEN 'p' THEN 'PARTITIONED TABLE'  WHEN 'i' THEN 'INDEX'  WHEN 'P' then 'PARTITIONED INDEX'  WHEN 'S' THEN 'SEQUENCE'  WHEN 'v' THEN 'VIEW'  WHEN 'c' THEN 'TYPE'  WHEN 'f' THEN 'FOREIGN TABLE'  WHEN 'm' THEN 'MATERIALIZED VIEW'  ELSE NULL  END  ELSE NULL  END  AS TABLE_TYPE, d.description AS REMARKS,  '' as TYPE_CAT, '' as TYPE_SCHEM, '' as TYPE_NAME, '' AS SELF_REFERENCING_COL_NAME, '' AS REF_GENERATION  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c  LEFT JOIN pg_catalog.pg_description d ON (c.oid = d.objoid AND d.objsubid = 0)  LEFT JOIN pg_catalog.pg_class dc ON (d.classoid=dc.oid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dn.oid=dc.relnamespace AND dn.nspname='pg_catalog')  WHERE c.relnamespace = n.oid  ";
+  public static final String PG_JDBC_GET_TABLES_PREFIX_5 =
+      "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME,  CASE n.nspname ~ '^pg_' OR n.nspname = 'information_schema'  WHEN true THEN CASE  WHEN n.nspname = 'pg_catalog' OR n.nspname = 'information_schema' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TABLE'   WHEN 'v' THEN 'SYSTEM VIEW'   WHEN 'i' THEN 'SYSTEM INDEX'   ELSE NULL   END  WHEN n.nspname = 'pg_toast' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TOAST TABLE'   WHEN 'i' THEN 'SYSTEM TOAST INDEX'   ELSE NULL   END  ELSE CASE c.relkind   WHEN 'r' THEN 'TEMPORARY TABLE'   WHEN 'p' THEN 'TEMPORARY TABLE'   WHEN 'i' THEN 'TEMPORARY INDEX'   WHEN 'S' THEN 'TEMPORARY SEQUENCE'   WHEN 'v' THEN 'TEMPORARY VIEW'   ELSE NULL   END  END  WHEN false THEN CASE c.relkind  WHEN 'r' THEN 'TABLE'  WHEN 'p' THEN 'PARTITIONED TABLE'  WHEN 'i' THEN 'INDEX'  WHEN 'S' THEN 'SEQUENCE'  WHEN 'v' THEN 'VIEW'  WHEN 'c' THEN 'TYPE'  WHEN 'f' THEN 'FOREIGN TABLE'  WHEN 'm' THEN 'MATERIALIZED VIEW'  ELSE NULL  END  ELSE NULL  END  AS TABLE_TYPE, d.description AS REMARKS,  '' as TYPE_CAT, '' as TYPE_SCHEM, '' as TYPE_NAME, '' AS SELF_REFERENCING_COL_NAME, '' AS REF_GENERATION  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c  LEFT JOIN pg_catalog.pg_description d ON (c.oid = d.objoid AND d.objsubid = 0)  LEFT JOIN pg_catalog.pg_class dc ON (d.classoid=dc.oid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dn.oid=dc.relnamespace AND dn.nspname='pg_catalog')  WHERE c.relnamespace = n.oid  ";
+  public static final String PG_JDBC_GET_TABLES_PREFIX_6 =
+      "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME,  CASE n.nspname ~ '^pg_' OR n.nspname = 'information_schema'  WHEN true THEN CASE  WHEN n.nspname = 'pg_catalog' OR n.nspname = 'information_schema' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TABLE'   WHEN 'v' THEN 'SYSTEM VIEW'   WHEN 'i' THEN 'SYSTEM INDEX'   ELSE NULL   END  WHEN n.nspname = 'pg_toast' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TOAST TABLE'   WHEN 'i' THEN 'SYSTEM TOAST INDEX'   ELSE NULL   END  ELSE CASE c.relkind   WHEN 'r' THEN 'TEMPORARY TABLE'   WHEN 'p' THEN 'TEMPORARY TABLE'   WHEN 'i' THEN 'TEMPORARY INDEX'   WHEN 'S' THEN 'TEMPORARY SEQUENCE'   WHEN 'v' THEN 'TEMPORARY VIEW'   ELSE NULL   END  END  WHEN false THEN CASE c.relkind  WHEN 'r' THEN 'TABLE'  WHEN 'p' THEN 'TABLE'  WHEN 'i' THEN 'INDEX'  WHEN 'S' THEN 'SEQUENCE'  WHEN 'v' THEN 'VIEW'  WHEN 'c' THEN 'TYPE'  WHEN 'f' THEN 'FOREIGN TABLE'  WHEN 'm' THEN 'MATERIALIZED VIEW'  ELSE NULL  END  ELSE NULL  END  AS TABLE_TYPE, d.description AS REMARKS,  '' as TYPE_CAT, '' as TYPE_SCHEM, '' as TYPE_NAME, '' AS SELF_REFERENCING_COL_NAME, '' AS REF_GENERATION  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c  LEFT JOIN pg_catalog.pg_description d ON (c.oid = d.objoid AND d.objsubid = 0)  LEFT JOIN pg_catalog.pg_class dc ON (d.classoid=dc.oid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dn.oid=dc.relnamespace AND dn.nspname='pg_catalog')  WHERE c.relnamespace = n.oid  ";
+  public static final String PG_JDBC_GET_TABLES_PREFIX_7 =
+      "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME,  CASE n.nspname ~ '^pg_' OR n.nspname = 'information_schema'  WHEN true THEN CASE  WHEN n.nspname = 'pg_catalog' OR n.nspname = 'information_schema' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TABLE'   WHEN 'v' THEN 'SYSTEM VIEW'   WHEN 'i' THEN 'SYSTEM INDEX'   ELSE NULL   END  WHEN n.nspname = 'pg_toast' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TOAST TABLE'   WHEN 'i' THEN 'SYSTEM TOAST INDEX'   ELSE NULL   END  ELSE CASE c.relkind   WHEN 'r' THEN 'TEMPORARY TABLE'   WHEN 'p' THEN 'TEMPORARY TABLE'   WHEN 'i' THEN 'TEMPORARY INDEX'   WHEN 'S' THEN 'TEMPORARY SEQUENCE'   WHEN 'v' THEN 'TEMPORARY VIEW'   ELSE NULL   END  END  WHEN false THEN CASE c.relkind  WHEN 'r' THEN 'TABLE'  WHEN 'p' THEN 'TABLE'  WHEN 'i' THEN 'INDEX'  WHEN 'S' THEN 'SEQUENCE'  WHEN 'v' THEN 'VIEW'  WHEN 'c' THEN 'TYPE'  WHEN 'f' THEN 'FOREIGN TABLE'  WHEN 'm' THEN 'MATERIALIZED VIEW'  ELSE NULL  END  ELSE NULL  END  AS TABLE_TYPE, d.description AS REMARKS  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c  LEFT JOIN pg_catalog.pg_description d ON (c.oid = d.objoid AND d.objsubid = 0)  LEFT JOIN pg_catalog.pg_class dc ON (d.classoid=dc.oid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dn.oid=dc.relnamespace AND dn.nspname='pg_catalog')  WHERE c.relnamespace = n.oid  ";
+  public static final String PG_JDBC_GET_TABLES_PREFIX_8 =
+      "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, c.relname AS TABLE_NAME,  CASE n.nspname ~ '^pg_' OR n.nspname = 'information_schema'  WHEN true THEN CASE  WHEN n.nspname = 'pg_catalog' OR n.nspname = 'information_schema' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TABLE'   WHEN 'v' THEN 'SYSTEM VIEW'   WHEN 'i' THEN 'SYSTEM INDEX'   ELSE NULL   END  WHEN n.nspname = 'pg_toast' THEN CASE c.relkind   WHEN 'r' THEN 'SYSTEM TOAST TABLE'   WHEN 'i' THEN 'SYSTEM TOAST INDEX'   ELSE NULL   END  ELSE CASE c.relkind   WHEN 'r' THEN 'TEMPORARY TABLE'   WHEN 'i' THEN 'TEMPORARY INDEX'   WHEN 'S' THEN 'TEMPORARY SEQUENCE'   WHEN 'v' THEN 'TEMPORARY VIEW'   ELSE NULL   END  END  WHEN false THEN CASE c.relkind  WHEN 'r' THEN 'TABLE'  WHEN 'i' THEN 'INDEX'  WHEN 'S' THEN 'SEQUENCE'  WHEN 'v' THEN 'VIEW'  WHEN 'c' THEN 'TYPE'  WHEN 'f' THEN 'FOREIGN TABLE'  WHEN 'm' THEN 'MATERIALIZED VIEW'  ELSE NULL  END  ELSE NULL  END  AS TABLE_TYPE, d.description AS REMARKS  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c  LEFT JOIN pg_catalog.pg_description d ON (c.oid = d.objoid AND d.objsubid = 0)  LEFT JOIN pg_catalog.pg_class dc ON (d.classoid=dc.oid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dn.oid=dc.relnamespace AND dn.nspname='pg_catalog')  WHERE c.relnamespace = n.oid  ";
+  public static final String PG_JDBC_GET_TABLES_REPLACEMENT =
+      "SELECT TABLE_CATALOG AS TABLE_CAT, TABLE_SCHEMA AS TABLE_SCHEM, TABLE_NAME AS TABLE_NAME,\n"
+          + "       CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END AS TABLE_TYPE,\n"
+          + "       NULL AS REMARKS, NULL AS TYPE_CAT, NULL AS TYPE_SCHEM, NULL AS TYPE_NAME,\n"
+          + "       NULL AS SELF_REFERENCING_COL_NAME, NULL AS REF_GENERATION\n"
+          + "FROM INFORMATION_SCHEMA.TABLES AS T\n";
+
+  public static final String PG_JDBC_GET_COLUMNS_PREFIX_1 =
+      "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,t.typtypmod,a.attnum,null as attidentity,null as attgenerated,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+  public static final String PG_JDBC_GET_COLUMNS_PREFIX_2 =
+      "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,t.typtypmod,a.attnum,null as attidentity,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+  public static final String PG_JDBC_GET_COLUMNS_PREFIX_3 =
+      "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,a.attnum,null as attidentity,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+  public static final String PG_JDBC_GET_COLUMNS_PREFIX_4 =
+      "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,a.attnum,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+  public static final String PG_JDBC_GET_COLUMNS_REPLACEMENT =
+      "SELECT TABLE_CATALOG AS \"TABLE_CAT\", TABLE_SCHEMA AS nspname, TABLE_NAME AS relname, COLUMN_NAME AS attname, '' as typtype,\n"
+          + "       CASE\n"
+          + "           WHEN DATA_TYPE = 'boolean' THEN 16\n"
+          + "           WHEN DATA_TYPE = 'boolean[]' THEN 1000\n"
+          + "           WHEN DATA_TYPE = 'bytea' THEN 17\n"
+          + "           WHEN DATA_TYPE = 'bytea[]' THEN 1001\n"
+          + "           WHEN DATA_TYPE = 'date' THEN 1082\n"
+          + "           WHEN DATA_TYPE = 'date[]' THEN 1182\n"
+          + "           WHEN DATA_TYPE = 'double precision' THEN 701\n"
+          + "           WHEN DATA_TYPE = 'double precision[]' THEN 1022\n"
+          + "           WHEN DATA_TYPE = 'bigint' THEN 20\n"
+          + "           WHEN DATA_TYPE = 'bigint[]' THEN 1016\n"
+          + "           WHEN DATA_TYPE = 'numeric' THEN 1700\n"
+          + "           WHEN DATA_TYPE = 'numeric[]' THEN 1231\n"
+          + "           WHEN DATA_TYPE = 'character varying' THEN 1043\n"
+          + "           WHEN DATA_TYPE = 'character varying[]' THEN 1015\n"
+          + "           WHEN DATA_TYPE = 'jsonb' THEN 3802\n"
+          + "           WHEN DATA_TYPE = 'jsonb[]' THEN 3807\n"
+          + "           WHEN DATA_TYPE = 'timestamp with time zone' THEN 1184\n"
+          + "           WHEN DATA_TYPE = 'timestamp with time zone[]' THEN 1185\n"
+          + "           END AS atttypid,\n"
+          + "       DATA_TYPE AS atttypid, 0 as atttypmod,\n"
+          + "       CASE\n"
+          + "           WHEN DATA_TYPE LIKE 'ARRAY' THEN 0\n"
+          + "           WHEN DATA_TYPE = 'boolean' THEN NULL\n"
+          + "           WHEN DATA_TYPE LIKE 'bytea' THEN 10485760\n"
+          + "           WHEN DATA_TYPE = 'date' THEN 10\n"
+          + "           WHEN DATA_TYPE = 'double precision' THEN 15\n"
+          + "           WHEN DATA_TYPE = 'bigint' THEN 19\n"
+          + "           WHEN DATA_TYPE = 'numeric' THEN 15\n"
+          + "           WHEN DATA_TYPE LIKE 'character varying' THEN CHARACTER_MAXIMUM_LENGTH\n"
+          + "           WHEN DATA_TYPE = 'jsonb' THEN 2621440\n"
+          + "           WHEN DATA_TYPE = 'timestamp with time zone' THEN 35\n"
+          + "           END AS \"COLUMN_SIZE\",\n"
+          + "       0 AS \"BUFFER_LENGTH\",\n"
+          + "       CASE\n"
+          + "           WHEN DATA_TYPE LIKE 'double precision' THEN 16\n"
+          + "           WHEN DATA_TYPE LIKE 'numeric' THEN 16383\n"
+          + "           ELSE NULL\n"
+          + "           END AS \"DECIMAL_DIGITS\",\n"
+          + "       CASE\n"
+          + "           WHEN DATA_TYPE LIKE 'bigint' THEN 10\n"
+          + "           WHEN DATA_TYPE LIKE 'numeric' THEN 10\n"
+          + "           WHEN DATA_TYPE LIKE 'double precision' THEN 2\n"
+          + "           ELSE NULL\n"
+          + "           END AS \"NUM_PREC_RADIX\",\n"
+          + "       CASE\n"
+          + "           WHEN IS_NULLABLE = 'YES' THEN TRUE\n"
+          + "           WHEN IS_NULLABLE = 'NO' THEN FALSE\n"
+          + "           ELSE FALSE\n"
+          + "           END AS attnotnull,\n"
+          + "       NULL AS description,\n"
+          + "       column_default AS adsrc,\n"
+          + "       NULL AS attidentity,\n"
+          + "       NULL AS attgenerated,\n"
+          + "       NULL AS typbasetype,\n"
+          + "       0 AS \"SQL_DATA_TYPE\",\n"
+          + "       0 AS \"SQL_DATETIME_SUB\",\n"
+          + "       CHARACTER_MAXIMUM_LENGTH AS \"CHAR_OCTET_LENGTH\",\n"
+          + "       ORDINAL_POSITION AS attnum,\n"
+          + "       IS_NULLABLE AS \"IS_NULLABLE\",\n"
+          + "       NULL AS \"SCOPE_CATALOG\",\n"
+          + "       NULL AS \"SCOPE_SCHEMA\",\n"
+          + "       NULL AS \"SCOPE_TABLE\",\n"
+          + "       NULL AS \"SOURCE_DATA_TYPE\",\n"
+          + "       'NO' AS \"IS_AUTOINCREMENT\",\n"
+          + "       CASE\n"
+          + "           WHEN (IS_GENERATED = 'NEVER') THEN 'NO'\n"
+          + "           ELSE 'YES'\n"
+          + "        END AS \"IS_GENERATEDCOLUMN\"\n"
+          + "FROM INFORMATION_SCHEMA.COLUMNS C\n";
+
+  public static final String PG_JDBC_GET_INDEXES_PREFIX_1 =
+      "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM,  ct.relname AS TABLE_NAME, NOT i.indisunique AS NON_UNIQUE, NULL AS INDEX_QUALIFIER, ci.relname AS INDEX_NAME,  CASE i.indisclustered  WHEN true THEN 1 ELSE CASE am.amname  WHEN 'hash' THEN 2 ELSE 3 END  END AS TYPE,  a.attnum AS ORDINAL_POSITION,  CASE WHEN i.indexprs IS NULL THEN a.attname  ELSE pg_catalog.pg_get_indexdef(ci.oid,a.attnum,false) END AS COLUMN_NAME,  NULL AS ASC_OR_DESC,  ci.reltuples AS CARDINALITY,  ci.relpages AS PAGES,  pg_catalog.pg_get_expr(i.indpred, i.indrelid) AS FILTER_CONDITION  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class ct, pg_catalog.pg_class ci,  pg_catalog.pg_attribute a, pg_catalog.pg_am am , pg_catalog.pg_index i";
+  public static final String PG_JDBC_GET_INDEXES_REPLACEMENT =
+      "SELECT IDX.TABLE_CATALOG AS \"TABLE_CAT\", IDX.TABLE_SCHEMA AS \"TABLE_SCHEM\", IDX.TABLE_NAME AS \"TABLE_NAME\",\n"
+          + "       CASE WHEN IS_UNIQUE='YES' THEN FALSE ELSE TRUE END AS \"NON_UNIQUE\",\n"
+          + "       IDX.TABLE_CATALOG AS \"INDEX_QUALIFIER\", IDX.INDEX_NAME AS \"INDEX_NAME\",\n"
+          + "       2 AS \"TYPE\",\n"
+          + "       ORDINAL_POSITION AS \"ORDINAL_POSITION\", COLUMN_NAME AS \"COLUMN_NAME\", SUBSTR(COLUMN_ORDERING, 1, 1) AS \"ASC_OR_DESC\",\n"
+          + "       -1 AS \"CARDINALITY\", -- Not supported\n"
+          + "       -1 AS \"PAGES\", -- Not supported\n"
+          + "       NULL AS \"FILTER_CONDITION\"\n"
+          + "FROM INFORMATION_SCHEMA.INDEXES IDX\n"
+          + "INNER JOIN INFORMATION_SCHEMA.INDEX_COLUMNS COL\n"
+          + "            ON  COALESCE(IDX.TABLE_CATALOG, '')=COALESCE(COL.TABLE_CATALOG, '')\n"
+          + "                AND IDX.TABLE_SCHEMA=COL.TABLE_SCHEMA\n"
+          + "                AND IDX.TABLE_NAME=COL.TABLE_NAME\n"
+          + "                AND IDX.INDEX_NAME=COL.INDEX_NAME\n";
+
+  public static final String PG_JDBC_GET_PRIMARY_KEY_PREFIX_1 =
+      "SELECT        result.TABLE_CAT,        result.TABLE_SCHEM,        result.TABLE_NAME,        result.COLUMN_NAME,        result.KEY_SEQ,        result.PK_NAME FROM      (SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM,   ct.relname AS TABLE_NAME, a.attname AS COLUMN_NAME,   (information_schema._pg_expandarray(i.indkey)).n AS KEY_SEQ, ci.relname AS PK_NAME,   information_schema._pg_expandarray(i.indkey) AS KEYS, a.attnum AS A_ATTNUM FROM pg_catalog.pg_class ct   JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)   JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)   JOIN pg_catalog.pg_index i ON ( a.attrelid = i.indrelid)   JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)";
+  public static final String PG_JDBC_GET_PRIMARY_KEY_PREFIX_2 =
+      "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM,   ct.relname AS TABLE_NAME, a.attname AS COLUMN_NAME,   (i.keys).n AS KEY_SEQ, ci.relname AS PK_NAME FROM pg_catalog.pg_class ct   JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)   JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)   JOIN (SELECT i.indexrelid, i.indrelid, i.indisprimary,              information_schema._pg_expandarray(i.indkey) AS keys         FROM pg_catalog.pg_index i) i     ON (a.attnum = (i.keys).x AND a.attrelid = i.indrelid)   JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)";
+  public static final String PG_JDBC_GET_PRIMARY_KEY_REPLACEMENT =
+      "SELECT IDX.TABLE_CATALOG AS \"TABLE_CAT\", IDX.TABLE_SCHEMA AS \"TABLE_SCHEM\", IDX.TABLE_NAME AS \"TABLE_NAME\",\n"
+          + "       COLS.COLUMN_NAME AS \"COLUMN_NAME\", ORDINAL_POSITION AS \"KEY_SEQ\", IDX.INDEX_NAME AS \"PK_NAME\"\n"
+          + "FROM INFORMATION_SCHEMA.INDEXES IDX\n"
+          + "INNER JOIN INFORMATION_SCHEMA.INDEX_COLUMNS COLS\n"
+          + "            ON  COALESCE(IDX.TABLE_CATALOG, '')=COALESCE(COLS.TABLE_CATALOG, '')\n"
+          + "                AND IDX.TABLE_SCHEMA=COLS.TABLE_SCHEMA\n"
+          + "                AND IDX.TABLE_NAME=COLS.TABLE_NAME\n"
+          + "                AND IDX.INDEX_NAME=COLS.INDEX_NAME\n";
+
+  public static final String PG_JDBC_GET_TYPE_INFO_PREFIX_FULL =
+      "SELECT t.typname,t.oid FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON (t.typnamespace = n.oid)  WHERE n.nspname  != 'pg_toast' AND  (t.typrelid = 0 OR (SELECT c.relkind = 'c' FROM pg_catalog.pg_class c WHERE c.oid = t.typrelid))";
+  public static final String PG_JDBC_GET_TYPE_INFO_REPLACEMENT_FULL =
+      " select 'bool' as typname, 16 as oid union all \n"
+          + " select 'bytea' as typname, 17 as oid union all \n"
+          + " select 'int8' as typname, 20 as oid union all \n"
+          + " select 'float8' as typname, 701 as oid union all \n"
+          + " select 'varchar' as typname, 1043 as oid union all \n"
+          + " select 'date' as typname, 1082 as oid union all \n"
+          + " select 'timestamptz' as typname, 1184 as oid union all \n"
+          + " select 'numeric' as typname, 1700 as oid union all \n"
+          + " select 'jsonb' as typname, 3802 as oid union all \n"
+          + " select '_bool' as typname, 1000 as oid union all \n"
+          + " select '_bytea' as typname, 1001 as oid union all \n"
+          + " select '_int8' as typname, 1016 as oid union all \n"
+          + " select '_float8' as typname, 1022 as oid union all \n"
+          + " select '_varchar' as typname, 1015 as oid union all \n"
+          + " select '_date' as typname, 1182 as oid union all \n"
+          + " select '_timestamptz' as typname, 1185 as oid union all \n"
+          + " select '_numeric' as typname, 1231 as oid union all \n"
+          + " select '_jsonb' as typname, 3807 as oid";
+  public static final String PG_JDBC_GET_TYPE_INFO_WITH_TYPTYPE_PREFIX =
+      "SELECT typinput='array_in'::regproc as is_array, typtype, typname, pg_type.oid   FROM pg_catalog.pg_type   LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname                    from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  ORDER BY sp.r, pg_type.oid DESC";
+  public static final String PG_JDBC_GET_TYPE_INFO_WITH_TYPTYPE_REPLACEMENT =
+      "select true as is_array, 'b' as typtype, '_jsonb' as typname, 3807 as oid union all\n"
+          + " select false as is_array, 'b' as typtype, 'jsonb' as typname, 3802 as oid union all\n"
+          + " select false as is_array, 'b' as typtype, 'numeric' as typname, 1700 as oid union all\n"
+          + " select true as is_array, 'b' as typtype, '_numeric' as typname, 1231 as oid union all\n"
+          + " select true as is_array, 'b' as typtype, '_timestamptz' as typname, 1185 as oid union all\n"
+          + " select false as is_array, 'b' as typtype, 'timestamptz' as typname, 1184 as oid union all\n"
+          + " select true as is_array, 'b' as typtype, '_date' as typname, 1182 as oid union all\n"
+          + " select false as is_array, 'b' as typtype, 'date' as typname, 1082 as oid union all\n"
+          + " select false as is_array, 'b' as typtype, 'varchar' as typname, 1043 as oid union all\n"
+          + " select true as is_array, 'b' as typtype, '_float8' as typname, 1022 as oid union all\n"
+          + " select true as is_array, 'b' as typtype, '_int8' as typname, 1016 as oid union all\n"
+          + " select true as is_array, 'b' as typtype, '_varchar' as typname, 1015 as oid union all\n"
+          + " select true as is_array, 'b' as typtype, '_bytea' as typname, 1001 as oid union all\n"
+          + " select true as is_array, 'b' as typtype, '_bool' as typname, 1000 as oid union all\n"
+          + " select false as is_array, 'b' as typtype, 'float8' as typname, 701 as oid union all\n"
+          + " select false as is_array, 'b' as typtype, 'int8' as typname, 20 as oid union all\n"
+          + " select false as is_array, 'b' as typtype, 'bytea' as typname, 17 as oid union all\n"
+          + " select false as is_array, 'b' as typtype, 'bool' as typname, 16 as oid";
+  public static final String PG_JDBC_GET_TYPE_INFO_WITH_PARAMETER_PREFIX =
+      "SELECT pg_type.oid, typname   FROM pg_catalog.pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname                    from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = $1  ORDER BY sp.r, pg_type.oid DESC LIMIT 1";
+  public static final String PG_JDBC_GET_TYPE_INFO_WITH_PARAMETER_REPLACEMENT =
+      "select 16 as oid, 'bool' as typname from (select 1) t where 'bool'=$1 union all \n"
+          + " select 17 as oid, 'bytea' as typname from (select 1) t where 'bytea'=$1 union all \n"
+          + " select 20 as oid, 'int8' as typname from (select 1) t where 'int8'=$1 union all \n"
+          + " select 701 as oid, 'float8' as typname from (select 1) t where 'float8'=$1 union all \n"
+          + " select 1043 as oid, 'varchar' as typname from (select 1) t where 'varchar'=$1 union all \n"
+          + " select 1082 as oid, 'date' as typname from (select 1) t where 'date'=$1 union all \n"
+          + " select 1184 as oid, 'timestamptz' as typname from (select 1) t where 'timestamptz'=$1 union all \n"
+          + " select 1700 as oid, 'numeric' as typname from (select 1) t where 'numeric'=$1 union all \n"
+          + " select 3802 as oid, 'jsonb' as typname from (select 1) t where 'jsonb'=$1 union all \n"
+          + " select 1000 as oid, '_bool' as typname from (select 1) t where '_bool'=$1 union all \n"
+          + " select 1001 as oid, '_bytea' as typname from (select 1) t where '_bytea'=$1 union all \n"
+          + " select 1016 as oid, '_int8' as typname from (select 1) t where '_int8'=$1 union all \n"
+          + " select 1022 as oid, '_float8' as typname from (select 1) t where '_float8'=$1 union all \n"
+          + " select 1015 as oid, '_varchar' as typname from (select 1) t where '_varchar'=$1 union all \n"
+          + " select 1182 as oid, '_date' as typname from (select 1) t where '_date'=$1 union all \n"
+          + " select 1185 as oid, '_timestamptz' as typname from (select 1) t where '_timestamptz'=$1 union all \n"
+          + " select 1231 as oid, '_numeric' as typname from (select 1) t where '_numeric'=$1 union all \n"
+          + " select 3807 as oid, '_jsonb' as typname from (select 1) t where '_jsonb'=$1";
+  public static final String PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PREFIX =
+      "SELECT typinput='array_in'::regproc as is_array, typtype, typname   FROM pg_catalog.pg_type   LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname                    from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  ORDER BY sp.r, pg_type.oid DESC";
+  public static final String PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_REPLACEMENT =
+      "select true as is_array, 'b' as typtype, '_jsonb' as typname union all\n"
+          + " select false as is_array, 'b' as typtype, 'jsonb' as typname union all\n"
+          + " select false as is_array, 'b' as typtype, 'numeric' as typname union all\n"
+          + " select true as is_array, 'b' as typtype, '_numeric' as typname union all\n"
+          + " select true as is_array, 'b' as typtype, '_timestamptz' as typname union all\n"
+          + " select false as is_array, 'b' as typtype, 'timestamptz' as typname union all\n"
+          + " select true as is_array, 'b' as typtype, '_date' as typname union all\n"
+          + " select false as is_array, 'b' as typtype, 'date' as typname union all\n"
+          + " select false as is_array, 'b' as typtype, 'varchar' as typname union all\n"
+          + " select true as is_array, 'b' as typtype, '_float8' as typname union all\n"
+          + " select true as is_array, 'b' as typtype, '_int8' as typname union all\n"
+          + " select true as is_array, 'b' as typtype, '_varchar' as typname union all\n"
+          + " select true as is_array, 'b' as typtype, '_bytea' as typname union all\n"
+          + " select true as is_array, 'b' as typtype, '_bool' as typname union all\n"
+          + " select false as is_array, 'b' as typtype, 'float8' as typname union all\n"
+          + " select false as is_array, 'b' as typtype, 'int8' as typname union all\n"
+          + " select false as is_array, 'b' as typtype, 'bytea' as typname union all\n"
+          + " select false as is_array, 'b' as typtype, 'bool' as typname";
+  public static final String PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PARAM_PREFIX =
+      "SELECT typinput='array_in'::regproc, typtype   FROM pg_catalog.pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname                    from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = $1  ORDER BY sp.r, pg_type.oid DESC LIMIT 1";
+  public static final String PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PARAM_REPLACEMENT =
+      "select false as is_array, 'b' as typtype from (select 1) t where 'bool'=$1 union all \n"
+          + " select false as is_array, 'b' as typtype from (select 1) t where 'bytea'=$1 union all \n"
+          + " select false as is_array, 'b' as typtype from (select 1) t where 'int8'=$1 union all \n"
+          + " select false as is_array, 'b' as typtype from (select 1) t where 'float8'=$1 union all \n"
+          + " select false as is_array, 'b' as typtype from (select 1) t where 'varchar'=$1 union all \n"
+          + " select false as is_array, 'b' as typtype from (select 1) t where 'date'=$1 union all \n"
+          + " select false as is_array, 'b' as typtype from (select 1) t where 'timestamptz'=$1 union all \n"
+          + " select false as is_array, 'b' as typtype from (select 1) t where 'numeric'=$1 union all \n"
+          + " select false as is_array, 'b' as typtype from (select 1) t where 'jsonb'=$1 union all \n"
+          + " select true as is_array, 'b' as typtype from (select 1) t where '_bool'=$1 union all \n"
+          + " select true as is_array, 'b' as typtype from (select 1) t where '_bytea'=$1 union all \n"
+          + " select true as is_array, 'b' as typtype from (select 1) t where '_int8'=$1 union all \n"
+          + " select true as is_array, 'b' as typtype from (select 1) t where '_float8'=$1 union all \n"
+          + " select true as is_array, 'b' as typtype from (select 1) t where '_varchar'=$1 union all \n"
+          + " select true as is_array, 'b' as typtype from (select 1) t where '_date'=$1 union all \n"
+          + " select true as is_array, 'b' as typtype from (select 1) t where '_timestamptz'=$1 union all \n"
+          + " select true as is_array, 'b' as typtype from (select 1) t where '_numeric'=$1 union all \n"
+          + " select true as is_array, 'b' as typtype from (select 1) t where '_jsonb'=$1";
+  public static final String PG_JDBC_GET_TYPE_INFO_NOT_TOAST_PREFIX =
+      "SELECT t.typname,t.oid FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON (t.typnamespace = n.oid)  WHERE n.nspname  != 'pg_toast'";
+  public static final String PG_JDBC_GET_TYPE_INFO_NOT_TOAST_REPLACEMENT =
+      "select 'bool' as typname, 16 as oid union all\n"
+          + " select 'bytea' as typname, 17 as oid union all\n"
+          + " select 'int8' as typname, 20 as oid union all\n"
+          + " select 'float8' as typname, 701 as oid union all\n"
+          + " select 'varchar' as typname, 1043 as oid union all\n"
+          + " select 'date' as typname, 1082 as oid union all\n"
+          + " select 'timestamptz' as typname, 1184 as oid union all\n"
+          + " select 'numeric' as typname, 1700 as oid union all\n"
+          + " select 'jsonb' as typname, 3802 as oid union all\n"
+          + " select '_bool' as typname, 1000 as oid union all\n"
+          + " select '_bytea' as typname, 1001 as oid union all\n"
+          + " select '_int8' as typname, 1016 as oid union all\n"
+          + " select '_float8' as typname, 1022 as oid union all\n"
+          + " select '_varchar' as typname, 1015 as oid union all\n"
+          + " select '_date' as typname, 1182 as oid union all\n"
+          + " select '_timestamptz' as typname, 1185 as oid union all\n"
+          + " select '_numeric' as typname, 1231 as oid union all\n"
+          + " select '_jsonb' as typname, 3807 as oid";
+
+  public static final String PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_1 =
+      "SELECT n.nspname,c.relname,r.rolname,c.relacl  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c, pg_catalog.pg_roles r  WHERE c.relnamespace = n.oid  AND c.relowner = r.oid  AND c.relkind IN ('r','p'";
+  public static final String PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_2 =
+      "SELECT n.nspname,c.relname,r.rolname,c.relacl  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c, pg_catalog.pg_roles r  WHERE c.relnamespace = n.oid  AND c.relowner = r.oid  AND c.relkind = 'r'";
+  public static final String PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT =
+      "select '' as nspname, '' as relname, '' as rolname, '' as relacl from (select 1) t where false";
+  public static final String PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1 =
+      "SELECT n.nspname,c.relname,r.rolname,c.relacl,  a.attname  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c,  pg_catalog.pg_roles r, pg_catalog.pg_attribute a  WHERE c.relnamespace = n.oid  AND c.relowner = r.oid  AND c.oid = a.attrelid  AND c.relkind = 'r'  AND a.attnum > 0 AND NOT a.attisdropped";
+  public static final String PG_JDBC_GET_COLUMN_PRIVILEGES_REPLACEMENT =
+      "select '' as nspname, '' as relname, '' as rolname, '' as relacl, '' as attname from (select 1) t where false";
+
+  public static final String PG_JDBC_GET_BEST_ROW_IDENTIFIER_PREFIX =
+      "SELECT a.attname, a.atttypid, atttypmod FROM pg_catalog.pg_class ct   JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)   JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)   JOIN (SELECT i.indexrelid, i.indrelid, i.indisprimary,              information_schema._pg_expandarray(i.indkey) AS keys         FROM pg_catalog.pg_index i) i     ON (a.attnum = (i.keys).x AND a.attrelid = i.indrelid) WHERE true";
+  public static final String PG_JDBC_GET_BEST_ROW_IDENTIFIER_REPLACEMENT =
+      "select '' as attname, 0 as atttypid, 0 as atttypmod from (select 1) t where false";
+
   private static final String PG_JDBC_PK_QUERY_INNER_PREFIX_42_3 =
       "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, "
           + "  ct.relname AS TABLE_NAME, a.attname AS COLUMN_NAME, "
@@ -333,8 +612,8 @@ public class PgJdbcCatalog {
           + "       CONSTRAINTS.CONSTRAINT_NAME AS FK_NAME, CONSTRAINTS.UNIQUE_CONSTRAINT_NAME AS PK_NAME,\n"
           + "       7 AS DEFERRABILITY -- 7 = importedKeyNotDeferrable\n"
           + "FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS CONSTRAINTS\n"
-          + "INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE CHILD  ON CONSTRAINTS.CONSTRAINT_CATALOG=CHILD.CONSTRAINT_CATALOG AND CONSTRAINTS.CONSTRAINT_SCHEMA= CHILD.CONSTRAINT_SCHEMA AND CONSTRAINTS.CONSTRAINT_NAME= CHILD.CONSTRAINT_NAME\n"
-          + "INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE PARENT ON CONSTRAINTS.UNIQUE_CONSTRAINT_CATALOG=PARENT.CONSTRAINT_CATALOG AND CONSTRAINTS.UNIQUE_CONSTRAINT_SCHEMA=PARENT.CONSTRAINT_SCHEMA AND CONSTRAINTS.UNIQUE_CONSTRAINT_NAME=PARENT.CONSTRAINT_NAME AND PARENT.ORDINAL_POSITION=CHILD.POSITION_IN_UNIQUE_CONSTRAINT\n"
+          + "INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE CHILD  ON COALESCE(CONSTRAINTS.CONSTRAINT_CATALOG, '')=COALESCE(CHILD.CONSTRAINT_CATALOG, '') AND CONSTRAINTS.CONSTRAINT_SCHEMA= CHILD.CONSTRAINT_SCHEMA AND CONSTRAINTS.CONSTRAINT_NAME= CHILD.CONSTRAINT_NAME\n"
+          + "INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE PARENT ON COALESCE(CONSTRAINTS.UNIQUE_CONSTRAINT_CATALOG, '')=COALESCE(PARENT.CONSTRAINT_CATALOG, '') AND CONSTRAINTS.UNIQUE_CONSTRAINT_SCHEMA=PARENT.CONSTRAINT_SCHEMA AND CONSTRAINTS.UNIQUE_CONSTRAINT_NAME=PARENT.CONSTRAINT_NAME AND PARENT.ORDINAL_POSITION=CHILD.POSITION_IN_UNIQUE_CONSTRAINT\n"
           + "WHERE TRUE\n";
 
   public static final String PG_DESCRIPTION =
