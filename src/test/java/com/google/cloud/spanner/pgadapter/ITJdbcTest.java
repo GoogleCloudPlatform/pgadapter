@@ -391,7 +391,7 @@ public class ITJdbcTest implements IntegrationTest {
    * This must be run with the system property -Dcopy_in_insert_or_update=true set, or otherwise it
    * will eventually fail on a unique key constraint violation, as the primary key value is a random
    * number. <code>
-   *   psql -h localhost -d knut-test-db -c "copy (select (random()*1000000000)::bigint, random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, (random()*999999)::int, (random()*999999)::numeric, now()-random()*interval '50 year', md5(random()::text || clock_timestamp()::text)::varchar from generate_series(1, 1000000) s(i)) to stdout" | psql -h localhost -p 5433 -d test -c "set autocommit_dml_mode='partitioned_non_atomic'" -c "copy all_types from stdin;"
+   *   psql -h localhost -d knut-test-db -c "copy (select (random()*1000000000)::bigint, random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, (random()*999999)::int, (random()*999999)::numeric, now()-random()*interval '50 year', md5(random()::text || clock_timestamp()::text)::varchar from generate_series(1, 1000000) s(i)) to stdout" | psql -h localhost -p 5433 -d test -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'" -c "copy all_types from stdin;"
    * </code>
    */
   @Test
@@ -461,7 +461,9 @@ public class ITJdbcTest implements IntegrationTest {
     testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
-      connection.createStatement().execute("set autocommit_dml_mode='partitioned_non_atomic'");
+      connection
+          .createStatement()
+          .execute("set spanner.autocommit_dml_mode='partitioned_non_atomic'");
 
       PGConnection pgConnection = connection.unwrap(PGConnection.class);
       CopyManager copyManager = pgConnection.getCopyAPI();
