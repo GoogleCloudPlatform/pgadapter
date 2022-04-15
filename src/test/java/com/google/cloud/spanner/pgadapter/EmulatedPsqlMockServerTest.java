@@ -41,11 +41,7 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
-    // This test case fails because batching does not work properly when the server is started in
-    // psql mode (i.e. with -q).
-    // Comment out the next line and enable the second and the test case will succeed.
     doStartMockSpannerAndPgAdapterServers(ImmutableList.of("-q"));
-    // doStartMockSpannerAndPgAdapterServers(Collections.emptyList());
 
     mockSpanner.putStatementResults(
         StatementResult.update(Statement.of(INSERT1), 1L),

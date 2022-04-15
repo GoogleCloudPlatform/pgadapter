@@ -153,7 +153,7 @@ public abstract class ControlMessage extends WireMessage {
   public boolean sendSpannerResult(
       int resultIndex, IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
-    String command = statement.getCommand(resultIndex);
+    String command = statement.getCommandTag(resultIndex);
     switch (statement.getStatementType(resultIndex)) {
       case DDL:
       case CLIENT_SIDE:

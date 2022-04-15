@@ -50,14 +50,15 @@ public class IntermediateStatement {
   protected final OptionsMetadata options;
   private final ImmutableList<StatementType> statementTypes;
   protected ResultSet[] statementResults;
-  protected boolean[] hasMoreData;
-  protected SpannerException[] exceptions;
+  protected final boolean[] hasMoreData;
+  protected final SpannerException[] exceptions;
   protected final ParsedStatement parsedStatement;
-  protected List<String> commands;
+  protected final ImmutableList<String> commands;
+  protected final List<String> commandTags;
   protected boolean executed = false;
-  protected Connection connection;
+  protected final Connection connection;
   protected long[] updateCounts;
-  protected List<ParsedStatement> statements;
+  protected final ImmutableList<ParsedStatement> statements;
   private ConnectionHandler connectionHandler;
   private ExecutionStatus executionStatus;
 
@@ -79,6 +80,7 @@ public class IntermediateStatement {
     this.connection = connection;
     this.statements = parseStatements(parsedStatement);
     this.commands = StatementParser.parseCommands(this.statements);
+    this.commandTags = new ArrayList<>(this.commands);
     this.statementTypes = determineStatementTypes(this.statements);
     this.hasMoreData = new boolean[this.statements.size()];
     this.exceptions = new SpannerException[this.statements.size()];
@@ -167,14 +169,14 @@ public class IntermediateStatement {
     return builder.build();
   }
 
-  protected static List<ParsedStatement> parseStatements(ParsedStatement stmt) {
+  protected static ImmutableList<ParsedStatement> parseStatements(ParsedStatement stmt) {
     String sql = stmt.getSqlWithoutComments();
     Preconditions.checkNotNull(sql);
-    List<ParsedStatement> statements = new ArrayList<>();
+    ImmutableList.Builder<ParsedStatement> builder = ImmutableList.builder();
     for (String statement : splitStatements(sql)) {
-      statements.add(PARSER.parse(Statement.of(statement)));
+      builder.add(PARSER.parse(Statement.of(statement)));
     }
-    return statements;
+    return builder.build();
   }
 
   /**
@@ -386,6 +388,7 @@ public class IntermediateStatement {
   private void executeSingleStatement(int index) {
     // Before executing the statement, handle specific statements that change the transaction status
     String command = getCommand(index);
+    String statement = getStatement(index);
     if ("BEGIN".equals(command)) {
       if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
         // Executing a BEGIN statement when an explicit transaction is already active is a no-op
@@ -403,12 +406,12 @@ public class IntermediateStatement {
       if (connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
         connectionHandler.setStatus(ConnectionStatus.IDLE);
         // COMMIT rollbacks aborted transaction
-        statements.set(index, PARSER.parse(Statement.of("ROLLBACK")));
-        commands.set(index, "ROLLBACK");
+        statement = "ROLLBACK";
+        commandTags.set(index, "ROLLBACK");
       }
     }
     try {
-      StatementResult result = this.connection.execute(Statement.of(getStatement(index)));
+      StatementResult result = this.connection.execute(Statement.of(statement));
       updateResultCount(index, result);
     } catch (SpannerException e) {
       handleExecutionExceptionAndTransactionStatus(index, e);
@@ -503,6 +506,11 @@ public class IntermediateStatement {
   /** @return the extracted command (first word) from the SQL statement. */
   public String getCommand(int index) {
     return this.commands.get(index);
+  }
+
+  /** @return the extracted command (first word) from the really executed SQL statement. */
+  public String getCommandTag(int index) {
+    return this.commandTags.get(index);
   }
 
   /* Used for testing purposes */

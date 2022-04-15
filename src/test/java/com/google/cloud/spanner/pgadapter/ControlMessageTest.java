@@ -66,7 +66,7 @@ public final class ControlMessageTest {
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(intermediateStatement.getStatementType(0)).thenReturn(StatementType.UPDATE);
-    when(intermediateStatement.getCommand(0)).thenReturn("INSERT");
+    when(intermediateStatement.getCommandTag(0)).thenReturn("INSERT");
     when(intermediateStatement.getUpdateCount(0)).thenReturn(1L);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
 
