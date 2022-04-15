@@ -303,9 +303,12 @@ public class IntermediateStatement {
         long[] updateCounts = connection.runBatch();
         updateBatchResultCount(updateCounts);
       } else {
-        StatementResult result =
-            connection.execute(Statement.of(this.parsedStatement.getSqlWithoutComments()));
-        updateResultCount(result);
+        // Ignore empty statements.
+        if (!"".equals(this.parsedStatement.getSqlWithoutComments())) {
+          StatementResult result =
+              connection.execute(Statement.of(this.parsedStatement.getSqlWithoutComments()));
+          updateResultCount(result);
+        }
       }
     } catch (SpannerException e) {
       if (statements.size() > 1) {
