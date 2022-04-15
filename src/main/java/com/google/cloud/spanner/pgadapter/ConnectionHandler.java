@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -62,17 +63,18 @@ public class ConnectionHandler extends Thread {
   private final Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
-  private static volatile Map<Integer, IntermediateStatement> activeStatementsMap = new HashMap<>();
-  private static final Map<Integer, Integer> connectionToSecretMapping = new HashMap<>();
+  private static final Map<Integer, IntermediateStatement> activeStatementsMap =
+      new ConcurrentHashMap<>();
+  private static final Map<Integer, Integer> connectionToSecretMapping = new ConcurrentHashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
   private int connectionId;
   private final int secret;
   // Separate the following from the threat ID generator, since PG connection IDs are maximum
   //  32 bytes, and shouldn't be incremented on failed startups.
-  private static AtomicInteger incrementingConnectionId = new AtomicInteger(0);
+  private static final AtomicInteger incrementingConnectionId = new AtomicInteger(0);
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
-  private Connection spannerConnection;
+  private final Connection spannerConnection;
 
   ConnectionHandler(ProxyServer server, Socket socket) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());

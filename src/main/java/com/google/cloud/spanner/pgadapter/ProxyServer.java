@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +48,7 @@ public class ProxyServer extends AbstractApiService {
   private static final Logger logger = Logger.getLogger(ProxyServer.class.getName());
   private final OptionsMetadata options;
   private final Properties properties;
-  private final List<ConnectionHandler> handlers = new LinkedList<>();
+  private final List<ConnectionHandler> handlers = Collections.synchronizedList(new LinkedList<>());
 
   private ServerSocket serverSocket;
   private int localPort;

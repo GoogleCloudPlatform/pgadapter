@@ -51,6 +51,58 @@ class JdbcMetadataStatementHelper {
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_SCHEMAS_PREFIX)) {
       return replaceGetSchemasQuery(sql);
     }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_1)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_2)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_3)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_4)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_5)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_6)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_7)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_8)) {
+      return replaceGetTablesQuery(sql);
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_1)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_2)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_3)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_4)) {
+      return replaceGetColumnsQuery(sql);
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_1)) {
+      return replaceGetIndexInfoQuery(sql);
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_PRIMARY_KEY_PREFIX_1)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_PRIMARY_KEY_PREFIX_2)) {
+      return replaceGetPrimaryKeyQuery(sql);
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_PREFIX_FULL)) {
+      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_REPLACEMENT_FULL;
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITH_TYPTYPE_PREFIX)) {
+      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITH_TYPTYPE_REPLACEMENT;
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITH_PARAMETER_PREFIX)) {
+      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITH_PARAMETER_REPLACEMENT;
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PREFIX)) {
+      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_REPLACEMENT;
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PARAM_PREFIX)) {
+      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PARAM_REPLACEMENT;
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_NOT_TOAST_PREFIX)) {
+      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_NOT_TOAST_REPLACEMENT;
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_1)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_2)) {
+      return PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT;
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1)) {
+      return PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT;
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_BEST_ROW_IDENTIFIER_PREFIX)) {
+      return PgJdbcCatalog.PG_JDBC_GET_BEST_ROW_IDENTIFIER_REPLACEMENT;
+    }
+
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTIONS_WITH_FUNC_TYPE_PREFIX)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_FUNCTIONS_WITHOUT_FUNC_TYPE_PREFIX)) {
       return PgJdbcCatalog.PG_JDBC_GET_FUNCTIONS_REPLACEMENT;
@@ -172,6 +224,100 @@ class JdbcMetadataStatementHelper {
     return replacedSql
         .replace(" AND nspname LIKE ", " AND schema_name LIKE ")
         .replace(" ORDER BY TABLE_SCHEM", " ORDER BY schema_name");
+  }
+
+  private static String replaceGetTablesQuery(String sql) {
+    String replacedSql = PgJdbcCatalog.PG_JDBC_GET_TABLES_REPLACEMENT;
+    int startIndex;
+    String wherePrefix = "WHERE c.relnamespace = n.oid";
+    if (sql.contains(wherePrefix)) {
+      startIndex = sql.indexOf(wherePrefix) + wherePrefix.length();
+    } else {
+      return sql;
+    }
+    replacedSql += " WHERE TRUE " + sql.substring(startIndex);
+    return replacedSql
+        .replace(" AND n.nspname LIKE ", " AND TABLE_SCHEMA LIKE ")
+        .replace(" AND c.relname LIKE ", " AND TABLE_NAME LIKE ")
+        .replace(
+            "c.relkind = 'r' AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TABLE'")
+        .replace(
+            "c.relkind IN ('r','p') AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TABLE'")
+        .replace(
+            "c.relkind = 'v' AND n.nspname <> 'pg_catalog' AND n.nspname <> 'information_schema'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'VIEW'")
+        .replace(
+            "ORDER BY TABLE_TYPE,TABLE_SCHEM,TABLE_NAME",
+            "ORDER BY TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME");
+  }
+
+  private static String replaceGetColumnsQuery(String sql) {
+    String replacedSql = PgJdbcCatalog.PG_JDBC_GET_COLUMNS_REPLACEMENT;
+    int startIndex;
+    String wherePrefix1 =
+        " WHERE c.relkind in ('r','p','v','f','m') and a.attnum > 0 AND NOT a.attisdropped ";
+    String wherePrefix2 =
+        " WHERE c.relkind in ('r','v','f','m') and a.attnum > 0 AND NOT a.attisdropped ";
+    if (sql.contains(wherePrefix1)) {
+      startIndex = sql.indexOf(wherePrefix1) + wherePrefix1.length();
+    } else if (sql.contains(wherePrefix2)) {
+      startIndex = sql.indexOf(wherePrefix2) + wherePrefix2.length();
+    } else {
+      return sql;
+    }
+    replacedSql += " WHERE TRUE " + sql.substring(startIndex);
+    return replacedSql
+        .replace(" AND n.nspname LIKE ", " AND TABLE_SCHEMA LIKE ")
+        .replace(" AND c.relname LIKE ", " AND TABLE_NAME LIKE ")
+        .replace(" AND attname LIKE ", " AND COLUMN_NAME LIKE ")
+        .replace(
+            "ORDER BY nspname,c.relname,attnum",
+            "ORDER BY TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION");
+  }
+
+  private static String replaceGetIndexInfoQuery(String sql) {
+    String replacedSql = PgJdbcCatalog.PG_JDBC_GET_INDEXES_REPLACEMENT;
+    int startIndex;
+    String wherePrefix1 =
+        " WHERE ct.oid=i.indrelid AND ci.oid=i.indexrelid AND a.attrelid=ci.oid AND ci.relam=am.oid  AND n.oid = ct.relnamespace ";
+    if (sql.contains(wherePrefix1)) {
+      startIndex = sql.indexOf(wherePrefix1) + wherePrefix1.length();
+    } else {
+      return sql;
+    }
+    replacedSql += " WHERE TRUE " + sql.substring(startIndex);
+    return replacedSql
+        .replace(" AND n.nspname = ", " AND IDX.TABLE_SCHEMA = ")
+        .replace(" AND ct.relname = ", " AND IDX.TABLE_NAME = ")
+        .replace(" AND i.indisunique ", " AND IDX.IS_UNIQUE='YES' ")
+        .replace(
+            "ORDER BY NON_UNIQUE, TYPE, INDEX_NAME, ORDINAL_POSITION",
+            "ORDER BY IDX.TABLE_NAME, IS_UNIQUE DESC, IDX.INDEX_NAME, CASE WHEN ORDINAL_POSITION IS NULL THEN 0 ELSE ORDINAL_POSITION END");
+  }
+
+  private static String replaceGetPrimaryKeyQuery(String sql) {
+    String replacedSql = PgJdbcCatalog.PG_JDBC_GET_PRIMARY_KEY_REPLACEMENT;
+    int startIndex;
+    String wherePrefix1 = " WHERE true ";
+    if (sql.contains(wherePrefix1)) {
+      startIndex = sql.indexOf(wherePrefix1) + wherePrefix1.length();
+    } else {
+      return sql;
+    }
+    replacedSql += " WHERE TRUE " + sql.substring(startIndex);
+    return replacedSql
+        .replace(") result where  result.A_ATTNUM = (result.KEYS).x", "")
+        .replace(" AND n.nspname = ", " AND IDX.TABLE_SCHEMA = ")
+        .replace(" AND ct.relname = ", " AND IDX.TABLE_NAME = ")
+        .replace(" AND i.indisprimary ", " AND IDX.INDEX_TYPE='PRIMARY_KEY' ")
+        .replace(
+            "ORDER BY result.table_name, result.pk_name, result.key_seq",
+            "ORDER BY COLS.TABLE_NAME, IDX.INDEX_NAME, COLS.ORDINAL_POSITION")
+        .replace(
+            "ORDER BY table_name, pk_name, key_seq",
+            "ORDER BY COLS.TABLE_NAME, IDX.INDEX_NAME, COLS.ORDINAL_POSITION");
   }
 
   private static String replaceImportedExportedKeysQuery(String sql) {

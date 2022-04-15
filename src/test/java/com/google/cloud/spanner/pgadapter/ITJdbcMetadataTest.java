@@ -16,11 +16,12 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -35,11 +36,13 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Types;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -48,9 +51,6 @@ import org.junit.runners.JUnit4;
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
 public class ITJdbcMetadataTest implements IntegrationTest {
-  private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
-  private static ProxyServer server;
-  private static Database database;
   private static final String[] VERSIONS =
       new String[] {
         "42.3.3", "42.3.2", "42.3.1", "42.3.0", "42.2.25", "42.2.24", "42.2.23", "42.2.22",
@@ -60,83 +60,58 @@ public class ITJdbcMetadataTest implements IntegrationTest {
         "42.1.1", "42.1.0", "42.0.0"
       };
 
+  private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
+  private static Database database;
+
   @BeforeClass
-  public static void setup() throws Exception {
-    // TODO: Refactor the integration tests to use a common subclass, as this is repeated in each
-    // class.
+  public static void setup() {
     testEnv.setUp();
-    if (testEnv.isUseExistingDb()) {
-      database = testEnv.getExistingDatabase();
-    } else {
-      database = testEnv.createDatabase();
-      testEnv.updateDdl(
-          database.getId().getDatabase(),
-          Arrays.asList(
-              "create table numbers (num int not null primary key, name varchar(100))",
-              "create unique index idx_numbers_name on numbers (name)",
-              "create table all_types ("
-                  + "col_bigint bigint not null primary key, "
-                  + "col_bool bool, "
-                  + "col_bytea bytea, "
-                  + "col_float8 float8, "
-                  + "col_int int, "
-                  + "col_numeric numeric, "
-                  + "col_timestamptz timestamptz, "
-                  + "col_varchar varchar(100))",
-              "create index idx_col_varchar_int on all_types (col_varchar, col_int)",
-              "create table singers (singer_id int8 not null primary key, name varchar(200))",
-              "create table albums (\n"
-                  + "\talbum_id int8 not null primary key,\n"
-                  + "\tsinger_id int8 not null references singers (singer_id),\n"
-                  + "\ttitle varchar(100)\n"
-                  + ")",
-              "create table tracks (\n"
-                  + "\talbum_id int8 not null references albums (album_id),\n"
-                  + "\ttrack_number int8 not null,\n"
-                  + "\ttitle varchar(100),\n"
-                  + "\tprimary key (album_id, track_number)\n"
-                  + ")",
-              "create table recording_attempt (\n"
-                  + "\talbum int8 not null references albums (album_id),\n"
-                  + "\ttrack int8 not null,\n"
-                  + "\tattempt int8 not null,\n"
-                  + "\trecording_time timestamptz not null,\n"
-                  + "\tprimary key (album, track, attempt),\n"
-                  + "\tforeign key (album, track) references tracks (album_id, track_number)\n"
-                  + ")"));
-    }
-    String credentials = testEnv.getCredentials();
-    ImmutableList.Builder<String> argsListBuilder =
-        ImmutableList.<String>builder()
-            .add(
-                "-p",
-                testEnv.getProjectId(),
-                "-i",
-                testEnv.getInstanceId(),
-                "-d",
-                database.getId().getDatabase(),
-                "-s",
-                String.valueOf(testEnv.getPort()),
-                "-e",
-                testEnv.getUrl().getHost());
-    if (credentials != null) {
-      argsListBuilder.add("-c", testEnv.getCredentials());
-    }
-    String[] args = argsListBuilder.build().toArray(new String[0]);
-    server = new ProxyServer(new OptionsMetadata(args));
-    server.startServer();
+    database = testEnv.createDatabase(getDdlStatements());
+    testEnv.startPGAdapterServer(database.getId(), getAdditionalPGAdapterOptions());
   }
 
   @AfterClass
   public static void teardown() {
-    if (server != null) {
-      server.stopServer();
-    }
+    testEnv.stopPGAdapterServer();
     testEnv.cleanUp();
   }
 
+  private static Iterable<String> getAdditionalPGAdapterOptions() {
+    return Collections.singleton("-jdbc");
+  }
+
+  private static Iterable<String> getDdlStatements() {
+    ImmutableList.Builder<String> builder = ImmutableList.builder();
+    builder.addAll(PgAdapterTestEnv.DEFAULT_DATA_MODEL);
+    builder.addAll(
+        Arrays.asList(
+            "create unique index idx_numbers_name on numbers (name)",
+            "create index idx_col_varchar_int on all_types (col_varchar, col_int)",
+            "create table singers (singer_id int8 not null primary key, name varchar(200))",
+            "create table albums (\n"
+                + "\talbum_id int8 not null primary key,\n"
+                + "\tsinger_id int8 not null references singers (singer_id),\n"
+                + "\ttitle varchar(100)\n"
+                + ")",
+            "create table tracks (\n"
+                + "\talbum_id int8 not null references albums (album_id),\n"
+                + "\ttrack_number int8 not null,\n"
+                + "\ttitle varchar(100),\n"
+                + "\tprimary key (album_id, track_number)\n"
+                + ")",
+            "create table recording_attempt (\n"
+                + "\talbum int8 not null references albums (album_id),\n"
+                + "\ttrack int8 not null,\n"
+                + "\tattempt int8 not null,\n"
+                + "\trecording_time timestamptz not null,\n"
+                + "\tprimary key (album, track, attempt),\n"
+                + "\tforeign key (album, track) references tracks (album_id, track_number)\n"
+                + ")"));
+    return builder.build();
+  }
+
   private String createUrl() {
-    return String.format("jdbc:postgresql://localhost:%d/", testEnv.getPort());
+    return String.format("jdbc:postgresql://%s/", testEnv.getPGAdapterHostAndPort());
   }
 
   private void runForAllVersions(Consumer<Connection> runnable) throws Exception {
@@ -171,6 +146,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
         Object runner = constructor.newInstance();
         Method runMethod = runner.getClass().getDeclaredMethod("run", String.class, Consumer.class);
         runMethod.invoke(runner, createUrl(), runnable);
+      } catch (Throwable t) {
+        throw new Exception(String.format("Error for version %s:", version) + t.getMessage(), t);
       } finally {
         Thread.currentThread().setContextClassLoader(defaultClassLoader);
       }
@@ -179,7 +156,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   public static class TestRunner {
     public void run(String url, Consumer<Connection> runnable) throws Exception {
-      // Dynamically load the PG JDBC driver using the defautl class loader of the current thread.
+      // Dynamically load the PG JDBC driver using the default class loader of the current thread.
       Class.forName("org.postgresql.Driver");
       try (Connection connection = DriverManager.getConnection(url)) {
         runnable.accept(connection);
@@ -197,8 +174,11 @@ public class ITJdbcMetadataTest implements IntegrationTest {
         connection -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
-            assertEquals(
-                server.getOptions().getServerVersion(), metadata.getDatabaseProductVersion());
+            if (testEnv.getServer() != null) {
+              assertEquals(
+                  testEnv.getServer().getOptions().getServerVersion(),
+                  metadata.getDatabaseProductVersion());
+            }
           } catch (SQLException e) {
             throw SpannerExceptionFactory.asSpannerException(e);
           }
@@ -235,6 +215,24 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   }
 
   @Test
+  public void testDatabaseMetaDataTables_Unfiltered() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            try (ResultSet tables = metadata.getTables(null, null, null, null)) {
+              // Just assert that there is at least one result.
+              assertTrue(tables.next());
+              //noinspection StatementWithEmptyBody
+              while (tables.next()) {}
+            }
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
+  }
+
+  @Test
   public void testDatabaseMetaDataTables_FilteredByName() throws Exception {
     runForAllVersions(
         connection -> {
@@ -242,6 +240,31 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet tables =
                 metadata.getTables(null, "public", "%a%", new String[] {"TABLE"})) {
+              assertTrue(tables.next());
+              assertEquals("albums", tables.getString("TABLE_NAME"));
+              assertTrue(tables.next());
+              assertEquals("all_types", tables.getString("TABLE_NAME"));
+              assertTrue(tables.next());
+              assertEquals("recording_attempt", tables.getString("TABLE_NAME"));
+              assertTrue(tables.next());
+              assertEquals("tracks", tables.getString("TABLE_NAME"));
+
+              assertFalse(tables.next());
+            }
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
+  }
+
+  @Test
+  public void testDatabaseMetaDataTables_TablesAndViews() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            try (ResultSet tables =
+                metadata.getTables(null, "public", "%a%", new String[] {"TABLE", "VIEW"})) {
               assertTrue(tables.next());
               assertEquals("albums", tables.getString("TABLE_NAME"));
               assertTrue(tables.next());
@@ -360,9 +383,14 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             try (ResultSet indexInfo =
                 metadata.getIndexInfo(null, "public", "all_types", false, false)) {
               assertTrue(indexInfo.next());
+              assertEquals("col_bigint", indexInfo.getString("COLUMN_NAME"));
+              assertEquals("PRIMARY_KEY", indexInfo.getString("INDEX_NAME"));
+              assertTrue(indexInfo.next());
               assertEquals("col_varchar", indexInfo.getString("COLUMN_NAME"));
+              assertEquals("idx_col_varchar_int", indexInfo.getString("INDEX_NAME"));
               assertTrue(indexInfo.next());
               assertEquals("col_int", indexInfo.getString("COLUMN_NAME"));
+              assertEquals("idx_col_varchar_int", indexInfo.getString("INDEX_NAME"));
 
               assertFalse(indexInfo.next());
             }
@@ -381,7 +409,11 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             try (ResultSet indexInfo =
                 metadata.getIndexInfo(null, "public", "numbers", true, false)) {
               assertTrue(indexInfo.next());
+              assertEquals("num", indexInfo.getString("COLUMN_NAME"));
+              assertEquals("PRIMARY_KEY", indexInfo.getString("INDEX_NAME"));
+              assertTrue(indexInfo.next());
               assertEquals("name", indexInfo.getString("COLUMN_NAME"));
+              assertEquals("idx_numbers_name", indexInfo.getString("INDEX_NAME"));
 
               assertFalse(indexInfo.next());
             }
@@ -623,17 +655,20 @@ public class ITJdbcMetadataTest implements IntegrationTest {
         });
   }
 
-  @Test(expected = SQLFeatureNotSupportedException.class)
-  public void testDatabaseMetaDataSuperTypes() throws SQLException {
-    try (Connection connection =
-        DriverManager.getConnection(
-            String.format("jdbc:postgresql://localhost:%d/", testEnv.getPort()))) {
-      DatabaseMetaData metadata = connection.getMetaData();
-      // This method is not supported by the PG JDBC driver.
-      try (ResultSet types = metadata.getSuperTypes(null, null, null)) {
-        assertFalse(types.next());
-      }
-    }
+  @Test
+  public void testDatabaseMetaDataSuperTypes() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            // This method is not supported by the PG JDBC driver.
+            assertThrows(
+                SQLFeatureNotSupportedException.class,
+                () -> metadata.getSuperTypes(null, null, null));
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
   }
 
   @Test
@@ -667,6 +702,10 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             try (ResultSet tablePrivileges = metadata.getTablePrivileges(null, null, null)) {
               assertFalse(tablePrivileges.next());
             }
+            try (ResultSet tablePrivileges =
+                metadata.getTablePrivileges(null, "public", "all_types")) {
+              assertFalse(tablePrivileges.next());
+            }
           } catch (SQLException e) {
             throw SpannerExceptionFactory.asSpannerException(e);
           }
@@ -683,25 +722,37 @@ public class ITJdbcMetadataTest implements IntegrationTest {
                 metadata.getColumnPrivileges(null, null, null, null)) {
               assertFalse(columnPrivileges.next());
             }
+            try (ResultSet columnPrivileges =
+                metadata.getColumnPrivileges(null, "public", "all_types", null)) {
+              assertFalse(columnPrivileges.next());
+            }
+            try (ResultSet columnPrivileges =
+                metadata.getColumnPrivileges(null, null, null, "col_bigint")) {
+              assertFalse(columnPrivileges.next());
+            }
           } catch (SQLException e) {
             throw SpannerExceptionFactory.asSpannerException(e);
           }
         });
   }
 
-  @Test(expected = SQLFeatureNotSupportedException.class)
-  public void testDatabaseMetaDataAttributes() throws SQLException {
-    try (Connection connection =
-        DriverManager.getConnection(
-            String.format("jdbc:postgresql://localhost:%d/", testEnv.getPort()))) {
-      DatabaseMetaData metadata = connection.getMetaData();
-      // This method is not supported by the PG JDBC driver.
-      try (ResultSet attributes = metadata.getAttributes(null, null, null, null)) {
-        assertFalse(attributes.next());
-      }
-    }
+  @Test
+  public void testDatabaseMetaDataAttributes() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            // This method is not supported by the PG JDBC driver.
+            assertThrows(
+                SQLFeatureNotSupportedException.class,
+                () -> metadata.getAttributes(null, null, null, null));
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
   }
 
+  @Ignore("Not yet supported")
   @Test
   public void testDatabaseMetaDataBestRowIdentifier() throws Exception {
     runForAllVersions(
@@ -735,6 +786,29 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   }
 
   @Test
+  public void testDatabaseMetaDataBestRowIdentifier_NoData() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            // The current replacement returns an empty result set.
+            try (ResultSet rowIdentifiers =
+                metadata.getBestRowIdentifier(
+                    null, "public", "singers", DatabaseMetaData.bestRowTransaction, false)) {
+              assertFalse(rowIdentifiers.next());
+            }
+            try (ResultSet rowIdentifiers =
+                metadata.getBestRowIdentifier(
+                    null, "public", "tracks", DatabaseMetaData.bestRowTransaction, false)) {
+              assertFalse(rowIdentifiers.next());
+            }
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
+  }
+
+  @Test
   public void testDatabaseMetaDataCatalogs() throws Exception {
     runForAllVersions(
         connection -> {
@@ -742,7 +816,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet catalogs = metadata.getCatalogs()) {
               assertTrue(catalogs.next());
-              assertEquals("", catalogs.getString("TABLE_CAT"));
+              assertNotNull(catalogs.getString("TABLE_CAT"));
               assertFalse(catalogs.next());
             }
           } catch (SQLException e) {
@@ -759,19 +833,35 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet schemas = metadata.getSchemas()) {
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              // TODO: Remove once TABLE_CATALOG is always filled.
+              if (schemas.getString("TABLE_CATALOG") != null) {
+                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              }
               assertEquals("information_schema", schemas.getString("TABLE_SCHEM"));
 
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
-              assertEquals("pg_catalog", schemas.getString("TABLE_SCHEM"));
+              // TODO: Remove once TABLE_CATALOG is always filled.
+              if (schemas.getString("TABLE_CATALOG") != null) {
+                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              }
+              // TODO: Remove once pg_catalog is always present.
+              if ("pg_catalog".equals(schemas.getString("TABLE_SCHEM"))) {
+                assertEquals("pg_catalog", schemas.getString("TABLE_SCHEM"));
 
-              assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+                assertTrue(schemas.next());
+              }
+
+              // TODO: Remove once TABLE_CATALOG is always filled.
+              if (schemas.getString("TABLE_CATALOG") != null) {
+                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              }
               assertEquals("public", schemas.getString("TABLE_SCHEM"));
 
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              // TODO: Remove once TABLE_CATALOG is always filled.
+              if (schemas.getString("TABLE_CATALOG") != null) {
+                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              }
               assertEquals("spanner_sys", schemas.getString("TABLE_SCHEM"));
 
               assertFalse(schemas.next());
@@ -779,7 +869,10 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
             try (ResultSet schemas = metadata.getSchemas(null, "public")) {
               assertTrue(schemas.next());
-              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              // TODO: Remove once TABLE_CATALOG is always filled.
+              if (schemas.getString("TABLE_CATALOG") != null) {
+                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              }
               assertEquals("public", schemas.getString("TABLE_SCHEM"));
 
               assertFalse(schemas.next());
@@ -867,16 +960,19 @@ public class ITJdbcMetadataTest implements IntegrationTest {
         });
   }
 
-  @Test(expected = SQLFeatureNotSupportedException.class)
-  public void testDatabaseMetaDataPseudoColumns() throws SQLException {
-    try (Connection connection =
-        DriverManager.getConnection(
-            String.format("jdbc:postgresql://localhost:%d/", testEnv.getPort()))) {
-      DatabaseMetaData metadata = connection.getMetaData();
-      try (ResultSet pseudoColumns = metadata.getPseudoColumns(null, null, null, null)) {
-        assertFalse(pseudoColumns.next());
-      }
-    }
+  @Test
+  public void testDatabaseMetaDataPseudoColumns() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            assertThrows(
+                SQLFeatureNotSupportedException.class,
+                () -> metadata.getPseudoColumns(null, null, null, null));
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
   }
 
   @Test

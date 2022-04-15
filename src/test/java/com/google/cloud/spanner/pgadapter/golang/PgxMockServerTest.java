@@ -165,7 +165,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     String sql = "SELECT * FROM all_types WHERE col_bigint=1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
-    String res = pgxTest.TestQueryAllDataTypes(createConnString());
+    String res = pgxTest.TestQueryAllDataTypes(createConnString(), true);
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);

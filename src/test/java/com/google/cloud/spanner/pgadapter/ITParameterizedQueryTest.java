@@ -14,15 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 
 import com.google.cloud.spanner.Database;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Bytes;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -32,6 +30,7 @@ import java.util.List;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -41,62 +40,49 @@ import org.postgresql.core.Oid;
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
 public final class ITParameterizedQueryTest implements IntegrationTest {
-  private ProxyServer server;
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
+  private static Database database;
+
   private Socket clientSocket;
   private DataOutputStream out;
   private DataInputStream in;
 
+  @BeforeClass
+  public static void setup() {
+    testEnv.setUp();
+    database = testEnv.createDatabase(getDdlStatements());
+    testEnv.startPGAdapterServer(database.getId(), Collections.emptyList());
+  }
+
+  @AfterClass
+  public static void teardown() {
+    testEnv.stopPGAdapterServer();
+    testEnv.cleanUp();
+  }
+
   @Before
-  public void setUp() throws Exception {
-    final String ddl =
+  public void insertTestData() {
+    List<String> values =
+        new ArrayList<>(Arrays.asList("(1, 1, '1')", "(2, 20, 'Joe')", "(3, 23, 'Jack')"));
+    String dml = "INSERT INTO users (id, age, name) VALUES " + String.join(", ", values);
+    testEnv.updateTables(
+        database.getId().getDatabase(), ImmutableList.of("delete from users", dml));
+  }
+
+  private static Iterable<String> getDdlStatements() {
+    return Collections.singletonList(
         "CREATE TABLE users (\n"
             + "  id   bigint PRIMARY KEY,\n"
             + "  age  bigint,\n"
             + "  name   text\n"
-            + ");";
-    List<String> values =
-        new ArrayList<>(Arrays.asList("(1, 1, '1')", "(2, 20, 'Joe')", "(3, 23, 'Jack')"));
-    String dml = "INSERT INTO users (id, age, name) VALUES " + String.join(", ", values);
-    // TODO: Refactor the integration tests to use a common subclass, as this is repeated in each
-    // class.
-    testEnv.setUp();
-    Database db = testEnv.createDatabase();
-    testEnv.updateDdl(db.getId().getDatabase(), Collections.singletonList(ddl));
-    testEnv.updateTables(db.getId().getDatabase(), Collections.singletonList(dml));
-    String credentials = testEnv.getCredentials();
-    ImmutableList.Builder<String> argsListBuilder =
-        ImmutableList.<String>builder()
-            .add(
-                "-p",
-                testEnv.getProjectId(),
-                "-i",
-                testEnv.getInstanceId(),
-                "-d",
-                db.getId().getDatabase(),
-                "-s",
-                String.valueOf(testEnv.getPort()),
-                "-e",
-                testEnv.getUrl().getHost());
-    if (credentials != null) {
-      argsListBuilder.add("-c", testEnv.getCredentials());
-    }
-    String[] args = argsListBuilder.build().toArray(new String[0]);
-    server = new ProxyServer(new OptionsMetadata(args));
-    server.startServer();
+            + ");");
   }
 
   @After
-  public void stopServer() throws Exception {
+  public void closeSocket() throws Exception {
     clientSocket.close();
     out.close();
     in.close();
-    if (server != null) server.stopServer();
-  }
-
-  @AfterClass
-  public static void cleanUp() {
-    testEnv.cleanUp();
   }
 
   // '\0' for name will refer to an unnamed statement.
@@ -223,9 +209,9 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
 
   @Test
   public void unnamedParameterTest() throws Exception {
-    testEnv.waitForServer(server);
+    testEnv.waitForServer();
 
-    clientSocket = new Socket(InetAddress.getByName(null), server.getLocalPort());
+    clientSocket = new Socket(testEnv.getPGAdapterHost(), testEnv.getPGAdapterPort());
     out = new DataOutputStream(clientSocket.getOutputStream());
     in = new DataInputStream(clientSocket.getInputStream());
     testEnv.initializeConnection(out);
@@ -270,18 +256,18 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     byte[] commandCompleteData = {83, 69, 76, 69, 67, 84, 32, 49, 0};
     byte[] readyForQueryData = {73};
 
-    assertEquals(dataRow0, dataRows[0].getPayload());
-    assertEquals(commandCompleteData, commandComplete.getPayload());
-    assertEquals(readyForQueryData, readyForQuery.getPayload());
+    assertArrayEquals(dataRow0, dataRows[0].getPayload());
+    assertArrayEquals(commandCompleteData, commandComplete.getPayload());
+    assertArrayEquals(readyForQueryData, readyForQuery.getPayload());
   }
 
   @Test
   public void parameterTest() throws Exception {
-    testEnv.waitForServer(server);
+    testEnv.waitForServer();
     String statementName = "test-statement\0";
     String portalName = "test-portal\0";
 
-    clientSocket = new Socket(InetAddress.getByName(null), server.getLocalPort());
+    clientSocket = new Socket(testEnv.getPGAdapterHost(), testEnv.getPGAdapterPort());
     out = new DataOutputStream(clientSocket.getOutputStream());
     in = new DataInputStream(clientSocket.getInputStream());
     testEnv.initializeConnection(out);
@@ -327,8 +313,8 @@ public final class ITParameterizedQueryTest implements IntegrationTest {
     byte[] commandCompleteData = {83, 69, 76, 69, 67, 84, 32, 49, 0};
     byte[] readyForQueryData = {73};
 
-    assertEquals(dataRow0, dataRows[0].getPayload());
-    assertEquals(commandCompleteData, commandComplete.getPayload());
-    assertEquals(readyForQueryData, readyForQuery.getPayload());
+    assertArrayEquals(dataRow0, dataRows[0].getPayload());
+    assertArrayEquals(commandCompleteData, commandComplete.getPayload());
+    assertArrayEquals(readyForQueryData, readyForQuery.getPayload());
   }
 }

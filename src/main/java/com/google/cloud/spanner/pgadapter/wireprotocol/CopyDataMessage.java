@@ -19,7 +19,6 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
-import java.io.IOException;
 import java.text.MessageFormat;
 
 /**
@@ -32,16 +31,15 @@ public class CopyDataMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'd';
 
-  private byte[] payload;
-  private CopyStatement statement;
+  private final byte[] payload;
+  private final CopyStatement statement;
 
   public CopyDataMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     // Payload byte array excluding 4 bytes containing the length of message itself
-    this.payload = new byte[this.length - 4];
-    if (this.inputStream.read(this.payload) < 0) {
-      throw new IOException("Could not read copy data.");
-    }
+    int dataLength = this.length - 4;
+    this.payload = new byte[dataLength];
+    this.inputStream.readFully(this.payload);
     this.statement = (CopyStatement) connection.getActiveStatement();
   }
 

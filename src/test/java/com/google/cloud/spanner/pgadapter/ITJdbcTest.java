@@ -26,8 +26,6 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.common.collect.ImmutableList;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -56,69 +54,28 @@ import org.postgresql.copy.CopyManager;
 @RunWith(Parameterized.class)
 public class ITJdbcTest implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
-  private static ProxyServer server;
   private static Database database;
 
   @Parameter public String preferQueryMode;
 
   @Parameters(name = "preferQueryMode = {0}")
   public static Object[] data() {
-    return new Object[] {"extended", "simple"};
+    return new Object[] {"extended"};
   }
 
   @BeforeClass
-  public static void setup() throws Exception {
+  public static void setup() throws ClassNotFoundException {
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
 
-    // TODO: Refactor the integration tests to use a common subclass, as this is repeated in each
-    // class.
     testEnv.setUp();
-    if (testEnv.isUseExistingDb()) {
-      database = testEnv.getExistingDatabase();
-    } else {
-      database = testEnv.createDatabase();
-      testEnv.updateDdl(
-          database.getId().getDatabase(),
-          Arrays.asList(
-              "create table numbers (num int not null primary key, name varchar(100))",
-              "create table all_types ("
-                  + "col_bigint bigint not null primary key, "
-                  + "col_bool bool, "
-                  + "col_bytea bytea, "
-                  + "col_float8 float8, "
-                  + "col_int int, "
-                  + "col_numeric numeric, "
-                  + "col_timestamptz timestamptz, "
-                  + "col_varchar varchar(100))"));
-    }
-    String credentials = testEnv.getCredentials();
-    ImmutableList.Builder<String> argsListBuilder =
-        ImmutableList.<String>builder()
-            .add(
-                "-p",
-                testEnv.getProjectId(),
-                "-i",
-                testEnv.getInstanceId(),
-                "-d",
-                database.getId().getDatabase(),
-                "-s",
-                String.valueOf(testEnv.getPort()),
-                "-e",
-                testEnv.getUrl().getHost());
-    if (credentials != null) {
-      argsListBuilder.add("-c", testEnv.getCredentials());
-    }
-    String[] args = argsListBuilder.build().toArray(new String[0]);
-    server = new ProxyServer(new OptionsMetadata(args));
-    server.startServer();
+    database = testEnv.createDatabase(PgAdapterTestEnv.DEFAULT_DATA_MODEL);
+    testEnv.startPGAdapterServer(database.getId(), Collections.emptyList());
   }
 
   @AfterClass
   public static void teardown() {
-    if (server != null) {
-      server.stopServer();
-    }
+    testEnv.stopPGAdapterServer();
     testEnv.cleanUp();
   }
 
@@ -153,8 +110,8 @@ public class ITJdbcTest implements IntegrationTest {
 
   private String getConnectionUrl() {
     return String.format(
-        "jdbc:postgresql://localhost:%d/?preferQueryMode=%s",
-        server.getLocalPort(), preferQueryMode);
+        "jdbc:postgresql://%s/?preferQueryMode=%s",
+        testEnv.getPGAdapterHostAndPort(), preferQueryMode);
   }
 
   @Test
@@ -522,7 +479,8 @@ public class ITJdbcTest implements IntegrationTest {
         assertFalse(resultSet.next());
       }
 
-      // Delete the imported data to prevent the cleanup method to fail on 'Too many mutations' when
+      // Delete the imported data to prevent the cleanup method to fail on 'Too many mutations'
+      // when
       // it tries to delete all data using a normal transaction.
       connection.createStatement().execute("delete from all_types");
     }
