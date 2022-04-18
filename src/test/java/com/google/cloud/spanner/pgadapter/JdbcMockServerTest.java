@@ -40,7 +40,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -53,6 +52,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
 
 @RunWith(JUnit4.class)
@@ -161,9 +161,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         preparedStatement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
         preparedStatement.setDouble(++index, 3.14d);
         preparedStatement.setBigDecimal(++index, new BigDecimal("6.626"));
-        preparedStatement.setTimestamp(
-            ++index, java.sql.Timestamp.from(Instant.from(zonedDateTime)));
-        preparedStatement.setDate(++index, java.sql.Date.valueOf(LocalDate.of(2022, 3, 29)));
+        preparedStatement.setObject(++index, zonedDateTime);
+        preparedStatement.setObject(++index, LocalDate.of(2022, 3, 29));
         preparedStatement.setString(++index, "test");
         try (ResultSet resultSet = preparedStatement.executeQuery()) {
           assertTrue(resultSet.next());
@@ -404,5 +403,100 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(1, updateDatabaseDdlRequests.size());
     assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
     assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(0));
+  }
+
+  @Test
+  public void testPreparedStatement() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(
+                    "insert into all_types "
+                        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
+                .bind("p1")
+                .to(2L)
+                .bind("p2")
+                .to((Boolean) null)
+                .bind("p3")
+                .to((ByteArray) null)
+                .bind("p4")
+                .to((Double) null)
+                .bind("p5")
+                .to((Long) null)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric(null))
+                .bind("p7")
+                .to((Timestamp) null)
+                .bind("p8")
+                .to((Date) null)
+                .bind("p9")
+                .to((String) null)
+                .build(),
+            1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(
+                    "insert into all_types "
+                        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(true)
+                .bind("p3")
+                .to(ByteArray.copyFrom("test"))
+                .bind("p4")
+                .to(3.14d)
+                .bind("p5")
+                .to(100L)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .bind("p7")
+                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000"))
+                .bind("p8")
+                .to(Date.parseDate("2022-03-29"))
+                .bind("p9")
+                .to("test")
+                .build(),
+            1L));
+
+    OffsetDateTime zonedDateTime =
+        LocalDateTime.of(2022, 2, 16, 13, 18, 2, 123456789).atOffset(ZoneOffset.UTC);
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement statement =
+          connection.prepareStatement(
+              "insert into all_types "
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+        PGStatement pgStatement = statement.unwrap(PGStatement.class);
+        pgStatement.setPrepareThreshold(1);
+
+        int index = 0;
+        statement.setLong(++index, 1L);
+        statement.setBoolean(++index, true);
+        statement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
+        statement.setDouble(++index, 3.14d);
+        statement.setInt(++index, 100);
+        statement.setBigDecimal(++index, new BigDecimal("6.626"));
+        statement.setObject(++index, zonedDateTime);
+        statement.setObject(++index, LocalDate.of(2022, 3, 29));
+        statement.setString(++index, "test");
+
+        assertEquals(1, statement.executeUpdate());
+
+        index = 0;
+        statement.setLong(++index, 2);
+        statement.setNull(++index, Types.BOOLEAN);
+        statement.setNull(++index, Types.BINARY);
+        statement.setNull(++index, Types.DOUBLE);
+        statement.setNull(++index, Types.INTEGER);
+        statement.setNull(++index, Types.NUMERIC);
+        statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
+        statement.setNull(++index, Types.DATE);
+        statement.setNull(++index, Types.VARCHAR);
+
+        assertEquals(1, statement.executeUpdate());
+      }
+    }
   }
 }

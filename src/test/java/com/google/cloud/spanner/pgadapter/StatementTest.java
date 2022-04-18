@@ -242,7 +242,7 @@ public class StatementTest {
   @Test
   public void testPreparedStatement() {
     String sqlStatement = "SELECT * FROM users WHERE age > $2 AND age < $3 AND name = $1";
-    List<Integer> parameterDataTypes = Arrays.asList(Oid.VARCHAR, Oid.INT8, Oid.INT4);
+    int[] parameterDataTypes = new int[] {Oid.VARCHAR, Oid.INT8, Oid.INT4};
 
     Statement statement =
         Statement.newBuilder(sqlStatement)
@@ -279,7 +279,7 @@ public class StatementTest {
   @Test
   public void testPreparedStatementIllegalTypeThrowsException() {
     String sqlStatement = "SELECT * FROM users WHERE metadata = $1";
-    List<Integer> parameterDataTypes = Collections.singletonList(Oid.JSON);
+    int[] parameterDataTypes = new int[] {Oid.JSON};
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(options, parse(sqlStatement), connection);
