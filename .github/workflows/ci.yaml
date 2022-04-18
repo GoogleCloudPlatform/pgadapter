@@ -55,15 +55,6 @@ jobs:
         java-version: 11
     - run: java -version
     - run: .ci/run-with-credentials.sh lint
-  clirr:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-java@v1
-      with:
-        java-version: 8
-    - run: java -version
-    - run: .ci/run-with-credentials.sh clirr
   e2e-psql-v11:
     runs-on: ubuntu-latest
     steps:
@@ -160,7 +151,7 @@ jobs:
     runs-on: ubuntu-latest
     # Only releases on the postgresql-dialect branch
     if: github.head_ref == 'postgresql-dialect'
-    needs: [ units, lint, clirr, integration, e2e-psql-v11, e2e-psql-v12, e2e-psql-v13 ]
+    needs: [ units, lint, integration, e2e-psql-v11, e2e-psql-v12, e2e-psql-v13 ]
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-java@v1
@@ -180,7 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     # Only releases on the postgresql-dialect branch
     if: github.head_ref == 'postgresql-dialect'
-    needs: [ units, lint, clirr, integration, e2e-psql-v11, e2e-psql-v12, e2e-psql-v13 ]
+    needs: [ units, lint, integration, e2e-psql-v11, e2e-psql-v12, e2e-psql-v13 ]
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-java@v1

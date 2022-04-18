@@ -106,9 +106,9 @@ echo "------Test \"-c option WITH DML batching\"------"
 diff -i -w -s .ci/e2e-result/with-dml-batching.txt .ci/e2e-expected/with-dml-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
-echo "------Test \"-c option invalid begin/commit batching\"------"
-/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/invalid-commit-batch.txt)" &> .ci/e2e-result/invalid-commit-batching.txt
-diff -i -w -s .ci/e2e-result/invalid-commit-batching.txt .ci/e2e-expected/invalid-commit-batching.txt
+echo "------Test \"-c option begin/commit batching\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/begin-commit-batch.txt)" &> .ci/e2e-result/begin-commit-batching.txt
+diff -i -w -s .ci/e2e-result/begin-commit-batching.txt .ci/e2e-expected/begin-commit-batching.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"COPY FROM STDIN\"------"
