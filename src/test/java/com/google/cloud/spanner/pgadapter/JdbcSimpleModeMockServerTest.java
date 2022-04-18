@@ -866,4 +866,41 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
     assertEquals(UPDATE_STATEMENT.getSql(), requests.get(1).getSql());
   }
+
+  @Test
+  public void testAbortedTransactionRollbackInAutocommit() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertFalse(statement.execute("BEGIN"));
+        assertEquals(0, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+
+        assertFalse(statement.execute(UPDATE_STATEMENT.getSql()));
+        assertEquals(2, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+
+        SQLException exception =
+            assertThrows(SQLException.class, () -> statement.execute(INVALID_DML.getSql()));
+        assertThat(
+            exception.getMessage(), containsString("INVALID_ARGUMENT: Statement is invalid."));
+
+        assertFalse(statement.execute("COMMIT"));
+        assertEquals(0, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+      }
+    }
+
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(2, requests.size());
+    assertEquals(UPDATE_STATEMENT.getSql(), requests.get(0).getSql());
+    assertTrue(requests.get(0).getTransaction().hasBegin());
+    assertEquals(INVALID_DML.getSql(), requests.get(1).getSql());
+    assertTrue(requests.get(1).getTransaction().hasId());
+
+    List<RollbackRequest> rollbackRequests = mockSpanner.getRequestsOfType(RollbackRequest.class);
+    assertEquals(1, rollbackRequests.size());
+  }
 }

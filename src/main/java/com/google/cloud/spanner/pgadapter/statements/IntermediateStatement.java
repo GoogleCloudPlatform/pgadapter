@@ -398,16 +398,17 @@ public class IntermediateStatement {
       }
     }
     if ("COMMIT".equals(command) || "ROLLBACK".equals(command)) {
-      if (executionStatus == ExecutionStatus.AUTOCOMMIT) {
-        // Executing a COMMIT/ROLLBACK statement in autocommit mode is a no-op
-        return;
-      }
-      executionStatus = ExecutionStatus.AUTOCOMMIT;
       if (connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
         connectionHandler.setStatus(ConnectionStatus.IDLE);
         // COMMIT rollbacks aborted transaction
         statement = "ROLLBACK";
         commandTags.set(index, "ROLLBACK");
+      }
+      if (executionStatus == ExecutionStatus.AUTOCOMMIT) {
+        // Executing a COMMIT/ROLLBACK statement in autocommit mode is a no-op
+        return;
+      } else {
+        executionStatus = ExecutionStatus.AUTOCOMMIT;
       }
     }
     try {
