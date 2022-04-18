@@ -1,6 +1,6 @@
                                                                                 List of schemas
-    catalog_name | schema_name | schema_owner | default_character_set_catalog | default_character_set_schema | default_character_set_name | sql_path | effective_timestamp
+    catalog_name     | schema_name | schema_owner | default_character_set_catalog | default_character_set_schema | default_character_set_name | sql_path | effective_timestamp 
 +++++++
-                 | public      |              |                               |                              |                            |          |
+ testdb_e2e_psql_v?? | public      |              |                               |                              |                            |          |
 (1 row)
 
