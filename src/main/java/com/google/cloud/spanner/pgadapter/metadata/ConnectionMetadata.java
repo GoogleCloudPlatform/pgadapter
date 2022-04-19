@@ -14,9 +14,11 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.api.core.InternalApi;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 
+@InternalApi
 public class ConnectionMetadata {
 
   private final DataInputStream inputStream;

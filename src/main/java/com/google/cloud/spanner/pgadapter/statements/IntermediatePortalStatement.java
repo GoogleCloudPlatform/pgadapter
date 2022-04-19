@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
@@ -31,6 +32,7 @@ import java.util.logging.Logger;
  * An intermediate representation of a portal statement (that is, a prepared statement which
  * contains all relevant information for execution.
  */
+@InternalApi
 public class IntermediatePortalStatement extends IntermediatePreparedStatement {
 
   private static final Logger logger =

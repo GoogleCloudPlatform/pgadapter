@@ -19,7 +19,6 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
-import java.sql.Types;
 import org.postgresql.core.Utils;
 import org.postgresql.util.PGbytea;
 
@@ -27,17 +26,17 @@ import org.postgresql.util.PGbytea;
  * Parse specified type to binary (generally this is the simplest parse class, as items are
  * generally represented in binary for wire format).
  */
-public class BinaryParser extends Parser<ByteArray> {
+class BinaryParser extends Parser<ByteArray> {
 
-  public BinaryParser(ResultSet item, int position) {
+  BinaryParser(ResultSet item, int position) {
     this.item = item.getBytes(position);
   }
 
-  public BinaryParser(Object item) {
+  BinaryParser(Object item) {
     this.item = (ByteArray) item;
   }
 
-  public BinaryParser(byte[] item, FormatCode formatCode) {
+  BinaryParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
@@ -58,11 +57,6 @@ public class BinaryParser extends Parser<ByteArray> {
   }
 
   @Override
-  public int getSqlType() {
-    return Types.BINARY;
-  }
-
-  @Override
   protected String stringParse() {
     return this.item == null ? null : "\\x" + Utils.toHexString(this.item.toByteArray());
   }
@@ -77,6 +71,7 @@ public class BinaryParser extends Parser<ByteArray> {
     return this.item == null ? null : this.item.toByteArray();
   }
 
+  @Override
   public void bind(Statement.Builder statementBuilder, String name) {
     statementBuilder.bind(name).to(this.item);
   }

@@ -137,17 +137,6 @@ public class ProxyServer extends AbstractApiService {
     awaitTerminated();
   }
 
-  public void run() {
-    try {
-      runServer();
-    } catch (IOException e) {
-      logger.log(
-          Level.WARNING,
-          e,
-          () -> String.format("Server on port %d stopped by exception: %s", getLocalPort(), e));
-    }
-  }
-
   /**
    * Thread logic: opens the listening socket and instantiates the connection handler.
    *
@@ -261,14 +250,17 @@ public class ProxyServer extends AbstractApiService {
     return this.options;
   }
 
+  /** @return the JDBC connection properties that are used by this server */
   public Properties getProperties() {
-    return this.properties;
+    return (Properties) this.properties.clone();
   }
 
+  /** @return the current number of connections. */
   public int getNumberOfConnections() {
     return this.handlers.size();
   }
 
+  /** @return the local TCP port that this server is using. */
   public int getLocalPort() {
     return localPort;
   }
