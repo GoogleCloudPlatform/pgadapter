@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.golang;
 
 import static org.junit.Assert.assertNull;
+import static org.junit.Assume.assumeFalse;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Timestamp;
@@ -132,6 +133,9 @@ public class ITPgxTest implements IntegrationTest {
 
   @Test
   public void testInsertNullsAllDataTypes() {
+    assumeFalse(
+        "Untyped parameters are not yet supported by Spangres", preferQueryMode.equals("extended"));
+
     // Make sure there is no row that already exists with col_bigint=100
     String databaseId = database.getId().getDatabase();
     testEnv.write(
