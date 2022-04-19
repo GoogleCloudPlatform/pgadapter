@@ -1,1 +1,4 @@
-ERROR: FAILED_PRECONDITION: Executing queries is not allowed for DDL batches. "CREATE TABLE test (id integer PRIMARY KEY); SELECT * FROM test; SELECT * FROM test"
+ id
+----
+(0 rows)
+

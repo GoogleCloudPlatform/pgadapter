@@ -1,1 +1,0 @@
-ERROR: FAILED_PRECONDITION: This connection has an active batch and cannot begin a transaction "BEGIN TRANSACTION; INSERT INTO users (id, age, name) VALUES (99, 99, 'test'); COMMIT"

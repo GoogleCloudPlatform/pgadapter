@@ -391,7 +391,7 @@ public class ITJdbcTest implements IntegrationTest {
    * This must be run with the system property -Dcopy_in_insert_or_update=true set, or otherwise it
    * will eventually fail on a unique key constraint violation, as the primary key value is a random
    * number. <code>
-   *   psql -h localhost -d knut-test-db -c "copy (select (random()*1000000000)::bigint, random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, (random()*999999)::int, (random()*999999)::numeric, now()-random()*interval '50 year', md5(random()::text || clock_timestamp()::text)::varchar from generate_series(1, 1000000) s(i)) to stdout" | psql -h localhost -p 5433 -d test -c "set autocommit_dml_mode='partitioned_non_atomic'" -c "copy all_types from stdin;"
+   *   psql -h localhost -d knut-test-db -c "copy (select (random()*1000000000)::bigint, random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, (random()*999999)::int, (random()*999999)::numeric, now()-random()*interval '50 year', md5(random()::text || clock_timestamp()::text)::varchar from generate_series(1, 1000000) s(i)) to stdout" | psql -h localhost -p 5433 -d test -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'" -c "copy all_types from stdin;"
    * </code>
    */
   @Test
@@ -461,7 +461,9 @@ public class ITJdbcTest implements IntegrationTest {
     testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
-      connection.createStatement().execute("set autocommit_dml_mode='partitioned_non_atomic'");
+      connection
+          .createStatement()
+          .execute("set spanner.autocommit_dml_mode='partitioned_non_atomic'");
 
       PGConnection pgConnection = connection.unwrap(PGConnection.class);
       CopyManager copyManager = pgConnection.getCopyAPI();
@@ -483,6 +485,72 @@ public class ITJdbcTest implements IntegrationTest {
       // when
       // it tries to delete all data using a normal transaction.
       connection.createStatement().execute("delete from all_types");
+    }
+  }
+
+  @Test
+  public void testTwoDmlStatementsInSimpleMode() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result is an update count or no result.
+        assertFalse(
+            statement.execute(
+                "INSERT INTO numbers VALUES (2, 'Two'); UPDATE numbers SET name=name || ' - Updated';"));
+
+        // Note that we have sent two DML statements to the database in one string. These should be
+        // treated as separate statements, and there should therefore be two results coming back
+        // from the server. That is; The first update count should be 1 (the INSERT), and the second
+        // should be 2 (the UPDATE).
+        assertEquals(1, statement.getUpdateCount());
+
+        // The following is a prime example of how not to design an API, but this is how JDBC works.
+        // getMoreResults() returns true if the next result is a ResultSet. However, if the next
+        // result is an update count, it returns false, and we have to check getUpdateCount() to
+        // verify whether there were any more results.
+        assertFalse(statement.getMoreResults());
+        assertEquals(2, statement.getUpdateCount());
+
+        // There are no more results. This is indicated by getMoreResults returning false AND
+        // getUpdateCount returning -1.
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+
+        // Read back the data to verify.
+        try (ResultSet resultSet =
+            statement.executeQuery("SELECT name FROM numbers ORDER BY num")) {
+          assertTrue(resultSet.next());
+          assertEquals("One - Updated", resultSet.getString("name"));
+          assertTrue(resultSet.next());
+          assertEquals("Two - Updated", resultSet.getString("name"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testDmlAndQueryInBatchInSimpleMode() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertFalse(
+            statement.execute(
+                "INSERT INTO numbers VALUES (2, 'Two'); SELECT name FROM numbers ORDER BY num;"));
+        assertEquals(1, statement.getUpdateCount());
+
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals("One", resultSet.getString("name"));
+          assertTrue(resultSet.next());
+          assertEquals("Two", resultSet.getString("name"));
+          assertFalse(resultSet.next());
+        }
+
+        // There are no more results. This is indicated by getMoreResults returning false AND
+        // getUpdateCount returning -1.
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+      }
     }
   }
 }

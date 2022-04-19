@@ -30,19 +30,19 @@ set +e
 
 case ${JOB_TYPE} in
 units)
-  mvn verify -Dclirr.skip=true -DskipITs=true -Ptest-all
+  mvn verify -B -Dclirr.skip=true -DskipITs=true -Ptest-all
   ;;
 lint)
-  mvn com.coveo:fmt-maven-plugin:check
+  mvn -B com.coveo:fmt-maven-plugin:check
   ;;
 clirr)
-  mvn clirr:check
+  mvn -B clirr:check
   ;;
 integration)
-  mvn verify -Dclirr.skip=true -DskipITs=false -DPG_ADAPTER_HOST="https://${GOOGLE_CLOUD_ENDPOINT}" -DPG_ADAPTER_INSTANCE="${GOOGLE_CLOUD_INSTANCE}" -DPG_ADAPTER_DATABASE="${GOOGLE_CLOUD_DATABASE}"
+  mvn verify -B -Dclirr.skip=true -DskipITs=false -DPG_ADAPTER_HOST="https://${GOOGLE_CLOUD_ENDPOINT}" -DPG_ADAPTER_INSTANCE="${GOOGLE_CLOUD_INSTANCE}" -DPG_ADAPTER_DATABASE="${GOOGLE_CLOUD_DATABASE}"
   ;;
 uber-jar-build)
-  mvn package -Pshade -DskipTests
+  mvn package -Pshade -DskipTests -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
   ;;
 uber-jar-release)
   PGADAPTER_VERSION="$(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=project.version -q -DforceStdout)"
@@ -73,6 +73,8 @@ e2e-psql)
   done
 
 #  start PGAdapter
+  echo "Starting PGAdapter"
+  ls -lh target
   UBER_JAR="pgadapter.jar"
   (java -jar target/"${UBER_JAR}" -p "${GOOGLE_CLOUD_PROJECT}" -i "${GOOGLE_CLOUD_INSTANCE}" -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -e "${GOOGLE_CLOUD_ENDPOINT}" -s 4242 -q > /dev/null 2>&1) &
   BACK_PID=$!
