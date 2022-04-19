@@ -74,12 +74,12 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     this.executed = true;
     // If the portal has already been described, the statement has already been executed, and we
     // don't need to do that once more.
-    if (this.statementResult == null) {
+    if (getStatementResult(0) == null) {
       try {
         StatementResult result = connection.execute(this.statement);
-        this.updateResultCount(result);
+        this.updateResultCount(0, result);
       } catch (SpannerException e) {
-        handleExecutionException(e);
+        handleExecutionException(0, e);
       }
     }
   }

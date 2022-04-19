@@ -235,8 +235,10 @@ public class ConnectionHandler extends Thread {
 
   /** Closes portals and statements if the result of an execute was the end of a transaction. */
   public void cleanUp(IntermediateStatement statement) throws Exception {
-    if (!statement.isHasMoreData() && statement.isBound()) {
-      statement.close();
+    for (int index = 0; index < statement.getStatementCount(); index++) {
+      if (!statement.isHasMoreData(index) && statement.isBound()) {
+        statement.close(index);
+      }
     }
     // TODO when we have transaction data from jdbcConnection, close all portals if done
   }
@@ -401,7 +403,8 @@ public class ConnectionHandler extends Thread {
     UNAUTHENTICATED,
     IDLE,
     COPY_IN,
-    TERMINATED
+    TERMINATED,
+    TRANSACTION_ABORTED
   }
 
   /**

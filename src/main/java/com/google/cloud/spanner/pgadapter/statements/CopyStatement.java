@@ -23,9 +23,9 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
@@ -66,10 +66,9 @@ public class CopyStatement extends IntermediateStatement {
     super(options, parsedStatement, connection);
   }
 
-  @Override
   public Exception getException() {
     // Do not clear exceptions on a CopyStatement.
-    return this.exception;
+    return this.exceptions[0];
   }
 
   @Override
@@ -81,7 +80,6 @@ public class CopyStatement extends IntermediateStatement {
     super.close();
   }
 
-  @Override
   public Long getUpdateCount() {
     try {
       return updateCount.get();
@@ -93,8 +91,8 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   @Override
-  public ResultType getResultType() {
-    return ResultType.UPDATE_COUNT;
+  public StatementType getStatementType(int index) {
+    return StatementType.UPDATE;
   }
 
   /** @return Mapping of table column names to column type. */
@@ -288,10 +286,14 @@ public class CopyStatement extends IntermediateStatement {
     return 0;
   }
 
-  @Override
   public void handleExecutionException(SpannerException e) {
+    this.handleExecutionException(0, e);
+  }
+
+  @Override
+  public void handleExecutionException(int index, SpannerException e) {
     executor.shutdownNow();
-    super.handleExecutionException(e);
+    super.handleExecutionException(index, e);
   }
 
   @Override

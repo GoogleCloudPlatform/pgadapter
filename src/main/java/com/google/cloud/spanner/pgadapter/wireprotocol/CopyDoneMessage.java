@@ -43,11 +43,11 @@ public class CopyDoneMessage extends ControlMessage {
     if (this.statement != null) {
       MutationWriter mutationWriter = this.statement.getMutationWriter();
       statement.close();
-      if (!statement.hasException()) {
+      if (!statement.hasException(0)) {
         try {
           long rowCount = this.statement.getUpdateCount();
-          statement.addUpdateCount(rowCount); // Increase the row count of number of rows copied.
-          this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
+          statement.setUpdateCount(0, rowCount); // Set the row count of number of rows copied.
+          this.sendSpannerResult(0, this.statement, QueryMode.SIMPLE, 0L);
           this.outputStream.flush();
         } catch (Exception e) {
           // Spanner returned an error when trying to commit the batch of mutations.

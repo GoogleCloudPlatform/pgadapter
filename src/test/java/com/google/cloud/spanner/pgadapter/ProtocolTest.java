@@ -20,6 +20,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
@@ -914,13 +915,14 @@ public class ProtocolTest {
 
     doReturn(false)
         .when(messageSpy)
-        .sendSpannerResult(any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
+        .sendSpannerResult(
+            anyInt(), any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
 
     messageSpy.send();
 
     verify(intermediatePortalStatement).execute();
     verify(messageSpy)
-        .sendSpannerResult(intermediatePortalStatement, QueryMode.EXTENDED, totalRows);
+        .sendSpannerResult(0, intermediatePortalStatement, QueryMode.EXTENDED, totalRows);
     verify(connectionHandler).cleanUp(intermediatePortalStatement);
   }
 
@@ -1310,10 +1312,11 @@ public class ProtocolTest {
     CopyDoneMessage messageSpy = (CopyDoneMessage) spy(message);
     doReturn(false)
         .when(messageSpy)
-        .sendSpannerResult(any(IntermediateStatement.class), any(QueryMode.class), anyLong());
+        .sendSpannerResult(
+            anyInt(), any(IntermediateStatement.class), any(QueryMode.class), anyLong());
 
     messageSpy.send();
-    verify(messageSpy).sendSpannerResult(copyStatement, QueryMode.SIMPLE, 0L);
+    verify(messageSpy).sendSpannerResult(0, copyStatement, QueryMode.SIMPLE, 0L);
   }
 
   @Test
@@ -1393,7 +1396,7 @@ public class ProtocolTest {
 
     assertEquals("TEXT", copyStatement.getFormatType());
     assertEquals('\t', copyStatement.getDelimiterChar());
-    assertFalse(copyStatement.hasException());
+    assertFalse(copyStatement.hasException(0));
     assertEquals(12L, copyStatement.getUpdateCount().longValue());
     assertEquals(12L, mw.getRowCount());
 
