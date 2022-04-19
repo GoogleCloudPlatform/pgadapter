@@ -16,11 +16,9 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
-import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.commands.Command;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import org.json.simple.JSONObject;
 
 /**
  * Meant to be utilized when running as a proxy for any interactive terminal tool either PSQL or
@@ -34,13 +32,7 @@ public class MatcherStatement extends IntermediateStatement {
       OptionsMetadata options,
       ParsedStatement parsedStatement,
       ConnectionHandler connectionHandler) {
-    super(
-        options,
-        translateSQL(
-            parsedStatement,
-            connectionHandler.getSpannerConnection(),
-            connectionHandler.getServer().getOptions().getCommandMetadataJSON()),
-        connectionHandler.getSpannerConnection());
+    super(options, translateSQL(parsedStatement, connectionHandler), connectionHandler);
   }
 
   @Override
@@ -57,10 +49,12 @@ public class MatcherStatement extends IntermediateStatement {
    *     gives out the original Statement.
    */
   private static ParsedStatement translateSQL(
-      ParsedStatement parsedStatement, Connection connection, JSONObject commandMetadataJSON) {
+      ParsedStatement parsedStatement, ConnectionHandler connectionHandler) {
     for (Command currentCommand :
         Command.getCommands(
-            parsedStatement.getSqlWithoutComments(), connection, commandMetadataJSON)) {
+            parsedStatement.getSqlWithoutComments(),
+            connectionHandler.getSpannerConnection(),
+            connectionHandler.getServer().getOptions().getCommandMetadataJSON())) {
       if (currentCommand.is()) {
         return PARSER.parse(Statement.of(currentCommand.translate()));
       }

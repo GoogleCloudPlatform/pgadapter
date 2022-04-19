@@ -386,6 +386,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testDdl() throws SQLException {
     String sql = "CREATE TABLE foo (id bigint primary key)";
+    addDdlResponseToSpannerAdmin();
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {

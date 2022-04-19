@@ -1,1 +1,0 @@
-BEGIN TRANSACTION; INSERT INTO users (id, age, name) VALUES (99, 99, 'test'); COMMIT;

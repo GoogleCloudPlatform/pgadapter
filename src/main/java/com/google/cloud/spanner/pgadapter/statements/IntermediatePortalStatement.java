@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -86,8 +87,8 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
       // DescribePortal message without a following Execute message is extremely rare, as that would
       // only happen if the client is ill-behaved, or if the client crashes between the
       // DescribePortal and Execute.
-      this.statementResult = connection.executeQuery(this.statement);
-      this.hasMoreData = this.statementResult.next();
+      ResultSet statementResult = connection.executeQuery(this.statement);
+      setStatementResult(0, statementResult);
       return new DescribePortalMetadata(statementResult);
     } catch (SpannerException e) {
       logger.log(Level.SEVERE, e, e::getMessage);

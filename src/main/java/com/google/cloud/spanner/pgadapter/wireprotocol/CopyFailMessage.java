@@ -50,7 +50,7 @@ public class CopyFailMessage extends ControlMessage {
       mutationWriter.rollback();
       mutationWriter.closeErrorFile();
       statement.close();
-      if (!statement.hasException()) {
+      if (!statement.hasException(0)) {
         new ErrorResponse(this.outputStream, new Exception(this.errorMessage), State.IOError)
             .send();
       }
