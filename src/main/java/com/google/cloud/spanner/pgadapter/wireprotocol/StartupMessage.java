@@ -30,7 +30,7 @@ public class StartupMessage extends BootstrapMessage {
   public static final int IDENTIFIER = 196608; // First Hextet: 3 (version), Second Hextet: 0
 
   private final boolean authenticate;
-  private Map<String, String> parameters;
+  private final Map<String, String> parameters;
 
   public StartupMessage(ConnectionHandler connection, int length) throws Exception {
     super(connection, length);
@@ -41,6 +41,7 @@ public class StartupMessage extends BootstrapMessage {
   @Override
   protected void sendPayload() throws Exception {
     if (!authenticate) {
+      this.connection.connectToSpanner(this.parameters.get("database"));
       sendStartupMessage(
           this.outputStream,
           this.connection.getConnectionId(),

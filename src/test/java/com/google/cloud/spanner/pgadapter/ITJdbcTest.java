@@ -70,7 +70,7 @@ public class ITJdbcTest implements IntegrationTest {
 
     testEnv.setUp();
     database = testEnv.createDatabase(PgAdapterTestEnv.DEFAULT_DATA_MODEL);
-    testEnv.startPGAdapterServer(database.getId(), Collections.emptyList());
+    testEnv.startPGAdapterServer(Collections.emptyList());
   }
 
   @AfterClass
@@ -110,8 +110,8 @@ public class ITJdbcTest implements IntegrationTest {
 
   private String getConnectionUrl() {
     return String.format(
-        "jdbc:postgresql://%s/?preferQueryMode=%s",
-        testEnv.getPGAdapterHostAndPort(), preferQueryMode);
+        "jdbc:postgresql://%s/%s?preferQueryMode=%s",
+        testEnv.getPGAdapterHostAndPort(), database.getId().getDatabase(), preferQueryMode);
   }
 
   @Test
