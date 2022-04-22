@@ -33,7 +33,7 @@ public class ParseMessage extends ControlMessage {
 
   private final String name;
   private final IntermediatePreparedStatement statement;
-  private final ImmutableList<Integer> parameterDataTypes;
+  private final int[] parameterDataTypes;
 
   public ParseMessage(ConnectionHandler connection) throws Exception {
     super(connection);
@@ -41,11 +41,10 @@ public class ParseMessage extends ControlMessage {
     ParsedStatement parsedStatement = PARSER.parse(Statement.of(this.readString()));
     ImmutableList.Builder<Integer> builder = ImmutableList.builder();
     short numberOfParameters = this.inputStream.readShort();
+    this.parameterDataTypes = new int[numberOfParameters];
     for (int i = 0; i < numberOfParameters; i++) {
-      int type = this.inputStream.readInt();
-      builder.add(type);
+      parameterDataTypes[i] = this.inputStream.readInt();
     }
-    this.parameterDataTypes = builder.build();
     this.statement =
         new IntermediatePreparedStatement(
             connection.getServer().getOptions(),

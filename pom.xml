@@ -33,7 +33,7 @@
   <description>
     The PGAdapter server implements the PostgreSQL wire-protocol, but sends all received statements
     to a Cloud Spanner database instead of a PostgreSQL database. The Cloud Spanner database must
-    have been created using the PostgreSQL dialect. See https://cloud.google.com/spanner/docs/quickstart-console#postgresql
+    have been created to use the PostgreSQL dialect. See https://cloud.google.com/spanner/docs/quickstart-console#postgresql
     for more information on how to create PostgreSQL dialect databases on Cloud Spanner.
   </description>
   <parent>
