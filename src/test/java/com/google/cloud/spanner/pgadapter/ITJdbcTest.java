@@ -616,7 +616,7 @@ public class ITJdbcTest implements IntegrationTest {
                 .set("col_float8")
                 .to((Double) null)
                 .set("col_int")
-                .to((Integer) null)
+                .to((Long) null)
                 .set("col_numeric")
                 .to((BigDecimal) null)
                 .set("col_timestamptz")
