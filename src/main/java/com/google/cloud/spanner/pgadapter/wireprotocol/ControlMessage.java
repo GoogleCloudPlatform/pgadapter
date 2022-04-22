@@ -165,7 +165,7 @@ public abstract class ControlMessage extends WireMessage {
         if (state.hasMoreRows()) {
           new PortalSuspendedResponse(this.outputStream).send(false);
         } else {
-          statement.getStatementResult(resultIndex).close();
+          statement.close(resultIndex);
           new CommandCompleteResponse(this.outputStream, "SELECT " + state.getNumberOfRowsSent())
               .send(false);
         }

@@ -201,8 +201,9 @@ public class IntermediateStatement {
   }
 
   public void close(int index) throws Exception {
-    if (this.getStatementResult(index) != null) {
-      this.getStatementResult(index).close();
+    if (this.statementResults != null && this.statementResults[index] != null) {
+      this.statementResults[index].close();
+      this.statementResults[index] = null;
     }
   }
 

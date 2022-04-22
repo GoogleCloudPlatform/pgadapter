@@ -138,7 +138,7 @@ public class ConnectionHandler extends Thread {
 
       try {
         this.connectionMetadata = new ConnectionMetadata(input, output);
-        this.message = BootstrapMessage.create(this);
+        this.message = this.server.recordMessage(BootstrapMessage.create(this));
         this.message.send();
         while (this.status == ConnectionStatus.UNAUTHENTICATED) {
           try {
@@ -379,7 +379,7 @@ public class ConnectionHandler extends Thread {
   }
 
   public void setMessageState(WireMessage message) {
-    this.message = message;
+    this.message = this.server.recordMessage(message);
   }
 
   public ConnectionMetadata getConnectionMetadata() {

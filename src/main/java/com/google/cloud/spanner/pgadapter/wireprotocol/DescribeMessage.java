@@ -73,6 +73,10 @@ public class DescribeMessage extends ControlMessage {
     return this.name;
   }
 
+  public PreparedType getType() {
+    return type;
+  }
+
   @Override
   protected int getHeaderLength() {
     return 5;
