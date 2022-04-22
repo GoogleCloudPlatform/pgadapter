@@ -414,11 +414,14 @@ public class IntermediateStatement {
         executionStatus = ExecutionStatus.AUTOCOMMIT;
       }
     }
-    try {
-      StatementResult result = this.connection.execute(Statement.of(statement));
-      updateResultCount(index, result);
-    } catch (SpannerException e) {
-      handleExecutionExceptionAndTransactionStatus(index, e);
+    // Ignore empty statements.
+    if (!"".equals(statement)) {
+      try {
+        StatementResult result = this.connection.execute(Statement.of(statement));
+        updateResultCount(index, result);
+      } catch (SpannerException e) {
+        handleExecutionExceptionAndTransactionStatus(index, e);
+      }
     }
   }
 
