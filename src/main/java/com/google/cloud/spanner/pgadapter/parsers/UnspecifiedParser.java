@@ -26,7 +26,13 @@ import java.sql.Types;
 public class UnspecifiedParser extends Parser<Value> {
 
   public UnspecifiedParser(byte[] item, FormatCode formatCode) {
-    this.item = item == null ? null : Value.string(new String(item, UTF8));
+    this.item =
+        item == null
+            ? null
+            : Value.untyped(
+                com.google.protobuf.Value.newBuilder()
+                    .setStringValue(new String(item, StandardCharsets.UTF_8))
+                    .build());
   }
 
   @Override

@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.golang;
 import static org.junit.Assert.assertNull;
 
 import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.Key;
@@ -28,7 +29,6 @@ import java.util.Collections;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -75,13 +75,14 @@ public class ITPgxTest implements IntegrationTest {
             + "col_int int, "
             + "col_numeric numeric, "
             + "col_timestamptz timestamptz, "
+            + "col_date date, "
             + "col_varchar varchar(100))");
   }
 
   private GoString createConnString() {
     return new GoString(
         String.format(
-            "postgres://uid:pwd@localhost:%d/?statement_cache_capacity=0&sslmode=disable",
+            "postgres://uid:pwd@localhost:%d/?sslmode=disable",
             testEnv.getServer().getLocalPort()));
   }
 
@@ -106,6 +107,8 @@ public class ITPgxTest implements IntegrationTest {
                 .to(new BigDecimal("6.626"))
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("2022-02-16T14:18:02.123456789+01:00"))
+                .set("col_date")
+                .to(Date.parseDate("2022-03-29"))
                 .set("col_varchar")
                 .to("test")
                 .build()));
@@ -131,7 +134,7 @@ public class ITPgxTest implements IntegrationTest {
     assertNull(pgxTest.TestInsertAllDataTypes(createConnString(), false));
   }
 
-  @Ignore("Untyped null values are not supported by the backend yet")
+  //  @Ignore("Untyped null values are not supported by the backend yet")
   @Test
   public void testInsertNullsAllDataTypes() {
     // Make sure there is no row that already exists with col_bigint=100
@@ -139,6 +142,6 @@ public class ITPgxTest implements IntegrationTest {
     testEnv.write(
         databaseId, Collections.singletonList(Mutation.delete("all_types", Key.of(100L))));
 
-    assertNull(pgxTest.TestInsertNullsAllDataTypes(createConnString(), false));
+    assertNull(pgxTest.TestInsertNullsAllDataTypes(createConnString()));
   }
 }

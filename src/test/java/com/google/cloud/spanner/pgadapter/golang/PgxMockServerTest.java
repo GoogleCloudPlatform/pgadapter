@@ -243,7 +243,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .build(),
             1L));
 
-    String res = pgxTest.TestInsertNullsAllDataTypes(createConnString(), true);
+    String res = pgxTest.TestInsertNullsAllDataTypes(createConnString());
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);

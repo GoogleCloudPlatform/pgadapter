@@ -306,6 +306,9 @@ public class StatementTest {
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(options, parse(sqlStatement), connection);
+    int[] parameters = new int[3];
+    Arrays.fill(parameters, Oid.INT8);
+    intermediateStatement.setParameterDataTypes(parameters);
 
     intermediateStatement.describe();
   }

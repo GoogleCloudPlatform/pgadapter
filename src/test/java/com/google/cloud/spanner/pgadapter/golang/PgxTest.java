@@ -29,11 +29,11 @@ public interface PgxTest extends Library {
 
   String TestQueryWithParameter(GoString connString);
 
-  String TestQueryAllDataTypes(GoString connString, boolean dateSupported);
+  String TestQueryAllDataTypes(GoString connString, boolean binary);
 
-  String TestInsertAllDataTypes(GoString connString, boolean dateSupported);
+  String TestInsertAllDataTypes(GoString connString, boolean floatAndNumericSupported);
 
-  String TestInsertNullsAllDataTypes(GoString connString, boolean dateSupported);
+  String TestInsertNullsAllDataTypes(GoString connString);
 
   String TestWrongDialect(GoString connString);
 

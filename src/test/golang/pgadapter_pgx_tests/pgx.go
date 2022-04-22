@@ -100,7 +100,7 @@ func TestQueryWithParameter(connString string) *C.char {
 }
 
 //export TestQueryAllDataTypes
-func TestQueryAllDataTypes(connString string, dateSupported bool) *C.char {
+func TestQueryAllDataTypes(connString string, binary bool) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -119,30 +119,17 @@ func TestQueryAllDataTypes(connString string, dateSupported bool) *C.char {
 	var varcharValue string
 
 	row := conn.QueryRow(ctx, "SELECT * FROM all_types WHERE col_bigint=1")
-	if dateSupported {
-		err = row.Scan(
-			&bigintValue,
-			&boolValue,
-			&byteaValue,
-			&float8Value,
-			&intValue,
-			&numericValue,
-			&timestamptzValue,
-			&dateValue,
-			&varcharValue,
-		)
-	} else {
-		err = row.Scan(
-			&bigintValue,
-			&boolValue,
-			&byteaValue,
-			&float8Value,
-			&intValue,
-			&numericValue,
-			&timestamptzValue,
-			&varcharValue,
-		)
-	}
+	err = row.Scan(
+		&bigintValue,
+		&boolValue,
+		&byteaValue,
+		&float8Value,
+		&intValue,
+		&numericValue,
+		&timestamptzValue,
+		&dateValue,
+		&varcharValue,
+	)
 	if err != nil {
 		return C.CString(fmt.Sprintf("Failed to execute query: %v", err.Error()))
 	}
@@ -166,14 +153,16 @@ func TestQueryAllDataTypes(connString string, dateSupported bool) *C.char {
 	if g, w := numericValue, wantNumericValue; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
-	if dateSupported {
-		wantDateValue, _ := time.Parse("2006-01-02", "2022-03-29")
-		if g, w := dateValue, wantDateValue; !reflect.DeepEqual(g, w) {
-			return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
-		}
+	wantDateValue, _ := time.Parse("2006-01-02", "2022-03-29")
+	if g, w := dateValue, wantDateValue; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
-	wantTimestamptzValue, _ := time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456789+00:00")
-	if g, w := timestamptzValue.String(), wantTimestamptzValue.String(); g != w {
+	// Text mode truncates the value to microseconds. Binary mode preserves nano precision.
+	wantTimestamptzValue, _ := time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456+00:00")
+	if binary {
+		wantTimestamptzValue, _ = time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456789+00:00")
+	}
+	if g, w := timestamptzValue.UTC().String(), wantTimestamptzValue.UTC().String(); g != w {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	if g, w := varcharValue, "test"; g != w {
@@ -184,7 +173,7 @@ func TestQueryAllDataTypes(connString string, dateSupported bool) *C.char {
 }
 
 //export TestInsertAllDataTypes
-func TestInsertAllDataTypes(connString string, dateSupported bool) *C.char {
+func TestInsertAllDataTypes(connString string, floatAndNumericSupported bool) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -206,19 +195,20 @@ func TestInsertAllDataTypes(connString string, dateSupported bool) *C.char {
 	}
 
 	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8)"
-	if !dateSupported {
-		sql = "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar) values ($1, $2, $3, $4, $5, $6, $7)"
-	}
 	numeric := pgtype.Numeric{}
 	_ = numeric.Set("6.626")
 	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T07:39:10.123456789+01:00")
 	var tag pgconn.CommandTag
-	if dateSupported {
-		date := pgtype.Date{}
-		_ = date.Set("2022-04-02")
+	date := pgtype.Date{}
+	_ = date.Set("2022-04-02")
+	// TODO: Remove when we have full support for DescribeStatement. Currently, PGAdapter
+	// automatically 'recognizes' bytea and bool parameters that are sent as unspecified. Numeric
+	// and float types are not recognized, as it is impossible to distinguish between them based
+	// only on text.
+	if floatAndNumericSupported {
 		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, numeric, timestamptz, date, "test_string")
 	} else {
-		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, numeric, timestamptz, "test_string")
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), nil, nil, timestamptz, date, "test_string")
 	}
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
@@ -234,7 +224,7 @@ func TestInsertAllDataTypes(connString string, dateSupported bool) *C.char {
 }
 
 //export TestInsertNullsAllDataTypes
-func TestInsertNullsAllDataTypes(connString string, dateSupported bool) *C.char {
+func TestInsertNullsAllDataTypes(connString string) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -243,13 +233,8 @@ func TestInsertNullsAllDataTypes(connString string, dateSupported bool) *C.char 
 	defer conn.Close(ctx)
 
 	var tag pgconn.CommandTag
-	if dateSupported {
-		sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
-		tag, err = conn.Exec(ctx, sql, int64(100), nil, nil, nil, nil, nil, nil, nil, nil)
-	} else {
-		sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8)"
-		tag, err = conn.Exec(ctx, sql, int64(100), nil, nil, nil, nil, nil, nil, nil)
-	}
+	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+	tag, err = conn.Exec(ctx, sql, int64(100), nil, nil, nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
 	}

@@ -24,6 +24,7 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import org.postgresql.core.Oid;
+import org.postgresql.util.PGbytea;
 
 /**
  * Parser is the parsing superclass, used to take wire format data types and convert them
@@ -50,13 +51,9 @@ public abstract class Parser<T> {
   protected T item;
 
   /**
-   * Untyped parameters are allowed in PostgreSQL, and some drivers use this deliberately to work
-   * around side effects regarding dates and timestamps with and without timezones. See for example
-   * https://github.com/pgjdbc/pgjdbc/blob/3af3b32cc5b77db3e7af1cbc217d6288fd0cf9b9/pgjdbc/src/main/java/org/postgresql/jdbc/PgPreparedStatement.java#L1322
+   * TODO: Remove when we have full support for DescribeStatement.
    *
-   * <p>TODO: This method currently only checks whether the value could be a timestamp with
-   * timezone. Date and timestamp without timezone are also known to be sent with type code {@link
-   * Oid#UNSPECIFIED} by the JDBC driver, and must be implemented once Spanner supports these types.
+   * <p>Guess the type of a parameter with unspecified type.
    *
    * @param item The value to guess the type for
    * @param formatCode The encoding that is used for the value
@@ -67,6 +64,17 @@ public abstract class Parser<T> {
     // TODO: Put 'guessType' behind a command line flag so it is only enabled when wanted.
     if (formatCode == FormatCode.TEXT && item != null) {
       String value = new String(item, StandardCharsets.UTF_8);
+      if (value.equals("t") || value.equals("f")) {
+        return Oid.BOOL;
+      }
+      if (value.length() >= 2 && value.charAt(0) == '\\' && value.charAt(1) == 'x') {
+        try {
+          PGbytea.toBytes(item);
+          return Oid.BYTEA;
+        } catch (Exception e) {
+          // ignore and fall through
+        }
+      }
       if (TimestampParser.isTimestamp(value)) {
         return Oid.TIMESTAMPTZ;
       }
