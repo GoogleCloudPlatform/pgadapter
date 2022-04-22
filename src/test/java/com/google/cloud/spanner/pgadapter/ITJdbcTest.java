@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -552,5 +553,112 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals(-1, statement.getUpdateCount());
       }
     }
+  }
+
+  @Test
+  public void testFetchSize() throws SQLException {
+    writeExtraTestRows();
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      // Fetch size is only respected in a transaction.
+      connection.setAutoCommit(false);
+      try (PreparedStatement statement =
+          connection.prepareStatement("select * from all_types order by col_bigint")) {
+        // Fetch two rows at a time from the PG server.
+        statement.setFetchSize(2);
+        try (ResultSet resultSet = statement.executeQuery()) {
+          int rowCount = 0;
+          while (resultSet.next()) {
+            assertEquals(++rowCount, resultSet.getLong(1));
+            for (int col = 2; col <= resultSet.getMetaData().getColumnCount(); col++) {
+              if (resultSet.getLong(1) == 3L) {
+                assertNull(resultSet.getObject(col));
+              } else {
+                assertNotNull(resultSet.getObject(col));
+              }
+            }
+          }
+          assertEquals(5, rowCount);
+        }
+      }
+      connection.commit();
+    }
+  }
+
+  private void writeExtraTestRows() {
+    testEnv.write(
+        database.getId().getDatabase(),
+        Arrays.asList(
+            Mutation.newInsertBuilder("all_types")
+                .set("col_bigint")
+                .to(2L)
+                .set("col_bool")
+                .to(false)
+                .set("col_bytea")
+                .to(ByteArray.copyFrom("foo"))
+                .set("col_float8")
+                .to(-3.14d)
+                .set("col_int")
+                .to(Integer.MAX_VALUE)
+                .set("col_numeric")
+                .to(new BigDecimal("-3.14"))
+                .set("col_timestamptz")
+                .to(Timestamp.parseTimestamp("2022-04-22T19:27:30+02:00"))
+                .set("col_varchar")
+                .to("bar")
+                .build(),
+            Mutation.newInsertBuilder("all_types")
+                .set("col_bigint")
+                .to(3L)
+                .set("col_bool")
+                .to((Boolean) null)
+                .set("col_bytea")
+                .to((ByteArray) null)
+                .set("col_float8")
+                .to((Double) null)
+                .set("col_int")
+                .to((Integer) null)
+                .set("col_numeric")
+                .to((BigDecimal) null)
+                .set("col_timestamptz")
+                .to((Timestamp) null)
+                .set("col_varchar")
+                .to((String) null)
+                .build(),
+            Mutation.newInsertBuilder("all_types")
+                .set("col_bigint")
+                .to(4L)
+                .set("col_bool")
+                .to(true)
+                .set("col_bytea")
+                .to(ByteArray.copyFrom(""))
+                .set("col_float8")
+                .to(0d)
+                .set("col_int")
+                .to(0)
+                .set("col_numeric")
+                .to(BigDecimal.ZERO)
+                .set("col_timestamptz")
+                .to(Timestamp.parseTimestamp("0001-01-01T00:00:00Z"))
+                .set("col_varchar")
+                .to("")
+                .build(),
+            Mutation.newInsertBuilder("all_types")
+                .set("col_bigint")
+                .to(5L)
+                .set("col_bool")
+                .to(true)
+                .set("col_bytea")
+                .to(ByteArray.copyFrom(""))
+                .set("col_float8")
+                .to(0d)
+                .set("col_int")
+                .to(0)
+                .set("col_numeric")
+                .to(BigDecimal.ZERO)
+                .set("col_timestamptz")
+                .to(Timestamp.parseTimestamp("0001-01-01T00:00:00Z"))
+                .set("col_varchar")
+                .to("")
+                .build()));
   }
 }
