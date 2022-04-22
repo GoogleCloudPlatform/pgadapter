@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.wireoutput.MD5AuthenticationRequest;
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -46,6 +47,7 @@ public class StartupMessage extends BootstrapMessage {
           this.connection.getConnectionId(),
           this.connection.getSecret(),
           this.connection.getServer().getOptions());
+      this.connection.setStatus(ConnectionStatus.IDLE);
     } else {
       new MD5AuthenticationRequest(this.outputStream, 0).send();
     }

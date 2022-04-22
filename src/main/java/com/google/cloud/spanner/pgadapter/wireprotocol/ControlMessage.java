@@ -25,7 +25,6 @@ import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireoutput.PortalSuspendedResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -136,8 +135,13 @@ public abstract class ControlMessage extends WireMessage {
    * @throws Exception if there is some issue in the sending of the error messages.
    */
   protected void handleError(Exception e) throws Exception {
-    new ErrorResponse(this.outputStream, e, State.InternalError).send(false);
-    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send(false);
+    new ErrorResponse(this.outputStream, e, State.RaiseException).send(false);
+    if (connection.getSpannerConnection().isInTransaction()) {
+      connection.getSpannerConnection().rollbackAsync();
+      connection.setStatus(ConnectionStatus.TRANSACTION_ABORTED);
+    }
+    // new ReadyResponse(this.outputStream,
+    // connection.getStatus().getReadyResponseStatus()).send(false);
     this.outputStream.flush();
   }
 
@@ -192,7 +196,7 @@ public abstract class ControlMessage extends WireMessage {
    * @param mode Specific Query Mode required for this specific message for Postgres
    * @param maxRows Maximum number of rows requested
    * @return An adapted representation with specific metadata which PG wire requires.
-   * @throws Exception
+   * @throws com.google.cloud.spanner.SpannerException if traversing the {@link ResultSet} fails.
    */
   public SendResultSetState sendResultSet(
       int resultIndex, IntermediateStatement describedResult, QueryMode mode, long maxRows)
@@ -200,7 +204,6 @@ public abstract class ControlMessage extends WireMessage {
     long rows = 0;
     boolean hasData = describedResult.isHasMoreData(resultIndex);
     ResultSet resultSet = describedResult.getStatementResult(resultIndex);
-    // TODO optimize loop
     while (hasData) {
       new DataRowResponse(
               this.outputStream,
@@ -210,11 +213,7 @@ public abstract class ControlMessage extends WireMessage {
               mode)
           .send(false);
       rows++;
-      try {
-        hasData = resultSet.next();
-      } catch (Exception e) {
-        System.err.println("Something went wrong with getting next!");
-      }
+      hasData = resultSet.next();
       if (rows == maxRows) {
         break;
       }

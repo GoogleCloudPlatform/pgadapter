@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.client.util.Preconditions;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -27,7 +28,7 @@ public class ReadyResponse extends WireOutput {
 
   public ReadyResponse(DataOutputStream output, Status status) {
     super(output, 5);
-    this.status = status;
+    this.status = Preconditions.checkNotNull(status);
   }
 
   @Override

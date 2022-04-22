@@ -59,6 +59,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
@@ -121,14 +122,23 @@ public abstract class AbstractMockServerTest {
           .build();
   private static final com.google.spanner.v1.ResultSet SELECT_FIVE_ROWS_RESULTSET =
       com.google.spanner.v1.ResultSet.newBuilder()
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setStringValue("1").build())
-                  .addValues(Value.newBuilder().setStringValue("2").build())
-                  .addValues(Value.newBuilder().setStringValue("3").build())
-                  .addValues(Value.newBuilder().setStringValue("4").build())
-                  .addValues(Value.newBuilder().setStringValue("5").build())
-                  .build())
+          .addAllRows(
+              ImmutableList.of(
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("1").build())
+                      .build(),
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("2").build())
+                      .build(),
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("3").build())
+                      .build(),
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("4").build())
+                      .build(),
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("5").build())
+                      .build()))
           .setMetadata(SELECT1_METADATA)
           .build();
   protected static final Statement UPDATE_STATEMENT =
@@ -337,7 +347,7 @@ public abstract class AbstractMockServerTest {
       }
     }
     spannerServer.shutdown();
-    spannerServer.awaitTermination();
+    spannerServer.awaitTermination(10L, TimeUnit.SECONDS);
   }
 
   /**

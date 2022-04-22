@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import java.text.MessageFormat;
 
 /**
@@ -33,10 +32,7 @@ public class SyncMessage extends ControlMessage {
 
   @Override
   protected void sendPayload() throws Exception {
-    boolean inTransaction = connection.getSpannerConnection().isInTransaction();
-    new ReadyResponse(
-            this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
-        .send();
+    new ReadyResponse(this.outputStream, connection.getStatus().getReadyResponseStatus()).send();
   }
 
   @Override

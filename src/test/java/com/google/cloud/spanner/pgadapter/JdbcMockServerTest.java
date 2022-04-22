@@ -17,11 +17,13 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
@@ -36,6 +38,7 @@ import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.Status;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -506,7 +509,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCursor() throws SQLException {
+  public void testCursorSuccess() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
       try (PreparedStatement statement = connection.prepareStatement(SELECT_FIVE_ROWS.getSql())) {
@@ -543,16 +546,71 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
       List<ExecuteMessage> executeMessages = getWireMessagesOfType(ExecuteMessage.class);
       assertEquals(5, executeMessages.size());
+      assertEquals("", executeMessages.get(0).getName());
       for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
         assertEquals(describeMessage.getName(), executeMessage.getName());
         assertEquals(2, executeMessage.getMaxRows());
       }
+      assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
 
       List<ParseMessage> parseMessages = getWireMessagesOfType(ParseMessage.class);
       assertEquals(3, parseMessages.size());
       assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
       assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(1).getStatement().getSql());
       assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
+    }
+  }
+
+  @Test
+  public void testCursorFailsHalfway() throws SQLException {
+    mockSpanner.setExecuteStreamingSqlExecutionTime(
+        SimulatedExecutionTime.ofStreamException(Status.DATA_LOSS.asRuntimeException(), 2));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      try (PreparedStatement statement = connection.prepareStatement(SELECT_FIVE_ROWS.getSql())) {
+        // Fetch one row at a time from the PG server.
+        statement.setFetchSize(1);
+        try (ResultSet resultSet = statement.executeQuery()) {
+          // The first row should succeed.
+          assertTrue(resultSet.next());
+          // The second row should fail.
+          assertThrows(SQLException.class, resultSet::next);
+        }
+      }
+      connection.rollback();
+    }
+    // The ExecuteSql request should only be sent once to Cloud Spanner.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(SELECT_FIVE_ROWS.getSql(), executeRequest.getSql());
+
+    // PGAdapter should receive 4 Execute messages:
+    // 1. BEGIN
+    // 2. Execute - fetch row 1
+    // 3. Execute - fetch row 2 -- This fails with a DATA_LOSS error
+    // The JDBC driver does not send a ROLLBACK
+    if (pgServer != null) {
+      List<DescribeMessage> describeMessages = getWireMessagesOfType(DescribeMessage.class);
+      assertEquals(1, describeMessages.size());
+      DescribeMessage describeMessage = describeMessages.get(0);
+      assertEquals(PreparedType.Portal, describeMessage.getType());
+
+      List<ExecuteMessage> executeMessages = getWireMessagesOfType(ExecuteMessage.class);
+      assertEquals(4, executeMessages.size());
+      assertEquals("", executeMessages.get(0).getName());
+      for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
+        assertEquals(describeMessage.getName(), executeMessage.getName());
+        assertEquals(1, executeMessage.getMaxRows());
+      }
+      assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
+
+      List<ParseMessage> parseMessages = getWireMessagesOfType(ParseMessage.class);
+      assertEquals(3, parseMessages.size());
+      assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
+      assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(1).getStatement().getSql());
+      assertEquals("ROLLBACK", parseMessages.get(2).getStatement().getSql());
     }
   }
 }

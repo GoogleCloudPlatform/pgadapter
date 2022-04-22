@@ -59,7 +59,7 @@ public class IntermediateStatement {
   protected final Connection connection;
   protected long[] updateCounts;
   protected final ImmutableList<ParsedStatement> statements;
-  private ConnectionHandler connectionHandler;
+  protected final ConnectionHandler connectionHandler;
   private ExecutionStatus executionStatus;
 
   private static final char STATEMENT_DELIMITER = ';';
@@ -69,15 +69,17 @@ public class IntermediateStatement {
       OptionsMetadata options,
       ParsedStatement parsedStatement,
       ConnectionHandler connectionHandler) {
-    this(options, parsedStatement, connectionHandler.getSpannerConnection());
-    this.connectionHandler = connectionHandler;
+    this(connectionHandler, options, parsedStatement);
   }
 
   protected IntermediateStatement(
-      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
+      ConnectionHandler connectionHandler,
+      OptionsMetadata options,
+      ParsedStatement parsedStatement) {
+    this.connectionHandler = connectionHandler;
     this.options = options;
     this.parsedStatement = replaceKnownUnsupportedQueries(parsedStatement);
-    this.connection = connection;
+    this.connection = connectionHandler.getSpannerConnection();
     this.statements = parseStatements(parsedStatement);
     this.commands = StatementParser.parseCommands(this.statements);
     this.commandTags = new ArrayList<>(this.commands);
