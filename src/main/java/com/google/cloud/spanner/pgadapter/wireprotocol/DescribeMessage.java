@@ -29,9 +29,9 @@ public class DescribeMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'D';
 
-  private PreparedType type;
-  private String name;
-  private IntermediateStatement statement;
+  private final PreparedType type;
+  private final String name;
+  private final IntermediateStatement statement;
 
   public DescribeMessage(ConnectionHandler connection) throws Exception {
     super(connection);

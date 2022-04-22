@@ -93,6 +93,18 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testEmptyStatement() throws SQLException {
+    String sql = "";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      assertFalse(connection.createStatement().execute(sql));
+    }
+
+    // An empty statement is not sent to Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
   public void testWrongDialect() {
     // Let the mock server respond with the Google SQL dialect instead of PostgreSQL. The
     // connection should be gracefully rejected. Close all open pooled Spanner objects so we know

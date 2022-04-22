@@ -269,7 +269,7 @@ public class ProtocolTest {
             parameterCount,
             parameters);
 
-    List<Integer> expectedParameterDataTypes = Collections.singletonList(1002);
+    int[] expectedParameterDataTypes = new int[] {1002};
     String expectedSQL = "SELECT * FROM users WHERE name = $1";
     String expectedMessageName = "some statement";
 
@@ -288,7 +288,7 @@ public class ProtocolTest {
     assertEquals(ParseMessage.class, message.getClass());
     assertEquals(expectedMessageName, ((ParseMessage) message).getName());
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
-    assertEquals(
+    assertArrayEquals(
         expectedParameterDataTypes,
         ((ParseMessage) message).getStatement().getParameterDataTypes());
 
@@ -330,7 +330,7 @@ public class ProtocolTest {
             parameterCount,
             parameters);
 
-    List<Integer> expectedParameterDataTypes = Collections.singletonList(1002);
+    int[] expectedParameterDataTypes = new int[] {1002};
     String expectedSQL = "SELECT * FROM users WHERE name = $1";
     String expectedMessageName = "some statement";
 
@@ -349,7 +349,7 @@ public class ProtocolTest {
     assertEquals(ParseMessage.class, message.getClass());
     assertEquals(expectedMessageName, ((ParseMessage) message).getName());
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
-    assertEquals(
+    assertArrayEquals(
         expectedParameterDataTypes,
         ((ParseMessage) message).getStatement().getParameterDataTypes());
 
@@ -392,7 +392,7 @@ public class ProtocolTest {
             parameterCount,
             parameters);
 
-    List<Integer> expectedParameterDataTypes = Collections.singletonList(0);
+    int[] expectedParameterDataTypes = new int[] {0};
     String expectedSQL = "SELECT * FROM users WHERE name = $1";
     String expectedMessageName = "some statement";
 
@@ -411,7 +411,7 @@ public class ProtocolTest {
     assertEquals(ParseMessage.class, message.getClass());
     assertEquals(expectedMessageName, ((ParseMessage) message).getName());
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
-    assertEquals(
+    assertArrayEquals(
         expectedParameterDataTypes,
         ((ParseMessage) message).getStatement().getParameterDataTypes());
 
@@ -439,7 +439,7 @@ public class ProtocolTest {
         Bytes.concat(
             messageMetadata, length, statementName.getBytes(), payload.getBytes(), intToBytes(0));
 
-    List<Integer> expectedParameterDataTypes = Collections.emptyList();
+    int[] expectedParameterDataTypes = new int[0];
     String expectedSQL = "SELECT * FROM users WHERE name = $1";
     String expectedMessageName = "some statement";
 
@@ -458,7 +458,7 @@ public class ProtocolTest {
     assertEquals(ParseMessage.class, message.getClass());
     assertEquals(expectedMessageName, ((ParseMessage) message).getName());
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
-    assertEquals(
+    assertArrayEquals(
         expectedParameterDataTypes,
         ((ParseMessage) message).getStatement().getParameterDataTypes());
 
