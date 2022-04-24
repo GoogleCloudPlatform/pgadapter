@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.golang;
 
 import static org.junit.Assert.assertNull;
+import static org.junit.Assume.assumeFalse;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Timestamp;
@@ -28,16 +29,15 @@ import java.util.Collections;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
 @Category(IntegrationTest.class)
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class ITPgxTest implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
@@ -81,8 +81,8 @@ public class ITPgxTest implements IntegrationTest {
   private GoString createConnString() {
     return new GoString(
         String.format(
-            "postgres://uid:pwd@localhost:%d/?statement_cache_capacity=0&sslmode=disable",
-            testEnv.getServer().getLocalPort()));
+            "postgres://uid:pwd@localhost:%d/?statement_cache_capacity=0&sslmode=disable&prefer_simple_protocol=%s",
+            testEnv.getServer().getLocalPort(), preferQueryMode.equals("simple")));
   }
 
   @Before
@@ -131,9 +131,11 @@ public class ITPgxTest implements IntegrationTest {
     assertNull(pgxTest.TestInsertAllDataTypes(createConnString(), false));
   }
 
-  @Ignore("Untyped null values are not supported by the backend yet")
   @Test
   public void testInsertNullsAllDataTypes() {
+    assumeFalse(
+        "Untyped parameters are not yet supported by Spangres", preferQueryMode.equals("extended"));
+
     // Make sure there is no row that already exists with col_bigint=100
     String databaseId = database.getId().getDatabase();
     testEnv.write(
