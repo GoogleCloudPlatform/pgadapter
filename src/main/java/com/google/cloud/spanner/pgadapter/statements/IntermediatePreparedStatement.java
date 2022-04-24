@@ -27,6 +27,7 @@ import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import org.postgresql.core.Oid;
@@ -37,7 +38,7 @@ import org.postgresql.core.Oid;
 @InternalApi
 public class IntermediatePreparedStatement extends IntermediateStatement {
 
-  protected List<Integer> parameterDataTypes;
+  protected int[] parameterDataTypes;
   protected Statement statement;
 
   public IntermediatePreparedStatement(
@@ -55,18 +56,18 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * @return The type of the item specified.
    */
   private int parseType(byte[][] parameters, int index) throws IllegalArgumentException {
-    if (this.parameterDataTypes.size() > index) {
-      return this.parameterDataTypes.get(index);
+    if (this.parameterDataTypes.length > index) {
+      return this.parameterDataTypes[index];
     } else {
       return Oid.UNSPECIFIED;
     }
   }
 
-  public List<Integer> getParameterDataTypes() {
+  public int[] getParameterDataTypes() {
     return this.parameterDataTypes;
   }
 
-  public void setParameterDataTypes(List<Integer> parameterDataTypes) {
+  public void setParameterDataTypes(int[] parameterDataTypes) {
     this.parameterDataTypes = parameterDataTypes;
   }
 
@@ -129,12 +130,15 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   /**
    * Returns the parameter types in the SQL string of this statement. The current implementation
-   * always returns Oid.UNSPECIFIED for all parameters, as we have no way to actually determine the
-   * parameter types.
+   * always returns any parameters that may have been specified in the PARSE message, and
+   * OID.Unspecified for all other parameters.
    */
   private int[] getParameterTypes() {
     Set<String> parameters =
         PARSER.getQueryParameters(this.parsedStatement.getSqlWithoutComments());
-    return new int[parameters.size()];
+    if (this.parameterDataTypes == null) {
+      return new int[parameters.size()];
+    }
+    return Arrays.copyOf(this.parameterDataTypes, parameters.size());
   }
 }
