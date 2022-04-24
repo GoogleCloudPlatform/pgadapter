@@ -23,6 +23,7 @@ import java.sql.Types;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to {@link Number}. */
+// TODO: Change this to use String as type, and only convert to BigDecimal for binary transfer.
 public class NumericParser extends Parser<Number> {
   public NumericParser(ResultSet item, int position) {
     // This should be either a BigDecimal value or a Double.NaN.
@@ -35,7 +36,16 @@ public class NumericParser extends Parser<Number> {
   }
 
   public NumericParser(Object item) {
-    this.item = (Number) item;
+    if (item instanceof Number) {
+      this.item = (Number) item;
+    } else if (item instanceof String) {
+      String stringValue = (String) item;
+      if (stringValue.equalsIgnoreCase("NaN")) {
+        this.item = Double.NaN;
+      } else {
+        this.item = new BigDecimal(stringValue);
+      }
+    }
   }
 
   public NumericParser(byte[] item, FormatCode formatCode) {
@@ -46,7 +56,7 @@ public class NumericParser extends Parser<Number> {
           if (stringValue.equalsIgnoreCase("NaN")) {
             this.item = Double.NaN;
           } else {
-            this.item = new BigDecimal(new String(item));
+            this.item = new BigDecimal(stringValue);
           }
           break;
         case BINARY:

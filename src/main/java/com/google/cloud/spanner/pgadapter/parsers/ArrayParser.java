@@ -70,9 +70,8 @@ public class ArrayParser extends Parser<List<?>> {
       case INT64:
         return value.getInt64Array();
       case STRING:
-        return value.getStringArray();
       case PG_NUMERIC:
-        return value.getNumericArray();
+        return value.getStringArray();
       case TIMESTAMP:
         return value.getTimestampArray();
       case FLOAT64:

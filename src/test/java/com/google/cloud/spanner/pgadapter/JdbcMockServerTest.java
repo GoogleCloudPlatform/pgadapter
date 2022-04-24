@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -79,6 +78,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   private static void addRandomResultResults() {
+    // TODO: Add dialect argument once RandomResultSetGenerator supports PostgreSQL.
     RandomResultSetGenerator generator = new RandomResultSetGenerator(RANDOM_RESULTS_ROW_COUNT);
     mockSpanner.putStatementResult(StatementResult.query(SELECT_RANDOM, generator.generate()));
   }
@@ -629,7 +629,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   @Ignore("RandomResultSetGenerator does not yet support PostgreSQL")
   public void testRandomResults() throws SQLException {
-    final int fetchSize = 50;
+    final int fetchSize = 3;
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
       try (PreparedStatement statement = connection.prepareStatement(SELECT_RANDOM.getSql())) {
@@ -638,10 +638,11 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           int rowCount = 0;
           while (resultSet.next()) {
             for (int col = 0; col < resultSet.getMetaData().getColumnCount(); col++) {
-              assertNotNull(resultSet.getObject(col + 1));
+              resultSet.getObject(col + 1);
             }
+            rowCount++;
           }
-          assertEquals(5, rowCount);
+          assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
         }
       }
       connection.commit();
@@ -651,7 +652,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
-    assertEquals(SELECT_FIVE_ROWS.getSql(), executeRequest.getSql());
+    assertEquals(SELECT_RANDOM.getSql(), executeRequest.getSql());
 
     // PGAdapter should receive 5 Execute messages:
     // 1. BEGIN
@@ -666,18 +667,22 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals(PreparedType.Portal, describeMessage.getType());
 
       List<ExecuteMessage> executeMessages = getWireMessagesOfType(ExecuteMessage.class);
-      assertEquals(5, executeMessages.size());
+      int expectedExecuteMessageCount =
+          RANDOM_RESULTS_ROW_COUNT / fetchSize
+              + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0)
+              + 2;
+      assertEquals(expectedExecuteMessageCount, executeMessages.size());
       assertEquals("", executeMessages.get(0).getName());
       for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
         assertEquals(describeMessage.getName(), executeMessage.getName());
-        assertEquals(2, executeMessage.getMaxRows());
+        assertEquals(fetchSize, executeMessage.getMaxRows());
       }
       assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
 
       List<ParseMessage> parseMessages = getWireMessagesOfType(ParseMessage.class);
       assertEquals(3, parseMessages.size());
       assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
-      assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(1).getStatement().getSql());
+      assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(1).getStatement().getSql());
       assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
     }
   }
