@@ -61,7 +61,7 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Parameters(name = "preferQueryMode = {0}")
   public static Object[] data() {
-    return new Object[] {"extended"};
+    return new Object[] {"extended", "simple"};
   }
 
   @BeforeClass
