@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.statements.MatcherStatement;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.EmptyQueryResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
@@ -119,6 +120,8 @@ public class QueryMessage extends ControlMessage {
 
         // Return early as we do not respond with CommandComplete after a COPY command.
         return;
+      } else if ("".equals(this.statement.getCommandTag(index))) {
+        new EmptyQueryResponse(outputStream).send();
       } else {
         if (this.statement.containsResultSet(index)) {
           new RowDescriptionResponse(
