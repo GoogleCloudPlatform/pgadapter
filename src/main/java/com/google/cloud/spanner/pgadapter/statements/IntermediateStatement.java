@@ -47,6 +47,8 @@ import java.util.Objects;
  */
 @InternalApi
 public class IntermediateStatement {
+  public static final String TRANSACTION_ABORTED_ERROR =
+      "current transaction is aborted, commands ignored until end of transaction block";
   protected static final PostgreSQLStatementParser PARSER =
       (PostgreSQLStatementParser) AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
@@ -365,29 +367,17 @@ public class IntermediateStatement {
         handleExecutionException(
             executedCount,
             SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INVALID_ARGUMENT,
-                "ERROR: current transaction is aborted, commands ignored until end of transaction block"));
+                ErrorCode.INVALID_ARGUMENT, TRANSACTION_ABORTED_ERROR));
         executedCount++;
         continue;
       }
       if (getStatementType(executedCount) == StatementType.DDL) {
-        if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION
-            || (options.isDisableDdlBatching() && connection.isInTransaction())) {
-          String explicit =
-              executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION ? " explicit" : "";
-          handleExecutionExceptionAndTransactionStatus(
-              executedCount,
-              SpannerExceptionFactory.newSpannerException(
-                  ErrorCode.INVALID_ARGUMENT,
-                  String.format(
-                      "ERROR: DDL statements are only allowed outside%s transactions.", explicit)));
+        try {
+          prepareExecuteDdl(executedCount);
+        } catch (SpannerException e) {
+          handleExecutionExceptionAndTransactionStatus(executedCount, e);
           executedCount++;
-          return;
-        }
-        // A DDL statement commits the implicit transaction.
-        if (executionStatus == ExecutionStatus.IMPLICIT_TRANSACTION
-            && connection.isInTransaction()) {
-          connection.commit();
+          break;
         }
       }
       boolean canUseBatch = false;
@@ -404,11 +394,86 @@ public class IntermediateStatement {
       }
       // Return directly after any exception.
       if (hasException(executedCount - 1)) {
-        return;
+        break;
       }
     }
     if (executionStatus == ExecutionStatus.IMPLICIT_TRANSACTION && connection.isInTransaction()) {
-      connection.commit();
+      if (hasException(executedCount - 1)) {
+        connection.rollback();
+      } else {
+        connection.commit();
+      }
+    }
+  }
+
+  /**
+   * Prepares the connection for executing a DDL statement. This can include committing the current
+   * transaction.
+   *
+   * <p>Executing the DDL statement may or may not be allowed depending on the state of the
+   * transaction and the selected {@link
+   * com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode}. The method
+   * will throw a {@link SpannerException} if executing a DDL statement at this point is not
+   * allowed.
+   */
+  protected void prepareExecuteDdl(int index) {
+    // Single statements are simpler to check, so we do that in a separate check.
+    if (statements.size() == 1) {
+      switch (options.getDdlTransactionMode()) {
+        case Single:
+        case Batch:
+        case AutocommitImplicitTransaction:
+          // Single DDL statements outside explicit transactions are always allowed. For a single
+          // statement, there can also not be an implicit transaction that needs to be committed.
+          if (connection.isInTransaction()) {
+            throw SpannerExceptionFactory.newSpannerException(
+                ErrorCode.FAILED_PRECONDITION,
+                "DDL statements are only allowed outside explicit transactions.");
+          }
+          break;
+        case AutocommitExplicitTransaction:
+          // DDL statements are allowed even in explicit transactions. Commit any transaction that
+          // might be active.
+          if (connection.isInTransaction()) {
+            connection.commit();
+          }
+      }
+      return;
+    }
+
+    // We are in a batch of statements.
+    switch (options.getDdlTransactionMode()) {
+      case Single:
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.FAILED_PRECONDITION,
+            "DDL statements are only allowed outside batches and transactions.");
+      case Batch:
+        if (connection.isInTransaction()
+            || statements.stream().anyMatch(statement -> !statement.isDdl())) {
+          throw SpannerExceptionFactory.newSpannerException(
+              ErrorCode.FAILED_PRECONDITION,
+              "DDL statements are not allowed in mixed batches or transactions.");
+        }
+        break;
+      case AutocommitImplicitTransaction:
+        if (connection.isInTransaction()
+            && executionStatus != ExecutionStatus.IMPLICIT_TRANSACTION) {
+          throw SpannerExceptionFactory.newSpannerException(
+              ErrorCode.FAILED_PRECONDITION,
+              "DDL statements are only allowed outside explicit transactions.");
+        }
+        if (connection.isInTransaction()) {
+          // Commit the implicit transaction before we continue.
+          connection.commit();
+        }
+        break;
+      case AutocommitExplicitTransaction:
+        // Commit any transaction that might be active and allow executing the statement.
+        // Switch the execution state to implicit transaction.
+        if (connection.isInTransaction()) {
+          connection.commit();
+          executionStatus = ExecutionStatus.IMPLICIT_TRANSACTION;
+        }
     }
   }
 
