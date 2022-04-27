@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -52,6 +53,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +65,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
+import org.postgresql.jdbc.PgStatement;
 
 @RunWith(JUnit4.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
@@ -126,27 +129,29 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testQueryWithParameters() throws SQLException {
     String jdbcSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
             + "and col_bytea=? "
+            + "and col_int=? "
             + "and col_float8=? "
             + "and col_numeric=? "
             + "and col_timestamptz=? "
             + "and col_date=? "
             + "and col_varchar=?";
     String pgSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "
             + "where col_bigint=$1 "
             + "and col_bool=$2 "
             + "and col_bytea=$3 "
-            + "and col_float8=$4 "
-            + "and col_numeric=$5 "
-            + "and col_timestamptz=$6 "
-            + "and col_date=$7 "
-            + "and col_varchar=$8";
+            + "and col_int=$4 "
+            + "and col_float8=$5 "
+            + "and col_numeric=$6 "
+            + "and col_timestamptz=$7 "
+            + "and col_date=$8 "
+            + "and col_varchar=$9";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -158,68 +163,101 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to(ByteArray.copyFrom("test"))
                 .bind("p4")
-                .to(3.14d)
+                .to(100)
                 .bind("p5")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(3.14d)
                 .bind("p6")
-                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p7")
-                .to(Date.parseDate("2022-03-29"))
+                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123457000Z"))
                 .bind("p8")
+                .to(Date.parseDate("2022-03-29"))
+                .bind("p9")
                 .to("test")
                 .build(),
             ALL_TYPES_RESULTSET));
 
-    OffsetDateTime zonedDateTime =
+    OffsetDateTime offsetDateTime =
         LocalDateTime.of(2022, 2, 16, 13, 18, 2, 123456789).atOffset(ZoneOffset.UTC);
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (PreparedStatement preparedStatement = connection.prepareStatement(jdbcSql)) {
-        int index = 0;
-        preparedStatement.setLong(++index, 1L);
-        preparedStatement.setBoolean(++index, true);
-        preparedStatement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
-        preparedStatement.setDouble(++index, 3.14d);
-        preparedStatement.setBigDecimal(++index, new BigDecimal("6.626"));
-        preparedStatement.setObject(++index, zonedDateTime);
-        preparedStatement.setObject(++index, LocalDate.of(2022, 3, 29));
-        preparedStatement.setString(++index, "test");
-        try (ResultSet resultSet = preparedStatement.executeQuery()) {
-          assertTrue(resultSet.next());
-          assertEquals(1L, resultSet.getLong(1));
-          assertFalse(resultSet.next());
+    OffsetDateTime truncatedOffsetDateTime = offsetDateTime.truncatedTo(ChronoUnit.MICROS);
+
+    // Threshold 5 is the default. Use a named prepared statement if it is executed 5 times or more.
+    // Threshold 1 means always use a named prepared statement.
+    // Threshold 0 means never use a named prepared statement.
+    // Threshold -1 means use binary transfer of values and use DESCRIBE statement.
+    // (10 points to you if you guessed the last one up front!).
+    for (int preparedThreshold : new int[] {5, 1, 0, -1}) {
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (PreparedStatement preparedStatement = connection.prepareStatement(jdbcSql)) {
+          preparedStatement.unwrap(PgStatement.class).setPrepareThreshold(preparedThreshold);
+          int index = 0;
+          preparedStatement.setLong(++index, 1L);
+          preparedStatement.setBoolean(++index, true);
+          preparedStatement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
+          preparedStatement.setInt(++index, 100);
+          preparedStatement.setDouble(++index, 3.14d);
+          preparedStatement.setBigDecimal(++index, new BigDecimal("6.626"));
+          preparedStatement.setObject(++index, offsetDateTime);
+          preparedStatement.setObject(++index, LocalDate.of(2022, 3, 29));
+          preparedStatement.setString(++index, "test");
+          try (ResultSet resultSet = preparedStatement.executeQuery()) {
+            assertTrue(resultSet.next());
+            index = 0;
+            assertEquals(1L, resultSet.getLong(++index));
+            assertTrue(resultSet.getBoolean(++index));
+            assertArrayEquals("test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(++index));
+            assertEquals(3.14d, resultSet.getDouble(++index), 0.0d);
+            assertEquals(100, resultSet.getInt(++index));
+            assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(++index));
+            if (preparedThreshold < 0) {
+              // The binary format will truncate the timestamp value to microseconds.
+              assertEquals(
+                  truncatedOffsetDateTime, resultSet.getObject(++index, OffsetDateTime.class));
+            } else {
+              assertEquals(offsetDateTime, resultSet.getObject(++index, OffsetDateTime.class));
+            }
+            assertEquals(LocalDate.of(2022, 3, 29), resultSet.getObject(++index, LocalDate.class));
+            assertEquals("test", resultSet.getString(++index));
+            assertFalse(resultSet.next());
+          }
         }
       }
+
+      List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+      // Prepare threshold less than 0 means use binary transfer + DESCRIBE statement.
+      assertEquals(preparedThreshold < 0 ? 2 : 1, requests.size());
+
+      ExecuteSqlRequest executeRequest = requests.get(requests.size() - 1);
+      assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+      assertEquals(pgSql, executeRequest.getSql());
+
+      Map<String, Value> params = executeRequest.getParams().getFieldsMap();
+      Map<String, Type> types = executeRequest.getParamTypesMap();
+
+      assertEquals(TypeCode.INT64, types.get("p1").getCode());
+      assertEquals("1", params.get("p1").getStringValue());
+      assertEquals(TypeCode.BOOL, types.get("p2").getCode());
+      assertTrue(params.get("p2").getBoolValue());
+      assertEquals(TypeCode.BYTES, types.get("p3").getCode());
+      assertEquals(
+          Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)),
+          params.get("p3").getStringValue());
+      assertEquals(TypeCode.INT64, types.get("p4").getCode());
+      assertEquals("100", params.get("p4").getStringValue());
+      assertEquals(TypeCode.FLOAT64, types.get("p5").getCode());
+      assertEquals(3.14d, params.get("p5").getNumberValue(), 0.0d);
+      assertEquals(TypeCode.NUMERIC, types.get("p6").getCode());
+      assertEquals(TypeAnnotationCode.PG_NUMERIC, types.get("p6").getTypeAnnotation());
+      assertEquals("6.626", params.get("p6").getStringValue());
+      assertEquals(TypeCode.TIMESTAMP, types.get("p7").getCode());
+      assertEquals("2022-02-16T13:18:02.123457000Z", params.get("p7").getStringValue());
+      assertEquals(TypeCode.DATE, types.get("p8").getCode());
+      assertEquals("2022-03-29", params.get("p8").getStringValue());
+      assertEquals(TypeCode.STRING, types.get("p9").getCode());
+      assertEquals("test", params.get("p9").getStringValue());
+
+      mockSpanner.clearRequests();
     }
-
-    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(1, requests.size());
-
-    ExecuteSqlRequest executeRequest = requests.get(0);
-    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
-    assertEquals(pgSql, executeRequest.getSql());
-
-    Map<String, Value> params = executeRequest.getParams().getFieldsMap();
-    Map<String, Type> types = executeRequest.getParamTypesMap();
-
-    assertEquals(TypeCode.INT64, types.get("p1").getCode());
-    assertEquals("1", params.get("p1").getStringValue());
-    assertEquals(TypeCode.BOOL, types.get("p2").getCode());
-    assertTrue(params.get("p2").getBoolValue());
-    assertEquals(TypeCode.BYTES, types.get("p3").getCode());
-    assertEquals(
-        Base64.getEncoder().encodeToString("test".getBytes(StandardCharsets.UTF_8)),
-        params.get("p3").getStringValue());
-    assertEquals(TypeCode.FLOAT64, types.get("p4").getCode());
-    assertEquals(3.14d, params.get("p4").getNumberValue(), 0.0d);
-    assertEquals(TypeCode.NUMERIC, types.get("p5").getCode());
-    assertEquals(TypeAnnotationCode.PG_NUMERIC, types.get("p5").getTypeAnnotation());
-    assertEquals("6.626", params.get("p5").getStringValue());
-    assertEquals(TypeCode.TIMESTAMP, types.get("p6").getCode());
-    assertEquals("2022-02-16T13:18:02.123457000Z", params.get("p6").getStringValue());
-    assertEquals(TypeCode.DATE, types.get("p7").getCode());
-    assertEquals("2022-03-29", params.get("p7").getStringValue());
-    assertEquals(TypeCode.STRING, types.get("p8").getCode());
-    assertEquals("test", params.get("p8").getStringValue());
   }
 
   @Test

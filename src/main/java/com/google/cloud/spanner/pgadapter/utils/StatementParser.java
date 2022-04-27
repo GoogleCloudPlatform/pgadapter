@@ -14,10 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 
+// TODO: Replace everything here with parsing in the client library.
+@InternalApi
 public class StatementParser {
 
   /**

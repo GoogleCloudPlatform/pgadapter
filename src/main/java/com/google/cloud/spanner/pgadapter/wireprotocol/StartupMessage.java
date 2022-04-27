@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.wireoutput.MD5AuthenticationRequest;
@@ -25,6 +26,7 @@ import java.util.Map;
  * The first (non-encryption, non-admin) message expected in from a client in a connection loop.
  * Here we handle metadata and authentication if any.
  */
+@InternalApi
 public class StartupMessage extends BootstrapMessage {
 
   private static final String USER_KEY = "user";

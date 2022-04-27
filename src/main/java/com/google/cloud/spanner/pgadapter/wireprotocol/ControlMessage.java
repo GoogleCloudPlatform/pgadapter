@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
@@ -34,6 +35,7 @@ import java.util.List;
  * Generic representation for a control wire message: that is, a message which does not handle any
  * form of start-up, but reather general communications.
  */
+@InternalApi
 public abstract class ControlMessage extends WireMessage {
 
   public ControlMessage(ConnectionHandler connection) throws IOException {

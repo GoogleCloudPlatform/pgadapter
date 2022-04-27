@@ -14,7 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.api.core.InternalApi;
+
 /** The state of a result after (a part of it) has been sent to the client. */
+@InternalApi
 public class SendResultSetState {
 
   private final long numRowsSent;

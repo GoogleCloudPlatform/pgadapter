@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
@@ -25,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
 import java.text.MessageFormat;
 
 /** Calls describe on a portal or prepared statement. */
+@InternalApi
 public class DescribeMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'D';

@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
@@ -43,6 +44,7 @@ import java.util.Objects;
  * statement, such as execution, termination, etc. Represented as an intermediate representation for
  * statements which does not belong directly to Postgres, Spanner, etc.
  */
+@InternalApi
 public class IntermediateStatement {
   protected static final PostgreSQLStatementParser PARSER =
       (PostgreSQLStatementParser) AbstractStatementParser.getInstance(Dialect.POSTGRESQL);

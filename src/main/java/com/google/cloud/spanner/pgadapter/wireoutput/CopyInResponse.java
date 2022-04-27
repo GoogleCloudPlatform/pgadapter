@@ -14,11 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Arrays;
 
+@InternalApi
 public class CopyInResponse extends WireOutput {
 
   /* Message format specification from https://www.postgresql.org/docs/13/protocol-message-formats.html */
