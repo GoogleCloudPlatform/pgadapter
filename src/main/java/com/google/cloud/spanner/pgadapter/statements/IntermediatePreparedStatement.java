@@ -82,11 +82,11 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     // don't need to do that once more.
     if (getStatementResult(0) == null) {
       try {
-        // TODO: Refactor to use ClientSideStatement information.
         if (!connection.isInTransaction()
+            // TODO(230579451): Refactor to use ClientSideStatement information.
             && this.parsedStatement.getType().equals(StatementType.CLIENT_SIDE)
             && (this.commands.get(0).equals("ROLLBACK") || this.commands.get(0).equals("COMMIT"))) {
-          // TODO: Return warning that no transaction if connection status == IDLE.
+          // TODO(230579929): Return warning that no transaction if connection status == IDLE.
           connectionHandler.setStatus(ConnectionStatus.IDLE);
         } else {
           StatementResult result = connection.execute(this.statement);
