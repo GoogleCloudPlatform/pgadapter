@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
@@ -23,6 +24,7 @@ import java.text.MessageFormat;
  * Handles a flush command from the user. JDBC does not require this step, so server-side this is a
  * noop.
  */
+@InternalApi
 public class FlushMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'H';

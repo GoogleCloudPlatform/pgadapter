@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.api.core.InternalApi;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
@@ -21,13 +22,14 @@ import org.postgresql.util.ByteConverter;
 import org.postgresql.util.MD5Digest;
 
 /** User class for when proper auth gets added. */
+@InternalApi
 public class User {
 
   private static final Charset UTF8 = StandardCharsets.UTF_8;
 
   private final String username;
-  private String md5Password;
-  private int salt;
+  private final String md5Password;
+  private final int salt;
 
   public User(String username, String password) {
     Random rnd = new Random();

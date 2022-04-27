@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.commands;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.connection.Connection;
 import java.util.regex.Pattern;
 
@@ -22,6 +23,7 @@ import java.util.regex.Pattern;
  * would be to print database and database attributes, however As we do not have easy access to
  * those, we just print the current database name.
  */
+@InternalApi
 public class ListCommand extends Command {
 
   private static final Pattern INPUT_REGEX =
@@ -37,7 +39,7 @@ public class ListCommand extends Command {
 
   private final Connection connection;
 
-  public ListCommand(String sql, Connection connection) {
+  ListCommand(String sql, Connection connection) {
     super(sql);
     this.connection = connection;
   }

@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationOkResponse;
@@ -30,6 +31,7 @@ import java.util.TimeZone;
  * This represents all messages which occur before {@link ControlMessage} type messages. Those
  * include encryption, admin (e.g.: cancellation) and start-up messages.
  */
+@InternalApi
 public abstract class BootstrapMessage extends WireMessage {
 
   public BootstrapMessage(ConnectionHandler connection, int length) {

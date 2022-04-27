@@ -23,7 +23,6 @@ import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.Value;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.sql.Types;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -32,7 +31,7 @@ import java.util.stream.Collectors;
  * Translate wire protocol to array. Since arrays house any other specified types (including
  * potentially arrays), we use all parser types to parse each item within.
  */
-public class ArrayParser extends Parser<List<?>> {
+class ArrayParser extends Parser<List<?>> {
   private static final String STRING_TOGGLE = "\"";
   private static final String ARRAY_DELIMITER = ",";
   private static final String PG_ARRAY_OPEN = "{", PG_ARRAY_CLOSE = "}";
@@ -41,7 +40,7 @@ public class ArrayParser extends Parser<List<?>> {
   private final Type arrayElementType;
   private final boolean isStringEquivalent;
 
-  public ArrayParser(ResultSet item, int position) {
+  ArrayParser(ResultSet item, int position) {
     if (item != null) {
       this.arrayElementType = item.getColumnType(position).getArrayElementType();
       if (this.arrayElementType.getCode() == Code.ARRAY) {
@@ -88,13 +87,8 @@ public class ArrayParser extends Parser<List<?>> {
   }
 
   @Override
-  public List<?> getItem() {
+  List<?> getItem() {
     return this.item;
-  }
-
-  @Override
-  public int getSqlType() {
-    return Types.ARRAY;
   }
 
   /**
@@ -185,6 +179,7 @@ public class ArrayParser extends Parser<List<?>> {
     }
   }
 
+  @Override
   public void bind(Statement.Builder statementBuilder, String name) {
     throw SpannerExceptionFactory.newSpannerException(
         ErrorCode.UNIMPLEMENTED, "Array parameters not yet supported");

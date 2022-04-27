@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.api.core.InternalApi;
 import java.util.ArrayList;
 import java.util.List;
 import org.json.simple.JSONArray;
@@ -24,6 +25,7 @@ import org.json.simple.JSONObject;
  * generated at run-time from a user-defined JSON. This class concerns with the population of those
  * JSON objects onto more accessible formats for easier internal handling.
  */
+@InternalApi
 public class DynamicCommandMetadata {
 
   private static final String COMMANDS_KEY = "commands";
@@ -31,9 +33,9 @@ public class DynamicCommandMetadata {
   private static final String OUTPUT_KEY = "output_pattern";
   private static final String MATCHER_KEY = "matcher_array";
 
-  private String inputPattern;
-  private String outputPattern;
-  private List<String> matcherOrder;
+  private final String inputPattern;
+  private final String outputPattern;
+  private final List<String> matcherOrder;
 
   private DynamicCommandMetadata(JSONObject commandJSON) {
     this.inputPattern = getJSONString(commandJSON, INPUT_KEY);

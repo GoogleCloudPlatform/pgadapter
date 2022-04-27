@@ -14,8 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.Server;
-import com.google.cloud.spanner.pgadapter.utils.Credentials;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.HashMap;
@@ -151,13 +152,12 @@ public class OptionsMetadata {
    */
   private String buildCredentialsFile(CommandLine commandLine) {
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
-      String credentialsPath = Credentials.getApplicationDefaultCredentialsFilePath();
-      if (credentialsPath == null) {
-        throw new IllegalArgumentException(
-            "User must specify a valid credential file, "
-                + "or have application default credentials set-up.");
+      try {
+        // This will throw an IOException if no default credentials are available.
+        GoogleCredentials.getApplicationDefault();
+      } catch (IOException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
       }
-      return credentialsPath;
     }
     return commandLine.getOptionValue(OPTION_CREDENTIALS_FILE);
   }
