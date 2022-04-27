@@ -14,10 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import java.text.MessageFormat;
 
 /** Closes a connection. */
+@InternalApi
 public class TerminateMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'X';

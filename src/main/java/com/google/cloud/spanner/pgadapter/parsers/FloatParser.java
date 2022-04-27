@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,38 +14,42 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
-import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
-import java.nio.charset.StandardCharsets;
+import org.postgresql.util.ByteConverter;
 
-/** Translate from wire protocol to string. */
-class StringParser extends Parser<String> {
+/** Translate from wire protocol to float. */
+public class FloatParser extends Parser<Float> {
 
-  StringParser(ResultSet item, int position) {
-    this.item = item.getString(position);
-  }
-
-  StringParser(Object item) {
-    this.item = (String) item;
-  }
-
-  StringParser(byte[] item, FormatCode formatCode) {
+  FloatParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
-      this.item = new String(item, UTF8);
+      switch (formatCode) {
+        case TEXT:
+          this.item = Float.valueOf(new String(item));
+          break;
+        case BINARY:
+          this.item = ByteConverter.float4(item, 0);
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported format: " + formatCode);
+      }
     }
   }
 
   @Override
   protected String stringParse() {
-    return this.item;
+    return this.item == null ? null : Float.toString(this.item);
   }
 
   @Override
   protected byte[] binaryParse() {
-    return this.item == null ? null : this.item.getBytes(StandardCharsets.UTF_8);
+    if (this.item == null) {
+      return null;
+    }
+    byte[] result = new byte[4];
+    ByteConverter.float4(result, 0, this.item);
+    return result;
   }
 
-  @Override
   public void bind(Statement.Builder statementBuilder, String name) {
     statementBuilder.bind(name).to(this.item);
   }

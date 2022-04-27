@@ -16,21 +16,20 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
-import java.sql.Types;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to int. */
-public class IntegerParser extends Parser<Integer> {
+class IntegerParser extends Parser<Integer> {
 
-  public IntegerParser(ResultSet item, int position) {
+  IntegerParser(ResultSet item, int position) {
     this.item = Math.toIntExact(item.getLong(position));
   }
 
-  public IntegerParser(Object item) {
+  IntegerParser(Object item) {
     this.item = (Integer) item;
   }
 
-  public IntegerParser(byte[] item, FormatCode formatCode) {
+  IntegerParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
@@ -46,11 +45,6 @@ public class IntegerParser extends Parser<Integer> {
   }
 
   @Override
-  public int getSqlType() {
-    return Types.INTEGER;
-  }
-
-  @Override
   protected String stringParse() {
     return this.item == null ? null : Integer.toString(this.item);
   }
@@ -60,7 +54,7 @@ public class IntegerParser extends Parser<Integer> {
     return this.item == null ? null : binaryParse(this.item);
   }
 
-  public static byte[] binaryParse(int value) {
+  static byte[] binaryParse(int value) {
     byte[] result = new byte[4];
     ByteConverter.int4(result, 0, value);
     return result;

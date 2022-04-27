@@ -14,12 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 import org.postgresql.util.ByteConverter;
 
 /** Used for password response. */
+@InternalApi
 public class MD5AuthenticationRequest extends WireOutput {
 
   private static final int PASSWORD_REQUIRED_FLAG = 5;

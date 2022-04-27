@@ -14,10 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.text.MessageFormat;
 
 /** Signals the end of a describe statement. */
+@InternalApi
 public class NoDataResponse extends WireOutput {
 
   public NoDataResponse(DataOutputStream output) {

@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -21,6 +22,7 @@ import java.text.MessageFormat;
 /**
  * Signals readiness status to receieve messages (here we only tend to send Idle, which means ready)
  */
+@InternalApi
 public class ReadyResponse extends WireOutput {
 
   private final Status status;

@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
@@ -24,6 +25,7 @@ import java.text.MessageFormat;
  * A Password Message takes a username and password and input and supposedly handles auth. Here,
  * however, since connections are through localhost, we do not do so.
  */
+@InternalApi
 public class PasswordMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'p';

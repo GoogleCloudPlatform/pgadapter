@@ -16,21 +16,20 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
-import java.sql.Types;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to long. */
-public class LongParser extends Parser<Long> {
+class LongParser extends Parser<Long> {
 
-  public LongParser(ResultSet item, int position) {
+  LongParser(ResultSet item, int position) {
     this.item = item.getLong(position);
   }
 
-  public LongParser(Object item) {
+  LongParser(Object item) {
     this.item = (Long) item;
   }
 
-  public LongParser(byte[] item, FormatCode formatCode) {
+  LongParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
@@ -43,11 +42,6 @@ public class LongParser extends Parser<Long> {
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
-  }
-
-  @Override
-  public int getSqlType() {
-    return Types.BIGINT;
   }
 
   @Override
@@ -65,6 +59,7 @@ public class LongParser extends Parser<Long> {
     return result;
   }
 
+  @Override
   public void bind(Statement.Builder statementBuilder, String name) {
     statementBuilder.bind(name).to(this.item);
   }

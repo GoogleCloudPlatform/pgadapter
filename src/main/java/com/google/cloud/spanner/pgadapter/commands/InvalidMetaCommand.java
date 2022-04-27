@@ -14,17 +14,19 @@
 
 package com.google.cloud.spanner.pgadapter.commands;
 
+import com.google.api.core.InternalApi;
 import java.util.regex.Pattern;
 
 /**
  * Fallthrough Command which should match most meta-commands. We are expected to run this last in
  * the matching logic to present the user with better error statements.
  */
+@InternalApi
 public class InvalidMetaCommand extends Command {
 
   private static final Pattern INPUT_REGEX = Pattern.compile(".*pg_catalog.*");
 
-  public InvalidMetaCommand(String sql) {
+  InvalidMetaCommand(String sql) {
     super(sql);
   }
 
