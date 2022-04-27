@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
@@ -27,6 +28,7 @@ import java.text.MessageFormat;
  * be future proof, and to ensure the input stream is flushed of the command (in order to continue
  * receiving properly)
  */
+@InternalApi
 public class CopyDataMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'd';

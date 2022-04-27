@@ -14,9 +14,11 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 
 /** Simple POJO to hold describe metadata, specific to portal describes. */
+@InternalApi
 public class DescribePortalMetadata extends DescribeMetadata<ResultSet> {
 
   public DescribePortalMetadata(ResultSet metadata) {

@@ -14,12 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 
 /** Sends error information back to client. */
+@InternalApi
 public class ErrorResponse extends WireOutput {
   public enum Severity {
     ERROR,

@@ -19,12 +19,11 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.sql.Types;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to {@link Number}. */
-public class NumericParser extends Parser<Number> {
-  public NumericParser(ResultSet item, int position) {
+class NumericParser extends Parser<Number> {
+  NumericParser(ResultSet item, int position) {
     // This should be either a BigDecimal value or a Double.NaN.
     Value value = item.getValue(position);
     if (Value.NAN.equalsIgnoreCase(value.getString())) {
@@ -34,11 +33,11 @@ public class NumericParser extends Parser<Number> {
     }
   }
 
-  public NumericParser(Object item) {
+  NumericParser(Object item) {
     this.item = (Number) item;
   }
 
-  public NumericParser(byte[] item, FormatCode formatCode) {
+  NumericParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
@@ -56,11 +55,6 @@ public class NumericParser extends Parser<Number> {
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
-  }
-
-  @Override
-  public int getSqlType() {
-    return Types.NUMERIC;
   }
 
   @Override
@@ -82,6 +76,7 @@ public class NumericParser extends Parser<Number> {
     return ByteConverter.numeric((BigDecimal) this.item);
   }
 
+  @Override
   public void bind(Statement.Builder statementBuilder, String name) {
     statementBuilder.bind(name).to(Value.pgNumeric(stringParse()));
   }

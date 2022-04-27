@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Sends to the client specific row contents. */
+@InternalApi
 public class DataRowResponse extends WireOutput {
 
   private static final int HEADER_LENGTH = 4;
@@ -56,7 +58,7 @@ public class DataRowResponse extends WireOutput {
         columns.add(null);
       } else {
         DataFormat format = DataFormat.getDataFormat(column_index, statement, this.mode, options);
-        byte[] column = new Converter().parseData(this.resultSet, column_index, format);
+        byte[] column = Converter.parseData(this.resultSet, column_index, format);
         length += column.length;
         columns.add(column);
       }

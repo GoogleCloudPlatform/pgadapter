@@ -14,11 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Signals the end of a parse transaction. */
+@InternalApi
 public class ParseCompleteResponse extends WireOutput {
 
   public ParseCompleteResponse(DataOutputStream output) {

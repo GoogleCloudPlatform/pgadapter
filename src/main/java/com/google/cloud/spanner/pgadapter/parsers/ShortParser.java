@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,29 +14,20 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
-import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import org.postgresql.util.ByteConverter;
 
-/** Translate from wire protocol to double. */
-class DoubleParser extends Parser<Double> {
+/** Translate from wire protocol to short. */
+class ShortParser extends Parser<Short> {
 
-  DoubleParser(ResultSet item, int position) {
-    this.item = item.getDouble(position);
-  }
-
-  DoubleParser(Object item) {
-    this.item = (Double) item;
-  }
-
-  DoubleParser(byte[] item, FormatCode formatCode) {
+  ShortParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          this.item = Double.valueOf(new String(item));
+          this.item = Short.valueOf(new String(item));
           break;
         case BINARY:
-          this.item = ByteConverter.float8(item, 0);
+          this.item = ByteConverter.int2(item, 0);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
@@ -46,21 +37,22 @@ class DoubleParser extends Parser<Double> {
 
   @Override
   protected String stringParse() {
-    return this.item == null ? null : Double.toString(this.item);
+    return this.item == null ? null : Short.toString(this.item);
   }
 
   @Override
   protected byte[] binaryParse() {
-    if (this.item == null) {
-      return null;
-    }
-    byte[] result = new byte[8];
-    ByteConverter.float8(result, 0, this.item);
+    return this.item == null ? null : binaryParse(this.item);
+  }
+
+  public static byte[] binaryParse(int value) {
+    byte[] result = new byte[2];
+    ByteConverter.int2(result, 0, value);
     return result;
   }
 
   @Override
   public void bind(Statement.Builder statementBuilder, String name) {
-    statementBuilder.bind(name).to(this.item);
+    statementBuilder.bind(name).to(this.item == null ? null : this.item.longValue());
   }
 }

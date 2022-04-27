@@ -14,10 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.text.MessageFormat;
 
 /** Assures to the client that a portal got closed successfully. */
+@InternalApi
 public class CloseResponse extends WireOutput {
 
   public CloseResponse(DataOutputStream output) {
