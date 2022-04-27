@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.spanner.Statement;
-import java.sql.Types;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to short. */
@@ -34,11 +33,6 @@ class ShortParser extends Parser<Short> {
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
-  }
-
-  @Override
-  public int getSqlType() {
-    return Types.SMALLINT;
   }
 
   @Override
