@@ -14,7 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.api.core.InternalApi;
+
 /** Simple POJO superclass to hold results from a describe statement. */
+@InternalApi
 public abstract class DescribeMetadata<T> {
 
   protected T metadata;

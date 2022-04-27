@@ -18,14 +18,13 @@ import com.google.cloud.Date;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.common.base.Preconditions;
-import java.sql.Types;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import org.postgresql.util.ByteConverter;
 
 /** Translate wire protocol dates to desired formats. */
-public class DateParser extends Parser<Date> {
+class DateParser extends Parser<Date> {
   // Valid format for date: 'yyyy-MM-dd [+-]HH[:mi]'.
   // Timezone information is optional. Timezone may also be specified using only hour value.
   // NOTE: Following algorithm might perform slowly due to exception handling; sadly, this seems
@@ -38,15 +37,15 @@ public class DateParser extends Parser<Date> {
     new SimpleDateFormat("yyyy-MM-dd -HH")
   };
 
-  public DateParser(ResultSet item, int position) {
+  DateParser(ResultSet item, int position) {
     this.item = item.getDate(position);
   }
 
-  public DateParser(Object item) {
+  DateParser(Object item) {
     this.item = (Date) item;
   }
 
-  public DateParser(byte[] item, FormatCode formatCode) {
+  DateParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
@@ -74,7 +73,7 @@ public class DateParser extends Parser<Date> {
    * @param value The value to check. May not be <code>null</code>.
    * @return <code>true</code> if the text contains a valid date.
    */
-  public static boolean isDate(String value) {
+  static boolean isDate(String value) {
     Preconditions.checkNotNull(value);
     for (SimpleDateFormat dateFormat : VALID_DATE_FORMATS) {
       try {
@@ -85,11 +84,6 @@ public class DateParser extends Parser<Date> {
       }
     }
     return false;
-  }
-
-  @Override
-  public int getSqlType() {
-    return Types.DATE;
   }
 
   @Override
@@ -122,6 +116,7 @@ public class DateParser extends Parser<Date> {
     return (int) days;
   }
 
+  @Override
   public void bind(Statement.Builder statementBuilder, String name) {
     statementBuilder.bind(name).to(this.item);
   }

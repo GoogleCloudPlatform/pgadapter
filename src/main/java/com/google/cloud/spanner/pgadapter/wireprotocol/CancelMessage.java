@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import java.text.MessageFormat;
 
@@ -22,6 +23,7 @@ import java.text.MessageFormat;
  * protocol. We expect that this message contains an ID for the connection which issues the original
  * query, as well as an auth secret.
  */
+@InternalApi
 public class CancelMessage extends BootstrapMessage {
 
   private static final int MESSAGE_LENGTH = 16;

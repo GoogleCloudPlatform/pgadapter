@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
@@ -29,6 +30,7 @@ import org.postgresql.core.Oid;
  * Parser is the parsing superclass, used to take wire format data types and convert them
  * specifically to desired byte types. Each subclass is assigned with a specific type.
  */
+@InternalApi
 public abstract class Parser<T> {
 
   public enum FormatCode {
@@ -255,12 +257,9 @@ public abstract class Parser<T> {
     }
   }
 
-  public T getItem() {
+  T getItem() {
     return this.item;
   }
-
-  /** Returns the corresponding JDBC SQL type. */
-  public abstract int getSqlType();
 
   /**
    * Parses data based on specified data format (Spanner, text, or binary)

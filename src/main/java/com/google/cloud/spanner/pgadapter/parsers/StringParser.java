@@ -17,28 +17,22 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import java.nio.charset.StandardCharsets;
-import java.sql.Types;
 
 /** Translate from wire protocol to string. */
-public class StringParser extends Parser<String> {
+class StringParser extends Parser<String> {
 
-  public StringParser(ResultSet item, int position) {
+  StringParser(ResultSet item, int position) {
     this.item = item.getString(position);
   }
 
-  public StringParser(Object item) {
+  StringParser(Object item) {
     this.item = (String) item;
   }
 
-  public StringParser(byte[] item, FormatCode formatCode) {
+  StringParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       this.item = new String(item, UTF8);
     }
-  }
-
-  @Override
-  public int getSqlType() {
-    return Types.VARCHAR;
   }
 
   @Override
@@ -51,6 +45,7 @@ public class StringParser extends Parser<String> {
     return this.item == null ? null : this.item.getBytes(StandardCharsets.UTF_8);
   }
 
+  @Override
   public void bind(Statement.Builder statementBuilder, String name) {
     statementBuilder.bind(name).to(this.item);
   }

@@ -14,11 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Assures to the client that a statement got bound to a portal successfully. */
+@InternalApi
 public class BindCompleteResponse extends WireOutput {
 
   public BindCompleteResponse(DataOutputStream output) {

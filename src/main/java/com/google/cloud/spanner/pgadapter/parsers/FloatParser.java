@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.spanner.Statement;
-import java.sql.Types;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to float. */
@@ -34,11 +33,6 @@ public class FloatParser extends Parser<Float> {
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
-  }
-
-  @Override
-  public int getSqlType() {
-    return Types.FLOAT;
   }
 
   @Override

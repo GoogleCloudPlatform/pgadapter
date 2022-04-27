@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
@@ -34,6 +35,7 @@ import org.postgresql.core.Oid;
 /**
  * Intermediate representation for prepared statements (i.e.: statements before they become portals)
  */
+@InternalApi
 public class IntermediatePreparedStatement extends IntermediateStatement {
 
   protected int[] parameterDataTypes;

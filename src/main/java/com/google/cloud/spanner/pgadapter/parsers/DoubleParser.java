@@ -16,21 +16,20 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
-import java.sql.Types;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to double. */
-public class DoubleParser extends Parser<Double> {
+class DoubleParser extends Parser<Double> {
 
-  public DoubleParser(ResultSet item, int position) {
+  DoubleParser(ResultSet item, int position) {
     this.item = item.getDouble(position);
   }
 
-  public DoubleParser(Object item) {
+  DoubleParser(Object item) {
     this.item = (Double) item;
   }
 
-  public DoubleParser(byte[] item, FormatCode formatCode) {
+  DoubleParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
@@ -43,11 +42,6 @@ public class DoubleParser extends Parser<Double> {
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
-  }
-
-  @Override
-  public int getSqlType() {
-    return Types.DOUBLE;
   }
 
   @Override
@@ -65,6 +59,7 @@ public class DoubleParser extends Parser<Double> {
     return result;
   }
 
+  @Override
   public void bind(Statement.Builder statementBuilder, String name) {
     statementBuilder.bind(name).to(this.item);
   }

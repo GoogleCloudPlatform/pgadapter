@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import java.text.MessageFormat;
 import java.util.List;
@@ -24,14 +25,15 @@ import java.util.List;
  * for this to be future proof, and to ensure the input stream is flushed of the command (in order
  * to continue receiving properly)
  */
+@InternalApi
 public class FunctionCallMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'F';
 
-  private int functionID;
-  private List<Short> argumentFormatCodes;
-  private byte[][] arguments;
-  private Short resultFormatCode;
+  private final int functionID;
+  private final List<Short> argumentFormatCodes;
+  private final byte[][] arguments;
+  private final Short resultFormatCode;
 
   public FunctionCallMessage(ConnectionHandler connection) throws Exception {
     super(connection);
