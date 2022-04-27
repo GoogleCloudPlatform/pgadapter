@@ -45,6 +45,7 @@ public class OptionsMetadata {
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
   private static final String OPTION_PSQL_MODE = "q";
+  private static final String OPTION_DISABLE_DDL_BATCHING = "disable-ddl-batching";
   private static final String OPTION_JDBC_MODE = "jdbc";
   private static final String OPTION_COMMAND_METADATA_FILE = "j";
   private static final String OPTION_DISABLE_LOCALHOST_CHECK = "x";
@@ -65,6 +66,7 @@ public class OptionsMetadata {
   private final boolean binaryFormat;
   private final boolean authenticate;
   private final boolean requiresMatcher;
+  private final boolean disableDdlBatching;
   private final boolean replaceJdbcMetadataQueries;
   private final boolean disableLocalhostCheck;
   private final JSONObject commandMetadataJSON;
@@ -82,6 +84,7 @@ public class OptionsMetadata {
     this.requiresMatcher =
         commandLine.hasOption(OPTION_PSQL_MODE)
             || commandLine.hasOption(OPTION_COMMAND_METADATA_FILE);
+    this.disableDdlBatching = commandLine.hasOption(OPTION_DISABLE_DDL_BATCHING);
     this.replaceJdbcMetadataQueries = commandLine.hasOption(OPTION_JDBC_MODE);
     this.commandMetadataJSON = buildCommandMetadataJSON(commandLine);
     this.propertyMap = parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
@@ -105,6 +108,7 @@ public class OptionsMetadata {
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
     this.requiresMatcher = requiresMatcher;
+    this.disableDdlBatching = false;
     this.replaceJdbcMetadataQueries = replaceJdbcMetadataQueries;
     this.commandMetadataJSON = commandMetadata;
     this.propertyMap = new HashMap<>();
@@ -362,6 +366,10 @@ public class OptionsMetadata {
       help.printHelp(CLI_ARGS, options);
       throw new IllegalArgumentException(e.getMessage());
     }
+  }
+
+  public boolean isDisableDdlBatching() {
+    return this.disableDdlBatching;
   }
 
   public boolean isBinaryFormat() {

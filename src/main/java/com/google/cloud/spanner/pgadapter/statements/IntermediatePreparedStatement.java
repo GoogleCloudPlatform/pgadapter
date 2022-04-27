@@ -71,10 +71,10 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   @Override
   public void execute() {
-    this.executed = true;
     // If the portal has already been described, the statement has already been executed, and we
     // don't need to do that once more.
     if (getStatementResult(0) == null) {
+      this.executedCount++;
       try {
         StatementResult result = connection.execute(this.statement);
         this.updateResultCount(0, result);

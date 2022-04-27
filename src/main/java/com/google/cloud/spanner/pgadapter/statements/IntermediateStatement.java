@@ -27,6 +27,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.TransactionMode;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
@@ -55,7 +56,7 @@ public class IntermediateStatement {
   protected final ParsedStatement parsedStatement;
   protected final ImmutableList<String> commands;
   protected final List<String> commandTags;
-  protected boolean executed = false;
+  protected int executedCount = 0;
   protected final Connection connection;
   protected long[] updateCounts;
   protected final ImmutableList<ParsedStatement> statements;
@@ -213,7 +214,11 @@ public class IntermediateStatement {
 
   /** @return True if this statement was executed, False otherwise. */
   public boolean isExecuted() {
-    return executed;
+    return executedCount > 0;
+  }
+
+  public int getExecutedCount() {
+    return this.executedCount;
   }
 
   /**
@@ -341,48 +346,103 @@ public class IntermediateStatement {
 
   /** Execute the SQL statement, storing metadata. */
   public void execute() {
-    executed = true;
     if (connection.isInTransaction()) {
       executionStatus = ExecutionStatus.EXPLICIT_TRANSACTION;
     } else {
-      executionStatus = ExecutionStatus.AUTOCOMMIT;
+      executionStatus = ExecutionStatus.IMPLICIT_TRANSACTION;
     }
-    int index = 0;
-    while (index < getStatementCount()) {
+    while (executedCount < getStatementCount()) {
+      maybeStartImplicitTransaction(executedCount);
+
       if (connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED
-          && !"ROLLBACK".equals(getCommand(index))
-          && !"COMMIT".equals(getCommand(index))) {
+          && !"ROLLBACK".equals(getCommand(executedCount))
+          && !"COMMIT".equals(getCommand(executedCount))) {
         handleExecutionException(
-            index,
+            executedCount,
             SpannerExceptionFactory.newSpannerException(
                 ErrorCode.INVALID_ARGUMENT,
                 "ERROR: current transaction is aborted, commands ignored until end of transaction block"));
-        index++;
+        executedCount++;
         continue;
       }
-      if (getStatementType(index) == StatementType.DDL
-          && executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
-        handleExecutionExceptionAndTransactionStatus(
-            index,
-            SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INVALID_ARGUMENT,
-                "ERROR: DDL statements are only allowed outside explicit transactions."));
-        index++;
-        continue;
+      if (getStatementType(executedCount) == StatementType.DDL) {
+        if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION
+            || (options.isDisableDdlBatching() && connection.isInTransaction())) {
+          String explicit =
+              executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION ? " explicit" : "";
+          handleExecutionExceptionAndTransactionStatus(
+              executedCount,
+              SpannerExceptionFactory.newSpannerException(
+                  ErrorCode.INVALID_ARGUMENT,
+                  String.format(
+                      "ERROR: DDL statements are only allowed outside%s transactions.", explicit)));
+          executedCount++;
+          return;
+        }
+        // A DDL statement commits the implicit transaction.
+        if (executionStatus == ExecutionStatus.IMPLICIT_TRANSACTION
+            && connection.isInTransaction()) {
+          connection.commit();
+        }
       }
       boolean canUseBatch = false;
-      if (index < (getStatementCount() - 1)) {
-        StatementType statementType = getStatementType(index);
-        StatementType nextStatementType = getStatementType(index + 1);
+      if (executedCount < (getStatementCount() - 1)) {
+        StatementType statementType = getStatementType(executedCount);
+        StatementType nextStatementType = getStatementType(executedCount + 1);
         canUseBatch = canBeBatchedTogether(statementType, nextStatementType);
       }
       if (canUseBatch) {
-        index += executeStatementsInBatch(index);
+        executedCount += executeStatementsInBatch(executedCount);
       } else {
-        executeSingleStatement(index);
-        index++;
+        executeSingleStatement(executedCount);
+        executedCount++;
+      }
+      // Return directly after any exception.
+      if (hasException(executedCount - 1)) {
+        return;
       }
     }
+    if (executionStatus == ExecutionStatus.IMPLICIT_TRANSACTION && connection.isInTransaction()) {
+      connection.commit();
+    }
+  }
+
+  private void maybeStartImplicitTransaction(int index) {
+    if (connection.isInTransaction()) {
+      return;
+    }
+    if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
+      return;
+    }
+    // No need to start a transaction for the last statement.
+    if (index == statements.size() - 1) {
+      return;
+    }
+    // No need to start a transaction for DDL or client side statements.
+    if (statementTypes.get(index) == StatementType.DDL
+        || statementTypes.get(index) == StatementType.CLIENT_SIDE) {
+      return;
+    }
+    // If there are only DML statements left, those can be executed as an auto-commit dml batch.
+    if (hasOnlyDmlStatementsAfter(index)) {
+      return;
+    }
+    // We need to start an implicit transaction.
+    // Check if a read-only transaction suffices.
+    connection.beginTransaction();
+    if (!hasDmlStatementsAfter(index)) {
+      connection.setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    }
+  }
+
+  private boolean hasDmlStatementsAfter(int index) {
+    return statementTypes.subList(index, statementTypes.size()).stream()
+        .anyMatch(type -> type == StatementType.UPDATE);
+  }
+
+  private boolean hasOnlyDmlStatementsAfter(int index) {
+    return statementTypes.subList(index, statementTypes.size()).stream()
+        .allMatch(type -> type == StatementType.UPDATE);
   }
 
   private void executeSingleStatement(int index) {
@@ -390,12 +450,13 @@ public class IntermediateStatement {
     String command = getCommand(index);
     String statement = getStatement(index);
     if ("BEGIN".equals(command)) {
-      if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
-        // Executing a BEGIN statement when an explicit transaction is already active is a no-op
-        return;
-      } else {
-        executionStatus = ExecutionStatus.EXPLICIT_TRANSACTION;
+      // Executing a BEGIN statement when a transaction is already active will set the execution
+      // mode to EXPLICIT_TRANSACTION. The current transaction is not committed.
+      executionStatus = ExecutionStatus.EXPLICIT_TRANSACTION;
+      if (!connection.isInTransaction()) {
+        connection.execute(Statement.of(statement));
       }
+      return;
     }
     if ("COMMIT".equals(command) || "ROLLBACK".equals(command)) {
       if (connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
@@ -404,11 +465,11 @@ public class IntermediateStatement {
         statement = "ROLLBACK";
         commandTags.set(index, "ROLLBACK");
       }
-      if (executionStatus == ExecutionStatus.AUTOCOMMIT) {
-        // Executing a COMMIT/ROLLBACK statement in autocommit mode is a no-op
+      // Executing ROLLBACK or COMMIT when there is no active transaction is a no-op, but will
+      // change the transaction mode to implicit.
+      executionStatus = ExecutionStatus.IMPLICIT_TRANSACTION;
+      if (!connection.isInTransaction()) {
         return;
-      } else {
-        executionStatus = ExecutionStatus.AUTOCOMMIT;
       }
     }
     // Ignore empty statements.
@@ -468,16 +529,7 @@ public class IntermediateStatement {
       long[] counts = e.getUpdateCounts();
       updateBatchResultCount(fromIndex, counts);
       handleExecutionExceptionAndTransactionStatus(fromIndex + counts.length, e);
-      // Skip remaining statements in DML/DDL batch
-      // TODO: May want to start off from the failure in order to be compatible with the
-      // behavior of PG.
-      for (int i = fromIndex + counts.length + 1; i < index; i++) {
-        handleExecutionException(
-            i,
-            SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INTERNAL,
-                "ERROR: Statement is not executed due to the preceding error in DML/DDL batch."));
-      }
+      return counts.length + 1;
     }
     return index - fromIndex;
   }
@@ -524,6 +576,6 @@ public class IntermediateStatement {
 
   enum ExecutionStatus {
     EXPLICIT_TRANSACTION,
-    AUTOCOMMIT
+    IMPLICIT_TRANSACTION
   }
 }

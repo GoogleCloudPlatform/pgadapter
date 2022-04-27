@@ -24,6 +24,7 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
+import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -289,7 +290,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
             assertThrows(
                 SQLException.class,
                 () -> statement.execute(String.format("%s; %s;", INSERT_STATEMENT, INVALID_DML)));
-        assertEquals("ERROR: INVALID_ARGUMENT: Statement is invalid.", exception.getMessage());
+        assertTrue(exception.getMessage().contains("INVALID_ARGUMENT: Statement is invalid."));
       }
     }
 
@@ -337,8 +338,9 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     List<RollbackRequest> rollbackRequests = mockSpanner.getRequestsOfType(RollbackRequest.class);
     assertEquals(1, rollbackRequests.size());
 
+    // The transaction should not be committed as it fails on the invalid DML statement.
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertEquals(1, commitRequests.size());
+    assertEquals(0, commitRequests.size());
   }
 
   @Test
@@ -366,13 +368,14 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(INVALID_DML.getSql(), request.getStatements(1).getSql());
 
-    // The aborted transaction should be rolled back by pgadapter
+    // The aborted transaction should be rolled back by PGAdapter.
     List<RollbackRequest> rollbackRequests = mockSpanner.getRequestsOfType(RollbackRequest.class);
     assertEquals(1, rollbackRequests.size());
 
-    // BEGIN statement commits the implicit transaction
+    // BEGIN statement converts the implicit transaction to an explicit transaction, but is
+    // otherwise a no-op. We should therefore not receive any commits.
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertEquals(1, commitRequests.size());
+    assertEquals(0, commitRequests.size());
   }
 
   @Test
@@ -390,9 +393,8 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     }
 
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(2, requests.size());
+    assertEquals(1, requests.size());
     assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
-    assertEquals(SELECT1.getSql(), requests.get(1).getSql());
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
     assertEquals(1, commitRequests.size());
@@ -420,15 +422,21 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     }
 
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(4, requests.size());
+    assertEquals(3, requests.size());
     assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
+    assertTrue(requests.get(0).getTransaction().hasBegin());
+    // The rest of the statements in the batch are all selects, so PGAdapter tries to use a
+    // read-only transaction.
+    //    assertEquals(1, mockSpanner.getRequestsOfType(BeginTransactionRequest.class).size());
+    //
+    // assertTrue(mockSpanner.getRequestsOfType(BeginTransactionRequest.class).get(0).getOptions().hasReadOnly());
     assertEquals(SELECT1.getSql(), requests.get(1).getSql());
-    assertTrue(requests.get(1).getTransaction().hasSingleUse());
+    assertTrue(requests.get(1).getTransaction().hasId());
     assertEquals(INVALID_SELECT.getSql(), requests.get(2).getSql());
-    assertTrue(requests.get(2).getTransaction().hasSingleUse());
-    assertEquals(SELECT2.getSql(), requests.get(3).getSql());
-    assertTrue(requests.get(3).getTransaction().hasSingleUse());
+    assertTrue(requests.get(2).getTransaction().hasId());
 
+    // We get one commit for the read/write transaction. The read-only transaction is not committed
+    // or rolled back, as that is not necessary for read-only transactions.
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
     assertEquals(1, commitRequests.size());
 
@@ -467,9 +475,14 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     assertEquals(2, requests.size());
     assertEquals(SELECT1.getSql(), requests.get(0).getSql());
-    assertTrue(requests.get(0).getTransaction().hasSingleUse());
+    assertTrue(requests.get(0).getTransaction().hasId());
     assertEquals(SELECT2.getSql(), requests.get(1).getSql());
-    assertTrue(requests.get(1).getTransaction().hasSingleUse());
+    assertTrue(requests.get(1).getTransaction().hasId());
+
+    List<BeginTransactionRequest> beginRequests =
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class);
+    assertEquals(1, beginRequests.size());
+    assertTrue(beginRequests.get(0).getOptions().hasReadOnly());
   }
 
   @Test
@@ -535,14 +548,13 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       }
     }
 
-    // Verify that the execution does not halt and the last statement is executed.
+    // Verify that the execution is stopped after the first error.
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(2, requests.size());
+    assertEquals(1, requests.size());
     assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
-    assertEquals(UPDATE_STATEMENT.getSql(), requests.get(1).getSql());
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertEquals(2, commitRequests.size());
+    assertEquals(1, commitRequests.size());
   }
 
   @Test
@@ -591,11 +603,16 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     assertEquals(2, requests.size());
     assertEquals(SELECT1.getSql(), requests.get(0).getSql());
-    // Check that DDL statements close the implicit transaction
-    assertTrue(requests.get(0).getTransaction().hasSingleUse());
+    // The first statement after the DDL statement should start an implicit transaction.
+    // That transaction will be a read-only transaction, and the begin of those are not inlined
+    // with the first statement.
+    assertTrue(requests.get(0).getTransaction().hasId());
     assertEquals(SELECT2.getSql(), requests.get(1).getSql());
-    // Check that DDL statements close the implicit transaction
-    assertTrue(requests.get(1).getTransaction().hasSingleUse());
+    assertTrue(requests.get(1).getTransaction().hasId());
+    assertEquals(1, mockSpanner.getRequestsOfType(BeginTransactionRequest.class).size());
+    BeginTransactionRequest beginRequest =
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class).get(0);
+    assertTrue(beginRequest.getOptions().hasReadOnly());
   }
 
   @Test
@@ -763,11 +780,11 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
       assertEquals(3, requests.size());
       assertEquals(SELECT1.getSql(), requests.get(0).getSql());
-      assertTrue(requests.get(0).getTransaction().hasSingleUse());
+      assertTrue(requests.get(0).getTransaction().hasBegin());
       assertEquals(INSERT_STATEMENT.getSql(), requests.get(1).getSql());
-      assertTrue(requests.get(1).getTransaction().hasBegin());
+      assertTrue(requests.get(1).getTransaction().hasId());
       assertEquals(SELECT2.getSql(), requests.get(2).getSql());
-      assertTrue(requests.get(2).getTransaction().hasSingleUse());
+      assertTrue(requests.get(2).getTransaction().hasId());
 
       List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
       assertEquals(1, commitRequests.size());
