@@ -97,12 +97,16 @@ public abstract class Parser<T> {
         return new BinaryParser(item, formatCode);
       case Oid.DATE:
         return new DateParser(item, formatCode);
+      case Oid.FLOAT4:
+        return new FloatParser(item, formatCode);
       case Oid.FLOAT8:
         return new DoubleParser(item, formatCode);
-      case Oid.INT8:
-        return new LongParser(item, formatCode);
+      case Oid.INT2:
+        return new ShortParser(item, formatCode);
       case Oid.INT4:
         return new IntegerParser(item, formatCode);
+      case Oid.INT8:
+        return new LongParser(item, formatCode);
       case Oid.NUMERIC:
         return new NumericParser(item, formatCode);
       case Oid.TEXT:
@@ -120,7 +124,7 @@ public abstract class Parser<T> {
         }
         return create(item, type, formatCode);
       default:
-        throw new IllegalArgumentException("Illegal or unknown element type: " + oidType);
+        throw new IllegalArgumentException("Unsupported parameter type: " + oidType);
     }
   }
 
