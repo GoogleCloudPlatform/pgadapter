@@ -140,8 +140,6 @@ public abstract class ControlMessage extends WireMessage {
       connection.getSpannerConnection().rollbackAsync();
       connection.setStatus(ConnectionStatus.TRANSACTION_ABORTED);
     }
-    // new ReadyResponse(this.outputStream,
-    // connection.getStatus().getReadyResponseStatus()).send(false);
     this.outputStream.flush();
   }
 
