@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
@@ -24,6 +25,7 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
@@ -55,6 +57,7 @@ import java.util.logging.Logger;
  * <p>Each {@link ConnectionHandler} is also a {@link Thread}. Although a TCP connection does not
  * necessarily need to have its own thread, this makes the implementation more straightforward.
  */
+@InternalApi
 public class ConnectionHandler extends Thread {
 
   private static final Logger logger = Logger.getLogger(ConnectionHandler.class.getName());
@@ -127,7 +130,7 @@ public class ConnectionHandler extends Thread {
     try (DataInputStream input =
             new DataInputStream(new BufferedInputStream(this.socket.getInputStream()));
         DataOutputStream output =
-            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream())); ) {
+            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream()))) {
       if (!server.getOptions().disableLocalhostCheck()
           && !this.socket.getInetAddress().isAnyLocalAddress()
           && !this.socket.getInetAddress().isLoopbackAddress()) {
@@ -138,7 +141,7 @@ public class ConnectionHandler extends Thread {
 
       try {
         this.connectionMetadata = new ConnectionMetadata(input, output);
-        this.message = BootstrapMessage.create(this);
+        this.message = this.server.recordMessage(BootstrapMessage.create(this));
         this.message.send();
         while (this.status == ConnectionStatus.UNAUTHENTICATED) {
           try {
@@ -311,9 +314,8 @@ public class ConnectionHandler extends Thread {
    * @param connectionId The connection owhose statement must be cancelled.
    * @param secret The secret value linked to this connection. If it does not match, we cannot
    *     cancel.
-   * @throws Exception If Cancellation fails.
    */
-  public synchronized void cancelActiveStatement(int connectionId, int secret) throws Exception {
+  public synchronized void cancelActiveStatement(int connectionId, int secret) {
     int expectedSecret = ConnectionHandler.connectionToSecretMapping.get(connectionId);
     if (secret != expectedSecret) {
       logger.log(
@@ -379,7 +381,7 @@ public class ConnectionHandler extends Thread {
   }
 
   public void setMessageState(WireMessage message) {
-    this.message = message;
+    this.message = this.server.recordMessage(message);
   }
 
   public ConnectionMetadata getConnectionMetadata() {
@@ -400,11 +402,22 @@ public class ConnectionHandler extends Thread {
 
   /** Status of a {@link ConnectionHandler} */
   public enum ConnectionStatus {
-    UNAUTHENTICATED,
-    IDLE,
-    COPY_IN,
-    TERMINATED,
-    TRANSACTION_ABORTED
+    UNAUTHENTICATED(Status.IDLE),
+    IDLE(Status.IDLE),
+    TRANSACTION(Status.TRANSACTION),
+    COPY_IN(Status.IDLE),
+    TERMINATED(Status.IDLE),
+    TRANSACTION_ABORTED(Status.FAILED);
+
+    private final ReadyResponse.Status readyResponseStatus;
+
+    ConnectionStatus(ReadyResponse.Status readyResponseStatus) {
+      this.readyResponseStatus = readyResponseStatus;
+    }
+
+    public ReadyResponse.Status getReadyResponseStatus() {
+      return this.readyResponseStatus;
+    }
   }
 
   /**

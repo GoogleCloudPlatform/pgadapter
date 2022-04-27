@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -28,6 +29,7 @@ import java.text.MessageFormat;
  * for this to be future proof, and to ensure the input stream is flushed of the command (in order
  * to continue receiving properly)
  */
+@InternalApi
 public class CopyDoneMessage extends ControlMessage {
   protected static final char IDENTIFIER = 'c';
   private final CopyStatement statement;

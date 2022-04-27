@@ -14,10 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.Tuple;
 import com.google.cloud.spanner.ResultSet;
 
 /** Simple POJO to hold describe metadata specific to prepared statements. */
+@InternalApi
 public class DescribeStatementMetadata extends DescribeMetadata<Tuple<int[], ResultSet>> {
 
   public DescribeStatementMetadata(int[] parameters, ResultSet resultMetaData) {

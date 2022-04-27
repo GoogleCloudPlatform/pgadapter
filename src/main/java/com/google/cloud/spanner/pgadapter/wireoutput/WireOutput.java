@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -30,6 +31,7 @@ import java.util.logging.Logger;
  * and length (provided you initialize them correctly through getIdentifier and he constructor
  * respectively) via send, so you just have to implement payload sending.
  */
+@InternalApi
 public abstract class WireOutput {
 
   private static final Logger logger = Logger.getLogger(WireOutput.class.getName());

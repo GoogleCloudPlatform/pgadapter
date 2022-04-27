@@ -14,11 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
-import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -31,6 +32,7 @@ import java.util.logging.Logger;
  * An intermediate representation of a portal statement (that is, a prepared statement which
  * contains all relevant information for execution.
  */
+@InternalApi
 public class IntermediatePortalStatement extends IntermediatePreparedStatement {
 
   private static final Logger logger =
@@ -39,8 +41,10 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   protected List<Short> resultFormatCodes;
 
   public IntermediatePortalStatement(
-      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
-    super(options, parsedStatement, connection);
+      ConnectionHandler connectionHandler,
+      OptionsMetadata options,
+      ParsedStatement parsedStatement) {
+    super(connectionHandler, options, parsedStatement);
     this.statement = Statement.of(parsedStatement.getSqlWithoutComments());
     this.parameterFormatCodes = new ArrayList<>();
     this.resultFormatCodes = new ArrayList<>();

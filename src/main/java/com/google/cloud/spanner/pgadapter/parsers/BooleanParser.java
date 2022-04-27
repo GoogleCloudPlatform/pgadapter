@@ -17,7 +17,6 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.common.collect.ImmutableSet;
-import java.sql.Types;
 import java.util.Locale;
 import java.util.Set;
 import org.postgresql.util.ByteConverter;
@@ -26,7 +25,7 @@ import org.postgresql.util.ByteConverter;
  * Parse specified data to boolean. For most cases it is simply translating from chars 't'/'f' to
  * bit, or simply returning the bit representation.
  */
-public class BooleanParser extends Parser<Boolean> {
+class BooleanParser extends Parser<Boolean> {
   private static final String TRUE_VALUE = "t";
   private static final String FALSE_VALUE = "f";
   // See https://www.postgresql.org/docs/current/datatype-boolean.html
@@ -35,15 +34,15 @@ public class BooleanParser extends Parser<Boolean> {
   private static final Set<String> FALSE_VALUES =
       ImmutableSet.of("f", "fa", "fal", "fals", "false", "n", "no", "of", "off");
 
-  public BooleanParser(ResultSet item, int position) {
+  BooleanParser(ResultSet item, int position) {
     this.item = item.getBoolean(position);
   }
 
-  public BooleanParser(Object item) {
+  BooleanParser(Object item) {
     this.item = (Boolean) item;
   }
 
-  public BooleanParser(byte[] item, FormatCode formatCode) {
+  BooleanParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
@@ -63,11 +62,6 @@ public class BooleanParser extends Parser<Boolean> {
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
-  }
-
-  @Override
-  public int getSqlType() {
-    return Types.BOOLEAN;
   }
 
   @Override
@@ -93,6 +87,7 @@ public class BooleanParser extends Parser<Boolean> {
     return result;
   }
 
+  @Override
   public void bind(Statement.Builder statementBuilder, String name) {
     statementBuilder.bind(name).to(this.item);
   }

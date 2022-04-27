@@ -14,12 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import java.text.MessageFormat;
 
 /** Executes a portal. */
+@InternalApi
 public class ExecuteMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'E';
@@ -79,8 +81,12 @@ public class ExecuteMessage extends ControlMessage {
     if (this.statement.hasException(0)) {
       this.handleError(this.statement.getException(0));
     } else {
-      this.sendSpannerResult(0, this.statement, QueryMode.EXTENDED, this.maxRows);
-      this.outputStream.flush();
+      try {
+        this.sendSpannerResult(0, this.statement, QueryMode.EXTENDED, this.maxRows);
+        this.outputStream.flush();
+      } catch (Exception e) {
+        handleError(e);
+      }
     }
     this.connection.cleanUp(this.statement);
   }

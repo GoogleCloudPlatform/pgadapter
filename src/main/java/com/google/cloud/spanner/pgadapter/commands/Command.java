@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.commands;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.metadata.DynamicCommandMetadata;
 import java.util.ArrayList;
@@ -28,12 +29,13 @@ import org.json.simple.JSONObject;
  * and translating it to a form that Spanner understands. The user should call is() to determine
  * whether it matches before trying to translate.
  */
+@InternalApi
 public abstract class Command {
 
   protected Matcher matcher;
   protected String sql;
 
-  public Command(String sql) {
+  Command(String sql) {
     this.sql = sql;
     this.matcher = getPattern().matcher(sql);
   }
@@ -43,7 +45,7 @@ public abstract class Command {
    * this.matcher). Useful if the pattern is not static, or not pattern related (in which case you
    * may set it to null).
    */
-  protected Command(Matcher matcher) {
+  Command(Matcher matcher) {
     this.matcher = matcher;
   }
 

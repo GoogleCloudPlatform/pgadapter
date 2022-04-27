@@ -14,9 +14,11 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import com.google.api.core.InternalApi;
 import java.sql.DatabaseMetaData;
 
 /** Contains replacements for known queries that are executed by the PG JDBC driver. */
+@InternalApi
 public class PgJdbcCatalog {
   public static final String PG_JDBC_GET_MAX_NAME_LENGTH_PREFIX =
       "SELECT t.typlen FROM pg_catalog.pg_type t, pg_catalog.pg_namespace n "

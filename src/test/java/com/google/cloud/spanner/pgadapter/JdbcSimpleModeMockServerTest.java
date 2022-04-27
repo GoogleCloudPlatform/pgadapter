@@ -106,6 +106,25 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testEmptyStatementFollowedByNonEmptyStatement() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // Execute should return false for the first statement.
+        assertFalse(statement.execute(""));
+
+        assertTrue(statement.execute("SELECT 1"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+      }
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
   public void testWrongDialect() {
     // Let the mock server respond with the Google SQL dialect instead of PostgreSQL. The
     // connection should be gracefully rejected. Close all open pooled Spanner objects so we know

@@ -247,6 +247,7 @@ public class StatementTest {
 
   @Test
   public void testPreparedStatement() {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     String sqlStatement = "SELECT * FROM users WHERE age > $2 AND age < $3 AND name = $1";
     int[] parameterDataTypes = new int[] {Oid.VARCHAR, Oid.INT8, Oid.INT4};
 
@@ -264,7 +265,7 @@ public class StatementTest {
     when(connection.execute(statement)).thenReturn(statementResult);
 
     IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(options, parse(sqlStatement), connection);
+        new IntermediatePreparedStatement(connectionHandler, options, parse(sqlStatement));
     intermediateStatement.setParameterDataTypes(parameterDataTypes);
 
     assertEquals(sqlStatement, intermediateStatement.getSql());
@@ -288,7 +289,7 @@ public class StatementTest {
     int[] parameterDataTypes = new int[] {Oid.JSON};
 
     IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(options, parse(sqlStatement), connection);
+        new IntermediatePreparedStatement(connectionHandler, options, parse(sqlStatement));
     intermediateStatement.setParameterDataTypes(parameterDataTypes);
 
     byte[][] parameters = {"{}".getBytes()};
@@ -300,23 +301,25 @@ public class StatementTest {
 
   @Test
   public void testPreparedStatementDescribeDoesNotThrowException() {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     String sqlStatement = "SELECT * FROM users WHERE name = $1 AND age > $2 AND age < $3";
     when(connection.analyzeQuery(Statement.of(sqlStatement), QueryAnalyzeMode.PLAN))
         .thenReturn(resultSet);
 
     IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(options, parse(sqlStatement), connection);
+        new IntermediatePreparedStatement(connectionHandler, options, parse(sqlStatement));
 
     intermediateStatement.describe();
   }
 
   @Test
   public void testPortalStatement() {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
     when(connection.executeQuery(Statement.of(sqlStatement))).thenReturn(resultSet);
 
     IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(options, parse(sqlStatement), connection);
+        new IntermediatePortalStatement(connectionHandler, options, parse(sqlStatement));
 
     intermediateStatement.describe();
 
@@ -352,10 +355,11 @@ public class StatementTest {
 
   @Test
   public void testPortalStatementDescribePropagatesFailure() {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
 
     IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(options, parse(sqlStatement), connection);
+        new IntermediatePortalStatement(connectionHandler, options, parse(sqlStatement));
 
     when(connection.executeQuery(Statement.of(sqlStatement)))
         .thenThrow(
@@ -456,11 +460,12 @@ public class StatementTest {
 
   @Test
   public void testCopyInvalidBuildMutation() throws Exception {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     setupQueryInformationSchemaResults();
 
     CopyStatement statement =
         new CopyStatement(
-            mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"), connection);
+            connectionHandler, mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"));
     statement.execute();
 
     byte[] payload = "2 3\n".getBytes();

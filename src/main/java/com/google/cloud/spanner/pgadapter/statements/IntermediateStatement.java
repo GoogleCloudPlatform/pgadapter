@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
@@ -44,6 +45,7 @@ import java.util.Objects;
  * statement, such as execution, termination, etc. Represented as an intermediate representation for
  * statements which does not belong directly to Postgres, Spanner, etc.
  */
+@InternalApi
 public class IntermediateStatement {
   protected static final PostgreSQLStatementParser PARSER =
       (PostgreSQLStatementParser) AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
@@ -60,7 +62,7 @@ public class IntermediateStatement {
   protected final Connection connection;
   protected long[] updateCounts;
   protected final ImmutableList<ParsedStatement> statements;
-  private ConnectionHandler connectionHandler;
+  protected final ConnectionHandler connectionHandler;
   private ExecutionStatus executionStatus;
 
   private static final char STATEMENT_DELIMITER = ';';
@@ -70,15 +72,17 @@ public class IntermediateStatement {
       OptionsMetadata options,
       ParsedStatement parsedStatement,
       ConnectionHandler connectionHandler) {
-    this(options, parsedStatement, connectionHandler.getSpannerConnection());
-    this.connectionHandler = connectionHandler;
+    this(connectionHandler, options, parsedStatement);
   }
 
   protected IntermediateStatement(
-      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
+      ConnectionHandler connectionHandler,
+      OptionsMetadata options,
+      ParsedStatement parsedStatement) {
+    this.connectionHandler = connectionHandler;
     this.options = options;
     this.parsedStatement = replaceKnownUnsupportedQueries(parsedStatement);
-    this.connection = connection;
+    this.connection = connectionHandler.getSpannerConnection();
     this.statements = parseStatements(parsedStatement);
     this.commands = StatementParser.parseCommands(this.statements);
     this.commandTags = new ArrayList<>(this.commands);
@@ -202,8 +206,9 @@ public class IntermediateStatement {
   }
 
   public void close(int index) throws Exception {
-    if (this.getStatementResult(index) != null) {
-      this.getStatementResult(index).close();
+    if (this.statementResults != null && this.statementResults[index] != null) {
+      this.statementResults[index].close();
+      this.statementResults[index] = null;
     }
   }
 

@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.api.core.InternalApi;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,23 +25,26 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 /** Parses command metadata json files. */
+@InternalApi
 public class CommandMetadataParser {
   private static final String DEFAULT_FILE = "metadata/default_command_metadata.json";
   private static final String EMPTY_FILE = "metadata/empty_command_metadata.json";
   private final JSONParser jsonParser;
 
+  @VisibleForTesting
   public CommandMetadataParser() {
     this.jsonParser = new JSONParser();
   }
 
-  public JSONObject parse(String fileName) throws IOException, ParseException {
+  JSONObject parse(String fileName) throws IOException, ParseException {
     return parse(new FileInputStream(fileName));
   }
 
-  public JSONObject emptyCommands() throws IOException, ParseException {
+  JSONObject emptyCommands() throws IOException, ParseException {
     return parse(this.getClass().getClassLoader().getResourceAsStream(EMPTY_FILE));
   }
 
+  @VisibleForTesting
   public JSONObject defaultCommands() throws IOException, ParseException {
     return parse(this.getClass().getClassLoader().getResourceAsStream(DEFAULT_FILE));
   }

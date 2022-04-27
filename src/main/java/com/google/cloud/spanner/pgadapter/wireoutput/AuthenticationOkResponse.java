@@ -14,11 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Assures the client that the authentication process (if any) was successful. */
+@InternalApi
 public class AuthenticationOkResponse extends WireOutput {
 
   private static final int SUCCESS_FLAG = 0;
