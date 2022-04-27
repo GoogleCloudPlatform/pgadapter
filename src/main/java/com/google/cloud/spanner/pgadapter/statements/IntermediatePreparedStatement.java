@@ -20,8 +20,10 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
-import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -42,8 +44,10 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   protected Statement statement;
 
   public IntermediatePreparedStatement(
-      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
-    super(options, parsedStatement, connection);
+      ConnectionHandler connectionHandler,
+      OptionsMetadata options,
+      ParsedStatement parsedStatement) {
+    super(connectionHandler, options, parsedStatement);
     this.parameterDataTypes = null;
   }
 
@@ -78,8 +82,18 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     // don't need to do that once more.
     if (getStatementResult(0) == null) {
       try {
-        StatementResult result = connection.execute(this.statement);
-        this.updateResultCount(0, result);
+        if (!connection.isInTransaction()
+            // TODO(230579451): Refactor to use ClientSideStatement information.
+            && this.parsedStatement.getType().equals(StatementType.CLIENT_SIDE)
+            && (this.commands.get(0).equals("ROLLBACK") || this.commands.get(0).equals("COMMIT"))) {
+          // TODO(230579929): Return warning that no transaction if connection status == IDLE.
+          connectionHandler.setStatus(ConnectionStatus.IDLE);
+        } else {
+          StatementResult result = connection.execute(this.statement);
+          this.updateResultCount(0, result);
+          connectionHandler.setStatus(
+              connection.isInTransaction() ? ConnectionStatus.TRANSACTION : ConnectionStatus.IDLE);
+        }
       } catch (SpannerException e) {
         handleExecutionException(0, e);
       }
@@ -98,7 +112,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   public IntermediatePortalStatement bind(
       byte[][] parameters, List<Short> parameterFormatCodes, List<Short> resultFormatCodes) {
     IntermediatePortalStatement portal =
-        new IntermediatePortalStatement(this.options, this.parsedStatement, this.connection);
+        new IntermediatePortalStatement(this.connectionHandler, this.options, this.parsedStatement);
     portal.setParameterFormatCodes(parameterFormatCodes);
     portal.setResultFormatCodes(resultFormatCodes);
     Statement.Builder builder = Statement.newBuilder(this.parsedStatement.getSqlWithoutComments());

@@ -67,7 +67,6 @@ public class IntermediateStatementTest {
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.RESULT_SET);
     when(result.getResultSet()).thenReturn(resultSet);
-    when(result.getUpdateCount()).thenThrow(new IllegalStateException());
 
     statement.updateResultCount(0, result);
 
@@ -84,7 +83,6 @@ public class IntermediateStatementTest {
             mock(OptionsMetadata.class), parse("update bar set foo=1"), connectionHandler);
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
-    when(result.getResultSet()).thenThrow(new IllegalStateException());
     when(result.getUpdateCount()).thenReturn(100L);
 
     statement.updateResultCount(0, result);
@@ -104,8 +102,6 @@ public class IntermediateStatementTest {
             connectionHandler);
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.NO_RESULT);
-    when(result.getResultSet()).thenThrow(new IllegalStateException());
-    when(result.getUpdateCount()).thenThrow(new IllegalStateException());
 
     statement.updateResultCount(0, result);
 

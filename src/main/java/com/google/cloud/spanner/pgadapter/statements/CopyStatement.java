@@ -26,7 +26,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
-import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
@@ -63,8 +63,10 @@ public class CopyStatement extends IntermediateStatement {
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
   public CopyStatement(
-      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
-    super(options, parsedStatement, connection);
+      ConnectionHandler connectionHandler,
+      OptionsMetadata options,
+      ParsedStatement parsedStatement) {
+    super(connectionHandler, options, parsedStatement);
   }
 
   public Exception getException() {

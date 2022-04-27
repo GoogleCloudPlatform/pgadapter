@@ -52,10 +52,7 @@ public class QueryMessage extends ControlMessage {
     this.isCopy = StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments());
     if (isCopy) {
       this.statement =
-          new CopyStatement(
-              connection.getServer().getOptions(),
-              parsedStatement,
-              this.connection.getSpannerConnection());
+          new CopyStatement(connection, connection.getServer().getOptions(), parsedStatement);
     } else if (!connection.getServer().getOptions().requiresMatcher()) {
       this.statement =
           new IntermediateStatement(

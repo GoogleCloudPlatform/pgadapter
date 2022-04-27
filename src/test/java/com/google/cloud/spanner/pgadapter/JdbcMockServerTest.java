@@ -18,13 +18,20 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.RandomResultSetGenerator;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
+import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
@@ -33,6 +40,7 @@ import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.Status;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -51,6 +59,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -60,11 +69,21 @@ import org.postgresql.jdbc.PgStatement;
 
 @RunWith(JUnit4.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
+  private static final int RANDOM_RESULTS_ROW_COUNT = 10;
+  private static final Statement SELECT_RANDOM = Statement.of("select * from random_table");
 
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
+
+    addRandomResultResults();
+  }
+
+  private static void addRandomResultResults() {
+    // TODO(230579459): Add dialect argument once RandomResultSetGenerator supports PostgreSQL.
+    RandomResultSetGenerator generator = new RandomResultSetGenerator(RANDOM_RESULTS_ROW_COUNT);
+    mockSpanner.putStatementResult(StatementResult.query(SELECT_RANDOM, generator.generate()));
   }
 
   /**
@@ -536,6 +555,173 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
         assertEquals(1, statement.executeUpdate());
       }
+    }
+  }
+
+  @Test
+  public void testCursorSuccess() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      try (PreparedStatement statement = connection.prepareStatement(SELECT_FIVE_ROWS.getSql())) {
+        // Fetch two rows at a time from the PG server.
+        statement.setFetchSize(2);
+        try (ResultSet resultSet = statement.executeQuery()) {
+          int index = 0;
+          while (resultSet.next()) {
+            assertEquals(++index, resultSet.getInt(1));
+          }
+          assertEquals(5, index);
+        }
+      }
+      connection.commit();
+    }
+    // The ExecuteSql request should only be sent once to Cloud Spanner.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(SELECT_FIVE_ROWS.getSql(), executeRequest.getSql());
+
+    // PGAdapter should receive 5 Execute messages:
+    // 1. BEGIN
+    // 2. Execute - fetch rows 1, 2
+    // 3. Execute - fetch rows 3, 4
+    // 4. Execute - fetch rows 5
+    // 5. COMMIT
+    if (pgServer != null) {
+      List<DescribeMessage> describeMessages = getWireMessagesOfType(DescribeMessage.class);
+      assertEquals(1, describeMessages.size());
+      DescribeMessage describeMessage = describeMessages.get(0);
+      assertEquals(PreparedType.Portal, describeMessage.getType());
+
+      List<ExecuteMessage> executeMessages = getWireMessagesOfType(ExecuteMessage.class);
+      assertEquals(5, executeMessages.size());
+      assertEquals("", executeMessages.get(0).getName());
+      for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
+        assertEquals(describeMessage.getName(), executeMessage.getName());
+        assertEquals(2, executeMessage.getMaxRows());
+      }
+      assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
+
+      List<ParseMessage> parseMessages = getWireMessagesOfType(ParseMessage.class);
+      assertEquals(3, parseMessages.size());
+      assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
+      assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(1).getStatement().getSql());
+      assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
+    }
+  }
+
+  @Test
+  public void testCursorFailsHalfway() throws SQLException {
+    mockSpanner.setExecuteStreamingSqlExecutionTime(
+        SimulatedExecutionTime.ofStreamException(Status.DATA_LOSS.asRuntimeException(), 2));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      try (PreparedStatement statement = connection.prepareStatement(SELECT_FIVE_ROWS.getSql())) {
+        // Fetch one row at a time from the PG server.
+        statement.setFetchSize(1);
+        try (ResultSet resultSet = statement.executeQuery()) {
+          // The first row should succeed.
+          assertTrue(resultSet.next());
+          // The second row should fail.
+          assertThrows(SQLException.class, resultSet::next);
+        }
+      }
+      connection.rollback();
+    }
+    // The ExecuteSql request should only be sent once to Cloud Spanner.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(SELECT_FIVE_ROWS.getSql(), executeRequest.getSql());
+
+    // PGAdapter should receive 4 Execute messages:
+    // 1. BEGIN
+    // 2. Execute - fetch row 1
+    // 3. Execute - fetch row 2 -- This fails with a DATA_LOSS error
+    // The JDBC driver does not send a ROLLBACK
+    if (pgServer != null) {
+      List<DescribeMessage> describeMessages = getWireMessagesOfType(DescribeMessage.class);
+      assertEquals(1, describeMessages.size());
+      DescribeMessage describeMessage = describeMessages.get(0);
+      assertEquals(PreparedType.Portal, describeMessage.getType());
+
+      List<ExecuteMessage> executeMessages = getWireMessagesOfType(ExecuteMessage.class);
+      assertEquals(4, executeMessages.size());
+      assertEquals("", executeMessages.get(0).getName());
+      for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
+        assertEquals(describeMessage.getName(), executeMessage.getName());
+        assertEquals(1, executeMessage.getMaxRows());
+      }
+      assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
+
+      List<ParseMessage> parseMessages = getWireMessagesOfType(ParseMessage.class);
+      assertEquals(3, parseMessages.size());
+      assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
+      assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(1).getStatement().getSql());
+      assertEquals("ROLLBACK", parseMessages.get(2).getStatement().getSql());
+    }
+  }
+
+  @Test
+  @Ignore("RandomResultSetGenerator does not yet support PostgreSQL")
+  public void testRandomResults() throws SQLException {
+    final int fetchSize = 3;
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      try (PreparedStatement statement = connection.prepareStatement(SELECT_RANDOM.getSql())) {
+        statement.setFetchSize(fetchSize);
+        try (ResultSet resultSet = statement.executeQuery()) {
+          int rowCount = 0;
+          while (resultSet.next()) {
+            for (int col = 0; col < resultSet.getMetaData().getColumnCount(); col++) {
+              resultSet.getObject(col + 1);
+            }
+            rowCount++;
+          }
+          assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
+        }
+      }
+      connection.commit();
+    }
+    // The ExecuteSql request should only be sent once to Cloud Spanner.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(SELECT_RANDOM.getSql(), executeRequest.getSql());
+
+    // PGAdapter should receive 5 Execute messages:
+    // 1. BEGIN
+    // 2. Execute - fetch rows 1, 2
+    // 3. Execute - fetch rows 3, 4
+    // 4. Execute - fetch rows 5
+    // 5. COMMIT
+    if (pgServer != null) {
+      List<DescribeMessage> describeMessages = getWireMessagesOfType(DescribeMessage.class);
+      assertEquals(1, describeMessages.size());
+      DescribeMessage describeMessage = describeMessages.get(0);
+      assertEquals(PreparedType.Portal, describeMessage.getType());
+
+      List<ExecuteMessage> executeMessages = getWireMessagesOfType(ExecuteMessage.class);
+      int expectedExecuteMessageCount =
+          RANDOM_RESULTS_ROW_COUNT / fetchSize
+              + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0)
+              + 2;
+      assertEquals(expectedExecuteMessageCount, executeMessages.size());
+      assertEquals("", executeMessages.get(0).getName());
+      for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
+        assertEquals(describeMessage.getName(), executeMessage.getName());
+        assertEquals(fetchSize, executeMessage.getMaxRows());
+      }
+      assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
+
+      List<ParseMessage> parseMessages = getWireMessagesOfType(ParseMessage.class);
+      assertEquals(3, parseMessages.size());
+      assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
+      assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(1).getStatement().getSql());
+      assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
     }
   }
 }

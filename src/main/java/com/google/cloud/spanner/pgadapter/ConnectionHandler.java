@@ -25,6 +25,7 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
@@ -140,7 +141,7 @@ public class ConnectionHandler extends Thread {
 
       try {
         this.connectionMetadata = new ConnectionMetadata(input, output);
-        this.message = BootstrapMessage.create(this);
+        this.message = this.server.recordMessage(BootstrapMessage.create(this));
         this.message.send();
         while (this.status == ConnectionStatus.UNAUTHENTICATED) {
           try {
@@ -380,7 +381,7 @@ public class ConnectionHandler extends Thread {
   }
 
   public void setMessageState(WireMessage message) {
-    this.message = message;
+    this.message = this.server.recordMessage(message);
   }
 
   public ConnectionMetadata getConnectionMetadata() {
@@ -401,11 +402,22 @@ public class ConnectionHandler extends Thread {
 
   /** Status of a {@link ConnectionHandler} */
   public enum ConnectionStatus {
-    UNAUTHENTICATED,
-    IDLE,
-    COPY_IN,
-    TERMINATED,
-    TRANSACTION_ABORTED
+    UNAUTHENTICATED(Status.IDLE),
+    IDLE(Status.IDLE),
+    TRANSACTION(Status.TRANSACTION),
+    COPY_IN(Status.IDLE),
+    TERMINATED(Status.IDLE),
+    TRANSACTION_ABORTED(Status.FAILED);
+
+    private final ReadyResponse.Status readyResponseStatus;
+
+    ConnectionStatus(ReadyResponse.Status readyResponseStatus) {
+      this.readyResponseStatus = readyResponseStatus;
+    }
+
+    public ReadyResponse.Status getReadyResponseStatus() {
+      return this.readyResponseStatus;
+    }
   }
 
   /**

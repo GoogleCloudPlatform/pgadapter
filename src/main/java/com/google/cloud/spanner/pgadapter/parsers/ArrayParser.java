@@ -69,9 +69,10 @@ class ArrayParser extends Parser<List<?>> {
       case INT64:
         return value.getInt64Array();
       case STRING:
-        return value.getStringArray();
       case PG_NUMERIC:
-        return value.getNumericArray();
+        // Get numeric arrays as a string array instead of as an array of BigDecimal, as numeric
+        // arrays could contain 'NaN' values, which are not supported by BigDecimal.
+        return value.getStringArray();
       case TIMESTAMP:
         return value.getTimestampArray();
       case FLOAT64:
