@@ -15,7 +15,9 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
@@ -59,9 +61,10 @@ import java.util.logging.Logger;
  */
 @InternalApi
 public class ConnectionHandler extends Thread {
-
   private static final Logger logger = Logger.getLogger(ConnectionHandler.class.getName());
   private static final AtomicLong CONNECTION_HANDLER_ID_GENERATOR = new AtomicLong(0L);
+  private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
+
   private final ProxyServer server;
   private final Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
@@ -89,6 +92,22 @@ public class ConnectionHandler extends Thread {
       uri = uri.substring("jdbc:".length());
     }
     uri = appendPropertiesToUrl(uri, server.getProperties());
+    if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
+      uri =
+          uri
+              + ";"
+              + ConnectionOptions.CHANNEL_PROVIDER_PROPERTY_NAME
+              + "="
+              + System.getProperty(CHANNEL_PROVIDER_PROPERTY);
+      try {
+        Class.forName(System.getProperty(CHANNEL_PROVIDER_PROPERTY));
+      } catch (ClassNotFoundException e) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "Unknown or invalid channel provider: "
+                + System.getProperty(CHANNEL_PROVIDER_PROPERTY));
+      }
+    }
     ConnectionOptions connectionOptions = ConnectionOptions.newBuilder().setUri(uri).build();
     this.spannerConnection = connectionOptions.getConnection();
     setDaemon(true);
