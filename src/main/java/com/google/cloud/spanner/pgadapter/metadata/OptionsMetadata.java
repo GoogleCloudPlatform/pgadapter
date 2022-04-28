@@ -339,17 +339,22 @@ public class OptionsMetadata {
         OPTION_DDL_TRANSACTION_MODE,
         "ddl-transaction-mode",
         true,
-        "Sets the way PGAdapter should handle DDL statements in implicit and explicit "
-            + "transactions. Cloud Spanner does not support DDL transactions. The possible modes "
-            + "are:\n"
-            + "None: Only allows single DDL statements outside implicit and explicit transactions.\n"
-            + "Batch: Allows batches that contain only DDL statements. "
-            + "Does not allow mixed batches of DDL and other statements, or DDL statements in transactions.\n"
-            + "AutocommitImplicitTransaction: Allows mixed batches of DDL and other statements. "
-            + "Automatically commits the implicit transaction when a DDL statement is encountered in a batch. "
-            + "DDL statements in explicit transactions are not allowed."
-            + "AutocommitExplicitTransaction: Allows mixed batches of DDL and other statements. "
-            + "Automatically commits the current transaction when a DDL statement is encountered.");
+        String.format(
+            "Sets the way PGAdapter should handle DDL statements in implicit and explicit "
+                + "transactions. Cloud Spanner does not support DDL transactions. The possible modes "
+                + "are:\n"
+                + "%s: Only allows single DDL statements outside implicit and explicit transactions.\n"
+                + "%s: Allows batches that contain only DDL statements. "
+                + "Does not allow mixed batches of DDL and other statements, or DDL statements in transactions.\n"
+                + "%s: Allows mixed batches of DDL and other statements. "
+                + "Automatically commits the implicit transaction when a DDL statement is encountered in a batch. "
+                + "DDL statements in explicit transactions are not allowed.\n"
+                + "%s: Allows mixed batches of DDL and other statements. "
+                + "Automatically commits the current transaction when a DDL statement is encountered.",
+            DdlTransactionMode.Single,
+            DdlTransactionMode.Batch,
+            DdlTransactionMode.AutocommitImplicitTransaction,
+            DdlTransactionMode.AutocommitExplicitTransaction));
     options.addOption(
         OPTION_JDBC_MODE,
         "jdbc-mode",
@@ -415,6 +420,7 @@ public class OptionsMetadata {
 
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
+    help.setWidth(120);
     try {
       CommandLine commandLine = parser.parse(options, args);
       if (commandLine.hasOption(OPTION_HELP)) {

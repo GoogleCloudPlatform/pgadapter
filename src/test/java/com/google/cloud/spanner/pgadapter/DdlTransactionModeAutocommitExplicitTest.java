@@ -17,9 +17,11 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.RollbackRequest;
 import java.sql.Connection;
@@ -118,5 +120,46 @@ public class DdlTransactionModeAutocommitExplicitTest
     assertFalse(requests.get(1).getTransaction().hasBegin());
     assertTrue(requests.get(1).getTransaction().hasId());
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testDdlInExplicitTransactionSwitchedToImplicit() throws SQLException {
+    String sql =
+        String.format(
+            "BEGIN; %s; CREATE TABLE foo (id bigint primary key); %s; %s; COMMIT;",
+            INSERT_STATEMENT, UPDATE_STATEMENT, INVALID_DML);
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // The invalid DML statement will cause the batch to fail. The statement is in an explicit
+        // transaction block, but that block also contains a DDL statement. That statement auto
+        // commits the explicit transaction, which means that we continue with an implicit
+        // transaction after that. That transaction is therefore rolled back when the batch fails.
+        SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
+        assertTrue(exception.getMessage(), exception.getMessage().contains(EXCEPTION.getMessage()));
+
+        // The connection should not be in the aborted transaction state.
+        assertTrue(statement.execute("show transaction isolation level"));
+      }
+    }
+
+    // The first statement is executed as a single DML statement.
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(1, requests.size());
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
+    assertTrue(requests.get(0).getTransaction().hasBegin());
+    assertTrue(requests.get(0).getTransaction().getBegin().hasReadWrite());
+    // The transaction is automatically committed by the CREATE TABLE statement.
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+
+    List<ExecuteBatchDmlRequest> batchDmlRequests =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class);
+    assertEquals(1, batchDmlRequests.size());
+    assertEquals(2, batchDmlRequests.get(0).getStatementsCount());
+    assertTrue(batchDmlRequests.get(0).getTransaction().hasBegin());
+    assertTrue(batchDmlRequests.get(0).getTransaction().getBegin().hasReadWrite());
+    // The transaction fails and is automatically rolled back.
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
 }
