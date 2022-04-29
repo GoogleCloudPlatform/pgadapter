@@ -1604,6 +1604,7 @@ public class ProtocolTest {
     message.send();
 
     DataInputStream outputResult = inputStreamFromOutputStream(result);
+    verify(connectionHandler).connectToSpanner("databasename");
 
     // AuthenticationOkResponse
     assertEquals('R', outputResult.readByte());

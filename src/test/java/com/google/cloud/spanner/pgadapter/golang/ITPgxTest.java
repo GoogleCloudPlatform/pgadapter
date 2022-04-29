@@ -56,7 +56,7 @@ public class ITPgxTest implements IntegrationTest {
 
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
-    testEnv.startPGAdapterServer(database.getId(), Collections.emptyList());
+    testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
   }
 
   @AfterClass
