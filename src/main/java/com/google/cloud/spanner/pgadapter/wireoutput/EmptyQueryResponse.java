@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,30 +14,25 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
-import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
-import java.io.IOException;
 import java.text.MessageFormat;
 
-/** Signals the end of a connection. */
-@InternalApi
-public class TerminateResponse extends WireOutput {
-
-  public TerminateResponse(DataOutputStream output) {
+public class EmptyQueryResponse extends WireOutput {
+  public EmptyQueryResponse(DataOutputStream output) {
     super(output, 4);
   }
 
   @Override
-  protected void sendPayload() throws IOException {}
+  protected void sendPayload() throws Exception {}
 
   @Override
   public byte getIdentifier() {
-    return 'X';
+    return 'I';
   }
 
   @Override
   protected String getMessageName() {
-    return "Terminate";
+    return "EmptyQueryResponse";
   }
 
   @Override

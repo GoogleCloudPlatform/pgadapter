@@ -19,9 +19,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import com.google.cloud.ByteArray;
-import com.google.cloud.Date;
-import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
@@ -37,20 +34,22 @@ import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.core.Utils;
 
 /**
- * Tests PGAdapter using the native Go pgx driver. The Go code can be found in
+ * Tests PGAdapter using the native Go pgx driver in simple query mode. The Go code can be found in
  * src/test/golang/pgadapter_pgx_tests/pgx.go.
  */
 @Category(GolangTest.class)
 @RunWith(JUnit4.class)
-public class PgxMockServerTest extends AbstractMockServerTest {
+public class PgxSimpleModeMockServerTest extends AbstractMockServerTest {
   private static PgxTest pgxTest;
 
   @BeforeClass
@@ -61,7 +60,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   private GoString createConnString() {
     return new GoString(
         String.format(
-            "postgres://uid:pwd@localhost:%d/?statement_cache_capacity=0&sslmode=disable",
+            "postgres://uid:pwd@localhost:%d/?prefer_simple_protocol=true&sslmode=disable",
             pgServer.getLocalPort()));
   }
 
@@ -72,7 +71,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
-            com.google.spanner.v1.ResultSet.newBuilder()
+            ResultSet.newBuilder()
                 .setMetadata(
                     ResultSetMetadata.newBuilder()
                         .setRowType(
@@ -118,8 +117,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testQueryWithParameter() {
-    String sql = "SELECT * FROM FOO WHERE BAR=$1";
-    Statement statement = Statement.newBuilder(sql).bind("p1").to("baz").build();
+    String sql = "SELECT * FROM FOO WHERE BAR='baz'";
+    Statement statement = Statement.newBuilder(sql).build();
 
     ResultSetMetadata metadata =
         ResultSetMetadata.newBuilder()
@@ -132,12 +131,6 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             .build())
                     .build())
             .build();
-
-    // Add a query result with only the metadata for the query without parameter values.
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.of(sql), ResultSet.newBuilder().setMetadata(metadata).build()));
-    // Also add a query result with both metadata and rows for the statement with parameter values.
     mockSpanner.putStatementResult(
         StatementResult.query(
             statement,
@@ -178,36 +171,20 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   @Test
   public void testInsertAllDataTypes() {
     String sql =
-        "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8)";
-    mockSpanner.putStatementResult(
-        StatementResult.update(
-            Statement.newBuilder(sql)
-                .bind("p1")
-                .to(100L)
-                .bind("p2")
-                .to(true)
-                .bind("p3")
-                .to(ByteArray.copyFrom("test_bytes"))
-                .bind("p4")
-                .to(3.14d)
-                .bind("p5")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
-                .bind("p6")
-                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
-                .bind("p7")
-                .to(Date.parseDate("2022-04-02"))
-                .bind("p8")
-                .to("test_string")
-                .build(),
-            1L));
+        String.format(
+            "INSERT INTO all_types "
+                + "(col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar) "
+                + "values (100, true, '%s', 3.14, '%s', '%s', '%s', 'test_string')",
+            "\\x" + Utils.toHexString("test_bytes".getBytes(StandardCharsets.UTF_8)),
+            "6626e-3",
+            "2022-03-24 07:39:10.123456+01:00:00",
+            "2022-04-02");
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
 
     String res = pgxTest.TestInsertAllDataTypes(createConnString());
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // The patched version of pgx sends the query only once!
     assertEquals(1, requests.size());
     ExecuteSqlRequest request = requests.get(0);
     assertEquals(QueryMode.NORMAL, request.getQueryMode());
@@ -218,36 +195,13 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     String sql =
         "INSERT INTO all_types "
             + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
-    mockSpanner.putStatementResult(
-        StatementResult.update(
-            Statement.newBuilder(sql)
-                .bind("p1")
-                .to(100L)
-                .bind("p2")
-                .to((com.google.cloud.spanner.Value) null)
-                .bind("p3")
-                .to((com.google.cloud.spanner.Value) null)
-                .bind("p4")
-                .to((com.google.cloud.spanner.Value) null)
-                .bind("p5")
-                .to((com.google.cloud.spanner.Value) null)
-                .bind("p6")
-                .to((com.google.cloud.spanner.Value) null)
-                .bind("p7")
-                .to((com.google.cloud.spanner.Value) null)
-                .bind("p8")
-                .to((com.google.cloud.spanner.Value) null)
-                .bind("p9")
-                .to((com.google.cloud.spanner.Value) null)
-                .build(),
-            1L));
+            + "values (100, null, null, null, null, null, null, null, null)";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
 
     String res = pgxTest.TestInsertNullsAllDataTypes(createConnString());
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // The patched version of pgx sends the query only once!
     assertEquals(1, requests.size());
     ExecuteSqlRequest request = requests.get(0);
     assertEquals(QueryMode.NORMAL, request.getQueryMode());

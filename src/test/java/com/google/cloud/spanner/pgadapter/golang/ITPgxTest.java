@@ -32,12 +32,12 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
 @Category(IntegrationTest.class)
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class ITPgxTest implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
@@ -56,7 +56,7 @@ public class ITPgxTest implements IntegrationTest {
 
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
-    testEnv.startPGAdapterServer(database.getId(), Collections.emptyList());
+    testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
   }
 
   @AfterClass
@@ -82,8 +82,8 @@ public class ITPgxTest implements IntegrationTest {
   private GoString createConnString() {
     return new GoString(
         String.format(
-            "postgres://uid:pwd@localhost:%d/?sslmode=disable",
-            testEnv.getServer().getLocalPort()));
+            "postgres://uid:pwd@localhost:%d/?sslmode=disable&prefer_simple_protocol=%s",
+            testEnv.getServer().getLocalPort(), preferQueryMode.equals("simple")));
   }
 
   @Before
@@ -121,7 +121,7 @@ public class ITPgxTest implements IntegrationTest {
 
   @Test
   public void testQueryAllDataTypes() {
-    assertNull(pgxTest.TestQueryAllDataTypes(createConnString(), false));
+    assertNull(pgxTest.TestQueryAllDataTypes(createConnString()));
   }
 
   @Test
@@ -131,10 +131,19 @@ public class ITPgxTest implements IntegrationTest {
     testEnv.write(
         databaseId, Collections.singletonList(Mutation.delete("all_types", Key.of(100L))));
 
-    assertNull(pgxTest.TestInsertAllDataTypes(createConnString(), false));
+    assertNull(pgxTest.TestInsertAllDataTypes(createConnString()));
   }
 
-  //  @Ignore("Untyped null values are not supported by the backend yet")
+  @Test
+  public void testPrepareStatement() {
+    assertNull(pgxTest.TestPrepareStatement(createConnString()));
+  }
+
+  @Test
+  public void testPrepareSelectStatement() {
+    assertNull(pgxTest.TestPrepareSelectStatement(createConnString()));
+  }
+
   @Test
   public void testInsertNullsAllDataTypes() {
     // Make sure there is no row that already exists with col_bigint=100

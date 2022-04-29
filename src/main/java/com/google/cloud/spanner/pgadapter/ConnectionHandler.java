@@ -14,16 +14,22 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
@@ -55,6 +61,7 @@ import java.util.logging.Logger;
  * <p>Each {@link ConnectionHandler} is also a {@link Thread}. Although a TCP connection does not
  * necessarily need to have its own thread, this makes the implementation more straightforward.
  */
+@InternalApi
 public class ConnectionHandler extends Thread {
 
   private static final Logger logger = Logger.getLogger(ConnectionHandler.class.getName());
@@ -74,20 +81,13 @@ public class ConnectionHandler extends Thread {
   private static final AtomicInteger incrementingConnectionId = new AtomicInteger(0);
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
-  private final Connection spannerConnection;
+  private Connection spannerConnection;
 
   ConnectionHandler(ProxyServer server, Socket socket) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
-    String uri = server.getOptions().getConnectionURL();
-    if (uri.startsWith("jdbc:")) {
-      uri = uri.substring("jdbc:".length());
-    }
-    uri = appendPropertiesToUrl(uri, server.getProperties());
-    ConnectionOptions connectionOptions = ConnectionOptions.newBuilder().setUri(uri).build();
-    this.spannerConnection = connectionOptions.getConnection();
     setDaemon(true);
     logger.log(
         Level.INFO,
@@ -95,6 +95,37 @@ public class ConnectionHandler extends Thread {
             String.format(
                 "Connection handler with ID %s created for client %s",
                 getName(), socket.getInetAddress().getHostAddress()));
+  }
+
+  @InternalApi
+  public void connectToSpanner(String database) {
+    OptionsMetadata options = getServer().getOptions();
+    String uri =
+        options.hasDefaultConnectionUrl()
+            ? options.getDefaultConnectionUrl()
+            : options.buildConnectionURL(database);
+    if (uri.startsWith("jdbc:")) {
+      uri = uri.substring("jdbc:".length());
+    }
+    uri = appendPropertiesToUrl(uri, getServer().getProperties());
+    ConnectionOptions connectionOptions = ConnectionOptions.newBuilder().setUri(uri).build();
+    Connection spannerConnection = connectionOptions.getConnection();
+    try {
+      // Note: Calling getDialect() will cause a SpannerException if the connection itself is
+      // invalid, for example as a result of the credentials being wrong.
+      if (spannerConnection.getDialect() != Dialect.POSTGRESQL) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            String.format(
+                "The database uses dialect %s. Currently PGAdapter only supports connections to PostgreSQL dialect databases. "
+                    + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
+                spannerConnection.getDialect()));
+      }
+    } catch (SpannerException e) {
+      spannerConnection.close();
+      throw e;
+    }
+    this.spannerConnection = spannerConnection;
   }
 
   private String appendPropertiesToUrl(String url, Properties info) {
@@ -127,7 +158,7 @@ public class ConnectionHandler extends Thread {
     try (DataInputStream input =
             new DataInputStream(new BufferedInputStream(this.socket.getInputStream()));
         DataOutputStream output =
-            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream())); ) {
+            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream()))) {
       if (!server.getOptions().disableLocalhostCheck()
           && !this.socket.getInetAddress().isAnyLocalAddress()
           && !this.socket.getInetAddress().isLoopbackAddress()) {
@@ -138,7 +169,7 @@ public class ConnectionHandler extends Thread {
 
       try {
         this.connectionMetadata = new ConnectionMetadata(input, output);
-        this.message = BootstrapMessage.create(this);
+        this.message = this.server.recordMessage(BootstrapMessage.create(this));
         this.message.send();
         while (this.status == ConnectionStatus.UNAUTHENTICATED) {
           try {
@@ -311,9 +342,8 @@ public class ConnectionHandler extends Thread {
    * @param connectionId The connection owhose statement must be cancelled.
    * @param secret The secret value linked to this connection. If it does not match, we cannot
    *     cancel.
-   * @throws Exception If Cancellation fails.
    */
-  public synchronized void cancelActiveStatement(int connectionId, int secret) throws Exception {
+  public synchronized void cancelActiveStatement(int connectionId, int secret) {
     int expectedSecret = ConnectionHandler.connectionToSecretMapping.get(connectionId);
     if (secret != expectedSecret) {
       logger.log(
@@ -379,7 +409,7 @@ public class ConnectionHandler extends Thread {
   }
 
   public void setMessageState(WireMessage message) {
-    this.message = message;
+    this.message = this.server.recordMessage(message);
   }
 
   public ConnectionMetadata getConnectionMetadata() {
@@ -400,11 +430,22 @@ public class ConnectionHandler extends Thread {
 
   /** Status of a {@link ConnectionHandler} */
   public enum ConnectionStatus {
-    UNAUTHENTICATED,
-    IDLE,
-    COPY_IN,
-    TERMINATED,
-    TRANSACTION_ABORTED
+    UNAUTHENTICATED(Status.IDLE),
+    IDLE(Status.IDLE),
+    TRANSACTION(Status.TRANSACTION),
+    COPY_IN(Status.IDLE),
+    TERMINATED(Status.IDLE),
+    TRANSACTION_ABORTED(Status.FAILED);
+
+    private final ReadyResponse.Status readyResponseStatus;
+
+    ConnectionStatus(ReadyResponse.Status readyResponseStatus) {
+      this.readyResponseStatus = readyResponseStatus;
+    }
+
+    public ReadyResponse.Status getReadyResponseStatus() {
+      return this.readyResponseStatus;
+    }
   }
 
   /**

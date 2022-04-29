@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -26,6 +27,7 @@ import java.text.MessageFormat;
 import org.postgresql.core.Oid;
 
 /** Sends back qualifier for a row. */
+@InternalApi
 public class RowDescriptionResponse extends WireOutput {
 
   private static final int HEADER_LENGTH = 4;

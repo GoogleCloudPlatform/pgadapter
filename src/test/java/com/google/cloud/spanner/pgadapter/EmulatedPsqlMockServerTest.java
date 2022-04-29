@@ -20,9 +20,12 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
+import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.SessionName;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.List;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -41,7 +44,8 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(ImmutableList.of("-q"));
+    // Start PGAdapter in psql mode without a default database.
+    doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of("-q"));
 
     mockSpanner.putStatementResults(
         StatementResult.update(Statement.of(INSERT1), 1L),
@@ -53,16 +57,31 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
    * mode for queries and DML statements. This makes the JDBC driver behave in (much) the same way
    * as psql.
    */
-  private String createUrl() {
+  private String createUrl(String database) {
     return String.format(
-        "jdbc:postgresql://localhost:%d/?preferQueryMode=simple", pgServer.getLocalPort());
+        "jdbc:postgresql://localhost:%d/%s?preferQueryMode=simple",
+        pgServer.getLocalPort(), database);
+  }
+
+  @Test
+  public void testConnectToDifferentDatabases() throws SQLException {
+    final ImmutableList<String> databases = ImmutableList.of("db1", "db2");
+    for (String database : databases) {
+      try (Connection connection = DriverManager.getConnection(createUrl(database))) {
+        connection.createStatement().execute(INSERT1);
+      }
+    }
+
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(databases.size(), requests.size());
+    for (int i = 0; i < requests.size(); i++) {
+      assertEquals(databases.get(i), SessionName.parse(requests.get(i).getSession()).getDatabase());
+    }
   }
 
   @Test
   public void testTwoInserts() throws SQLException {
-    String sql = "insert into foo values (1); insert into foo values (2);";
-
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
       connection.createStatement().execute(String.format("%s; %s", INSERT1, INSERT2));
     }
 

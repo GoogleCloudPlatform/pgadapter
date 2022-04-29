@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -100,7 +101,7 @@ func TestQueryWithParameter(connString string) *C.char {
 }
 
 //export TestQueryAllDataTypes
-func TestQueryAllDataTypes(connString string, binary bool) *C.char {
+func TestQueryAllDataTypes(connString string) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -113,7 +114,7 @@ func TestQueryAllDataTypes(connString string, binary bool) *C.char {
 	var byteaValue []byte
 	var float8Value float64
 	var intValue int
-	var numericValue pgtype.Numeric // pgx default maps numeric to string
+	var numericValue pgtype.Numeric // pgx by default maps numeric to string
 	var timestamptzValue time.Time
 	var dateValue time.Time
 	var varcharValue string
@@ -157,9 +158,10 @@ func TestQueryAllDataTypes(connString string, binary bool) *C.char {
 	if g, w := dateValue, wantDateValue; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
-	// Text mode truncates the value to microseconds. Binary mode preserves nano precision.
+	// Encoding the timestamp values as a parameter will truncate it to microsecond precision.
 	wantTimestamptzValue, _ := time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456+00:00")
-	if binary {
+	if strings.Contains(connString, "prefer_simple_protocol=true") {
+		// Simple protocol writes the timestamp as a string and preserves nanosecond precision.
 		wantTimestamptzValue, _ = time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456789+00:00")
 	}
 	if g, w := timestamptzValue.UTC().String(), wantTimestamptzValue.UTC().String(); g != w {
@@ -173,26 +175,13 @@ func TestQueryAllDataTypes(connString string, binary bool) *C.char {
 }
 
 //export TestInsertAllDataTypes
-func TestInsertAllDataTypes(connString string, floatAndNumericSupported bool) *C.char {
+func TestInsertAllDataTypes(connString string) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
 		return C.CString(err.Error())
 	}
 	defer conn.Close(ctx)
-
-	// There is no data type registered by default for NUMERIC in pgx, as there is no native
-	// decimal/numeric data in Go. We therefore need to register the default that we want to use.
-	if dt, ok := conn.ConnInfo().DataTypeForOID(pgtype.NumericOID); ok {
-		conn.ConnInfo().RegisterDefaultPgType(pgtype.Numeric{}, dt.Name)
-	} else {
-		return C.CString("could not register default type for numeric")
-	}
-	if dt, ok := conn.ConnInfo().DataTypeForOID(pgtype.DateOID); ok {
-		conn.ConnInfo().RegisterDefaultPgType(pgtype.Date{}, dt.Name)
-	} else {
-		return C.CString("could not register default type for date")
-	}
 
 	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8)"
 	numeric := pgtype.Numeric{}
@@ -201,14 +190,12 @@ func TestInsertAllDataTypes(connString string, floatAndNumericSupported bool) *C
 	var tag pgconn.CommandTag
 	date := pgtype.Date{}
 	_ = date.Set("2022-04-02")
-	// TODO: Remove when we have full support for DescribeStatement. Currently, PGAdapter
-	// automatically 'recognizes' bytea and bool parameters that are sent as unspecified. Numeric
-	// and float types are not recognized, as it is impossible to distinguish between them based
-	// only on text.
-	if floatAndNumericSupported {
-		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, numeric, timestamptz, date, "test_string")
+	if strings.Contains(connString, "prefer_simple_protocol=true") {
+		// Simple mode will format the date as '2022-04-02 00:00:00Z', which is not supported by the
+		// backend yet.
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, numeric, timestamptz, "2022-04-02", "test_string")
 	} else {
-		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), nil, nil, timestamptz, date, "test_string")
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, numeric, timestamptz, date, "test_string")
 	}
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
@@ -243,6 +230,105 @@ func TestInsertNullsAllDataTypes(connString string) *C.char {
 	}
 	if g, w := tag.RowsAffected(), int64(1); g != w {
 		return C.CString(fmt.Sprintf("rows affected mismatch:\n Got: %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
+//export TestPrepareStatement
+func TestPrepareStatement(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	sql := "UPDATE all_types SET col_int=$1, col_bool=$2, col_bytea=$3, col_float8=$4, " +
+		"col_numeric=$5, col_timestamptz=$6, col_date=$7, col_varchar=$8 WHERE col_bigint=$9"
+	sd, err := conn.Prepare(ctx, "update_all_types", sql)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	if g, w := len(sd.ParamOIDs), 9; g != w {
+		return C.CString(fmt.Sprintf("param type count mismatch:\n Got: %v\nWant: %v", g, w))
+	}
+	wantParamTypes := []int{
+		pgtype.Int8OID,
+		pgtype.BoolOID,
+		pgtype.ByteaOID,
+		pgtype.Float8OID,
+		pgtype.NumericOID,
+		pgtype.TimestamptzOID,
+		pgtype.DateOID,
+		pgtype.VarcharOID,
+		pgtype.Int8OID,
+	}
+	for i, tp := range wantParamTypes {
+		if g, w := sd.ParamOIDs[i], uint32(tp); g != w {
+			return C.CString(fmt.Sprintf("param type mismatch for param[%v]:\n Got: %v\nWant: %v", i, g, w))
+		}
+	}
+	if g, w := len(sd.Fields), 0; g != w {
+		return C.CString(fmt.Sprintf("field count mismatch:\n Got: %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
+//export TestPrepareSelectStatement
+func TestPrepareSelectStatement(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	sql := "SELECT * FROM all_types WHERE col_int=$1 AND col_bool=$2 AND col_bytea=$3 AND col_float8=$4 AND " +
+		"col_numeric=$5 AND col_timestamptz=$6 AND col_date=$7 AND col_varchar=$8 AND col_bigint=$9"
+	sd, err := conn.Prepare(ctx, "update_all_types", sql)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	wantParamTypes := []int{
+		pgtype.Int8OID,
+		pgtype.BoolOID,
+		pgtype.ByteaOID,
+		pgtype.Float8OID,
+		pgtype.NumericOID,
+		pgtype.TimestamptzOID,
+		pgtype.DateOID,
+		pgtype.VarcharOID,
+		pgtype.Int8OID,
+	}
+	if g, w := len(sd.ParamOIDs), len(wantParamTypes); g != w {
+		return C.CString(fmt.Sprintf("param type count mismatch:\n Got: %v\nWant: %v", g, w))
+	}
+	for i, tp := range wantParamTypes {
+		if g, w := sd.ParamOIDs[i], uint32(tp); g != w {
+			return C.CString(fmt.Sprintf("param type mismatch for param[%v]:\n Got: %v\nWant: %v", i, g, w))
+		}
+	}
+
+	wantFieldTypes := []int{
+		pgtype.Int8OID,
+		pgtype.BoolOID,
+		pgtype.ByteaOID,
+		pgtype.Float8OID,
+		pgtype.Int8OID,
+		pgtype.NumericOID,
+		pgtype.TimestamptzOID,
+		pgtype.DateOID,
+		pgtype.VarcharOID,
+	}
+	if g, w := len(sd.Fields), len(wantFieldTypes); g != w {
+		return C.CString(fmt.Sprintf("field count mismatch:\n Got: %v\nWant: %v", g, w))
+	}
+	for i, tp := range wantParamTypes {
+		if g, w := sd.ParamOIDs[i], uint32(tp); g != w {
+			return C.CString(fmt.Sprintf("param type mismatch for param[%v]:\n Got: %v\nWant: %v", i, g, w))
+		}
 	}
 
 	return nil

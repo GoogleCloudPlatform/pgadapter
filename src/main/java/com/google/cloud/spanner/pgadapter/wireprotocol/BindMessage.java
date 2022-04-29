@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
@@ -26,6 +27,7 @@ import java.util.List;
  * with missing data to prepare for execution). A bound prepared statement always yields a portal
  * unless it fails.
  */
+@InternalApi
 public class BindMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'B';
@@ -56,7 +58,8 @@ public class BindMessage extends ControlMessage {
   protected void sendPayload() throws Exception {
     this.connection.registerPortal(
         this.portalName,
-        this.statement.bind(this.parameters, this.formatCodes, this.resultFormatCodes));
+        this.statement.bind(
+            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes));
     new BindCompleteResponse(this.outputStream).send();
   }
 

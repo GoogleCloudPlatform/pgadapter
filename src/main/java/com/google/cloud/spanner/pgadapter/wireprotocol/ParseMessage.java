@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
@@ -26,6 +27,7 @@ import com.google.common.collect.ImmutableList;
 import java.text.MessageFormat;
 
 /** Creates a prepared statement. */
+@InternalApi
 public class ParseMessage extends ControlMessage {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
@@ -47,9 +49,7 @@ public class ParseMessage extends ControlMessage {
     }
     this.statement =
         new IntermediatePreparedStatement(
-            connection.getServer().getOptions(),
-            parsedStatement,
-            connection.getSpannerConnection());
+            connection, connection.getServer().getOptions(), name, parsedStatement);
     this.statement.setParameterDataTypes(this.parameterDataTypes);
   }
 

@@ -23,9 +23,9 @@ import java.sql.Types;
  * Parser for values with unspecified type. Any non-null values will be stored as a string, but the
  * SQL type will be reported as {@link Types#OTHER}.
  */
-public class UnspecifiedParser extends Parser<Value> {
+class UnspecifiedParser extends Parser<Value> {
 
-  public UnspecifiedParser(byte[] item, FormatCode formatCode) {
+  UnspecifiedParser(byte[] item, FormatCode formatCode) {
     this.item =
         item == null
             ? null
@@ -33,11 +33,6 @@ public class UnspecifiedParser extends Parser<Value> {
                 com.google.protobuf.Value.newBuilder()
                     .setStringValue(new String(item, StandardCharsets.UTF_8))
                     .build());
-  }
-
-  @Override
-  public int getSqlType() {
-    return Types.OTHER;
   }
 
   @Override

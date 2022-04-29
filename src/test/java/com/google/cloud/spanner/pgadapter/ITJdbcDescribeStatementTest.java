@@ -18,6 +18,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
@@ -29,6 +30,7 @@ import com.google.common.collect.ImmutableList;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.ParameterMetaData;
 import java.sql.PreparedStatement;
@@ -59,13 +61,13 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
     testEnv.setUp();
     database = testEnv.createDatabase(PgAdapterTestEnv.DEFAULT_DATA_MODEL);
-    testEnv.startPGAdapterServer(database.getId(), Collections.emptyList());
+    testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
   }
 
   @AfterClass
   public static void teardown() {
     testEnv.stopPGAdapterServer();
-    // testEnv.cleanUp();
+    testEnv.cleanUp();
   }
 
   @Before
@@ -90,6 +92,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
                 .to(new BigDecimal("3.14"))
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00"))
+                .set("col_date")
+                .to(com.google.cloud.Date.parseDate("2022-04-29"))
                 .set("col_varchar")
                 .to("test")
                 .build()));
@@ -103,7 +107,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   public void testParameterMetaData() throws SQLException {
     for (String sql :
         new String[] {
-          "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar "
+          "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
               + "from all_types "
               + "where col_bigint=? "
               + "and col_bool=? "
@@ -112,10 +116,37 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_int=? "
               + "and col_numeric=? "
               + "and col_timestamptz=? "
+              + "and col_date=? "
               + "and col_varchar=?",
           "insert into all_types "
-              + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar) "
-              + "values (?, ?, ?, ?, ?, ?, ?, ?)",
+              + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+              + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          "insert into all_types "
+              + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+              + "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+              + "from all_types "
+              + "where col_bigint=? "
+              + "and col_bool=? "
+              + "and col_bytea=? "
+              + "and col_float8=? "
+              + "and col_int=? "
+              + "and col_numeric=? "
+              + "and col_timestamptz=? "
+              + "and col_date=? "
+              + "and col_varchar=?",
+          "insert into all_types " + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          "insert into all_types "
+              + "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+              + "from all_types "
+              + "where col_bigint=? "
+              + "and col_bool=? "
+              + "and col_bytea=? "
+              + "and col_float8=? "
+              + "and col_int=? "
+              + "and col_numeric=? "
+              + "and col_timestamptz=? "
+              + "and col_date=? "
+              + "and col_varchar=?",
           "update all_types set col_bigint=?, "
               + "col_bool=?, "
               + "col_bytea=?, "
@@ -123,7 +154,26 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "col_int=?, "
               + "col_numeric=?, "
               + "col_timestamptz=?, "
+              + "col_date=?, "
               + "col_varchar=?",
+          "update all_types set col_bigint=null, "
+              + "col_bool=null, "
+              + "col_bytea=null, "
+              + "col_float8=null, "
+              + "col_int=null, "
+              + "col_numeric=null, "
+              + "col_timestamptz=null, "
+              + "col_date=null, "
+              + "col_varchar=null "
+              + "where col_bigint=? "
+              + "and col_bool=? "
+              + "and col_bytea=? "
+              + "and col_float8=? "
+              + "and col_int=? "
+              + "and col_numeric=? "
+              + "and col_timestamptz=? "
+              + "and col_date=? "
+              + "and col_varchar=?",
           "delete "
               + "from all_types "
               + "where col_bigint=? "
@@ -133,25 +183,77 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_int=? "
               + "and col_numeric=? "
               + "and col_timestamptz=? "
+              + "and col_date=? "
               + "and col_varchar=?"
         }) {
       try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
           ParameterMetaData metadata = statement.getParameterMetaData();
-          assertEquals(8, metadata.getParameterCount());
+          assertEquals(9, metadata.getParameterCount());
           for (int index = 1; index <= metadata.getParameterCount(); index++) {
             assertEquals(ParameterMetaData.parameterModeIn, metadata.getParameterMode(index));
             assertEquals(ParameterMetaData.parameterNullableUnknown, metadata.isNullable(index));
           }
           int index = 0;
-          assertEquals(Types.BIGINT, metadata.getParameterType(++index));
+          assertEquals(sql, Types.BIGINT, metadata.getParameterType(++index));
           assertEquals(Types.BIT, metadata.getParameterType(++index));
           assertEquals(Types.BINARY, metadata.getParameterType(++index));
           assertEquals(Types.DOUBLE, metadata.getParameterType(++index));
           assertEquals(Types.BIGINT, metadata.getParameterType(++index));
           assertEquals(Types.NUMERIC, metadata.getParameterType(++index));
           assertEquals(Types.TIMESTAMP, metadata.getParameterType(++index));
+          assertEquals(Types.DATE, metadata.getParameterType(++index));
           assertEquals(Types.VARCHAR, metadata.getParameterType(++index));
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testDescribeInvalidStatements() throws SQLException {
+    for (String sql :
+        new String[] {
+          "select borked "
+              + "from all_types "
+              + "where col_bigint=? "
+              + "and col_bool=? "
+              + "and col_bytea=? "
+              + "and col_float8=? "
+              + "and col_int=? "
+              + "and col_numeric=? "
+              + "and col_timestamptz=? "
+              + "and col_date=? "
+              + "and col_varchar=?",
+          "insert into all_types "
+              + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, borked) "
+              + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          "update all_types set col_bigint=?, "
+              + "col_bool=?, "
+              + "col_bytea=?, "
+              + "col_float8=?, "
+              + "col_int=?, "
+              + "col_numeric=?, "
+              + "col_timestamptz=?, "
+              + "col_date=?, "
+              + "col_varchar=?, borked='really borked'",
+          "delete "
+              + "from all_types "
+              + "where col_bigint=? "
+              + "and col_bool=? "
+              + "and col_bytea=? "
+              + "and col_float8=? "
+              + "and col_int=? "
+              + "and col_numeric=? "
+              + "and col_timestamptz=? "
+              + "and col_date=? "
+              + "and col_varchar=?"
+              + "and borked='really borked'"
+        }) {
+      try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+          SQLException exception =
+              assertThrows(SQLException.class, statement::getParameterMetaData);
+          assertTrue(exception.getMessage(), exception.getMessage().contains("borked"));
         }
       }
     }
@@ -168,6 +270,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
             "col_int",
             "col_numeric",
             "col_timestamptz",
+            "col_date",
             "col_varchar");
     ImmutableList<Integer> types =
         ImmutableList.of(
@@ -178,6 +281,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
             Types.BIGINT,
             Types.NUMERIC,
             Types.TIMESTAMP,
+            Types.DATE,
             Types.VARCHAR);
     String sql =
         String.format(
@@ -190,13 +294,14 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
                 + "and col_int=? "
                 + "and col_numeric=? "
                 + "and col_timestamptz=? "
+                + "and col_date=? "
                 + "and col_varchar=?",
             String.join(", ", columnNames));
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
         ResultSetMetaData metadata = statement.getMetaData();
-        assertEquals(8, metadata.getColumnCount());
+        assertEquals(9, metadata.getColumnCount());
         for (int index = 1; index <= metadata.getColumnCount(); index++) {
           assertEquals(types.get(index - 1).intValue(), metadata.getColumnType(index));
           assertEquals(ResultSetMetaData.columnNullableUnknown, metadata.isNullable(index));
@@ -209,7 +314,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   @Test
   public void testSelectWithParameters() throws SQLException {
     String sql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
@@ -218,6 +323,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
             + "and col_int=? "
             + "and col_numeric=? "
             + "and col_timestamptz=? "
+            + "and col_date=? "
             + "and col_varchar=?";
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
@@ -235,21 +341,24 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setBigDecimal(++index, new BigDecimal("3.14"));
         statement.setTimestamp(
             ++index, Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00").toSqlTimestamp());
+        statement.setDate(++index, Date.valueOf("2022-04-29"));
         statement.setString(++index, "test");
 
         try (ResultSet resultSet = statement.executeQuery()) {
           assertTrue(resultSet.next());
 
-          assertEquals(1, resultSet.getLong(1));
-          assertTrue(resultSet.getBoolean(2));
-          assertArrayEquals("test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(3));
-          assertEquals(3.14d, resultSet.getDouble(4), 0.0d);
-          assertEquals(1, resultSet.getInt(5));
-          assertEquals(new BigDecimal("3.14"), resultSet.getBigDecimal(6));
+          index = 0;
+          assertEquals(1, resultSet.getLong(++index));
+          assertTrue(resultSet.getBoolean(++index));
+          assertArrayEquals("test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(++index));
+          assertEquals(3.14d, resultSet.getDouble(++index), 0.0d);
+          assertEquals(1, resultSet.getInt(++index));
+          assertEquals(new BigDecimal("3.14"), resultSet.getBigDecimal(++index));
           assertEquals(
               Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00").toSqlTimestamp(),
-              resultSet.getTimestamp(7));
-          assertEquals("test", resultSet.getString(8));
+              resultSet.getTimestamp(++index));
+          assertEquals(Date.valueOf("2022-04-29"), resultSet.getDate(++index));
+          assertEquals("test", resultSet.getString(++index));
 
           assertFalse(resultSet.next());
         }
@@ -263,8 +372,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         // This forces the PG JDBC driver to use binary transfer mode for the results, and will
         // also cause it to send a DescribeStatement message.
         statement.unwrap(PgStatement.class).setPrepareThreshold(-1);
@@ -278,6 +387,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
         statement.setTimestamp(
             ++index, Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp());
+        statement.setDate(++index, Date.valueOf("2022-04-29"));
         statement.setString(++index, "string_test");
 
         assertEquals(1, statement.executeUpdate());
@@ -287,16 +397,19 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
           connection.createStatement().executeQuery("select * from all_types where col_bigint=2")) {
         assertTrue(resultSet.next());
 
-        assertEquals(2, resultSet.getLong(1));
-        assertTrue(resultSet.getBoolean(2));
-        assertArrayEquals("bytes_test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(3));
-        assertEquals(10.1d, resultSet.getDouble(4), 0.0d);
-        assertEquals(100, resultSet.getInt(5));
-        assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(6));
+        int index = 0;
+        assertEquals(2, resultSet.getLong(++index));
+        assertTrue(resultSet.getBoolean(++index));
+        assertArrayEquals(
+            "bytes_test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(++index));
+        assertEquals(10.1d, resultSet.getDouble(++index), 0.0d);
+        assertEquals(100, resultSet.getInt(++index));
+        assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(++index));
         assertEquals(
             Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp(),
-            resultSet.getTimestamp(7));
-        assertEquals("string_test", resultSet.getString(8));
+            resultSet.getTimestamp(++index));
+        assertEquals(Date.valueOf("2022-04-29"), resultSet.getDate(++index));
+        assertEquals("string_test", resultSet.getString(++index));
 
         assertFalse(resultSet.next());
       }
@@ -313,6 +426,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
             + "col_int=?, "
             + "col_numeric=?, "
             + "col_timestamptz=?, "
+            + "col_date=?, "
             + "col_varchar=? "
             + "where col_bigint=?";
 
@@ -333,6 +447,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setTimestamp(
             ++index,
             Timestamp.parseTimestamp("2022-02-11T14:04:59.123456789+01:00").toSqlTimestamp());
+        statement.setDate(++index, Date.valueOf("2000-02-29"));
         statement.setString(++index, "updated");
         statement.setLong(++index, 1);
 
@@ -343,18 +458,20 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
           connection.createStatement().executeQuery("select * from all_types where col_bigint=1")) {
         assertTrue(resultSet.next());
 
-        assertEquals(1, resultSet.getLong(1));
-        assertFalse(resultSet.getBoolean(2));
-        assertArrayEquals("updated".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(3));
-        assertEquals(3.14d * 2d, resultSet.getDouble(4), 0.0d);
-        assertEquals(2, resultSet.getInt(5));
-        assertEquals(new BigDecimal("10.0"), resultSet.getBigDecimal(6));
+        int index = 0;
+        assertEquals(1, resultSet.getLong(++index));
+        assertFalse(resultSet.getBoolean(++index));
+        assertArrayEquals("updated".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(++index));
+        assertEquals(3.14d * 2d, resultSet.getDouble(++index), 0.0d);
+        assertEquals(2, resultSet.getInt(++index));
+        assertEquals(new BigDecimal("10.0"), resultSet.getBigDecimal(++index));
         // Note: The JDBC driver already truncated the timestamp value before it was sent to PG.
         // So here we read back the truncated value.
         assertEquals(
             Timestamp.parseTimestamp("2022-02-11T14:04:59.123457+01:00").toSqlTimestamp(),
-            resultSet.getTimestamp(7));
-        assertEquals("updated", resultSet.getString(8));
+            resultSet.getTimestamp(++index));
+        assertEquals(Date.valueOf("2000-02-29"), resultSet.getDate(++index));
+        assertEquals("updated", resultSet.getString(++index));
 
         assertFalse(resultSet.next());
       }
@@ -367,8 +484,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         // This forces the PG JDBC driver to use binary transfer mode for the results, and will
         // also cause it to send a DescribeStatement message.
         statement.unwrap(PgStatement.class).setPrepareThreshold(-1);
@@ -381,6 +498,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setNull(++index, Types.INTEGER);
         statement.setNull(++index, Types.NUMERIC);
         statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
+        statement.setNull(++index, Types.DATE);
         statement.setNull(++index, Types.VARCHAR);
 
         assertEquals(1, statement.executeUpdate());
@@ -406,6 +524,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertNull(resultSet.getBigDecimal(++index));
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getTimestamp(++index));
+        assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getDate(++index));
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getString(++index));
         assertTrue(resultSet.wasNull());

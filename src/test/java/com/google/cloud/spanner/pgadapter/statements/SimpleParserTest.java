@@ -103,85 +103,72 @@ public class SimpleParserTest {
 
   @Test
   public void testParseExpressionList() {
-    assertEquals(
-        Arrays.asList("foo", "bar"), new SimpleParser("foo, bar").parseExpressionListUntil());
-    assertEquals(
-        Collections.singletonList("foo"), new SimpleParser("foo").parseExpressionListUntil());
+    assertEquals(Arrays.asList("foo", "bar"), new SimpleParser("foo, bar").parseExpressionList());
+    assertEquals(Collections.singletonList("foo"), new SimpleParser("foo").parseExpressionList());
     assertEquals(
         Collections.singletonList("\"foo\" bar"),
-        new SimpleParser("\"foo\" bar").parseExpressionListUntil());
+        new SimpleParser("\"foo\" bar").parseExpressionList());
     assertEquals(
-        Collections.singletonList("\"foo\""),
-        new SimpleParser("\"foo\"").parseExpressionListUntil());
+        Collections.singletonList("\"foo\""), new SimpleParser("\"foo\"").parseExpressionList());
     assertEquals(
-        Collections.singletonList("foo bar"),
-        new SimpleParser(" foo bar").parseExpressionListUntil());
-    assertEquals(
-        Collections.singletonList("foo"), new SimpleParser("\tfoo").parseExpressionListUntil());
+        Collections.singletonList("foo bar"), new SimpleParser(" foo bar").parseExpressionList());
+    assertEquals(Collections.singletonList("foo"), new SimpleParser("\tfoo").parseExpressionList());
     assertEquals(
         Collections.singletonList("\"foo\" bar"),
-        new SimpleParser("\n\"foo\" bar").parseExpressionListUntil());
+        new SimpleParser("\n\"foo\" bar").parseExpressionList());
     assertEquals(
         Collections.singletonList("\"foo\""),
-        new SimpleParser("    \"foo\"").parseExpressionListUntil());
+        new SimpleParser("    \"foo\"").parseExpressionList());
 
     assertEquals(
-        Collections.singletonList("foo(bar)"),
-        new SimpleParser("foo(bar)").parseExpressionListUntil());
-    assertEquals(
-        Arrays.asList("foo", "bar"), new SimpleParser("foo, bar)").parseExpressionListUntil());
+        Collections.singletonList("foo(bar)"), new SimpleParser("foo(bar)").parseExpressionList());
+    assertEquals(Arrays.asList("foo", "bar"), new SimpleParser("foo, bar)").parseExpressionList());
     assertEquals(
         Arrays.asList("\"foo,bar\"", "bar"),
-        new SimpleParser("\"foo,bar\", bar").parseExpressionListUntil());
+        new SimpleParser("\"foo,bar\", bar").parseExpressionList());
     assertEquals(
-        Collections.singletonList("\"foo\""),
-        new SimpleParser("\"foo\"").parseExpressionListUntil());
+        Collections.singletonList("\"foo\""), new SimpleParser("\"foo\"").parseExpressionList());
     assertEquals(
-        Collections.singletonList("foo bar"),
-        new SimpleParser(" foo bar").parseExpressionListUntil());
-    assertEquals(
-        Collections.singletonList("foo"), new SimpleParser("\tfoo").parseExpressionListUntil());
+        Collections.singletonList("foo bar"), new SimpleParser(" foo bar").parseExpressionList());
+    assertEquals(Collections.singletonList("foo"), new SimpleParser("\tfoo").parseExpressionList());
     assertEquals(
         Collections.singletonList("\"foo\" bar"),
-        new SimpleParser("\n\"foo\" bar").parseExpressionListUntil());
+        new SimpleParser("\n\"foo\" bar").parseExpressionList());
     assertEquals(
         Collections.singletonList("\"foo\n\""),
-        new SimpleParser("    \"foo\n\"").parseExpressionListUntil());
+        new SimpleParser("    \"foo\n\"").parseExpressionList());
     assertEquals(
         Collections.singletonList("foo(bar, test)"),
-        new SimpleParser("foo(bar, test)").parseExpressionListUntil());
+        new SimpleParser("foo(bar, test)").parseExpressionList());
     assertEquals(
         Collections.singletonList("(foo(bar, test))"),
-        new SimpleParser("(foo(bar, test))  ").parseExpressionListUntil());
+        new SimpleParser("(foo(bar, test))  ").parseExpressionList());
     assertEquals(
         Arrays.asList("(foo(bar, test))", "bar"),
-        new SimpleParser("  (foo(bar, test)),bar").parseExpressionListUntil());
+        new SimpleParser("  (foo(bar, test)),bar").parseExpressionList());
     assertEquals(
         Arrays.asList("(foo(bar, test))", "bar"),
-        new SimpleParser("  (foo(bar, test)),bar").parseExpressionListUntil());
+        new SimpleParser("  (foo(bar, test)),bar").parseExpressionList());
     assertEquals(
         Arrays.asList("(foo('bar, test'))", "bar"),
-        new SimpleParser("  (foo('bar, test')),bar").parseExpressionListUntil());
+        new SimpleParser("  (foo('bar, test')),bar").parseExpressionList());
     assertEquals(
         Arrays.asList("(foo('bar\", test'))", "bar"),
-        new SimpleParser("  (foo('bar\", test')),bar").parseExpressionListUntil());
+        new SimpleParser("  (foo('bar\", test')),bar").parseExpressionList());
     assertEquals(
         Arrays.asList("(foo('bar\\', test'))", "bar"),
-        new SimpleParser("  (foo('bar\\', test')),bar").parseExpressionListUntil());
+        new SimpleParser("  (foo('bar\\', test')),bar").parseExpressionList());
+    assertEquals(Collections.singletonList("''"), new SimpleParser("''").parseExpressionList());
     assertEquals(
-        Collections.singletonList("''"), new SimpleParser("''").parseExpressionListUntil());
-    assertEquals(
-        Collections.singletonList("'\\''"), new SimpleParser("'\\''").parseExpressionListUntil());
-    assertEquals(
-        Collections.singletonList("'\"'"), new SimpleParser("'\"'").parseExpressionListUntil());
+        Collections.singletonList("'\\''"), new SimpleParser("'\\''").parseExpressionList());
+    assertEquals(Collections.singletonList("'\"'"), new SimpleParser("'\"'").parseExpressionList());
 
-    assertNull(new SimpleParser("\"foo").parseExpressionListUntil());
-    assertNull(new SimpleParser("foo(").parseExpressionListUntil());
+    assertNull(new SimpleParser("\"foo").parseExpressionList());
+    assertNull(new SimpleParser("foo(").parseExpressionList());
     assertEquals(
         Collections.singletonList("foo(bar, test)"),
-        new SimpleParser("foo(bar, test)) bar").parseExpressionListUntil());
-    assertNull(new SimpleParser("foo((bar, test) bar").parseExpressionListUntil());
-    assertEquals(
-        Collections.singletonList("foo"), new SimpleParser("foo)(").parseExpressionListUntil());
+        new SimpleParser("foo(bar, test)) bar").parseExpressionList());
+    assertNull(new SimpleParser("foo((bar, test) bar").parseExpressionList());
+    assertEquals(Collections.singletonList("foo"), new SimpleParser("foo)(").parseExpressionList());
   }
 }

@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 
 /** Utility class for converting between generic PostgreSQL conversions. */
 public class Converter {
+  private Converter() {}
   /**
    * Return the data of the specified column of the {@link ResultSet} as a byte array. The column
    * may not contain a null value.
@@ -30,7 +31,7 @@ public class Converter {
    * @param format The {@link DataFormat} format to use to encode the data.
    * @return a byte array containing the data in the specified format.
    */
-  public byte[] parseData(ResultSet result, int columnarIndex, DataFormat format) {
+  public static byte[] parseData(ResultSet result, int columnarIndex, DataFormat format) {
     Preconditions.checkArgument(
         !result.isNull(columnarIndex), "Column may not contain a null value");
     Parser<?> parser = Parser.create(result, result.getColumnType(columnarIndex), columnarIndex);

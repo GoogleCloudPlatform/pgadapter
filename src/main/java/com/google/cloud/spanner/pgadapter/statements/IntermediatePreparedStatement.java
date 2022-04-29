@@ -14,39 +14,54 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.AbortedException;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.TransactionContext;
+import com.google.cloud.spanner.TransactionManager;
+import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSortedSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.postgresql.core.Oid;
 
 /**
  * Intermediate representation for prepared statements (i.e.: statements before they become portals)
  */
+@InternalApi
 public class IntermediatePreparedStatement extends IntermediateStatement {
-
+  private final String name;
   protected int[] parameterDataTypes;
   protected Statement statement;
 
   public IntermediatePreparedStatement(
-      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
-    super(options, parsedStatement, connection);
+      ConnectionHandler connectionHandler,
+      OptionsMetadata options,
+      String name,
+      ParsedStatement parsedStatement) {
+    super(connectionHandler, options, parsedStatement);
+    this.name = name;
     this.parameterDataTypes = null;
   }
 
@@ -81,8 +96,18 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     // don't need to do that once more.
     if (getStatementResult(0) == null) {
       try {
-        StatementResult result = connection.execute(this.statement);
-        this.updateResultCount(0, result);
+        if (!connection.isInTransaction()
+            // TODO(230579451): Refactor to use ClientSideStatement information.
+            && this.parsedStatement.getType().equals(StatementType.CLIENT_SIDE)
+            && (this.commands.get(0).equals("ROLLBACK") || this.commands.get(0).equals("COMMIT"))) {
+          // TODO(230579929): Return warning that no transaction if connection status == IDLE.
+          connectionHandler.setStatus(ConnectionStatus.IDLE);
+        } else {
+          StatementResult result = connection.execute(this.statement);
+          this.updateResultCount(0, result);
+          connectionHandler.setStatus(
+              connection.isInTransaction() ? ConnectionStatus.TRANSACTION : ConnectionStatus.IDLE);
+        }
       } catch (SpannerException e) {
         handleExecutionException(0, e);
       }
@@ -99,9 +124,13 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * @return An Intermediate Portal Statement (or rather a bound version of this statement)
    */
   public IntermediatePortalStatement bind(
-      byte[][] parameters, List<Short> parameterFormatCodes, List<Short> resultFormatCodes) {
+      String name,
+      byte[][] parameters,
+      List<Short> parameterFormatCodes,
+      List<Short> resultFormatCodes) {
     IntermediatePortalStatement portal =
-        new IntermediatePortalStatement(this.options, this.parsedStatement, this.connection);
+        new IntermediatePortalStatement(
+            this.connectionHandler, this.options, name, this.parsedStatement);
     portal.setParameterFormatCodes(parameterFormatCodes);
     portal.setResultFormatCodes(resultFormatCodes);
     Statement.Builder builder = Statement.newBuilder(this.parsedStatement.getSqlWithoutComments());
@@ -123,15 +152,14 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
         ImmutableSortedSet.<String>orderedBy(Comparator.comparing(o -> o.substring(1)))
             .addAll(PARSER.getQueryParameters(this.parsedStatement.getSqlWithoutComments()))
             .build();
-    int[] paramTypes;
+    boolean describeFailed = false;
     if (parameters.isEmpty()) {
-      paramTypes = new int[0];
-    } else if (parameters.size() == this.parameterDataTypes.length
-        && Arrays.stream(this.parameterDataTypes).noneMatch(p -> p == 0)) {
+      ensureParameterLength(0);
+    } else if (parameters.size() != this.parameterDataTypes.length
+        || Arrays.stream(this.parameterDataTypes).anyMatch(p -> p == 0)) {
       // Note: We are only asking the backend to parse the types if there is at least one parameter
       // with unspecified type. Otherwise, we will rely on the types given in PARSE.
-      paramTypes = this.parameterDataTypes;
-    } else {
+
       // Transform the statement into a select statement that selects the parameters, and then
       // extract the types from the result set metadata.
       Statement selectParamsStatement = transformToSelectParams(parameters);
@@ -139,24 +167,54 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
         // The transformation failed. Just rely on the types given in the PARSE message. If the
         // transformation failed because the statement was malformed, the backend will catch that at
         // a later stage.
-        paramTypes = getParameterTypes();
+        describeFailed = true;
+        ensureParameterLength(parameters.size());
       } else {
         try (ResultSet paramsResultSet =
             connection.analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)) {
-          paramTypes = getParameterTypes(paramsResultSet);
+          extractParameterTypes(paramsResultSet);
         } catch (SpannerException exception) {
-          // Ignore this and rely on the types given in PARSE.
-          paramTypes = getParameterTypes();
+          // Ignore here and rely on the types given in PARSE.
+          describeFailed = true;
+          ensureParameterLength(parameters.size());
         }
       }
     }
     if (this.parsedStatement.isQuery()) {
       Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
       try (ResultSet columnsResultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN)) {
-        return new DescribeStatementMetadata(paramTypes, columnsResultSet);
+        return new DescribeStatementMetadata(this.parameterDataTypes, columnsResultSet);
       }
     }
-    return new DescribeStatementMetadata(paramTypes, null);
+    if (describeFailed || !Strings.isNullOrEmpty(this.name)) {
+      // Let the backend analyze the statement if it is a named prepared statement or if the query
+      // that was used to determine the parameter types failed, so we can return a reasonable error
+      // message if the statement is invalid. If it is the unnamed statement or getting the param
+      // types succeeded, we will let the following EXECUTE message handle that, instead of sending
+      // the statement twice to the backend.
+      try (TransactionManager transactionManager =
+          connection.getDatabaseClient().transactionManager()) {
+        TransactionContext context = transactionManager.begin();
+        for (int attempts = 0; attempts < 100; attempts++) {
+          try {
+            try (ResultSet resultSet =
+                context.analyzeQuery(
+                    Statement.of(this.parsedStatement.getSqlWithoutComments()),
+                    QueryAnalyzeMode.PLAN)) {
+              // TODO(230839170): Replace with a call to connection.analyzeQuery(...) once the
+              //                  Connection API supports planning DML statements.
+              // The call to resultSet.next() is a requirement from the client library.
+              resultSet.next();
+            }
+            transactionManager.rollback();
+            break;
+          } catch (AbortedException e) {
+            context = transactionManager.resetForRetry();
+          }
+        }
+      }
+    }
+    return new DescribeStatementMetadata(this.parameterDataTypes, null);
   }
 
   @VisibleForTesting
@@ -185,7 +243,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     switch (getCommand(0)) {
       case "INSERT":
         return transformInsertToSelectParams(
-            this.parsedStatement.getSqlWithoutComments(), parameters);
+            this.connection, this.parsedStatement.getSqlWithoutComments(), parameters);
       case "UPDATE":
         return transformUpdateToSelectParams(
             this.parsedStatement.getSqlWithoutComments(), parameters);
@@ -198,7 +256,8 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   }
 
   @VisibleForTesting
-  static @Nullable Statement transformInsertToSelectParams(String sql, Set<String> parameters) {
+  static @Nullable Statement transformInsertToSelectParams(
+      Connection connection, String sql, Set<String> parameters) {
     SimpleParser parser = new SimpleParser(sql);
     if (!parser.eat("insert")) {
       return null;
@@ -209,6 +268,16 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       return null;
     }
     parser.skipWhitespaces();
+
+    List<String> columnsList = null;
+    if (parser.eat("(")) {
+      columnsList = parser.parseExpressionList();
+      if (!parser.eat(")")) {
+        return null;
+      }
+    }
+
+    parser.skipWhitespaces();
     int potentialSelectStart = parser.getPos();
     if (parser.eat("select")) {
       // This is an `insert into <table> [(...)] select ...` statement. Then we can just use the
@@ -217,26 +286,16 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
           String.format(
               "select %s from (%s) p",
               String.join(", ", parameters), parser.getSql().substring(potentialSelectStart)));
-    } else if (!parser.eat("(")) {
+    } else if (!parser.eat("values")) {
       return null;
     }
-    List<String> columnsList = parser.parseExpressionListUntil();
-    if (!parser.eat(")")) {
-      return null;
-    }
-    // We currently only support `insert into <table> (col1, col2, ...) values (val1, val2, ...)`
-    // statements with a columns list. The other option would be to query the information schema to
-    // get the columns of the table, but that would happen in a separate transaction, which would
-    // make the entire operation non-atomic.
+
     if (columnsList == null || columnsList.isEmpty()) {
-      return null;
-    }
-    if (!parser.eat("values")) {
-      return null;
+      columnsList = getAllColumns(connection, table);
     }
     List<List<String>> rows = new ArrayList<>();
     while (parser.eat("(")) {
-      List<String> row = parser.parseExpressionListUntil();
+      List<String> row = parser.parseExpressionList();
       if (row == null || row.isEmpty() || !parser.eat(")") || row.size() != columnsList.size()) {
         return null;
       }
@@ -265,6 +324,16 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     select.append(" from ").append(table).append(") p");
 
     return Statement.of(select.toString());
+  }
+
+  static List<String> getAllColumns(Connection connection, String table) {
+    try (ResultSet resultSet =
+        connection.analyzeQuery(
+            Statement.of("SELECT * FROM \"" + table + "\" LIMIT 1"), QueryAnalyzeMode.PLAN)) {
+      return resultSet.getType().getStructFields().stream()
+          .map(StructField::getName)
+          .collect(Collectors.toList());
+    }
   }
 
   @VisibleForTesting
@@ -323,12 +392,14 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       return null;
     }
 
-    StringBuilder select = new StringBuilder("select ");
-    select.append(String.join(", ", parameters)).append(" from (select 1 from ").append(table);
-    if (whereStart > -1) {
-      select.append(" ").append(sql.substring(whereStart));
-    }
-    select.append(") p");
+    StringBuilder select =
+        new StringBuilder("select ")
+            .append(String.join(", ", parameters))
+            .append(" from (select 1 from ")
+            .append(table)
+            .append(" ")
+            .append(sql.substring(whereStart))
+            .append(") p");
 
     return Statement.of(select.toString());
   }
@@ -338,26 +409,25 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * always returns any parameters that may have been specified in the PARSE message, and
    * OID.Unspecified for all other parameters.
    */
-  private int[] getParameterTypes(ResultSet paramsResultSet) {
-    int[] paramTypes = Arrays.copyOf(this.parameterDataTypes, paramsResultSet.getColumnCount());
+  private void extractParameterTypes(ResultSet paramsResultSet) {
+    ensureParameterLength(paramsResultSet.getColumnCount());
     for (int i = 0; i < paramsResultSet.getColumnCount(); i++) {
-      if (paramTypes[i] == 0) {
-        paramTypes[i] = Parser.toOid(paramsResultSet.getColumnType(i));
+      // Only override parameter types that were not specified by the frontend.
+      if (this.parameterDataTypes[i] == 0) {
+        this.parameterDataTypes[i] = Parser.toOid(paramsResultSet.getColumnType(i));
       }
     }
-    return paramTypes;
   }
 
   /**
-   * Returns the parameter types in the SQL string of this statement based only on the types given
-   * during the PARSE phase + OID.Unspecified for all other parameters.
+   * Enlarges the size of the parameter types of this statement to match the given count. Existing
+   * parameter types are preserved. New parameters are set to OID.Unspecified.
    */
-  private int[] getParameterTypes() {
-    Set<String> parameters =
-        PARSER.getQueryParameters(this.parsedStatement.getSqlWithoutComments());
+  private void ensureParameterLength(int parameterCount) {
     if (this.parameterDataTypes == null) {
-      return new int[parameters.size()];
+      this.parameterDataTypes = new int[parameterCount];
+    } else if (this.parameterDataTypes.length != parameterCount) {
+      this.parameterDataTypes = Arrays.copyOf(this.parameterDataTypes, parameterCount);
     }
-    return Arrays.copyOf(this.parameterDataTypes, parameters.size());
   }
 }

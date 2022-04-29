@@ -74,7 +74,6 @@ public class IntermediateStatementTest {
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.RESULT_SET);
     when(result.getResultSet()).thenReturn(resultSet);
-    when(result.getUpdateCount()).thenThrow(new IllegalStateException());
 
     statement.updateResultCount(0, result);
 
@@ -91,7 +90,6 @@ public class IntermediateStatementTest {
             mock(OptionsMetadata.class), parse("update bar set foo=1"), connectionHandler);
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
-    when(result.getResultSet()).thenThrow(new IllegalStateException());
     when(result.getUpdateCount()).thenReturn(100L);
 
     statement.updateResultCount(0, result);
@@ -111,8 +109,6 @@ public class IntermediateStatementTest {
             connectionHandler);
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.NO_RESULT);
-    when(result.getResultSet()).thenThrow(new IllegalStateException());
-    when(result.getUpdateCount()).thenThrow(new IllegalStateException());
 
     statement.updateResultCount(0, result);
 
@@ -158,6 +154,14 @@ public class IntermediateStatementTest {
     assertEquals(
         "select $1 from (select * from bar where some_col=$1) p",
         transformInsert("insert foo select * from bar where some_col=$1").getSql());
+    assertEquals(
+        "select $1 from (select * from bar where some_col=$1) p",
+        transformInsert("insert into foo (col1, col2) select * from bar where some_col=$1")
+            .getSql());
+    assertEquals(
+        "select $1 from (select * from bar where some_col=$1) p",
+        transformInsert("insert foo (col1, col2, col3) select * from bar where some_col=$1")
+            .getSql());
   }
 
   @Test
@@ -193,6 +197,32 @@ public class IntermediateStatementTest {
     assertEquals(
         "select $1, $2 from (select 1 from foo where id=$1 and bar > $2) p",
         transformDelete("delete foo\nwhere id=$1 and bar > $2").getSql());
+    assertEquals(
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 "
+            + "from (select 1 from all_types "
+            + "where col_bigint=$1 "
+            + "and col_bool=$2 "
+            + "and col_bytea=$3 "
+            + "and col_float8=$4 "
+            + "and col_int=$5 "
+            + "and col_numeric=$6 "
+            + "and col_timestamptz=$7 "
+            + "and col_date=$8 "
+            + "and col_varchar=$9"
+            + ") p",
+        transformDelete(
+                "delete "
+                    + "from all_types "
+                    + "where col_bigint=$1 "
+                    + "and col_bool=$2 "
+                    + "and col_bytea=$3 "
+                    + "and col_float8=$4 "
+                    + "and col_int=$5 "
+                    + "and col_numeric=$6 "
+                    + "and col_timestamptz=$7 "
+                    + "and col_date=$8 "
+                    + "and col_varchar=$9")
+            .getSql());
 
     assertNull(transformDelete("delete from foo"));
     assertNull(transformDelete("dlete from foo where id=$1"));
@@ -204,7 +234,7 @@ public class IntermediateStatementTest {
         ImmutableSortedSet.<String>orderedBy(Comparator.comparing(o -> o.substring(1)))
             .addAll(PARSER.getQueryParameters(sql))
             .build();
-    return transformInsertToSelectParams(sql, parameters);
+    return transformInsertToSelectParams(mock(Connection.class), sql, parameters);
   }
 
   private static Statement transformUpdate(String sql) {

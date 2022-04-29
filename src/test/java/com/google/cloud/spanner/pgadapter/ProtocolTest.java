@@ -664,7 +664,10 @@ public class ProtocolTest {
     assertEquals(expectedFormatCodes, ((BindMessage) message).getResultFormatCodes());
 
     when(intermediatePreparedStatement.bind(
-            ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+            ArgumentMatchers.anyString(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any()))
         .thenReturn(intermediatePortalStatement);
 
     message.send();
@@ -1013,7 +1016,7 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.IDLE);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1042,8 +1045,7 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
-    when(connection.isInTransaction()).thenReturn(true);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.TRANSACTION);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1230,6 +1232,7 @@ public class ProtocolTest {
 
   @Test
   public void testMultipleCopyDataMessages() throws Exception {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
 
     byte[] messageMetadata = {'d'};
@@ -1254,7 +1257,7 @@ public class ProtocolTest {
     when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
     CopyStatement copyStatement =
-        new CopyStatement(options, parse("COPY keyvalue FROM STDIN;"), connection);
+        new CopyStatement(connectionHandler, options, parse("COPY keyvalue FROM STDIN;"));
     copyStatement.execute();
 
     when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
@@ -1358,7 +1361,7 @@ public class ProtocolTest {
 
     CopyStatement copyStatement =
         new CopyStatement(
-            mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"), connection);
+            connectionHandler, mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"));
     copyStatement.execute();
 
     MutationWriter mw = copyStatement.getMutationWriter();
@@ -1379,7 +1382,7 @@ public class ProtocolTest {
 
     CopyStatement copyStatement =
         new CopyStatement(
-            mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"), connection);
+            connectionHandler, mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"));
 
     assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
@@ -1411,7 +1414,7 @@ public class ProtocolTest {
 
     CopyStatement copyStatement =
         new CopyStatement(
-            mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"), connection);
+            connectionHandler, mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"));
 
     assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
@@ -1443,7 +1446,7 @@ public class ProtocolTest {
 
     CopyStatement copyStatement =
         new CopyStatement(
-            mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"), connection);
+            connectionHandler, mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"));
     assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
     assertTrue(copyStatement.isExecuted());
@@ -1484,7 +1487,7 @@ public class ProtocolTest {
     }
 
     CopyStatement copyStatement =
-        new CopyStatement(options, parse("COPY keyvalue FROM STDIN;"), connection);
+        new CopyStatement(connectionHandler, options, parse("COPY keyvalue FROM STDIN;"));
     assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
     assertTrue(copyStatement.isExecuted());
@@ -1604,6 +1607,7 @@ public class ProtocolTest {
     message.send();
 
     DataInputStream outputResult = inputStreamFromOutputStream(result);
+    verify(connectionHandler).connectToSpanner("databasename");
 
     // AuthenticationOkResponse
     assertEquals('R', outputResult.readByte());
@@ -1756,6 +1760,7 @@ public class ProtocolTest {
   }
 
   private void setupQueryInformationSchemaResults() {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     ResultSet spannerType = mock(ResultSet.class);
     when(spannerType.getString("column_name")).thenReturn("key", "value");
     when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");

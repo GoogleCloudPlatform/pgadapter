@@ -108,6 +108,7 @@ public final class PgAdapterTestEnv {
               + "col_int int, "
               + "col_numeric numeric, "
               + "col_timestamptz timestamptz, "
+              + "col_date date, "
               + "col_varchar varchar(100))");
 
   // The project Id. This can be overwritten.
@@ -149,21 +150,25 @@ public final class PgAdapterTestEnv {
     options = createSpannerOptions();
   }
 
-  public void startPGAdapterServer(
+  public void startPGAdapterServer(Iterable<String> additionalPGAdapterOptions) {
+    startPGAdapterServer(null, additionalPGAdapterOptions);
+  }
+
+  public void startPGAdapterServerWithDefaultDatabase(
       DatabaseId databaseId, Iterable<String> additionalPGAdapterOptions) {
+    startPGAdapterServer(databaseId.getDatabase(), additionalPGAdapterOptions);
+  }
+
+  private void startPGAdapterServer(
+      String databaseId, Iterable<String> additionalPGAdapterOptions) {
     if (PG_ADAPTER_ADDRESS == null) {
       String credentials = getCredentials();
       ImmutableList.Builder<String> argsListBuilder =
-          ImmutableList.<String>builder()
-              .add(
-                  "-p",
-                  getProjectId(),
-                  "-i",
-                  getInstanceId(),
-                  "-d",
-                  databaseId.getDatabase(),
-                  "-s",
-                  String.valueOf(0));
+          ImmutableList.<String>builder().add("-p", getProjectId(), "-i", getInstanceId());
+      if (databaseId != null) {
+        argsListBuilder.add("-d", databaseId);
+      }
+      argsListBuilder.add("-s", String.valueOf(0));
       if (getSpannerUrl() != null) {
         String host = getSpannerUrl();
         if (host.startsWith("https://")) {

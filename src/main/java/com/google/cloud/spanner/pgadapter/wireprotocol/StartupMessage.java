@@ -14,7 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.wireoutput.MD5AuthenticationRequest;
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -24,13 +26,14 @@ import java.util.Map;
  * The first (non-encryption, non-admin) message expected in from a client in a connection loop.
  * Here we handle metadata and authentication if any.
  */
+@InternalApi
 public class StartupMessage extends BootstrapMessage {
 
   private static final String USER_KEY = "user";
   public static final int IDENTIFIER = 196608; // First Hextet: 3 (version), Second Hextet: 0
 
   private final boolean authenticate;
-  private Map<String, String> parameters;
+  private final Map<String, String> parameters;
 
   public StartupMessage(ConnectionHandler connection, int length) throws Exception {
     super(connection, length);
@@ -41,11 +44,13 @@ public class StartupMessage extends BootstrapMessage {
   @Override
   protected void sendPayload() throws Exception {
     if (!authenticate) {
+      this.connection.connectToSpanner(this.parameters.get("database"));
       sendStartupMessage(
           this.outputStream,
           this.connection.getConnectionId(),
           this.connection.getSecret(),
           this.connection.getServer().getOptions());
+      this.connection.setStatus(ConnectionStatus.IDLE);
     } else {
       new MD5AuthenticationRequest(this.outputStream, 0).send();
     }

@@ -38,7 +38,7 @@ class SimpleParser {
     return pos;
   }
 
-  List<String> parseExpressionListUntil() {
+  List<String> parseExpressionList() {
     return parseExpressionListUntil(null);
   }
 

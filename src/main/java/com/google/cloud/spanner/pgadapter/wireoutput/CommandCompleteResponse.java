@@ -14,11 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
 
 /** Signals to a client that an issued query is complete. */
+@InternalApi
 public class CommandCompleteResponse extends WireOutput {
 
   private static final int HEADER_LENGTH = 4;

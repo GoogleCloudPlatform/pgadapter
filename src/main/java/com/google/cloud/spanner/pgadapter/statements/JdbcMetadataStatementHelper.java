@@ -35,10 +35,7 @@ class JdbcMetadataStatementHelper {
    */
   static boolean isPotentialJdbcMetadataStatement(String sql) {
     // All JDBC metadata queries that need any replacements reference the pg_catalog schema.
-    if (!sql.contains("pg_catalog.")) {
-      return false;
-    }
-    return true;
+    return sql.contains("pg_catalog.");
   }
 
   static String replaceJdbcMetadataStatement(String sql) {

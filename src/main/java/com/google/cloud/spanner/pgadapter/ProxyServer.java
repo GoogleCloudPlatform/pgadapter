@@ -15,16 +15,14 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.api.core.AbstractApiService;
-import com.google.cloud.spanner.Dialect;
-import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
+import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -36,6 +34,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -53,6 +53,13 @@ public class ProxyServer extends AbstractApiService {
   private ServerSocket serverSocket;
   private int localPort;
 
+  /** The server will keep track of all messages it receives if it started in DEBUG mode. */
+  private static final int MAX_DEBUG_MESSAGES = 100_000;
+
+  private final boolean debugMode;
+  private final ConcurrentLinkedQueue<WireMessage> debugMessages = new ConcurrentLinkedQueue<>();
+  private final AtomicInteger debugMessageCount = new AtomicInteger();
+
   /**
    * Instantiates the ProxyServer from CLI-gathered metadata.
    *
@@ -62,6 +69,7 @@ public class ProxyServer extends AbstractApiService {
     this.options = optionsMetadata;
     this.localPort = optionsMetadata.getProxyPort();
     this.properties = new Properties();
+    this.debugMode = optionsMetadata.isDebugMode();
     addConnectionProperties();
   }
 
@@ -77,6 +85,7 @@ public class ProxyServer extends AbstractApiService {
     this.options = optionsMetadata;
     this.localPort = optionsMetadata.getProxyPort();
     this.properties = properties;
+    this.debugMode = optionsMetadata.isDebugMode();
     addConnectionProperties();
   }
 
@@ -135,17 +144,6 @@ public class ProxyServer extends AbstractApiService {
   public void stopServer() {
     stopAsync();
     awaitTerminated();
-  }
-
-  public void run() {
-    try {
-      runServer();
-    } catch (IOException e) {
-      logger.log(
-          Level.WARNING,
-          e,
-          () -> String.format("Server on port %d stopped by exception: %s", getLocalPort(), e));
-    }
   }
 
   /**
@@ -220,23 +218,8 @@ public class ProxyServer extends AbstractApiService {
    */
   void createConnectionHandler(Socket socket) {
     ConnectionHandler handler = new ConnectionHandler(this, socket);
-    try {
-      // Note: Calling getDialect() will cause a SpannerException if the connection itself is
-      // invalid, for example as a result of the credentials being wrong.
-      if (handler.getSpannerConnection().getDialect() != Dialect.POSTGRESQL) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            String.format(
-                "The database uses dialect %s. Currently PGAdapter only supports connections to PostgreSQL dialect databases. "
-                    + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
-                handler.getSpannerConnection().getDialect()));
-      }
-      register(handler);
-      handler.start();
-    } catch (Exception e) {
-      handler.getSpannerConnection().close();
-      throw e;
-    }
+    register(handler);
+    handler.start();
   }
 
   /**
@@ -261,14 +244,17 @@ public class ProxyServer extends AbstractApiService {
     return this.options;
   }
 
+  /** @return the JDBC connection properties that are used by this server */
   public Properties getProperties() {
-    return this.properties;
+    return (Properties) this.properties.clone();
   }
 
+  /** @return the current number of connections. */
   public int getNumberOfConnections() {
     return this.handlers.size();
   }
 
+  /** @return the local TCP port that this server is using. */
   public int getLocalPort() {
     return localPort;
   }
@@ -276,6 +262,29 @@ public class ProxyServer extends AbstractApiService {
   @Override
   public String toString() {
     return String.format("ProxyServer[port: %d]", getLocalPort());
+  }
+
+  ConcurrentLinkedQueue<WireMessage> getDebugMessages() {
+    return debugMessages;
+  }
+
+  void clearDebugMessages() {
+    synchronized (debugMessages) {
+      debugMessages.clear();
+      debugMessageCount.set(0);
+    }
+  }
+
+  WireMessage recordMessage(WireMessage message) {
+    if (debugMode) {
+      if (debugMessageCount.get() >= MAX_DEBUG_MESSAGES) {
+        throw new IllegalStateException(
+            "Received too many debug messages. Did you turn on DEBUG mode by accident?");
+      }
+      debugMessages.add(message);
+      debugMessageCount.incrementAndGet();
+    }
+    return message;
   }
 
   /**

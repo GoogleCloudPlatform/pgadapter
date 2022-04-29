@@ -29,18 +29,24 @@ public interface PgxTest extends Library {
 
   String TestQueryWithParameter(GoString connString);
 
-  String TestQueryAllDataTypes(GoString connString, boolean binary);
+  String TestQueryAllDataTypes(GoString connString);
 
-  String TestInsertAllDataTypes(GoString connString, boolean floatAndNumericSupported);
+  String TestInsertAllDataTypes(GoString connString);
 
   String TestInsertNullsAllDataTypes(GoString connString);
+
+  String TestPrepareStatement(GoString connString);
+
+  String TestPrepareSelectStatement(GoString connString);
 
   String TestWrongDialect(GoString connString);
 
   static PgxTest compile() throws IOException, InterruptedException {
     // Compile the Go code to ensure that we always have the most recent test code.
     ProcessBuilder builder = new ProcessBuilder();
-    String[] compileCommand = "go build -o pgx_test.so -buildmode=c-shared pgx.go".split(" ");
+    String[] compileCommand =
+        "/home/loite/sdk/go1.17.8/bin/go build -o pgx_test.so -buildmode=c-shared pgx.go"
+            .split(" ");
     builder.command(compileCommand);
     builder.directory(new File("./src/test/golang/pgadapter_pgx_tests"));
     Process process = builder.start();

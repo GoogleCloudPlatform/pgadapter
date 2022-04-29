@@ -14,15 +14,16 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import java.text.MessageFormat;
 
 /**
  * Handles a sync command from the user. JDBC does not require this step, so server-side this is a
  * noop.
  */
+@InternalApi
 public class SyncMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'S';
@@ -33,10 +34,7 @@ public class SyncMessage extends ControlMessage {
 
   @Override
   protected void sendPayload() throws Exception {
-    boolean inTransaction = connection.getSpannerConnection().isInTransaction();
-    new ReadyResponse(
-            this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
-        .send();
+    new ReadyResponse(this.outputStream, connection.getStatus().getReadyResponseStatus()).send();
   }
 
   @Override

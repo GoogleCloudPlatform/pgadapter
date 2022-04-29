@@ -14,8 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.Server;
-import com.google.cloud.spanner.pgadapter.utils.Credentials;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.HashMap;
@@ -57,9 +59,11 @@ public class OptionsMetadata {
   private static final String OPTION_SPANNER_ENDPOINT = "e";
   private static final String OPTION_JDBC_PROPERTIES = "r";
   private static final String OPTION_SERVER_VERSION = "v";
+  private static final String OPTION_DEBUG_MODE = "debug";
 
+  private final CommandLine commandLine;
   private final CommandMetadataParser commandMetadataParser;
-  private final String connectionURL;
+  private final String defaultConnectionUrl;
   private final int proxyPort;
   private final TextFormat textFormat;
   private final boolean binaryFormat;
@@ -70,11 +74,17 @@ public class OptionsMetadata {
   private final JSONObject commandMetadataJSON;
   private final Map<String, String> propertyMap;
   private final String serverVersion;
+  private final boolean debugMode;
 
   public OptionsMetadata(String[] args) {
-    CommandLine commandLine = buildOptions(args);
+    this.commandLine = buildOptions(args);
     this.commandMetadataParser = new CommandMetadataParser();
-    this.connectionURL = buildConnectionURL(commandLine);
+    if (this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
+      this.defaultConnectionUrl =
+          buildConnectionURL(this.commandLine.getOptionValue(OPTION_DATABASE_NAME));
+    } else {
+      this.defaultConnectionUrl = null;
+    }
     this.proxyPort = buildProxyPort(commandLine);
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
@@ -87,10 +97,11 @@ public class OptionsMetadata {
     this.propertyMap = parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
+    this.debugMode = commandLine.hasOption(OPTION_DEBUG_MODE);
   }
 
   public OptionsMetadata(
-      String connectionURL,
+      String defaultConnectionUrl,
       int proxyPort,
       TextFormat textFormat,
       boolean forceBinary,
@@ -98,8 +109,9 @@ public class OptionsMetadata {
       boolean requiresMatcher,
       boolean replaceJdbcMetadataQueries,
       JSONObject commandMetadata) {
+    this.commandLine = null;
     this.commandMetadataParser = new CommandMetadataParser();
-    this.connectionURL = connectionURL;
+    this.defaultConnectionUrl = defaultConnectionUrl;
     this.proxyPort = proxyPort;
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
@@ -110,6 +122,7 @@ public class OptionsMetadata {
     this.propertyMap = new HashMap<>();
     this.disableLocalhostCheck = false;
     this.serverVersion = DEFAULT_SERVER_VERSION;
+    this.debugMode = false;
   }
 
   private Map<String, String> parseProperties(String propertyOptions) {
@@ -146,18 +159,16 @@ public class OptionsMetadata {
    * Get credential file path from either command line or application default. If neither throw
    * error.
    *
-   * @param commandLine The parsed options for CLI
    * @return The absolute path of the credentials file.
    */
-  private String buildCredentialsFile(CommandLine commandLine) {
+  private String buildCredentialsFile() {
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
-      String credentialsPath = Credentials.getApplicationDefaultCredentialsFilePath();
-      if (credentialsPath == null) {
-        throw new IllegalArgumentException(
-            "User must specify a valid credential file, "
-                + "or have application default credentials set-up.");
+      try {
+        // This will throw an IOException if no default credentials are available.
+        GoogleCredentials.getApplicationDefault();
+      } catch (IOException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
       }
-      return credentialsPath;
     }
     return commandLine.getOptionValue(OPTION_CREDENTIALS_FILE);
   }
@@ -165,10 +176,10 @@ public class OptionsMetadata {
   /**
    * Takes user inputs and builds a JDBC connection string from them.
    *
-   * @param commandLine The parsed options for CLI
    * @return The parsed JDBC connection string.
    */
-  private String buildConnectionURL(CommandLine commandLine) {
+  public String buildConnectionURL(String database) {
+    Preconditions.checkNotNull(database);
     String host = commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT, "");
     String jdbcEndpoint;
     if (host.isEmpty()) {
@@ -194,10 +205,10 @@ public class OptionsMetadata {
                 + ";userAgent=%s",
             commandLine.getOptionValue(OPTION_PROJECT_ID),
             commandLine.getOptionValue(OPTION_INSTANCE_ID),
-            commandLine.getOptionValue(OPTION_DATABASE_NAME),
+            database,
             DEFAULT_USER_AGENT);
 
-    String credentials = buildCredentialsFile(commandLine);
+    String credentials = buildCredentialsFile();
     if (!Strings.isNullOrEmpty(credentials)) {
       url = String.format("%s;credentials=%s", url, credentials);
     }
@@ -266,11 +277,15 @@ public class OptionsMetadata {
         "instance",
         true,
         "The id of the Spanner instance within the GCP project.");
-    options.addRequiredOption(
+    options.addOption(
         OPTION_DATABASE_NAME,
         "database",
         true,
-        "The name of the Spanner database within the GCP project.");
+        "The default Spanner database within the GCP project to use. "
+            + "If specified, PGAdapter will always connect to this database. "
+            + "Any database name in the connection request from the client will be ignored. "
+            + "Omit this option to be able to connect to different databases using a single "
+            + "PGAdapter instance.");
     options.addOption(
         OPTION_CREDENTIALS_FILE,
         "credentials-file",
@@ -348,6 +363,12 @@ public class OptionsMetadata {
         "This option specifies what server_version PG Adapter should claim to be. If not specified "
             + " it will default to version "
             + DEFAULT_SERVER_VERSION);
+    options.addOption(
+        OPTION_DEBUG_MODE,
+        "debug-mode",
+        false,
+        "-- ONLY USE FOR DEBUGGING -- This option only intended for debugging. It will "
+            + "instruct the server to keep track of all messages it receives.");
 
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
@@ -368,12 +389,40 @@ public class OptionsMetadata {
     return this.binaryFormat;
   }
 
+  public boolean isDebugMode() {
+    return this.debugMode;
+  }
+
   public JSONObject getCommandMetadataJSON() {
     return this.commandMetadataJSON;
   }
 
+  /**
+   * @deprecated use {@link #getDefaultConnectionUrl()}
+   * @return the default connection URL that is used by the server.
+   */
+  @Deprecated
   public String getConnectionURL() {
-    return this.connectionURL;
+    return this.defaultConnectionUrl;
+  }
+
+  /**
+   * @return true if the server uses a default connection URL and ignores the database in a
+   *     connection request
+   */
+  public boolean hasDefaultConnectionUrl() {
+    return this.defaultConnectionUrl != null;
+  }
+
+  /**
+   * Returns the default connection URL that is used by the server. If a default connection URL has
+   * been set, the database parameter in a connection request will be ignored, and the database in
+   * this connection URL will be used instead.
+   *
+   * @return the default connection URL that is used by the server.
+   */
+  public String getDefaultConnectionUrl() {
+    return defaultConnectionUrl;
   }
 
   public int getProxyPort() {
