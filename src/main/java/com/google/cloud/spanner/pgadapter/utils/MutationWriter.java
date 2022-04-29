@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.utils;
 
 import com.google.api.core.ApiFuture;
 import com.google.api.core.ApiFutures;
+import com.google.api.core.InternalApi;
 import com.google.api.core.SettableApiFuture;
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -68,6 +69,7 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.postgresql.jdbc.TimestampUtils;
 
+@InternalApi
 public class MutationWriter implements Callable<Long>, Closeable {
   public enum CopyTransactionMode {
     /**

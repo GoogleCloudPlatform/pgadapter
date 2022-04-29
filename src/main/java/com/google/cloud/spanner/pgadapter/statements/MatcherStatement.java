@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
@@ -26,6 +27,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
  * penalty by running matchers to determine whether they belong to a specific meta-command. If
  * matches, translates the command into something Spanner can handle.
  */
+@InternalApi
 public class MatcherStatement extends IntermediateStatement {
 
   public MatcherStatement(

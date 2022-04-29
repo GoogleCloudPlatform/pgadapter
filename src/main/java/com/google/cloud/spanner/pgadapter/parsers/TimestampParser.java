@@ -19,7 +19,6 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
-import java.sql.Types;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
@@ -28,11 +27,10 @@ import java.util.regex.Pattern;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to timestamp. */
-public class TimestampParser extends Parser<Timestamp> {
+class TimestampParser extends Parser<Timestamp> {
 
-  public static final int MILLISECONDS_IN_SECOND = 1000;
-  public static final int MICROSECONDS_IN_SECOND = 1000000;
-  public static final long NANOSECONDS_IN_MICROSECONDS = 1000L;
+  private static final int MICROSECONDS_IN_SECOND = 1000000;
+  private static final long NANOSECONDS_IN_MICROSECONDS = 1000L;
   private static final char TIMESTAMP_SEPARATOR = 'T';
   private static final char EMPTY_SPACE = ' ';
   private static final String ZERO_TIMEZONE = "Z";
@@ -56,15 +54,15 @@ public class TimestampParser extends Parser<Timestamp> {
           .appendOffset("+HH:mm", "Z")
           .toFormatter();
 
-  public TimestampParser(ResultSet item, int position) {
+  TimestampParser(ResultSet item, int position) {
     this.item = item.getTimestamp(position);
   }
 
-  public TimestampParser(Object item) {
+  TimestampParser(Object item) {
     this.item = (Timestamp) item;
   }
 
-  public TimestampParser(byte[] item, FormatCode formatCode) {
+  TimestampParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
@@ -94,14 +92,9 @@ public class TimestampParser extends Parser<Timestamp> {
    * @param value The value to check. May not be <code>null</code>.
    * @return <code>true</code> if the text contains a valid timestamp.
    */
-  public static boolean isTimestamp(String value) {
+  static boolean isTimestamp(String value) {
     Preconditions.checkNotNull(value);
     return TIMESTAMP_PATTERN.matcher(value).matches();
-  }
-
-  @Override
-  public int getSqlType() {
-    return Types.TIMESTAMP_WITH_TIMEZONE;
   }
 
   @Override
@@ -140,6 +133,7 @@ public class TimestampParser extends Parser<Timestamp> {
         .replace(ZERO_TIMEZONE, PG_ZERO_TIMEZONE);
   }
 
+  @Override
   public void bind(Statement.Builder statementBuilder, String name) {
     statementBuilder.bind(name).to(this.item);
   }

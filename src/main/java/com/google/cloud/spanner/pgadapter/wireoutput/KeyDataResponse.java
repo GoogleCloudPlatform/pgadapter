@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
+import com.google.api.core.InternalApi;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -22,6 +23,7 @@ import java.text.MessageFormat;
  * Sends back information regarding the current connection (identifier and secret) as part of
  * start-up. Used for cancel statements.
  */
+@InternalApi
 public class KeyDataResponse extends WireOutput {
 
   private final int processId;

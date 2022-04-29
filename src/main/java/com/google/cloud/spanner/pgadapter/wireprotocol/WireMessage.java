@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -25,6 +26,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /** Generic representation for a wire message, generally executed by calling send. */
+@InternalApi
 public abstract class WireMessage {
 
   private static final Logger logger = Logger.getLogger(WireMessage.class.getName());

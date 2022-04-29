@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.wireoutput.DeclineSSLResponse;
 import java.io.IOException;
@@ -23,6 +24,7 @@ import java.text.MessageFormat;
  * Handles SSL bootstrap message. Since we do not do SSL (connection is expected to be through
  * localhost after all), we decline the first message, and send an error for subsequent ones.
  */
+@InternalApi
 public class SSLMessage extends BootstrapMessage {
 
   private static final int MESSAGE_LENGTH = 8;

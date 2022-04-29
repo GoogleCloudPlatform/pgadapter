@@ -14,12 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.CloseCompleteResponse;
 import java.text.MessageFormat;
 
 /** Close the designated statement. */
+@InternalApi
 public class CloseMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'C';

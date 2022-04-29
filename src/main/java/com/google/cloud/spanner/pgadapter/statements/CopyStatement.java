@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
 import static com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
@@ -25,7 +26,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
-import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
@@ -45,13 +46,13 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.csv.CSVFormat;
 
+@InternalApi
 public class CopyStatement extends IntermediateStatement {
 
   private static final String COLUMN_NAME = "column_name";
   private static final String DATA_TYPE = "data_type";
-  private static final String CSV = "CSV";
 
-  private CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+  private final CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
   private CSVFormat format;
 
   // Table columns read from information schema.
@@ -62,8 +63,10 @@ public class CopyStatement extends IntermediateStatement {
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
   public CopyStatement(
-      OptionsMetadata options, ParsedStatement parsedStatement, Connection connection) {
-    super(options, parsedStatement, connection);
+      ConnectionHandler connectionHandler,
+      OptionsMetadata options,
+      ParsedStatement parsedStatement) {
+    super(connectionHandler, options, parsedStatement);
   }
 
   public Exception getException() {
@@ -100,7 +103,7 @@ public class CopyStatement extends IntermediateStatement {
     return this.tableColumns;
   }
 
-  /** @return CSVFormat for parsing copy data based on COPY statement options specified. */
+  /** CSVFormat for parsing copy data based on COPY statement options specified. */
   public void setParserFormat(CopyTreeParser.CopyOptions options) {
     this.format = CSVFormat.POSTGRESQL_TEXT;
     if (options.getFormat() == Format.CSV) {
@@ -330,7 +333,7 @@ public class CopyStatement extends IntermediateStatement {
     }
   }
 
-  private void parseCopyStatement() throws Exception {
+  private void parseCopyStatement() {
     try {
       parse(parsedStatement.getSqlWithoutComments(), this.options);
     } catch (Exception | TokenMgrError e) {

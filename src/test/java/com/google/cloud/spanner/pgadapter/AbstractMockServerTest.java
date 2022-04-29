@@ -27,6 +27,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.admin.database.v1.MockDatabaseAdminImpl;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -57,7 +58,10 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -86,6 +90,8 @@ public abstract class AbstractMockServerTest {
 
   protected static final Statement SELECT1 = Statement.of("SELECT 1");
   protected static final Statement SELECT2 = Statement.of("SELECT 2");
+  protected static final Statement SELECT_FIVE_ROWS =
+      Statement.of("SELECT * FROM TableWithFiveRows");
   protected static final Statement INVALID_SELECT = Statement.of("SELECT foo");
   private static final ResultSetMetadata SELECT1_METADATA =
       ResultSetMetadata.newBuilder()
@@ -112,6 +118,27 @@ public abstract class AbstractMockServerTest {
               ListValue.newBuilder()
                   .addValues(Value.newBuilder().setStringValue("2").build())
                   .build())
+          .setMetadata(SELECT1_METADATA)
+          .build();
+  private static final com.google.spanner.v1.ResultSet SELECT_FIVE_ROWS_RESULTSET =
+      com.google.spanner.v1.ResultSet.newBuilder()
+          .addAllRows(
+              ImmutableList.of(
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("1").build())
+                      .build(),
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("2").build())
+                      .build(),
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("3").build())
+                      .build(),
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("4").build())
+                      .build(),
+                  ListValue.newBuilder()
+                      .addValues(Value.newBuilder().setStringValue("5").build())
+                      .build()))
           .setMetadata(SELECT1_METADATA)
           .build();
   protected static final Statement UPDATE_STATEMENT =
@@ -215,6 +242,13 @@ public abstract class AbstractMockServerTest {
   private static Server spannerServer;
   protected static ProxyServer pgServer;
 
+  protected <T extends WireMessage> List<T> getWireMessagesOfType(Class<T> type) {
+    return pgServer.getDebugMessages().stream()
+        .filter(msg -> msg.getClass().equals(type))
+        .map(msg -> (T) msg)
+        .collect(Collectors.toList());
+  }
+
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers("d", Collections.emptyList());
@@ -226,6 +260,8 @@ public abstract class AbstractMockServerTest {
     mockSpanner.setAbortProbability(0.0D); // We don't want any unpredictable aborted transactions.
     mockSpanner.putStatementResult(StatementResult.query(SELECT1, SELECT1_RESULTSET));
     mockSpanner.putStatementResult(StatementResult.query(SELECT2, SELECT2_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_FIVE_ROWS, SELECT_FIVE_ROWS_RESULTSET));
     mockSpanner.putStatementResult(StatementResult.update(UPDATE_STATEMENT, UPDATE_COUNT));
     mockSpanner.putStatementResult(StatementResult.update(INSERT_STATEMENT, INSERT_COUNT));
     mockSpanner.putStatementResult(
@@ -273,6 +309,7 @@ public abstract class AbstractMockServerTest {
     }
     argsListBuilder.add(
         "-jdbc",
+        "-debug",
         "-c",
         "", // empty credentials file, as we are using a plain text connection.
         "-s",
@@ -307,7 +344,7 @@ public abstract class AbstractMockServerTest {
       }
     }
     spannerServer.shutdown();
-    spannerServer.awaitTermination();
+    spannerServer.awaitTermination(10L, TimeUnit.SECONDS);
   }
 
   /**
@@ -336,6 +373,9 @@ public abstract class AbstractMockServerTest {
   public void clearRequests() {
     mockSpanner.clearRequests();
     mockDatabaseAdmin.reset();
+    if (pgServer != null) {
+      pgServer.clearDebugMessages();
+    }
   }
 
   protected void addDdlResponseToSpannerAdmin() {

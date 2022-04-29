@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.commands;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.metadata.DynamicCommandMetadata;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import java.util.ArrayList;
@@ -25,10 +26,11 @@ import java.util.regex.Pattern;
  * file, a user may determine input and output parameters as well as matchers counts, which will be
  * used to dynamically generate a matcher for a specific run.
  */
+@InternalApi
 public class DynamicCommand extends Command {
   private final DynamicCommandMetadata metadata;
 
-  public DynamicCommand(String sql, DynamicCommandMetadata metadata) {
+  DynamicCommand(String sql, DynamicCommandMetadata metadata) {
     super(getPattern(metadata).matcher(sql));
     this.metadata = metadata;
   }

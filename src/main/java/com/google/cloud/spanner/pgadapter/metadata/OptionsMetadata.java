@@ -14,8 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.Server;
-import com.google.cloud.spanner.pgadapter.utils.Credentials;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.io.IOException;
@@ -58,6 +59,7 @@ public class OptionsMetadata {
   private static final String OPTION_SPANNER_ENDPOINT = "e";
   private static final String OPTION_JDBC_PROPERTIES = "r";
   private static final String OPTION_SERVER_VERSION = "v";
+  private static final String OPTION_DEBUG_MODE = "debug";
 
   private final CommandLine commandLine;
   private final CommandMetadataParser commandMetadataParser;
@@ -72,6 +74,7 @@ public class OptionsMetadata {
   private final JSONObject commandMetadataJSON;
   private final Map<String, String> propertyMap;
   private final String serverVersion;
+  private final boolean debugMode;
 
   public OptionsMetadata(String[] args) {
     this.commandLine = buildOptions(args);
@@ -94,6 +97,7 @@ public class OptionsMetadata {
     this.propertyMap = parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
+    this.debugMode = commandLine.hasOption(OPTION_DEBUG_MODE);
   }
 
   public OptionsMetadata(
@@ -118,6 +122,7 @@ public class OptionsMetadata {
     this.propertyMap = new HashMap<>();
     this.disableLocalhostCheck = false;
     this.serverVersion = DEFAULT_SERVER_VERSION;
+    this.debugMode = false;
   }
 
   private Map<String, String> parseProperties(String propertyOptions) {
@@ -158,13 +163,12 @@ public class OptionsMetadata {
    */
   private String buildCredentialsFile() {
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
-      String credentialsPath = Credentials.getApplicationDefaultCredentialsFilePath();
-      if (credentialsPath == null) {
-        throw new IllegalArgumentException(
-            "User must specify a valid credential file, "
-                + "or have application default credentials set-up.");
+      try {
+        // This will throw an IOException if no default credentials are available.
+        GoogleCredentials.getApplicationDefault();
+      } catch (IOException e) {
+        throw SpannerExceptionFactory.asSpannerException(e);
       }
-      return credentialsPath;
     }
     return commandLine.getOptionValue(OPTION_CREDENTIALS_FILE);
   }
@@ -359,6 +363,12 @@ public class OptionsMetadata {
         "This option specifies what server_version PG Adapter should claim to be. If not specified "
             + " it will default to version "
             + DEFAULT_SERVER_VERSION);
+    options.addOption(
+        OPTION_DEBUG_MODE,
+        "debug-mode",
+        false,
+        "-- ONLY USE FOR DEBUGGING -- This option only intended for debugging. It will "
+            + "instruct the server to keep track of all messages it receives.");
 
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
@@ -377,6 +387,10 @@ public class OptionsMetadata {
 
   public boolean isBinaryFormat() {
     return this.binaryFormat;
+  }
+
+  public boolean isDebugMode() {
+    return this.debugMode;
   }
 
   public JSONObject getCommandMetadataJSON() {
