@@ -38,7 +38,7 @@ public class DdlTransactionModeBatchTest extends DdlTransactionModeNoneTest {
 
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(Collections.singleton("-ddl=Batch"));
+    doStartMockSpannerAndPgAdapterServers("d", Collections.singleton("-ddl=Batch"));
   }
 
   @Override

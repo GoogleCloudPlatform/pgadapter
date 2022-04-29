@@ -42,7 +42,7 @@ public class DdlTransactionModeNoneTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(Collections.singleton("-ddl=Single"));
+    doStartMockSpannerAndPgAdapterServers("d", Collections.singleton("-ddl=Single"));
   }
 
   /**

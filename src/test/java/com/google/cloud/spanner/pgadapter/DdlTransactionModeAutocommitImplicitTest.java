@@ -45,7 +45,7 @@ public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionMode
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        Collections.singleton("-ddl=AutocommitImplicitTransaction"));
+        "d", Collections.singleton("-ddl=AutocommitImplicitTransaction"));
   }
 
   @Test

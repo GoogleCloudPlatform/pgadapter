@@ -42,7 +42,7 @@ public class DdlTransactionModeAutocommitExplicitTest
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        Collections.singleton("-ddl=AutocommitExplicitTransaction"));
+        "d", Collections.singleton("-ddl=AutocommitExplicitTransaction"));
   }
 
   @Test
