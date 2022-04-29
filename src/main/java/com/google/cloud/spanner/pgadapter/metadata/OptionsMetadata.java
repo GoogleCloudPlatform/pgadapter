@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.metadata;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.Server;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.HashMap;
@@ -60,8 +61,9 @@ public class OptionsMetadata {
   private static final String OPTION_SERVER_VERSION = "v";
   private static final String OPTION_DEBUG_MODE = "debug";
 
+  private final CommandLine commandLine;
   private final CommandMetadataParser commandMetadataParser;
-  private final String connectionURL;
+  private final String defaultConnectionUrl;
   private final int proxyPort;
   private final TextFormat textFormat;
   private final boolean binaryFormat;
@@ -75,9 +77,14 @@ public class OptionsMetadata {
   private final boolean debugMode;
 
   public OptionsMetadata(String[] args) {
-    CommandLine commandLine = buildOptions(args);
+    this.commandLine = buildOptions(args);
     this.commandMetadataParser = new CommandMetadataParser();
-    this.connectionURL = buildConnectionURL(commandLine);
+    if (this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
+      this.defaultConnectionUrl =
+          buildConnectionURL(this.commandLine.getOptionValue(OPTION_DATABASE_NAME));
+    } else {
+      this.defaultConnectionUrl = null;
+    }
     this.proxyPort = buildProxyPort(commandLine);
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
@@ -94,7 +101,7 @@ public class OptionsMetadata {
   }
 
   public OptionsMetadata(
-      String connectionURL,
+      String defaultConnectionUrl,
       int proxyPort,
       TextFormat textFormat,
       boolean forceBinary,
@@ -102,8 +109,9 @@ public class OptionsMetadata {
       boolean requiresMatcher,
       boolean replaceJdbcMetadataQueries,
       JSONObject commandMetadata) {
+    this.commandLine = null;
     this.commandMetadataParser = new CommandMetadataParser();
-    this.connectionURL = connectionURL;
+    this.defaultConnectionUrl = defaultConnectionUrl;
     this.proxyPort = proxyPort;
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
@@ -151,10 +159,9 @@ public class OptionsMetadata {
    * Get credential file path from either command line or application default. If neither throw
    * error.
    *
-   * @param commandLine The parsed options for CLI
    * @return The absolute path of the credentials file.
    */
-  private String buildCredentialsFile(CommandLine commandLine) {
+  private String buildCredentialsFile() {
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
       try {
         // This will throw an IOException if no default credentials are available.
@@ -169,10 +176,10 @@ public class OptionsMetadata {
   /**
    * Takes user inputs and builds a JDBC connection string from them.
    *
-   * @param commandLine The parsed options for CLI
    * @return The parsed JDBC connection string.
    */
-  private String buildConnectionURL(CommandLine commandLine) {
+  public String buildConnectionURL(String database) {
+    Preconditions.checkNotNull(database);
     String host = commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT, "");
     String jdbcEndpoint;
     if (host.isEmpty()) {
@@ -198,10 +205,10 @@ public class OptionsMetadata {
                 + ";userAgent=%s",
             commandLine.getOptionValue(OPTION_PROJECT_ID),
             commandLine.getOptionValue(OPTION_INSTANCE_ID),
-            commandLine.getOptionValue(OPTION_DATABASE_NAME),
+            database,
             DEFAULT_USER_AGENT);
 
-    String credentials = buildCredentialsFile(commandLine);
+    String credentials = buildCredentialsFile();
     if (!Strings.isNullOrEmpty(credentials)) {
       url = String.format("%s;credentials=%s", url, credentials);
     }
@@ -270,11 +277,15 @@ public class OptionsMetadata {
         "instance",
         true,
         "The id of the Spanner instance within the GCP project.");
-    options.addRequiredOption(
+    options.addOption(
         OPTION_DATABASE_NAME,
         "database",
         true,
-        "The name of the Spanner database within the GCP project.");
+        "The default Spanner database within the GCP project to use. "
+            + "If specified, PGAdapter will always connect to this database. "
+            + "Any database name in the connection request from the client will be ignored. "
+            + "Omit this option to be able to connect to different databases using a single "
+            + "PGAdapter instance.");
     options.addOption(
         OPTION_CREDENTIALS_FILE,
         "credentials-file",
@@ -386,8 +397,32 @@ public class OptionsMetadata {
     return this.commandMetadataJSON;
   }
 
+  /**
+   * @deprecated use {@link #getDefaultConnectionUrl()}
+   * @return the default connection URL that is used by the server.
+   */
+  @Deprecated
   public String getConnectionURL() {
-    return this.connectionURL;
+    return this.defaultConnectionUrl;
+  }
+
+  /**
+   * @return true if the server uses a default connection URL and ignores the database in a
+   *     connection request
+   */
+  public boolean hasDefaultConnectionUrl() {
+    return this.defaultConnectionUrl != null;
+  }
+
+  /**
+   * Returns the default connection URL that is used by the server. If a default connection URL has
+   * been set, the database parameter in a connection request will be ignored, and the database in
+   * this connection URL will be used instead.
+   *
+   * @return the default connection URL that is used by the server.
+   */
+  public String getDefaultConnectionUrl() {
+    return defaultConnectionUrl;
   }
 
   public int getProxyPort() {

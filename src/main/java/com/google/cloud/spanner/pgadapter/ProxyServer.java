@@ -15,10 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.api.core.AbstractApiService;
-import com.google.cloud.spanner.Dialect;
-import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
@@ -221,23 +218,8 @@ public class ProxyServer extends AbstractApiService {
    */
   void createConnectionHandler(Socket socket) {
     ConnectionHandler handler = new ConnectionHandler(this, socket);
-    try {
-      // Note: Calling getDialect() will cause a SpannerException if the connection itself is
-      // invalid, for example as a result of the credentials being wrong.
-      if (handler.getSpannerConnection().getDialect() != Dialect.POSTGRESQL) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            String.format(
-                "The database uses dialect %s. Currently PGAdapter only supports connections to PostgreSQL dialect databases. "
-                    + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
-                handler.getSpannerConnection().getDialect()));
-      }
-      register(handler);
-      handler.start();
-    } catch (Exception e) {
-      handler.getSpannerConnection().close();
-      throw e;
-    }
+    register(handler);
+    handler.start();
   }
 
   /**
