@@ -251,11 +251,11 @@ public abstract class AbstractMockServerTest {
 
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(Collections.emptyList());
+    doStartMockSpannerAndPgAdapterServers("d", Collections.emptyList());
   }
 
   protected static void doStartMockSpannerAndPgAdapterServers(
-      Iterable<String> extraPGAdapterOptions) throws Exception {
+      String defaultDatabase, Iterable<String> extraPGAdapterOptions) throws Exception {
     mockSpanner = new MockSpannerServiceImpl();
     mockSpanner.setAbortProbability(0.0D); // We don't want any unpredictable aborted transactions.
     mockSpanner.putStatementResult(StatementResult.query(SELECT1, SELECT1_RESULTSET));
@@ -303,24 +303,21 @@ public abstract class AbstractMockServerTest {
             .start();
 
     ImmutableList.Builder<String> argsListBuilder =
-        ImmutableList.<String>builder()
-            .add(
-                "-p",
-                "p",
-                "-i",
-                "i",
-                "-d",
-                "d",
-                "-jdbc",
-                "-debug",
-                "-c",
-                "", // empty credentials file, as we are using a plain text connection.
-                "-s",
-                "0", // port 0 to let the OS pick an available port
-                "-e",
-                String.format("localhost:%d", spannerServer.getPort()),
-                "-r",
-                "usePlainText=true;");
+        ImmutableList.<String>builder().add("-p", "p", "-i", "i");
+    if (defaultDatabase != null) {
+      argsListBuilder.add("-d", defaultDatabase);
+    }
+    argsListBuilder.add(
+        "-jdbc",
+        "-debug",
+        "-c",
+        "", // empty credentials file, as we are using a plain text connection.
+        "-s",
+        "0", // port 0 to let the OS pick an available port
+        "-e",
+        String.format("localhost:%d", spannerServer.getPort()),
+        "-r",
+        "usePlainText=true;");
     argsListBuilder.addAll(extraPGAdapterOptions);
     String[] args = argsListBuilder.build().toArray(new String[0]);
     pgServer = new ProxyServer(new OptionsMetadata(args));

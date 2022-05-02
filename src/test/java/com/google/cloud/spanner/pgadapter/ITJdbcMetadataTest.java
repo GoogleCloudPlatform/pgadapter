@@ -67,7 +67,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   public static void setup() {
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
-    testEnv.startPGAdapterServer(database.getId(), getAdditionalPGAdapterOptions());
+    testEnv.startPGAdapterServerWithDefaultDatabase(
+        database.getId(), getAdditionalPGAdapterOptions());
   }
 
   @AfterClass

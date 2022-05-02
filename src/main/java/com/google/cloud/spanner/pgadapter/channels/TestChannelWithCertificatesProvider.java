@@ -17,11 +17,10 @@ package com.google.cloud.spanner.pgadapter.channels;
 import com.google.api.gax.grpc.GrpcTransportChannel;
 import com.google.api.gax.rpc.FixedTransportChannelProvider;
 import com.google.api.gax.rpc.TransportChannelProvider;
-import com.google.cloud.spanner.connection.ConnectionOptions;
+import com.google.cloud.spanner.connection.ConnectionOptions.ExternalChannelProvider;
 import com.google.common.base.Strings;
 
-public class TestChannelWithCertificatesProvider
-    implements ConnectionOptions.ExternalChannelProvider {
+public class TestChannelWithCertificatesProvider implements ExternalChannelProvider {
   private static final String TEST_CERT_PROPERTY = "TEST_CERT";
   private static final String HOST_IN_CERT_PROPERTY = "TEST_HOST_IN_CERT";
 

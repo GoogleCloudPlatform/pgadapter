@@ -15,12 +15,14 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
@@ -80,18 +82,33 @@ public class ConnectionHandler extends Thread {
   private static final AtomicInteger incrementingConnectionId = new AtomicInteger(0);
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
-  private final Connection spannerConnection;
+  private Connection spannerConnection;
 
   ConnectionHandler(ProxyServer server, Socket socket) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
-    String uri = server.getOptions().getConnectionURL();
+    setDaemon(true);
+    logger.log(
+        Level.INFO,
+        () ->
+            String.format(
+                "Connection handler with ID %s created for client %s",
+                getName(), socket.getInetAddress().getHostAddress()));
+  }
+
+  @InternalApi
+  public void connectToSpanner(String database) {
+    OptionsMetadata options = getServer().getOptions();
+    String uri =
+        options.hasDefaultConnectionUrl()
+            ? options.getDefaultConnectionUrl()
+            : options.buildConnectionURL(database);
     if (uri.startsWith("jdbc:")) {
       uri = uri.substring("jdbc:".length());
     }
-    uri = appendPropertiesToUrl(uri, server.getProperties());
+    uri = appendPropertiesToUrl(uri, getServer().getProperties());
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
       uri =
           uri
@@ -109,14 +126,23 @@ public class ConnectionHandler extends Thread {
       }
     }
     ConnectionOptions connectionOptions = ConnectionOptions.newBuilder().setUri(uri).build();
-    this.spannerConnection = connectionOptions.getConnection();
-    setDaemon(true);
-    logger.log(
-        Level.INFO,
-        () ->
+    Connection spannerConnection = connectionOptions.getConnection();
+    try {
+      // Note: Calling getDialect() will cause a SpannerException if the connection itself is
+      // invalid, for example as a result of the credentials being wrong.
+      if (spannerConnection.getDialect() != Dialect.POSTGRESQL) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
             String.format(
-                "Connection handler with ID %s created for client %s",
-                getName(), socket.getInetAddress().getHostAddress()));
+                "The database uses dialect %s. Currently PGAdapter only supports connections to PostgreSQL dialect databases. "
+                    + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
+                spannerConnection.getDialect()));
+      }
+    } catch (SpannerException e) {
+      spannerConnection.close();
+      throw e;
+    }
+    this.spannerConnection = spannerConnection;
   }
 
   private String appendPropertiesToUrl(String url, Properties info) {
