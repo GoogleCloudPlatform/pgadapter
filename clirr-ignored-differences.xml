@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- see http://www.mojohaus.org/clirr-maven-plugin/examples/ignored-differences.html -->
+<differences>
+  <!-- Removed ProxyServer.run() as the server is now modeled as an ApiService. -->
+  <difference>
+    <differenceType>7002</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/ProxyServer</className>
+    <method>void run()</method>
+  </difference>
+
+  <!-- Add ignores for all sub packages, as these are considered internal. -->
+  <difference>
+    <differenceType>1001</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/*/*</className>
+    <method>**</method>
+    <from>**</from>
+    <to>**</to>
+  </difference>
+  <difference>
+    <differenceType>6001</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/*/*</className>
+    <field>**</field>
+    <from>**</from>
+    <to>**</to>
+  </difference>
+  <difference>
+    <differenceType>6003</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/*/*</className>
+    <field>**</field>
+    <from>**</from>
+    <to>**</to>
+  </difference>
+  <difference>
+    <differenceType>6004</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/*/*</className>
+    <field>**</field>
+    <from>**</from>
+    <to>**</to>
+  </difference>
+  <difference>
+    <differenceType>6006</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/*/*</className>
+    <field>**</field>
+    <from>**</from>
+    <to>**</to>
+  </difference>
+  <difference>
+    <differenceType>7002</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/*/*</className>
+    <method>**</method>
+    <from>**</from>
+    <to>**</to>
+  </difference>
+  <difference>
+    <differenceType>7004</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/*/*</className>
+    <method>**</method>
+    <from>**</from>
+    <to>**</to>
+  </difference>
+  <difference>
+    <differenceType>7005</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/*/*</className>
+    <method>**</method>
+    <from>**</from>
+    <to>**</to>
+  </difference>
+  <difference>
+    <differenceType>7006</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/*/*</className>
+    <method>**</method>
+    <from>**</from>
+    <to>**</to>
+  </difference>
+  <difference>
+    <differenceType>7009</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/*/*</className>
+    <method>**</method>
+    <from>**</from>
+    <to>**</to>
+  </difference>
+  <difference>
+    <differenceType>8001</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/*/*</className>
+    <method>**</method>
+    <from>**</from>
+    <to>**</to>
+  </difference>
+
+</differences>
