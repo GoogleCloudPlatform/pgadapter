@@ -1,4 +1,7 @@
 {
+  "baseBranches": [
+    "postgresql-dialect"
+  ],
   "extends": [
     ":separateMajorReleases",
     ":combinePatchMinorReleases",
