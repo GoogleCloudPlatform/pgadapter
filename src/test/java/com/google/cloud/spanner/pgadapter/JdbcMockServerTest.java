@@ -45,7 +45,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.ParameterMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -350,11 +349,18 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testDescribeQueryWithNonExistingTable() throws SQLException {
     String sql = "select * from non_existing_table where id=$1";
     mockSpanner.putStatementResult(
-        StatementResult.exception(Statement.of(sql), Status.NOT_FOUND.withDescription("Table non_existing_table not found").asRuntimeException()));
+        StatementResult.exception(
+            Statement.of(sql),
+            Status.NOT_FOUND
+                .withDescription("Table non_existing_table not found")
+                .asRuntimeException()));
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
-        SQLException exception = assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
-        assertTrue(exception.getMessage(), exception.getMessage().contains("Table non_existing_table not found"));
+        SQLException exception =
+            assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
+        assertTrue(
+            exception.getMessage(),
+            exception.getMessage().contains("Table non_existing_table not found"));
       }
     }
 

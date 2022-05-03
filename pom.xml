@@ -23,11 +23,13 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <excludedTests>com.google.cloud.spanner.pgadapter.IntegrationTest,com.google.cloud.spanner.pgadapter.golang.GolangTest</excludedTests>
+
+    <spanner.version>6.23.4-SNAPSHOT</spanner.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.4.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.4.3-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -67,12 +69,12 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
-      <version>6.23.4-SNAPSHOT</version>
+      <version>${spanner.version}</version>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.3.1</version>
+      <version>42.3.4</version>
     </dependency>
     <dependency>
       <groupId>commons-cli</groupId>
@@ -93,7 +95,7 @@
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
-      <version>6.23.4-SNAPSHOT</version>
+      <version>${spanner.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
