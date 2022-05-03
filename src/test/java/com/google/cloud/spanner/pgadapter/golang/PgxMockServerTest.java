@@ -140,6 +140,15 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                     .build())
             .build();
 
+    // Add a query result for the statement parameter types.
+    String selectParamsSql = "select $1 from (SELECT * FROM FOO WHERE BAR=$1) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(selectParamsSql),
+            ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .build()));
+
     // Add a query result with only the metadata for the query without parameter values.
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -160,13 +169,19 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent twice
-    // to the backend.
-    assertEquals(2, requests.size());
-    ExecuteSqlRequest describeRequest = requests.get(0);
-    assertEquals(sql, describeRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(1);
+    // pgx by default always uses prepared statements. That means that each request is sent three
+    // times to the backend:
+    // 1. DescribeStatement (parameters)
+    // 2. DescribeStatement (results)
+    // 3. Execute (including DescribePortal)
+    assertEquals(3, requests.size());
+    ExecuteSqlRequest describeParametersRequest = requests.get(0);
+    assertEquals(selectParamsSql, describeParametersRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeParametersRequest.getQueryMode());
+    ExecuteSqlRequest describeStatementRequest = requests.get(1);
+    assertEquals(sql, describeStatementRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeParametersRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = requests.get(2);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }
@@ -180,8 +195,9 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent twice
-    // to the backend.
+    // pgx by default always uses prepared statements. As this statement does not contain any
+    // parameters, we don't need to describe the parameter types, so it is 'only' sent twice to the
+    // backend.
     assertEquals(2, requests.size());
     ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
@@ -195,8 +211,28 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   public void testInsertAllDataTypes() {
     String sql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8)";
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+    String describeSql =
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9 from all_types) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING)))
+                .build()));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -209,12 +245,14 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .bind("p4")
                 .to(3.14d)
                 .bind("p5")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(1L)
                 .bind("p6")
-                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p7")
-                .to(Date.parseDate("2022-04-02"))
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p8")
+                .to(Date.parseDate("2022-04-02"))
+                .bind("p9")
                 .to("test_string")
                 .build(),
             1L));
@@ -223,13 +261,19 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent twice
-    // to the backend.
-    assertEquals(2, requests.size());
-    ExecuteSqlRequest describeRequest = requests.get(0);
+    // pgx by default always uses prepared statements. That means that each request is sent three
+    // times to the backend the first time it is executed:
+    // 1. DescribeStatement (parameters)
+    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
+    // 3. Execute
+    assertEquals(3, requests.size());
+    ExecuteSqlRequest describeParamsRequest = requests.get(0);
+    assertEquals(describeSql, describeParamsRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
+    ExecuteSqlRequest describeRequest = requests.get(1);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(1);
+    ExecuteSqlRequest executeRequest = requests.get(2);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }
@@ -266,21 +310,21 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .bind("p1")
                 .to(100L)
                 .bind("p2")
-                .to((com.google.cloud.spanner.Value) null)
+                .to((Boolean) null)
                 .bind("p3")
-                .to((com.google.cloud.spanner.Value) null)
+                .to((ByteArray) null)
                 .bind("p4")
-                .to((com.google.cloud.spanner.Value) null)
+                .to((Double) null)
                 .bind("p5")
-                .to((com.google.cloud.spanner.Value) null)
+                .to((Long) null)
                 .bind("p6")
-                .to((com.google.cloud.spanner.Value) null)
+                .to(com.google.cloud.spanner.Value.pgNumeric(null))
                 .bind("p7")
-                .to((com.google.cloud.spanner.Value) null)
+                .to((Timestamp) null)
                 .bind("p8")
-                .to((com.google.cloud.spanner.Value) null)
+                .to((Date) null)
                 .bind("p9")
-                .to((com.google.cloud.spanner.Value) null)
+                .to((String) null)
                 .build(),
             1L));
 
@@ -288,13 +332,19 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent twice
-    // to the backend.
-    assertEquals(2, requests.size());
-    ExecuteSqlRequest describeRequest = requests.get(0);
+    // pgx by default always uses prepared statements. That means that each request is sent three
+    // times to the backend the first time it is executed:
+    // 1. DescribeStatement (parameters)
+    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
+    // 3. Execute
+    assertEquals(3, requests.size());
+    ExecuteSqlRequest describeParamsRequest = requests.get(0);
+    assertEquals(describeSql, describeParamsRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
+    ExecuteSqlRequest describeRequest = requests.get(1);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(1);
+    ExecuteSqlRequest executeRequest = requests.get(2);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }

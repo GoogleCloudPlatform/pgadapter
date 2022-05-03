@@ -44,9 +44,7 @@ public interface PgxTest extends Library {
   static PgxTest compile() throws IOException, InterruptedException {
     // Compile the Go code to ensure that we always have the most recent test code.
     ProcessBuilder builder = new ProcessBuilder();
-    String[] compileCommand =
-        "/home/loite/sdk/go1.17.8/bin/go build -o pgx_test.so -buildmode=c-shared pgx.go"
-            .split(" ");
+    String[] compileCommand = "go build -o pgx_test.so -buildmode=c-shared pgx.go".split(" ");
     builder.command(compileCommand);
     builder.directory(new File("./src/test/golang/pgadapter_pgx_tests"));
     Process process = builder.start();

@@ -15,13 +15,10 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.AbortedException;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
-import com.google.cloud.spanner.TransactionContext;
-import com.google.cloud.spanner.TransactionManager;
 import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
@@ -186,33 +183,14 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
         return new DescribeStatementMetadata(this.parameterDataTypes, columnsResultSet);
       }
     }
-    if (describeFailed || !Strings.isNullOrEmpty(this.name)) {
+    if (this.parsedStatement.isUpdate() && (describeFailed || !Strings.isNullOrEmpty(this.name))) {
       // Let the backend analyze the statement if it is a named prepared statement or if the query
       // that was used to determine the parameter types failed, so we can return a reasonable error
       // message if the statement is invalid. If it is the unnamed statement or getting the param
       // types succeeded, we will let the following EXECUTE message handle that, instead of sending
       // the statement twice to the backend.
-      try (TransactionManager transactionManager =
-          connection.getDatabaseClient().transactionManager()) {
-        TransactionContext context = transactionManager.begin();
-        for (int attempts = 0; attempts < 100; attempts++) {
-          try {
-            try (ResultSet resultSet =
-                context.analyzeQuery(
-                    Statement.of(this.parsedStatement.getSqlWithoutComments()),
-                    QueryAnalyzeMode.PLAN)) {
-              // TODO(230839170): Replace with a call to connection.analyzeQuery(...) once the
-              //                  Connection API supports planning DML statements.
-              // The call to resultSet.next() is a requirement from the client library.
-              resultSet.next();
-            }
-            transactionManager.rollback();
-            break;
-          } catch (AbortedException e) {
-            context = transactionManager.resetForRetry();
-          }
-        }
-      }
+      connection.analyzeUpdate(
+          Statement.of(this.parsedStatement.getSqlWithoutComments()), QueryAnalyzeMode.PLAN);
     }
     return new DescribeStatementMetadata(this.parameterDataTypes, null);
   }

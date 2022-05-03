@@ -173,8 +173,8 @@ public class PgxSimpleModeMockServerTest extends AbstractMockServerTest {
     String sql =
         String.format(
             "INSERT INTO all_types "
-                + "(col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar) "
-                + "values (100, true, '%s', 3.14, '%s', '%s', '%s', 'test_string')",
+                + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                + "values (100, true, '%s', 3.14, 1, '%s', '%s', '%s', 'test_string')",
             "\\x" + Utils.toHexString("test_bytes".getBytes(StandardCharsets.UTF_8)),
             "6626e-3",
             "2022-03-24 07:39:10.123456+01:00:00",

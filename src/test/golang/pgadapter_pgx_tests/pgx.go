@@ -183,7 +183,7 @@ func TestInsertAllDataTypes(connString string) *C.char {
 	}
 	defer conn.Close(ctx)
 
-	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8)"
+	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
 	numeric := pgtype.Numeric{}
 	_ = numeric.Set("6.626")
 	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T07:39:10.123456789+01:00")
@@ -193,9 +193,9 @@ func TestInsertAllDataTypes(connString string) *C.char {
 	if strings.Contains(connString, "prefer_simple_protocol=true") {
 		// Simple mode will format the date as '2022-04-02 00:00:00Z', which is not supported by the
 		// backend yet.
-		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, numeric, timestamptz, "2022-04-02", "test_string")
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string")
 	} else {
-		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, numeric, timestamptz, date, "test_string")
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string")
 	}
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
