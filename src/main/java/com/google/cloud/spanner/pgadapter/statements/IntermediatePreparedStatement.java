@@ -149,6 +149,15 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
         ImmutableSortedSet.<String>orderedBy(Comparator.comparing(o -> o.substring(1)))
             .addAll(PARSER.getQueryParameters(this.parsedStatement.getSqlWithoutComments()))
             .build();
+
+    DescribeStatementMetadata result;
+    if (this.parsedStatement.isQuery()) {
+      Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
+      try (ResultSet columnsResultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN)) {
+        return new DescribeStatementMetadata(this.parameterDataTypes, columnsResultSet);
+      }
+    }
+
     boolean describeFailed = false;
     if (parameters.isEmpty()) {
       ensureParameterLength(0);
@@ -175,12 +184,6 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
           describeFailed = true;
           ensureParameterLength(parameters.size());
         }
-      }
-    }
-    if (this.parsedStatement.isQuery()) {
-      Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
-      try (ResultSet columnsResultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN)) {
-        return new DescribeStatementMetadata(this.parameterDataTypes, columnsResultSet);
       }
     }
     if (this.parsedStatement.isUpdate() && (describeFailed || !Strings.isNullOrEmpty(this.name))) {
