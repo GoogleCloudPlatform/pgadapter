@@ -171,15 +171,15 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     // pgx by default always uses prepared statements. That means that each request is sent three
     // times to the backend:
-    // 1. DescribeStatement (parameters)
-    // 2. DescribeStatement (results)
+    // 1. DescribeStatement (results)
+    // 2. DescribeStatement (parameters)
     // 3. Execute (including DescribePortal)
     assertEquals(3, requests.size());
-    ExecuteSqlRequest describeParametersRequest = requests.get(0);
-    assertEquals(selectParamsSql, describeParametersRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeParametersRequest.getQueryMode());
-    ExecuteSqlRequest describeStatementRequest = requests.get(1);
+    ExecuteSqlRequest describeStatementRequest = requests.get(0);
     assertEquals(sql, describeStatementRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeStatementRequest.getQueryMode());
+    ExecuteSqlRequest describeParametersRequest = requests.get(1);
+    assertEquals(selectParamsSql, describeParametersRequest.getSql());
     assertEquals(QueryMode.PLAN, describeParametersRequest.getQueryMode());
     ExecuteSqlRequest executeRequest = requests.get(2);
     assertEquals(sql, executeRequest.getSql());
