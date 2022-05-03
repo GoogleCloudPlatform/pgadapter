@@ -24,6 +24,7 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
@@ -82,7 +83,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   private static void addRandomResultResults() {
     // TODO(230579459): Add dialect argument once RandomResultSetGenerator supports PostgreSQL.
-    RandomResultSetGenerator generator = new RandomResultSetGenerator(RANDOM_RESULTS_ROW_COUNT);
+    RandomResultSetGenerator generator = new RandomResultSetGenerator(RANDOM_RESULTS_ROW_COUNT, Dialect.POSTGRESQL);
     mockSpanner.putStatementResult(StatementResult.query(SELECT_RANDOM, generator.generate()));
   }
 
@@ -665,7 +666,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  @Ignore("RandomResultSetGenerator does not yet support PostgreSQL")
   public void testRandomResults() throws SQLException {
     final int fetchSize = 3;
     try (Connection connection = DriverManager.getConnection(createUrl())) {
