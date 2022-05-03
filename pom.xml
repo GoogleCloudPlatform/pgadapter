@@ -91,6 +91,12 @@
       <artifactId>json</artifactId>
       <version>20210307</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-model</artifactId>
+      <version>3.8.5</version>
+    </dependency>
+
     <!-- Test dependencies -->
     <dependency>
       <groupId>com.google.cloud</groupId>
@@ -319,6 +325,18 @@
         </executions>
         <configuration>
           <skipITs>${skipITs}</skipITs>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+            </manifest>
+          </archive>
         </configuration>
       </plugin>
     </plugins>
