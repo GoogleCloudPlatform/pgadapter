@@ -1,0 +1,56 @@
+name: Build and Push assembly to Google Cloud Storage
+
+on:
+  # This allows manual activation of this action for testing.
+  workflow_dispatch:
+  push:
+    tags:
+      # Automatically build and push Docker image when a release (version) tag is pushed.
+      - v*
+
+env:
+  GITHUB_SHA: ${{ github.sha }}
+  GITHUB_REF: ${{ github.ref }}
+
+jobs:
+  setup-build-publish-deploy:
+    name: Setup, Build, and Publish
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v0'
+        with:
+          credentials_json: '${{ secrets.CLOUD_SPANNER_PG_ADAPTER_SERVICE_ACCOUNT }}'
+
+      # Build the assembly
+      - name: Build assembly
+        run: |
+          mvn package -Passembly -DskipTests
+          export VERSION=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
+          echo $VERSION
+          cd "target/pgadapter"
+          tar -czvf pgadapter.tar.gz pgadapter.jar lib
+          
+          cp "pgadapter.tar.gz" "pgadapter-$VERSION.tar.gz"
+          echo "assembly=target/pgadapter/pgadapter-$VERSION.tar.gz" >> $GITHUB_ENV
+          echo "assembly_current=target/pgadapter/pgadapter.tar.gz" >> $GITHUB_ENV
+          echo ${{ env.assembly }}
+          echo ${{ env.assembly_current }}
+
+      # Upload the assembly to Google Cloud Storage
+      - id: 'upload-versioned-file'
+        uses: 'google-github-actions/upload-cloud-storage@v0'
+        with:
+          path: ${{ env.assembly }}
+          destination: 'pgadapter-jar-releases'
+          parent: false
+      - id: 'overwrite-current-file'
+        uses: 'google-github-actions/upload-cloud-storage@v0'
+        with:
+          path: ${{ env.assembly_current }}
+          destination: 'pgadapter-jar-releases'
+          parent: false
