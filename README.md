@@ -37,10 +37,10 @@ See [Options](#Options) for an explanation of all further options.
 
 ### Standalone with pre-built jar
 
-A pre-built jar containing all dependencies can be downloaded from https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.jar
+A pre-built jar and all dependencies can be downloaded from https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz
 
 ```shell
-wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.jar
+wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz && tar -xzvf pgadapter.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 ```
 
@@ -51,22 +51,23 @@ You can also download a specific version of the jar. Example (replace `v0.4.0` w
 
 ```shell
 VERSION=v0.4.0
-wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.jar
-java -jar pgadapter-${VERSION}.jar -p my-project -i my-instance -d my-database
+wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz && tar -xzvf pgadapter-${VERSION}.tar.gz
+java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 ```
 
 See [Options](#Options) for an explanation of all further options.
 
 ### Standalone with locally built jar
-1. Build a jar file containing all dependencies by running
+1. Build a jar file and assemble all dependencies by running
 
 ```shell
-mvn package -P shade
+mvn package -P assembly
 ```
 
-2. Execute
+2. Execute (the binaries are in the target/pgadapter folder)
 ```shell
-java -jar <jar-file> <options>
+cd target/pgadapter
+java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 ```
 
 See [Options](#Options) for an explanation of all further options.
@@ -243,8 +244,9 @@ The following options are optional:
 An example of a simple run string:
 
 ```shell
-java -jar <jar-file> -p <project name> -i <instance id> -d <database name> -c
-<path to credentials file> -s 5432 
+java -jar pgadapter.jar \
+     -p <project-id> -i <instance-id> -d <database-id> \
+     -c <path to credentials file> -s 5432
 ```
 
 ## Details

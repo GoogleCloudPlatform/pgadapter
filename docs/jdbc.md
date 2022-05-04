@@ -8,7 +8,7 @@ version 42.0.0 and higher.
 First start PGAdapter in JDBC mode by adding `-jdbc` to the command line parameters:
 
 ```shell
-wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.jar
+wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz && tar -xzvf pgadapter.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database -jdbc
 ```
 
@@ -31,5 +31,5 @@ try (Connection connection = DriverManager.getConnection("jdbc:postgresql://loca
 
 ## Running PGAdapter
 
-This example uses the pre-built jar with dependencies to run PGAdapter as a standalone process.
+This example uses the pre-built jar to run PGAdapter as a standalone process.
 See [README](../README.md) for more possibilities on how to run PGAdapter.
