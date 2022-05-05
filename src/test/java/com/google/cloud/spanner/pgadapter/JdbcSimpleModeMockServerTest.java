@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.TRANSACTION_ABORTED_ERROR;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
@@ -24,6 +25,7 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
+import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -308,7 +310,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
             assertThrows(
                 SQLException.class,
                 () -> statement.execute(String.format("%s; %s;", INSERT_STATEMENT, INVALID_DML)));
-        assertEquals("ERROR: INVALID_ARGUMENT: Statement is invalid.", exception.getMessage());
+        assertTrue(exception.getMessage().contains("INVALID_ARGUMENT: Statement is invalid."));
       }
     }
 
@@ -337,14 +339,27 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
         assertThat(
             exception.getMessage(), containsString("INVALID_ARGUMENT: Statement is invalid."));
+
+        // Execute a client side statement to verify that the transaction is in the aborted state.
+        exception =
+            assertThrows(
+                SQLException.class, () -> statement.execute("show transaction isolation level"));
+        assertTrue(
+            exception.getMessage(), exception.getMessage().contains(TRANSACTION_ABORTED_ERROR));
+        // Rollback the transaction and verify that we can get out of the aborted state.
+        statement.execute("rollback work");
+        assertTrue(statement.execute("show transaction isolation level"));
       }
     }
 
-    // Verify that the DML statements were batched together by PgAdapter.
+    // The first DML statement is executed separately, as it is followed by a non-DML statement.
+    // The BEGIN statement will switch the batch to use an explicit transaction. The first DML
+    // statement will be included as part of that explicit transaction.
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     assertEquals(1, requests.size());
     assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
 
+    // Verify that the DML statements were batched together by PgAdapter.
     List<ExecuteBatchDmlRequest> batchDmlRequests =
         mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class);
     assertEquals(1, requests.size());
@@ -353,11 +368,13 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(INVALID_DML.getSql(), request.getStatements(1).getSql());
 
+    // The explicit transaction is rolled back by PGAdapter. The
     List<RollbackRequest> rollbackRequests = mockSpanner.getRequestsOfType(RollbackRequest.class);
     assertEquals(1, rollbackRequests.size());
 
+    // The transaction should not be committed as it fails on the invalid DML statement.
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertEquals(1, commitRequests.size());
+    assertEquals(0, commitRequests.size());
   }
 
   @Test
@@ -385,13 +402,14 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(INVALID_DML.getSql(), request.getStatements(1).getSql());
 
-    // The aborted transaction should be rolled back by pgadapter
+    // The aborted transaction should be rolled back by PGAdapter.
     List<RollbackRequest> rollbackRequests = mockSpanner.getRequestsOfType(RollbackRequest.class);
     assertEquals(1, rollbackRequests.size());
 
-    // BEGIN statement commits the implicit transaction
+    // BEGIN statement converts the implicit transaction to an explicit transaction, but is
+    // otherwise a no-op. We should therefore not receive any commits.
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertEquals(1, commitRequests.size());
+    assertEquals(0, commitRequests.size());
   }
 
   @Test
@@ -409,9 +427,8 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     }
 
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(2, requests.size());
+    assertEquals(1, requests.size());
     assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
-    assertEquals(SELECT1.getSql(), requests.get(1).getSql());
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
     assertEquals(1, commitRequests.size());
@@ -426,7 +443,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testErrorHandlingInAutocommitMode() throws SQLException {
+  public void testErrorHandlingInImplicitTransaction() throws SQLException {
     String sql =
         String.format(
             "%s; %s; %s; %s; %s;", INSERT_STATEMENT, "COMMIT", SELECT1, INVALID_SELECT, SELECT2);
@@ -435,19 +452,32 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
         assertThat(
             exception.getMessage(), containsString("INVALID_ARGUMENT: Statement is invalid."));
+
+        // Verify that the transaction was rolled back and that the connection is usable.
+        assertTrue(statement.execute("show transaction isolation level"));
       }
     }
 
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(4, requests.size());
+    assertEquals(3, requests.size());
     assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
+    assertTrue(requests.get(0).getTransaction().hasBegin());
+    // The rest of the statements in the batch are all selects, so PGAdapter tries to use a
+    // read-only transaction.
+    assertEquals(1, mockSpanner.getRequestsOfType(BeginTransactionRequest.class).size());
+    assertTrue(
+        mockSpanner
+            .getRequestsOfType(BeginTransactionRequest.class)
+            .get(0)
+            .getOptions()
+            .hasReadOnly());
     assertEquals(SELECT1.getSql(), requests.get(1).getSql());
-    assertTrue(requests.get(1).getTransaction().hasSingleUse());
+    assertTrue(requests.get(1).getTransaction().hasId());
     assertEquals(INVALID_SELECT.getSql(), requests.get(2).getSql());
-    assertTrue(requests.get(2).getTransaction().hasSingleUse());
-    assertEquals(SELECT2.getSql(), requests.get(3).getSql());
-    assertTrue(requests.get(3).getTransaction().hasSingleUse());
+    assertTrue(requests.get(2).getTransaction().hasId());
 
+    // We get one commit for the read/write transaction. The read-only transaction is not committed
+    // or rolled back, as that is not necessary for read-only transactions.
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
     assertEquals(1, commitRequests.size());
 
@@ -486,135 +516,16 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     assertEquals(2, requests.size());
     assertEquals(SELECT1.getSql(), requests.get(0).getSql());
-    assertTrue(requests.get(0).getTransaction().hasSingleUse());
+    assertTrue(requests.get(0).getTransaction().hasId());
     assertEquals(SELECT2.getSql(), requests.get(1).getSql());
-    assertTrue(requests.get(1).getTransaction().hasSingleUse());
-  }
+    assertTrue(requests.get(1).getTransaction().hasId());
 
-  @Test
-  public void testMixedBatch() throws SQLException {
-    String sql =
-        "CREATE TABLE foo (id bigint primary key); INSERT INTO FOO VALUES (1); UPDATE FOO SET BAR=1 WHERE BAZ=2;";
-    addDdlResponseToSpannerAdmin();
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (Statement statement = connection.createStatement()) {
-        // Statement#execute(String) returns false if the result was either an update count or there
-        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
-        assertFalse(statement.execute(sql));
-        assertEquals(0, statement.getUpdateCount());
-
-        // getMoreResults() returns false as the next result is an update count.
-        assertFalse(statement.getMoreResults());
-        assertEquals(1, statement.getUpdateCount());
-
-        // getMoreResults() returns false as the next result is an update count.
-        assertFalse(statement.getMoreResults());
-        assertEquals(2, statement.getUpdateCount());
-
-        // getMoreResults() should now return false. We should also check getUpdateCount() as that
-        // method should return -1 to indicate that there is also no update count available.
-        assertFalse(statement.getMoreResults());
-        assertEquals(-1, statement.getUpdateCount());
-      }
-    }
-
-    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
-        mockDatabaseAdmin.getRequests().stream()
-            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
-            .map(UpdateDatabaseDdlRequest.class::cast)
-            .collect(Collectors.toList());
-    assertEquals(1, updateDatabaseDdlRequests.size());
-    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
-    assertEquals(
-        "CREATE TABLE foo (id bigint primary key)",
-        updateDatabaseDdlRequests.get(0).getStatements(0));
-
-    // Verify that the DML statements were batched together by PgAdapter.
-    List<ExecuteBatchDmlRequest> requests =
-        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class);
-    assertEquals(1, requests.size());
-    ExecuteBatchDmlRequest request = requests.get(0);
-    assertEquals(2, request.getStatementsCount());
-    assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
-    assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
-
-    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertEquals(1, commitRequests.size());
-  }
-
-  @Test
-  public void testErrorHandlingOfDdl() throws SQLException {
-    addDdlExceptionToSpannerAdmin();
-    String sql = String.format("%s; %s; %s", INSERT_STATEMENT, INVALID_DDL, UPDATE_STATEMENT);
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (Statement statement = connection.createStatement()) {
-        SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
-        assertThat(
-            exception.getMessage(), containsString("INVALID_ARGUMENT: Statement is invalid."));
-      }
-    }
-
-    // Verify that the execution does not halt and the last statement is executed.
-    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(2, requests.size());
-    assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
-    assertEquals(UPDATE_STATEMENT.getSql(), requests.get(1).getSql());
-
-    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertEquals(2, commitRequests.size());
-  }
-
-  @Test
-  public void testSelectInDdlBatch() throws SQLException {
-    String sql = "CREATE TABLE foo (id bigint primary key); SELECT 1; SELECT 2;";
-    addDdlResponseToSpannerAdmin();
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (Statement statement = connection.createStatement()) {
-        // Statement#execute(String) returns false if the result was either an update count or there
-        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
-        assertFalse(statement.execute(sql));
-        assertEquals(0, statement.getUpdateCount());
-
-        assertTrue(statement.getMoreResults());
-        try (ResultSet resultSet = statement.getResultSet()) {
-          assertTrue(resultSet.next());
-          assertEquals(1L, resultSet.getLong(1));
-          assertFalse(resultSet.next());
-        }
-
-        assertTrue(statement.getMoreResults());
-        try (ResultSet resultSet = statement.getResultSet()) {
-          assertTrue(resultSet.next());
-          assertEquals(2L, resultSet.getLong(1));
-          assertFalse(resultSet.next());
-        }
-
-        // getMoreResults() should now return false. We should also check getUpdateCount() as that
-        // method should return -1 to indicate that there is also no update count available.
-        assertFalse(statement.getMoreResults());
-        assertEquals(-1, statement.getUpdateCount());
-      }
-    }
-
-    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
-        mockDatabaseAdmin.getRequests().stream()
-            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
-            .map(UpdateDatabaseDdlRequest.class::cast)
-            .collect(Collectors.toList());
-    assertEquals(1, updateDatabaseDdlRequests.size());
-    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
-    assertEquals(
-        "CREATE TABLE foo (id bigint primary key)",
-        updateDatabaseDdlRequests.get(0).getStatements(0));
-
-    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(2, requests.size());
-    assertEquals(SELECT1.getSql(), requests.get(0).getSql());
-    // Check that DDL statements close the implicit transaction
-    assertTrue(requests.get(0).getTransaction().hasSingleUse());
-    assertEquals(SELECT2.getSql(), requests.get(1).getSql());
-    // Check that DDL statements close the implicit transaction
-    assertTrue(requests.get(1).getTransaction().hasSingleUse());
+    // PGAdapter will use a read-only transaction if it sees that the implicit transaction will only
+    // read.
+    List<BeginTransactionRequest> beginRequests =
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class);
+    assertEquals(1, beginRequests.size());
+    assertTrue(beginRequests.get(0).getOptions().hasReadOnly());
   }
 
   @Test
@@ -782,11 +693,11 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
       assertEquals(3, requests.size());
       assertEquals(SELECT1.getSql(), requests.get(0).getSql());
-      assertTrue(requests.get(0).getTransaction().hasSingleUse());
+      assertTrue(requests.get(0).getTransaction().hasBegin());
       assertEquals(INSERT_STATEMENT.getSql(), requests.get(1).getSql());
-      assertTrue(requests.get(1).getTransaction().hasBegin());
+      assertTrue(requests.get(1).getTransaction().hasId());
       assertEquals(SELECT2.getSql(), requests.get(2).getSql());
-      assertTrue(requests.get(2).getTransaction().hasSingleUse());
+      assertTrue(requests.get(2).getTransaction().hasId());
 
       List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
       assertEquals(1, commitRequests.size());
@@ -833,44 +744,41 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testDdlInExplicitTransaction() throws SQLException {
-    addDdlResponseToSpannerAdmin();
-
+  public void testBeginTransactionWithOptions() throws SQLException {
+    String sql = "BEGIN TRANSACTION; SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;";
     try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (java.sql.Statement statement = connection.createStatement()) {
-        // Start an explicit transaction before executing batch
-        assertFalse(statement.execute("BEGIN; SELECT 1"));
+      try (Statement statement = connection.createStatement()) {
+        // Execute returns false for statements that return no results.
+        assertFalse(statement.execute(sql));
         assertEquals(0, statement.getUpdateCount());
 
-        assertTrue(statement.getMoreResults());
-        try (ResultSet resultSet = statement.getResultSet()) {
-          assertTrue(resultSet.next());
-          assertEquals(1L, resultSet.getLong(1));
-          assertFalse(resultSet.next());
-        }
+        // getMoreResults also returns false for statements that return no results.
+        assertFalse(statement.getMoreResults());
+        assertEquals(0, statement.getUpdateCount());
 
+        // getMoreResults also returns false if there are no more results. If getUpdateCount returns
+        // -1, it is an indication that there are no more results.
         assertFalse(statement.getMoreResults());
         assertEquals(-1, statement.getUpdateCount());
 
-        // Execute batch
+        // Execute a garbled statement. This should abort the explicit transaction.
+        assertThrows(SQLException.class, () -> statement.execute("bork bork bork"));
         SQLException exception =
             assertThrows(
-                SQLException.class,
-                () -> statement.execute("SELECT 2; CREATE TABLE BAR (id bigint primary key);"));
-        assertThat(
-            exception.getMessage(),
-            containsString("DDL statements are only allowed outside explicit transactions."));
+                SQLException.class, () -> statement.execute("show transaction isolation level"));
+        assertTrue(
+            exception.getMessage(), exception.getMessage().contains(TRANSACTION_ABORTED_ERROR));
+
+        // Verify that we can get out of the aborted transaction by committing it. This will
+        // effectively rollback the transaction.
+        assertFalse(statement.execute("commit work and no chain"));
+        assertTrue(statement.execute("show transaction isolation level"));
       }
     }
-
-    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(2, requests.size());
-    assertEquals(SELECT1.getSql(), requests.get(0).getSql());
-    assertTrue(requests.get(0).getTransaction().hasBegin());
-    // Verify that the explicit transaction is active while batch starts
-    assertEquals(SELECT2.getSql(), requests.get(1).getSql());
-    assertFalse(requests.get(1).getTransaction().hasBegin());
-    assertTrue(requests.get(1).getTransaction().hasId());
+    // There should be no commit or rollback requests on the server, as PGAdapter never actually
+    // starts a transaction, as all statements are handled in the connection itself.
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
 
   @Test
