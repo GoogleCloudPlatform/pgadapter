@@ -53,7 +53,7 @@ public class StatementParser {
         return sql.substring(0, i).toUpperCase();
       }
     }
-    return sql;
+    return sql.toUpperCase();
   }
 
   /** Returns true if the given sql string is the given command. */

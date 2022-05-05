@@ -519,7 +519,7 @@ public class IntermediateStatement {
     // Before executing the statement, handle specific statements that change the transaction status
     String command = getCommand(index);
     String statement = getStatement(index);
-    if ("BEGIN".equals(command)) {
+    if ("BEGIN".equals(command) || "START".equals(command)) {
       // Executing a BEGIN statement when a transaction is already active will set the execution
       // mode to EXPLICIT_TRANSACTION. The current transaction is not committed.
       executionStatus = ExecutionStatus.EXPLICIT_TRANSACTION;
