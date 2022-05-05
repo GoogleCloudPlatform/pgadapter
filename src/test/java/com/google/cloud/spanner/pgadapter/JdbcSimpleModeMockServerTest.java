@@ -934,4 +934,20 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     List<RollbackRequest> rollbackRequests = mockSpanner.getRequestsOfType(RollbackRequest.class);
     assertEquals(1, rollbackRequests.size());
   }
+
+  @Test
+  public void testStatementTagError() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertFalse(statement.execute("begin"));
+        assertFalse(statement.execute(INSERT_STATEMENT.getSql()));
+        assertFalse(statement.execute("set spanner.statement_tag='foo'"));
+        // Execute an invalid statement.
+        assertThrows(SQLException.class, () -> statement.execute("set statement_timeout=2s"));
+        // Make sure that we actually received a Rollback statement. The rollback was initiated by
+        // PGAdapter when the transaction was aborted.
+        assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+      }
+    }
+  }
 }
