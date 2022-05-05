@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
@@ -100,14 +101,18 @@ public class DescribeMessage extends ControlMessage {
           new NoDataResponse(this.outputStream).send();
           break;
         case QUERY:
-          new RowDescriptionResponse(
-                  this.outputStream,
-                  this.statement,
-                  ((DescribePortalMetadata) this.statement.describe()).getMetadata(),
-                  this.connection.getServer().getOptions(),
-                  QueryMode.EXTENDED)
-              .send();
-          break;
+          try {
+            new RowDescriptionResponse(
+                    this.outputStream,
+                    this.statement,
+                    ((DescribePortalMetadata) this.statement.describe()).getMetadata(),
+                    this.connection.getServer().getOptions(),
+                    QueryMode.EXTENDED)
+                .send();
+            break;
+          } catch (SpannerException exception) {
+            this.handleError(exception);
+          }
       }
     }
   }
@@ -118,18 +123,22 @@ public class DescribeMessage extends ControlMessage {
    * @throws Exception if sending the message back to the client causes an error.
    */
   public void handleDescribeStatement() throws Exception {
-    DescribeStatementMetadata metadata = (DescribeStatementMetadata) this.statement.describe();
-    new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send();
-    if (metadata.getResultSet() != null) {
-      new RowDescriptionResponse(
-              this.outputStream,
-              this.statement,
-              metadata.getResultSet(),
-              this.connection.getServer().getOptions(),
-              QueryMode.EXTENDED)
-          .send();
-    } else {
-      new NoDataResponse(this.outputStream).send();
+    try {
+      DescribeStatementMetadata metadata = (DescribeStatementMetadata) this.statement.describe();
+      new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send();
+      if (metadata.getResultSet() != null) {
+        new RowDescriptionResponse(
+                this.outputStream,
+                this.statement,
+                metadata.getResultSet(),
+                this.connection.getServer().getOptions(),
+                QueryMode.EXTENDED)
+            .send();
+      } else {
+        new NoDataResponse(this.outputStream).send();
+      }
+    } catch (SpannerException exception) {
+      this.handleError(exception);
     }
   }
 }
