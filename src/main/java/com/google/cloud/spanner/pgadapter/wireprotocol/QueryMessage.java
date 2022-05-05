@@ -140,6 +140,8 @@ public class QueryMessage extends ControlMessage {
       if (connection.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
         transactionStatus = Status.FAILED;
         // Actively rollback the aborted transaction but still block clients
+        // Clear any statement tags, as these are not allowed for rollbacks.
+        connection.getSpannerConnection().setStatementTag(null);
         connection.getSpannerConnection().rollback();
       } else {
         transactionStatus = Status.TRANSACTION;
