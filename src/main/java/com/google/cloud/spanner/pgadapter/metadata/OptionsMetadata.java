@@ -61,6 +61,7 @@ public class OptionsMetadata {
   private static final String DEFAULT_USER_AGENT = "pg-adapter";
 
   private static final String OPTION_SERVER_PORT = "s";
+  private static final String OPTION_SOCKET_FILE = "socket";
   private static final String OPTION_PROJECT_ID = "p";
   private static final String OPTION_INSTANCE_ID = "i";
   private static final String OPTION_DATABASE_NAME = "d";
@@ -77,6 +78,7 @@ public class OptionsMetadata {
   private static final String OPTION_HELP = "h";
   private static final String DEFAULT_PORT = "5432";
   private static final int MIN_PORT = 0, MAX_PORT = 65535;
+  private static final String DEFAULT_SOCKET_FILE = "/tmp/.s.PGSQL.%d";
   /*Note: this is a private preview feature, not meant for GA version. */
   private static final String OPTION_SPANNER_ENDPOINT = "e";
   private static final String OPTION_JDBC_PROPERTIES = "r";
@@ -87,6 +89,7 @@ public class OptionsMetadata {
   private final CommandMetadataParser commandMetadataParser;
   private final String defaultConnectionUrl;
   private final int proxyPort;
+  private final String socketFile;
   private final TextFormat textFormat;
   private final boolean binaryFormat;
   private final boolean authenticate;
@@ -109,6 +112,7 @@ public class OptionsMetadata {
       this.defaultConnectionUrl = null;
     }
     this.proxyPort = buildProxyPort(commandLine);
+    this.socketFile = commandLine.getOptionValue(OPTION_SOCKET_FILE, DEFAULT_SOCKET_FILE);
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
@@ -138,6 +142,7 @@ public class OptionsMetadata {
     this.commandMetadataParser = new CommandMetadataParser();
     this.defaultConnectionUrl = defaultConnectionUrl;
     this.proxyPort = proxyPort;
+    this.socketFile = DEFAULT_SOCKET_FILE;
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
@@ -491,6 +496,10 @@ public class OptionsMetadata {
 
   public int getProxyPort() {
     return this.proxyPort;
+  }
+
+  public String getSocketFile(int localPort) {
+    return String.format(this.socketFile, localPort);
   }
 
   public TextFormat getTextFormat() {

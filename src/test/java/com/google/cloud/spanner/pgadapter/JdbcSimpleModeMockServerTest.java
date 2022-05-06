@@ -48,19 +48,28 @@ import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.jdbc.TimestampUtils;
 
 /**
  * Tests the native PG JDBC driver in simple query mode. This is similar to the protocol that is
  * used by psql, and for example allows batches to be given as semicolon-separated strings.
  */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
+  }
+
+  @Parameter public boolean useDomainSocket;
+
+  @Parameters(name = "useDomainSocket = {0}")
+  public static Object[] data() {
+    return new Object[] {true, false};
   }
 
   /**
@@ -69,6 +78,14 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
    * as psql.
    */
   private String createUrl() {
+    if (useDomainSocket) {
+      return String.format(
+          "jdbc:postgresql://localhost/?"
+              + "socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
+              + "&socketFactoryArg=/tmp/.s.PGSQL.%d"
+              + "&preferQueryMode=simple",
+          pgServer.getLocalPort());
+    }
     return String.format(
         "jdbc:postgresql://localhost:%d/?preferQueryMode=simple", pgServer.getLocalPort());
   }
