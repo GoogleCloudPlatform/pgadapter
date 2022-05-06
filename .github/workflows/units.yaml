@@ -6,12 +6,16 @@ jobs:
   units:
     strategy:
       matrix:
-        version: [ 10, 12, 14 ]
+        version: [ 8, 11, 17 ]
         os: [ ubuntu-latest, windows-latest ]
+      runs-on: ${{ matrix.os }}
+      steps:
       - uses: actions/checkout@v2
       - uses: stCarolas/setup-maven@v4
         with:
           maven-version: 3.8.1
       - uses: actions/setup-java@v1
+        with:
+          java-version: ${{ matrix.version }}
       - run: java -version
       - run: mvn -B test -Ptest-all
