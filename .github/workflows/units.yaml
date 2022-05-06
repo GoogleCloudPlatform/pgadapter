@@ -1,7 +1,6 @@
 on:
   pull_request:
-    branches: [ postgresql-dialect ]
-name: integration-tests-against-docker
+name: units
 jobs:
   units:
     strategy:
