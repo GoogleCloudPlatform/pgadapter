@@ -69,6 +69,7 @@ public class IntermediateStatement {
 
   private static final char STATEMENT_DELIMITER = ';';
   private static final char SINGLE_QUOTE = '\'';
+  private static final char DOUBLE_QUOTE = '"';
 
   public IntermediateStatement(
       OptionsMetadata options,
@@ -134,7 +135,7 @@ public class IntermediateStatement {
     return builder.build();
   }
 
-  private static ImmutableList<String> splitStatements(String sql) {
+  static ImmutableList<String> splitStatements(String sql) {
     // First check trivial cases with only one statement.
     int firstIndexOfDelimiter = sql.indexOf(STATEMENT_DELIMITER);
     if (firstIndexOfDelimiter == -1) {
@@ -147,26 +148,33 @@ public class IntermediateStatement {
     ImmutableList.Builder<String> builder = ImmutableList.builder();
     // TODO: Fix this parsing, as it does not take all types of quotes into consideration.
     boolean insideQuotes = false;
-    boolean currentCharacterIsEscaped = false;
+    char quoteChar = 0;
     int index = 0;
     for (int i = 0; i < sql.length(); ++i) {
-      // ignore escaped quotes
-      if (sql.charAt(i) == SINGLE_QUOTE && !currentCharacterIsEscaped) {
-        insideQuotes = !insideQuotes;
-      }
-      // skip semicolon inside quotes
-      if (sql.charAt(i) == STATEMENT_DELIMITER && !insideQuotes) {
-        String stmt = sql.substring(index, i).trim();
-        // Statements with only ';' character are empty and dropped.
-        if (stmt.length() > 0) {
-          builder.add(stmt);
+      if (insideQuotes) {
+        if (sql.charAt(i) == quoteChar) {
+          if (sql.length() > (i + 1) && sql.charAt(i + 1) == quoteChar) {
+            // This is an escaped quote. Skip one ahead.
+            i++;
+          } else {
+            insideQuotes = false;
+          }
         }
-        index = i + 1;
-      }
-      if (currentCharacterIsEscaped) {
-        currentCharacterIsEscaped = false;
-      } else if (sql.charAt(i) == '\\') {
-        currentCharacterIsEscaped = true;
+      } else {
+        if (sql.charAt(i) == SINGLE_QUOTE || sql.charAt(i) == DOUBLE_QUOTE) {
+          quoteChar = sql.charAt(i);
+          insideQuotes = true;
+        } else {
+          // skip semicolon inside quotes
+          if (sql.charAt(i) == STATEMENT_DELIMITER) {
+            String stmt = sql.substring(index, i).trim();
+            // Statements with only ';' character are empty and dropped.
+            if (stmt.length() > 0) {
+              builder.add(stmt);
+            }
+            index = i + 1;
+          }
+        }
       }
     }
 

@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.utils.StatementParser.singleQuoteEscape;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
@@ -21,7 +22,6 @@ import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -148,7 +148,10 @@ public class StatementParserTest {
   @Test
   public void testEscapes() {
     String sql = "Bobby\\'O\\'Bob'; DROP TABLE USERS; select'";
-    String expectedSql = "Bobby\\'O\\'Bob\\'; DROP TABLE USERS; select\\'";
-    Assert.assertEquals(StatementParser.singleQuoteEscape(sql), expectedSql);
+    String expectedSql = "Bobby\\''O\\''Bob''; DROP TABLE USERS; select''";
+    assertEquals(expectedSql, singleQuoteEscape(sql));
+
+    assertEquals("''test''", singleQuoteEscape("'test'"));
+    assertEquals("''''test''''", singleQuoteEscape("''test''"));
   }
 }
