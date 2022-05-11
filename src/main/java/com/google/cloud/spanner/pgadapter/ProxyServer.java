@@ -174,7 +174,16 @@ public class ProxyServer extends AbstractApiService {
                   getLocalPort(), e));
     } finally {
       for (ConnectionHandler handler : this.handlers) {
-        handler.terminate();
+        try {
+          handler.terminate();
+        } catch (Exception exception) {
+          logger.log(
+              Level.WARNING,
+              exception,
+              () ->
+                  String.format(
+                      "Connection handler %s could not be terminated: %s", handler, exception));
+        }
       }
       logger.log(Level.INFO, () -> String.format("Socket on port %d stopped", getLocalPort()));
       notifyStopped();
