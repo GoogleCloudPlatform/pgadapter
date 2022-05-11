@@ -31,7 +31,7 @@ import java.util.logging.Logger;
 public abstract class WireMessage {
 
   private static final Logger logger = Logger.getLogger(WireMessage.class.getName());
-  private static final int MAX_MESSAGE_LENGTH = 1 << 16;
+  private static final int MAX_MESSAGE_LENGTH = 1 << 20;
 
   protected int length;
   protected DataInputStream inputStream;
