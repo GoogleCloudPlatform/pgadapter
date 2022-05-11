@@ -123,36 +123,4 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
       }
     }
   }
-
-  @Test
-  public void testProtectionAgainstMessageLength() throws IOException {
-    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
-      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
-          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
-        // Request startup.
-        outputStream.writeInt(17);
-        outputStream.writeInt(StartupMessage.IDENTIFIER);
-        outputStream.writeBytes("user");
-        outputStream.writeByte(0);
-        outputStream.writeBytes("foo");
-        outputStream.writeByte(0);
-        outputStream.flush();
-
-        // Send a message that claims to be very large.
-        // This will cause the backend to terminate the connection to protect itself.
-        outputStream.writeByte('Q');
-        outputStream.writeInt(Integer.MAX_VALUE);
-        outputStream.writeUTF("select foo from bar");
-        outputStream.writeByte(0);
-        outputStream.flush();
-
-        // Read until the end of the stream. The stream should be closed by the backend.
-        int bytesRead = 0;
-        while (inputStream.read() > -1 && bytesRead < 1 << 16) {
-          bytesRead++;
-        }
-        assertEquals(-1, inputStream.read());
-      }
-    }
-  }
 }

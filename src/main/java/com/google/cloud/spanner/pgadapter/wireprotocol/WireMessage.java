@@ -31,7 +31,6 @@ import java.util.logging.Logger;
 public abstract class WireMessage {
 
   private static final Logger logger = Logger.getLogger(WireMessage.class.getName());
-  private static final int MAX_MESSAGE_LENGTH = 1 << 20;
 
   protected int length;
   protected DataInputStream inputStream;
@@ -39,7 +38,7 @@ public abstract class WireMessage {
   protected ConnectionHandler connection;
 
   public WireMessage(ConnectionHandler connection, int length) {
-    Preconditions.checkArgument(length <= MAX_MESSAGE_LENGTH);
+    Preconditions.checkArgument(length >= 4);
     this.connection = connection;
     this.inputStream = connection.getConnectionMetadata().getInputStream();
     this.outputStream = connection.getConnectionMetadata().getOutputStream();
