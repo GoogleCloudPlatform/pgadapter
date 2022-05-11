@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.common.base.Preconditions;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -30,6 +31,7 @@ import java.util.logging.Logger;
 public abstract class WireMessage {
 
   private static final Logger logger = Logger.getLogger(WireMessage.class.getName());
+  private static final int MAX_MESSAGE_LENGTH = 1 << 16;
 
   protected int length;
   protected DataInputStream inputStream;
@@ -37,6 +39,7 @@ public abstract class WireMessage {
   protected ConnectionHandler connection;
 
   public WireMessage(ConnectionHandler connection, int length) {
+    Preconditions.checkArgument(length <= MAX_MESSAGE_LENGTH);
     this.connection = connection;
     this.inputStream = connection.getConnectionMetadata().getInputStream();
     this.outputStream = connection.getConnectionMetadata().getOutputStream();
