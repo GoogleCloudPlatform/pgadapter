@@ -88,10 +88,10 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   @Override
   public void execute() {
-    this.executed = true;
     // If the portal has already been described, the statement has already been executed, and we
     // don't need to do that once more.
     if (getStatementResult(0) == null) {
+      this.executedCount++;
       try {
         if (!connection.isInTransaction()
             // TODO(230579451): Refactor to use ClientSideStatement information.

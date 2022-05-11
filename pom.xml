@@ -62,11 +62,6 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.googlecode.json-simple</groupId>
-      <artifactId>json-simple</artifactId>
-      <version>1.1.1</version>
-    </dependency>
-    <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
       <version>${spanner.version}</version>
@@ -75,6 +70,11 @@
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <version>42.3.4</version>
+    </dependency>
+    <dependency>
+      <groupId>com.googlecode.json-simple</groupId>
+      <artifactId>json-simple</artifactId>
+      <version>1.1.1</version>
     </dependency>
     <dependency>
       <groupId>commons-cli</groupId>
@@ -87,10 +87,11 @@
       <version>1.9.0</version>
     </dependency>
     <dependency>
-      <groupId>org.json</groupId>
-      <artifactId>json</artifactId>
-      <version>20210307</version>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-model</artifactId>
+      <version>3.8.5</version>
     </dependency>
+
     <!-- Test dependencies -->
     <dependency>
       <groupId>com.google.cloud</groupId>
@@ -110,6 +111,7 @@
       <groupId>net.java.dev.jna</groupId>
       <artifactId>jna</artifactId>
       <version>5.10.0</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -207,7 +209,7 @@
                   <goal>copy-resources</goal>
                 </goals>
                 <configuration>
-                  <outputDirectory>${basedir}/target/PGAdapter</outputDirectory>
+                  <outputDirectory>${project.build.directory}/pgadapter</outputDirectory>
                   <resources>
                     <resource>
                       <directory>resources</directory>
@@ -242,6 +244,14 @@
             <artifactId>maven-jar-plugin</artifactId>
             <configuration>
               <finalName>pgadapter/pgadapter</finalName>
+              <archive>
+                <index>false</index>
+                <manifest>
+                  <mainClass>com.google.cloud.spanner.pgadapter.Server</mainClass>
+                  <addClasspath>true</addClasspath>
+                  <classpathPrefix>lib/</classpathPrefix>
+                </manifest>
+              </archive>
             </configuration>
           </plugin>
         </plugins>
@@ -319,6 +329,18 @@
         </executions>
         <configuration>
           <skipITs>${skipITs}</skipITs>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+            </manifest>
+          </archive>
         </configuration>
       </plugin>
     </plugins>

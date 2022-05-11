@@ -34,6 +34,27 @@ import org.json.simple.JSONObject;
 
 /** Metadata extractor for CLI. */
 public class OptionsMetadata {
+  public enum DdlTransactionMode {
+
+    // Disables all DDL batching and DDL statements in transactions. Only single DDL statements
+    // outside batches and transactions are allowed.
+    Single,
+
+    // Allows batches that contain only DDL statements outside explicit transactions.
+    // Does not allow mixing of DML, DQL and DDL statements in one batch.
+    // This is the default mode.
+    Batch,
+
+    // DDL statements automatically commit the active implicit transaction.
+    // Allows batches that contain mixes of DML, DQL and DDL statements.
+    // Fails if a DDL statement is executed in an explicit transaction.
+    AutocommitImplicitTransaction,
+
+    // DDL statements automatically commit the active explicit or implicit transaction.
+    // Allows batches that contain mixes of DML, DQL and DDL statements.
+    // Explicit transaction blocks that contain DDL statements will not be atomic.
+    AutocommitExplicitTransaction,
+  }
 
   private static final Logger logger = Logger.getLogger(OptionsMetadata.class.getName());
   private static final String DEFAULT_SERVER_VERSION = "1.0.0";
@@ -47,6 +68,7 @@ public class OptionsMetadata {
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
   private static final String OPTION_PSQL_MODE = "q";
+  private static final String OPTION_DDL_TRANSACTION_MODE = "ddl";
   private static final String OPTION_JDBC_MODE = "jdbc";
   private static final String OPTION_COMMAND_METADATA_FILE = "j";
   private static final String OPTION_DISABLE_LOCALHOST_CHECK = "x";
@@ -69,6 +91,7 @@ public class OptionsMetadata {
   private final boolean binaryFormat;
   private final boolean authenticate;
   private final boolean requiresMatcher;
+  private final DdlTransactionMode ddlTransactionMode;
   private final boolean replaceJdbcMetadataQueries;
   private final boolean disableLocalhostCheck;
   private final JSONObject commandMetadataJSON;
@@ -92,6 +115,8 @@ public class OptionsMetadata {
     this.requiresMatcher =
         commandLine.hasOption(OPTION_PSQL_MODE)
             || commandLine.hasOption(OPTION_COMMAND_METADATA_FILE);
+    this.ddlTransactionMode =
+        parseDdlTransactionMode(commandLine.getOptionValue(OPTION_DDL_TRANSACTION_MODE));
     this.replaceJdbcMetadataQueries = commandLine.hasOption(OPTION_JDBC_MODE);
     this.commandMetadataJSON = buildCommandMetadataJSON(commandLine);
     this.propertyMap = parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
@@ -117,6 +142,7 @@ public class OptionsMetadata {
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
     this.requiresMatcher = requiresMatcher;
+    this.ddlTransactionMode = DdlTransactionMode.AutocommitImplicitTransaction;
     this.replaceJdbcMetadataQueries = replaceJdbcMetadataQueries;
     this.commandMetadataJSON = commandMetadata;
     this.propertyMap = new HashMap<>();
@@ -139,6 +165,19 @@ public class OptionsMetadata {
       }
     }
     return properties;
+  }
+
+  private DdlTransactionMode parseDdlTransactionMode(String value) {
+    if (value == null) {
+      return DdlTransactionMode.Batch;
+    }
+    try {
+      return DdlTransactionMode.valueOf(value);
+    } catch (IllegalArgumentException e) {
+      // Catch and rethrow to give a better error message.
+      throw new IllegalArgumentException(
+          String.format("Invalid ddl-batching mode value specified: %s", value));
+    }
   }
 
   /**
@@ -308,6 +347,26 @@ public class OptionsMetadata {
             + " and as such cannot be used with the option -j. This mode should not be used for"
             + " production, and we do not guarantee its functionality beyond the basics.");
     options.addOption(
+        OPTION_DDL_TRANSACTION_MODE,
+        "ddl-transaction-mode",
+        true,
+        String.format(
+            "Sets the way PGAdapter should handle DDL statements in implicit and explicit "
+                + "transactions. Cloud Spanner does not support DDL transactions. The possible modes "
+                + "are:\n"
+                + "%s: Only allows single DDL statements outside implicit and explicit transactions.\n"
+                + "%s: Allows batches that contain only DDL statements. "
+                + "Does not allow mixed batches of DDL and other statements, or DDL statements in transactions.\n"
+                + "%s: Allows mixed batches of DDL and other statements. "
+                + "Automatically commits the implicit transaction when a DDL statement is encountered in a batch. "
+                + "DDL statements in explicit transactions are not allowed.\n"
+                + "%s: Allows mixed batches of DDL and other statements. "
+                + "Automatically commits the current transaction when a DDL statement is encountered.",
+            DdlTransactionMode.Single,
+            DdlTransactionMode.Batch,
+            DdlTransactionMode.AutocommitImplicitTransaction,
+            DdlTransactionMode.AutocommitExplicitTransaction));
+    options.addOption(
         OPTION_JDBC_MODE,
         "jdbc-mode",
         false,
@@ -372,6 +431,7 @@ public class OptionsMetadata {
 
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
+    help.setWidth(120);
     try {
       CommandLine commandLine = parser.parse(options, args);
       if (commandLine.hasOption(OPTION_HELP)) {
@@ -383,6 +443,10 @@ public class OptionsMetadata {
       help.printHelp(CLI_ARGS, options);
       throw new IllegalArgumentException(e.getMessage());
     }
+  }
+
+  public DdlTransactionMode getDdlTransactionMode() {
+    return this.ddlTransactionMode;
   }
 
   public boolean isBinaryFormat() {

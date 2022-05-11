@@ -103,7 +103,7 @@ public class QueryMessage extends ControlMessage {
    */
   public void handleQuery() throws Exception {
     // Skip unexecuted statements, as no response needs be returned
-    for (int index = 0; index < statement.getStatements().size(); index++) {
+    for (int index = 0; index < statement.getExecutedCount(); index++) {
       if (this.statement.hasException(index)) {
         new ErrorResponse(
                 this.outputStream, this.statement.getException(index), State.InternalError)
@@ -140,6 +140,8 @@ public class QueryMessage extends ControlMessage {
       if (connection.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
         transactionStatus = Status.FAILED;
         // Actively rollback the aborted transaction but still block clients
+        // Clear any statement tags, as these are not allowed for rollbacks.
+        connection.getSpannerConnection().setStatementTag(null);
         connection.getSpannerConnection().rollback();
       } else {
         transactionStatus = Status.TRANSACTION;

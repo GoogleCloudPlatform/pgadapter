@@ -38,6 +38,7 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
@@ -189,6 +190,7 @@ public class StatementTest {
 
   @Test
   public void testBasicNoResultStatement() throws Exception {
+    when(options.getDdlTransactionMode()).thenReturn(DdlTransactionMode.Batch);
     when(statementResult.getResultType()).thenReturn(StatementResult.ResultType.NO_RESULT);
     when(connection.execute(Statement.of("CREATE TABLE users (name varchar(100) primary key)")))
         .thenReturn(statementResult);
