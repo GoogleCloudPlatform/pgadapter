@@ -15,6 +15,9 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import java.io.FileReader;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 
 /** Effectively this is the main class */
 public class Server {
@@ -25,6 +28,7 @@ public class Server {
    */
   public static void main(String[] args) {
     try {
+      System.out.printf("-- Starting PGAdapter version %s --\n", getVersion());
       OptionsMetadata optionsMetadata = new OptionsMetadata(args);
       ProxyServer server = new ProxyServer(optionsMetadata);
       server.startServer();
@@ -33,6 +37,26 @@ public class Server {
           "The server could not be started because an error occurred: "
               + (e.getMessage() == null ? e.toString() : e.getMessage()));
       System.out.println("Run with option -h or --help to get help");
+      System.out.printf("Version: %s\n", getVersion());
     }
+  }
+
+  static String getVersion() {
+    String version = Server.class.getPackage().getImplementationVersion();
+    if (version != null) {
+      return version;
+    }
+
+    try {
+      MavenXpp3Reader reader = new MavenXpp3Reader();
+      Model model = reader.read(new FileReader("pom.xml"));
+      if (model.getVersion() != null) {
+        return model.getVersion();
+      }
+    } catch (Exception e) {
+      // ignore
+    }
+
+    return "(unknown)";
   }
 }

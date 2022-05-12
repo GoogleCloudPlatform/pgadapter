@@ -60,7 +60,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -82,8 +81,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   private static void addRandomResultResults() {
-    // TODO(230579459): Add dialect argument once RandomResultSetGenerator supports PostgreSQL.
-    RandomResultSetGenerator generator = new RandomResultSetGenerator(RANDOM_RESULTS_ROW_COUNT, Dialect.POSTGRESQL);
+    RandomResultSetGenerator generator =
+        new RandomResultSetGenerator(RANDOM_RESULTS_ROW_COUNT, Dialect.POSTGRESQL);
     mockSpanner.putStatementResult(StatementResult.query(SELECT_RANDOM, generator.generate()));
   }
 
