@@ -20,6 +20,15 @@ jobs:
           go-version: '^1.17.7'
       - run: go version
       - run: mvn -B test -Ptest-all
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          directory: ./target/site/jacoco
+          fail_ci_if_error: true
+          flags: unittests
+          name: codecov-umbrella
+          path_to_write_report: ./coverage/codecov_report.txt
+          verbose: true
   windows:
     runs-on: windows-latest
     strategy:
