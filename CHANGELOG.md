@@ -1,5 +1,20 @@
 # Changelog
 
+### [0.4.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.4.1...v0.4.2) (2022-05-03)
+
+
+### Dependencies
+
+* bump PostgreSQL JDBC to 42.3.4 ([#138](https://github.com/GoogleCloudPlatform/pgadapter/issues/138)) ([9b67670](https://github.com/GoogleCloudPlatform/pgadapter/commit/9b676707f002dfed89f573039a1e83a8517cded0))
+* bump Spanner to 6.23.3 ([#137](https://github.com/GoogleCloudPlatform/pgadapter/issues/137)) ([180b25c](https://github.com/GoogleCloudPlatform/pgadapter/commit/180b25c65b00c0ea10b92b121c46178c9c1d8006))
+
+### [0.4.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.4.0...v0.4.1) (2022-05-02)
+
+
+### Bug Fixes
+
+* update documentation to reflect \c support ([#132](https://github.com/GoogleCloudPlatform/pgadapter/issues/132)) ([10798df](https://github.com/GoogleCloudPlatform/pgadapter/commit/10798dfe51cc61bba7bdc3919cdabb5edd4dce6e))
+
 ## [0.4.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.3.0...v0.4.0) (2022-04-29)
 
 

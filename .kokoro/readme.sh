@@ -15,7 +15,7 @@
 
 set -eo pipefail
 
-cd ${KOKORO_ARTIFACTS_DIR}/github/java-spanner-pgadapter
+cd ${KOKORO_ARTIFACTS_DIR}/github/pgadapter
 
 # Disable buffering, so that the logs stream through.
 export PYTHONUNBUFFERED=1
