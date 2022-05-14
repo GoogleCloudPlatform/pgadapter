@@ -62,7 +62,8 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Parameter public String preferQueryMode;
 
-  @Parameter(1) public boolean useDomainSocket;
+  @Parameter(1)
+  public boolean useDomainSocket;
 
   @Parameters(name = "preferQueryMode = {0}, useDomainSocket = {1}")
   public static List<Object[]> data() {
