@@ -187,6 +187,9 @@ public class ConnectionHandler extends Thread {
           try {
             message.nextHandler();
             message.send();
+          } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
+            this.handleError(output, fatalException);
+            this.status = ConnectionStatus.TERMINATED;
           } catch (Exception e) {
             this.handleError(output, e);
           }
@@ -226,7 +229,9 @@ public class ConnectionHandler extends Thread {
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
   public void handleTerminate() {
     closeAllPortals();
-    this.spannerConnection.close();
+    if (this.spannerConnection != null) {
+      this.spannerConnection.close();
+    }
     this.status = ConnectionStatus.TERMINATED;
   }
 
@@ -237,6 +242,8 @@ public class ConnectionHandler extends Thread {
   void terminate() throws IOException {
     if (this.status != ConnectionStatus.TERMINATED) {
       handleTerminate();
+    }
+    if (!socket.isClosed()) {
       socket.close();
     }
   }

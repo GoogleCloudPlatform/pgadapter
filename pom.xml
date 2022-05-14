@@ -24,7 +24,7 @@
 
     <excludedTests>com.google.cloud.spanner.pgadapter.IntegrationTest,com.google.cloud.spanner.pgadapter.golang.GolangTest</excludedTests>
 
-    <spanner.version>6.23.4-SNAPSHOT</spanner.version>
+    <spanner.version>6.24.0</spanner.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -314,6 +314,11 @@
             </goals>
           </execution>
         </executions>
+        <configuration>
+          <excludes>
+            <exclude>com/google/cloud/spanner/pgadapter/parsers/copy/**/*</exclude>
+          </excludes>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
