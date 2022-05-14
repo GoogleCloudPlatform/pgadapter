@@ -28,6 +28,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.connection.TransactionMode;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
@@ -370,8 +371,8 @@ public class IntermediateStatement {
       maybeStartImplicitTransaction(executedCount);
 
       if (connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED
-          && !"ROLLBACK".equals(getCommand(executedCount))
-          && !"COMMIT".equals(getCommand(executedCount))) {
+          && !isRollback(executedCount)
+          && !isCommit(executedCount)) {
         handleExecutionException(
             executedCount,
             SpannerExceptionFactory.newSpannerException(
@@ -523,11 +524,28 @@ public class IntermediateStatement {
         .allMatch(type -> type == StatementType.UPDATE);
   }
 
+  private boolean isBegin(int index) {
+    return getStatements().get(index).getType() == StatementType.CLIENT_SIDE
+        && getStatements().get(index).getClientSideStatementType() == ClientSideStatementType.BEGIN;
+  }
+
+  private boolean isCommit(int index) {
+    return getStatements().get(index).getType() == StatementType.CLIENT_SIDE
+        && getStatements().get(index).getClientSideStatementType()
+            == ClientSideStatementType.COMMIT;
+  }
+
+  private boolean isRollback(int index) {
+    return getStatements().get(index).getType() == StatementType.CLIENT_SIDE
+        && getStatements().get(index).getClientSideStatementType()
+            == ClientSideStatementType.ROLLBACK;
+  }
+
   private void executeSingleStatement(int index) {
     // Before executing the statement, handle specific statements that change the transaction status
     String command = getCommand(index);
     String statement = getStatement(index);
-    if ("BEGIN".equals(command) || "START".equals(command)) {
+    if (isBegin(index)) {
       // Executing a BEGIN statement when a transaction is already active will set the execution
       // mode to EXPLICIT_TRANSACTION. The current transaction is not committed.
       executionStatus = ExecutionStatus.EXPLICIT_TRANSACTION;
@@ -536,7 +554,7 @@ public class IntermediateStatement {
       }
       return;
     }
-    if ("COMMIT".equals(command) || "ROLLBACK".equals(command)) {
+    if (isCommit(index) || isRollback(index)) {
       if (connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
         connectionHandler.setStatus(ConnectionStatus.IDLE);
         // COMMIT rollbacks aborted transaction
