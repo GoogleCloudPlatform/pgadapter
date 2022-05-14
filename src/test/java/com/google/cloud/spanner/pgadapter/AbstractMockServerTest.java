@@ -352,7 +352,6 @@ public abstract class AbstractMockServerTest {
    * instance for a test case. This method will ignore any errors and retry if closing fails.
    */
   protected void closeSpannerPool() {
-    SpannerException exception = null;
     for (int attempt = 0; attempt < 1000; attempt++) {
       try {
         SpannerPool.closeSpannerPool();
@@ -363,10 +362,8 @@ public abstract class AbstractMockServerTest {
         } catch (InterruptedException interruptedException) {
           throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
         }
-        exception = e;
       }
     }
-    throw exception;
   }
 
   @Before
