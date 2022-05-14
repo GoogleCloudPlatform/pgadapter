@@ -112,7 +112,7 @@ public class OptionsMetadata {
       this.defaultConnectionUrl = null;
     }
     this.proxyPort = buildProxyPort(commandLine);
-    this.socketFile = commandLine.getOptionValue(OPTION_SOCKET_FILE, DEFAULT_SOCKET_FILE);
+    this.socketFile = buildSocketFile(commandLine);
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
@@ -142,7 +142,7 @@ public class OptionsMetadata {
     this.commandMetadataParser = new CommandMetadataParser();
     this.defaultConnectionUrl = defaultConnectionUrl;
     this.proxyPort = proxyPort;
-    this.socketFile = DEFAULT_SOCKET_FILE;
+    this.socketFile = Server.isWindows() ? "" : DEFAULT_SOCKET_FILE;
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
@@ -197,6 +197,12 @@ public class OptionsMetadata {
       throw new IllegalArgumentException("Port must be between " + MIN_PORT + " and " + MAX_PORT);
     }
     return port;
+  }
+
+  private String buildSocketFile(CommandLine commandLine) {
+    // Unix domain sockets are disabled by default on Windows.
+    return commandLine.getOptionValue(
+        OPTION_SOCKET_FILE, Server.isWindows() ? "" : DEFAULT_SOCKET_FILE);
   }
 
   /**
@@ -311,6 +317,15 @@ public class OptionsMetadata {
     Options options = new Options();
     options.addOption(
         OPTION_SERVER_PORT, "server-port", true, "This proxy's port number (Default 5432).");
+    options.addOption(
+        OPTION_SOCKET_FILE,
+        "server-socket-file",
+        true,
+        String.format(
+            "This proxy's domain socket file (Default %s). "
+                + "Domain sockets are disabled by default on Windows. Set this property to a non-empty value on Windows to enable domain sockets. "
+                + "Set this property to the empty string on other operating systems to disable domain sockets.",
+            String.format(DEFAULT_SOCKET_FILE, 5432)));
     options.addRequiredOption(
         OPTION_PROJECT_ID,
         "project",
@@ -496,6 +511,10 @@ public class OptionsMetadata {
 
   public int getProxyPort() {
     return this.proxyPort;
+  }
+
+  public boolean isDomainSocketEnabled() {
+    return !Strings.isNullOrEmpty(this.socketFile);
   }
 
   public String getSocketFile(int localPort) {

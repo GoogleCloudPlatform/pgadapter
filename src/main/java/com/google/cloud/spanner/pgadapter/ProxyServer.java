@@ -25,6 +25,7 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import com.google.common.collect.ImmutableList;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -57,8 +58,18 @@ public class ProxyServer extends AbstractApiService {
   private final Properties properties;
   private final List<ConnectionHandler> handlers = Collections.synchronizedList(new LinkedList<>());
 
+  /**
+   * Latch that is closed when the TCP server has started. We need this to know the exact port that
+   * the TCP socket was assigned, so we can assign the same port number to the Unix domain socket.
+   */
   private final CountDownLatch tcpStartedLatch = new CountDownLatch(1);
+  /**
+   * List of server sockets accepting connections. It currently only contains one TCP socket and
+   * optionally one Unix domain socket, but could in theory be expanded to contain multiple sockets
+   * of each type.
+   */
   private final List<ServerSocket> serverSockets = Collections.synchronizedList(new LinkedList<>());
+
   private int localPort;
 
   /** The server will keep track of all messages it receives if it started in DEBUG mode. */
@@ -117,10 +128,15 @@ public class ProxyServer extends AbstractApiService {
 
   @Override
   protected void doStart() {
-    CountDownLatch startupLatch = new CountDownLatch(2);
-    CountDownLatch stoppedLatch = new CountDownLatch(2);
-    for (ServerRunnable server :
-        new ServerRunnable[] {this::runTcpServer, this::runDomainSocketServer}) {
+    ImmutableList<ServerRunnable> serverRunnables;
+    if (options.isDomainSocketEnabled()) {
+      serverRunnables = ImmutableList.of(this::runTcpServer, this::runDomainSocketServer);
+    } else {
+      serverRunnables = ImmutableList.of(this::runTcpServer);
+    }
+    CountDownLatch startupLatch = new CountDownLatch(serverRunnables.size());
+    CountDownLatch stoppedLatch = new CountDownLatch(serverRunnables.size());
+    for (ServerRunnable server : serverRunnables) {
       Thread listenerThread =
           new Thread("spanner-postgres-adapter-proxy-listener") {
             @Override

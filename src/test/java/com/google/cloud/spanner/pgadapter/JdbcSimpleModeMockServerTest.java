@@ -24,6 +24,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
@@ -69,7 +70,8 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
 
   @Parameters(name = "useDomainSocket = {0}")
   public static Object[] data() {
-    return new Object[] {true, false};
+    OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
+    return options.isDomainSocketEnabled() ? new Object[] {true, false} : new Object[] {false};
   }
 
   /**
