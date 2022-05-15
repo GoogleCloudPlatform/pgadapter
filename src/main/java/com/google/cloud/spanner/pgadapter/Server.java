@@ -41,11 +41,6 @@ public class Server {
     }
   }
 
-  /** Returns true if the OS is Windows. */
-  public static boolean isWindows() {
-    return System.getProperty("os.name", "").toLowerCase().contains("win");
-  }
-
   static String getVersion() {
     String version = Server.class.getPackage().getImplementationVersion();
     if (version != null) {

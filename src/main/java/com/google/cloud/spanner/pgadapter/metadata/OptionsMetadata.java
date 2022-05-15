@@ -61,7 +61,7 @@ public class OptionsMetadata {
   private static final String DEFAULT_USER_AGENT = "pg-adapter";
 
   private static final String OPTION_SERVER_PORT = "s";
-  private static final String OPTION_SOCKET_FILE = "socket";
+  private static final String OPTION_SOCKET_FILE = "f";
   private static final String OPTION_PROJECT_ID = "p";
   private static final String OPTION_INSTANCE_ID = "i";
   private static final String OPTION_DATABASE_NAME = "d";
@@ -85,6 +85,7 @@ public class OptionsMetadata {
   private static final String OPTION_SERVER_VERSION = "v";
   private static final String OPTION_DEBUG_MODE = "debug";
 
+  private final String osName;
   private final CommandLine commandLine;
   private final CommandMetadataParser commandMetadataParser;
   private final String defaultConnectionUrl;
@@ -103,6 +104,11 @@ public class OptionsMetadata {
   private final boolean debugMode;
 
   public OptionsMetadata(String[] args) {
+    this(System.getProperty("os.name", ""), args);
+  }
+
+  OptionsMetadata(String osName, String[] args) {
+    this.osName = osName;
     this.commandLine = buildOptions(args);
     this.commandMetadataParser = new CommandMetadataParser();
     if (this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
@@ -138,11 +144,34 @@ public class OptionsMetadata {
       boolean requiresMatcher,
       boolean replaceJdbcMetadataQueries,
       JSONObject commandMetadata) {
+    this(
+        System.getProperty("os.name", ""),
+        defaultConnectionUrl,
+        proxyPort,
+        textFormat,
+        forceBinary,
+        authenticate,
+        requiresMatcher,
+        replaceJdbcMetadataQueries,
+        commandMetadata);
+  }
+
+  OptionsMetadata(
+      String osName,
+      String defaultConnectionUrl,
+      int proxyPort,
+      TextFormat textFormat,
+      boolean forceBinary,
+      boolean authenticate,
+      boolean requiresMatcher,
+      boolean replaceJdbcMetadataQueries,
+      JSONObject commandMetadata) {
+    this.osName = osName;
     this.commandLine = null;
     this.commandMetadataParser = new CommandMetadataParser();
     this.defaultConnectionUrl = defaultConnectionUrl;
     this.proxyPort = proxyPort;
-    this.socketFile = Server.isWindows() ? "" : DEFAULT_SOCKET_FILE;
+    this.socketFile = isWindows() ? "" : DEFAULT_SOCKET_FILE;
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
@@ -201,8 +230,9 @@ public class OptionsMetadata {
 
   private String buildSocketFile(CommandLine commandLine) {
     // Unix domain sockets are disabled by default on Windows.
-    return commandLine.getOptionValue(
-        OPTION_SOCKET_FILE, Server.isWindows() ? "" : DEFAULT_SOCKET_FILE);
+    return commandLine
+        .getOptionValue(OPTION_SOCKET_FILE, isWindows() ? "" : DEFAULT_SOCKET_FILE)
+        .trim();
   }
 
   /**
@@ -547,6 +577,11 @@ public class OptionsMetadata {
 
   public String getServerVersion() {
     return serverVersion;
+  }
+
+  /** Returns true if the OS is Windows. */
+  public boolean isWindows() {
+    return osName.toLowerCase().contains("win");
   }
 
   /**
