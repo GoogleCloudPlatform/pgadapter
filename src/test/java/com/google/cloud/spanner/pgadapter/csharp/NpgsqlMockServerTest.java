@@ -16,28 +16,25 @@ package com.google.cloud.spanner.pgadapter.csharp;
 
 import static org.junit.Assert.assertEquals;
 
-import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
-import java.io.File;
+import com.google.spanner.v1.ExecuteSqlRequest;
 import java.io.IOException;
-import java.util.Scanner;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class NpgsqlMockServerTest extends AbstractMockServerTest {
+public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
+
+  private String createConnectionString() {
+    return String.format(
+        "Host=localhost;Port=%d;Database=d;SSL Mode=Disable", pgServer.getLocalPort());
+  }
 
   @Test
-  public void testPing() throws IOException, InterruptedException {
-    ProcessBuilder builder = new ProcessBuilder();
-    String[] compileCommand = "dotnet run".split(" ");
-    builder.command(compileCommand);
-    builder.directory(new File("./src/test/csharp/pgadapter_npgsql_tests/npgsql_tests"));
-    Process process = builder.start();
-    Scanner scanner = new Scanner(process.getInputStream());
-    String output = scanner.nextLine();
-    int res = process.waitFor();
-    assertEquals(0, res);
-    assertEquals("Here is C#", output);
+  public void testSelect1() throws IOException, InterruptedException {
+    String result = execute("TestSelect1", createConnectionString());
+    assertEquals("Success", result);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 }
