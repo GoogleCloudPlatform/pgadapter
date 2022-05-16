@@ -21,6 +21,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
@@ -141,8 +142,28 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
                           .build())
                   .build())
           .build();
+
+  // npgsql assumes that the following types are *always* present.
+  //  _int16Handler = new Int16Handler(PgType("smallint"));
+  //  _int32Handler = new Int32Handler(PgType("integer"));
+  //  _int64Handler = new Int64Handler(PgType("bigint"));
+  //  _doubleHandler = new DoubleHandler(PgType("double precision"));
+  //  _numericHandler = new NumericHandler(PgType("numeric"));
+  //  _textHandler ??= new TextHandler(PgType("text"), _connector.TextEncoding);
+  //  _timestampHandler ??= new TimestampHandler(PgType("timestamp without time zone"));
+  //  _timestampTzHandler ??= new TimestampTzHandler(PgType("timestamp with time zone"));
+  //  _dateHandler ??= new DateHandler(PgType("date"));
+  //  _boolHandler ??= new BoolHandler(PgType("boolean"));
+  //
+  // pg_catalog	21	int2	b	false
   private static final com.google.spanner.v1.ResultSet SELECT_TYPES_RESULTSET =
-      com.google.spanner.v1.ResultSet.newBuilder().setMetadata(SELECT_TYPES_METADATA).build();
+      ResultSet.newBuilder()
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .build()
+          )
+          .setMetadata(SELECT_TYPES_METADATA).build();
   private static final Statement SELECT_ATTRIBUTES =
       Statement.of(
           "SELECT typ.oid, att.attname, att.atttypid\n"

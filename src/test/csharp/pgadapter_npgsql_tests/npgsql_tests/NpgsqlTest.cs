@@ -9,7 +9,8 @@ public class NpgsqlTest
     {
         if (args.Length != 2)
         {
-            throw new ArgumentException($"Unexpected number of arguments: Got {args.Length}, Want 2: TestName ConnectionString");
+            throw new ArgumentException($"Unexpected number of arguments: " +
+                                        $"Got {args.Length}, Want 2: TestName ConnectionString");
         }
         var test = new NpgsqlTest(args[0], args[1]);
         test.Execute();
@@ -60,10 +61,5 @@ public class NpgsqlTest
             }
         }
         Console.WriteLine("Success");
-    }
-
-    public void Ping()
-    {
-        Console.WriteLine("Here is C#");
     }
 }
