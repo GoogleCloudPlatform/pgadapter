@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.channels;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.google.common.io.Resources;
 import com.google.common.net.HostAndPort;
 import io.grpc.Channel;
 import io.grpc.ManagedChannel;
@@ -28,6 +27,7 @@ import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -35,7 +35,6 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 
 /** Utility functions for creating GRPC Channels that require certificates. */
 public final class TestChannelWithCertificates {
@@ -133,12 +132,12 @@ public final class TestChannelWithCertificates {
     }
 
     /** Copies cert resource to file, stripping out PEM comments. */
-    public static File copyCert(String resourceName) throws IOException {
-      URL resourceUrl = Resources.getResource(resourceName);
+    public static File copyCert(String certFileName) throws IOException {
+      File certFile = new File(certFileName);
       File file = File.createTempFile("CAcert", "pem");
       file.deleteOnExit();
       try (BufferedReader in =
-              new BufferedReader(new InputStreamReader(resourceUrl.openStream(), UTF_8));
+              new BufferedReader(new InputStreamReader(new FileInputStream(certFile), UTF_8));
           Writer out = new OutputStreamWriter(new FileOutputStream(file), UTF_8)) {
         String line;
         do {
