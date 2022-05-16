@@ -116,6 +116,8 @@ public class ConnectionHandler extends Thread {
               + ConnectionOptions.CHANNEL_PROVIDER_PROPERTY_NAME
               + "="
               + System.getProperty(CHANNEL_PROVIDER_PROPERTY);
+      // This forces the connection to use NoCredentials.
+      uri = uri + ";usePlainText=true";
       try {
         Class.forName(System.getProperty(CHANNEL_PROVIDER_PROPERTY));
       } catch (ClassNotFoundException e) {
