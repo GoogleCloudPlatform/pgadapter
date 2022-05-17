@@ -20,6 +20,7 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.protobuf.ListValue;
+import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
@@ -31,6 +32,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Scanner;
 import org.junit.BeforeClass;
+import org.postgresql.core.Oid;
 
 public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTest {
   private static final Statement SELECT_VERSION = Statement.of("SELECT version()");
@@ -161,9 +163,106 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
           .addRows(
               ListValue.newBuilder()
                   .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
-                  .build()
-          )
-          .setMetadata(SELECT_TYPES_METADATA).build();
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT2)).build())
+                  .addValues(Value.newBuilder().setStringValue("int2").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT4)).build())
+                  .addValues(Value.newBuilder().setStringValue("int4").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT8)).build())
+                  .addValues(Value.newBuilder().setStringValue("int8").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT8)).build())
+                  .addValues(Value.newBuilder().setStringValue("float8").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.NUMERIC)).build())
+                  .addValues(Value.newBuilder().setStringValue("numeric").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.NUMERIC)).build())
+                  .addValues(Value.newBuilder().setStringValue("numeric").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.TEXT)).build())
+                  .addValues(Value.newBuilder().setStringValue("text").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.TIMESTAMP)).build())
+                  .addValues(Value.newBuilder().setStringValue("timestamp").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(
+                      Value.newBuilder().setStringValue(String.valueOf(Oid.TIMESTAMPTZ)).build())
+                  .addValues(Value.newBuilder().setStringValue("timestamptz").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.DATE)).build())
+                  .addValues(Value.newBuilder().setStringValue("date").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.BOOL)).build())
+                  .addValues(Value.newBuilder().setStringValue("bool").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .setMetadata(SELECT_TYPES_METADATA)
+          .build();
   private static final Statement SELECT_ATTRIBUTES =
       Statement.of(
           "SELECT typ.oid, att.attname, att.atttypid\n"

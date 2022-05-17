@@ -18,6 +18,8 @@ import static org.junit.Assert.assertEquals;
 
 import com.google.spanner.v1.ExecuteSqlRequest;
 import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -33,8 +35,12 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   @Test
   public void testSelect1() throws IOException, InterruptedException {
     String result = execute("TestSelect1", createConnectionString());
-    assertEquals("Success", result);
+    assertEquals("Success\n", result);
 
-    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    List<ExecuteSqlRequest> requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(SELECT1.getSql()))
+            .collect(Collectors.toList());
+    assertEquals(1, requests.size());
   }
 }
