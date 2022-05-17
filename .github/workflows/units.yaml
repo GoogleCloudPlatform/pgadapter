@@ -4,6 +4,8 @@ name: units
 jobs:
   ubuntu:
     runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: true
     strategy:
       fail-fast: false
       matrix:
@@ -31,6 +33,8 @@ jobs:
           verbose: true
   windows:
     runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
     strategy:
       fail-fast: false
       matrix:
