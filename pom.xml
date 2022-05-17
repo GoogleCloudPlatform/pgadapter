@@ -22,7 +22,11 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <excludedTests>com.google.cloud.spanner.pgadapter.IntegrationTest,com.google.cloud.spanner.pgadapter.golang.GolangTest</excludedTests>
+    <excludedTests>
+      com.google.cloud.spanner.pgadapter.IntegrationTest,
+      com.google.cloud.spanner.pgadapter.golang.GolangTest,
+      com.google.cloud.spanner.pgadapter.csharp.DotnetTest
+    </excludedTests>
 
     <spanner.version>6.24.0</spanner.version>
   </properties>
