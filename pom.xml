@@ -315,6 +315,7 @@
           </execution>
         </executions>
         <configuration>
+          <append>true</append>
           <excludes>
             <exclude>com/google/cloud/spanner/pgadapter/parsers/copy/**/*</exclude>
           </excludes>
