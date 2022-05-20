@@ -1,5 +1,7 @@
 on:
   pull_request:
+  # This allows manual activation of this action for testing.
+  workflow_dispatch:
 name: integration
 env:
   GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
