@@ -26,23 +26,10 @@ public class StatementParser {
   /**
    * Simple method to escape SQL. Ultimately it is preferred that a user uses PreparedStatements but
    * for the case of psql emulation, we apply this to provide a simple layer of protection to the
-   * user. Here we simple escape the single quote if it is not currently escaped. Note that the only
-   * reason we are doing it manually is because StringEscapeUtils deprecated escapeSql.
+   * user. This method simply duplicates all single quotes (i.e. ' becomes '').
    */
   public static String singleQuoteEscape(String sql) {
-    StringBuilder result = new StringBuilder();
-    boolean currentCharacterIsEscaped = false;
-    for (char currentCharacter : sql.toCharArray()) {
-      if (currentCharacterIsEscaped) {
-        currentCharacterIsEscaped = false;
-      } else if (currentCharacter == '\\') {
-        currentCharacterIsEscaped = true;
-      } else if (currentCharacter == '\'') {
-        result.append('\\');
-      }
-      result.append(currentCharacter);
-    }
-    return result.toString();
+    return sql.replace("'", "''");
   }
 
   /** Determines the (update) command that was received from the sql string. */
