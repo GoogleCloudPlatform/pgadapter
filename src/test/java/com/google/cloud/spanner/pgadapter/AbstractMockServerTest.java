@@ -333,7 +333,7 @@ public abstract class AbstractMockServerTest {
       if (e.getErrorCode() == ErrorCode.FAILED_PRECONDITION
           && e.getMessage()
               .contains(
-                  "There is/are 1 connection(s) still open. Close all connections before calling closeSpanner()")) {
+                  "connection(s) still open. Close all connections before calling closeSpanner()")) {
         // Ignore this exception for now. It is caused by the fact that the PgAdapter proxy server
         // is not gracefully shutting down all connections when the proxy is stopped, and it also
         // does not wait until any connections that have been requested to close, actually have
