@@ -25,6 +25,7 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
@@ -50,14 +51,16 @@ import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.jdbc.TimestampUtils;
 
 /**
  * Tests the native PG JDBC driver in simple query mode. This is similar to the protocol that is
  * used by psql, and for example allows batches to be given as semicolon-separated strings.
  */
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
@@ -70,12 +73,28 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     doStartMockSpannerAndPgAdapterServers(null, Collections.emptyList());
   }
 
+  @Parameter public boolean useDomainSocket;
+
+  @Parameters(name = "useDomainSocket = {0}")
+  public static Object[] data() {
+    OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
+    return options.isDomainSocketEnabled() ? new Object[] {true, false} : new Object[] {false};
+  }
+
   /**
    * Creates a JDBC connection string that instructs the PG JDBC driver to use the default simple
    * mode for queries and DML statements. This makes the JDBC driver behave in (much) the same way
    * as psql.
    */
   private String createUrl() {
+    if (useDomainSocket) {
+      return String.format(
+          "jdbc:postgresql://localhost/?"
+              + "socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
+              + "&socketFactoryArg=/tmp/.s.PGSQL.%d"
+              + "&preferQueryMode=simple",
+          pgServer.getLocalPort());
+    }
     return String.format(
         "jdbc:postgresql://localhost:%d/my-db?preferQueryMode=simple", pgServer.getLocalPort());
   }
