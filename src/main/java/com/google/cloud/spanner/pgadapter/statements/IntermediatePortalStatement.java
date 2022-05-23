@@ -25,7 +25,6 @@ import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -95,9 +94,9 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
       ResultSet statementResult = connection.executeQuery(this.statement);
       setStatementResult(0, statementResult);
       return new DescribePortalMetadata(statementResult);
-    } catch (SpannerException e) {
-      logger.log(Level.SEVERE, e, e::getMessage);
-      throw e;
+    } catch (SpannerException exception) {
+      handleExecutionExceptionAndTransactionStatus(0, exception);
+      throw exception;
     }
   }
 }
