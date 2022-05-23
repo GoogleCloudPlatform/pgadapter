@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.transformDeleteToSelectParams;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.transformInsertToSelectParams;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.transformUpdateToSelectParams;
+import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.splitStatements;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -36,6 +37,7 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSortedSet;
 import java.util.Comparator;
 import java.util.Set;
@@ -61,6 +63,33 @@ public class IntermediateStatementTest {
   }
 
   @Mock private Connection connection;
+
+  @Test
+  public void testSplitStatements() {
+    assertEquals(ImmutableList.of(""), splitStatements(""));
+    assertEquals(ImmutableList.of("select 1"), splitStatements("select 1"));
+    assertEquals(ImmutableList.of("select 1"), splitStatements("select 1;"));
+    assertEquals(ImmutableList.of("select 1", "select 2"), splitStatements("select 1; select 2;"));
+    assertEquals(
+        ImmutableList.of("select '1;2'", "select 2"), splitStatements("select '1;2'; select 2;"));
+    assertEquals(
+        ImmutableList.of("select \"bobby;drop table\"", "select 2"),
+        splitStatements("select \"bobby;drop table\"; select 2;"));
+    assertEquals(
+        ImmutableList.of("select '1'';\"2'", "select 2"),
+        splitStatements("select '1'';\"2'; select 2;"));
+    assertEquals(
+        ImmutableList.of("select \"a\"\";b\"", "select 2"),
+        splitStatements("select \"a\"\";b\"; select 2;"));
+    assertEquals(
+        ImmutableList.of("select '1'''", "select '2'"),
+        splitStatements("select '1'''; select '2'"));
+    assertEquals(
+        ImmutableList.of("select '1'''", "select '2'''"),
+        splitStatements("select '1'''; select '2'''"));
+    assertEquals(
+        ImmutableList.of("select 1", "select '2'';'"), splitStatements("select 1; select '2'';'"));
+  }
 
   @Test
   public void testUpdateResultCount_ResultSet() {
