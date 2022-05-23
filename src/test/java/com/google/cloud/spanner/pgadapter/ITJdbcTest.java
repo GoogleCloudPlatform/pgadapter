@@ -27,6 +27,7 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -37,8 +38,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -59,9 +62,26 @@ public class ITJdbcTest implements IntegrationTest {
 
   @Parameter public String preferQueryMode;
 
-  @Parameters(name = "preferQueryMode = {0}")
-  public static Object[] data() {
-    return new Object[] {"extended", "simple"};
+  @Parameter(1)
+  public boolean useDomainSocket;
+
+  @Parameters(name = "preferQueryMode = {0}, useDomainSocket = {1}")
+  public static List<Object[]> data() {
+    OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
+    boolean[] useDomainSockets;
+    if (options.isDomainSocketEnabled()) {
+      useDomainSockets = new boolean[] {true, false};
+    } else {
+      useDomainSockets = new boolean[] {false};
+    }
+    String[] queryModes = {"extended", "simple"};
+    List<Object[]> parameters = new ArrayList<>();
+    for (String queryMode : queryModes) {
+      for (boolean useDomainSocket : useDomainSockets) {
+        parameters.add(new Object[] {queryMode, useDomainSocket});
+      }
+    }
+    return parameters;
   }
 
   @BeforeClass
