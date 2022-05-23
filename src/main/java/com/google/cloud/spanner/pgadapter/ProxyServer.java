@@ -15,7 +15,9 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.api.core.AbstractApiService;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
@@ -23,8 +25,10 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import com.google.common.collect.ImmutableList;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -35,9 +39,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.newsclub.net.unix.AFUNIXServerSocket;
+import org.newsclub.net.unix.AFUNIXSocketAddress;
 
 /**
  * The proxy server listens for incoming client connections and starts a new {@link
@@ -50,7 +58,18 @@ public class ProxyServer extends AbstractApiService {
   private final Properties properties;
   private final List<ConnectionHandler> handlers = Collections.synchronizedList(new LinkedList<>());
 
-  private ServerSocket serverSocket;
+  /**
+   * Latch that is closed when the TCP server has started. We need this to know the exact port that
+   * the TCP socket was assigned, so we can assign the same port number to the Unix domain socket.
+   */
+  private final CountDownLatch tcpStartedLatch = new CountDownLatch(1);
+  /**
+   * List of server sockets accepting connections. It currently only contains one TCP socket and
+   * optionally one Unix domain socket, but could in theory be expanded to contain multiple sockets
+   * of each type.
+   */
+  private final List<ServerSocket> serverSockets = Collections.synchronizedList(new LinkedList<>());
+
   private int localPort;
 
   /** The server will keep track of all messages it receives if it started in DEBUG mode. */
@@ -102,42 +121,73 @@ public class ProxyServer extends AbstractApiService {
     logger.log(Level.INFO, () -> String.format("Server started on port %d", getLocalPort()));
   }
 
+  interface ServerRunnable {
+    void run(CountDownLatch startupLatch, CountDownLatch stoppedLatch)
+        throws IOException, InterruptedException;
+  }
+
   @Override
   protected void doStart() {
-    Thread listenerThread =
-        new Thread("spanner-postgres-adapter-proxy-listener") {
-          @Override
-          public void run() {
-            try {
-              runServer();
-            } catch (IOException e) {
-              logger.log(
-                  Level.WARNING,
-                  e,
-                  () ->
-                      String.format(
-                          "Server on port %s stopped by exception: %s", getLocalPort(), e));
+    ImmutableList<ServerRunnable> serverRunnables;
+    if (options.isDomainSocketEnabled()) {
+      serverRunnables = ImmutableList.of(this::runTcpServer, this::runDomainSocketServer);
+    } else {
+      serverRunnables = ImmutableList.of(this::runTcpServer);
+    }
+    CountDownLatch startupLatch = new CountDownLatch(serverRunnables.size());
+    CountDownLatch stoppedLatch = new CountDownLatch(serverRunnables.size());
+    for (ServerRunnable server : serverRunnables) {
+      Thread listenerThread =
+          new Thread("spanner-postgres-adapter-proxy-listener") {
+            @Override
+            public void run() {
+              try {
+                server.run(startupLatch, stoppedLatch);
+              } catch (Exception exception) {
+                logger.log(
+                    Level.WARNING,
+                    exception,
+                    () ->
+                        String.format(
+                            "Server on port %s stopped by exception: %s",
+                            getLocalPort(), exception));
+              }
             }
-          }
-        };
-    listenerThread.start();
+          };
+      listenerThread.start();
+    }
+    try {
+      if (startupLatch.await(30L, TimeUnit.SECONDS)) {
+        notifyStarted();
+      } else {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.DEADLINE_EXCEEDED, "The server did not start in a timely fashion.");
+      }
+    } catch (InterruptedException interruptedException) {
+      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+    }
   }
 
   @Override
   protected void doStop() {
-    try {
-      logger.log(Level.INFO, () -> String.format("Server on port %d is stopping", getLocalPort()));
-      this.serverSocket.close();
-      logger.log(
-          Level.INFO, () -> String.format("Server socket on port %d closed", getLocalPort()));
-    } catch (IOException exception) {
-      logger.log(
-          Level.WARNING,
-          exception,
-          () ->
-              String.format(
-                  "Closing server socket on port %d failed: %s", getLocalPort(), exception));
+    for (ServerSocket serverSocket : this.serverSockets) {
+      try {
+        logger.log(
+            Level.INFO, () -> String.format("Server on socket %s is stopping", serverSocket));
+        serverSocket.close();
+        logger.log(
+            Level.INFO, () -> String.format("Server socket on socket %s closed", serverSocket));
+      } catch (IOException exception) {
+        logger.log(
+            Level.WARNING,
+            exception,
+            () -> String.format("Closing server socket %s failed: %s", serverSocket, exception));
+      }
     }
+    for (ConnectionHandler handler : this.handlers) {
+      handler.terminate();
+    }
+    notifyStopped();
   }
 
   /** Safely stops the server (iff started), closing specific socket and cleaning up. */
@@ -147,14 +197,37 @@ public class ProxyServer extends AbstractApiService {
   }
 
   /**
-   * Thread logic: opens the listening socket and instantiates the connection handler.
+   * Thread logic: opens the TCP listening socket and instantiates the connection handler.
    *
    * @throws IOException if ServerSocket cannot start.
    */
-  void runServer() throws IOException {
-    this.serverSocket = new ServerSocket(this.options.getProxyPort());
-    this.localPort = serverSocket.getLocalPort();
-    notifyStarted();
+  void runTcpServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch) throws IOException {
+    ServerSocket tcpSocket = new ServerSocket(this.options.getProxyPort());
+    this.serverSockets.add(tcpSocket);
+    this.localPort = tcpSocket.getLocalPort();
+    tcpStartedLatch.countDown();
+    runServer(tcpSocket, startupLatch, stoppedLatch);
+  }
+
+  void runDomainSocketServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch)
+      throws IOException, InterruptedException {
+    // Wait until the TCP server has started, so we can get the port number it is using.
+    if (!tcpStartedLatch.await(30L, TimeUnit.SECONDS)) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.DEADLINE_EXCEEDED, "Timeout while waiting for TCP server to start");
+    }
+    File tempDir = new File(this.options.getSocketFile(getLocalPort()));
+    AFUNIXServerSocket domainSocket = AFUNIXServerSocket.newInstance();
+    domainSocket.bind(AFUNIXSocketAddress.of(tempDir));
+    this.serverSockets.add(domainSocket);
+    runServer(domainSocket, startupLatch, stoppedLatch);
+  }
+
+  void runServer(
+      ServerSocket serverSocket, CountDownLatch startupLatch, CountDownLatch stoppedLatch)
+      throws IOException {
+    startupLatch.countDown();
+    awaitRunning();
     try {
       while (isRunning()) {
         Socket socket = serverSocket.accept();
@@ -170,23 +243,11 @@ public class ProxyServer extends AbstractApiService {
           Level.INFO,
           () ->
               String.format(
-                  "Socket exception on port %d: %s. This is normal when the server is stopped.",
-                  getLocalPort(), e));
+                  "Socket exception on socket %s: %s. This is normal when the server is stopped.",
+                  serverSocket, e));
     } finally {
-      for (ConnectionHandler handler : this.handlers) {
-        try {
-          handler.terminate();
-        } catch (Exception exception) {
-          logger.log(
-              Level.WARNING,
-              exception,
-              () ->
-                  String.format(
-                      "Connection handler %s could not be terminated: %s", handler, exception));
-        }
-      }
-      logger.log(Level.INFO, () -> String.format("Socket on port %d stopped", getLocalPort()));
-      notifyStopped();
+      logger.log(Level.INFO, () -> String.format("Socket %s stopped", serverSocket));
+      stoppedLatch.countDown();
     }
   }
 
