@@ -346,18 +346,19 @@ public class IntermediateStatement {
   /**
    * Clean up and save metadata when an exception occurs.
    *
-   * @param e The exception to store.
+   * @param exception The exception to store.
    */
-  protected void handleExecutionException(int index, SpannerException e) {
-    this.exceptions[index] = e;
+  protected void handleExecutionException(int index, SpannerException exception) {
+    this.exceptions[index] = exception;
     this.hasMoreData[index] = false;
   }
 
-  private void handleExecutionExceptionAndTransactionStatus(int index, SpannerException e) {
+  protected void handleExecutionExceptionAndTransactionStatus(
+      int index, SpannerException exception) {
     if (executionStatus == ExecutionStatus.EXPLICIT_TRANSACTION) {
       connectionHandler.setStatus(ConnectionStatus.TRANSACTION_ABORTED);
     }
-    handleExecutionException(index, e);
+    handleExecutionException(index, exception);
   }
 
   /** Execute the SQL statement, storing metadata. */

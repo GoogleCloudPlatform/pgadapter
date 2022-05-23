@@ -31,7 +31,6 @@ import com.google.cloud.spanner.pgadapter.wireoutput.EmptyQueryResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
 import java.text.MessageFormat;
 
@@ -134,20 +133,14 @@ public class QueryMessage extends ControlMessage {
         this.sendSpannerResult(index, this.statement, QueryMode.SIMPLE, 0L);
       }
     }
-    boolean inTransaction = connection.getSpannerConnection().isInTransaction();
-    Status transactionStatus = Status.IDLE;
-    if (inTransaction) {
-      if (connection.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
-        transactionStatus = Status.FAILED;
-        // Actively rollback the aborted transaction but still block clients
-        // Clear any statement tags, as these are not allowed for rollbacks.
-        connection.getSpannerConnection().setStatementTag(null);
-        connection.getSpannerConnection().rollback();
-      } else {
-        transactionStatus = Status.TRANSACTION;
-      }
+    if (connection.getSpannerConnection().isInTransaction()
+        && connection.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
+      // Actively rollback the aborted transaction but still block clients
+      // Clear any statement tags, as these are not allowed for rollbacks.
+      connection.getSpannerConnection().setStatementTag(null);
+      connection.getSpannerConnection().rollback();
     }
-    new ReadyResponse(this.outputStream, transactionStatus).send();
+    new ReadyResponse(this.outputStream, connection.getStatus().getReadyResponseStatus()).send();
     this.connection.cleanUp(this.statement);
   }
 }
