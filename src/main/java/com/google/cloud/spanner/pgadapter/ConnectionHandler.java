@@ -258,12 +258,21 @@ public class ConnectionHandler extends Thread {
    * Terminates this connection at the request of the server. This is called if the server is
    * shutting down while the connection is still active.
    */
-  void terminate() throws IOException {
+  void terminate() {
     if (this.status != ConnectionStatus.TERMINATED) {
       handleTerminate();
-    }
-    if (!socket.isClosed()) {
-      socket.close();
+      try {
+        if (!socket.isClosed()) {
+          socket.close();
+        }
+      } catch (IOException exception) {
+        logger.log(
+            Level.WARNING,
+            exception,
+            () ->
+                String.format(
+                    "Failed to close connection handler with ID %s: %s", getName(), exception));
+      }
     }
   }
 
