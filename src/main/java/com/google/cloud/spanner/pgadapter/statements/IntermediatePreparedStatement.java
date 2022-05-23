@@ -15,9 +15,11 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
@@ -32,6 +34,7 @@ import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Logger;
 import org.postgresql.core.Oid;
 
 /**
@@ -39,7 +42,8 @@ import org.postgresql.core.Oid;
  */
 @InternalApi
 public class IntermediatePreparedStatement extends IntermediateStatement {
-
+  private static final Logger logger =
+      Logger.getLogger(IntermediatePreparedStatement.class.getName());
   protected int[] parameterDataTypes;
   protected Statement statement;
 
@@ -77,6 +81,12 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   @Override
   public void execute() {
+    // TODO(230579451): Refactor to use ClientSideStatement information.
+    if (connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
+      handleTransactionAborted();
+      return;
+    }
+
     // If the portal has already been described, the statement has already been executed, and we
     // don't need to do that once more.
     if (getStatementResult(0) == null) {
@@ -94,9 +104,28 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
           connectionHandler.setStatus(
               connection.isInTransaction() ? ConnectionStatus.TRANSACTION : ConnectionStatus.IDLE);
         }
-      } catch (SpannerException e) {
-        handleExecutionException(0, e);
+      } catch (SpannerException exception) {
+        handleExecutionExceptionAndTransactionStatus(0, exception);
       }
+    }
+  }
+
+  private void handleTransactionAborted() {
+    // TODO(230579451): Refactor to use ClientSideStatement information.
+    String command = getCommand(0);
+    if ("COMMIT".equals(command) || "ROLLBACK".equals(command)) {
+      connectionHandler.setStatus(ConnectionStatus.IDLE);
+      // COMMIT rollbacks aborted transaction
+      commandTags.set(0, "ROLLBACK");
+      if (connection.isInTransaction()) {
+        connection.rollback();
+      }
+    } else {
+      handleExecutionException(
+          executedCount,
+          SpannerExceptionFactory.newSpannerException(
+              ErrorCode.INVALID_ARGUMENT, TRANSACTION_ABORTED_ERROR));
+      executedCount++;
     }
   }
 
@@ -130,16 +159,21 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   @Override
   public DescribeMetadata describe() {
-    if (this.parsedStatement.isQuery()) {
-      Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
-      try (ResultSet resultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN)) {
-        // TODO: Remove ResultSet.next() call once this is supported in the client library.
-        // See https://github.com/googleapis/java-spanner/pull/1691
-        resultSet.next();
-        return new DescribeStatementMetadata(getParameterTypes(), resultSet);
+    try {
+      if (this.parsedStatement.isQuery()) {
+        Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
+        try (ResultSet resultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN)) {
+          // TODO: Remove ResultSet.next() call once this is supported in the client library.
+          // See https://github.com/googleapis/java-spanner/pull/1691
+          resultSet.next();
+          return new DescribeStatementMetadata(getParameterTypes(), resultSet);
+        }
       }
+      return new DescribeStatementMetadata(getParameterTypes(), null);
+    } catch (SpannerException exception) {
+      this.handleExecutionExceptionAndTransactionStatus(0, exception);
+      throw exception;
     }
-    return new DescribeStatementMetadata(getParameterTypes(), null);
   }
 
   /**
