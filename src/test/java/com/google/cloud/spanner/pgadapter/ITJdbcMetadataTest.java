@@ -363,6 +363,11 @@ public class ITJdbcMetadataTest implements IntegrationTest {
               assertTrue("timestamptz".equals(name) || "timestamp with time zone".equals(name));
 
               assertTrue(columns.next());
+              assertEquals("col_date", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.DATE, columns.getInt("DATA_TYPE"));
+              assertEquals("date", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
               assertEquals("col_varchar", columns.getString("COLUMN_NAME"));
               assertEquals(Types.VARCHAR, columns.getInt("DATA_TYPE"));
               assertEquals("varchar", columns.getString("TYPE_NAME"));
