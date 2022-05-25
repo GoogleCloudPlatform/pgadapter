@@ -326,13 +326,15 @@ public abstract class AbstractMockServerTest {
 
   @AfterClass
   public static void stopMockSpannerAndPgAdapterServers() throws Exception {
-    try {
-      pgServer.stopServer();
-    } catch (IllegalStateException exception) {
-      logger.warning(
-          String.format(
-              "Ignoring %s as this can happen if the server is sent multiple invalid messages",
-              exception.getMessage()));
+    if (pgServer != null) {
+      try {
+        pgServer.stopServer();
+      } catch (IllegalStateException exception) {
+        logger.warning(
+            String.format(
+                "Ignoring %s as this can happen if the server is sent multiple invalid messages",
+                exception.getMessage()));
+      }
     }
     try {
       SpannerPool.closeSpannerPool();
@@ -351,8 +353,10 @@ public abstract class AbstractMockServerTest {
         throw exception;
       }
     }
-    spannerServer.shutdown();
-    spannerServer.awaitTermination(10L, TimeUnit.SECONDS);
+    if (spannerServer != null) {
+      spannerServer.shutdown();
+      spannerServer.awaitTermination(10L, TimeUnit.SECONDS);
+    }
   }
 
   /**

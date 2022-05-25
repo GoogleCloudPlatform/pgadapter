@@ -39,7 +39,9 @@ public class DomainSocketsTest extends AbstractMockServerTest {
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     // Hide the implementation in the base class to prevent PGAdapter to be started for the test
     // class.
-    assumeFalse(System.getProperty("os.name", "").contains("win"));
+    assumeFalse(
+        "Domain sockets are disabled by default on Windows",
+        System.getProperty("os.name", "").startsWith("Windows"));
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
   }
