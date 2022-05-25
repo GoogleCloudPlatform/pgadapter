@@ -92,7 +92,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       return String.format(
           "jdbc:postgresql://localhost/?"
               + "socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
-              + "&socketFactoryArg=/var/run/postgresql/.s.PGSQL.%d"
+              + "&socketFactoryArg=/tmp/.s.PGSQL.%d"
               + "&preferQueryMode=simple",
           pgServer.getLocalPort());
     }
