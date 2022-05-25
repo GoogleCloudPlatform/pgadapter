@@ -202,7 +202,7 @@ public class ProxyServer extends AbstractApiService {
    * @throws IOException if ServerSocket cannot start.
    */
   void runTcpServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch) throws IOException {
-    ServerSocket tcpSocket = new ServerSocket(this.options.getProxyPort());
+    ServerSocket tcpSocket = new ServerSocket(this.options.getProxyPort(), 1000);
     this.serverSockets.add(tcpSocket);
     this.localPort = tcpSocket.getLocalPort();
     tcpStartedLatch.countDown();
@@ -222,7 +222,7 @@ public class ProxyServer extends AbstractApiService {
         tempDir.mkdirs();
       }
       AFUNIXServerSocket domainSocket = AFUNIXServerSocket.newInstance();
-      domainSocket.bind(AFUNIXSocketAddress.of(tempDir));
+      domainSocket.bind(AFUNIXSocketAddress.of(tempDir), 1000);
       this.serverSockets.add(domainSocket);
       runServer(domainSocket, startupLatch, stoppedLatch);
     } catch (SocketException socketException) {
