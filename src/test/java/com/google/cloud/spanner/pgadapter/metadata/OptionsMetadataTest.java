@@ -33,7 +33,7 @@ public class OptionsMetadataTest {
         assertEquals("", options.getSocketFile(5432));
         assertFalse(options.isDomainSocketEnabled());
       } else {
-        assertEquals("/var/run/postgresql/.s.PGSQL.5432", options.getSocketFile(5432));
+        assertEquals("/tmp/.s.PGSQL.5432", options.getSocketFile(5432));
         assertTrue(options.isDomainSocketEnabled());
       }
     }
