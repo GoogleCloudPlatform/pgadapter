@@ -581,7 +581,7 @@ public class OptionsMetadata {
 
   /** Returns true if the OS is Windows. */
   public boolean isWindows() {
-    return osName.toLowerCase().startsWith("Windows");
+    return osName.toLowerCase().startsWith("windows");
   }
 
   /**
