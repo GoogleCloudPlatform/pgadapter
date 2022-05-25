@@ -229,7 +229,7 @@ public class ProxyServer extends AbstractApiService {
       logger.log(
           Level.SEVERE,
           String.format(
-              "Failed to bind to Unix domain socket. Please verify that the user running PGAdapter has write permission for file %s\nExecute ",
+              "Failed to bind to Unix domain socket. Please verify that the user running PGAdapter has write permission for file %s",
               tempDir),
           socketException);
       startupLatch.countDown();
