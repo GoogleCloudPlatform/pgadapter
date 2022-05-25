@@ -218,6 +218,9 @@ public class ProxyServer extends AbstractApiService {
     }
     File tempDir = new File(this.options.getSocketFile(getLocalPort()));
     try {
+      if (tempDir.getParentFile() != null && !tempDir.getParentFile().exists()) {
+        tempDir.mkdirs();
+      }
       AFUNIXServerSocket domainSocket = AFUNIXServerSocket.newInstance();
       domainSocket.bind(AFUNIXSocketAddress.of(tempDir));
       this.serverSockets.add(domainSocket);
