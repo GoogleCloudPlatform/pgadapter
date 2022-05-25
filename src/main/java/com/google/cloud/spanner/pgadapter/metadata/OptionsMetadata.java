@@ -78,7 +78,7 @@ public class OptionsMetadata {
   private static final String OPTION_HELP = "h";
   private static final String DEFAULT_PORT = "5432";
   private static final int MIN_PORT = 0, MAX_PORT = 65535;
-  private static final String DEFAULT_SOCKET_FILE = "/tmp/.s.PGSQL.%d";
+  private static final String DEFAULT_SOCKET_FILE = "/var/run/postgresql/.s.PGSQL.%d";
   /*Note: this is a private preview feature, not meant for GA version. */
   private static final String OPTION_SPANNER_ENDPOINT = "e";
   private static final String OPTION_JDBC_PROPERTIES = "r";

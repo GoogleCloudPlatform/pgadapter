@@ -217,10 +217,20 @@ public class ProxyServer extends AbstractApiService {
           ErrorCode.DEADLINE_EXCEEDED, "Timeout while waiting for TCP server to start");
     }
     File tempDir = new File(this.options.getSocketFile(getLocalPort()));
-    AFUNIXServerSocket domainSocket = AFUNIXServerSocket.newInstance();
-    domainSocket.bind(AFUNIXSocketAddress.of(tempDir));
-    this.serverSockets.add(domainSocket);
-    runServer(domainSocket, startupLatch, stoppedLatch);
+    try {
+      AFUNIXServerSocket domainSocket = AFUNIXServerSocket.newInstance();
+      domainSocket.bind(AFUNIXSocketAddress.of(tempDir));
+      this.serverSockets.add(domainSocket);
+      runServer(domainSocket, startupLatch, stoppedLatch);
+    } catch (SocketException socketException) {
+      logger.log(
+          Level.SEVERE,
+          String.format(
+              "Failed to bind to Unix domain socket. Please verify that the user running PGAdapter has write permission for file %s\nExecute ",
+              tempDir),
+          socketException);
+      startupLatch.countDown();
+    }
   }
 
   void runServer(
