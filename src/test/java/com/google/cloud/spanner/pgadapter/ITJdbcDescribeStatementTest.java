@@ -211,16 +211,14 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testParameterMetaDataInLimit() throws SQLException {
-    String sql = "select * from all_types order by col_varchar limit ? offset ?";
+    String sql = "select * from all_types order by col_varchar limit ?";
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
         ParameterMetaData metadata = statement.getParameterMetaData();
-        assertEquals(2, metadata.getParameterCount());
-        for (int index = 1; index <= metadata.getParameterCount(); index++) {
-          assertEquals(Types.BIGINT, metadata.getParameterType(index));
-          assertEquals(ParameterMetaData.parameterModeIn, metadata.getParameterMode(index));
-          assertEquals(ParameterMetaData.parameterNullableUnknown, metadata.isNullable(index));
-        }
+        assertEquals(1, metadata.getParameterCount());
+        assertEquals(Types.BIGINT, metadata.getParameterType(1));
+        assertEquals(ParameterMetaData.parameterModeIn, metadata.getParameterMode(1));
+        assertEquals(ParameterMetaData.parameterNullableUnknown, metadata.isNullable(1));
       }
     }
   }
