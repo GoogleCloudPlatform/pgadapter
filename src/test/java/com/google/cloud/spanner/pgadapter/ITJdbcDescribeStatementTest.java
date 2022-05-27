@@ -210,6 +210,22 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   }
 
   @Test
+  public void testParameterMetaDataInLimit() throws SQLException {
+    String sql = "select * from all_types order by col_varchar limit ? offset ?";
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        ParameterMetaData metadata = statement.getParameterMetaData();
+        assertEquals(2, metadata.getParameterCount());
+        for (int index = 1; index <= metadata.getParameterCount(); index++) {
+          assertEquals(Types.BIGINT, metadata.getParameterType(index));
+          assertEquals(ParameterMetaData.parameterModeIn, metadata.getParameterMode(index));
+          assertEquals(ParameterMetaData.parameterNullableUnknown, metadata.isNullable(index));
+        }
+      }
+    }
+  }
+
+  @Test
   public void testDescribeInvalidStatements() throws SQLException {
     for (String sql :
         new String[] {

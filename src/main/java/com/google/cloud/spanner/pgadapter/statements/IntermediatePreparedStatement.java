@@ -242,11 +242,23 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     }
   }
 
+  /**
+   * Transforms a query or DML statement into a SELECT statement that selects the parameters in the
+   * statements. Examples:
+   *
+   * <ul>
+   *   <li><code>select * from foo where id=$1</code> is transformed to <code>
+   *       select $1 from (select * from foo where id=$1) p</code>
+   *   <li><code>insert into foo (id, value) values ($1, $2)</code> is transformed to <code>
+   *       select $1, $2 from (select id=$1, value=$2 from foo) p</code>
+   * </ul>
+   */
   @VisibleForTesting
   Statement transformToSelectParams(Set<String> parameters) {
     switch (this.parsedStatement.getType()) {
       case QUERY:
-        return transformSelectToSelectParams(parameters);
+        return transformSelectToSelectParams(
+            this.parsedStatement.getSqlWithoutComments(), parameters);
       case UPDATE:
         return transformDmlToSelectParams(parameters);
       case CLIENT_SIDE:
@@ -257,13 +269,20 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     }
   }
 
-  private Statement transformSelectToSelectParams(Set<String> parameters) {
-    return Statement.of(
-        String.format(
-            "select %s from (%s) p",
-            String.join(", ", parameters), this.parsedStatement.getSqlWithoutComments()));
+  /**
+   * Transforms a query into one that selects the parameters in the query.
+   *
+   * <p>Example: <code>select id, value from foo where value like $1</code> is transformed to <code>
+   * select $1, $2 from (select id, value from foo where value like $1) p</code>
+   */
+  private static Statement transformSelectToSelectParams(String sql, Set<String> parameters) {
+    return Statement.of(String.format("select %s from (%s) p", String.join(", ", parameters), sql));
   }
 
+  /**
+   * Transforms a DML statement into a SELECT statement that selects the parameters in the DML
+   * statement.
+   */
   private Statement transformDmlToSelectParams(Set<String> parameters) {
     switch (getCommand(0)) {
       case "INSERT":
@@ -280,6 +299,27 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     }
   }
 
+  /**
+   * Transforms an INSERT statement into a SELECT statement that selects the parameters in the
+   * insert statement. The way this is done depends on whether the INSERT statement uses a VALUES
+   * clause or a SELECT statement. If the INSERT statement uses a SELECT clause, the same strategy
+   * is used as for normal SELECT statements. For INSERT statements with a VALUES clause, a SELECT
+   * statement is created that selects a comparison between the column where a value is inserted and
+   * the expression that is used to insert a value in the column.
+   *
+   * <p>Examples:
+   *
+   * <ul>
+   *   <li><code>insert into foo (id, value) values ($1, $2)</code> is transformed to <code>
+   *       select $1, $2 from (select id=$1, value=$2 from foo) p</code>
+   *   <li><code>
+   *       insert into bar (id, value, created_at) values (1, $1 + sqrt($2), current_timestamp())
+   *       </code> is transformed to <code>
+   *       select $1, $2 from (select value=$1 + sqrt($2) from bar) p</code>
+   *   <li><code>insert into foo values ($1, $2)</code> is transformed to <code>
+   *       select $1, $2 from (select id=$1, value=$2 from foo) p</code>
+   * </ul>
+   */
   @VisibleForTesting
   static @Nullable Statement transformInsertToSelectParams(
       Connection connection, String sql, Set<String> parameters) {
@@ -307,10 +347,8 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     if (parser.eat("select")) {
       // This is an `insert into <table> [(...)] select ...` statement. Then we can just use the
       // select statement as the result.
-      return Statement.of(
-          String.format(
-              "select %s from (%s) p",
-              String.join(", ", parameters), parser.getSql().substring(potentialSelectStart)));
+      return transformSelectToSelectParams(
+          parser.getSql().substring(potentialSelectStart), parameters);
     } else if (!parser.eat("values")) {
       return null;
     }
@@ -351,6 +389,11 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     return Statement.of(select.toString());
   }
 
+  /**
+   * Returns a list of all columns in the given table. This is used to transform insert statements
+   * without a column list. The query that is used does not use the INFORMATION_SCHEMA, but queries
+   * the table directly, so it can use the same transaction as the actual insert statement.
+   */
   static List<String> getAllColumns(Connection connection, String table) {
     try (ResultSet resultSet =
         connection.analyzeQuery(
@@ -361,6 +404,20 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     }
   }
 
+  /**
+   * Transforms an UPDATE statement into a SELECT statement that selects the parameters in the
+   * update statement. This is done by creating a SELECT statement that selects the assignment
+   * expressions in the UPDATE statement, followed by the WHERE clause of the UPDATE statement.
+   *
+   * <p>Examples:
+   *
+   * <ul>
+   *   <li><code>update foo set value=$1 where id=$2</code> is transformed to <code>
+   *       select $1, $2 from (select value=$1 from foo where id=$2) p</code>
+   *   <li><code>update bar set value=$1+sqrt($2), updated_at=current_timestamp()</code> is
+   *       transformed to <code>select $1, $2 from (select value=$1+sqrt($2) from foo) p</code>
+   * </ul>
+   */
   @VisibleForTesting
   static Statement transformUpdateToSelectParams(String sql, Set<String> parameters) {
     SimpleParser parser = new SimpleParser(sql);
@@ -399,6 +456,18 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     return Statement.of(select.toString());
   }
 
+  /**
+   * Transforms a DELETE statement into a SELECT statement that selects the parameters of the DELETE
+   * statement. This is done by creating a SELECT 1 FROM table_name WHERE ... statement from the
+   * DELETE statement.
+   *
+   * <p>Example:
+   *
+   * <ul>
+   *   <li><code>DELETE FROM foo WHERE id=$1</code> is transformed to <code>
+   *       SELECT $1 FROM (SELECT 1 FROM foo WHERE id=$1) p</code>
+   * </ul>
+   */
   @VisibleForTesting
   static Statement transformDeleteToSelectParams(String sql, Set<String> parameters) {
     SimpleParser parser = new SimpleParser(sql);

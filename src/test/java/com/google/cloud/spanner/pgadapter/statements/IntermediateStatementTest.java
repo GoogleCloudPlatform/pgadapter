@@ -191,6 +191,11 @@ public class IntermediateStatementTest {
         "select $1 from (select * from bar where some_col=$1) p",
         transformInsert("insert foo (col1, col2, col3) select * from bar where some_col=$1")
             .getSql());
+    assertEquals(
+        "select $1, $2 from (select * from bar where some_col=$1 limit $2) p",
+        transformInsert(
+                "insert foo (col1, col2, col3) select * from bar where some_col=$1 limit $2")
+            .getSql());
   }
 
   @Test
