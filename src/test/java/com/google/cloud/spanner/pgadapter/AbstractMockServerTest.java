@@ -368,21 +368,29 @@ public abstract class AbstractMockServerTest {
 
   @AfterClass
   public static void stopMockSpannerAndPgAdapterServers() throws Exception {
-    pgServer.stopServer();
+    try {
+      pgServer.stopServer();
+    } catch (IllegalStateException exception) {
+      logger.warning(
+          String.format(
+              "Ignoring %s as this can happen if the server is sent multiple invalid messages",
+              exception.getMessage()));
+    }
     try {
       SpannerPool.closeSpannerPool();
-    } catch (SpannerException e) {
-      if (e.getErrorCode() == ErrorCode.FAILED_PRECONDITION
-          && e.getMessage()
+    } catch (SpannerException exception) {
+      if (exception.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+          && exception
+              .getMessage()
               .contains(
                   "connection(s) still open. Close all connections before calling closeSpanner()")) {
         // Ignore this exception for now. It is caused by the fact that the PgAdapter proxy server
         // is not gracefully shutting down all connections when the proxy is stopped, and it also
         // does not wait until any connections that have been requested to close, actually have
         // closed.
-        logger.warning(String.format("Ignoring %s as this is expected", e.getMessage()));
+        logger.warning(String.format("Ignoring %s as this is expected", exception.getMessage()));
       } else {
-        throw e;
+        throw exception;
       }
     }
     spannerServer.shutdown();
