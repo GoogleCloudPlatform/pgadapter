@@ -59,7 +59,7 @@ public class BindMessage extends ControlMessage {
     this.connection.registerPortal(
         this.portalName,
         this.statement.bind(this.parameters, this.formatCodes, this.resultFormatCodes));
-    new BindCompleteResponse(this.outputStream).send();
+    new BindCompleteResponse(this.outputStream).send(false);
   }
 
   @Override
