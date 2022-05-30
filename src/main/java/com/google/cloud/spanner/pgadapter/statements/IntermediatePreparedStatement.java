@@ -34,6 +34,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSortedSet;
 import java.util.ArrayList;
@@ -41,6 +42,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -112,10 +115,17 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
           // TODO(230579929): Return warning that no transaction if connection status == IDLE.
           connectionHandler.setStatus(ConnectionStatus.IDLE);
         } else {
+          Stopwatch watch = Stopwatch.createStarted();
           StatementResult result = connection.execute(this.statement);
           this.updateResultCount(0, result);
           connectionHandler.setStatus(
               connection.isInTransaction() ? ConnectionStatus.TRANSACTION : ConnectionStatus.IDLE);
+          logger.log(
+              Level.FINE,
+              () ->
+                  String.format(
+                      "Executing prepared statement took %dms",
+                      watch.elapsed(TimeUnit.MILLISECONDS)));
         }
       } catch (SpannerException exception) {
         handleExecutionExceptionAndTransactionStatus(0, exception);
