@@ -84,8 +84,8 @@ public class ExecuteMessage extends ControlMessage {
       try {
         this.sendSpannerResult(0, this.statement, QueryMode.EXTENDED, this.maxRows);
         this.outputStream.flush();
-      } catch (Exception e) {
-        handleError(e);
+      } catch (Exception exception) {
+        handleError(exception);
       }
     }
     this.connection.cleanUp(this.statement);

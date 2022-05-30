@@ -294,9 +294,9 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   @Override
-  public void handleExecutionException(int index, SpannerException e) {
+  public void handleExecutionException(int index, SpannerException exception) {
     executor.shutdownNow();
-    super.handleExecutionException(index, e);
+    super.handleExecutionException(index, exception);
   }
 
   @Override

@@ -61,6 +61,7 @@ public class OptionsMetadata {
   private static final String DEFAULT_USER_AGENT = "pg-adapter";
 
   private static final String OPTION_SERVER_PORT = "s";
+  private static final String OPTION_SOCKET_FILE = "f";
   private static final String OPTION_PROJECT_ID = "p";
   private static final String OPTION_INSTANCE_ID = "i";
   private static final String OPTION_DATABASE_NAME = "d";
@@ -77,16 +78,19 @@ public class OptionsMetadata {
   private static final String OPTION_HELP = "h";
   private static final String DEFAULT_PORT = "5432";
   private static final int MIN_PORT = 0, MAX_PORT = 65535;
+  private static final String DEFAULT_SOCKET_FILE = "/tmp/.s.PGSQL.%d";
   /*Note: this is a private preview feature, not meant for GA version. */
   private static final String OPTION_SPANNER_ENDPOINT = "e";
   private static final String OPTION_JDBC_PROPERTIES = "r";
   private static final String OPTION_SERVER_VERSION = "v";
   private static final String OPTION_DEBUG_MODE = "debug";
 
+  private final String osName;
   private final CommandLine commandLine;
   private final CommandMetadataParser commandMetadataParser;
   private final String defaultConnectionUrl;
   private final int proxyPort;
+  private final String socketFile;
   private final TextFormat textFormat;
   private final boolean binaryFormat;
   private final boolean authenticate;
@@ -100,6 +104,11 @@ public class OptionsMetadata {
   private final boolean debugMode;
 
   public OptionsMetadata(String[] args) {
+    this(System.getProperty("os.name", ""), args);
+  }
+
+  OptionsMetadata(String osName, String[] args) {
+    this.osName = osName;
     this.commandLine = buildOptions(args);
     this.commandMetadataParser = new CommandMetadataParser();
     if (this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
@@ -109,6 +118,7 @@ public class OptionsMetadata {
       this.defaultConnectionUrl = null;
     }
     this.proxyPort = buildProxyPort(commandLine);
+    this.socketFile = buildSocketFile(commandLine);
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
@@ -134,10 +144,34 @@ public class OptionsMetadata {
       boolean requiresMatcher,
       boolean replaceJdbcMetadataQueries,
       JSONObject commandMetadata) {
+    this(
+        System.getProperty("os.name", ""),
+        defaultConnectionUrl,
+        proxyPort,
+        textFormat,
+        forceBinary,
+        authenticate,
+        requiresMatcher,
+        replaceJdbcMetadataQueries,
+        commandMetadata);
+  }
+
+  OptionsMetadata(
+      String osName,
+      String defaultConnectionUrl,
+      int proxyPort,
+      TextFormat textFormat,
+      boolean forceBinary,
+      boolean authenticate,
+      boolean requiresMatcher,
+      boolean replaceJdbcMetadataQueries,
+      JSONObject commandMetadata) {
+    this.osName = osName;
     this.commandLine = null;
     this.commandMetadataParser = new CommandMetadataParser();
     this.defaultConnectionUrl = defaultConnectionUrl;
     this.proxyPort = proxyPort;
+    this.socketFile = isWindows() ? "" : DEFAULT_SOCKET_FILE;
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
@@ -192,6 +226,13 @@ public class OptionsMetadata {
       throw new IllegalArgumentException("Port must be between " + MIN_PORT + " and " + MAX_PORT);
     }
     return port;
+  }
+
+  private String buildSocketFile(CommandLine commandLine) {
+    // Unix domain sockets are disabled by default on Windows.
+    return commandLine
+        .getOptionValue(OPTION_SOCKET_FILE, isWindows() ? "" : DEFAULT_SOCKET_FILE)
+        .trim();
   }
 
   /**
@@ -306,6 +347,15 @@ public class OptionsMetadata {
     Options options = new Options();
     options.addOption(
         OPTION_SERVER_PORT, "server-port", true, "This proxy's port number (Default 5432).");
+    options.addOption(
+        OPTION_SOCKET_FILE,
+        "server-socket-file",
+        true,
+        String.format(
+            "This proxy's domain socket file (Default %s). "
+                + "Domain sockets are disabled by default on Windows. Set this property to a non-empty value on Windows to enable domain sockets. "
+                + "Set this property to the empty string on other operating systems to disable domain sockets.",
+            String.format(DEFAULT_SOCKET_FILE, 5432)));
     options.addRequiredOption(
         OPTION_PROJECT_ID,
         "project",
@@ -493,6 +543,14 @@ public class OptionsMetadata {
     return this.proxyPort;
   }
 
+  public boolean isDomainSocketEnabled() {
+    return !Strings.isNullOrEmpty(this.socketFile);
+  }
+
+  public String getSocketFile(int localPort) {
+    return String.format(this.socketFile, localPort);
+  }
+
   public TextFormat getTextFormat() {
     return this.textFormat;
   }
@@ -519,6 +577,11 @@ public class OptionsMetadata {
 
   public String getServerVersion() {
     return serverVersion;
+  }
+
+  /** Returns true if the OS is Windows. */
+  public boolean isWindows() {
+    return osName.toLowerCase().contains("win");
   }
 
   /**

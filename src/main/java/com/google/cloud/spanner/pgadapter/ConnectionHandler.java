@@ -63,9 +63,10 @@ import java.util.logging.Logger;
  */
 @InternalApi
 public class ConnectionHandler extends Thread {
-
   private static final Logger logger = Logger.getLogger(ConnectionHandler.class.getName());
   private static final AtomicLong CONNECTION_HANDLER_ID_GENERATOR = new AtomicLong(0L);
+  private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
+
   private final ProxyServer server;
   private final Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
@@ -108,6 +109,24 @@ public class ConnectionHandler extends Thread {
       uri = uri.substring("jdbc:".length());
     }
     uri = appendPropertiesToUrl(uri, getServer().getProperties());
+    if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
+      uri =
+          uri
+              + ";"
+              + ConnectionOptions.CHANNEL_PROVIDER_PROPERTY_NAME
+              + "="
+              + System.getProperty(CHANNEL_PROVIDER_PROPERTY);
+      // This forces the connection to use NoCredentials.
+      uri = uri + ";usePlainText=true";
+      try {
+        Class.forName(System.getProperty(CHANNEL_PROVIDER_PROPERTY));
+      } catch (ClassNotFoundException e) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "Unknown or invalid channel provider: "
+                + System.getProperty(CHANNEL_PROVIDER_PROPERTY));
+      }
+    }
     ConnectionOptions connectionOptions = ConnectionOptions.newBuilder().setUri(uri).build();
     Connection spannerConnection = connectionOptions.getConnection();
     try {
@@ -239,12 +258,21 @@ public class ConnectionHandler extends Thread {
    * Terminates this connection at the request of the server. This is called if the server is
    * shutting down while the connection is still active.
    */
-  void terminate() throws IOException {
+  void terminate() {
     if (this.status != ConnectionStatus.TERMINATED) {
       handleTerminate();
-    }
-    if (!socket.isClosed()) {
-      socket.close();
+      try {
+        if (!socket.isClosed()) {
+          socket.close();
+        }
+      } catch (IOException exception) {
+        logger.log(
+            Level.WARNING,
+            exception,
+            () ->
+                String.format(
+                    "Failed to close connection handler with ID %s: %s", getName(), exception));
+      }
     }
   }
 

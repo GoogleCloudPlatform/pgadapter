@@ -664,7 +664,10 @@ public class ProtocolTest {
     assertEquals(expectedFormatCodes, ((BindMessage) message).getResultFormatCodes());
 
     when(intermediatePreparedStatement.bind(
-            ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+            ArgumentMatchers.anyString(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any()))
         .thenReturn(intermediatePortalStatement);
 
     message.send();
@@ -1130,8 +1133,8 @@ public class ProtocolTest {
 
     String expectedSQL = "INSERT INTO users (name) VALUES ('test')";
 
-    when(connection.isInTransaction()).thenReturn(true);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.TRANSACTION);
     when(statementResult.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
     when(statementResult.getUpdateCount()).thenReturn(1L);
     when(connection.execute(Statement.of(expectedSQL))).thenReturn(statementResult);

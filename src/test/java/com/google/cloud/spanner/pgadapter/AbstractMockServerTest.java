@@ -28,6 +28,7 @@ import com.google.cloud.spanner.admin.database.v1.MockDatabaseAdminImpl;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -250,6 +251,47 @@ public abstract class AbstractMockServerTest {
         .collect(Collectors.toList());
   }
 
+  protected static ResultSetMetadata createMetadata(ImmutableList<TypeCode> types) {
+    StructType.Builder builder = StructType.newBuilder();
+    for (int index = 0; index < types.size(); index++) {
+      builder.addFields(
+          Field.newBuilder()
+              .setType(
+                  Type.newBuilder()
+                      .setCode(types.get(index))
+                      .setTypeAnnotation(
+                          types.get(index) == TypeCode.NUMERIC
+                              ? TypeAnnotationCode.PG_NUMERIC
+                              : TypeAnnotationCode.TYPE_ANNOTATION_CODE_UNSPECIFIED)
+                      .build())
+              .setName("")
+              .build());
+    }
+    return ResultSetMetadata.newBuilder().setRowType(builder.build()).build();
+  }
+
+  protected static ResultSetMetadata createMetadata(
+      ImmutableList<TypeCode> types, ImmutableList<String> names) {
+    Preconditions.checkArgument(
+        types.size() == names.size(), "Types and names must have same length");
+    StructType.Builder builder = StructType.newBuilder();
+    for (int index = 0; index < types.size(); index++) {
+      builder.addFields(
+          Field.newBuilder()
+              .setType(
+                  Type.newBuilder()
+                      .setCode(types.get(index))
+                      .setTypeAnnotation(
+                          types.get(index) == TypeCode.NUMERIC
+                              ? TypeAnnotationCode.PG_NUMERIC
+                              : TypeAnnotationCode.TYPE_ANNOTATION_CODE_UNSPECIFIED)
+                      .build())
+              .setName(names.get(index))
+              .build());
+    }
+    return ResultSetMetadata.newBuilder().setRowType(builder.build()).build();
+  }
+
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers("d", Collections.emptyList());
@@ -327,21 +369,29 @@ public abstract class AbstractMockServerTest {
 
   @AfterClass
   public static void stopMockSpannerAndPgAdapterServers() throws Exception {
-    pgServer.stopServer();
+    try {
+      pgServer.stopServer();
+    } catch (IllegalStateException exception) {
+      logger.warning(
+          String.format(
+              "Ignoring %s as this can happen if the server is sent multiple invalid messages",
+              exception.getMessage()));
+    }
     try {
       SpannerPool.closeSpannerPool();
-    } catch (SpannerException e) {
-      if (e.getErrorCode() == ErrorCode.FAILED_PRECONDITION
-          && e.getMessage()
+    } catch (SpannerException exception) {
+      if (exception.getErrorCode() == ErrorCode.FAILED_PRECONDITION
+          && exception
+              .getMessage()
               .contains(
-                  "There is/are 1 connection(s) still open. Close all connections before calling closeSpanner()")) {
+                  "connection(s) still open. Close all connections before calling closeSpanner()")) {
         // Ignore this exception for now. It is caused by the fact that the PgAdapter proxy server
         // is not gracefully shutting down all connections when the proxy is stopped, and it also
         // does not wait until any connections that have been requested to close, actually have
         // closed.
-        logger.warning(String.format("Ignoring %s as this is expected", e.getMessage()));
+        logger.warning(String.format("Ignoring %s as this is expected", exception.getMessage()));
       } else {
-        throw e;
+        throw exception;
       }
     }
     spannerServer.shutdown();
