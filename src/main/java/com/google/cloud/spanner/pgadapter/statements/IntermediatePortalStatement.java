@@ -42,8 +42,9 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   public IntermediatePortalStatement(
       ConnectionHandler connectionHandler,
       OptionsMetadata options,
+      String name,
       ParsedStatement parsedStatement) {
-    super(connectionHandler, options, parsedStatement);
+    super(connectionHandler, options, name, parsedStatement);
     this.statement = Statement.of(parsedStatement.getSqlWithoutComments());
     this.parameterFormatCodes = new ArrayList<>();
     this.resultFormatCodes = new ArrayList<>();

@@ -15,9 +15,9 @@
 package com.google.cloud.spanner.pgadapter.golang;
 
 import static org.junit.Assert.assertNull;
-import static org.junit.Assume.assumeFalse;
 
 import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.Key;
@@ -75,13 +75,14 @@ public class ITPgxTest implements IntegrationTest {
             + "col_int int, "
             + "col_numeric numeric, "
             + "col_timestamptz timestamptz, "
+            + "col_date date, "
             + "col_varchar varchar(100))");
   }
 
   private GoString createConnString() {
     return new GoString(
         String.format(
-            "postgres://uid:pwd@localhost:%d/?statement_cache_capacity=0&sslmode=disable&prefer_simple_protocol=%s",
+            "postgres://uid:pwd@localhost:%d/?sslmode=disable&prefer_simple_protocol=%s",
             testEnv.getServer().getLocalPort(), preferQueryMode.equals("simple")));
   }
 
@@ -106,6 +107,8 @@ public class ITPgxTest implements IntegrationTest {
                 .to(new BigDecimal("6.626"))
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("2022-02-16T14:18:02.123456789+01:00"))
+                .set("col_date")
+                .to(Date.parseDate("2022-03-29"))
                 .set("col_varchar")
                 .to("test")
                 .build()));
@@ -118,7 +121,7 @@ public class ITPgxTest implements IntegrationTest {
 
   @Test
   public void testQueryAllDataTypes() {
-    assertNull(pgxTest.TestQueryAllDataTypes(createConnString(), false));
+    assertNull(pgxTest.TestQueryAllDataTypes(createConnString()));
   }
 
   @Test
@@ -128,19 +131,26 @@ public class ITPgxTest implements IntegrationTest {
     testEnv.write(
         databaseId, Collections.singletonList(Mutation.delete("all_types", Key.of(100L))));
 
-    assertNull(pgxTest.TestInsertAllDataTypes(createConnString(), false));
+    assertNull(pgxTest.TestInsertAllDataTypes(createConnString()));
+  }
+
+  @Test
+  public void testPrepareStatement() {
+    assertNull(pgxTest.TestPrepareStatement(createConnString()));
+  }
+
+  @Test
+  public void testPrepareSelectStatement() {
+    assertNull(pgxTest.TestPrepareSelectStatement(createConnString()));
   }
 
   @Test
   public void testInsertNullsAllDataTypes() {
-    assumeFalse(
-        "Untyped parameters are not yet supported by Spangres", preferQueryMode.equals("extended"));
-
     // Make sure there is no row that already exists with col_bigint=100
     String databaseId = database.getId().getDatabase();
     testEnv.write(
         databaseId, Collections.singletonList(Mutation.delete("all_types", Key.of(100L))));
 
-    assertNull(pgxTest.TestInsertNullsAllDataTypes(createConnString(), false));
+    assertNull(pgxTest.TestInsertNullsAllDataTypes(createConnString()));
   }
 }

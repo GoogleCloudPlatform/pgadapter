@@ -23,6 +23,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
@@ -38,6 +39,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -124,6 +126,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(new BigDecimal("3.14"))
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00"))
+                .set("col_date")
+                .to(Date.parseDate("2022-05-23"))
                 .set("col_varchar")
                 .to("test")
                 .build()));
@@ -151,7 +155,7 @@ public class ITJdbcTest implements IntegrationTest {
   public void testSelectWithParameters() throws SQLException {
     boolean isSimpleMode = "simple".equalsIgnoreCase(preferQueryMode);
     String sql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
@@ -161,6 +165,7 @@ public class ITJdbcTest implements IntegrationTest {
             + "and col_int=? "
             + "and col_numeric=? "
             + "and col_timestamptz=? "
+            + "and col_date=? "
             + "and col_varchar=?";
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
@@ -177,23 +182,29 @@ public class ITJdbcTest implements IntegrationTest {
         statement.setBigDecimal(++index, new BigDecimal("3.14"));
         statement.setTimestamp(
             ++index, Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00").toSqlTimestamp());
+        statement.setObject(++index, LocalDate.of(2022, 5, 23));
         statement.setString(++index, "test");
 
         try (ResultSet resultSet = statement.executeQuery()) {
           assertTrue(resultSet.next());
 
-          assertEquals(1, resultSet.getLong(1));
-          assertTrue(resultSet.getBoolean(2));
+          index = 0;
+          assertEquals(1, resultSet.getLong(++index));
+          assertTrue(resultSet.getBoolean(++index));
           if (!isSimpleMode) {
-            assertArrayEquals("test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(3));
+            assertArrayEquals("test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(++index));
+          } else {
+            ++index;
           }
-          assertEquals(3.14d, resultSet.getDouble(4), 0.0d);
-          assertEquals(1, resultSet.getInt(5));
-          assertEquals(new BigDecimal("3.14"), resultSet.getBigDecimal(6));
+          assertEquals(3.14d, resultSet.getDouble(++index), 0.0d);
+          assertEquals(1, resultSet.getInt(++index));
+          assertEquals(new BigDecimal("3.14"), resultSet.getBigDecimal(++index));
           assertEquals(
               Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00").toSqlTimestamp(),
-              resultSet.getTimestamp(7));
-          assertEquals("test", resultSet.getString(8));
+              resultSet.getTimestamp(++index));
+          assertEquals(
+              LocalDate.parse("2022-05-23"), resultSet.getObject(++index, LocalDate.class));
+          assertEquals("test", resultSet.getString(++index));
 
           assertFalse(resultSet.next());
         }
@@ -208,8 +219,8 @@ public class ITJdbcTest implements IntegrationTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setBoolean(++index, true);
@@ -224,6 +235,7 @@ public class ITJdbcTest implements IntegrationTest {
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
         statement.setTimestamp(
             ++index, Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp());
+        statement.setObject(++index, LocalDate.parse("2000-02-29"));
         statement.setString(++index, "string_test");
 
         assertEquals(1, statement.executeUpdate());
@@ -233,18 +245,23 @@ public class ITJdbcTest implements IntegrationTest {
           connection.createStatement().executeQuery("select * from all_types where col_bigint=2")) {
         assertTrue(resultSet.next());
 
-        assertEquals(2, resultSet.getLong(1));
-        assertTrue(resultSet.getBoolean(2));
+        int index = 0;
+        assertEquals(2, resultSet.getLong(++index));
+        assertTrue(resultSet.getBoolean(++index));
         if (!isSimpleMode) {
-          assertArrayEquals("bytes_test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(3));
+          assertArrayEquals(
+              "bytes_test".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(++index));
+        } else {
+          ++index;
         }
-        assertEquals(10.1d, resultSet.getDouble(4), 0.0d);
-        assertEquals(100, resultSet.getInt(5));
-        assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(6));
+        assertEquals(10.1d, resultSet.getDouble(++index), 0.0d);
+        assertEquals(100, resultSet.getInt(++index));
+        assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(++index));
         assertEquals(
             Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp(),
-            resultSet.getTimestamp(7));
-        assertEquals("string_test", resultSet.getString(8));
+            resultSet.getTimestamp(++index));
+        assertEquals(LocalDate.of(2000, 2, 29), resultSet.getObject(++index, LocalDate.class));
+        assertEquals("string_test", resultSet.getString(++index));
 
         assertFalse(resultSet.next());
       }
@@ -263,6 +280,7 @@ public class ITJdbcTest implements IntegrationTest {
             + "col_int=?, "
             + "col_numeric=?, "
             + "col_timestamptz=?, "
+            + "col_date=?, "
             + "col_varchar=? "
             + "where col_bigint=?";
 
@@ -281,6 +299,7 @@ public class ITJdbcTest implements IntegrationTest {
         statement.setTimestamp(
             ++index,
             Timestamp.parseTimestamp("2022-02-11T14:04:59.123456789+01:00").toSqlTimestamp());
+        statement.setObject(++index, LocalDate.of(2000, 1, 1));
         statement.setString(++index, "updated");
         statement.setLong(++index, 1);
 
@@ -291,20 +310,25 @@ public class ITJdbcTest implements IntegrationTest {
           connection.createStatement().executeQuery("select * from all_types where col_bigint=1")) {
         assertTrue(resultSet.next());
 
-        assertEquals(1, resultSet.getLong(1));
-        assertFalse(resultSet.getBoolean(2));
+        int index = 0;
+        assertEquals(1, resultSet.getLong(++index));
+        assertFalse(resultSet.getBoolean(++index));
         if (!isSimpleMode) {
-          assertArrayEquals("updated".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(3));
+          assertArrayEquals(
+              "updated".getBytes(StandardCharsets.UTF_8), resultSet.getBytes(++index));
+        } else {
+          ++index;
         }
-        assertEquals(3.14d * 2d, resultSet.getDouble(4), 0.0d);
-        assertEquals(2, resultSet.getInt(5));
-        assertEquals(new BigDecimal("10.0"), resultSet.getBigDecimal(6));
+        assertEquals(3.14d * 2d, resultSet.getDouble(++index), 0.0d);
+        assertEquals(2, resultSet.getInt(++index));
+        assertEquals(new BigDecimal("10.0"), resultSet.getBigDecimal(++index));
         // Note: The JDBC driver already truncated the timestamp value before it was sent to PG.
         // So here we read back the truncated value.
         assertEquals(
             Timestamp.parseTimestamp("2022-02-11T14:04:59.123457+01:00").toSqlTimestamp(),
-            resultSet.getTimestamp(7));
-        assertEquals("updated", resultSet.getString(8));
+            resultSet.getTimestamp(++index));
+        assertEquals(LocalDate.parse("2000-01-01"), resultSet.getObject(++index, LocalDate.class));
+        assertEquals("updated", resultSet.getString(++index));
 
         assertFalse(resultSet.next());
       }
@@ -314,13 +338,11 @@ public class ITJdbcTest implements IntegrationTest {
   @Test
   public void testNullValues() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
-      // TODO: Add col_timestamptz to the statement when PgAdapter allows untyped null values.
-      // The PG JDBC driver sends date and timestamp parameters with type code Oid.UNSPECIFIED.
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setNull(++index, Types.BOOLEAN);
@@ -328,12 +350,8 @@ public class ITJdbcTest implements IntegrationTest {
         statement.setNull(++index, Types.DOUBLE);
         statement.setNull(++index, Types.INTEGER);
         statement.setNull(++index, Types.NUMERIC);
-        // TODO: Enable the next line when PgAdapter allows untyped null values.
-        // This is currently blocked on both the Spangres backend allowing untyped null values in
-        // SQL statements, as well as the Java client library and/or JDBC driver allowing untyped
-        // null values.
-        // See also https://github.com/googleapis/java-spanner/pull/1680
-        // statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
+        statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
+        statement.setNull(++index, Types.DATE);
         statement.setNull(++index, Types.VARCHAR);
 
         assertEquals(1, statement.executeUpdate());
@@ -359,6 +377,8 @@ public class ITJdbcTest implements IntegrationTest {
         assertNull(resultSet.getBigDecimal(++index));
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getTimestamp(++index));
+        assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getDate(++index));
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getString(++index));
         assertTrue(resultSet.wasNull());
@@ -494,7 +514,7 @@ public class ITJdbcTest implements IntegrationTest {
               new FileInputStream("./src/test/resources/all_types_data.txt"));
       assertEquals(10_000L, copyCount);
 
-      // Verify that the table is still empty.
+      // Verify that there are 10,000 rows in the table.
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("select count(*) from all_types")) {
         assertTrue(resultSet.next());
@@ -503,8 +523,7 @@ public class ITJdbcTest implements IntegrationTest {
       }
 
       // Delete the imported data to prevent the cleanup method to fail on 'Too many mutations'
-      // when
-      // it tries to delete all data using a normal transaction.
+      // when it tries to delete all data using a normal transaction.
       connection.createStatement().execute("delete from all_types");
     }
   }
@@ -623,6 +642,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(new BigDecimal("-3.14"))
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("2022-04-22T19:27:30+02:00"))
+                .set("col_date")
+                .to(Date.parseDate("2000-01-01"))
                 .set("col_varchar")
                 .to("bar")
                 .build(),
@@ -641,6 +662,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to((BigDecimal) null)
                 .set("col_timestamptz")
                 .to((Timestamp) null)
+                .set("col_date")
+                .to((Date) null)
                 .set("col_varchar")
                 .to((String) null)
                 .build(),
@@ -659,6 +682,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(BigDecimal.ZERO)
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("0001-01-01T00:00:00Z"))
+                .set("col_date")
+                .to(Date.parseDate("0001-01-01"))
                 .set("col_varchar")
                 .to("")
                 .build(),
@@ -677,6 +702,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(BigDecimal.ZERO)
                 .set("col_timestamptz")
                 .to(Timestamp.parseTimestamp("0001-01-01T00:00:00Z"))
+                .set("col_date")
+                .to(Date.parseDate("0001-01-01"))
                 .set("col_varchar")
                 .to("")
                 .build()));

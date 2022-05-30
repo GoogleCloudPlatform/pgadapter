@@ -58,7 +58,8 @@ public class BindMessage extends ControlMessage {
   protected void sendPayload() throws Exception {
     this.connection.registerPortal(
         this.portalName,
-        this.statement.bind(this.parameters, this.formatCodes, this.resultFormatCodes));
+        this.statement.bind(
+            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes));
     new BindCompleteResponse(this.outputStream).send();
   }
 

@@ -267,7 +267,7 @@ public class StatementTest {
     when(connection.execute(statement)).thenReturn(statementResult);
 
     IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(connectionHandler, options, parse(sqlStatement));
+        new IntermediatePreparedStatement(connectionHandler, options, "", parse(sqlStatement));
     intermediateStatement.setParameterDataTypes(parameterDataTypes);
 
     assertEquals(sqlStatement, intermediateStatement.getSql());
@@ -275,7 +275,7 @@ public class StatementTest {
     byte[][] parameters = {"userName".getBytes(), "20".getBytes(), "30".getBytes()};
     IntermediatePortalStatement intermediatePortalStatement =
         intermediateStatement.bind(
-            parameters, Arrays.asList((short) 0, (short) 0, (short) 0), new ArrayList<>());
+            "", parameters, Arrays.asList((short) 0, (short) 0, (short) 0), new ArrayList<>());
     intermediateStatement.execute();
     verify(connection).execute(statement);
 
@@ -291,14 +291,14 @@ public class StatementTest {
     int[] parameterDataTypes = new int[] {Oid.JSON};
 
     IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(connectionHandler, options, parse(sqlStatement));
+        new IntermediatePreparedStatement(connectionHandler, options, "", parse(sqlStatement));
     intermediateStatement.setParameterDataTypes(parameterDataTypes);
 
     byte[][] parameters = {"{}".getBytes()};
 
     assertThrows(
         IllegalArgumentException.class,
-        () -> intermediateStatement.bind(parameters, new ArrayList<>(), new ArrayList<>()));
+        () -> intermediateStatement.bind("", parameters, new ArrayList<>(), new ArrayList<>()));
   }
 
   @Test
@@ -309,7 +309,10 @@ public class StatementTest {
         .thenReturn(resultSet);
 
     IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(connectionHandler, options, parse(sqlStatement));
+        new IntermediatePreparedStatement(connectionHandler, options, "", parse(sqlStatement));
+    int[] parameters = new int[3];
+    Arrays.fill(parameters, Oid.INT8);
+    intermediateStatement.setParameterDataTypes(parameters);
 
     intermediateStatement.describe();
   }
@@ -321,7 +324,7 @@ public class StatementTest {
     when(connection.executeQuery(Statement.of(sqlStatement))).thenReturn(resultSet);
 
     IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(connectionHandler, options, parse(sqlStatement));
+        new IntermediatePortalStatement(connectionHandler, options, "", parse(sqlStatement));
 
     intermediateStatement.describe();
 
@@ -361,7 +364,7 @@ public class StatementTest {
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
 
     IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(connectionHandler, options, parse(sqlStatement));
+        new IntermediatePortalStatement(connectionHandler, options, "", parse(sqlStatement));
 
     when(connection.executeQuery(Statement.of(sqlStatement)))
         .thenThrow(
