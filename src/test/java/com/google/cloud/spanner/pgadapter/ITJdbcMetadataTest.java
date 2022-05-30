@@ -327,6 +327,11 @@ public class ITJdbcMetadataTest implements IntegrationTest {
               assertTrue("timestamptz".equals(name) || "timestamp with time zone".equals(name));
 
               assertTrue(columns.next());
+              assertEquals("col_date", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.DATE, columns.getInt("DATA_TYPE"));
+              assertEquals("date", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
               assertEquals("col_varchar", columns.getString("COLUMN_NAME"));
               assertEquals(Types.VARCHAR, columns.getInt("DATA_TYPE"));
               assertEquals("varchar", columns.getString("TYPE_NAME"));
@@ -361,6 +366,11 @@ public class ITJdbcMetadataTest implements IntegrationTest {
               assertEquals(Types.TIMESTAMP, columns.getInt("DATA_TYPE"));
               String name = columns.getString("TYPE_NAME");
               assertTrue("timestamptz".equals(name) || "timestamp with time zone".equals(name));
+
+              assertTrue(columns.next());
+              assertEquals("col_date", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.DATE, columns.getInt("DATA_TYPE"));
+              assertEquals("date", columns.getString("TYPE_NAME"));
 
               assertTrue(columns.next());
               assertEquals("col_varchar", columns.getString("COLUMN_NAME"));
@@ -648,6 +658,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             assertEquals(Types.NUMERIC, results.get("numeric").intValue());
             assertTrue(results.containsKey("timestamptz"));
             assertEquals(Types.TIMESTAMP, results.get("timestamptz").intValue());
+            assertTrue(results.containsKey("date"));
+            assertEquals(Types.DATE, results.get("date").intValue());
             assertTrue(results.containsKey("varchar"));
             assertEquals(Types.VARCHAR, results.get("varchar").intValue());
           } catch (SQLException e) {
@@ -834,35 +846,19 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet schemas = metadata.getSchemas()) {
               assertTrue(schemas.next());
-              // TODO: Remove once TABLE_CATALOG is always filled.
-              if (schemas.getString("TABLE_CATALOG") != null) {
-                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
-              }
+              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
               assertEquals("information_schema", schemas.getString("TABLE_SCHEM"));
 
               assertTrue(schemas.next());
-              // TODO: Remove once TABLE_CATALOG is always filled.
-              if (schemas.getString("TABLE_CATALOG") != null) {
-                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
-              }
-              // TODO: Remove once pg_catalog is always present.
-              if ("pg_catalog".equals(schemas.getString("TABLE_SCHEM"))) {
-                assertEquals("pg_catalog", schemas.getString("TABLE_SCHEM"));
+              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
+              assertEquals("pg_catalog", schemas.getString("TABLE_SCHEM"));
 
-                assertTrue(schemas.next());
-              }
-
-              // TODO: Remove once TABLE_CATALOG is always filled.
-              if (schemas.getString("TABLE_CATALOG") != null) {
-                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
-              }
+              assertTrue(schemas.next());
+              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
               assertEquals("public", schemas.getString("TABLE_SCHEM"));
 
               assertTrue(schemas.next());
-              // TODO: Remove once TABLE_CATALOG is always filled.
-              if (schemas.getString("TABLE_CATALOG") != null) {
-                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
-              }
+              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
               assertEquals("spanner_sys", schemas.getString("TABLE_SCHEM"));
 
               assertFalse(schemas.next());
@@ -870,10 +866,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
             try (ResultSet schemas = metadata.getSchemas(null, "public")) {
               assertTrue(schemas.next());
-              // TODO: Remove once TABLE_CATALOG is always filled.
-              if (schemas.getString("TABLE_CATALOG") != null) {
-                assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
-              }
+              assertEquals(database.getId().getDatabase(), schemas.getString("TABLE_CATALOG"));
               assertEquals("public", schemas.getString("TABLE_SCHEM"));
 
               assertFalse(schemas.next());

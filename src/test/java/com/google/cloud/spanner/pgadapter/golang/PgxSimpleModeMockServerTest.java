@@ -159,7 +159,7 @@ public class PgxSimpleModeMockServerTest extends AbstractMockServerTest {
     String sql = "SELECT * FROM all_types WHERE col_bigint=1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
-    String res = pgxTest.TestQueryAllDataTypes(createConnString(), true);
+    String res = pgxTest.TestQueryAllDataTypes(createConnString());
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
@@ -174,15 +174,15 @@ public class PgxSimpleModeMockServerTest extends AbstractMockServerTest {
     String sql =
         String.format(
             "INSERT INTO all_types "
-                + "(col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar) "
-                + "values (100, true, '%s', 3.14, '%s', '%s', '%s', 'test_string')",
+                + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                + "values (100, true, '%s', 3.14, 1, '%s', '%s', '%s', 'test_string')",
             "\\x" + Utils.toHexString("test_bytes".getBytes(StandardCharsets.UTF_8)),
             "6626e-3",
             "2022-03-24 07:39:10.123456+01:00:00",
-            "2022-04-02 00:00:00Z");
+            "2022-04-02");
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
 
-    String res = pgxTest.TestInsertAllDataTypes(createConnString(), true);
+    String res = pgxTest.TestInsertAllDataTypes(createConnString());
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
@@ -199,7 +199,7 @@ public class PgxSimpleModeMockServerTest extends AbstractMockServerTest {
             + "values (100, null, null, null, null, null, null, null, null)";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
 
-    String res = pgxTest.TestInsertNullsAllDataTypes(createConnString(), true);
+    String res = pgxTest.TestInsertNullsAllDataTypes(createConnString());
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
