@@ -40,6 +40,8 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Data type to store simple SQL statement with designated metadata. Allows manipulation of
@@ -48,6 +50,8 @@ import java.util.Objects;
  */
 @InternalApi
 public class IntermediateStatement {
+  private static final Logger logger = Logger.getLogger(IntermediateStatement.class.getName());
+
   public static final String TRANSACTION_ABORTED_ERROR =
       "current transaction is aborted, commands ignored until end of transaction block";
   protected static final PostgreSQLStatementParser PARSER =
@@ -509,8 +513,15 @@ public class IntermediateStatement {
     }
     // We need to start an implicit transaction.
     // Check if a read-only transaction suffices.
+    logger.log(
+        Level.FINE,
+        () -> String.format("Starting implicit transaction for statement with index %d", index));
     connection.beginTransaction();
     if (!hasDmlStatementsAfter(index)) {
+      logger.log(
+          Level.FINE,
+          () ->
+              String.format("Setting transaction to read-only for statement with index %d", index));
       connection.setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
     }
   }

@@ -44,8 +44,12 @@ public class ExecuteMessage extends ControlMessage {
 
   @Override
   protected void sendPayload() throws Exception {
+    Stopwatch watch = Stopwatch.createStarted();
     this.statement.execute();
     this.handleExecute();
+    logger.log(
+        Level.FINE,
+        () -> String.format("Handling execute took %dms", watch.elapsed(TimeUnit.MILLISECONDS)));
   }
 
   @Override
