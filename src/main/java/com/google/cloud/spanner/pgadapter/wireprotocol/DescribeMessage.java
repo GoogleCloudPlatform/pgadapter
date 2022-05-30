@@ -49,10 +49,14 @@ public class DescribeMessage extends ControlMessage {
 
   @Override
   protected void sendPayload() throws Exception {
-    if (this.type == PreparedType.Portal) {
-      this.handleDescribePortal();
-    } else {
-      this.handleDescribeStatement();
+    try {
+      if (this.type == PreparedType.Portal) {
+        this.handleDescribePortal();
+      } else {
+        this.handleDescribeStatement();
+      }
+    } catch (SpannerException e) {
+      handleError(e);
     }
   }
 

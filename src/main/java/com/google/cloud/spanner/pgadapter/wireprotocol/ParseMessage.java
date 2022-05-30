@@ -47,7 +47,7 @@ public class ParseMessage extends ControlMessage {
     }
     this.statement =
         new IntermediatePreparedStatement(
-            connection, connection.getServer().getOptions(), parsedStatement);
+            connection, connection.getServer().getOptions(), name, parsedStatement);
     this.statement.setParameterDataTypes(this.parameterDataTypes);
   }
 

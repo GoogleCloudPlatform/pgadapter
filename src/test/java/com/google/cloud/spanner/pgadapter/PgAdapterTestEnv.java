@@ -108,6 +108,7 @@ public final class PgAdapterTestEnv {
               + "col_int int, "
               + "col_numeric numeric, "
               + "col_timestamptz timestamptz, "
+              + "col_date date, "
               + "col_varchar varchar(100))");
 
   // The project Id. This can be overwritten.

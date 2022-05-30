@@ -346,6 +346,73 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testDescribeQueryWithNonExistingTable() throws SQLException {
+    String sql = "select * from non_existing_table where id=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql),
+            Status.NOT_FOUND
+                .withDescription("Table non_existing_table not found")
+                .asRuntimeException()));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        SQLException exception =
+            assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
+        assertTrue(
+            exception.getMessage(),
+            exception.getMessage().contains("Table non_existing_table not found"));
+      }
+    }
+
+    // We only receive one ExecuteSql request, as PGAdapter tries to describe the portal first.
+    // As that statement fails, it does not try to describe the parameters in the statement, but
+    // just returns the error from the DescribePortal statement.
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(1, requests.size());
+    assertEquals(sql, requests.get(0).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
+  }
+
+  @Test
+  public void testDescribeDmlWithNonExistingTable() throws SQLException {
+    String sql = "update non_existing_table set value=$2 where id=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql),
+            Status.NOT_FOUND
+                .withDescription("Table non_existing_table not found")
+                .asRuntimeException()));
+    String describeSql =
+        "select $1, $2 from (select value=$2 from non_existing_table where id=$1) p";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(describeSql),
+            Status.NOT_FOUND
+                .withDescription("Table non_existing_table not found")
+                .asRuntimeException()));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        SQLException exception =
+            assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
+        assertTrue(
+            exception.getMessage(),
+            exception.getMessage().contains("Table non_existing_table not found"));
+      }
+    }
+
+    // We receive two ExecuteSql requests:
+    // 1. DescribeStatement (parameters). This statement fails as the table does not exist.
+    // 2. Because the DescribeStatement step fails, PGAdapter executes the DML statement in analyze
+    // mode to force a 'correct' error message.
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(2, requests.size());
+    assertEquals(describeSql, requests.get(0).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
+    assertEquals(sql, requests.get(1).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(1).getQueryMode());
+  }
+
+  @Test
   public void testTwoDmlStatements() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {

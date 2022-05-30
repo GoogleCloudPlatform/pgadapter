@@ -664,7 +664,10 @@ public class ProtocolTest {
     assertEquals(expectedFormatCodes, ((BindMessage) message).getResultFormatCodes());
 
     when(intermediatePreparedStatement.bind(
-            ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+            ArgumentMatchers.anyString(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any(),
+            ArgumentMatchers.any()))
         .thenReturn(intermediatePortalStatement);
 
     message.send();
