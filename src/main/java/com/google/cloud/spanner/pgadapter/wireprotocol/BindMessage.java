@@ -18,12 +18,9 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
-import com.google.common.base.Stopwatch;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -61,16 +58,11 @@ public class BindMessage extends ControlMessage {
    */
   @Override
   protected void sendPayload() throws Exception {
-    Stopwatch watch = Stopwatch.createStarted();
     this.connection.registerPortal(
         this.portalName,
         this.statement.bind(
             this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes));
-    new BindCompleteResponse(this.outputStream).send(false);
-    logger.log(
-        Level.FINE,
-        () ->
-            String.format("Handling BindMessage took %dms", watch.elapsed(TimeUnit.MILLISECONDS)));
+    new BindCompleteResponse(this.outputStream).send();
   }
 
   @Override

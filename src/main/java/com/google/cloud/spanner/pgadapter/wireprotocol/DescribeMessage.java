@@ -112,7 +112,7 @@ public class DescribeMessage extends ControlMessage {
                     ((DescribePortalMetadata) this.statement.describe()).getMetadata(),
                     this.connection.getServer().getOptions(),
                     QueryMode.EXTENDED)
-                .send(false);
+                .send();
             break;
           } catch (SpannerException exception) {
             this.handleError(exception);

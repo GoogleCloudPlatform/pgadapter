@@ -57,7 +57,7 @@ public class ParseMessage extends ControlMessage {
       throw new IllegalStateException("Must close statement before reusing name.");
     }
     this.connection.registerStatement(this.name, this.statement);
-    new ParseCompleteResponse(this.outputStream).send(false);
+    new ParseCompleteResponse(this.outputStream).send();
   }
 
   @Override
