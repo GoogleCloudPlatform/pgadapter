@@ -101,10 +101,9 @@ public class ITPgxTest implements IntegrationTest {
 
   private GoString createConnString() {
     if (useDomainSocket) {
-      // TODO: Fix once verified that the test fails.
       return new GoString(
           String.format(
-              "host=/tmpnotfound port=%d prefer_simple_protocol=%s",
+              "host=/tmp port=%d prefer_simple_protocol=%s",
               testEnv.getServer().getLocalPort(), preferQueryMode.equals("simple")));
     }
     return new GoString(
