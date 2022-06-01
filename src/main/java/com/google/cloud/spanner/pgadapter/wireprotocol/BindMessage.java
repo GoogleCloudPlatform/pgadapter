@@ -21,7 +21,6 @@ import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.List;
-import java.util.logging.Logger;
 
 /**
  * Message of type bind (meaning that it is a message called to a prepared statement to complete it
@@ -30,8 +29,6 @@ import java.util.logging.Logger;
  */
 @InternalApi
 public class BindMessage extends ControlMessage {
-  private static final Logger logger = Logger.getLogger(BindMessage.class.getName());
-
   protected static final char IDENTIFIER = 'B';
 
   private String portalName;

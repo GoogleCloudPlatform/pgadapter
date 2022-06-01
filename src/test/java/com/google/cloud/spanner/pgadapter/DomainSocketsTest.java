@@ -79,7 +79,7 @@ public class DomainSocketsTest extends AbstractMockServerTest {
 
   @Test
   public void testCustomDomainSocketFile() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of("-f", "./.s.PGSQL.%d"));
+    doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of("-dir", "./"));
 
     String sql = "SELECT 1";
 
@@ -96,7 +96,7 @@ public class DomainSocketsTest extends AbstractMockServerTest {
 
   @Test
   public void testConnectionFailsForIncorrectDomainSocketFile() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of("-f", "./sockets/.s.PGSQL.%d"));
+    doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of("-dir", "./sockets"));
 
     assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl("./.s.PGSQL.%d")));
 
@@ -105,7 +105,7 @@ public class DomainSocketsTest extends AbstractMockServerTest {
 
   @Test
   public void testPGAdapterStartFailsWithInvalidSocketFile() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of("-f", "/.s.PGSQL.%d"));
+    doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of("-dir", "/"));
 
     // Verify that we cannot connect to the invalid (not permitted) domain socket.
     assertThrows(SQLException.class, () -> DriverManager.getConnection(createUrl("/.s.PGSQL.%d")));

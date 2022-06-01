@@ -43,9 +43,22 @@ public class OptionsMetadataTest {
   public void testCustomDomainSocketFile() {
     for (String os : new String[] {"ubuntu", "windows"}) {
       OptionsMetadata options =
-          new OptionsMetadata(os, new String[] {"-p p", "-i i", "-f /tmp/.my-socket.%d"});
-      assertEquals("/tmp/.my-socket.5432", options.getSocketFile(5432));
+          new OptionsMetadata(os, new String[] {"-p p", "-i i", "-c \"\"", "-dir /pgadapter"});
+      assertEquals("/pgadapter/.s.PGSQL.5432", options.getSocketFile(5432));
       assertTrue(options.isDomainSocketEnabled());
     }
+  }
+
+  @Test
+  public void testDefaultMaxBacklog() {
+    OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
+    assertEquals(1000, options.getMaxBacklog());
+  }
+
+  @Test
+  public void testCustomMaxBacklog() {
+    OptionsMetadata options =
+        new OptionsMetadata(new String[] {"-p p", "-i i", "-max_backlog 100"});
+    assertEquals(100, options.getMaxBacklog());
   }
 }

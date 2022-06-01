@@ -18,17 +18,11 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.common.base.Stopwatch;
 import java.text.MessageFormat;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /** Executes a portal. */
 @InternalApi
 public class ExecuteMessage extends ControlMessage {
-  private static final Logger logger = Logger.getLogger(ExecuteMessage.class.getName());
-
   protected static final char IDENTIFIER = 'E';
 
   private String name;
@@ -44,12 +38,8 @@ public class ExecuteMessage extends ControlMessage {
 
   @Override
   protected void sendPayload() throws Exception {
-    Stopwatch watch = Stopwatch.createStarted();
     this.statement.execute();
     this.handleExecute();
-    logger.log(
-        Level.FINE,
-        () -> String.format("Handling execute took %dms", watch.elapsed(TimeUnit.MILLISECONDS)));
   }
 
   @Override
@@ -91,14 +81,8 @@ public class ExecuteMessage extends ControlMessage {
       this.handleError(this.statement.getException(0));
     } else {
       try {
-        Stopwatch watch = Stopwatch.createStarted();
         this.sendSpannerResult(0, this.statement, QueryMode.EXTENDED, this.maxRows);
         this.outputStream.flush();
-        logger.log(
-            Level.FINE,
-            () ->
-                String.format(
-                    "Sending query results took %dms", watch.elapsed(TimeUnit.MILLISECONDS)));
       } catch (Exception exception) {
         handleError(exception);
       }
