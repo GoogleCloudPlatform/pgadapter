@@ -23,7 +23,6 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableList;
 import java.text.MessageFormat;
 
 /** Creates a prepared statement. */
@@ -41,7 +40,6 @@ public class ParseMessage extends ControlMessage {
     super(connection);
     this.name = this.readString();
     ParsedStatement parsedStatement = PARSER.parse(Statement.of(this.readString()));
-    ImmutableList.Builder<Integer> builder = ImmutableList.builder();
     short numberOfParameters = this.inputStream.readShort();
     this.parameterDataTypes = new int[numberOfParameters];
     for (int i = 0; i < numberOfParameters; i++) {

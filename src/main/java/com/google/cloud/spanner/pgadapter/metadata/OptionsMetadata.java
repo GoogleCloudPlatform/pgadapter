@@ -19,6 +19,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.Server;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -61,7 +62,8 @@ public class OptionsMetadata {
   private static final String DEFAULT_USER_AGENT = "pg-adapter";
 
   private static final String OPTION_SERVER_PORT = "s";
-  private static final String OPTION_SOCKET_FILE = "f";
+  private static final String OPTION_SOCKET_DIR = "dir";
+  private static final String OPTION_MAX_BACKLOG = "max_backlog";
   private static final String OPTION_PROJECT_ID = "p";
   private static final String OPTION_INSTANCE_ID = "i";
   private static final String OPTION_DATABASE_NAME = "d";
@@ -78,7 +80,9 @@ public class OptionsMetadata {
   private static final String OPTION_HELP = "h";
   private static final String DEFAULT_PORT = "5432";
   private static final int MIN_PORT = 0, MAX_PORT = 65535;
-  private static final String DEFAULT_SOCKET_FILE = "/tmp/.s.PGSQL.%d";
+  private static final String DEFAULT_SOCKET_DIR = "/tmp";
+  private static final String SOCKET_FILE_NAME = ".s.PGSQL.%d";
+  private static final int DEFAULT_MAX_BACKLOG = 1000;
   /*Note: this is a private preview feature, not meant for GA version. */
   private static final String OPTION_SPANNER_ENDPOINT = "e";
   private static final String OPTION_JDBC_PROPERTIES = "r";
@@ -91,6 +95,7 @@ public class OptionsMetadata {
   private final String defaultConnectionUrl;
   private final int proxyPort;
   private final String socketFile;
+  private final int maxBacklog;
   private final TextFormat textFormat;
   private final boolean binaryFormat;
   private final boolean authenticate;
@@ -119,6 +124,7 @@ public class OptionsMetadata {
     }
     this.proxyPort = buildProxyPort(commandLine);
     this.socketFile = buildSocketFile(commandLine);
+    this.maxBacklog = buildMaxBacklog(commandLine);
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
@@ -171,7 +177,8 @@ public class OptionsMetadata {
     this.commandMetadataParser = new CommandMetadataParser();
     this.defaultConnectionUrl = defaultConnectionUrl;
     this.proxyPort = proxyPort;
-    this.socketFile = isWindows() ? "" : DEFAULT_SOCKET_FILE;
+    this.socketFile = isWindows() ? "" : DEFAULT_SOCKET_DIR + File.separatorChar + SOCKET_FILE_NAME;
+    this.maxBacklog = DEFAULT_MAX_BACKLOG;
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
@@ -230,9 +237,27 @@ public class OptionsMetadata {
 
   private String buildSocketFile(CommandLine commandLine) {
     // Unix domain sockets are disabled by default on Windows.
-    return commandLine
-        .getOptionValue(OPTION_SOCKET_FILE, isWindows() ? "" : DEFAULT_SOCKET_FILE)
-        .trim();
+    String directory =
+        commandLine.getOptionValue(OPTION_SOCKET_DIR, isWindows() ? "" : DEFAULT_SOCKET_DIR).trim();
+    if (!Strings.isNullOrEmpty(directory)) {
+      if (directory.charAt(directory.length() - 1) != File.separatorChar) {
+        directory += File.separatorChar;
+      }
+      return directory + SOCKET_FILE_NAME;
+    }
+    return "";
+  }
+
+  private int buildMaxBacklog(CommandLine commandLine) {
+    int backlog =
+        Integer.parseInt(
+            commandLine
+                .getOptionValue(OPTION_MAX_BACKLOG, String.valueOf(DEFAULT_MAX_BACKLOG))
+                .trim());
+    if (backlog <= 0) {
+      throw new IllegalArgumentException("Max backlog must be greater than 0");
+    }
+    return backlog;
   }
 
   /**
@@ -348,14 +373,20 @@ public class OptionsMetadata {
     options.addOption(
         OPTION_SERVER_PORT, "server-port", true, "This proxy's port number (Default 5432).");
     options.addOption(
-        OPTION_SOCKET_FILE,
-        "server-socket-file",
+        null,
+        OPTION_SOCKET_DIR,
         true,
         String.format(
-            "This proxy's domain socket file (Default %s). "
+            "This proxy's domain socket directory (Default %s). "
                 + "Domain sockets are disabled by default on Windows. Set this property to a non-empty value on Windows to enable domain sockets. "
                 + "Set this property to the empty string on other operating systems to disable domain sockets.",
-            String.format(DEFAULT_SOCKET_FILE, 5432)));
+            DEFAULT_SOCKET_DIR));
+    options.addOption(
+        null,
+        OPTION_MAX_BACKLOG,
+        true,
+        String.format(
+            "Maximum queue length of incoming connections. Defaults to %d.", DEFAULT_MAX_BACKLOG));
     options.addRequiredOption(
         OPTION_PROJECT_ID,
         "project",
@@ -551,6 +582,10 @@ public class OptionsMetadata {
     return String.format(this.socketFile, localPort);
   }
 
+  public int getMaxBacklog() {
+    return this.maxBacklog;
+  }
+
   public TextFormat getTextFormat() {
     return this.textFormat;
   }
@@ -581,7 +616,7 @@ public class OptionsMetadata {
 
   /** Returns true if the OS is Windows. */
   public boolean isWindows() {
-    return osName.toLowerCase().contains("win");
+    return osName.toLowerCase().startsWith("windows");
   }
 
   /**

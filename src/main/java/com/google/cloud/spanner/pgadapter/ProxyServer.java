@@ -202,7 +202,8 @@ public class ProxyServer extends AbstractApiService {
    * @throws IOException if ServerSocket cannot start.
    */
   void runTcpServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch) throws IOException {
-    ServerSocket tcpSocket = new ServerSocket(this.options.getProxyPort());
+    ServerSocket tcpSocket =
+        new ServerSocket(this.options.getProxyPort(), this.options.getMaxBacklog());
     this.serverSockets.add(tcpSocket);
     this.localPort = tcpSocket.getLocalPort();
     tcpStartedLatch.countDown();
@@ -211,16 +212,30 @@ public class ProxyServer extends AbstractApiService {
 
   void runDomainSocketServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch)
       throws IOException, InterruptedException {
-    // Wait until the TCP server has started, so we can get the port number it is using.
-    if (!tcpStartedLatch.await(30L, TimeUnit.SECONDS)) {
+    // Wait until the TCP server has started if it is using a dynamic port, so we can get the port
+    // number it is using.
+    if (options.getProxyPort() == 0 && !tcpStartedLatch.await(30L, TimeUnit.SECONDS)) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.DEADLINE_EXCEEDED, "Timeout while waiting for TCP server to start");
     }
     File tempDir = new File(this.options.getSocketFile(getLocalPort()));
-    AFUNIXServerSocket domainSocket = AFUNIXServerSocket.newInstance();
-    domainSocket.bind(AFUNIXSocketAddress.of(tempDir));
-    this.serverSockets.add(domainSocket);
-    runServer(domainSocket, startupLatch, stoppedLatch);
+    try {
+      if (tempDir.getParentFile() != null && !tempDir.getParentFile().exists()) {
+        tempDir.mkdirs();
+      }
+      AFUNIXServerSocket domainSocket = AFUNIXServerSocket.newInstance();
+      domainSocket.bind(AFUNIXSocketAddress.of(tempDir), this.options.getMaxBacklog());
+      this.serverSockets.add(domainSocket);
+      runServer(domainSocket, startupLatch, stoppedLatch);
+    } catch (SocketException socketException) {
+      logger.log(
+          Level.SEVERE,
+          String.format(
+              "Failed to bind to Unix domain socket. Please verify that the user running PGAdapter has write permission for file %s",
+              tempDir),
+          socketException);
+      startupLatch.countDown();
+    }
   }
 
   void runServer(

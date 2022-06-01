@@ -29,7 +29,6 @@ import java.util.List;
  */
 @InternalApi
 public class BindMessage extends ControlMessage {
-
   protected static final char IDENTIFIER = 'B';
 
   private String portalName;

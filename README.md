@@ -151,7 +151,14 @@ The following options are optional:
 -s <port>
   * The inbound port for the proxy. Defaults to 5432. Choose a different port if you already have
     PostgreSQL running on your local system.
-   
+
+-dir <socket-file-directory>
+  * This proxy's domain socket directory. Defaults to '/tmp'.
+    Note: Some distributions of PostgreSQL and psql use '/var/run/postgresql' as the
+    default directory for Unix domain socket file names. When connecting to PGAdapter
+    using psql from one of these distributions, you either need to use 'psql -h /tmp'
+    or change the default Unix domain socket directory used by PGAdapter to '/var/run/postgresql'.
+
 -a
   * Use authentication when connecting. Currently authentication is not strictly
     implemented in the proxy layer, as it is expected to be run locally, and

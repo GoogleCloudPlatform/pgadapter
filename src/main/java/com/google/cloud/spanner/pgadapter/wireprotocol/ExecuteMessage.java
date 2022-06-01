@@ -23,7 +23,6 @@ import java.text.MessageFormat;
 /** Executes a portal. */
 @InternalApi
 public class ExecuteMessage extends ControlMessage {
-
   protected static final char IDENTIFIER = 'E';
 
   private String name;
