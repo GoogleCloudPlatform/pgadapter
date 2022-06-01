@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -329,6 +330,45 @@ func TestPrepareSelectStatement(connString string) *C.char {
 		if g, w := sd.ParamOIDs[i], uint32(tp); g != w {
 			return C.CString(fmt.Sprintf("param type mismatch for param[%v]:\n Got: %v\nWant: %v", i, g, w))
 		}
+	}
+
+	return nil
+}
+
+//export TestInsertBatch
+func TestInsertBatch(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	batch := &pgx.Batch{}
+	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+	numeric := pgtype.Numeric{}
+	batchSize := 1
+	for i := 0; i < batchSize; i++ {
+		numeric.Set("1.123")
+		timestamptz, _ := time.Parse(time.RFC3339Nano, fmt.Sprintf("2022-03-24T%02d:39:10.123456000Z", i))
+		//batch.Queue(sql, 100+i, i%2 == 0, []byte(strconv.Itoa(i)+"test_bytes"), 3.14+float64(i), i, numeric, timestamptz, fmt.Sprintf("2022-04-%02d", i+1), "test_string"+strconv.Itoa(i))
+		batch.Queue(sql, 100+i, i%2 == 0, []byte("test_bytes"), 3.14, i, numeric, timestamptz, fmt.Sprintf("2022-04-%02d", i+1), "test_string"+strconv.Itoa(i))
+	}
+	res := conn.SendBatch(ctx, batch)
+	for i := 0; i < batchSize; i++ {
+		tag, err := res.Exec()
+		if err != nil {
+			return C.CString(fmt.Sprintf("failed to execute insert statement %d: %v", i, err))
+		}
+		if !tag.Insert() {
+			return C.CString(fmt.Sprintf("statement %d was not recognized as an insert", i))
+		}
+		if g, w := tag.RowsAffected(), int64(1); g != w {
+			return C.CString(fmt.Sprintf("rows affected mismatch for statement %d:\n Got: %v\nWant: %v", i, g, w))
+		}
+	}
+	if err := res.Close(); err != nil {
+		return C.CString(err.Error())
 	}
 
 	return nil
