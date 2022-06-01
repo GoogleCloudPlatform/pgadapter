@@ -18,6 +18,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -33,7 +34,7 @@ public class OptionsMetadataTest {
         assertEquals("", options.getSocketFile(5432));
         assertFalse(options.isDomainSocketEnabled());
       } else {
-        assertEquals("/tmp/.s.PGSQL.5432", options.getSocketFile(5432));
+        assertEquals("/tmp" + File.separator + ".s.PGSQL.5432", options.getSocketFile(5432));
         assertTrue(options.isDomainSocketEnabled());
       }
     }
@@ -44,7 +45,8 @@ public class OptionsMetadataTest {
     for (String os : new String[] {"ubuntu", "windows"}) {
       OptionsMetadata options =
           new OptionsMetadata(os, new String[] {"-p p", "-i i", "-c \"\"", "-dir /pgadapter"});
-      assertEquals("/pgadapter/.s.PGSQL.5432", options.getSocketFile(5432));
+      assertEquals(
+          "/pgadapter" + File.separatorChar + ".s.PGSQL.5432", options.getSocketFile(5432));
       assertTrue(options.isDomainSocketEnabled());
     }
   }

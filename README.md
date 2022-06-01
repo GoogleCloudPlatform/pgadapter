@@ -152,13 +152,12 @@ The following options are optional:
   * The inbound port for the proxy. Defaults to 5432. Choose a different port if you already have
     PostgreSQL running on your local system.
 
--f <socket-file-name>
-  * The file name to use for Unix domain sockets. The file name should contain '%d' to indicate a
-    placeholder for the port where the server is running. Defaults to '/tmp/.s.PGSQL.%d'.
-    Note: Some distributions of PostgreSQL and psql use '/var/run/postgresql/.s.PGSQL.%d' as the
-    default for Unix domain socket file names. When connecting to PGAdapter using psql from one of
-    these distributions, you either need to use 'psql -h /tmp' or change the default Unix domain
-    socket file used by PGAdapter to '/var/run/postgresql/.s.PGSQL.%d'.
+-dir <socket-file-directory>
+  * This proxy's domain socket directory. Defaults to '/tmp'.
+    Note: Some distributions of PostgreSQL and psql use '/var/run/postgresql' as the
+    default directory for Unix domain socket file names. When connecting to PGAdapter
+    using psql from one of these distributions, you either need to use 'psql -h /tmp'
+    or change the default Unix domain socket directory used by PGAdapter to '/var/run/postgresql'.
 
 -a
   * Use authentication when connecting. Currently authentication is not strictly
