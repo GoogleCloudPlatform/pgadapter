@@ -1,5 +1,6 @@
 package com.google.cloud.spanner.pgadapter.python;
 
+import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import java.io.File;
 import java.io.IOException;
 import java.util.Scanner;
@@ -7,7 +8,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class PythonTest {
+public class PythonTest extends AbstractMockServerTest {
   static String execute(String test)
       throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
@@ -26,6 +27,11 @@ public class PythonTest {
     return output.toString();
   }
 
+  @Test
+  public void testBasic() throws IOException, InterruptedException {
+    this.execute("SELECT * from some_table");  
+
+  }
 
 
 
