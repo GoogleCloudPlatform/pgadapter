@@ -27,8 +27,10 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
@@ -305,7 +307,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.STRING)))
                 .build()));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
-    int batchSize = 1;
+    int batchSize = 10;
     for (int i = 0; i < batchSize; i++) {
       mockSpanner.putStatementResult(
           StatementResult.update(
@@ -315,13 +317,13 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                   .bind("p2")
                   .to(i % 2 == 0)
                   .bind("p3")
-                  .to(ByteArray.copyFrom("test_bytes"))
+                  .to(ByteArray.copyFrom(i + "test_bytes"))
                   .bind("p4")
-                  .to(3.14d)
+                  .to(3.14d + i)
                   .bind("p5")
                   .to(i)
                   .bind("p6")
-                  .to(com.google.cloud.spanner.Value.pgNumeric("1.123"))
+                  .to(com.google.cloud.spanner.Value.pgNumeric(i + ".123"))
                   .bind("p7")
                   .to(
                       Timestamp.parseTimestamp(
@@ -338,21 +340,34 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent three
-    // times to the backend the first time it is executed:
+    // pgx by default always uses prepared statements. That means that each request is sent 2 times
+    // to the backend to be described, and then `batchSize` times to be executed.
     // 1. DescribeStatement (parameters)
     // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
-    // 3. Execute
-    assertEquals(3, requests.size());
+    // 3. Execute 10 times.
+    assertEquals(batchSize + 2, requests.size());
     ExecuteSqlRequest describeParamsRequest = requests.get(0);
     assertEquals(describeSql, describeParamsRequest.getSql());
     assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
+    assertTrue(describeParamsRequest.hasTransaction());
+    // The first statement will start a (read/write) transaction.
+    assertTrue(describeParamsRequest.getTransaction().hasBegin());
     ExecuteSqlRequest describeRequest = requests.get(1);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(2);
-    assertEquals(sql, executeRequest.getSql());
-    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    // All following requests should use the transaction ID that was returned by the first statement.
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasId());
+    ByteString transactionId = describeRequest.getTransaction().getId();
+    for (int i = 2; i < batchSize + 2; i++) {
+      ExecuteSqlRequest executeRequest = requests.get(i);
+      assertEquals(sql, executeRequest.getSql());
+      assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+      assertEquals(transactionId, executeRequest.getTransaction().getId());
+    }
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).stream().findFirst().orElse(null);
+    assertNotNull(commitRequest);
+    assertEquals(transactionId, commitRequest.getTransactionId());
   }
 
   @Test

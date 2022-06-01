@@ -347,12 +347,11 @@ func TestInsertBatch(connString string) *C.char {
 	batch := &pgx.Batch{}
 	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
 	numeric := pgtype.Numeric{}
-	batchSize := 1
+	batchSize := 10
 	for i := 0; i < batchSize; i++ {
-		numeric.Set("1.123")
+		numeric.Set(strconv.Itoa(i) + ".123")
 		timestamptz, _ := time.Parse(time.RFC3339Nano, fmt.Sprintf("2022-03-24T%02d:39:10.123456000Z", i))
-		//batch.Queue(sql, 100+i, i%2 == 0, []byte(strconv.Itoa(i)+"test_bytes"), 3.14+float64(i), i, numeric, timestamptz, fmt.Sprintf("2022-04-%02d", i+1), "test_string"+strconv.Itoa(i))
-		batch.Queue(sql, 100+i, i%2 == 0, []byte("test_bytes"), 3.14, i, numeric, timestamptz, fmt.Sprintf("2022-04-%02d", i+1), "test_string"+strconv.Itoa(i))
+		batch.Queue(sql, 100+i, i%2 == 0, []byte(strconv.Itoa(i)+"test_bytes"), 3.14+float64(i), i, numeric, timestamptz, fmt.Sprintf("2022-04-%02d", i+1), "test_string"+strconv.Itoa(i))
 	}
 	res := conn.SendBatch(ctx, batch)
 	for i := 0; i < batchSize; i++ {
