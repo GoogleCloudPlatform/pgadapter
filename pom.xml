@@ -201,7 +201,10 @@
     <profile>
       <id>test-all</id>
       <properties>
-        <excludedTests>com.google.cloud.spanner.pgadapter.IntegrationTest</excludedTests>
+        <excludedTests>
+          com.google.cloud.spanner.pgadapter.IntegrationTest,
+          com.google.cloud.spanner.pgadapter.python
+        </excludedTests>
       </properties>
     </profile>
 
