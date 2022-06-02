@@ -23,6 +23,7 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
@@ -83,6 +84,7 @@ public class ConnectionHandler extends Thread {
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
   private Connection spannerConnection;
+  private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
 
   ConnectionHandler(ProxyServer server, Socket socket) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
@@ -145,6 +147,7 @@ public class ConnectionHandler extends Thread {
       throw e;
     }
     this.spannerConnection = spannerConnection;
+    this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
   }
 
   private String appendPropertiesToUrl(String url, Properties info) {
@@ -449,6 +452,10 @@ public class ConnectionHandler extends Thread {
 
   public ConnectionMetadata getConnectionMetadata() {
     return connectionMetadata;
+  }
+
+  public ExtendedQueryProtocolHandler getExtendedQueryProtocolHandler() {
+    return extendedQueryProtocolHandler;
   }
 
   public synchronized IntermediateStatement getActiveStatement() {

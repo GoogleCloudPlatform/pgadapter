@@ -22,9 +22,12 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.util.concurrent.Futures;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Future;
 import java.util.logging.Logger;
 
 /**
@@ -94,6 +97,23 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
       ResultSet statementResult = connection.executeQuery(this.statement);
       setStatementResult(0, statementResult);
       return new DescribePortalMetadata(statementResult);
+    } catch (SpannerException exception) {
+      handleExecutionExceptionAndTransactionStatus(0, exception);
+      throw exception;
+    }
+  }
+
+  @Override
+  public Future<DescribeMetadata> describeAsync(BackendConnection backendConnection) {
+    try {
+      // Pre-emptively execute the statement, even though it is only asked to be described. This is
+      // a lot more efficient than taking two round trips to the server, and getting a
+      // DescribePortal message without a following Execute message is extremely rare, as that would
+      // only happen if the client is ill-behaved, or if the client crashes between the
+      // DescribePortal and Execute.
+      Future<ResultSet> statementResult = backendConnection.executeQuery(this.statement);
+      setFutureStatementResult(statementResult);
+      return Futures.lazyTransform(statementResult, DescribePortalMetadata::new);
     } catch (SpannerException exception) {
       handleExecutionExceptionAndTransactionStatus(0, exception);
       throw exception;

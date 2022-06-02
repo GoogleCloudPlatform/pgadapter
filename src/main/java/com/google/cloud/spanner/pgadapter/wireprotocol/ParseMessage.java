@@ -20,6 +20,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
@@ -27,7 +28,7 @@ import java.text.MessageFormat;
 
 /** Creates a prepared statement. */
 @InternalApi
-public class ParseMessage extends ControlMessage {
+public class ParseMessage extends AbstractQueryProtocolMessage {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   protected static final char IDENTIFIER = 'P';
@@ -52,11 +53,15 @@ public class ParseMessage extends ControlMessage {
   }
 
   @Override
-  protected void sendPayload() throws Exception {
+  void buffer(BackendConnection backendConnection) {
     if (!Strings.isNullOrEmpty(this.name) && this.connection.hasStatement(this.name)) {
       throw new IllegalStateException("Must close statement before reusing name.");
     }
     this.connection.registerStatement(this.name, this.statement);
+  }
+
+  @Override
+  public void flush() throws Exception {
     new ParseCompleteResponse(this.outputStream).send();
   }
 

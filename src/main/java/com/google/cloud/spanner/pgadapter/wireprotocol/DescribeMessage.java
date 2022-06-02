@@ -15,26 +15,32 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterDescriptionResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
 import java.text.MessageFormat;
+import java.util.concurrent.Future;
 
 /** Calls describe on a portal or prepared statement. */
 @InternalApi
-public class DescribeMessage extends ControlMessage {
+public class DescribeMessage extends AbstractQueryProtocolMessage {
 
   protected static final char IDENTIFIER = 'D';
 
   private final PreparedType type;
   private final String name;
   private final IntermediateStatement statement;
+  private Future<DescribeMetadata> describePortalMetadata;
 
   public DescribeMessage(ConnectionHandler connection) throws Exception {
     super(connection);
@@ -48,7 +54,14 @@ public class DescribeMessage extends ControlMessage {
   }
 
   @Override
-  protected void sendPayload() throws Exception {
+  void buffer(BackendConnection backendConnection) {
+    if (this.type == PreparedType.Portal && this.statement.getStatementType(0) == StatementType.QUERY) {
+      describePortalMetadata = this.statement.describeAsync(backendConnection);
+    }
+  }
+
+  @Override
+  public void flush() throws Exception {
     try {
       if (this.type == PreparedType.Portal) {
         this.handleDescribePortal();
@@ -109,7 +122,7 @@ public class DescribeMessage extends ControlMessage {
             new RowDescriptionResponse(
                     this.outputStream,
                     this.statement,
-                    ((DescribePortalMetadata) this.statement.describe()).getMetadata(),
+                    ((DescribePortalMetadata) this.describePortalMetadata.get()).getMetadata(),
                     this.connection.getServer().getOptions(),
                     QueryMode.EXTENDED)
                 .send();

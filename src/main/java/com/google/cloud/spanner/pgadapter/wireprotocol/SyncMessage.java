@@ -34,6 +34,7 @@ public class SyncMessage extends ControlMessage {
 
   @Override
   protected void sendPayload() throws Exception {
+    connection.getExtendedQueryProtocolHandler().sync();
     new ReadyResponse(this.outputStream, connection.getStatus().getReadyResponseStatus()).send();
   }
 

@@ -355,7 +355,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest describeRequest = requests.get(1);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    // All following requests should use the transaction ID that was returned by the first statement.
+    // All following requests should use the transaction ID that was returned by the first
+    // statement.
     assertTrue(describeRequest.hasTransaction());
     assertTrue(describeRequest.getTransaction().hasId());
     ByteString transactionId = describeRequest.getTransaction().getId();
@@ -365,7 +366,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
       assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
       assertEquals(transactionId, executeRequest.getTransaction().getId());
     }
-    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).stream().findFirst().orElse(null);
+    CommitRequest commitRequest =
+        mockSpanner.getRequestsOfType(CommitRequest.class).stream().findFirst().orElse(null);
     assertNotNull(commitRequest);
     assertEquals(transactionId, commitRequest.getTransactionId());
   }

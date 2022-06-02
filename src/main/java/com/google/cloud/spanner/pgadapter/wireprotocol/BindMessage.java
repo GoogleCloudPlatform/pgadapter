@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
 import java.text.MessageFormat;
@@ -28,7 +29,7 @@ import java.util.List;
  * unless it fails.
  */
 @InternalApi
-public class BindMessage extends ControlMessage {
+public class BindMessage extends AbstractQueryProtocolMessage {
   protected static final char IDENTIFIER = 'B';
 
   private String portalName;
@@ -50,15 +51,17 @@ public class BindMessage extends ControlMessage {
 
   /**
    * Given the prepared statement, bind it and save it locally.
-   *
-   * @throws Exception If the binding fails.
    */
   @Override
-  protected void sendPayload() throws Exception {
+  void buffer(BackendConnection backendConnection) {
     this.connection.registerPortal(
         this.portalName,
         this.statement.bind(
             this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes));
+  }
+
+  @Override
+  public void flush() throws Exception {
     new BindCompleteResponse(this.outputStream).send();
   }
 

@@ -36,11 +36,13 @@ import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.util.concurrent.Futures;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Future;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -102,7 +104,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
     // If the portal has already been described, the statement has already been executed, and we
     // don't need to do that once more.
-    if (getStatementResult(0) == null) {
+    if (getStatementResult(0) == null && futureStatementResult == null) {
       this.executedCount++;
       try {
         if (!connection.isInTransaction()
@@ -194,8 +196,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       } else if (parameters.size() != this.parameterDataTypes.length
           || Arrays.stream(this.parameterDataTypes).anyMatch(p -> p == 0)) {
         // Note: We are only asking the backend to parse the types if there is at least one
-        // parameter
-        // with unspecified type. Otherwise, we will rely on the types given in PARSE.
+        // parameter with unspecified type. Otherwise, we will rely on the types given in PARSE.
 
         // Transform the statement into a select statement that selects the parameters, and then
         // extract the types from the result set metadata.
@@ -203,8 +204,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
         if (selectParamsStatement == null) {
           // The transformation failed. Just rely on the types given in the PARSE message. If the
           // transformation failed because the statement was malformed, the backend will catch that
-          // at
-          // a later stage.
+          // at a later stage.
           describeFailed = true;
           ensureParameterLength(parameters.size());
         } else {
@@ -226,11 +226,9 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
           && (describeFailed || !Strings.isNullOrEmpty(this.name))) {
         // Let the backend analyze the statement if it is a named prepared statement or if the query
         // that was used to determine the parameter types failed, so we can return a reasonable
-        // error
-        // message if the statement is invalid. If it is the unnamed statement or getting the param
-        // types succeeded, we will let the following EXECUTE message handle that, instead of
-        // sending
-        // the statement twice to the backend.
+        // error message if the statement is invalid. If it is the unnamed statement or getting the
+        // param types succeeded, we will let the following EXECUTE message handle that, instead of
+        // sending the statement twice to the backend.
         connection.analyzeUpdate(
             Statement.of(this.parsedStatement.getSqlWithoutComments()), QueryAnalyzeMode.PLAN);
       }

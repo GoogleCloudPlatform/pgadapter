@@ -202,8 +202,8 @@ public abstract class ControlMessage extends WireMessage {
       int resultIndex, IntermediateStatement describedResult, QueryMode mode, long maxRows)
       throws Exception {
     long rows = 0;
-    boolean hasData = describedResult.isHasMoreData(resultIndex);
     ResultSet resultSet = describedResult.getStatementResult(resultIndex);
+    boolean hasData = describedResult.isHasMoreData(resultIndex);
     while (hasData) {
       new DataRowResponse(
               this.outputStream,

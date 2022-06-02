@@ -17,12 +17,13 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import java.text.MessageFormat;
 
 /** Executes a portal. */
 @InternalApi
-public class ExecuteMessage extends ControlMessage {
+public class ExecuteMessage extends AbstractQueryProtocolMessage {
   protected static final char IDENTIFIER = 'E';
 
   private String name;
@@ -37,7 +38,11 @@ public class ExecuteMessage extends ControlMessage {
   }
 
   @Override
-  protected void sendPayload() throws Exception {
+  void buffer(BackendConnection backendConnection) {
+  }
+
+  @Override
+  public void flush() throws Exception {
     this.statement.execute();
     this.handleExecute();
   }

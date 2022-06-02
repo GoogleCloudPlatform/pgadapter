@@ -40,6 +40,8 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 /**
  * Data type to store simple SQL statement with designated metadata. Allows manipulation of
@@ -57,6 +59,7 @@ public class IntermediateStatement {
   private final ImmutableList<StatementType> statementTypes;
   protected ResultSet[] statementResults;
   protected final boolean[] hasMoreData;
+  protected Future<ResultSet> futureStatementResult;
   protected final SpannerException[] exceptions;
   protected final ParsedStatement parsedStatement;
   protected final ImmutableList<String> commands;
@@ -283,6 +286,13 @@ public class IntermediateStatement {
   }
 
   public ResultSet getStatementResult(int index) {
+    if (this.futureStatementResult != null) {
+      try {
+        return this.futureStatementResult.get();
+      } catch (ExecutionException executionException) {
+        SpannerExceptionFactory.asSpannerException(executionException.getCause());
+      }
+    }
     if (this.statementResults == null) {
       return null;
     }
@@ -299,6 +309,10 @@ public class IntermediateStatement {
       this.updateCounts = new long[getStatementCount()];
     }
     this.updateCounts[index] = -1;
+  }
+
+  protected void setFutureStatementResult(Future<ResultSet> result) {
+    this.futureStatementResult = result;
   }
 
   public StatementType getStatementType(int index) {
@@ -646,6 +660,10 @@ public class IntermediateStatement {
   public DescribeMetadata describe() {
     throw new IllegalStateException(
         "Cannot describe a simple statement " + "(only prepared statements and portals)");
+  }
+
+  public Future<DescribeMetadata> describeAsync(BackendConnection backendConnection) {
+    throw new UnsupportedOperationException();
   }
 
   /**
