@@ -2,22 +2,19 @@ import psycopg2 as pg
 import sys
 
 try:
+  assert len(sys.argv) == 3
   connection = pg.connect(user = "postgres",
                           database = "postgres",
                           host = "localhost",
-                          port = "5432")
-  assert len(sys.argv) == 2
-
+                          port = sys.argv[1])
   cursor = connection.cursor()
-
-  cursor.execute(sys.argv[1])
-
+  cursor.execute(sys.argv[2])
   for row in cursor:
     print(row)
 
-except:
+except Exception as e:
 
-  print("Can't connect to the PG Adapter")
+  print(e)
 
 
 
