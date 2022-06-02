@@ -137,6 +137,9 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   }
 
   private DescribePortalMetadata getPortalMetadata() {
+    if (!this.describePortalMetadata.isDone()) {
+      throw new IllegalStateException("Trying to get Portal Metadata before it has been described");
+    }
     try {
       return ((DescribePortalMetadata) this.describePortalMetadata.get());
     } catch (ExecutionException executionException) {
