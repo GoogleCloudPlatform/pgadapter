@@ -138,11 +138,11 @@ public abstract class ControlMessage extends WireMessage {
    */
   protected void handleError(Exception e) throws Exception {
     new ErrorResponse(this.outputStream, e, State.RaiseException).send(false);
-    if (connection.getSpannerConnection().isInTransaction()) {
-      connection.getSpannerConnection().rollbackAsync();
-      connection.setStatus(ConnectionStatus.TRANSACTION_ABORTED);
-    }
-    this.outputStream.flush();
+    //    if (connection.getSpannerConnection().isInTransaction()) {
+    //      connection.getSpannerConnection().rollbackAsync();
+    //      connection.setStatus(ConnectionStatus.TRANSACTION_ABORTED);
+    //    }
+    //    this.outputStream.flush();
   }
 
   /**

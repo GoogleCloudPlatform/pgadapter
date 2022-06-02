@@ -262,6 +262,7 @@ public class IntermediateStatement {
 
   /** @return True if at some point in execution, and exception was thrown. */
   public boolean hasException(int index) {
+    initFutureResult();
     return this.exceptions[index] != null;
   }
 

@@ -46,7 +46,10 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.ConnectionState;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
+import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
@@ -110,6 +113,8 @@ public class ProtocolTest {
   @Rule public MockitoRule rule = MockitoJUnit.rule();
   @Mock private ConnectionHandler connectionHandler;
   @Mock private Connection connection;
+  @Mock private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
+  @Mock private BackendConnection backendConnection;
   @Mock private ProxyServer server;
   @Mock private OptionsMetadata options;
   @Mock private IntermediatePreparedStatement intermediatePreparedStatement;
@@ -283,6 +288,8 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(ParseMessage.class, message.getClass());
@@ -294,6 +301,7 @@ public class ProtocolTest {
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
+    ((ParseMessage) message).flush();
     verify(connectionHandler)
         .registerStatement(expectedMessageName, ((ParseMessage) message).getStatement());
 
@@ -344,6 +352,8 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(ParseMessage.class, message.getClass());
@@ -355,6 +365,7 @@ public class ProtocolTest {
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
+    ((ParseMessage) message).flush();
     verify(connectionHandler)
         .registerStatement(expectedMessageName, ((ParseMessage) message).getStatement());
 
@@ -406,6 +417,8 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(ParseMessage.class, message.getClass());
@@ -417,6 +430,7 @@ public class ProtocolTest {
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
+    ((ParseMessage) message).flush();
     verify(connectionHandler)
         .registerStatement(expectedMessageName, ((ParseMessage) message).getStatement());
 
@@ -453,6 +467,8 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(ParseMessage.class, message.getClass());
@@ -464,6 +480,7 @@ public class ProtocolTest {
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
+    ((ParseMessage) message).flush();
     verify(connectionHandler)
         .registerStatement(expectedMessageName, ((ParseMessage) message).getStatement());
 
@@ -508,6 +525,8 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     WireMessage message = ControlMessage.create(connectionHandler);
 
@@ -552,6 +571,8 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     WireMessage message = ControlMessage.create(connectionHandler);
 
@@ -597,6 +618,8 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     WireMessage message = ControlMessage.create(connectionHandler);
 
@@ -654,6 +677,8 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(BindMessage.class, message.getClass());
@@ -671,6 +696,7 @@ public class ProtocolTest {
         .thenReturn(intermediatePortalStatement);
 
     message.send();
+    ((BindMessage) message).flush();
     verify(connectionHandler).registerPortal(expectedPortalName, intermediatePortalStatement);
 
     // BindCompleteResponse
@@ -838,6 +864,8 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(DescribeMessage.class, message.getClass());
@@ -849,6 +877,7 @@ public class ProtocolTest {
     doNothing().when(messageSpy).handleDescribePortal();
 
     messageSpy.send();
+    messageSpy.flush();
 
     verify(messageSpy).handleDescribePortal();
   }
@@ -872,6 +901,8 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(DescribeMessage.class, message.getClass());
@@ -883,6 +914,7 @@ public class ProtocolTest {
     doNothing().when(messageSpy).handleDescribeStatement();
 
     messageSpy.send();
+    messageSpy.flush();
 
     verify(messageSpy).handleDescribeStatement();
   }
@@ -907,6 +939,9 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(ExecuteMessage.class, message.getClass());
@@ -922,8 +957,9 @@ public class ProtocolTest {
             anyInt(), any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
 
     messageSpy.send();
+    messageSpy.flush();
 
-    verify(intermediatePortalStatement).execute();
+    verify(intermediatePortalStatement).executeAsync(backendConnection);
     verify(messageSpy)
         .sendSpannerResult(0, intermediatePortalStatement, QueryMode.EXTENDED, totalRows);
     verify(connectionHandler).cleanUp(intermediatePortalStatement);
@@ -1020,6 +1056,10 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(backendConnection.getConnectionState()).thenReturn(ConnectionState.IDLE);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(message.getClass(), SyncMessage.class);
@@ -1049,6 +1089,10 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(backendConnection.getConnectionState()).thenReturn(ConnectionState.TRANSACTION);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(SyncMessage.class, message.getClass());
@@ -1078,6 +1122,8 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(message.getClass(), FlushMessage.class);
@@ -1104,6 +1150,8 @@ public class ProtocolTest {
     DataOutputStream outputStream = new DataOutputStream(result);
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
     when(connection.isInTransaction()).thenReturn(true);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);

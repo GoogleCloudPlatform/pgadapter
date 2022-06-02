@@ -71,7 +71,8 @@ public class BackendConnection {
 
     void checkConnectionState() {
       // Only COMMIT or ROLLBACK is allowed if we are in an ABORTED transaction.
-      if (connectionState == ConnectionState.ABORTED && !(isCommit(parsedStatement) || isRollback(parsedStatement))) {
+      if (connectionState == ConnectionState.ABORTED
+          && !(isCommit(parsedStatement) || isRollback(parsedStatement))) {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, TRANSACTION_ABORTED_ERROR);
       }
@@ -104,7 +105,13 @@ public class BackendConnection {
     void execute() {
       try {
         checkConnectionState();
-        result.set(spannerConnection.execute(statement));
+        if (connectionState == ConnectionState.ABORTED
+            && !spannerConnection.isInTransaction()
+            && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
+          result.set(rollbackResult);
+        } else {
+          result.set(spannerConnection.execute(statement));
+        }
       } catch (Exception exception) {
         result.setException(exception);
         throw exception;
@@ -112,6 +119,8 @@ public class BackendConnection {
     }
   }
 
+  private static final Statement ROLLBACK = Statement.of("ROLLBACK");
+  private StatementResult rollbackResult;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
   private final LinkedList<BufferedStatement<?>> bufferedStatements = new LinkedList<>();
@@ -142,7 +151,7 @@ public class BackendConnection {
     int index = 0;
     try {
       for (BufferedStatement<?> bufferedStatement : bufferedStatements) {
-        checkAndSetTransactionState(index);
+        maybeBeginImplicitTransaction(index);
         bufferedStatement.execute();
 
         if (isBegin(index)) {
@@ -156,6 +165,9 @@ public class BackendConnection {
       }
     } catch (Exception exception) {
       connectionState = ConnectionState.ABORTED;
+      if (spannerConnection.isInTransaction()) {
+        rollbackResult = spannerConnection.execute(ROLLBACK);
+      }
     } finally {
       bufferedStatements.clear();
     }
@@ -169,14 +181,7 @@ public class BackendConnection {
     }
   }
 
-  private void checkAndSetTransactionState(int index) {
-    if (connectionState == ConnectionState.ABORTED) {
-      if (!(isCommit(index) || isRollback(index))) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT, TRANSACTION_ABORTED_ERROR);
-      }
-    }
-
+  private void maybeBeginImplicitTransaction(int index) {
     // Only start an implicit transaction if we have more than one statement left. Otherwise, just
     // let the Spanner connection execute the statement in auto-commit mode.
     if (bufferedStatements.size() > index + 1 && !isTransactionStatement(index)) {
@@ -213,8 +218,7 @@ public class BackendConnection {
 
   private boolean isBegin(ParsedStatement parsedStatement) {
     return parsedStatement.getType() == StatementType.CLIENT_SIDE
-        && parsedStatement.getClientSideStatementType()
-        == ClientSideStatementType.BEGIN;
+        && parsedStatement.getClientSideStatementType() == ClientSideStatementType.BEGIN;
   }
 
   private boolean isCommit(int index) {
@@ -223,8 +227,7 @@ public class BackendConnection {
 
   private boolean isCommit(ParsedStatement parsedStatement) {
     return parsedStatement.getType() == StatementType.CLIENT_SIDE
-        && parsedStatement.getClientSideStatementType()
-        == ClientSideStatementType.COMMIT;
+        && parsedStatement.getClientSideStatementType() == ClientSideStatementType.COMMIT;
   }
 
   private boolean isRollback(int index) {
@@ -233,8 +236,7 @@ public class BackendConnection {
 
   private boolean isRollback(ParsedStatement parsedStatement) {
     return parsedStatement.getType() == StatementType.CLIENT_SIDE
-        && parsedStatement.getClientSideStatementType()
-        == ClientSideStatementType.ROLLBACK;
+        && parsedStatement.getClientSideStatementType() == ClientSideStatementType.ROLLBACK;
   }
 
   private boolean isTransactionStatement(int index) {
