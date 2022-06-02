@@ -24,8 +24,7 @@ import java.io.IOException;
 public abstract class AbstractQueryProtocolMessage extends ControlMessage {
   private final ExtendedQueryProtocolHandler handler;
 
-  AbstractQueryProtocolMessage(ConnectionHandler connection)
-      throws IOException {
+  AbstractQueryProtocolMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     this.handler = connection.getExtendedQueryProtocolHandler();
   }

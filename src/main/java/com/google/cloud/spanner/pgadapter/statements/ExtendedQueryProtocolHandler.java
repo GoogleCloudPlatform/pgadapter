@@ -47,10 +47,12 @@ public class ExtendedQueryProtocolHandler {
   }
 
   private void flushMessages() throws Exception {
-    for (AbstractQueryProtocolMessage message : messages) {
-      message.flush();
+    try {
+      for (AbstractQueryProtocolMessage message : messages) {
+        message.flush();
+      }
+    } finally {
+      messages.clear();
     }
-    messages.clear();
   }
-
 }

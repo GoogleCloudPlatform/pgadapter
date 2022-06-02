@@ -462,10 +462,12 @@ public class ConnectionHandler extends Thread {
     return activeStatementsMap.get(this.connectionId);
   }
 
+  @Deprecated
   public synchronized ConnectionStatus getStatus() {
     return status;
   }
 
+  @Deprecated
   public synchronized void setStatus(ConnectionStatus status) {
     this.status = status;
   }

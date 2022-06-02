@@ -49,9 +49,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.statement = connection.getStatement(this.statementName);
   }
 
-  /**
-   * Given the prepared statement, bind it and save it locally.
-   */
+  /** Given the prepared statement, bind it and save it locally. */
   @Override
   void buffer(BackendConnection backendConnection) {
     this.connection.registerPortal(

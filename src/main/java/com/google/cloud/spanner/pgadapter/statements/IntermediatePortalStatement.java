@@ -19,10 +19,10 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
+import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.util.concurrent.Futures;
 import java.util.ArrayList;
@@ -111,9 +111,12 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
       // DescribePortal message without a following Execute message is extremely rare, as that would
       // only happen if the client is ill-behaved, or if the client crashes between the
       // DescribePortal and Execute.
-      Future<ResultSet> statementResult = backendConnection.executeQuery(this.statement);
-      setFutureStatementResult(statementResult);
-      return Futures.lazyTransform(statementResult, DescribePortalMetadata::new);
+      Future<StatementResult> statementResultFuture =
+          backendConnection.execute(this.parsedStatement, this.statement);
+      setFutureStatementResult(statementResultFuture);
+      return Futures.lazyTransform(
+          statementResultFuture,
+          statementResult -> new DescribePortalMetadata(statementResult.getResultSet()));
     } catch (SpannerException exception) {
       handleExecutionExceptionAndTransactionStatus(0, exception);
       throw exception;

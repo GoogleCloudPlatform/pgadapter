@@ -39,11 +39,11 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
 
   @Override
   void buffer(BackendConnection backendConnection) {
+    this.statement.executeAsync(backendConnection);
   }
 
   @Override
   public void flush() throws Exception {
-    this.statement.execute();
     this.handleExecute();
   }
 

@@ -349,27 +349,37 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest describeParamsRequest = requests.get(0);
     assertEquals(describeSql, describeParamsRequest.getSql());
     assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    assertTrue(describeParamsRequest.hasTransaction());
-    // The first statement will start a (read/write) transaction.
-    assertTrue(describeParamsRequest.getTransaction().hasBegin());
+    // The 'describe' query for the parameters will be executed as a single use transaction.
+    assertTrue(describeParamsRequest.getTransaction().hasSingleUse());
+
+    // The analyzeUpdate that is executed to verify the validity of the DML statement is executed as
+    // a separate transaction.
     ExecuteSqlRequest describeRequest = requests.get(1);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+
+    // The first Execute request will start a read/write transaction.
     // All following requests should use the transaction ID that was returned by the first
     // statement.
-    assertTrue(describeRequest.hasTransaction());
-    assertTrue(describeRequest.getTransaction().hasId());
-    ByteString transactionId = describeRequest.getTransaction().getId();
+    ByteString transactionId = ByteString.EMPTY;
     for (int i = 2; i < batchSize + 2; i++) {
       ExecuteSqlRequest executeRequest = requests.get(i);
       assertEquals(sql, executeRequest.getSql());
       assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
-      assertEquals(transactionId, executeRequest.getTransaction().getId());
+      if (i == 2) {
+        assertTrue(executeRequest.getTransaction().hasBegin());
+      } else {
+        if (transactionId.isEmpty()) {
+          transactionId = executeRequest.getTransaction().getId();
+        }
+        assertEquals(transactionId, executeRequest.getTransaction().getId());
+      }
     }
-    CommitRequest commitRequest =
-        mockSpanner.getRequestsOfType(CommitRequest.class).stream().findFirst().orElse(null);
-    assertNotNull(commitRequest);
-    assertEquals(transactionId, commitRequest.getTransactionId());
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(2, commitRequests.size());
+    CommitRequest batchCommit = commitRequests.get(1);
+    assertEquals(transactionId, batchCommit.getTransactionId());
   }
 
   @Test

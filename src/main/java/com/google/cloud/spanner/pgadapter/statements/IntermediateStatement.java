@@ -59,7 +59,7 @@ public class IntermediateStatement {
   private final ImmutableList<StatementType> statementTypes;
   protected ResultSet[] statementResults;
   protected final boolean[] hasMoreData;
-  protected Future<ResultSet> futureStatementResult;
+  protected Future<StatementResult> futureStatementResult;
   protected final SpannerException[] exceptions;
   protected final ParsedStatement parsedStatement;
   protected final ImmutableList<String> commands;
@@ -245,6 +245,7 @@ public class IntermediateStatement {
    *     QUERY.
    */
   public long getUpdateCount(int index) {
+    initFutureResult();
     if (this.updateCounts == null) {
       return 0;
     }
@@ -285,14 +286,27 @@ public class IntermediateStatement {
     return this.statements.get(index).getSqlWithoutComments();
   }
 
-  public ResultSet getStatementResult(int index) {
+  private void initFutureResult() {
     if (this.futureStatementResult != null) {
+      if (!this.futureStatementResult.isDone()) {
+        // This should not happen, and indicates a programming error.
+        throw new IllegalStateException("Statement result cannot be retrieved before flush/sync");
+      }
       try {
-        return this.futureStatementResult.get();
+        updateResultCount(0, this.futureStatementResult.get());
       } catch (ExecutionException executionException) {
-        SpannerExceptionFactory.asSpannerException(executionException.getCause());
+        this.exceptions[0] =
+            SpannerExceptionFactory.asSpannerException(executionException.getCause());
+      } catch (InterruptedException interruptedException) {
+        this.exceptions[0] = SpannerExceptionFactory.propagateInterrupt(interruptedException);
+      } finally {
+        this.futureStatementResult = null;
       }
     }
+  }
+
+  public ResultSet getStatementResult(int index) {
+    initFutureResult();
     if (this.statementResults == null) {
       return null;
     }
@@ -311,7 +325,7 @@ public class IntermediateStatement {
     this.updateCounts[index] = -1;
   }
 
-  protected void setFutureStatementResult(Future<ResultSet> result) {
+  protected void setFutureStatementResult(Future<StatementResult> result) {
     this.futureStatementResult = result;
   }
 
@@ -373,6 +387,10 @@ public class IntermediateStatement {
       connectionHandler.setStatus(ConnectionStatus.TRANSACTION_ABORTED);
     }
     handleExecutionException(index, exception);
+  }
+
+  public void executeAsync(BackendConnection backendConnection) {
+    throw new UnsupportedOperationException();
   }
 
   /** Execute the SQL statement, storing metadata. */

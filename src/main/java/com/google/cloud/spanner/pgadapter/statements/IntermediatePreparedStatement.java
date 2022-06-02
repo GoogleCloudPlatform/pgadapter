@@ -36,13 +36,11 @@ import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.util.concurrent.Futures;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Future;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -92,6 +90,15 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   public void setParameterDataTypes(int[] parameterDataTypes) {
     this.parameterDataTypes = parameterDataTypes;
+  }
+
+  @Override
+  public void executeAsync(BackendConnection backendConnection) {
+    // If the portal has already been described, the statement has already been executed, and we
+    // don't need to do that once more.
+    if (futureStatementResult == null && getStatementResult(0) == null) {
+      setFutureStatementResult(backendConnection.execute(parsedStatement, statement));
+    }
   }
 
   @Override

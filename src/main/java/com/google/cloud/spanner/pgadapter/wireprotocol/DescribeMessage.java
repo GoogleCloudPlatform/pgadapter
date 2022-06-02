@@ -15,8 +15,8 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -29,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.NoDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterDescriptionResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
 import java.text.MessageFormat;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 /** Calls describe on a portal or prepared statement. */
@@ -55,7 +56,8 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
 
   @Override
   void buffer(BackendConnection backendConnection) {
-    if (this.type == PreparedType.Portal && this.statement.getStatementType(0) == StatementType.QUERY) {
+    if (this.type == PreparedType.Portal
+        && this.statement.getStatementType(0) == StatementType.QUERY) {
       describePortalMetadata = this.statement.describeAsync(backendConnection);
     }
   }
@@ -122,7 +124,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
             new RowDescriptionResponse(
                     this.outputStream,
                     this.statement,
-                    ((DescribePortalMetadata) this.describePortalMetadata.get()).getMetadata(),
+                    getPortalMetadata().getMetadata(),
                     this.connection.getServer().getOptions(),
                     QueryMode.EXTENDED)
                 .send();
@@ -131,6 +133,16 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
             this.handleError(exception);
           }
       }
+    }
+  }
+
+  private DescribePortalMetadata getPortalMetadata() {
+    try {
+      return ((DescribePortalMetadata) this.describePortalMetadata.get());
+    } catch (ExecutionException executionException) {
+      throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
+    } catch (InterruptedException interruptedException) {
+      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
     }
   }
 
