@@ -92,7 +92,6 @@ public class PythonBasicTest extends AbstractMockServerTest {
 
     String actualOutput = execute(pgServer.getLocalPort(), sql);
     String expectedOutput = "(1, \'abcd\')\n";
-
     assertEquals(expectedOutput, actualOutput);
   }
 }
