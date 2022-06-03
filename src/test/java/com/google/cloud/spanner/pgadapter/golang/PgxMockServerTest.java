@@ -27,10 +27,10 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.common.collect.ImmutableList;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
@@ -345,7 +345,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     // 1. DescribeStatement (parameters)
     // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
     // 3. Execute 10 times.
-    assertEquals(batchSize + 2, requests.size());
+    assertEquals(2, requests.size());
     ExecuteSqlRequest describeParamsRequest = requests.get(0);
     assertEquals(describeSql, describeParamsRequest.getSql());
     assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
@@ -359,27 +359,16 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
     assertTrue(describeRequest.getTransaction().hasBegin());
 
-    // The first Execute request will start a read/write transaction.
-    // All following requests should use the transaction ID that was returned by the first
-    // statement.
-    ByteString transactionId = ByteString.EMPTY;
-    for (int i = 2; i < batchSize + 2; i++) {
-      ExecuteSqlRequest executeRequest = requests.get(i);
-      assertEquals(sql, executeRequest.getSql());
-      assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
-      if (i == 2) {
-        assertTrue(executeRequest.getTransaction().hasBegin());
-      } else {
-        if (transactionId.isEmpty()) {
-          transactionId = executeRequest.getTransaction().getId();
-        }
-        assertEquals(transactionId, executeRequest.getTransaction().getId());
-      }
-    }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest batchDmlRequest =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(batchSize, batchDmlRequest.getStatementsCount());
+    assertTrue(batchDmlRequest.getTransaction().hasBegin());
+
+    // There are two commit requests, as the 'Describe statement' message is executed as a separate
+    // transaction.
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
     assertEquals(2, commitRequests.size());
-    CommitRequest batchCommit = commitRequests.get(1);
-    assertEquals(transactionId, batchCommit.getTransactionId());
   }
 
   @Test

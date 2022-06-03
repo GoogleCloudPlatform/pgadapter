@@ -21,7 +21,6 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.util.concurrent.Futures;
@@ -87,7 +86,7 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   }
 
   @Override
-  public DescribeMetadata describe() {
+  public DescribePortalMetadata describe() {
     try {
       // Pre-emptively execute the statement, even though it is only asked to be described. This is
       // a lot more efficient than taking two round trips to the server, and getting a
@@ -104,7 +103,7 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   }
 
   @Override
-  public Future<DescribeMetadata> describeAsync(BackendConnection backendConnection) {
+  public Future<DescribePortalMetadata> describeAsync(BackendConnection backendConnection) {
     try {
       // Pre-emptively execute the statement, even though it is only asked to be described. This is
       // a lot more efficient than taking two round trips to the server, and getting a

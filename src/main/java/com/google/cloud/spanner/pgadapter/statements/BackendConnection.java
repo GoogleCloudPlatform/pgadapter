@@ -18,7 +18,9 @@ import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatemen
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerBatchUpdateException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -26,10 +28,13 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
+import com.google.cloud.spanner.connection.TransactionMode;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.LinkedList;
+import java.util.Objects;
 import java.util.concurrent.Future;
 
 /** This class emulates a backend PostgreSQL connection. */
@@ -96,6 +101,23 @@ public class BackendConnection {
     }
   }
 
+  private final class AnalyzeQuery extends BufferedStatement<ResultSet> {
+    AnalyzeQuery(ParsedStatement parsedStatement, Statement statement) {
+      super(parsedStatement, statement);
+    }
+
+    @Override
+    void execute() {
+      try {
+        checkConnectionState();
+        result.set(spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN));
+      } catch (Exception exception) {
+        result.setException(exception);
+        throw exception;
+      }
+    }
+  }
+
   private final class Execute extends BufferedStatement<StatementResult> {
     Execute(ParsedStatement parsedStatement, Statement statement) {
       super(parsedStatement, statement);
@@ -141,6 +163,12 @@ public class BackendConnection {
     return executeQuery.result;
   }
 
+  public Future<ResultSet> analyzeQuery(ParsedStatement parsedStatement, Statement statement) {
+    AnalyzeQuery analyzeQuery = new AnalyzeQuery(parsedStatement, statement);
+    bufferedStatements.add(analyzeQuery);
+    return analyzeQuery.result;
+  }
+
   public Future<StatementResult> execute(ParsedStatement parsedStatement, Statement statement) {
     Execute execute = new Execute(parsedStatement, statement);
     bufferedStatements.add(execute);
@@ -148,20 +176,35 @@ public class BackendConnection {
   }
 
   void flush() {
+    flush(false);
+  }
+
+  private void flush(boolean isSync) {
     int index = 0;
     try {
       for (BufferedStatement<?> bufferedStatement : bufferedStatements) {
-        maybeBeginImplicitTransaction(index);
-        bufferedStatement.execute();
-
-        if (isBegin(index)) {
-          transactionMode = TransactionMode.EXPLICIT;
-          connectionState = ConnectionState.TRANSACTION;
-        } else if (isCommit(index) || isRollback(index)) {
-          transactionMode = TransactionMode.IMPLICIT;
-          connectionState = ConnectionState.IDLE;
+        maybeBeginImplicitTransaction(index, isSync);
+        boolean canUseBatch = false;
+        if (index < (getStatementCount() - 1)) {
+          StatementType statementType = getStatementType(index);
+          StatementType nextStatementType = getStatementType(index + 1);
+          canUseBatch = canBeBatchedTogether(statementType, nextStatementType);
         }
-        index++;
+
+        if (canUseBatch) {
+          index += executeStatementsInBatch(index);
+        } else {
+          bufferedStatement.execute();
+
+          if (isBegin(index)) {
+            transactionMode = TransactionMode.EXPLICIT;
+            connectionState = ConnectionState.TRANSACTION;
+          } else if (isCommit(index) || isRollback(index)) {
+            transactionMode = TransactionMode.IMPLICIT;
+            connectionState = ConnectionState.IDLE;
+          }
+          index++;
+        }
       }
     } catch (Exception exception) {
       connectionState = ConnectionState.ABORTED;
@@ -175,22 +218,45 @@ public class BackendConnection {
 
   void sync() {
     try {
-      flush();
+      flush(true);
     } finally {
       endImplicitTransaction();
     }
   }
 
-  private void maybeBeginImplicitTransaction(int index) {
+  private void maybeBeginImplicitTransaction(int index, boolean isSync) {
+    if (connectionState != ConnectionState.IDLE) {
+      return;
+    }
+
     // Only start an implicit transaction if we have more than one statement left. Otherwise, just
     // let the Spanner connection execute the statement in auto-commit mode.
-    if (bufferedStatements.size() > index + 1 && !isTransactionStatement(index)) {
-      if (connectionState == ConnectionState.IDLE) {
-        spannerConnection.beginTransaction();
-        transactionMode = TransactionMode.IMPLICIT;
-        connectionState = ConnectionState.TRANSACTION;
-      }
+    if (isSync && index == bufferedStatements.size() - 1) {
+      return;
     }
+    // Don't start an implicit transaction if this is already a transaction statement.
+    if (isTransactionStatement(index)) {
+      return;
+    }
+    // No need to start a transaction for DDL or client side statements.
+    if (bufferedStatements.get(index).parsedStatement.getType() == StatementType.DDL
+        || bufferedStatements.get(index).parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+      return;
+    }
+    // If there are only DML statements left, those can be executed as an auto-commit dml batch.
+    if (isSync && hasOnlyDmlStatementsAfter(index)) {
+      return;
+    }
+
+    // We need to start an implicit transaction.
+    // Check if a read-only transaction suffices.
+    spannerConnection.beginTransaction();
+    if (isSync && !hasDmlStatementsAfter(index)) {
+      spannerConnection.setTransactionMode(
+          com.google.cloud.spanner.connection.TransactionMode.READ_ONLY_TRANSACTION);
+    }
+    transactionMode = TransactionMode.IMPLICIT;
+    connectionState = ConnectionState.TRANSACTION;
   }
 
   private void endImplicitTransaction() {
@@ -241,5 +307,142 @@ public class BackendConnection {
 
   private boolean isTransactionStatement(int index) {
     return isBegin(index) || isCommit(index) || isRollback(index);
+  }
+
+  private boolean hasDmlStatementsAfter(int index) {
+    return bufferedStatements.subList(index, bufferedStatements.size()).stream()
+        .anyMatch(statement -> statement.parsedStatement.getType() == StatementType.UPDATE);
+  }
+
+  private boolean hasOnlyDmlStatementsAfter(int index) {
+    return bufferedStatements.subList(index, bufferedStatements.size()).stream()
+        .allMatch(statement -> statement.parsedStatement.getType() == StatementType.UPDATE);
+  }
+
+  private int getStatementCount() {
+    return bufferedStatements.size();
+  }
+
+  private StatementType getStatementType(int index) {
+    return bufferedStatements.get(index).parsedStatement.getType();
+  }
+
+  private boolean canBeBatchedTogether(StatementType statementType1, StatementType statementType2) {
+    if (Objects.equals(statementType1, StatementType.QUERY)
+        || Objects.equals(statementType1, StatementType.CLIENT_SIDE)) {
+      return false;
+    }
+    return Objects.equals(statementType1, statementType2);
+  }
+
+  /**
+   * Executes the statements from fromIndex in a DML/DDL batch. The batch will consist of all
+   * statements from fromIndex till the first statement that is of a different type than the
+   * statement at fromIndex. That is; If the first statement is a DML statement, the batch will
+   * contain all statements that follow until it encounters a statement that is not a DML statement.
+   * The same also applies to DDL statements. Query statements and other statements can not be
+   * batched.
+   *
+   * @param fromIndex The index of the statements array where the batch should start
+   * @return The number of statements included in the batch.
+   */
+  private int executeStatementsInBatch(int fromIndex) {
+    Preconditions.checkArgument(fromIndex < getStatementCount() - 1);
+    Preconditions.checkArgument(
+        canBeBatchedTogether(getStatementType(fromIndex), getStatementType(fromIndex + 1)));
+    StatementType batchType = getStatementType(fromIndex);
+    switch (batchType) {
+      case UPDATE:
+        spannerConnection.startBatchDml();
+        break;
+      case DDL:
+        spannerConnection.startBatchDdl();
+        break;
+      default:
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT, "Statement type is not supported for batching");
+    }
+    int index = fromIndex;
+    while (index < getStatementCount()) {
+      StatementType statementType = getStatementType(index);
+      if (canBeBatchedTogether(batchType, statementType)) {
+        spannerConnection.execute(bufferedStatements.get(index).statement);
+        index++;
+      } else {
+        // End the batch here, as the statement type on this index can not be batched together with
+        // the other statements in the batch.
+        break;
+      }
+    }
+    try {
+      long[] counts = spannerConnection.runBatch();
+      updateBatchResultCount(fromIndex, counts);
+    } catch (SpannerBatchUpdateException e) {
+      long[] counts = e.getUpdateCounts();
+      updateBatchResultCount(fromIndex, counts);
+      return counts.length + 1;
+    }
+    return index - fromIndex;
+  }
+
+  private void updateBatchResultCount(int fromIndex, long[] updateCounts) {
+    for (int index = fromIndex; index < fromIndex + updateCounts.length; index++) {
+      Execute execute = (Execute) bufferedStatements.get(index);
+      if (execute.parsedStatement.getType() == StatementType.DDL) {
+        execute.result.set(new NoResult());
+      } else {
+        execute.result.set(new UpdateCount(updateCounts[index - fromIndex]));
+      }
+    }
+  }
+
+  private static final class NoResult implements StatementResult {
+    @Override
+    public ResultType getResultType() {
+      return ResultType.NO_RESULT;
+    }
+
+    @Override
+    public ClientSideStatementType getClientSideStatementType() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ResultSet getResultSet() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Long getUpdateCount() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private static final class UpdateCount implements StatementResult {
+    private final Long updateCount;
+
+    UpdateCount(Long updateCount) {
+      this.updateCount = updateCount;
+    }
+
+    @Override
+    public ResultType getResultType() {
+      return ResultType.UPDATE_COUNT;
+    }
+
+    @Override
+    public ClientSideStatementType getClientSideStatementType() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ResultSet getResultSet() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Long getUpdateCount() {
+      return updateCount;
+    }
   }
 }

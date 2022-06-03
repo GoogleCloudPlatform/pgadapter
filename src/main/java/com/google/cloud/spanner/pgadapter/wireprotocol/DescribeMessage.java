@@ -20,7 +20,6 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
@@ -41,7 +40,8 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   private final PreparedType type;
   private final String name;
   private final IntermediateStatement statement;
-  private Future<DescribeMetadata> describePortalMetadata;
+  private Future<DescribePortalMetadata> describePortalMetadata;
+  private Future<DescribeStatementMetadata> describeStatementMetadata;
 
   public DescribeMessage(ConnectionHandler connection) throws Exception {
     super(connection);
@@ -58,7 +58,8 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   void buffer(BackendConnection backendConnection) {
     if (this.type == PreparedType.Portal
         && this.statement.getStatementType(0) == StatementType.QUERY) {
-      describePortalMetadata = this.statement.describeAsync(backendConnection);
+      describePortalMetadata =
+          (Future<DescribePortalMetadata>) this.statement.describeAsync(backendConnection);
     }
   }
 
@@ -141,7 +142,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
       throw new IllegalStateException("Trying to get Portal Metadata before it has been described");
     }
     try {
-      return ((DescribePortalMetadata) this.describePortalMetadata.get());
+      return this.describePortalMetadata.get();
     } catch (ExecutionException executionException) {
       throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
     } catch (InterruptedException interruptedException) {
@@ -171,6 +172,20 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
       }
     } catch (SpannerException exception) {
       this.handleError(exception);
+    }
+  }
+
+  private DescribeStatementMetadata getStatementMetadata() {
+    if (!this.describeStatementMetadata.isDone()) {
+      throw new IllegalStateException(
+          "Trying to get Statement Metadata before it has been described");
+    }
+    try {
+      return this.describeStatementMetadata.get();
+    } catch (ExecutionException executionException) {
+      throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
+    } catch (InterruptedException interruptedException) {
+      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
     }
   }
 }
