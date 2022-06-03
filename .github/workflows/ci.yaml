@@ -32,6 +32,10 @@ jobs:
       with:
         go-version: '^1.17.7'
     - run: go version
+    - uses: actions/setup-python@v3
+      with:
+        python-version: '3.x'
+    - run: python --version
     - run: .ci/run-with-credentials.sh units
   lint:
     runs-on: ubuntu-latest
