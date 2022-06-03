@@ -29,6 +29,12 @@ public abstract class AbstractQueryProtocolMessage extends ControlMessage {
     this.handler = connection.getExtendedQueryProtocolHandler();
   }
 
+  AbstractQueryProtocolMessage(
+      ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) throws IOException {
+    super(connection, manuallyCreatedToken);
+    this.handler = connection.getExtendedQueryProtocolHandler();
+  }
+
   @Override
   protected final void sendPayload() throws Exception {
     this.buffer(handler.getBackendConnection());

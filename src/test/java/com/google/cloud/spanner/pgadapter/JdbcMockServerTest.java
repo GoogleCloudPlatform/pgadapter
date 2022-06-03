@@ -443,12 +443,14 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
 
     // The DML statements are split by the JDBC driver and sent as separate statements to PgAdapter.
-    // PgAdapter therefore also simply executes these as separate DML statements.
-    assertTrue(mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).isEmpty());
-    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(2, requests.size());
-    assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
-    assertEquals(UPDATE_STATEMENT.getSql(), requests.get(1).getSql());
+    // The Sync message is however sent after the second DML statement, which means that PGAdapter
+    // is able to batch these together into one ExecuteBatchDml statement.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
+    assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
   }
 
   @Test
@@ -465,15 +467,15 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
     }
 
-    // The PostgreSQL JDBC driver will send the DML statements as separated statements to PG when
-    // executing a batch using simple mode. This means that Spanner will receive two separate DML
-    // requests.
-    assertTrue(mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).isEmpty());
-    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-
-    assertEquals(2, requests.size());
-    assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
-    assertEquals(UPDATE_STATEMENT.getSql(), requests.get(1).getSql());
+    // The PostgreSQL JDBC driver will send the DML statements as separated statements to PG, but it
+    // will only send a Sync after the second statement. This means that PGAdapter is able to batch
+    // these together in one ExecuteBatchDml request.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
+    assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
   }
 
   @Test

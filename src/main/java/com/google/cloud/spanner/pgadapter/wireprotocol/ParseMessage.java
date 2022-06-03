@@ -52,6 +52,20 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
     this.statement.setParameterDataTypes(this.parameterDataTypes);
   }
 
+  /**
+   * Constructor for manually created Parse messages that originate from the simple query protocol.
+   */
+  ParseMessage(ConnectionHandler connection, String sql) throws Exception {
+    super(connection, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
+    this.name = "";
+    ParsedStatement parsedStatement = PARSER.parse(Statement.of(sql));
+    this.parameterDataTypes = new int[0];
+    this.statement =
+        new IntermediatePreparedStatement(
+            connection, connection.getServer().getOptions(), name, parsedStatement);
+    this.statement.setParameterDataTypes(this.parameterDataTypes);
+  }
+
   @Override
   void buffer(BackendConnection backendConnection) {
     if (!Strings.isNullOrEmpty(this.name) && this.connection.hasStatement(this.name)) {
@@ -62,7 +76,10 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
 
   @Override
   public void flush() throws Exception {
-    new ParseCompleteResponse(this.outputStream).send();
+    // The simple query protocol does not need the ParseComplete response.
+    if (!isManuallyCreated()) {
+      new ParseCompleteResponse(this.outputStream).send();
+    }
   }
 
   @Override

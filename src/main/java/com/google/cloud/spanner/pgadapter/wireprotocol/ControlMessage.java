@@ -37,9 +37,24 @@ import java.util.List;
  */
 @InternalApi
 public abstract class ControlMessage extends WireMessage {
+  protected enum ManuallyCreatedToken {
+    MANUALLY_CREATED_TOKEN;
+  }
+
+  private final ManuallyCreatedToken manuallyCreatedToken;
 
   public ControlMessage(ConnectionHandler connection) throws IOException {
     super(connection, connection.getConnectionMetadata().getInputStream().readInt());
+    this.manuallyCreatedToken = null;
+  }
+
+  protected ControlMessage(ConnectionHandler connection, ManuallyCreatedToken token) {
+    super(connection, 0);
+    this.manuallyCreatedToken = token;
+  }
+
+  protected boolean isManuallyCreated() {
+    return manuallyCreatedToken != null;
   }
 
   /**
@@ -138,11 +153,6 @@ public abstract class ControlMessage extends WireMessage {
    */
   protected void handleError(Exception e) throws Exception {
     new ErrorResponse(this.outputStream, e, State.RaiseException).send(false);
-    //    if (connection.getSpannerConnection().isInTransaction()) {
-    //      connection.getSpannerConnection().rollbackAsync();
-    //      connection.setStatus(ConnectionStatus.TRANSACTION_ABORTED);
-    //    }
-    //    this.outputStream.flush();
   }
 
   /**
