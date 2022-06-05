@@ -43,6 +43,7 @@ import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.statements.SimpleQueryStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
@@ -452,15 +453,14 @@ public class StatementTest {
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
-    IntermediateStatement intermediateStatement = ((QueryMessage) message).getStatement();
+    SimpleQueryStatement simpleQueryStatement = ((QueryMessage) message).getSimpleQueryStatement();
 
-    assertTrue(intermediateStatement.isBatchedQuery());
-    assertEquals(2, intermediateStatement.getStatements().size());
+    assertEquals(2, simpleQueryStatement.getStatements().size());
     assertEquals(
-        "INSERT INTO users (name) VALUES (';;test;;')", intermediateStatement.getStatement(0));
+        "INSERT INTO users (name) VALUES (';;test;;')", simpleQueryStatement.getStatement(0));
     assertEquals(
         "INSERT INTO users (name1, name2) VALUES ('''''', ';'';')",
-        intermediateStatement.getStatement(1));
+        simpleQueryStatement.getStatement(1));
   }
 
   @Test

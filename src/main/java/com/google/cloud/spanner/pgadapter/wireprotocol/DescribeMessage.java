@@ -55,9 +55,8 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   }
 
   /** Constructor for manually created Describe messages from the simple query protocol. */
-  DescribeMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken)
-      throws Exception {
-    super(connection, manuallyCreatedToken);
+  public DescribeMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
+    super(connection, 4, manuallyCreatedToken);
     this.type = PreparedType.Portal;
     this.name = "";
     this.statement = this.connection.getPortal(this.name);

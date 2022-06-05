@@ -55,10 +55,12 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   /**
    * Constructor for manually created Parse messages that originate from the simple query protocol.
    */
-  ParseMessage(ConnectionHandler connection, String sql) throws Exception {
-    super(connection, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
+  public ParseMessage(ConnectionHandler connection, ParsedStatement parsedStatement) {
+    super(
+        connection,
+        5 + parsedStatement.getSqlWithoutComments().length(),
+        ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
     this.name = "";
-    ParsedStatement parsedStatement = PARSER.parse(Statement.of(sql));
     this.parameterDataTypes = new int[0];
     this.statement =
         new IntermediatePreparedStatement(

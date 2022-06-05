@@ -19,6 +19,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
+import com.google.common.collect.ImmutableList;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.List;
@@ -32,12 +33,12 @@ import java.util.List;
 public class BindMessage extends AbstractQueryProtocolMessage {
   protected static final char IDENTIFIER = 'B';
 
-  private String portalName;
-  private String statementName;
-  private List<Short> formatCodes;
-  private List<Short> resultFormatCodes;
-  private byte[][] parameters;
-  private IntermediatePreparedStatement statement;
+  private final String portalName;
+  private final String statementName;
+  private final List<Short> formatCodes;
+  private final List<Short> resultFormatCodes;
+  private final byte[][] parameters;
+  private final IntermediatePreparedStatement statement;
 
   public BindMessage(ConnectionHandler connection) throws Exception {
     super(connection);
@@ -47,6 +48,16 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.parameters = getParameters(this.inputStream);
     this.resultFormatCodes = getFormatCodes(this.inputStream);
     this.statement = connection.getStatement(this.statementName);
+  }
+
+  public BindMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
+    super(connection, 4, manuallyCreatedToken);
+    this.portalName = "";
+    this.statementName = "";
+    this.formatCodes = ImmutableList.of();
+    this.resultFormatCodes = ImmutableList.of();
+    this.parameters = new byte[0][];
+    this.statement = connection.getStatement("");
   }
 
   /** Given the prepared statement, bind it and save it locally. */
@@ -60,7 +71,9 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   @Override
   public void flush() throws Exception {
-    new BindCompleteResponse(this.outputStream).send();
+    if (!isManuallyCreated()) {
+      new BindCompleteResponse(this.outputStream).send();
+    }
   }
 
   @Override

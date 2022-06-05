@@ -32,6 +32,10 @@ public class SyncMessage extends ControlMessage {
     super(connection);
   }
 
+  public SyncMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
+    super(connection, 4, manuallyCreatedToken);
+  }
+
   @Override
   protected void sendPayload() throws Exception {
     connection.getExtendedQueryProtocolHandler().sync();

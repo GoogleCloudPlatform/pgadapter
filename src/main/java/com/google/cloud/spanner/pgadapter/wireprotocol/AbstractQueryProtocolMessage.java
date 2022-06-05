@@ -30,8 +30,8 @@ public abstract class AbstractQueryProtocolMessage extends ControlMessage {
   }
 
   AbstractQueryProtocolMessage(
-      ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) throws IOException {
-    super(connection, manuallyCreatedToken);
+      ConnectionHandler connection, int length, ManuallyCreatedToken manuallyCreatedToken) {
+    super(connection, length, manuallyCreatedToken);
     this.handler = connection.getExtendedQueryProtocolHandler();
   }
 

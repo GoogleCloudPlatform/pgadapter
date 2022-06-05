@@ -37,7 +37,7 @@ import java.util.List;
  */
 @InternalApi
 public abstract class ControlMessage extends WireMessage {
-  protected enum ManuallyCreatedToken {
+  public enum ManuallyCreatedToken {
     MANUALLY_CREATED_TOKEN;
   }
 
@@ -48,8 +48,9 @@ public abstract class ControlMessage extends WireMessage {
     this.manuallyCreatedToken = null;
   }
 
-  protected ControlMessage(ConnectionHandler connection, ManuallyCreatedToken token) {
-    super(connection, 0);
+  /** Constructor for manually created Control messages. */
+  protected ControlMessage(ConnectionHandler connection, int length, ManuallyCreatedToken token) {
+    super(connection, length);
     this.manuallyCreatedToken = token;
   }
 

@@ -185,11 +185,11 @@ public class ProtocolTest {
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
-    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSql());
+    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSqlWithoutComments());
 
     QueryMessage messageSpy = (QueryMessage) spy(message);
 
-    doNothing().when(messageSpy).handleQuery();
+    doNothing().when(messageSpy).send();
 
     messageSpy.send();
     // Execute
@@ -223,11 +223,11 @@ public class ProtocolTest {
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
     assertEquals(MatcherStatement.class, ((QueryMessage) message).getStatement().getClass());
-    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSql());
+    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSqlWithoutComments());
 
     QueryMessage messageSpy = (QueryMessage) spy(message);
 
-    doNothing().when(messageSpy).handleQuery();
+    doNothing().when(messageSpy).send();
 
     messageSpy.send();
     verify(connection).execute(Statement.of(expectedSQL));
@@ -1195,7 +1195,7 @@ public class ProtocolTest {
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
-    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSql());
+    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSqlWithoutComments());
 
     message.send();
 
