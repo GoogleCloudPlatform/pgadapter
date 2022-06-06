@@ -34,7 +34,7 @@ jobs:
     - run: go version
     - uses: actions/checkout@v3
     - name: Install pipenv
-      run: pipx install pipenv
+      run: pip3 install pipenv
     - uses: actions/setup-python@v3
       with:
         python-version: '3.9'
