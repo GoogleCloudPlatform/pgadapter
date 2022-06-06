@@ -18,7 +18,6 @@ import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
-import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
@@ -42,34 +41,19 @@ import org.junit.runners.JUnit4;
 @Category(PythonTest.class)
 public class PythonBasicTest extends AbstractMockServerTest {
   static String execute(int port, String test) throws IOException, InterruptedException {
-
-    String[] runCommand2 = new String[] {"pipenv", "install"};
-    ProcessBuilder builder2 = new ProcessBuilder();
-    builder2.command(runCommand2);
-    builder2.directory(new File("./src/test/python"));
-    Process process = builder2.start();
-    //Scanner scanner = new Scanner(process.getInputStream());
-
-    int result = process.waitFor();
-    if(result != 0)
-      throw SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT,
-          "Couldnt install dependencies");
-
-
     String[] runCommand =
         new String[] {"python3", "pgAdapterBasicTests.py", Integer.toString(port), test};
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
     builder.directory(new File("./src/test/python"));
-    process = builder.start();
+    Process process = builder.start();
     Scanner scanner = new Scanner(process.getInputStream());
 
     StringBuilder output = new StringBuilder();
     while (scanner.hasNextLine()) {
       output.append(scanner.nextLine()).append("\n");
     }
-    result = process.waitFor();
-    System.out.println(output.toString());
+    int result = process.waitFor();
     /*try {
       assertEquals(output.toString(), 0, result);
     }catch (Exception e){
