@@ -42,14 +42,6 @@ jobs:
         python-version: '3.9'
         cache: 'pip'
     - run: pip install -r ./src/test/python/requirements.txt
-    - uses: actions/checkout@v3
-    - name: Install pipenv
-      run: pip3 install pipenv
-    - uses: actions/setup-python@v3
-      with:
-        python-version: '3.9'
-        cache: 'pipenv'
-    - run: cd ./src/test/python && pipenv install && pipenv shell && python3 -c "import psycopg2"
     - run: .ci/run-with-credentials.sh units
 
   lint:
