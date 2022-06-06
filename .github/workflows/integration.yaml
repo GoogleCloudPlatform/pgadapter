@@ -21,7 +21,7 @@ jobs:
   integration-test:
     needs: [check-env]
     if: needs.check-env.outputs.has-key == 'true'
-    timeout-minutes: 30
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
