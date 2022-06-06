@@ -16,9 +16,7 @@ package com.google.cloud.spanner.pgadapter.python;
 
 import static org.junit.Assert.assertEquals;
 
-import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.protobuf.ListValue;
