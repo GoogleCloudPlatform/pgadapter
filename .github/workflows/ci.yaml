@@ -37,6 +37,12 @@ jobs:
         python-version: '3.9'
     - run: python --version
     - uses: actions/checkout@v3
+    - uses: actions/setup-python@v3
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+    - run: pip install -r ./src/test/python/requirements.txt
+    - uses: actions/checkout@v3
     - name: Install pipenv
       run: pip3 install pipenv
     - uses: actions/setup-python@v3
