@@ -1,8 +1,8 @@
 import psycopg2 as pg
-#import sys
+import sys
 
 try:
-  '''assert len(sys.argv) == 3
+  assert len(sys.argv) == 3
   connection = pg.connect(user = "postgres",
                           database = "postgres",
                           host = "localhost",
@@ -11,10 +11,8 @@ try:
   cursor.execute(sys.argv[2])
   for row in cursor:
     print(row)
-'''
-  print('hello')
-except Exception as e:
 
+except Exception as e:
   print(e)
 
 
