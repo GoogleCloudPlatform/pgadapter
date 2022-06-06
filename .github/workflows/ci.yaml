@@ -39,7 +39,7 @@ jobs:
       with:
         python-version: '3.9'
         cache: 'pipenv'
-    - run: pipenv install
+    - run: cd ./src/test/python && pipenv install
     - uses: actions/setup-python@v3
       with:
         python-version: '3.x'
