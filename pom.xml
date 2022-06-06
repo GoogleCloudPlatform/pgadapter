@@ -406,6 +406,7 @@
           </execution>
         </executions>
         <configuration>
+          <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
           <argLine>${failsafe.jacoco.args}</argLine>
           <skipITs>${skipITs}</skipITs>
         </configuration>

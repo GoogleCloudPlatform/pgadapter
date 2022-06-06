@@ -16,19 +16,23 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.wireprotocol.AbstractQueryProtocolMessage;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.LinkedList;
 
 public class ExtendedQueryProtocolHandler {
   private final LinkedList<AbstractQueryProtocolMessage> messages = new LinkedList<>();
-  private final ConnectionHandler connectionHandler;
   private final BackendConnection backendConnection;
 
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
-    this.connectionHandler = connectionHandler;
     this.backendConnection =
         new BackendConnection(
             connectionHandler.getSpannerConnection(),
             connectionHandler.getServer().getOptions().getDdlTransactionMode());
+  }
+
+  @VisibleForTesting
+  public ExtendedQueryProtocolHandler(BackendConnection backendConnection) {
+    this.backendConnection = backendConnection;
   }
 
   public BackendConnection getBackendConnection() {
