@@ -61,7 +61,7 @@ public class PythonBasicTest extends AbstractMockServerTest {
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
     builder.directory(new File("./src/test/python"));
-    Process process = builder.start();
+    process = builder.start();
     Scanner scanner = new Scanner(process.getInputStream());
 
     StringBuilder output = new StringBuilder();
