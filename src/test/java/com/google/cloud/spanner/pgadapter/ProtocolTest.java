@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,9 +40,9 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
-import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
@@ -53,7 +54,6 @@ import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandle
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.statements.MatcherStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
@@ -92,7 +92,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.junit.AfterClass;
 import org.junit.Rule;
@@ -169,17 +168,22 @@ public class ProtocolTest {
     byte[] value = Bytes.concat(messageMetadata, payload.getBytes());
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    DataOutputStream outputStream = new DataOutputStream(new ByteArrayOutputStream());
 
     String expectedSQL = "SELECT * FROM users";
 
-    when(connection.execute(Statement.of(expectedSQL))).thenReturn(statementResult);
-    when(statementResult.getResultType()).thenReturn(ResultType.RESULT_SET);
-    when(statementResult.getResultSet()).thenReturn(resultSet);
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
     when(options.requiresMatcher()).thenReturn(false);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(backendConnection.getConnectionState()).thenReturn(ConnectionState.IDLE);
+    when(connectionHandler.getStatement("")).thenReturn(intermediatePortalStatement);
+    when(connectionHandler.getPortal("")).thenReturn(intermediatePortalStatement);
+    when(intermediatePortalStatement.getStatementType(0)).thenReturn(StatementType.QUERY);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -189,11 +193,7 @@ public class ProtocolTest {
 
     QueryMessage messageSpy = (QueryMessage) spy(message);
 
-    doNothing().when(messageSpy).send();
-
     messageSpy.send();
-    // Execute
-    verify(connection).execute(Statement.of(expectedSQL));
   }
 
   @Test
@@ -207,30 +207,16 @@ public class ProtocolTest {
 
     String expectedSQL = "SELECT * FROM users";
 
-    when(connection.execute(Statement.of(expectedSQL))).thenReturn(statementResult);
-    when(statementResult.getResultType()).thenReturn(ResultType.RESULT_SET);
-    when(statementResult.getResultSet()).thenReturn(resultSet);
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
-    when(options.requiresMatcher()).thenReturn(true);
-    when(options.getCommandMetadataJSON())
-        .thenReturn((JSONObject) parser.parse("{\"commands\": []}"));
-    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
-    assertEquals(MatcherStatement.class, ((QueryMessage) message).getStatement().getClass());
+    assertNotNull(((QueryMessage) message).getSimpleQueryStatement());
     assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSqlWithoutComments());
-
-    QueryMessage messageSpy = (QueryMessage) spy(message);
-
-    doNothing().when(messageSpy).send();
-
-    messageSpy.send();
-    verify(connection).execute(Statement.of(expectedSQL));
   }
 
   @Test
@@ -1183,15 +1169,23 @@ public class ProtocolTest {
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.TRANSACTION);
-    when(statementResult.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
-    when(statementResult.getUpdateCount()).thenReturn(1L);
-    when(connection.execute(Statement.of(expectedSQL))).thenReturn(statementResult);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getStatement("")).thenReturn(intermediatePortalStatement);
+    when(connectionHandler.getPortal("")).thenReturn(intermediatePortalStatement);
+    when(intermediatePortalStatement.getCommandTag(0)).thenReturn("INSERT");
+    when(intermediatePortalStatement.getStatementType(0)).thenReturn(StatementType.UPDATE);
+    when(intermediatePortalStatement.getUpdateCount(0)).thenReturn(1L);
+    when(backendConnection.getConnectionState()).thenReturn(ConnectionState.TRANSACTION);
     OptionsMetadata options = mock(OptionsMetadata.class);
     when(server.getOptions()).thenReturn(options);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        new ExtendedQueryProtocolHandler(backendConnection);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
