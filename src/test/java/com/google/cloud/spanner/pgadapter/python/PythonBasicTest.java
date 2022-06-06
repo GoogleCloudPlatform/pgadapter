@@ -16,7 +16,10 @@ package com.google.cloud.spanner.pgadapter.python;
 
 import static org.junit.Assert.assertEquals;
 
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.protobuf.ListValue;
@@ -53,7 +56,12 @@ public class PythonBasicTest extends AbstractMockServerTest {
     }
     int result = process.waitFor();
     System.out.println(output.toString());
-    assertEquals(output.toString(), 0, result);
+    try {
+      assertEquals(output.toString(), 0, result);
+    }catch (Exception e){
+      throw SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT,
+          output.toString());
+    }
 
     return output.toString();
   }
