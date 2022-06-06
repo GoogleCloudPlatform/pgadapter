@@ -41,7 +41,7 @@ jobs:
       with:
         python-version: '3.9'
         cache: 'pip'
-    - run: pip install -r ./src/test/python/requirements.txt && python3 -c "import psycopg2"
+    - run: pip install -r ./src/test/python/requirements.txt
     - run: .ci/run-with-credentials.sh units
 
   lint:
