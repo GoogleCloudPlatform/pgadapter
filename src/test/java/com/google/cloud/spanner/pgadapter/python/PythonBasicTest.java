@@ -46,11 +46,13 @@ public class PythonBasicTest extends AbstractMockServerTest {
     builder.directory(new File("./src/test/python"));
     Process process = builder.start();
     Scanner scanner = new Scanner(process.getInputStream());
+
     StringBuilder output = new StringBuilder();
     while (scanner.hasNextLine()) {
       output.append(scanner.nextLine()).append("\n");
     }
     int result = process.waitFor();
+    System.out.println(output.toString());
     assertEquals(output.toString(), 0, result);
 
     return output.toString();
