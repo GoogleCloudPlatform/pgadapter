@@ -120,13 +120,17 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
    */
   public void handleDescribePortal() throws Exception {
     if (this.statement.hasException(0)) {
-      this.handleError(this.statement.getException(0));
+      throw this.statement.getException(0);
     } else {
       switch (this.statement.getStatementType(0)) {
         case UPDATE:
         case DDL:
         case CLIENT_SIDE:
-          new NoDataResponse(this.outputStream).send();
+          // The simple query protocol does not expect a NoData response in case of a non-query
+          // statement.
+          if (!isManuallyCreated()) {
+            new NoDataResponse(this.outputStream).send();
+          }
           break;
         case QUERY:
           try {

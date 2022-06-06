@@ -23,9 +23,11 @@ import com.google.cloud.spanner.pgadapter.metadata.SendResultSetState;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.EmptyQueryResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireoutput.PortalSuspendedResponse;
+import com.google.common.base.Strings;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -149,11 +151,11 @@ public abstract class ControlMessage extends WireMessage {
   /**
    * Takes an Exception Object and relates its results to the user within the client.
    *
-   * @param e The exception to be related.
+   * @param exception The exception to be related.
    * @throws Exception if there is some issue in the sending of the error messages.
    */
-  protected void handleError(Exception e) throws Exception {
-    new ErrorResponse(this.outputStream, e, State.RaiseException).send(false);
+  protected void handleError(Exception exception) throws Exception {
+    new ErrorResponse(this.outputStream, exception, State.RaiseException).send(false);
   }
 
   /**
@@ -169,6 +171,11 @@ public abstract class ControlMessage extends WireMessage {
       int resultIndex, IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
     String command = statement.getCommandTag(resultIndex);
+    if (Strings.isNullOrEmpty(command)) {
+      new EmptyQueryResponse(this.outputStream).send(false);
+      return false;
+    }
+
     switch (statement.getStatementType(resultIndex)) {
       case DDL:
       case CLIENT_SIDE:

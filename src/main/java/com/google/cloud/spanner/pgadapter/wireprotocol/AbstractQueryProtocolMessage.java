@@ -23,6 +23,7 @@ import java.io.IOException;
 @InternalApi
 public abstract class AbstractQueryProtocolMessage extends ControlMessage {
   private final ExtendedQueryProtocolHandler handler;
+  private boolean returnedErrorResponse;
 
   AbstractQueryProtocolMessage(ConnectionHandler connection) throws IOException {
     super(connection);
@@ -44,4 +45,13 @@ public abstract class AbstractQueryProtocolMessage extends ControlMessage {
   abstract void buffer(BackendConnection backendConnection) throws Exception;
 
   public abstract void flush() throws Exception;
+
+  public boolean isReturnedErrorResponse() {
+    return returnedErrorResponse;
+  }
+
+  protected void handleError(Exception exception) throws Exception {
+    super.handleError(exception);
+    this.returnedErrorResponse = true;
+  }
 }

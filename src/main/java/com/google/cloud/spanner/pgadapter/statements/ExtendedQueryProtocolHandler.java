@@ -25,7 +25,10 @@ public class ExtendedQueryProtocolHandler {
 
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
     this.connectionHandler = connectionHandler;
-    this.backendConnection = new BackendConnection(connectionHandler.getSpannerConnection());
+    this.backendConnection =
+        new BackendConnection(
+            connectionHandler.getSpannerConnection(),
+            connectionHandler.getServer().getOptions().getDdlTransactionMode());
   }
 
   public BackendConnection getBackendConnection() {
@@ -50,6 +53,9 @@ public class ExtendedQueryProtocolHandler {
     try {
       for (AbstractQueryProtocolMessage message : messages) {
         message.flush();
+        if (message.isReturnedErrorResponse()) {
+          break;
+        }
       }
     } finally {
       messages.clear();

@@ -25,6 +25,7 @@ import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleQueryStatement;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import java.text.MessageFormat;
 
 /** Executes a simple statement. */
@@ -91,11 +92,23 @@ public class QueryMessage extends ControlMessage {
   }
 
   private void handleCopy() throws Exception {
-    new CopyInResponse(
-            this.outputStream,
-            copyStatement.getTableColumns().size(),
-            copyStatement.getFormatCode())
-        .send();
-    this.connection.setStatus(ConnectionStatus.COPY_IN);
+    if (this.copyStatement.hasException(0)) {
+      handleError(this.copyStatement.getException());
+      new ReadyResponse(
+              this.outputStream,
+              connection
+                  .getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getConnectionState()
+                  .getReadyResponseStatus())
+          .send();
+    } else {
+      new CopyInResponse(
+              this.outputStream,
+              copyStatement.getTableColumns().size(),
+              copyStatement.getFormatCode())
+          .send();
+      this.connection.setStatus(ConnectionStatus.COPY_IN);
+    }
   }
 }

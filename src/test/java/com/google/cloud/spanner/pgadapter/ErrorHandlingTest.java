@@ -117,6 +117,9 @@ public class ErrorHandlingTest extends AbstractMockServerTest {
 
       // Committing the transaction will actually execute a rollback.
       connection.commit();
+
+      // The connection should now be usable.
+      assertTrue(connection.createStatement().execute("show transaction isolation level"));
     }
     // Check that we only received a rollback and no commit.
     assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));

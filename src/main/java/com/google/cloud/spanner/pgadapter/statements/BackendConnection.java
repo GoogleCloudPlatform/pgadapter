@@ -14,6 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode.AutocommitExplicitTransaction;
+import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode.AutocommitImplicitTransaction;
+import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode.Batch;
+import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode.Single;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.TRANSACTION_ABORTED_ERROR;
 
 import com.google.api.core.InternalApi;
@@ -21,6 +25,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerBatchUpdateException;
+import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -28,7 +33,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
-import com.google.cloud.spanner.connection.TransactionMode;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.base.Preconditions;
@@ -130,7 +135,18 @@ public class BackendConnection {
         if (connectionState == ConnectionState.ABORTED
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
-          result.set(rollbackResult);
+          result.set(NO_RESULT);
+        } else if (isBegin(parsedStatement) && spannerConnection.isInTransaction()) {
+          // Ignore the statement as it is a no-op to execute BEGIN when we are already in a
+          // transaction. TODO: Return a warning.
+          result.set(NO_RESULT);
+        } else if ((isCommit(parsedStatement) || isRollback(parsedStatement))
+            && !spannerConnection.isInTransaction()) {
+          // Ignore the statement as it is a no-op to execute COMMIT/ROLLBACK when we are not in a
+          // transaction. TODO: Return a warning.
+          result.set(NO_RESULT);
+        } else if (statement.getSql().isEmpty()) {
+          result.set(NO_RESULT);
         } else {
           result.set(spannerConnection.execute(statement));
         }
@@ -141,15 +157,18 @@ public class BackendConnection {
     }
   }
 
+  private static final StatementResult NO_RESULT = new NoResult();
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
-  private StatementResult rollbackResult;
+
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
   private final LinkedList<BufferedStatement<?>> bufferedStatements = new LinkedList<>();
   private final Connection spannerConnection;
+  private final DdlTransactionMode ddlTransactionMode;
 
-  BackendConnection(Connection spannerConnection) {
+  BackendConnection(Connection spannerConnection, DdlTransactionMode ddlTransactionMode) {
     this.spannerConnection = spannerConnection;
+    this.ddlTransactionMode = ddlTransactionMode;
   }
 
   /** Returns the current connection state. */
@@ -182,8 +201,14 @@ public class BackendConnection {
   private void flush(boolean isSync) {
     int index = 0;
     try {
-      for (BufferedStatement<?> bufferedStatement : bufferedStatements) {
+      while (index < bufferedStatements.size()) {
+        BufferedStatement<?> bufferedStatement = bufferedStatements.get(index);
         maybeBeginImplicitTransaction(index, isSync);
+        // Prepare the connection for executing a DDL statement. This could include committing the
+        // current transaction, depending on the settings for execute DDL in transactions.
+        if (bufferedStatement.parsedStatement.isDdl()) {
+          prepareExecuteDdl(bufferedStatement);
+        }
         boolean canUseBatch = false;
         if (index < (getStatementCount() - 1)) {
           StatementType statementType = getStatementType(index);
@@ -209,7 +234,8 @@ public class BackendConnection {
     } catch (Exception exception) {
       connectionState = ConnectionState.ABORTED;
       if (spannerConnection.isInTransaction()) {
-        rollbackResult = spannerConnection.execute(ROLLBACK);
+        spannerConnection.setStatementTag(null);
+        spannerConnection.execute(ROLLBACK);
       }
     } finally {
       bufferedStatements.clear();
@@ -267,6 +293,7 @@ public class BackendConnection {
 
     try {
       if (spannerConnection.isInTransaction()) {
+        spannerConnection.setStatementTag(null);
         if (connectionState == ConnectionState.ABORTED) {
           spannerConnection.rollback();
         } else {
@@ -275,6 +302,79 @@ public class BackendConnection {
       }
     } finally {
       connectionState = ConnectionState.IDLE;
+    }
+  }
+
+  /**
+   * Prepares the connection for executing a DDL statement. This can include committing the current
+   * transaction.
+   *
+   * <p>Executing the DDL statement may or may not be allowed depending on the state of the
+   * transaction and the selected {@link
+   * com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode}. The method
+   * will throw a {@link SpannerException} if executing a DDL statement at this point is not
+   * allowed.
+   */
+  private void prepareExecuteDdl(BufferedStatement<?> bufferedStatement) {
+    try {
+      // Single statements are simpler to check, so we do that in a separate check.
+      if (bufferedStatements.size() == 1) {
+        switch (ddlTransactionMode) {
+          case Single:
+          case Batch:
+          case AutocommitImplicitTransaction:
+            // Single DDL statements outside explicit transactions are always allowed. For a single
+            // statement, there can also not be an implicit transaction that needs to be committed.
+            if (transactionMode == TransactionMode.EXPLICIT) {
+              throw SpannerExceptionFactory.newSpannerException(
+                  ErrorCode.FAILED_PRECONDITION,
+                  "DDL statements are only allowed outside explicit transactions.");
+            }
+            // Fall-through to commit the transaction if necessary.
+          case AutocommitExplicitTransaction:
+            // DDL statements are allowed even in explicit transactions. Commit any transaction that
+            // might be active.
+            if (spannerConnection.isInTransaction()) {
+              spannerConnection.commit();
+              transactionMode = TransactionMode.IMPLICIT;
+            }
+        }
+        return;
+      }
+
+      // We are in a batch of statements.
+      switch (ddlTransactionMode) {
+        case Single:
+          throw SpannerExceptionFactory.newSpannerException(
+              ErrorCode.FAILED_PRECONDITION,
+              "DDL statements are only allowed outside batches and transactions.");
+        case Batch:
+          if (spannerConnection.isInTransaction()
+              || bufferedStatements.stream()
+                  .anyMatch(statement -> !statement.parsedStatement.isDdl())) {
+            throw SpannerExceptionFactory.newSpannerException(
+                ErrorCode.FAILED_PRECONDITION,
+                "DDL statements are not allowed in mixed batches or transactions.");
+          }
+          break;
+        case AutocommitImplicitTransaction:
+          if (spannerConnection.isInTransaction() && transactionMode != TransactionMode.IMPLICIT) {
+            throw SpannerExceptionFactory.newSpannerException(
+                ErrorCode.FAILED_PRECONDITION,
+                "DDL statements are only allowed outside explicit transactions.");
+          }
+          // Fallthrough to commit the transaction if necessary.
+        case AutocommitExplicitTransaction:
+          // Commit any transaction that might be active and allow executing the statement.
+          // Switch the execution state to implicit transaction.
+          if (spannerConnection.isInTransaction()) {
+            spannerConnection.commit();
+            transactionMode = TransactionMode.IMPLICIT;
+          }
+      }
+    } catch (SpannerException exception) {
+      bufferedStatement.result.setException(exception);
+      throw exception;
     }
   }
 
@@ -377,10 +477,12 @@ public class BackendConnection {
     try {
       long[] counts = spannerConnection.runBatch();
       updateBatchResultCount(fromIndex, counts);
-    } catch (SpannerBatchUpdateException e) {
-      long[] counts = e.getUpdateCounts();
+    } catch (SpannerBatchUpdateException batchUpdateException) {
+      long[] counts = batchUpdateException.getUpdateCounts();
       updateBatchResultCount(fromIndex, counts);
-      return counts.length + 1;
+      Execute failedExecute = (Execute) bufferedStatements.get(fromIndex + counts.length);
+      failedExecute.result.setException(batchUpdateException);
+      throw batchUpdateException;
     }
     return index - fromIndex;
   }
