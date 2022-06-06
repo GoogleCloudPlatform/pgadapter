@@ -56,12 +56,16 @@ public class PythonBasicTest extends AbstractMockServerTest {
     }
     int result = process.waitFor();
     System.out.println(output.toString());
-    try {
+    /*try {
       assertEquals(output.toString(), 0, result);
     }catch (Exception e){
       throw SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT,
           output.toString());
     }
+*/
+    if(result != 0)
+      throw SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT,
+          output.toString());
 
     return output.toString();
   }
