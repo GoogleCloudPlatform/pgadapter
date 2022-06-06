@@ -43,7 +43,7 @@ import org.junit.runners.JUnit4;
 public class PythonBasicTest extends AbstractMockServerTest {
   static String execute(int port, String test) throws IOException, InterruptedException {
 
-    String[] runCommand2 = new String[] {"python3", "-m", "pipenv", "install"};
+    String[] runCommand2 = new String[] {"pipenv", "install"};
     ProcessBuilder builder2 = new ProcessBuilder();
     builder2.command(runCommand2);
     builder2.directory(new File("./src/test/python"));
