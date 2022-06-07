@@ -30,7 +30,6 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
@@ -296,7 +295,7 @@ public class ConnectionHandler extends Thread {
     } else if (this.status == ConnectionStatus.COPY_IN) {
       new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
     } else {
-      this.status = ConnectionStatus.IDLE;
+      this.status = ConnectionStatus.AUTHENTICATED;
       new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
       new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
     }
@@ -304,10 +303,8 @@ public class ConnectionHandler extends Thread {
 
   /** Closes portals and statements if the result of an execute was the end of a transaction. */
   public void cleanUp(IntermediateStatement statement) throws Exception {
-    for (int index = 0; index < statement.getStatementCount(); index++) {
-      if (!statement.isHasMoreData(index) && statement.isBound()) {
-        statement.close(index);
-      }
+    if (!statement.isHasMoreData() && statement.isBound()) {
+      statement.close();
     }
     // TODO when we have transaction data from jdbcConnection, close all portals if done
   }
@@ -462,34 +459,20 @@ public class ConnectionHandler extends Thread {
     return activeStatementsMap.get(this.connectionId);
   }
 
-  @Deprecated
   public synchronized ConnectionStatus getStatus() {
     return status;
   }
 
-  @Deprecated
   public synchronized void setStatus(ConnectionStatus status) {
     this.status = status;
   }
 
   /** Status of a {@link ConnectionHandler} */
   public enum ConnectionStatus {
-    UNAUTHENTICATED(Status.IDLE),
-    IDLE(Status.IDLE),
-    TRANSACTION(Status.TRANSACTION),
-    COPY_IN(Status.IDLE),
-    TERMINATED(Status.IDLE),
-    TRANSACTION_ABORTED(Status.FAILED);
-
-    private final ReadyResponse.Status readyResponseStatus;
-
-    ConnectionStatus(ReadyResponse.Status readyResponseStatus) {
-      this.readyResponseStatus = readyResponseStatus;
-    }
-
-    public ReadyResponse.Status getReadyResponseStatus() {
-      return this.readyResponseStatus;
-    }
+    UNAUTHENTICATED,
+    AUTHENTICATED,
+    COPY_IN,
+    TERMINATED,
   }
 
   /**

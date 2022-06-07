@@ -14,15 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode.AutocommitExplicitTransaction;
-import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode.AutocommitImplicitTransaction;
-import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode.Batch;
-import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode.Single;
-import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.TRANSACTION_ABORTED_ERROR;
-
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
-import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerBatchUpdateException;
 import com.google.cloud.spanner.SpannerException;
@@ -45,6 +38,13 @@ import java.util.concurrent.Future;
 /** This class emulates a backend PostgreSQL connection. */
 @InternalApi
 public class BackendConnection {
+  public static final String TRANSACTION_ABORTED_ERROR =
+      "current transaction is aborted, commands ignored until end of transaction block";
+
+  /**
+   * Connection state indicates whether the backend connection is idle, in a transaction or in an
+   * aborted transaction.
+   */
   public enum ConnectionState {
     IDLE(Status.IDLE),
     TRANSACTION(Status.TRANSACTION),
@@ -61,11 +61,20 @@ public class BackendConnection {
     }
   }
 
+  /**
+   * {@link TransactionMode} indicates whether the current transaction on a backend connection is
+   * implicit or explicit. Implicit transactions are automatically committed/rolled back when a
+   * batch of statements finishes execution.
+   */
   enum TransactionMode {
     IMPLICIT,
     EXPLICIT,
   }
 
+  /**
+   * Buffered statements are kept in memory until a flush or sync message is received. This makes it
+   * possible to batch multiple statements together when sending them to Cloud Spanner.
+   */
   abstract class BufferedStatement<T> {
     final ParsedStatement parsedStatement;
     final Statement statement;
@@ -85,40 +94,6 @@ public class BackendConnection {
           && !(isCommit(parsedStatement) || isRollback(parsedStatement))) {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, TRANSACTION_ABORTED_ERROR);
-      }
-    }
-  }
-
-  private final class ExecuteQuery extends BufferedStatement<ResultSet> {
-    ExecuteQuery(ParsedStatement parsedStatement, Statement statement) {
-      super(parsedStatement, statement);
-    }
-
-    @Override
-    void execute() {
-      try {
-        checkConnectionState();
-        result.set(spannerConnection.executeQuery(statement));
-      } catch (Exception exception) {
-        result.setException(exception);
-        throw exception;
-      }
-    }
-  }
-
-  private final class AnalyzeQuery extends BufferedStatement<ResultSet> {
-    AnalyzeQuery(ParsedStatement parsedStatement, Statement statement) {
-      super(parsedStatement, statement);
-    }
-
-    @Override
-    void execute() {
-      try {
-        checkConnectionState();
-        result.set(spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN));
-      } catch (Exception exception) {
-        result.setException(exception);
-        throw exception;
       }
     }
   }
@@ -176,28 +151,33 @@ public class BackendConnection {
     return this.connectionState;
   }
 
-  public Future<ResultSet> executeQuery(ParsedStatement parsedStatement, Statement statement) {
-    ExecuteQuery executeQuery = new ExecuteQuery(parsedStatement, statement);
-    bufferedStatements.add(executeQuery);
-    return executeQuery.result;
-  }
-
-  public Future<ResultSet> analyzeQuery(ParsedStatement parsedStatement, Statement statement) {
-    AnalyzeQuery analyzeQuery = new AnalyzeQuery(parsedStatement, statement);
-    bufferedStatements.add(analyzeQuery);
-    return analyzeQuery.result;
-  }
-
   public Future<StatementResult> execute(ParsedStatement parsedStatement, Statement statement) {
     Execute execute = new Execute(parsedStatement, statement);
     bufferedStatements.add(execute);
     return execute.result;
   }
 
+  /** Flushes the buffered statements to Spanner. */
   void flush() {
     flush(false);
   }
 
+  /**
+   * Flushes the buffered statements to Spanner and commits/rollbacks the implicit transaction (if
+   * any).
+   */
+  void sync() {
+    try {
+      flush(true);
+    } finally {
+      endImplicitTransaction();
+    }
+  }
+
+  /**
+   * Flushes all buffered statements to Cloud Spanner and commits/rolls back the transaction at the
+   * end if isSync=true.
+   */
   private void flush(boolean isSync) {
     int index = 0;
     try {
@@ -242,14 +222,7 @@ public class BackendConnection {
     }
   }
 
-  void sync() {
-    try {
-      flush(true);
-    } finally {
-      endImplicitTransaction();
-    }
-  }
-
+  /** Starts an implicit transaction if that is necessary. */
   private void maybeBeginImplicitTransaction(int index, boolean isSync) {
     if (connectionState != ConnectionState.IDLE) {
       return;
@@ -285,6 +258,7 @@ public class BackendConnection {
     connectionState = ConnectionState.TRANSACTION;
   }
 
+  /** Ends the current implicit transaction (if any). */
   private void endImplicitTransaction() {
     // Only touch the transaction if it is an implicit transaction.
     if (transactionMode != TransactionMode.IMPLICIT) {
@@ -487,6 +461,7 @@ public class BackendConnection {
     return index - fromIndex;
   }
 
+  /** Updates the results of the buffered statements after finishing executing a batch. */
   private void updateBatchResultCount(int fromIndex, long[] updateCounts) {
     for (int index = fromIndex; index < fromIndex + updateCounts.length; index++) {
       Execute execute = (Execute) bufferedStatements.get(index);
@@ -520,10 +495,10 @@ public class BackendConnection {
     }
   }
 
-  private static final class UpdateCount implements StatementResult {
+  public static final class UpdateCount implements StatementResult {
     private final Long updateCount;
 
-    UpdateCount(Long updateCount) {
+    public UpdateCount(Long updateCount) {
       this.updateCount = updateCount;
     }
 

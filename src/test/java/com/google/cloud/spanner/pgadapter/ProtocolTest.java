@@ -21,7 +21,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
@@ -42,7 +41,6 @@ import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
@@ -121,7 +119,6 @@ public class ProtocolTest {
   @Mock private ConnectionMetadata connectionMetadata;
   @Mock private DataOutputStream outputStream;
   @Mock private ResultSet resultSet;
-  @Mock private StatementResult statementResult;
 
   private byte[] intToBytes(int value) {
     byte[] parameters = new byte[4];
@@ -183,7 +180,6 @@ public class ProtocolTest {
     when(backendConnection.getConnectionState()).thenReturn(ConnectionState.IDLE);
     when(connectionHandler.getStatement("")).thenReturn(intermediatePortalStatement);
     when(connectionHandler.getPortal("")).thenReturn(intermediatePortalStatement);
-    when(intermediatePortalStatement.getStatementType(0)).thenReturn(StatementType.QUERY);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -939,15 +935,14 @@ public class ProtocolTest {
 
     doReturn(false)
         .when(messageSpy)
-        .sendSpannerResult(
-            anyInt(), any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
+        .sendSpannerResult(any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
 
     messageSpy.send();
     messageSpy.flush();
 
     verify(intermediatePortalStatement).executeAsync(backendConnection);
     verify(messageSpy)
-        .sendSpannerResult(0, intermediatePortalStatement, QueryMode.EXTENDED, totalRows);
+        .sendSpannerResult(intermediatePortalStatement, QueryMode.EXTENDED, totalRows);
     verify(connectionHandler).cleanUp(intermediatePortalStatement);
   }
 
@@ -1038,7 +1033,7 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.IDLE);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1071,7 +1066,7 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.TRANSACTION);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1168,14 +1163,14 @@ public class ProtocolTest {
     String expectedSQL = "INSERT INTO users (name) VALUES ('test')";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
-    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.TRANSACTION);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getStatement("")).thenReturn(intermediatePortalStatement);
     when(connectionHandler.getPortal("")).thenReturn(intermediatePortalStatement);
-    when(intermediatePortalStatement.getCommandTag(0)).thenReturn("INSERT");
-    when(intermediatePortalStatement.getStatementType(0)).thenReturn(StatementType.UPDATE);
-    when(intermediatePortalStatement.getUpdateCount(0)).thenReturn(1L);
+    when(intermediatePortalStatement.getCommandTag()).thenReturn("INSERT");
+    when(intermediatePortalStatement.getStatementType()).thenReturn(StatementType.UPDATE);
+    when(intermediatePortalStatement.getUpdateCount()).thenReturn(1L);
     when(backendConnection.getConnectionState()).thenReturn(ConnectionState.TRANSACTION);
     OptionsMetadata options = mock(OptionsMetadata.class);
     when(server.getOptions()).thenReturn(options);
@@ -1357,11 +1352,10 @@ public class ProtocolTest {
     CopyDoneMessage messageSpy = (CopyDoneMessage) spy(message);
     doReturn(false)
         .when(messageSpy)
-        .sendSpannerResult(
-            anyInt(), any(IntermediateStatement.class), any(QueryMode.class), anyLong());
+        .sendSpannerResult(any(IntermediateStatement.class), any(QueryMode.class), anyLong());
 
     messageSpy.send();
-    verify(messageSpy).sendSpannerResult(0, copyStatement, QueryMode.SIMPLE, 0L);
+    verify(messageSpy).sendSpannerResult(copyStatement, QueryMode.SIMPLE, 0L);
   }
 
   @Test
@@ -1441,8 +1435,8 @@ public class ProtocolTest {
 
     assertEquals("TEXT", copyStatement.getFormatType());
     assertEquals('\t', copyStatement.getDelimiterChar());
-    assertFalse(copyStatement.hasException(0));
-    assertEquals(12L, copyStatement.getUpdateCount().longValue());
+    assertFalse(copyStatement.hasException());
+    assertEquals(12L, copyStatement.getUpdateCount());
     assertEquals(12L, mw.getRowCount());
 
     copyStatement.close();

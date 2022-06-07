@@ -37,11 +37,6 @@ public class MatcherStatement extends IntermediateStatement {
     super(options, translateSQL(parsedStatement, connectionHandler), connectionHandler);
   }
 
-  @Override
-  public void execute() {
-    super.execute();
-  }
-
   /**
    * Translate a Postgres Specific command into something Spanner can handle. Currently, this is
    * only concerned with PSQL specific meta-commands.

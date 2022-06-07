@@ -17,7 +17,6 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
@@ -64,8 +63,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
 
   @Override
   void buffer(BackendConnection backendConnection) {
-    if (this.type == PreparedType.Portal
-        && this.statement.getStatementType(0) == StatementType.QUERY) {
+    if (this.type == PreparedType.Portal && this.statement.containsResultSet()) {
       describePortalMetadata =
           (Future<DescribePortalMetadata>) this.statement.describeAsync(backendConnection);
     }
@@ -119,32 +117,27 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
    * @throws Exception if sending the message back to the client causes an error.
    */
   public void handleDescribePortal() throws Exception {
-    if (this.statement.hasException(0)) {
-      throw this.statement.getException(0);
+    if (this.statement.hasException()) {
+      throw this.statement.getException();
     } else {
-      switch (this.statement.getStatementType(0)) {
-        case UPDATE:
-        case DDL:
-        case CLIENT_SIDE:
-          // The simple query protocol does not expect a NoData response in case of a non-query
-          // statement.
-          if (!isManuallyCreated()) {
-            new NoDataResponse(this.outputStream).send();
-          }
-          break;
-        case QUERY:
-          try {
-            new RowDescriptionResponse(
-                    this.outputStream,
-                    this.statement,
-                    getPortalMetadata().getMetadata(),
-                    this.connection.getServer().getOptions(),
-                    QueryMode.EXTENDED)
-                .send();
-            break;
-          } catch (SpannerException exception) {
-            this.handleError(exception);
-          }
+      if (this.statement.containsResultSet()) {
+        try {
+          new RowDescriptionResponse(
+                  this.outputStream,
+                  this.statement,
+                  getPortalMetadata().getMetadata(),
+                  this.connection.getServer().getOptions(),
+                  QueryMode.EXTENDED)
+              .send();
+        } catch (SpannerException exception) {
+          this.handleError(exception);
+        }
+      } else {
+        // The simple query protocol does not expect a NoData response in case of a non-query
+        // statement.
+        if (!isManuallyCreated()) {
+          new NoDataResponse(this.outputStream).send();
+        }
       }
     }
   }

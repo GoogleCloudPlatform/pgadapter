@@ -27,6 +27,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.EmptyQueryResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireoutput.PortalSuspendedResponse;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -167,27 +168,26 @@ public abstract class ControlMessage extends WireMessage {
    *
    * <p>NOTE: This method does not flush the output stream.
    */
-  public boolean sendSpannerResult(
-      int resultIndex, IntermediateStatement statement, QueryMode mode, long maxRows)
+  public boolean sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
-    String command = statement.getCommandTag(resultIndex);
+    String command = statement.getCommandTag();
     if (Strings.isNullOrEmpty(command)) {
       new EmptyQueryResponse(this.outputStream).send(false);
       return false;
     }
 
-    switch (statement.getStatementType(resultIndex)) {
+    switch (statement.getStatementType()) {
       case DDL:
       case CLIENT_SIDE:
         new CommandCompleteResponse(this.outputStream, command).send(false);
         return false;
       case QUERY:
-        SendResultSetState state = sendResultSet(resultIndex, statement, mode, maxRows);
-        statement.setHasMoreData(resultIndex, state.hasMoreRows());
+        SendResultSetState state = sendResultSet(statement, mode, maxRows);
+        statement.setHasMoreData(state.hasMoreRows());
         if (state.hasMoreRows()) {
           new PortalSuspendedResponse(this.outputStream).send(false);
         } else {
-          statement.close(resultIndex);
+          statement.close();
           new CommandCompleteResponse(this.outputStream, "SELECT " + state.getNumberOfRowsSent())
               .send(false);
         }
@@ -197,12 +197,11 @@ public abstract class ControlMessage extends WireMessage {
         // inserted. oid used to be the object ID of the inserted row if rows was 1 and the target
         // table had OIDs, but OIDs system columns are not supported anymore; therefore oid is
         // always 0.
-        command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount(resultIndex);
+        command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
         new CommandCompleteResponse(this.outputStream, command).send(false);
         return false;
       default:
-        throw new IllegalStateException(
-            "Unknown statement type: " + statement.getStatement(resultIndex));
+        throw new IllegalStateException("Unknown statement type: " + statement.getStatement());
     }
   }
 
@@ -217,18 +216,15 @@ public abstract class ControlMessage extends WireMessage {
    * @throws com.google.cloud.spanner.SpannerException if traversing the {@link ResultSet} fails.
    */
   public SendResultSetState sendResultSet(
-      int resultIndex, IntermediateStatement describedResult, QueryMode mode, long maxRows)
-      throws Exception {
+      IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
+    Preconditions.checkArgument(
+        describedResult.containsResultSet(), "The statement result must be a result set");
     long rows = 0;
-    ResultSet resultSet = describedResult.getStatementResult(resultIndex);
-    boolean hasData = describedResult.isHasMoreData(resultIndex);
+    ResultSet resultSet = describedResult.getStatementResult().getResultSet();
+    boolean hasData = describedResult.isHasMoreData();
     while (hasData) {
       new DataRowResponse(
-              this.outputStream,
-              resultIndex,
-              describedResult,
-              this.connection.getServer().getOptions(),
-              mode)
+              this.outputStream, describedResult, this.connection.getServer().getOptions(), mode)
           .send(false);
       rows++;
       hasData = resultSet.next();

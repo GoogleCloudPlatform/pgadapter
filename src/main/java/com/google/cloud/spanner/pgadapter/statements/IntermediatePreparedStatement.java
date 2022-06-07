@@ -15,19 +15,14 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
-import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -96,58 +91,9 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   public void executeAsync(BackendConnection backendConnection) {
     // If the portal has already been described, the statement has already been executed, and we
     // don't need to do that once more.
-    if (futureStatementResult == null && getStatementResult(0) == null) {
+    if (futureStatementResult == null && getStatementResult() == null) {
+      this.executed = true;
       setFutureStatementResult(backendConnection.execute(parsedStatement, statement));
-    }
-  }
-
-  @Override
-  public void execute() {
-    // TODO(230579451): Refactor to use ClientSideStatement information.
-    if (connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
-      handleTransactionAborted();
-      return;
-    }
-
-    // If the portal has already been described, the statement has already been executed, and we
-    // don't need to do that once more.
-    if (getStatementResult(0) == null && futureStatementResult == null) {
-      this.executedCount++;
-      try {
-        if (!connection.isInTransaction()
-            // TODO(230579451): Refactor to use ClientSideStatement information.
-            && this.parsedStatement.getType().equals(StatementType.CLIENT_SIDE)
-            && (this.commands.get(0).equals("ROLLBACK") || this.commands.get(0).equals("COMMIT"))) {
-          // TODO(230579929): Return warning that no transaction if connection status == IDLE.
-          connectionHandler.setStatus(ConnectionStatus.IDLE);
-        } else {
-          StatementResult result = connection.execute(this.statement);
-          this.updateResultCount(0, result);
-          connectionHandler.setStatus(
-              connection.isInTransaction() ? ConnectionStatus.TRANSACTION : ConnectionStatus.IDLE);
-        }
-      } catch (SpannerException exception) {
-        handleExecutionExceptionAndTransactionStatus(0, exception);
-      }
-    }
-  }
-
-  private void handleTransactionAborted() {
-    // TODO(230579451): Refactor to use ClientSideStatement information.
-    String command = getCommand(0);
-    if ("COMMIT".equals(command) || "ROLLBACK".equals(command)) {
-      connectionHandler.setStatus(ConnectionStatus.IDLE);
-      // COMMIT rollbacks aborted transaction
-      commandTags.set(0, "ROLLBACK");
-      if (connection.isInTransaction()) {
-        connection.rollback();
-      }
-    } else {
-      handleExecutionException(
-          executedCount,
-          SpannerExceptionFactory.newSpannerException(
-              ErrorCode.INVALID_ARGUMENT, TRANSACTION_ABORTED_ERROR));
-      executedCount++;
     }
   }
 
@@ -289,7 +235,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * statement.
    */
   private Statement transformDmlToSelectParams(Set<String> parameters) {
-    switch (getCommand(0)) {
+    switch (getCommand()) {
       case "INSERT":
         return transformInsertToSelectParams(
             this.connection, this.parsedStatement.getSqlWithoutComments(), parameters);

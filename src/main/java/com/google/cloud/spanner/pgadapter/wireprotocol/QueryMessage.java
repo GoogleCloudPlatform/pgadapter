@@ -92,7 +92,7 @@ public class QueryMessage extends ControlMessage {
   }
 
   private void handleCopy() throws Exception {
-    if (this.copyStatement.hasException(0)) {
+    if (this.copyStatement.hasException()) {
       handleError(this.copyStatement.getException());
       new ReadyResponse(
               this.outputStream,
