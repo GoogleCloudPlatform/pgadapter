@@ -35,7 +35,12 @@ import java.util.LinkedList;
 import java.util.Objects;
 import java.util.concurrent.Future;
 
-/** This class emulates a backend PostgreSQL connection. */
+/**
+ * This class emulates a backend PostgreSQL connection. Statements are buffered in memory until a
+ * flush/sync is received. This makes it possible to batch multiple statements together before
+ * sending these to Cloud Spanner. This class also keeps track of the transaction status of the
+ * connection.
+ */
 @InternalApi
 public class BackendConnection {
   public static final String TRANSACTION_ABORTED_ERROR =
@@ -46,8 +51,11 @@ public class BackendConnection {
    * aborted transaction.
    */
   public enum ConnectionState {
+    /** Connection is idle, no transaction is active. */
     IDLE(Status.IDLE),
+    /** An implicit or explicit transaction is active. */
     TRANSACTION(Status.TRANSACTION),
+    /** The current transaction is aborted. All statements are refused until rollback. */
     ABORTED(Status.FAILED);
 
     private final ReadyResponse.Status readyResponseStatus;
@@ -64,7 +72,7 @@ public class BackendConnection {
   /**
    * {@link TransactionMode} indicates whether the current transaction on a backend connection is
    * implicit or explicit. Implicit transactions are automatically committed/rolled back when a
-   * batch of statements finishes execution.
+   * batch of statements finishes execution (i.e. when we receive a Sync message).
    */
   enum TransactionMode {
     IMPLICIT,
@@ -141,6 +149,10 @@ public class BackendConnection {
   private final Connection spannerConnection;
   private final DdlTransactionMode ddlTransactionMode;
 
+  /**
+   * Creates a PG backend connection that uses the given Spanner {@link Connection} and {@link
+   * DdlTransactionMode}.
+   */
   BackendConnection(Connection spannerConnection, DdlTransactionMode ddlTransactionMode) {
     this.spannerConnection = spannerConnection;
     this.ddlTransactionMode = ddlTransactionMode;
@@ -151,6 +163,11 @@ public class BackendConnection {
     return this.connectionState;
   }
 
+  /**
+   * Buffers the given statement for execution on the backend connection when the next flush/sync
+   * message is received. The returned future will contain the result of the statement when
+   * execution has finished.
+   */
   public Future<StatementResult> execute(ParsedStatement parsedStatement, Statement statement) {
     Execute execute = new Execute(parsedStatement, statement);
     bufferedStatements.add(execute);
@@ -473,6 +490,9 @@ public class BackendConnection {
     }
   }
 
+  /**
+   * {@link StatementResult} implementation for statements that do not return anything (e.g. DDL).
+   */
   private static final class NoResult implements StatementResult {
     @Override
     public ResultType getResultType() {
@@ -495,6 +515,10 @@ public class BackendConnection {
     }
   }
 
+  /**
+   * Implementation of {@link StatementResult} for statements that return an update count (e.g.
+   * DML).
+   */
   public static final class UpdateCount implements StatementResult {
     private final Long updateCount;
 

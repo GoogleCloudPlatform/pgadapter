@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import java.text.MessageFormat;
@@ -94,7 +93,7 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
       this.handleError(this.statement.getException());
     } else {
       try {
-        this.sendSpannerResult(this.statement, QueryMode.EXTENDED, this.maxRows);
+        this.sendSpannerResult(this.statement, this.queryMode, this.maxRows);
         this.outputStream.flush();
       } catch (Exception exception) {
         handleError(exception);

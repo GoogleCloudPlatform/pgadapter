@@ -34,15 +34,16 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 
 /**
- * Class that represents a simple query protocol statement. This statement could contain multiple
- * semi-colon separated SQL statements.
+ * Class that represents a simple query protocol statement. This statement can contain multiple
+ * semi-colon separated SQL statements. The simple query protocol internally uses the extended query
+ * protocol to execute the statement(s) in the SQL string, but does not return all the messages that
+ * would have been returned by the extended protocol.
  */
 @InternalApi
 public class SimpleQueryStatement {
   private static final PostgreSQLStatementParser PARSER =
       (PostgreSQLStatementParser) AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
-  private final ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   private final ConnectionHandler connectionHandler;
   private final OptionsMetadata options;
   private final ParsedStatement fullStatement;
@@ -57,20 +58,19 @@ public class SimpleQueryStatement {
       ParsedStatement parsedStatement,
       ConnectionHandler connectionHandler) {
     this.connectionHandler = connectionHandler;
-    this.extendedQueryProtocolHandler = connectionHandler.getExtendedQueryProtocolHandler();
     this.options = options;
     this.fullStatement = parsedStatement;
     this.statements = parseStatements(parsedStatement);
   }
 
   public void execute() throws Exception {
-    // Do a Parse-Describe-Bind-Execute roundtrip for each statement in the query string.
+    // Do a Parse-Describe-Bind-Execute round-trip for each statement in the query string.
     // Finish with a Sync to close any implicit transaction and to return the results.
     for (ParsedStatement statement : this.statements) {
       if (options.requiresMatcher()) {
         statement = translatePotentialMetadataCommand(statement, connectionHandler);
       }
-      statement = replaceKnownUnsupportedQueries(statement);
+      statement = replaceKnownUnsupportedQueries(this.options, statement);
       new ParseMessage(connectionHandler, statement).send();
       new BindMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
       new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
@@ -79,8 +79,10 @@ public class SimpleQueryStatement {
     new SyncMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
   }
 
-  protected ParsedStatement replaceKnownUnsupportedQueries(ParsedStatement parsedStatement) {
-    if (this.options.isReplaceJdbcMetadataQueries()
+  /** Replaces any known unsupported query (e.g. JDBC metadata queries). */
+  static ParsedStatement replaceKnownUnsupportedQueries(
+      OptionsMetadata options, ParsedStatement parsedStatement) {
+    if (options.isReplaceJdbcMetadataQueries()
         && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(
             parsedStatement.getSqlWithoutComments())) {
       return PARSER.parse(

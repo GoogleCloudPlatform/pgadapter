@@ -18,7 +18,6 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
@@ -40,7 +39,6 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   private final String name;
   private final IntermediateStatement statement;
   private Future<DescribePortalMetadata> describePortalMetadata;
-  private Future<DescribeStatementMetadata> describeStatementMetadata;
 
   public DescribeMessage(ConnectionHandler connection) throws Exception {
     super(connection);
@@ -127,7 +125,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
                   this.statement,
                   getPortalMetadata().getMetadata(),
                   this.connection.getServer().getOptions(),
-                  QueryMode.EXTENDED)
+                  this.queryMode)
               .send();
         } catch (SpannerException exception) {
           this.handleError(exception);
@@ -170,27 +168,13 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
                 this.statement,
                 metadata.getResultSet(),
                 this.connection.getServer().getOptions(),
-                QueryMode.EXTENDED)
+                this.queryMode)
             .send();
       } else {
         new NoDataResponse(this.outputStream).send();
       }
     } catch (SpannerException exception) {
       this.handleError(exception);
-    }
-  }
-
-  private DescribeStatementMetadata getStatementMetadata() {
-    if (!this.describeStatementMetadata.isDone()) {
-      throw new IllegalStateException(
-          "Trying to get Statement Metadata before it has been described");
-    }
-    try {
-      return this.describeStatementMetadata.get();
-    } catch (ExecutionException executionException) {
-      throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
-    } catch (InterruptedException interruptedException) {
-      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
     }
   }
 }

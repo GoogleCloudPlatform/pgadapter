@@ -18,7 +18,6 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
@@ -68,22 +67,11 @@ public class IntermediateStatement {
       ParsedStatement parsedStatement) {
     this.connectionHandler = connectionHandler;
     this.options = options;
-    this.parsedStatement = replaceKnownUnsupportedQueries(parsedStatement);
+    this.parsedStatement =
+        SimpleQueryStatement.replaceKnownUnsupportedQueries(this.options, parsedStatement);
     this.connection = connectionHandler.getSpannerConnection();
     this.command = StatementParser.parseCommand(this.parsedStatement.getSqlWithoutComments());
     this.commandTag = this.command;
-  }
-
-  protected ParsedStatement replaceKnownUnsupportedQueries(ParsedStatement parsedStatement) {
-    if (this.options.isReplaceJdbcMetadataQueries()
-        && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(
-            parsedStatement.getSqlWithoutComments())) {
-      return PARSER.parse(
-          Statement.of(
-              JdbcMetadataStatementHelper.replaceJdbcMetadataStatement(
-                  parsedStatement.getSqlWithoutComments())));
-    }
-    return parsedStatement;
   }
 
   /**

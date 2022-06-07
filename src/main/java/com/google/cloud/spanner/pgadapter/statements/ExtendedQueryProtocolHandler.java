@@ -19,10 +19,15 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.AbstractQueryProtocolMess
 import com.google.common.annotations.VisibleForTesting;
 import java.util.LinkedList;
 
+/**
+ * Handles the message flow for the extended query protocol. Wire-protocol messages are buffered in
+ * memory until a flush/sync is received.
+ */
 public class ExtendedQueryProtocolHandler {
   private final LinkedList<AbstractQueryProtocolMessage> messages = new LinkedList<>();
   private final BackendConnection backendConnection;
 
+  /** Creates an {@link ExtendedQueryProtocolHandler} for the given connection. */
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
     this.backendConnection =
         new BackendConnection(
@@ -30,29 +35,46 @@ public class ExtendedQueryProtocolHandler {
             connectionHandler.getServer().getOptions().getDdlTransactionMode());
   }
 
+  /** Constructor only intended for testing. */
   @VisibleForTesting
   public ExtendedQueryProtocolHandler(BackendConnection backendConnection) {
     this.backendConnection = backendConnection;
   }
 
+  /** Returns the backend PG connection for this query handler. */
   public BackendConnection getBackendConnection() {
     return backendConnection;
   }
 
+  /**
+   * Buffer an extended query protocol message for execution when the next flush/sync message is
+   * received.
+   */
   public void buffer(AbstractQueryProtocolMessage message) {
     messages.add(message);
   }
 
+  /**
+   * Flushes the current queue of messages. Any pending database statements are first executed,
+   * before sending the wire-protocol responses to the frontend. A flush does not commit the
+   * implicit transaction (if any).
+   */
   public void flush() throws Exception {
     backendConnection.flush();
     flushMessages();
   }
 
+  /**
+   * Flushes the current queue of messages and commits the implicit transaction (if any). Any
+   * pending database statements are first executed, before sending the wire-protocol responses to
+   * the frontend.
+   */
   public void sync() throws Exception {
     backendConnection.sync();
     flushMessages();
   }
 
+  /** Flushes the wire-protocol messages to the frontend. */
   private void flushMessages() throws Exception {
     try {
       for (AbstractQueryProtocolMessage message : messages) {

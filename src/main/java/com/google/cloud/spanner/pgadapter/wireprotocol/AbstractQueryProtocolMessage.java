@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import java.io.IOException;
@@ -23,17 +24,20 @@ import java.io.IOException;
 @InternalApi
 public abstract class AbstractQueryProtocolMessage extends ControlMessage {
   private final ExtendedQueryProtocolHandler handler;
+  protected final QueryMode queryMode;
   private boolean returnedErrorResponse;
 
   AbstractQueryProtocolMessage(ConnectionHandler connection) throws IOException {
     super(connection);
     this.handler = connection.getExtendedQueryProtocolHandler();
+    this.queryMode = QueryMode.EXTENDED;
   }
 
   AbstractQueryProtocolMessage(
       ConnectionHandler connection, int length, ManuallyCreatedToken manuallyCreatedToken) {
     super(connection, length, manuallyCreatedToken);
     this.handler = connection.getExtendedQueryProtocolHandler();
+    this.queryMode = QueryMode.SIMPLE;
   }
 
   @Override

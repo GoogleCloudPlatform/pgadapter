@@ -36,7 +36,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.postgresql.core.Oid;
@@ -46,9 +45,6 @@ import org.postgresql.core.Oid;
  */
 @InternalApi
 public class IntermediatePreparedStatement extends IntermediateStatement {
-  private static final Logger logger =
-      Logger.getLogger(IntermediatePreparedStatement.class.getName());
-
   private final String name;
   protected int[] parameterDataTypes;
   protected Statement statement;
