@@ -38,9 +38,9 @@ import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionModeBatchTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {

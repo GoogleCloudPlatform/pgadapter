@@ -40,8 +40,12 @@ import java.util.List;
  */
 @InternalApi
 public abstract class ControlMessage extends WireMessage {
+  /**
+   * Token that is used to mark {@link ControlMessage}s that are manually created to execute a
+   * {@link QueryMessage}.
+   */
   public enum ManuallyCreatedToken {
-    MANUALLY_CREATED_TOKEN;
+    MANUALLY_CREATED_TOKEN
   }
 
   private final ManuallyCreatedToken manuallyCreatedToken;
@@ -57,8 +61,8 @@ public abstract class ControlMessage extends WireMessage {
     this.manuallyCreatedToken = token;
   }
 
-  protected boolean isManuallyCreated() {
-    return manuallyCreatedToken != null;
+  protected boolean isExtendedProtocol() {
+    return manuallyCreatedToken == null;
   }
 
   /**
@@ -168,19 +172,19 @@ public abstract class ControlMessage extends WireMessage {
    *
    * <p>NOTE: This method does not flush the output stream.
    */
-  public boolean sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
+  public void sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
     String command = statement.getCommandTag();
     if (Strings.isNullOrEmpty(command)) {
       new EmptyQueryResponse(this.outputStream).send(false);
-      return false;
+      return;
     }
 
     switch (statement.getStatementType()) {
       case DDL:
       case CLIENT_SIDE:
         new CommandCompleteResponse(this.outputStream, command).send(false);
-        return false;
+        break;
       case QUERY:
         SendResultSetState state = sendResultSet(statement, mode, maxRows);
         statement.setHasMoreData(state.hasMoreRows());
@@ -191,7 +195,7 @@ public abstract class ControlMessage extends WireMessage {
           new CommandCompleteResponse(this.outputStream, "SELECT " + state.getNumberOfRowsSent())
               .send(false);
         }
-        return state.hasMoreRows();
+        break;
       case UPDATE:
         // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
         // inserted. oid used to be the object ID of the inserted row if rows was 1 and the target
@@ -199,7 +203,7 @@ public abstract class ControlMessage extends WireMessage {
         // always 0.
         command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
         new CommandCompleteResponse(this.outputStream, command).send(false);
-        return false;
+        break;
       default:
         throw new IllegalStateException("Unknown statement type: " + statement.getStatement());
     }

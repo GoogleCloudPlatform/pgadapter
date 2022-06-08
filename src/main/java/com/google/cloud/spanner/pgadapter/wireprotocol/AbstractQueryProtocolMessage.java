@@ -21,6 +21,11 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import java.io.IOException;
 
+/**
+ * Abstract base class for extended query protocol messages. These can be buffered in memory locally
+ * until a flush or sync message is received. Any corresponding database statement will only be
+ * executed once a flush/sync is received.
+ */
 @InternalApi
 public abstract class AbstractQueryProtocolMessage extends ControlMessage {
   private final ExtendedQueryProtocolHandler handler;

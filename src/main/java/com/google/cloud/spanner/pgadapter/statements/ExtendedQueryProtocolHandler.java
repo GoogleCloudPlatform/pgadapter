@@ -17,7 +17,9 @@ package com.google.cloud.spanner.pgadapter.statements;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.wireprotocol.AbstractQueryProtocolMessage;
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 
 /**
  * Handles the message flow for the extended query protocol. Wire-protocol messages are buffered in
@@ -44,6 +46,12 @@ public class ExtendedQueryProtocolHandler {
   /** Returns the backend PG connection for this query handler. */
   public BackendConnection getBackendConnection() {
     return backendConnection;
+  }
+
+  /** Returns a copy of the currently buffered messages in this handler. */
+  @VisibleForTesting
+  List<AbstractQueryProtocolMessage> getMessages() {
+    return new ArrayList<>(messages);
   }
 
   /**

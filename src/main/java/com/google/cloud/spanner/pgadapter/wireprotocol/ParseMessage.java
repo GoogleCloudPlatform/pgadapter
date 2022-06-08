@@ -79,7 +79,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   @Override
   public void flush() throws Exception {
     // The simple query protocol does not need the ParseComplete response.
-    if (!isManuallyCreated()) {
+    if (isExtendedProtocol()) {
       new ParseCompleteResponse(this.outputStream).send();
     }
   }

@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,7 +47,6 @@ public class SimpleQueryStatement {
 
   private final ConnectionHandler connectionHandler;
   private final OptionsMetadata options;
-  private final ParsedStatement fullStatement;
   private final ImmutableList<ParsedStatement> statements;
 
   private static final char STATEMENT_DELIMITER = ';';
@@ -60,7 +59,6 @@ public class SimpleQueryStatement {
       ConnectionHandler connectionHandler) {
     this.connectionHandler = connectionHandler;
     this.options = options;
-    this.fullStatement = parsedStatement;
     this.statements = parseStatements(parsedStatement);
   }
 
@@ -182,9 +180,5 @@ public class SimpleQueryStatement {
 
   public String getStatement(int index) {
     return this.statements.get(index).getSqlWithoutComments();
-  }
-
-  public String getSql() {
-    return this.fullStatement.getSqlWithoutComments();
   }
 }

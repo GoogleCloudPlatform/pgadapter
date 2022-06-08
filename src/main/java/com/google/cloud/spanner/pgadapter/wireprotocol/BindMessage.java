@@ -40,6 +40,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
   private final byte[][] parameters;
   private final IntermediatePreparedStatement statement;
 
+  /** Constructor for Bind messages that are received from the front-end. */
   public BindMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.portalName = this.readString();
@@ -50,6 +51,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.statement = connection.getStatement(this.statementName);
   }
 
+  /** Constructor for Bind messages that are constructed to execute a Query message. */
   public BindMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
     super(connection, 4, manuallyCreatedToken);
     this.portalName = "";
@@ -71,7 +73,8 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   @Override
   public void flush() throws Exception {
-    if (!isManuallyCreated()) {
+    // The simple query protocol does not expect a BindComplete response.
+    if (isExtendedProtocol()) {
       new BindCompleteResponse(this.outputStream).send();
     }
   }

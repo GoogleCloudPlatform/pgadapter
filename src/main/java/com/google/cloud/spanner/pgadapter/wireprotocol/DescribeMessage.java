@@ -136,7 +136,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
       } else {
         // The simple query protocol does not expect a NoData response in case of a non-query
         // statement.
-        if (!isManuallyCreated()) {
+        if (isExtendedProtocol()) {
           new NoDataResponse(this.outputStream).send();
         }
       }

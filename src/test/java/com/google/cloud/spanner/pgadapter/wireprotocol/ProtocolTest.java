@@ -24,7 +24,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -918,7 +917,7 @@ public class ProtocolTest {
     verify(connectionHandler).getPortal("some portal");
     ExecuteMessage messageSpy = (ExecuteMessage) spy(message);
 
-    doReturn(false)
+    doNothing()
         .when(messageSpy)
         .sendSpannerResult(any(IntermediatePortalStatement.class), any(QueryMode.class), anyLong());
 
@@ -1378,7 +1377,7 @@ public class ProtocolTest {
 
     assertEquals(CopyDoneMessage.class, message.getClass());
     CopyDoneMessage messageSpy = (CopyDoneMessage) spy(message);
-    doReturn(false)
+    doNothing()
         .when(messageSpy)
         .sendSpannerResult(any(IntermediateStatement.class), any(QueryMode.class), anyLong());
 
