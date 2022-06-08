@@ -25,6 +25,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.statements.MatcherStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.EmptyQueryResponse;
@@ -52,13 +53,14 @@ public class QueryMessage extends ControlMessage {
     if (isCopy) {
       this.statement =
           new CopyStatement(connection, connection.getServer().getOptions(), parsedStatement);
-    } else if (!connection.getServer().getOptions().requiresMatcher()) {
+    } else if (connection.getServer().getOptions().requiresMatcher()
+        || connection.getWellKnownClient() == WellKnownClient.PSQL) {
       this.statement =
-          new IntermediateStatement(
+          new MatcherStatement(
               connection.getServer().getOptions(), parsedStatement, this.connection);
     } else {
       this.statement =
-          new MatcherStatement(
+          new IntermediateStatement(
               connection.getServer().getOptions(), parsedStatement, this.connection);
     }
     this.connection.addActiveStatement(this.statement);

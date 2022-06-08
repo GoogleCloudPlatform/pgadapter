@@ -34,6 +34,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -96,7 +97,8 @@ public class IntermediateStatement {
   }
 
   protected ParsedStatement replaceKnownUnsupportedQueries(ParsedStatement parsedStatement) {
-    if (this.options.isReplaceJdbcMetadataQueries()
+    if ((this.options.isReplaceJdbcMetadataQueries()
+            || connectionHandler.getWellKnownClient() == WellKnownClient.JDBC)
         && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(
             parsedStatement.getSqlWithoutComments())) {
       return PARSER.parse(

@@ -19,7 +19,11 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.commands.Command;
+import com.google.cloud.spanner.pgadapter.metadata.CommandMetadataParser;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import java.io.IOException;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.ParseException;
 
 /**
  * Meant to be utilized when running as a proxy for any interactive terminal tool either PSQL or
@@ -29,6 +33,16 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
  */
 @InternalApi
 public class MatcherStatement extends IntermediateStatement {
+  private static JSONObject getDefaultCommandMetadata() {
+    try {
+      return new CommandMetadataParser().defaultCommands();
+    } catch (IOException | ParseException exception) {
+      // ignore and return nothing
+      return null;
+    }
+  }
+
+  private static final JSONObject DEFAULT_COMMAND_METADATA = getDefaultCommandMetadata();
 
   public MatcherStatement(
       OptionsMetadata options,
@@ -52,13 +66,19 @@ public class MatcherStatement extends IntermediateStatement {
    */
   private static ParsedStatement translateSQL(
       ParsedStatement parsedStatement, ConnectionHandler connectionHandler) {
-    for (Command currentCommand :
-        Command.getCommands(
-            parsedStatement.getSqlWithoutComments(),
-            connectionHandler.getSpannerConnection(),
-            connectionHandler.getServer().getOptions().getCommandMetadataJSON())) {
-      if (currentCommand.is()) {
-        return PARSER.parse(Statement.of(currentCommand.translate()));
+    JSONObject commandMetadata =
+        connectionHandler.getServer().getOptions().requiresMatcher()
+            ? connectionHandler.getServer().getOptions().getCommandMetadataJSON()
+            : DEFAULT_COMMAND_METADATA;
+    if (commandMetadata != null) {
+      for (Command currentCommand :
+          Command.getCommands(
+              parsedStatement.getSqlWithoutComments(),
+              connectionHandler.getSpannerConnection(),
+              connectionHandler.getServer().getOptions().getCommandMetadataJSON())) {
+        if (currentCommand.is()) {
+          return PARSER.parse(Statement.of(currentCommand.translate()));
+        }
       }
     }
     return parsedStatement;

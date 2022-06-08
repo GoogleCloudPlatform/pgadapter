@@ -63,4 +63,13 @@ public class OptionsMetadataTest {
         new OptionsMetadata(new String[] {"-p p", "-i i", "-max_backlog 100"});
     assertEquals(100, options.getMaxBacklog());
   }
+
+  @Test
+  public void testDisableAutoDetectClient() {
+    OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
+    assertTrue(options.shouldAutoDetectClient());
+
+    options = new OptionsMetadata(new String[] {"-p p", "-i i", "-disable_auto_detect_client"});
+    assertFalse(options.shouldAutoDetectClient());
+  }
 }
