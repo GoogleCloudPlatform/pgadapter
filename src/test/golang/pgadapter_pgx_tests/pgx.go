@@ -345,15 +345,9 @@ func TestInsertBatch(connString string) *C.char {
 	defer conn.Close(ctx)
 
 	batch := &pgx.Batch{}
-	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
-	numeric := pgtype.Numeric{}
-	date := pgtype.Date{}
 	batchSize := 10
-	for i := 0; i < batchSize; i++ {
-		numeric.Set(strconv.Itoa(i) + ".123")
-		timestamptz, _ := time.Parse(time.RFC3339Nano, fmt.Sprintf("2022-03-24T%02d:39:10.123456000Z", i))
-		_ = date.Set(fmt.Sprintf("2022-04-%02d", i+1))
-		batch.Queue(sql, 100+i, i%2 == 0, []byte(strconv.Itoa(i)+"test_bytes"), 3.14+float64(i), i, numeric, timestamptz, date, "test_string"+strconv.Itoa(i))
+	if err := insertBatch(batch, connString, batchSize); err != nil {
+		return C.CString(err.Error())
 	}
 	res := conn.SendBatch(ctx, batch)
 	for i := 0; i < batchSize; i++ {
@@ -372,6 +366,78 @@ func TestInsertBatch(connString string) *C.char {
 		return C.CString(err.Error())
 	}
 
+	return nil
+}
+
+//export TestMixedBatch
+func TestMixedBatch(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	batch := &pgx.Batch{}
+	batchSize := 5
+	if err := insertBatch(batch, connString, batchSize); err != nil {
+		return C.CString(err.Error())
+	}
+	batch.Queue("select count(*) from all_types where col_bool=$1", true)
+	batch.Queue("update all_types set col_bool=false where col_bool=$1", true)
+
+	res := conn.SendBatch(ctx, batch)
+	for i := 0; i < batchSize; i++ {
+		tag, err := res.Exec()
+		if err != nil {
+			return C.CString(fmt.Sprintf("failed to execute insert statement %d: %v", i, err))
+		}
+		if !tag.Insert() {
+			return C.CString(fmt.Sprintf("statement %d was not recognized as an insert", i))
+		}
+		if g, w := tag.RowsAffected(), int64(1); g != w {
+			return C.CString(fmt.Sprintf("rows affected mismatch for statement %d:\n Got: %v\nWant: %v", i, g, w))
+		}
+	}
+	var count int64
+	if err := res.QueryRow().Scan(&count); err != nil {
+		return C.CString(fmt.Sprintf("failed to get row count: %v", err.Error()))
+	}
+	tag, err := res.Exec()
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to execute update: %v", err.Error()))
+	}
+	if !tag.Update() {
+		return C.CString("update statement was not recognized as an update")
+	}
+	if g, w := tag.RowsAffected(), count; g != w {
+		return C.CString(fmt.Sprintf("rows affected mismatch for update statement:\n Got: %v\nWant: %v", g, w))
+	}
+	if err := res.Close(); err != nil {
+		return C.CString(err.Error())
+	}
+
+	return nil
+}
+
+func insertBatch(batch *pgx.Batch, connString string, batchSize int) error {
+	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+	numeric := pgtype.Numeric{}
+	for i := 0; i < batchSize; i++ {
+		_ = numeric.Set(strconv.Itoa(i) + ".123")
+		var timestamptz interface{}
+		var date interface{}
+		// TODO: Remove this when the backend supports Zulu timestamp/date literals.
+		if strings.Contains(connString, "prefer_simple_protocol=true") {
+			date = fmt.Sprintf("2022-04-%02d", i+1)
+			timestamptz = fmt.Sprintf("2022-03-24 %02d:39:10.123456000+00", i)
+		} else {
+			date = &pgtype.Date{}
+			_ = date.(*pgtype.Date).Set(fmt.Sprintf("2022-04-%02d", i+1))
+			timestamptz, _ = time.Parse(time.RFC3339Nano, fmt.Sprintf("2022-03-24T%02d:39:10.123456000Z", i))
+		}
+		batch.Queue(sql, 100+i, i%2 == 0, []byte(strconv.Itoa(i)+"test_bytes"), 3.14+float64(i), i, numeric, timestamptz, date, "test_string"+strconv.Itoa(i))
+	}
 	return nil
 }
 

@@ -211,4 +211,37 @@ public class ITPgxTest implements IntegrationTest {
       assertFalse(resultSet.next());
     }
   }
+
+  @Test
+  public void testMixedBatch() {
+    // Make sure the table is empty before we execute the test.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(
+        databaseId, Collections.singletonList(Mutation.delete("all_types", KeySet.all())));
+    DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM all_types"))) {
+      assertTrue(resultSet.next());
+      assertEquals(0L, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
+
+    assertNull(pgxTest.TestMixedBatch(createConnString()));
+
+    final long batchSize = 5L;
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM all_types"))) {
+      assertTrue(resultSet.next());
+      assertEquals(batchSize, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
+    try (ResultSet resultSet =
+        client
+            .singleUse()
+            .executeQuery(Statement.of("SELECT COUNT(*) FROM all_types WHERE col_bool=true"))) {
+      assertTrue(resultSet.next());
+      assertEquals(0L, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
+  }
 }
