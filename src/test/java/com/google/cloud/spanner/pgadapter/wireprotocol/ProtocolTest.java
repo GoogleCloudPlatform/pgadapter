@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.google.cloud.spanner.pgadapter;
+package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -41,8 +41,10 @@ import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
@@ -53,27 +55,10 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
-import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.CancelMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.CloseMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
-import com.google.cloud.spanner.pgadapter.wireprotocol.CopyDataMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.CopyDoneMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.CopyFailMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.FlushMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.FunctionCallMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.TerminateMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.primitives.Bytes;
+import com.google.common.util.concurrent.SettableFuture;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -1793,6 +1778,21 @@ public class ProtocolTest {
     assertEquals('N', outputResult.readByte());
 
     assertThrows(IOException.class, message::send);
+  }
+
+  @Test
+  public void testGetPortalMetadataBeforeFlushFails() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
+    when(intermediatePortalStatement.containsResultSet()).thenReturn(true);
+    when(intermediatePortalStatement.describeAsync(backendConnection))
+        .thenReturn(SettableFuture.create());
+
+    DescribeMessage describeMessage =
+        new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
+    describeMessage.buffer(backendConnection);
+
+    assertThrows(IllegalStateException.class, describeMessage::getPortalMetadata);
   }
 
   private void setupQueryInformationSchemaResults() {

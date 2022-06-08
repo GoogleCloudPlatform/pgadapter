@@ -25,6 +25,7 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterDescriptionResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
+import com.google.common.annotations.VisibleForTesting;
 import java.text.MessageFormat;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -59,6 +60,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
     this.statement = this.connection.getPortal(this.name);
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   void buffer(BackendConnection backendConnection) {
     if (this.type == PreparedType.Portal && this.statement.containsResultSet()) {
@@ -114,7 +116,8 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
    *
    * @throws Exception if sending the message back to the client causes an error.
    */
-  public void handleDescribePortal() throws Exception {
+  @VisibleForTesting
+  void handleDescribePortal() throws Exception {
     if (this.statement.hasException()) {
       throw this.statement.getException();
     } else {
@@ -140,7 +143,8 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
     }
   }
 
-  private DescribePortalMetadata getPortalMetadata() {
+  @VisibleForTesting
+  DescribePortalMetadata getPortalMetadata() {
     if (!this.describePortalMetadata.isDone()) {
       throw new IllegalStateException("Trying to get Portal Metadata before it has been described");
     }

@@ -151,7 +151,6 @@ public class IntermediateStatement {
   private void initFutureResult() {
     if (this.futureStatementResult != null) {
       if (!this.futureStatementResult.isDone()) {
-        // This should not happen, and indicates a programming error.
         throw new IllegalStateException("Statement result cannot be retrieved before flush/sync");
       }
       try {

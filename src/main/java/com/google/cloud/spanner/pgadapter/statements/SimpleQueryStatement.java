@@ -29,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
@@ -101,7 +102,8 @@ public class SimpleQueryStatement {
    * @return The translated SQL statement if it matches any {@link Command} statement. Otherwise,
    *     returns the original Statement.
    */
-  private static ParsedStatement translatePotentialMetadataCommand(
+  @VisibleForTesting
+  static ParsedStatement translatePotentialMetadataCommand(
       ParsedStatement parsedStatement, ConnectionHandler connectionHandler) {
     for (Command currentCommand :
         Command.getCommands(

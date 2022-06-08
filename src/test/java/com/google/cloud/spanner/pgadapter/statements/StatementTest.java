@@ -415,6 +415,47 @@ public class StatementTest {
     verify(resultSet, never()).close();
   }
 
+  @Test
+  public void testIntermediateStatementExecuteAsyncIsUnsupported() {
+    String sql = "select * from foo";
+
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement(options, parse(sql), connectionHandler);
+
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> intermediateStatement.executeAsync(backendConnection));
+  }
+
+  @Test
+  public void testIntermediateStatementDescribeAsyncIsUnsupported() {
+    String sql = "select * from foo";
+
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement(options, parse(sql), connectionHandler);
+
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> intermediateStatement.describeAsync(backendConnection));
+  }
+
+  @Test
+  public void testGetStatementResultBeforeFlushFails() {
+    String sql = "select * from foo";
+
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    IntermediatePortalStatement intermediateStatement =
+        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
+    BackendConnection backendConnection =
+        new BackendConnection(connection, DdlTransactionMode.Batch);
+
+    intermediateStatement.executeAsync(backendConnection);
+
+    assertThrows(IllegalStateException.class, intermediateStatement::getStatementResult);
+  }
+
   private void setupQueryInformationSchemaResults() {
     ResultSet spannerType = mock(ResultSet.class);
     when(spannerType.getString("column_name")).thenReturn("key", "value");
