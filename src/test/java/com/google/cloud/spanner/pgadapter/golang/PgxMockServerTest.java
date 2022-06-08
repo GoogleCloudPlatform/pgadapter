@@ -26,6 +26,7 @@ import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
@@ -46,16 +47,26 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
 /**
  * Tests PGAdapter using the native Go pgx driver. The Go code can be found in
  * src/test/golang/pgadapter_pgx_tests/pgx.go.
  */
 @Category(GolangTest.class)
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class PgxMockServerTest extends AbstractMockServerTest {
   private static PgxTest pgxTest;
+
+  @Parameter public boolean useDomainSocket;
+
+  @Parameters(name = "useDomainSocket = {0}")
+  public static Object[] data() {
+    OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
+    return options.isDomainSocketEnabled() ? new Object[] {true, false} : new Object[] {false};
+  }
 
   @BeforeClass
   public static void compile() throws IOException, InterruptedException {
@@ -63,6 +74,9 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   }
 
   private GoString createConnString() {
+    if (useDomainSocket) {
+      return new GoString(String.format("host=/tmp port=%d", pgServer.getLocalPort()));
+    }
     return new GoString(
         String.format("postgres://uid:pwd@localhost:%d/?sslmode=disable", pgServer.getLocalPort()));
   }
