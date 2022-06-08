@@ -33,6 +33,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedTy
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
@@ -556,6 +557,37 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(1, updateDatabaseDdlRequests.size());
     assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
     assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(0));
+  }
+
+  @Test
+  public void testDdlBatch() throws SQLException {
+    ImmutableList<String> statements =
+        ImmutableList.of(
+            "CREATE TABLE foo (id bigint primary key)",
+            "CREATE TABLE bar (id bigint primary key, value text)",
+            "CREATE INDEX idx_foo ON bar (text)");
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        for (String sql : statements) {
+          statement.addBatch(sql);
+        }
+        int[] updateCounts = statement.executeBatch();
+        assertArrayEquals(new int[] {0, 0, 0}, updateCounts);
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(3, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    for (int i = 0; i < statements.size(); i++) {
+      assertEquals(statements.get(i), updateDatabaseDdlRequests.get(0).getStatements(i));
+    }
   }
 
   @Test

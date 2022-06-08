@@ -529,7 +529,7 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @Test
-  public void testTwoDmlStatementsInSimpleMode() throws SQLException {
+  public void testTwoDmlStatements() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // Statement#execute(String) returns false if the result is an update count or no result.
@@ -569,7 +569,7 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @Test
-  public void testDmlAndQueryInBatchInSimpleMode() throws SQLException {
+  public void testDmlAndQueryInBatch() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         assertFalse(
@@ -590,6 +590,43 @@ public class ITJdbcTest implements IntegrationTest {
         // getUpdateCount returning -1.
         assertFalse(statement.getMoreResults());
         assertEquals(-1, statement.getUpdateCount());
+      }
+    }
+  }
+
+  @Test
+  public void testDmlBatch() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (java.sql.PreparedStatement statement =
+          connection.prepareStatement("INSERT INTO numbers VALUES (?, ?)")) {
+        statement.setLong(1, 2L);
+        statement.setString(2, "Two");
+        statement.addBatch();
+
+        statement.setLong(1, 3L);
+        statement.setString(2, "Three");
+        statement.addBatch();
+
+        statement.setLong(1, 4L);
+        statement.setString(2, "Four");
+        statement.addBatch();
+
+        int[] updateCounts = statement.executeBatch();
+        assertArrayEquals(new int[] {1, 1, 1}, updateCounts);
+
+        // Read back the data to verify.
+        try (ResultSet resultSet =
+            statement.executeQuery("SELECT name FROM numbers ORDER BY num")) {
+          assertTrue(resultSet.next());
+          assertEquals("One", resultSet.getString("name"));
+          assertTrue(resultSet.next());
+          assertEquals("Two", resultSet.getString("name"));
+          assertTrue(resultSet.next());
+          assertEquals("Three", resultSet.getString("name"));
+          assertTrue(resultSet.next());
+          assertEquals("Four", resultSet.getString("name"));
+          assertFalse(resultSet.next());
+        }
       }
     }
   }

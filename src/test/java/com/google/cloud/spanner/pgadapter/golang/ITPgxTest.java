@@ -14,14 +14,21 @@
 
 package com.google.cloud.spanner.pgadapter.golang;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Key;
+import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
 import java.math.BigDecimal;
@@ -152,5 +159,30 @@ public class ITPgxTest implements IntegrationTest {
         databaseId, Collections.singletonList(Mutation.delete("all_types", Key.of(100L))));
 
     assertNull(pgxTest.TestInsertNullsAllDataTypes(createConnString()));
+  }
+
+  @Test
+  public void testInsertBatch() {
+    // Make sure the table is empty before we execute the test.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(
+        databaseId, Collections.singletonList(Mutation.delete("all_types", KeySet.all())));
+    DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM all_types"))) {
+      assertTrue(resultSet.next());
+      assertEquals(0L, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
+
+    assertNull(pgxTest.TestInsertBatch(createConnString()));
+
+    final long batchSize = 10L;
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM all_types"))) {
+      assertTrue(resultSet.next());
+      assertEquals(batchSize, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
   }
 }
