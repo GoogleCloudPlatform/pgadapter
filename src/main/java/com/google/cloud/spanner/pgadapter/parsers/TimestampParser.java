@@ -49,6 +49,8 @@ class TimestampParser extends Parser<Timestamp> {
 
   private static final DateTimeFormatter TIMESTAMP_FORMATTER =
       new DateTimeFormatterBuilder()
+          .parseLenient()
+          .parseCaseInsensitive()
           .appendPattern("yyyy-MM-dd HH:mm:ss")
           .appendFraction(ChronoField.MICRO_OF_SECOND, 0, 9, true)
           .appendOffset("+HH:mm", "Z")
@@ -66,7 +68,7 @@ class TimestampParser extends Parser<Timestamp> {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          String stringValue = new String(item, StandardCharsets.UTF_8);
+          String stringValue = toPGString(new String(item, StandardCharsets.UTF_8));
           TemporalAccessor temporalAccessor = TIMESTAMP_FORMATTER.parse(stringValue);
           this.item =
               Timestamp.ofTimeSecondsAndNanos(
@@ -94,12 +96,12 @@ class TimestampParser extends Parser<Timestamp> {
    */
   static boolean isTimestamp(String value) {
     Preconditions.checkNotNull(value);
-    return TIMESTAMP_PATTERN.matcher(value).matches();
+    return TIMESTAMP_PATTERN.matcher(toPGString(value)).matches();
   }
 
   @Override
   protected String stringParse() {
-    return this.item == null ? null : toPGString();
+    return this.item == null ? null : toPGString(this.item.toString());
   }
 
   @Override
@@ -126,11 +128,8 @@ class TimestampParser extends Parser<Timestamp> {
    *
    * @return a {@link String} that can be interpreted by PostgreSQL.
    */
-  private String toPGString() {
-    return this.item
-        .toString()
-        .replace(TIMESTAMP_SEPARATOR, EMPTY_SPACE)
-        .replace(ZERO_TIMEZONE, PG_ZERO_TIMEZONE);
+  private static String toPGString(String value) {
+    return value.replace(TIMESTAMP_SEPARATOR, EMPTY_SPACE).replace(ZERO_TIMEZONE, PG_ZERO_TIMEZONE);
   }
 
   @Override

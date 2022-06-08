@@ -118,7 +118,7 @@ public class BackendConnection {
         if (connectionState == ConnectionState.ABORTED
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
-          result.set(NO_RESULT);
+          result.set(ROLLBACK_RESULT);
         } else if (isBegin(parsedStatement) && spannerConnection.isInTransaction()) {
           // Ignore the statement as it is a no-op to execute BEGIN when we are already in a
           // transaction. TODO: Return a warning.
@@ -141,6 +141,7 @@ public class BackendConnection {
   }
 
   private static final StatementResult NO_RESULT = new NoResult();
+  private static final StatementResult ROLLBACK_RESULT = new NoResult("ROLLBACK");
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
   private ConnectionState connectionState = ConnectionState.IDLE;
@@ -493,10 +494,29 @@ public class BackendConnection {
   /**
    * {@link StatementResult} implementation for statements that do not return anything (e.g. DDL).
    */
-  private static final class NoResult implements StatementResult {
+  @InternalApi
+  public static final class NoResult implements StatementResult {
+    private final String commandTag;
+
+    private NoResult() {
+      this.commandTag = null;
+    }
+
+    private NoResult(String commandTag) {
+      this.commandTag = commandTag;
+    }
+
     @Override
     public ResultType getResultType() {
       return ResultType.NO_RESULT;
+    }
+
+    public boolean hasCommandTag() {
+      return this.commandTag != null;
+    }
+
+    public String getCommandTag() {
+      return this.commandTag;
     }
 
     @Override
@@ -519,6 +539,7 @@ public class BackendConnection {
    * Implementation of {@link StatementResult} for statements that return an update count (e.g.
    * DML).
    */
+  @InternalApi
   public static final class UpdateCount implements StatementResult {
     private final Long updateCount;
 

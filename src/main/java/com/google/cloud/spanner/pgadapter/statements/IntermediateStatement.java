@@ -28,6 +28,7 @@ import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -174,6 +175,9 @@ public class IntermediateStatement {
     this.statementResult = statementResult;
     if (statementResult.getResultType() == ResultType.RESULT_SET) {
       this.hasMoreData = statementResult.getResultSet().next();
+    } else if (statementResult instanceof NoResult
+        && ((NoResult) statementResult).hasCommandTag()) {
+      this.commandTag = ((NoResult) statementResult).getCommandTag();
     }
   }
 
