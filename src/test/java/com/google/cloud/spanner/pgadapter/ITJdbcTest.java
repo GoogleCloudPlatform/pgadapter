@@ -595,7 +595,7 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @Test
-  public void testDmlBatch() throws SQLException {
+  public void testDml() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (java.sql.PreparedStatement statement =
           connection.prepareStatement("INSERT INTO numbers VALUES (?, ?)")) {
@@ -616,7 +616,7 @@ public class ITJdbcTest implements IntegrationTest {
 
         // Read back the data to verify.
         try (ResultSet resultSet =
-            statement.executeQuery("SELECT name FROM numbers ORDER BY num")) {
+            connection.createStatement().executeQuery("SELECT name FROM numbers ORDER BY num")) {
           assertTrue(resultSet.next());
           assertEquals("One", resultSet.getString("name"));
           assertTrue(resultSet.next());

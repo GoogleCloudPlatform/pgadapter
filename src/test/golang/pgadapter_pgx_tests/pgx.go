@@ -350,8 +350,7 @@ func TestInsertBatch(connString string) *C.char {
 	batchSize := 10
 	for i := 0; i < batchSize; i++ {
 		numeric.Set(strconv.Itoa(i) + ".123")
-		timestamptz, _ := time.Parse(time.RFC3339Nano, fmt.Sprintf("2022-03-24T%02d:39:10.123456000Z", i))
-		batch.Queue(sql, 100+i, i%2 == 0, []byte(strconv.Itoa(i)+"test_bytes"), 3.14+float64(i), i, numeric, timestamptz, fmt.Sprintf("2022-04-%02d", i+1), "test_string"+strconv.Itoa(i))
+		batch.Queue(sql, 100+i, i%2 == 0, []byte(strconv.Itoa(i)+"test_bytes"), 3.14+float64(i), i, numeric, fmt.Sprintf("2022-03-24T%02d:39:10.123456000Z", i), fmt.Sprintf("2022-04-%02d", i+1), "test_string"+strconv.Itoa(i))
 	}
 	res := conn.SendBatch(ctx, batch)
 	for i := 0; i < batchSize; i++ {

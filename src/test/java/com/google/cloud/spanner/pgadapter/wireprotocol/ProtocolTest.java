@@ -932,6 +932,49 @@ public class ProtocolTest {
   }
 
   @Test
+  public void testExecuteMessageWithException() throws Exception {
+    byte[] messageMetadata = {'E'};
+    String statementName = "some portal\0";
+    int totalRows = 99999;
+
+    byte[] length = intToBytes(4 + statementName.length() + 4);
+
+    byte[] value =
+        Bytes.concat(messageMetadata, length, statementName.getBytes(), intToBytes(totalRows));
+
+    String expectedStatementName = "some portal";
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    Exception testException = new Exception("test error");
+    when(intermediatePortalStatement.hasException()).thenReturn(true);
+    when(intermediatePortalStatement.getException()).thenReturn(testException);
+    when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
+    assertEquals(ExecuteMessage.class, message.getClass());
+    assertEquals(expectedStatementName, ((ExecuteMessage) message).getName());
+    assertEquals(totalRows, ((ExecuteMessage) message).getMaxRows());
+
+    verify(connectionHandler).getPortal("some portal");
+    ExecuteMessage messageSpy = (ExecuteMessage) spy(message);
+
+    messageSpy.send();
+    messageSpy.flush();
+
+    verify(intermediatePortalStatement).executeAsync(backendConnection);
+    verify(messageSpy).handleError(testException);
+    verify(connectionHandler).cleanUp(intermediatePortalStatement);
+  }
+
+  @Test
   public void testClosePortalMessage() throws Exception {
     byte[] messageMetadata = {'C'};
     byte[] statementType = {'P'};
