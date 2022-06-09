@@ -70,14 +70,12 @@ public class ClientAutoDetector {
     PGX {
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
-        // pgx does not send enough unique parameters for it to be recognizable.
+        // pgx does not send enough unique parameters for it to be auto-detected.
         return false;
       }
     };
 
-    boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
-      return false;
-    }
+    abstract boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters);
   }
 
   /**
