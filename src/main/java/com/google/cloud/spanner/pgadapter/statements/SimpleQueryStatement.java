@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.utils.StatementParser.splitStatements;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
@@ -47,30 +49,30 @@ public class SimpleQueryStatement {
 
   private final ConnectionHandler connectionHandler;
   private final OptionsMetadata options;
-  private final ImmutableList<ParsedStatement> statements;
-
-  private static final char STATEMENT_DELIMITER = ';';
-  private static final char SINGLE_QUOTE = '\'';
-  private static final char DOUBLE_QUOTE = '"';
+  private final ImmutableList<Statement> statements;
 
   public SimpleQueryStatement(
-      OptionsMetadata options,
-      ParsedStatement parsedStatement,
-      ConnectionHandler connectionHandler) {
+      OptionsMetadata options, Statement originalStatement, ConnectionHandler connectionHandler) {
     this.connectionHandler = connectionHandler;
     this.options = options;
-    this.statements = parseStatements(parsedStatement);
+    this.statements = parseStatements(originalStatement);
   }
 
   public void execute() throws Exception {
     // Do a Parse-Describe-Bind-Execute round-trip for each statement in the query string.
     // Finish with a Sync to close any implicit transaction and to return the results.
-    for (ParsedStatement statement : this.statements) {
+    for (Statement originalStatement : this.statements) {
+      ParsedStatement originalParsedStatement = PARSER.parse(originalStatement);
+      ParsedStatement parsedStatement = originalParsedStatement;
       if (options.requiresMatcher()) {
-        statement = translatePotentialMetadataCommand(statement, connectionHandler);
+        parsedStatement = translatePotentialMetadataCommand(parsedStatement, connectionHandler);
       }
-      statement = replaceKnownUnsupportedQueries(this.options, statement);
-      new ParseMessage(connectionHandler, statement).send();
+      parsedStatement = replaceKnownUnsupportedQueries(this.options, parsedStatement);
+      if (parsedStatement != originalParsedStatement) {
+        // The original statement was replaced.
+        originalStatement = Statement.of(parsedStatement.getSqlWithoutComments());
+      }
+      new ParseMessage(connectionHandler, parsedStatement, originalStatement).send();
       new BindMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
       new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
       new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
@@ -115,70 +117,20 @@ public class SimpleQueryStatement {
     return parsedStatement;
   }
 
-  static ImmutableList<String> splitStatements(String sql) {
-    // First check trivial cases with only one statement.
-    int firstIndexOfDelimiter = sql.indexOf(STATEMENT_DELIMITER);
-    if (firstIndexOfDelimiter == -1) {
-      return ImmutableList.of(sql);
-    }
-    if (firstIndexOfDelimiter == sql.length() - 1) {
-      return ImmutableList.of(sql.substring(0, sql.length() - 1));
-    }
-
-    ImmutableList.Builder<String> builder = ImmutableList.builder();
-    // TODO: Fix this parsing, as it does not take all types of quotes into consideration.
-    boolean insideQuotes = false;
-    char quoteChar = 0;
-    int index = 0;
-    for (int i = 0; i < sql.length(); ++i) {
-      if (insideQuotes) {
-        if (sql.charAt(i) == quoteChar) {
-          if (sql.length() > (i + 1) && sql.charAt(i + 1) == quoteChar) {
-            // This is an escaped quote. Skip one ahead.
-            i++;
-          } else {
-            insideQuotes = false;
-          }
-        }
-      } else {
-        if (sql.charAt(i) == SINGLE_QUOTE || sql.charAt(i) == DOUBLE_QUOTE) {
-          quoteChar = sql.charAt(i);
-          insideQuotes = true;
-        } else {
-          // skip semicolon inside quotes
-          if (sql.charAt(i) == STATEMENT_DELIMITER) {
-            String stmt = sql.substring(index, i).trim();
-            // Statements with only ';' character are empty and dropped.
-            if (stmt.length() > 0) {
-              builder.add(stmt);
-            }
-            index = i + 1;
-          }
-        }
-      }
-    }
-
-    if (index < sql.length()) {
-      builder.add(sql.substring(index).trim());
+  protected static ImmutableList<Statement> parseStatements(Statement statement) {
+    Preconditions.checkNotNull(statement);
+    ImmutableList.Builder<Statement> builder = ImmutableList.builder();
+    for (String sql : splitStatements(statement.getSql())) {
+      builder.add(Statement.of(sql));
     }
     return builder.build();
   }
 
-  protected static ImmutableList<ParsedStatement> parseStatements(ParsedStatement stmt) {
-    String sql = stmt.getSqlWithoutComments();
-    Preconditions.checkNotNull(sql);
-    ImmutableList.Builder<ParsedStatement> builder = ImmutableList.builder();
-    for (String statement : splitStatements(sql)) {
-      builder.add(PARSER.parse(Statement.of(statement)));
-    }
-    return builder.build();
-  }
-
-  public List<ParsedStatement> getStatements() {
+  public List<Statement> getStatements() {
     return this.statements;
   }
 
   public String getStatement(int index) {
-    return this.statements.get(index).getSqlWithoutComments();
+    return this.statements.get(index).getSql();
   }
 }

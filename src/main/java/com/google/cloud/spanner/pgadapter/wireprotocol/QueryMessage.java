@@ -36,23 +36,29 @@ public class QueryMessage extends ControlMessage {
   protected static final char IDENTIFIER = 'Q';
   public static final String COPY = "COPY";
 
-  private final ParsedStatement statement;
+  private final Statement originalStatement;
   private final CopyStatement copyStatement;
   private final SimpleQueryStatement simpleQueryStatement;
   private final boolean isCopy;
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
-    this.statement = PARSER.parse(Statement.of(this.readAll()));
-    this.isCopy = StatementParser.isCommand(COPY, statement.getSqlWithoutComments());
+    this.originalStatement = Statement.of(this.readAll());
+    ParsedStatement parsedStatement = PARSER.parse(originalStatement);
+    this.isCopy = StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments());
     if (isCopy) {
       this.copyStatement =
-          new CopyStatement(connection, connection.getServer().getOptions(), statement);
+          new CopyStatement(
+              connection,
+              connection.getServer().getOptions(),
+              parsedStatement,
+              this.originalStatement);
       this.simpleQueryStatement = null;
       this.connection.addActiveStatement(this.copyStatement);
     } else {
       this.simpleQueryStatement =
-          new SimpleQueryStatement(connection.getServer().getOptions(), statement, this.connection);
+          new SimpleQueryStatement(
+              connection.getServer().getOptions(), this.originalStatement, this.connection);
       this.copyStatement = null;
     }
   }
@@ -75,7 +81,7 @@ public class QueryMessage extends ControlMessage {
   @Override
   protected String getPayloadString() {
     return new MessageFormat("Length: {0}, SQL: {1}")
-        .format(new Object[] {this.length, this.statement.getSqlWithoutComments()});
+        .format(new Object[] {this.length, this.originalStatement.getSql()});
   }
 
   @Override
@@ -83,8 +89,8 @@ public class QueryMessage extends ControlMessage {
     return String.valueOf(IDENTIFIER);
   }
 
-  public ParsedStatement getStatement() {
-    return this.statement;
+  public Statement getStatement() {
+    return this.originalStatement;
   }
 
   public SimpleQueryStatement getSimpleQueryStatement() {
