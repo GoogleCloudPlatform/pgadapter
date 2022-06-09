@@ -369,7 +369,7 @@ public class ParserTest {
 
   @Test
   public void testNumericParsing() {
-    BigDecimal value = new BigDecimal("1234567890.1234567890");
+    String value = "1234567890.1234567890";
 
     byte[] byteResult = ByteConverter.numeric(new BigDecimal("1234567890.1234567890"));
     byte[] stringResult = {
@@ -387,7 +387,7 @@ public class ParserTest {
 
   @Test
   public void testNumericParsingNaN() {
-    Number value = Double.NaN;
+    String value = "NaN";
 
     byte[] stringResult = {'N', 'a', 'N'};
 
