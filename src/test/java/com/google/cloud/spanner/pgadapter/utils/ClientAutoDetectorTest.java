@@ -20,6 +20,8 @@ import static org.junit.Assert.assertNotEquals;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -125,6 +127,22 @@ public class ClientAutoDetectorTest {
                 "client_encoding", "UTF8",
                 "DateStyle", "iso",
                 "TimeZone", "some-time-zone")));
+    ImmutableList<String> keys =
+        ImmutableList.of("user", "database", "client_encoding", "DateStyle", "TimeZone");
+    for (int i = 0; i < keys.size(); i++) {
+      List<String> list = new ArrayList<>(keys);
+      list.set(i, "foo");
+      assertNotEquals(
+          WellKnownClient.JDBC,
+          ClientAutoDetector.detectClient(
+              list,
+              ImmutableMap.of(
+                  "user", "some-user",
+                  "database", "some-database",
+                  "client_encoding", "UTF8",
+                  "DateStyle", "ISO",
+                  "TimeZone", "some-time-zone")));
+    }
   }
 
   @Test
