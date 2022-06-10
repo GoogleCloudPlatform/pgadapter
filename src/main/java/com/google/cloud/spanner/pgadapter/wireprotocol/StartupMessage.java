@@ -15,12 +15,14 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
-import com.google.cloud.spanner.pgadapter.wireoutput.MD5AuthenticationRequest;
+import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationCleartextPasswordResponse;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 /**
  * The first (non-encryption, non-admin) message expected in from a client in a connection loop.
@@ -29,7 +31,7 @@ import java.util.Map;
 @InternalApi
 public class StartupMessage extends BootstrapMessage {
 
-  private static final String USER_KEY = "user";
+  static final String DATABASE_KEY = "database";
   public static final int IDENTIFIER = 196608; // First Hextet: 3 (version), Second Hextet: 0
 
   private final boolean authenticate;
@@ -44,16 +46,23 @@ public class StartupMessage extends BootstrapMessage {
   @Override
   protected void sendPayload() throws Exception {
     if (!authenticate) {
-      this.connection.connectToSpanner(this.parameters.get("database"));
-      sendStartupMessage(
-          this.outputStream,
-          this.connection.getConnectionId(),
-          this.connection.getSecret(),
-          this.connection.getServer().getOptions());
-      this.connection.setStatus(ConnectionStatus.IDLE);
+      createConnectionAndSendStartupMessage(
+          this.connection, this.parameters.get(DATABASE_KEY), null);
     } else {
-      new MD5AuthenticationRequest(this.outputStream, 0).send();
+      new AuthenticationCleartextPasswordResponse(this.outputStream).send();
     }
+  }
+
+  static void createConnectionAndSendStartupMessage(
+      ConnectionHandler connection, String database, @Nullable GoogleCredentials credentials)
+      throws Exception {
+    connection.connectToSpanner(database, credentials);
+    sendStartupMessage(
+        connection.getConnectionMetadata().getOutputStream(),
+        connection.getConnectionId(),
+        connection.getSecret(),
+        connection.getServer().getOptions());
+    connection.setStatus(ConnectionStatus.IDLE);
   }
 
   /**
@@ -74,8 +83,7 @@ public class StartupMessage extends BootstrapMessage {
                 + "', but got: "
                 + protocol);
       }
-      this.connection.setMessageState(
-          new PasswordMessage(this.connection, this.parameters.get(USER_KEY)));
+      this.connection.setMessageState(new PasswordMessage(this.connection, this.parameters));
     } else {
       super.nextHandler();
     }

@@ -146,7 +146,9 @@ public class ErrorResponse extends WireOutput {
     TooManyRows("P0003"),
     InternalError("XX000"),
     DataCorrupted("XX001"),
-    IndexCorrupted("XX002");
+    IndexCorrupted("XX002"),
+    InvalidAuthorizationSpecification("28000"),
+    InvalidPassword("28P01");
 
     private final String code;
 
