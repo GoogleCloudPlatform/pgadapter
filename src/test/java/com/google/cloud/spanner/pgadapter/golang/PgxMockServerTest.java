@@ -46,7 +46,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -722,7 +721,6 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  @Ignore("Skip until https://github.com/googleapis/java-spanner/pull/1877 has been released")
   public void testWrongDialect() {
     // Let the mock server respond with the Google SQL dialect instead of PostgreSQL. The
     // connection should be gracefully rejected. Close all open pooled Spanner objects so we know
