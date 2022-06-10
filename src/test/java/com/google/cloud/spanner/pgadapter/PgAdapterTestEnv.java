@@ -51,7 +51,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /** Test wrapper used for integration tests. */
-public final class PgAdapterTestEnv {
+public class PgAdapterTestEnv {
   private static final int PROTOCOL_MESSAGE_SIZE = 8;
   private static final int INIT_PROTOCOL = 80877103;
   private static final int OPTIONS_PROTOCOL = 196608;
