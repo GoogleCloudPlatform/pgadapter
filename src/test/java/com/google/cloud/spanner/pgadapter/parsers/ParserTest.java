@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
@@ -383,6 +384,27 @@ public class ParserTest {
     assertEquals(value, parser.getItem());
     validateCreateBinary(byteResult, Oid.NUMERIC, value);
     validateCreateText(stringResult, Oid.NUMERIC, value);
+  }
+
+  @Test
+  public void testNumericParsingNull() {
+    NumericParser parser = new NumericParser(null);
+
+    assertNull(parser.stringParse());
+    assertNull(parser.binaryParse());
+  }
+
+  @Test
+  public void testNumericParsingInvalid() {
+    NumericParser parser = new NumericParser("invalid-number");
+
+    // String parsing will work, and will just propagate the nonsense number to the frontend.
+    assertEquals("invalid-number", parser.stringParse());
+
+    // Binary parsing fails, as it tries to convert it to a number, so it can be encoded in a byte
+    // array.
+    SpannerException binaryException = assertThrows(SpannerException.class, parser::binaryParse);
+    assertEquals(ErrorCode.INVALID_ARGUMENT, binaryException.getErrorCode());
   }
 
   @Test
