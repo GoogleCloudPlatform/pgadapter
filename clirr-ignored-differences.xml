@@ -7,6 +7,12 @@
     <className>com/google/cloud/spanner/pgadapter/ProxyServer</className>
     <method>void run()</method>
   </difference>
+  <!-- Moved transaction status to BackendConnection. -->
+  <difference>
+    <differenceType>6001</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/ConnectionHandler$ConnectionStatus</className>
+    <field>IDLE</field>
+  </difference>
 
   <!-- Add ignores for all sub packages, as these are considered internal. -->
   <difference>

@@ -14,13 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
@@ -38,9 +38,9 @@ import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionModeBatchTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
@@ -162,8 +162,7 @@ public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionMode
             assertThrows(
                 SQLException.class, () -> statement.execute("show transaction isolation level"));
         assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains(IntermediateStatement.TRANSACTION_ABORTED_ERROR));
+            exception.getMessage(), exception.getMessage().contains(TRANSACTION_ABORTED_ERROR));
       }
     }
 
