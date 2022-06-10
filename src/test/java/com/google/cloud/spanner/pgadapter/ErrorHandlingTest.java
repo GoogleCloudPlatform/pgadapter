@@ -104,6 +104,7 @@ public class ErrorHandlingTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
 
+      assertTrue(connection.createStatement().execute("SELECT 1"));
       SQLException exception =
           assertThrows(
               SQLException.class, () -> connection.createStatement().executeQuery(INVALID_SELECT));
@@ -119,7 +120,7 @@ public class ErrorHandlingTest extends AbstractMockServerTest {
       connection.commit();
     }
     // Check that we only received a rollback and no commit.
-    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertTrue(mockSpanner.countRequestsOfType(RollbackRequest.class) > 0);
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 }

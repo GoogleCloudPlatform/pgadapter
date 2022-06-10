@@ -54,7 +54,7 @@ diff -i -w -s .ci/e2e-result/backslash-di.txt .ci/e2e-expected/backslash-di.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"\\di <indexname>\"------"
-echo "\di PRIMARY_KEY;" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/backslash-di-param.txt
+echo "\di idx_users_name;" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/backslash-di-param.txt
 sed -i "s/---[-]*//g" .ci/e2e-result/backslash-di-param.txt
 diff -i -w -s .ci/e2e-result/backslash-di-param.txt .ci/e2e-expected/backslash-di-param.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
