@@ -14,7 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import java.math.BigDecimal;
@@ -22,45 +24,24 @@ import java.nio.charset.StandardCharsets;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to {@link Number}. */
-// TODO(230559811): Change this to use String as type, and only convert to BigDecimal for binary
-// transfer.
-class NumericParser extends Parser<Number> {
+class NumericParser extends Parser<String> {
   NumericParser(ResultSet item, int position) {
-    // This should be either a BigDecimal value or a Double.NaN.
-    Value value = item.getValue(position);
-    if (Value.NAN.equalsIgnoreCase(value.getString())) {
-      this.item = Double.NaN;
-    } else {
-      this.item = value.getNumeric();
-    }
+    this.item = item.isNull(position) ? null : item.getString(position);
   }
 
   NumericParser(Object item) {
-    if (item instanceof Number) {
-      this.item = (Number) item;
-    } else if (item instanceof String) {
-      String stringValue = (String) item;
-      if (stringValue.equalsIgnoreCase("NaN")) {
-        this.item = Double.NaN;
-      } else {
-        this.item = new BigDecimal(stringValue);
-      }
-    }
+    this.item = item == null ? null : item.toString();
   }
 
   NumericParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          String stringValue = new String(item);
-          if (stringValue.equalsIgnoreCase("NaN")) {
-            this.item = Double.NaN;
-          } else {
-            this.item = new BigDecimal(stringValue);
-          }
+          this.item = new String(item);
           break;
         case BINARY:
-          this.item = ByteConverter.numeric(item, 0, item.length);
+          Number number = ByteConverter.numeric(item, 0, item.length);
+          this.item = number == null ? null : number.toString();
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
@@ -70,10 +51,7 @@ class NumericParser extends Parser<Number> {
 
   @Override
   protected String stringParse() {
-    if (this.item == null) {
-      return null;
-    }
-    return Double.isNaN(this.item.doubleValue()) ? "NaN" : ((BigDecimal) this.item).toPlainString();
+    return this.item;
   }
 
   @Override
@@ -81,10 +59,15 @@ class NumericParser extends Parser<Number> {
     if (this.item == null) {
       return null;
     }
-    if (Double.isNaN(this.item.doubleValue())) {
+    if (this.item.equalsIgnoreCase("NaN")) {
       return "NaN".getBytes(StandardCharsets.UTF_8);
     }
-    return ByteConverter.numeric((BigDecimal) this.item);
+    try {
+      return ByteConverter.numeric(new BigDecimal(this.item));
+    } catch (NumberFormatException exception) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Invalid numeric value: " + this.item);
+    }
   }
 
   @Override
