@@ -14,7 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.TRANSACTION_ABORTED_ERROR;
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -104,6 +104,7 @@ public class ErrorHandlingTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
 
+      assertTrue(connection.createStatement().execute("SELECT 1"));
       SQLException exception =
           assertThrows(
               SQLException.class, () -> connection.createStatement().executeQuery(INVALID_SELECT));
@@ -117,9 +118,12 @@ public class ErrorHandlingTest extends AbstractMockServerTest {
 
       // Committing the transaction will actually execute a rollback.
       connection.commit();
+
+      // The connection should now be usable.
+      assertTrue(connection.createStatement().execute("show transaction isolation level"));
     }
     // Check that we only received a rollback and no commit.
-    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertTrue(mockSpanner.countRequestsOfType(RollbackRequest.class) > 0);
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 }

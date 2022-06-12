@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.google.cloud.spanner.pgadapter;
+package com.google.cloud.spanner.pgadapter.statements;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -36,13 +37,11 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
-import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
-import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
-import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
@@ -80,6 +79,8 @@ public class StatementTest {
   @Mock private Connection connection;
   @Mock private ConnectionHandler connectionHandler;
   @Mock private ConnectionMetadata connectionMetadata;
+  @Mock private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
+  @Mock private BackendConnection backendConnection;
   @Mock private ProxyServer server;
   @Mock private OptionsMetadata options;
   @Mock private StatementResult statementResult;
@@ -95,59 +96,45 @@ public class StatementTest {
 
   @Test
   public void testBasicSelectStatement() throws Exception {
-    when(connection.execute(Statement.of("SELECT * FROM users"))).thenReturn(statementResult);
-    when(statementResult.getResultType()).thenReturn(StatementResult.ResultType.RESULT_SET);
-    when(statementResult.getResultSet()).thenReturn(resultSet);
-    when(resultSet.next()).thenReturn(true);
-
+    String sql = "SELECT * FROM users";
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
-    IntermediateStatement intermediateStatement =
-        new IntermediateStatement(options, parse("SELECT * FROM users"), connectionHandler);
+    IntermediatePortalStatement intermediateStatement =
+        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
 
     assertFalse(intermediateStatement.isExecuted());
-    assertEquals("SELECT", intermediateStatement.getCommand(0));
+    assertEquals("SELECT", intermediateStatement.getCommand());
 
-    intermediateStatement.execute();
+    intermediateStatement.executeAsync(backendConnection);
 
-    verify(connection).execute(Statement.of("SELECT * FROM users"));
-    assertTrue(intermediateStatement.containsResultSet(0));
+    verify(backendConnection).execute(parse(sql), Statement.of(sql));
+    assertTrue(intermediateStatement.containsResultSet());
     assertTrue(intermediateStatement.isExecuted());
-    assertEquals(StatementType.QUERY, intermediateStatement.getStatementType(0));
-    assertEquals(resultSet, intermediateStatement.getStatementResult(0));
-    assertTrue(intermediateStatement.isHasMoreData(0));
-    assertFalse(intermediateStatement.hasException(0));
+    assertEquals(StatementType.QUERY, intermediateStatement.getStatementType());
     assertEquals(0, intermediateStatement.getResultFormatCode(0));
 
     intermediateStatement.close();
-
-    verify(resultSet).close();
   }
 
   @Test
   public void testBasicUpdateStatement() throws Exception {
-    when(statementResult.getResultType()).thenReturn(StatementResult.ResultType.UPDATE_COUNT);
-    when(statementResult.getUpdateCount()).thenReturn(1L);
-    when(connection.execute(Statement.of("UPDATE users SET name = someName WHERE id = 10")))
-        .thenReturn(statementResult);
+    String sql = "UPDATE users SET name = someName WHERE id = 10";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
-    IntermediateStatement intermediateStatement =
-        new IntermediateStatement(
-            options, parse("UPDATE users SET name = someName WHERE id = 10"), connectionHandler);
+    IntermediatePortalStatement intermediateStatement =
+        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
 
     assertFalse(intermediateStatement.isExecuted());
-    assertEquals("UPDATE", intermediateStatement.getCommand(0));
+    assertEquals("UPDATE", intermediateStatement.getCommand());
 
-    intermediateStatement.execute();
+    intermediateStatement.executeAsync(backendConnection);
 
-    verify(connection).execute(Statement.of("UPDATE users SET name = someName WHERE id = 10"));
-    assertFalse(intermediateStatement.containsResultSet(0));
-    assertEquals(1L, intermediateStatement.getUpdateCount(0));
+    verify(backendConnection).execute(parse(sql), Statement.of(sql));
+    assertFalse(intermediateStatement.containsResultSet());
     assertTrue(intermediateStatement.isExecuted());
-    assertEquals(StatementType.UPDATE, intermediateStatement.getStatementType(0));
-    assertNull(intermediateStatement.getStatementResult(0));
-    assertFalse(intermediateStatement.isHasMoreData(0));
-    assertFalse(intermediateStatement.hasException(0));
+    assertEquals(StatementType.UPDATE, intermediateStatement.getStatementType());
+    assertNull(intermediateStatement.getStatementResult());
+    assertFalse(intermediateStatement.isHasMoreData());
+    assertFalse(intermediateStatement.hasException());
     assertEquals(0, intermediateStatement.getResultFormatCode(0));
 
     intermediateStatement.close();
@@ -157,30 +144,28 @@ public class StatementTest {
 
   @Test
   public void testBasicZeroUpdateCountResultStatement() throws Exception {
-    when(statementResult.getResultType()).thenReturn(StatementResult.ResultType.UPDATE_COUNT);
-    when(statementResult.getUpdateCount()).thenReturn(0L);
-    when(connection.execute(Statement.of("UPDATE users SET name = someName WHERE id = -1")))
-        .thenReturn(statementResult);
+    String sql = "UPDATE users SET name = someName WHERE id = -1";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
-    IntermediateStatement intermediateStatement =
-        new IntermediateStatement(
-            options, parse("UPDATE users SET name = someName WHERE id = -1"), connectionHandler);
+    when(connection.execute(Statement.of(sql))).thenReturn(statementResult);
+    IntermediatePortalStatement intermediateStatement =
+        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
+    BackendConnection backendConnection =
+        new BackendConnection(connection, DdlTransactionMode.Batch);
 
     assertFalse(intermediateStatement.isExecuted());
-    assertEquals("UPDATE", intermediateStatement.getCommand(0));
+    assertEquals("UPDATE", intermediateStatement.getCommand());
 
-    intermediateStatement.execute();
+    intermediateStatement.executeAsync(backendConnection);
+    backendConnection.flush();
 
-    Mockito.verify(connection)
-        .execute(Statement.of("UPDATE users SET name = someName WHERE id = -1"));
-    assertFalse(intermediateStatement.containsResultSet(0));
-    assertEquals(0L, intermediateStatement.getUpdateCount(0));
+    assertFalse(intermediateStatement.containsResultSet());
+    assertEquals(0L, intermediateStatement.getUpdateCount());
     assertTrue(intermediateStatement.isExecuted());
-    assertEquals(StatementType.UPDATE, intermediateStatement.getStatementType(0));
-    assertNull(intermediateStatement.getStatementResult(0));
-    assertFalse(intermediateStatement.isHasMoreData(0));
-    assertFalse(intermediateStatement.hasException(0));
+    assertEquals(StatementType.UPDATE, intermediateStatement.getStatementType());
+    assertNotNull(intermediateStatement.getStatementResult());
+    assertFalse(intermediateStatement.isHasMoreData());
+    assertFalse(intermediateStatement.hasException());
     assertEquals(0, intermediateStatement.getResultFormatCode(0));
 
     intermediateStatement.close();
@@ -190,31 +175,25 @@ public class StatementTest {
 
   @Test
   public void testBasicNoResultStatement() throws Exception {
-    when(options.getDdlTransactionMode()).thenReturn(DdlTransactionMode.Batch);
-    when(statementResult.getResultType()).thenReturn(StatementResult.ResultType.NO_RESULT);
-    when(connection.execute(Statement.of("CREATE TABLE users (name varchar(100) primary key)")))
-        .thenReturn(statementResult);
+    String sql = "CREATE TABLE users (name varchar(100) primary key)";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
-    IntermediateStatement intermediateStatement =
-        new IntermediateStatement(
-            options,
-            parse("CREATE TABLE users (name varchar(100) primary key)"),
-            connectionHandler);
+    IntermediatePortalStatement intermediateStatement =
+        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
 
     assertFalse(intermediateStatement.isExecuted());
-    assertEquals("CREATE", intermediateStatement.getCommand(0));
+    assertEquals("CREATE", intermediateStatement.getCommand());
 
-    intermediateStatement.execute();
+    intermediateStatement.executeAsync(backendConnection);
 
-    verify(connection).execute(Statement.of("CREATE TABLE users (name varchar(100) primary key)"));
-    assertFalse(intermediateStatement.containsResultSet(0));
-    assertEquals(0, intermediateStatement.getUpdateCount(0));
+    verify(backendConnection).execute(parse(sql), Statement.of(sql));
+    assertFalse(intermediateStatement.containsResultSet());
+    assertEquals(0, intermediateStatement.getUpdateCount());
     assertTrue(intermediateStatement.isExecuted());
-    assertEquals(StatementType.DDL, intermediateStatement.getStatementType(0));
-    assertNull(intermediateStatement.getStatementResult(0));
-    assertFalse(intermediateStatement.isHasMoreData(0));
-    assertFalse(intermediateStatement.hasException(0));
+    assertEquals(StatementType.DDL, intermediateStatement.getStatementType());
+    assertNull(intermediateStatement.getStatementResult());
+    assertFalse(intermediateStatement.isHasMoreData());
+    assertFalse(intermediateStatement.hasException());
     assertEquals(0, intermediateStatement.getResultFormatCode(0));
 
     intermediateStatement.close();
@@ -232,19 +211,22 @@ public class StatementTest {
 
   @Test
   public void testBasicStatementExceptionGetsSetOnExceptedExecution() {
+    String sql = "SELECT * FROM users";
     SpannerException thrownException =
         SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT, "test error");
 
-    when(connection.execute(Statement.of("SELECT * FROM users"))).thenThrow(thrownException);
-
+    when(connection.execute(Statement.of(sql))).thenThrow(thrownException);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
-    IntermediateStatement intermediateStatement =
-        new IntermediateStatement(options, parse("SELECT * FROM users"), connectionHandler);
+    IntermediatePortalStatement intermediateStatement =
+        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
+    BackendConnection backendConnection =
+        new BackendConnection(connection, DdlTransactionMode.Batch);
 
-    intermediateStatement.execute();
+    intermediateStatement.executeAsync(backendConnection);
+    backendConnection.flush();
 
-    assertTrue(intermediateStatement.hasException(0));
-    assertEquals(thrownException, intermediateStatement.getException(0));
+    assertTrue(intermediateStatement.hasException());
+    assertEquals(thrownException, intermediateStatement.getException());
   }
 
   @Test
@@ -262,9 +244,8 @@ public class StatementTest {
             .bind("p3")
             .to(30)
             .build();
-    when(statementResult.getResultType()).thenReturn(StatementResult.ResultType.UPDATE_COUNT);
-    when(statementResult.getUpdateCount()).thenReturn(0L);
-    when(connection.execute(statement)).thenReturn(statementResult);
+    BackendConnection backendConnection =
+        new BackendConnection(connection, DdlTransactionMode.Batch);
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(connectionHandler, options, "", parse(sqlStatement));
@@ -276,11 +257,13 @@ public class StatementTest {
     IntermediatePortalStatement intermediatePortalStatement =
         intermediateStatement.bind(
             "", parameters, Arrays.asList((short) 0, (short) 0, (short) 0), new ArrayList<>());
-    intermediateStatement.execute();
+    intermediateStatement.executeAsync(backendConnection);
+    backendConnection.flush();
+
     verify(connection).execute(statement);
 
     assertEquals(sqlStatement, intermediatePortalStatement.getSql());
-    assertEquals("SELECT", intermediatePortalStatement.getCommand(0));
+    assertEquals("SELECT", intermediatePortalStatement.getCommand());
     assertFalse(intermediatePortalStatement.isExecuted());
     assertTrue(intermediateStatement.isBound());
   }
@@ -321,14 +304,16 @@ public class StatementTest {
   public void testPortalStatement() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
-    when(connection.executeQuery(Statement.of(sqlStatement))).thenReturn(resultSet);
 
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(connectionHandler, options, "", parse(sqlStatement));
+    BackendConnection backendConnection =
+        new BackendConnection(connection, DdlTransactionMode.Batch);
 
-    intermediateStatement.describe();
+    intermediateStatement.describeAsync(backendConnection);
+    backendConnection.flush();
 
-    verify(connection).executeQuery(Statement.of(sqlStatement));
+    verify(connection).execute(Statement.of(sqlStatement));
 
     assertEquals(0, intermediateStatement.getParameterFormatCode(0));
     assertEquals(0, intermediateStatement.getParameterFormatCode(1));
@@ -365,73 +350,19 @@ public class StatementTest {
 
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(connectionHandler, options, "", parse(sqlStatement));
+    BackendConnection backendConnection =
+        new BackendConnection(connection, DdlTransactionMode.Batch);
 
-    when(connection.executeQuery(Statement.of(sqlStatement)))
+    when(connection.execute(Statement.of(sqlStatement)))
         .thenThrow(
             SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT, "test error"));
 
-    SpannerException exception =
-        assertThrows(SpannerException.class, intermediateStatement::describe);
+    intermediateStatement.describeAsync(backendConnection);
+    backendConnection.flush();
+
+    assertTrue(intermediateStatement.hasException());
+    SpannerException exception = (SpannerException) intermediateStatement.getException();
     assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
-  }
-
-  @Test
-  public void testBatchStatements() {
-    String sql =
-        "INSERT INTO users (id) VALUES (1); INSERT INTO users (id) VALUES (2);INSERT INTO users (id) VALUES (3);";
-    IntermediateStatement intermediateStatement =
-        new IntermediateStatement(options, parse(sql), connectionHandler);
-
-    assertTrue(intermediateStatement.isBatchedQuery());
-    assertEquals(3, intermediateStatement.getStatements().size(), 3);
-    assertEquals("INSERT INTO users (id) VALUES (1)", intermediateStatement.getStatement(0));
-    assertEquals("INSERT INTO users (id) VALUES (2)", intermediateStatement.getStatement(1));
-    assertEquals("INSERT INTO users (id) VALUES (3)", intermediateStatement.getStatement(2));
-  }
-
-  @Test
-  public void testAdditionalBatchStatements() {
-    String sql =
-        "BEGIN TRANSACTION; INSERT INTO users (id) VALUES (1); INSERT INTO users (id) VALUES (2); INSERT INTO users (id) VALUES (3); COMMIT;";
-    IntermediateStatement intermediateStatement =
-        new IntermediateStatement(options, parse(sql), connectionHandler);
-
-    assertTrue(intermediateStatement.isBatchedQuery());
-
-    assertEquals(5, intermediateStatement.getStatements().size(), 5);
-    assertEquals("BEGIN TRANSACTION", intermediateStatement.getStatement(0));
-    assertEquals("INSERT INTO users (id) VALUES (1)", intermediateStatement.getStatement(1));
-    assertEquals("INSERT INTO users (id) VALUES (2)", intermediateStatement.getStatement(2));
-    assertEquals("INSERT INTO users (id) VALUES (3)", intermediateStatement.getStatement(3));
-    assertEquals("COMMIT", intermediateStatement.getStatement(4));
-  }
-
-  @Test
-  public void testBatchStatementsWithEmptyStatements() {
-    String sql = "INSERT INTO users (id) VALUES (1); ;;; INSERT INTO users (id) VALUES (2);";
-    IntermediateStatement intermediateStatement =
-        new IntermediateStatement(options, parse(sql), connectionHandler);
-
-    assertTrue(intermediateStatement.isBatchedQuery());
-    assertEquals(2, intermediateStatement.getStatements().size());
-    assertEquals("INSERT INTO users (id) VALUES (1)", intermediateStatement.getStatement(0));
-    assertEquals("INSERT INTO users (id) VALUES (2)", intermediateStatement.getStatement(1));
-  }
-
-  @Test
-  public void testBatchStatementsWithQuotes() {
-    String sql =
-        "INSERT INTO users (name) VALUES (';;test;;'); INSERT INTO users (name1, name2) VALUES ('''''', ';'';');";
-    IntermediateStatement intermediateStatement =
-        new IntermediateStatement(options, parse(sql), connectionHandler);
-
-    assertTrue(intermediateStatement.isBatchedQuery());
-    assertEquals(2, intermediateStatement.getStatements().size());
-    assertEquals(
-        "INSERT INTO users (name) VALUES (';;test;;')", intermediateStatement.getStatement(0));
-    assertEquals(
-        "INSERT INTO users (name1, name2) VALUES ('''''', ';'';')",
-        intermediateStatement.getStatement(1));
   }
 
   @Test
@@ -442,25 +373,22 @@ public class StatementTest {
     byte[] value = Bytes.concat(messageMetadata, payload.getBytes());
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
-    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
-    when(options.requiresMatcher()).thenReturn(false);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
-    IntermediateStatement intermediateStatement = ((QueryMessage) message).getStatement();
+    SimpleQueryStatement simpleQueryStatement = ((QueryMessage) message).getSimpleQueryStatement();
 
-    assertTrue(intermediateStatement.isBatchedQuery());
-    assertEquals(2, intermediateStatement.getStatements().size());
+    assertEquals(2, simpleQueryStatement.getStatements().size());
     assertEquals(
-        "INSERT INTO users (name) VALUES (';;test;;')", intermediateStatement.getStatement(0));
+        "INSERT INTO users (name) VALUES (';;test;;')", simpleQueryStatement.getStatement(0));
     assertEquals(
         "INSERT INTO users (name1, name2) VALUES ('''''', ';'';')",
-        intermediateStatement.getStatement(1));
+        simpleQueryStatement.getStatement(1));
   }
 
   @Test
@@ -485,6 +413,47 @@ public class StatementTest {
 
     statement.close();
     verify(resultSet, never()).close();
+  }
+
+  @Test
+  public void testIntermediateStatementExecuteAsyncIsUnsupported() {
+    String sql = "select * from foo";
+
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement(options, parse(sql), connectionHandler);
+
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> intermediateStatement.executeAsync(backendConnection));
+  }
+
+  @Test
+  public void testIntermediateStatementDescribeAsyncIsUnsupported() {
+    String sql = "select * from foo";
+
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    IntermediateStatement intermediateStatement =
+        new IntermediateStatement(options, parse(sql), connectionHandler);
+
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> intermediateStatement.describeAsync(backendConnection));
+  }
+
+  @Test
+  public void testGetStatementResultBeforeFlushFails() {
+    String sql = "select * from foo";
+
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    IntermediatePortalStatement intermediateStatement =
+        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
+    BackendConnection backendConnection =
+        new BackendConnection(connection, DdlTransactionMode.Batch);
+
+    intermediateStatement.executeAsync(backendConnection);
+
+    assertThrows(IllegalStateException.class, intermediateStatement::getStatementResult);
   }
 
   private void setupQueryInformationSchemaResults() {
