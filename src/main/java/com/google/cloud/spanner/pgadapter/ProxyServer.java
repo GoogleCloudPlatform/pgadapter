@@ -30,9 +30,15 @@ import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.net.StandardProtocolFamily;
+import java.net.UnixDomainSocketAddress;
+import java.nio.channels.Channels;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -44,8 +50,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.newsclub.net.unix.AFUNIXServerSocket;
-import org.newsclub.net.unix.AFUNIXSocketAddress;
 
 /**
  * The proxy server listens for incoming client connections and starts a new {@link
@@ -68,7 +72,8 @@ public class ProxyServer extends AbstractApiService {
    * optionally one Unix domain socket, but could in theory be expanded to contain multiple sockets
    * of each type.
    */
-  private final List<ServerSocket> serverSockets = Collections.synchronizedList(new LinkedList<>());
+  private final List<ServerSocketChannel> serverSockets =
+      Collections.synchronizedList(new LinkedList<>());
 
   private int localPort;
 
@@ -170,7 +175,7 @@ public class ProxyServer extends AbstractApiService {
 
   @Override
   protected void doStop() {
-    for (ServerSocket serverSocket : this.serverSockets) {
+    for (ServerSocketChannel serverSocket : this.serverSockets) {
       try {
         logger.log(
             Level.INFO, () -> String.format("Server on socket %s is stopping", serverSocket));
@@ -202,12 +207,17 @@ public class ProxyServer extends AbstractApiService {
    * @throws IOException if ServerSocket cannot start.
    */
   void runTcpServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch) throws IOException {
-    ServerSocket tcpSocket =
-        new ServerSocket(this.options.getProxyPort(), this.options.getMaxBacklog());
-    this.serverSockets.add(tcpSocket);
-    this.localPort = tcpSocket.getLocalPort();
+    ServerSocketChannel channel = ServerSocketChannel.open(StandardProtocolFamily.INET);
+    InetSocketAddress address = new InetSocketAddress(this.options.getProxyPort());
+    channel.configureBlocking(true);
+    channel.bind(address, this.options.getMaxBacklog());
+    //    ServerSocket tcpSocket =
+    //        new ServerSocket(this.options.getProxyPort(), this.options.getMaxBacklog());
+    this.serverSockets.add(channel);
+    //    this.localPort = tcpSocket.getLocalPort();
+    this.localPort = ((InetSocketAddress) channel.getLocalAddress()).getPort();
     tcpStartedLatch.countDown();
-    runServer(tcpSocket, startupLatch, stoppedLatch);
+    runServer(channel, startupLatch, stoppedLatch);
   }
 
   void runDomainSocketServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch)
@@ -219,14 +229,18 @@ public class ProxyServer extends AbstractApiService {
           ErrorCode.DEADLINE_EXCEEDED, "Timeout while waiting for TCP server to start");
     }
     File tempDir = new File(this.options.getSocketFile(getLocalPort()));
+    Path path = Path.of(tempDir.toURI());
     try {
       if (tempDir.getParentFile() != null && !tempDir.getParentFile().exists()) {
         tempDir.mkdirs();
       }
-      AFUNIXServerSocket domainSocket = AFUNIXServerSocket.newInstance();
-      domainSocket.bind(AFUNIXSocketAddress.of(tempDir), this.options.getMaxBacklog());
-      this.serverSockets.add(domainSocket);
-      runServer(domainSocket, startupLatch, stoppedLatch);
+      UnixDomainSocketAddress address = UnixDomainSocketAddress.of(path);
+      ServerSocketChannel domainSocketChannel =
+          ServerSocketChannel.open(StandardProtocolFamily.UNIX);
+      domainSocketChannel.configureBlocking(true);
+      domainSocketChannel.bind(address, this.options.getMaxBacklog());
+      this.serverSockets.add(domainSocketChannel);
+      runServer(domainSocketChannel, startupLatch, stoppedLatch);
     } catch (SocketException socketException) {
       logger.log(
           Level.SEVERE,
@@ -235,17 +249,19 @@ public class ProxyServer extends AbstractApiService {
               tempDir),
           socketException);
       startupLatch.countDown();
+    } finally {
+      Files.deleteIfExists(path);
     }
   }
 
   void runServer(
-      ServerSocket serverSocket, CountDownLatch startupLatch, CountDownLatch stoppedLatch)
+      ServerSocketChannel serverSocket, CountDownLatch startupLatch, CountDownLatch stoppedLatch)
       throws IOException {
     startupLatch.countDown();
     awaitRunning();
     try {
       while (isRunning()) {
-        Socket socket = serverSocket.accept();
+        SocketChannel socket = serverSocket.accept();
         try {
           createConnectionHandler(socket);
         } catch (SpannerException exception) {
@@ -272,7 +288,7 @@ public class ProxyServer extends AbstractApiService {
    * @param exception The exception that caused the connection request to fail.
    * @param socket The socket that was created for the connection.
    */
-  private void handleConnectionError(SpannerException exception, Socket socket) {
+  private void handleConnectionError(SpannerException exception, SocketChannel socket) {
     logger.log(
         Level.SEVERE,
         exception,
@@ -282,7 +298,7 @@ public class ProxyServer extends AbstractApiService {
                 exception.getMessage()));
     try {
       DataOutputStream output =
-          new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+          new DataOutputStream(new BufferedOutputStream(Channels.newOutputStream(socket)));
       new ErrorResponse(output, exception, ErrorResponse.State.ConnectionException, Severity.FATAL)
           .send();
       output.flush();
@@ -301,7 +317,7 @@ public class ProxyServer extends AbstractApiService {
    * @throws SpannerException if the {@link ConnectionHandler} is unable to connect to Cloud Spanner
    *     or if the dialect of the database is not PostgreSQL.
    */
-  void createConnectionHandler(Socket socket) {
+  void createConnectionHandler(SocketChannel socket) throws IOException {
     ConnectionHandler handler = new ConnectionHandler(this, socket);
     register(handler);
     handler.start();
