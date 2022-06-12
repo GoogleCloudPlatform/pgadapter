@@ -25,13 +25,13 @@ import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
@@ -86,6 +86,7 @@ public class ConnectionHandler extends Thread {
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
   private Connection spannerConnection;
+  private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
 
   ConnectionHandler(ProxyServer server, Socket socket) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
@@ -155,6 +156,7 @@ public class ConnectionHandler extends Thread {
       throw e;
     }
     this.spannerConnection = spannerConnection;
+    this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
   }
 
   private String appendPropertiesToUrl(String url, Properties info) {
@@ -303,7 +305,7 @@ public class ConnectionHandler extends Thread {
     } else if (this.status == ConnectionStatus.COPY_IN) {
       new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
     } else {
-      this.status = ConnectionStatus.IDLE;
+      this.status = ConnectionStatus.AUTHENTICATED;
       new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
       new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
     }
@@ -311,10 +313,8 @@ public class ConnectionHandler extends Thread {
 
   /** Closes portals and statements if the result of an execute was the end of a transaction. */
   public void cleanUp(IntermediateStatement statement) throws Exception {
-    for (int index = 0; index < statement.getStatementCount(); index++) {
-      if (!statement.isHasMoreData(index) && statement.isBound()) {
-        statement.close(index);
-      }
+    if (!statement.isHasMoreData() && statement.isBound()) {
+      statement.close();
     }
     // TODO when we have transaction data from jdbcConnection, close all portals if done
   }
@@ -461,6 +461,10 @@ public class ConnectionHandler extends Thread {
     return connectionMetadata;
   }
 
+  public ExtendedQueryProtocolHandler getExtendedQueryProtocolHandler() {
+    return extendedQueryProtocolHandler;
+  }
+
   public synchronized IntermediateStatement getActiveStatement() {
     return activeStatementsMap.get(this.connectionId);
   }
@@ -475,22 +479,10 @@ public class ConnectionHandler extends Thread {
 
   /** Status of a {@link ConnectionHandler} */
   public enum ConnectionStatus {
-    UNAUTHENTICATED(Status.IDLE),
-    IDLE(Status.IDLE),
-    TRANSACTION(Status.TRANSACTION),
-    COPY_IN(Status.IDLE),
-    TERMINATED(Status.IDLE),
-    TRANSACTION_ABORTED(Status.FAILED);
-
-    private final ReadyResponse.Status readyResponseStatus;
-
-    ConnectionStatus(ReadyResponse.Status readyResponseStatus) {
-      this.readyResponseStatus = readyResponseStatus;
-    }
-
-    public ReadyResponse.Status getReadyResponseStatus() {
-      return this.readyResponseStatus;
-    }
+    UNAUTHENTICATED,
+    AUTHENTICATED,
+    COPY_IN,
+    TERMINATED,
   }
 
   /**

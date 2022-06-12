@@ -22,7 +22,11 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-    <excludedTests>com.google.cloud.spanner.pgadapter.IntegrationTest,com.google.cloud.spanner.pgadapter.golang.GolangTest</excludedTests>
+    <excludedTests>
+      com.google.cloud.spanner.pgadapter.IntegrationTest,
+      com.google.cloud.spanner.pgadapter.golang.GolangTest,
+      <!--com.google.cloud.spanner.pgadapter.python.PythonTest-->
+    </excludedTests>
 
     <spanner.version>6.25.5</spanner.version>
   </properties>
@@ -201,7 +205,10 @@
     <profile>
       <id>test-all</id>
       <properties>
-        <excludedTests>com.google.cloud.spanner.pgadapter.IntegrationTest</excludedTests>
+        <excludedTests>
+          com.google.cloud.spanner.pgadapter.IntegrationTest,
+          <!--com.google.cloud.spanner.pgadapter.python.PythonTest-->
+        </excludedTests>
       </properties>
     </profile>
 
@@ -297,6 +304,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.0.0-M5</version>
         <configuration>
+          <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
           <argLine>${surefire.jacoco.args}</argLine>
           <excludedGroups>${excludedTests}</excludedGroups>
           <reportNameSuffix>sponge_log</reportNameSuffix>
@@ -405,6 +413,7 @@
           </execution>
         </executions>
         <configuration>
+          <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
           <argLine>${failsafe.jacoco.args}</argLine>
           <skipITs>${skipITs}</skipITs>
         </configuration>

@@ -24,16 +24,31 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class DdlTransactionModeNoneTest extends AbstractMockServerTest {
+  @Parameter public String preferQueryMode;
+
+  @Parameters(name = "preferQueryMode = {0}")
+  public static List<Object[]> data() {
+    String[] queryModes = {"extended", "simple"};
+    List<Object[]> parameters = new ArrayList<>();
+    for (String queryMode : queryModes) {
+      parameters.add(new Object[] {queryMode});
+    }
+    return parameters;
+  }
+
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
     // Make sure the PG JDBC driver is loaded.
@@ -45,14 +60,10 @@ public class DdlTransactionModeNoneTest extends AbstractMockServerTest {
     doStartMockSpannerAndPgAdapterServers("d", Collections.singleton("-ddl=Single"));
   }
 
-  /**
-   * Creates a JDBC connection string that instructs the PG JDBC driver to use the default simple
-   * mode for queries and DML statements. This makes the JDBC driver behave in (much) the same way
-   * as psql.
-   */
   protected String createUrl() {
     return String.format(
-        "jdbc:postgresql://localhost:%d/?preferQueryMode=simple", pgServer.getLocalPort());
+        "jdbc:postgresql://localhost:%d/?preferQueryMode=%s",
+        pgServer.getLocalPort(), preferQueryMode);
   }
 
   @Test
@@ -79,6 +90,31 @@ public class DdlTransactionModeNoneTest extends AbstractMockServerTest {
     assertEquals(
         "CREATE TABLE foo (id bigint primary key)",
         updateDatabaseDdlRequests.get(0).getStatements(0));
+  }
+
+  @Test
+  public void testSingleDdlStatementInExplicitTransaction() throws SQLException {
+    String sql = "CREATE TABLE foo (id bigint primary key)";
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        statement.execute("begin");
+        SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
+        assertTrue(
+            exception.getMessage(),
+            exception
+                .getMessage()
+                .contains("DDL statements are only allowed outside explicit transactions."));
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(0, updateDatabaseDdlRequests.size());
   }
 
   @Test

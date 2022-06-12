@@ -17,9 +17,10 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.transformDeleteToSelectParams;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.transformInsertToSelectParams;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.transformUpdateToSelectParams;
-import static com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.splitStatements;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleQueryStatement.splitStatements;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -104,11 +105,11 @@ public class IntermediateStatementTest {
     when(result.getResultType()).thenReturn(ResultType.RESULT_SET);
     when(result.getResultSet()).thenReturn(resultSet);
 
-    statement.updateResultCount(0, result);
+    statement.setStatementResult(result);
 
-    assertTrue(statement.hasMoreData[0]);
-    assertEquals(-1, statement.getUpdateCount(0));
-    assertSame(resultSet, statement.getStatementResult(0));
+    assertTrue(statement.hasMoreData);
+    assertEquals(-1, statement.getUpdateCount());
+    assertSame(resultSet, statement.getStatementResult().getResultSet());
   }
 
   @Test
@@ -121,11 +122,12 @@ public class IntermediateStatementTest {
     when(result.getResultType()).thenReturn(ResultType.UPDATE_COUNT);
     when(result.getUpdateCount()).thenReturn(100L);
 
-    statement.updateResultCount(0, result);
+    statement.setStatementResult(result);
 
-    assertFalse(statement.hasMoreData[0]);
-    assertEquals(100L, statement.getUpdateCount(0));
-    assertNull(statement.getStatementResult(0));
+    assertFalse(statement.hasMoreData);
+    assertEquals(100L, statement.getUpdateCount());
+    assertNotNull(statement.getStatementResult());
+    assertEquals(ResultType.UPDATE_COUNT, statement.getStatementResult().getResultType());
   }
 
   @Test
@@ -139,11 +141,12 @@ public class IntermediateStatementTest {
     StatementResult result = mock(StatementResult.class);
     when(result.getResultType()).thenReturn(ResultType.NO_RESULT);
 
-    statement.updateResultCount(0, result);
+    statement.setStatementResult(result);
 
-    assertFalse(statement.hasMoreData[0]);
-    assertEquals(0, statement.getUpdateCount(0));
-    assertNull(statement.getStatementResult(0));
+    assertFalse(statement.hasMoreData);
+    assertEquals(0, statement.getUpdateCount());
+    assertNotNull(statement.getStatementResult());
+    assertEquals(ResultType.NO_RESULT, statement.getStatementResult().getResultType());
   }
 
   @Test

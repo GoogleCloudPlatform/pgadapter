@@ -35,6 +35,7 @@ public class FlushMessage extends ControlMessage {
 
   @Override
   protected void sendPayload() throws Exception {
+    connection.getExtendedQueryProtocolHandler().flush();
     boolean inTransaction = connection.getSpannerConnection().isInTransaction();
     new ReadyResponse(
             this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)

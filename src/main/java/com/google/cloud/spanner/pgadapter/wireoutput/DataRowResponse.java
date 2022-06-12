@@ -39,14 +39,12 @@ public class DataRowResponse extends WireOutput {
 
   public DataRowResponse(
       DataOutputStream output,
-      int resultIndex,
       IntermediateStatement statement,
       OptionsMetadata options,
-      QueryMode mode)
-      throws Exception {
+      QueryMode mode) {
     super(output, 0);
     this.mode = mode;
-    this.resultSet = statement.getStatementResult(resultIndex);
+    this.resultSet = statement.getStatementResult().getResultSet();
     this.columns = new ArrayList<>(this.resultSet.getColumnCount());
     this.length = HEADER_LENGTH + COLUMN_NUMBER_LENGTH;
     // TODO profile this with immense rows/column count to see if it's an aread of optimization.

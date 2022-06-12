@@ -15,16 +15,16 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
+import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.util.concurrent.Futures;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Future;
 import java.util.logging.Logger;
 
 /**
@@ -33,7 +33,6 @@ import java.util.logging.Logger;
  */
 @InternalApi
 public class IntermediatePortalStatement extends IntermediatePreparedStatement {
-
   private static final Logger logger =
       Logger.getLogger(IntermediatePreparedStatement.class.getName());
   protected List<Short> parameterFormatCodes;
@@ -84,19 +83,17 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   }
 
   @Override
-  public DescribeMetadata describe() {
-    try {
-      // Pre-emptively execute the statement, even though it is only asked to be described. This is
-      // a lot more efficient than taking two round trips to the server, and getting a
-      // DescribePortal message without a following Execute message is extremely rare, as that would
-      // only happen if the client is ill-behaved, or if the client crashes between the
-      // DescribePortal and Execute.
-      ResultSet statementResult = connection.executeQuery(this.statement);
-      setStatementResult(0, statementResult);
-      return new DescribePortalMetadata(statementResult);
-    } catch (SpannerException exception) {
-      handleExecutionExceptionAndTransactionStatus(0, exception);
-      throw exception;
-    }
+  public Future<DescribePortalMetadata> describeAsync(BackendConnection backendConnection) {
+    // Pre-emptively execute the statement, even though it is only asked to be described. This is
+    // a lot more efficient than taking two round trips to the server, and getting a
+    // DescribePortal message without a following Execute message is extremely rare, as that would
+    // only happen if the client is ill-behaved, or if the client crashes between the
+    // DescribePortal and Execute.
+    Future<StatementResult> statementResultFuture =
+        backendConnection.execute(this.parsedStatement, this.statement);
+    setFutureStatementResult(statementResultFuture);
+    return Futures.lazyTransform(
+        statementResultFuture,
+        statementResult -> new DescribePortalMetadata(statementResult.getResultSet()));
   }
 }
