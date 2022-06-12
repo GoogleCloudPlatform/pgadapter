@@ -64,7 +64,7 @@ e2e-psql)
 #  create testing database
   gcloud config set api_endpoint_overrides/spanner "https://${GOOGLE_CLOUD_ENDPOINT}/"
   gcloud alpha spanner databases create "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --instance="${GOOGLE_CLOUD_INSTANCE}" --database-dialect=POSTGRESQL
-  gcloud spanner databases ddl update "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --instance="${GOOGLE_CLOUD_INSTANCE}" --ddl='CREATE TABLE users (id bigint PRIMARY KEY, age bigint, name text);'
+  gcloud spanner databases ddl update "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --instance="${GOOGLE_CLOUD_INSTANCE}" --ddl='CREATE TABLE users (id bigint PRIMARY KEY, age bigint, name text); create index idx_users_name on users (name);'
   for i in 1 2 3
   do
     # attempt this up to 3 times since it sometimes fails

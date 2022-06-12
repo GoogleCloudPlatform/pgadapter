@@ -21,18 +21,11 @@ import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.statements.MatcherStatement;
-import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.statements.SimpleQueryStatement;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.EmptyQueryResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
 import java.text.MessageFormat;
 
 /** Executes a simple statement. */
@@ -43,35 +36,34 @@ public class QueryMessage extends ControlMessage {
   protected static final char IDENTIFIER = 'Q';
   public static final String COPY = "COPY";
 
+  private final ParsedStatement statement;
+  private final CopyStatement copyStatement;
+  private final SimpleQueryStatement simpleQueryStatement;
   private final boolean isCopy;
-  private final IntermediateStatement statement;
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
-    ParsedStatement parsedStatement = PARSER.parse(Statement.of(this.readAll()));
-    this.isCopy = StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments());
+    this.statement = PARSER.parse(Statement.of(this.readAll()));
+    this.isCopy = StatementParser.isCommand(COPY, statement.getSqlWithoutComments());
     if (isCopy) {
-      this.statement =
-          new CopyStatement(connection, connection.getServer().getOptions(), parsedStatement);
-    } else if (connection.getServer().getOptions().requiresMatcher()
-        || connection.getWellKnownClient() == WellKnownClient.PSQL) {
-      this.statement =
-          new MatcherStatement(
-              connection.getServer().getOptions(), parsedStatement, this.connection);
+      this.copyStatement =
+          new CopyStatement(connection, connection.getServer().getOptions(), statement);
+      this.simpleQueryStatement = null;
+      this.connection.addActiveStatement(this.copyStatement);
     } else {
-      this.statement =
-          new IntermediateStatement(
-              connection.getServer().getOptions(), parsedStatement, this.connection);
+      this.simpleQueryStatement =
+          new SimpleQueryStatement(connection.getServer().getOptions(), statement, this.connection);
+      this.copyStatement = null;
     }
-    this.connection.addActiveStatement(this.statement);
   }
 
   @Override
   protected void sendPayload() throws Exception {
-    this.statement.execute();
-    this.handleQuery();
-    if (!this.statement.getCommand(0).equalsIgnoreCase(COPY)) {
-      this.connection.removeActiveStatement(this.statement);
+    if (this.isCopy) {
+      this.copyStatement.execute();
+      handleCopy();
+    } else {
+      this.simpleQueryStatement.execute();
     }
   }
 
@@ -83,7 +75,7 @@ public class QueryMessage extends ControlMessage {
   @Override
   protected String getPayloadString() {
     return new MessageFormat("Length: {0}, SQL: {1}")
-        .format(new Object[] {this.length, this.statement.getSql()});
+        .format(new Object[] {this.length, this.statement.getSqlWithoutComments()});
   }
 
   @Override
@@ -91,58 +83,32 @@ public class QueryMessage extends ControlMessage {
     return String.valueOf(IDENTIFIER);
   }
 
-  public IntermediateStatement getStatement() {
+  public ParsedStatement getStatement() {
     return this.statement;
   }
 
-  /**
-   * Simple Query handler, which examined the state of the statement and processes accordingly (if
-   * error, handle error, otherwise sends the result and if contains result set, send row
-   * description)
-   *
-   * @throws Exception if handling the query fails
-   */
-  public void handleQuery() throws Exception {
-    // Skip unexecuted statements, as no response needs be returned
-    for (int index = 0; index < statement.getExecutedCount(); index++) {
-      if (this.statement.hasException(index)) {
-        new ErrorResponse(
-                this.outputStream, this.statement.getException(index), State.InternalError)
-            .send();
-      } else if (this.statement.getCommand(index).equalsIgnoreCase(COPY)) {
-        CopyStatement copyStatement = (CopyStatement) this.statement;
-        new CopyInResponse(
-                this.outputStream,
-                copyStatement.getTableColumns().size(),
-                copyStatement.getFormatCode())
-            .send();
-        this.connection.setStatus(ConnectionStatus.COPY_IN);
+  public SimpleQueryStatement getSimpleQueryStatement() {
+    return this.simpleQueryStatement;
+  }
 
-        // Return early as we do not respond with CommandComplete after a COPY command.
-        return;
-      } else if ("".equals(this.statement.getCommandTag(index))) {
-        new EmptyQueryResponse(outputStream).send();
-      } else {
-        if (this.statement.containsResultSet(index)) {
-          new RowDescriptionResponse(
-                  this.outputStream,
-                  this.statement,
-                  this.statement.getStatementResult(index),
-                  this.connection.getServer().getOptions(),
-                  QueryMode.SIMPLE)
-              .send(false);
-        }
-        this.sendSpannerResult(index, this.statement, QueryMode.SIMPLE, 0L);
-      }
+  private void handleCopy() throws Exception {
+    if (this.copyStatement.hasException()) {
+      handleError(this.copyStatement.getException());
+      new ReadyResponse(
+              this.outputStream,
+              connection
+                  .getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getConnectionState()
+                  .getReadyResponseStatus())
+          .send();
+    } else {
+      new CopyInResponse(
+              this.outputStream,
+              copyStatement.getTableColumns().size(),
+              copyStatement.getFormatCode())
+          .send();
+      this.connection.setStatus(ConnectionStatus.COPY_IN);
     }
-    if (connection.getSpannerConnection().isInTransaction()
-        && connection.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
-      // Actively rollback the aborted transaction but still block clients
-      // Clear any statement tags, as these are not allowed for rollbacks.
-      connection.getSpannerConnection().setStatementTag(null);
-      connection.getSpannerConnection().rollback();
-    }
-    new ReadyResponse(this.outputStream, connection.getStatus().getReadyResponseStatus()).send();
-    this.connection.cleanUp(this.statement);
   }
 }

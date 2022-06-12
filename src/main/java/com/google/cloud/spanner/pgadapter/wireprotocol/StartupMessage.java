@@ -68,7 +68,7 @@ public class StartupMessage extends BootstrapMessage {
           this.connection.getConnectionId(),
           this.connection.getSecret(),
           this.connection.getServer().getOptions());
-      this.connection.setStatus(ConnectionStatus.IDLE);
+      this.connection.setStatus(ConnectionStatus.AUTHENTICATED);
     } else {
       new MD5AuthenticationRequest(this.outputStream, 0).send();
     }
