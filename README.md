@@ -167,18 +167,6 @@ The following options are optional:
     authenticate. Note that SSL is not included for the same reason that
     authentication logic is not: since all connections are local, sniffing
     traffic should not generally be a concern.
-
--q
-  * PSQL Mode. Use this option when fronting PSQL. This option will incur some
-    performance penalties due to query matching and translation and as such is
-    not recommended for production. It is further not guaranteed to perfectly
-    match PSQL logic. Please only use this mode when using PSQL.
-    
--jdbc
-  * JDBC Mode. Use this option when fronting the native PostgreSQL JDBC driver.
-    This option will inspect queries to look for native JDBC metadata queries and
-    replace these with queries that are suppported by Cloud Spanner PostgreSQL
-    databases.
     
 -c <multi-statementcommand>
     Runs a single command before exiting. This command can be comprised of multiple 
