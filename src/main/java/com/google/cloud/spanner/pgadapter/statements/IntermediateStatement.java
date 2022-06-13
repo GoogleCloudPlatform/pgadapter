@@ -69,7 +69,8 @@ public class IntermediateStatement {
     this.connectionHandler = connectionHandler;
     this.options = options;
     this.parsedStatement =
-        SimpleQueryStatement.replaceKnownUnsupportedQueries(this.options, parsedStatement);
+        SimpleQueryStatement.replaceKnownUnsupportedQueries(
+            this.connectionHandler.getWellKnownClient(), this.options, parsedStatement);
     this.connection = connectionHandler.getSpannerConnection();
     this.command = StatementParser.parseCommand(this.parsedStatement.getSqlWithoutComments());
     this.commandTag = this.command;
