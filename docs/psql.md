@@ -4,7 +4,7 @@ PGAdapter supports [psql](https://www.postgresql.org/docs/current/app-psql.html)
 
 ## Usage
 
-First start PGAdapter in `psql` mode by adding `-q` to the command line parameters.
+First start PGAdapter.
 
 ```shell
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
@@ -15,12 +15,11 @@ docker run \
   -e GOOGLE_APPLICATION_CREDENTIALS \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance -d my-database \
-  -x \
-  -q
+  -x
 ```
 
-- The `-q` option tells PGAdapter to translate queries from `psql` for meta commands like `\dt` into
-  queries that are supported by Cloud Spanner.
+- PGAdapter automatically recognizes connections from psql and translates queries from `psql` for 
+  meta commands like `\dt` into queries that are supported by Cloud Spanner.
 - The `-x` option tells PGAdapter to accept incoming connections from other hosts than localhost.
   This is necessary when running PGAdapter in a Docker container, as you will be connecting to it
   from outside the container, which will be seen as a connection from a different host.
@@ -46,8 +45,7 @@ docker run \
   -e GOOGLE_APPLICATION_CREDENTIALS \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance -d my-database \
-  -x \
-  -q
+  -x
 psql -h localhost -p 5433
 ```
 
