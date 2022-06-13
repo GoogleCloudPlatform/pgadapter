@@ -121,6 +121,7 @@ public abstract class AbstractMockServerTest {
                   .build())
           .setMetadata(SELECT1_METADATA)
           .build();
+
   private static final com.google.spanner.v1.ResultSet SELECT_FIVE_ROWS_RESULTSET =
       com.google.spanner.v1.ResultSet.newBuilder()
           .addAllRows(
