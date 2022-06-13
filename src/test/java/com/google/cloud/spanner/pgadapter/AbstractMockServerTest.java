@@ -351,7 +351,6 @@ public abstract class AbstractMockServerTest {
       argsListBuilder.add("-d", defaultDatabase);
     }
     argsListBuilder.add(
-        "-jdbc",
         "-debug",
         "-c",
         "", // empty credentials file, as we are using a plain text connection.
