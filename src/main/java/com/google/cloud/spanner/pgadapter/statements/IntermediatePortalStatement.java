@@ -25,7 +25,6 @@ import com.google.common.util.concurrent.Futures;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Future;
-import java.util.logging.Logger;
 
 /**
  * An intermediate representation of a portal statement (that is, a prepared statement which
@@ -33,8 +32,6 @@ import java.util.logging.Logger;
  */
 @InternalApi
 public class IntermediatePortalStatement extends IntermediatePreparedStatement {
-  private static final Logger logger =
-      Logger.getLogger(IntermediatePreparedStatement.class.getName());
   protected List<Short> parameterFormatCodes;
   protected List<Short> resultFormatCodes;
 
@@ -42,9 +39,10 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
       ConnectionHandler connectionHandler,
       OptionsMetadata options,
       String name,
-      ParsedStatement parsedStatement) {
-    super(connectionHandler, options, name, parsedStatement);
-    this.statement = Statement.of(parsedStatement.getSqlWithoutComments());
+      ParsedStatement parsedStatement,
+      Statement originalStatement) {
+    super(connectionHandler, options, name, parsedStatement, originalStatement);
+    this.statement = originalStatement;
     this.parameterFormatCodes = new ArrayList<>();
     this.resultFormatCodes = new ArrayList<>();
   }

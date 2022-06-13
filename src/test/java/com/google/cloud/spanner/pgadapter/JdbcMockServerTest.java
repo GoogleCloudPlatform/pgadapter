@@ -128,6 +128,26 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testQueryHint() throws SQLException {
+    String sql = "/* @OPTIMIZER_VERSION=1 */ SELECT 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(sql, executeRequest.getSql());
+  }
+
+  @Test
   public void testQueryWithParameters() throws SQLException {
     String jdbcSql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
@@ -470,8 +490,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         // The PG JDBC driver will internally split the following SQL string into two statements and
         // execute these sequentially. We still get the results back as if they were executed as one
         // batch on the same statement.
-        assertFalse(
-            statement.execute(String.format("%s; %s;", INSERT_STATEMENT, UPDATE_STATEMENT)));
+        assertFalse(statement.execute(String.format("%s;%s;", INSERT_STATEMENT, UPDATE_STATEMENT)));
 
         // Note that we have sent two DML statements to the database in one string. These should be
         // treated as separate statements, and there should therefore be two results coming back
@@ -534,7 +553,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // Statement#execute(String) returns true if the result is a result set.
-        assertTrue(statement.execute("SELECT 1; SELECT 2;"));
+        assertTrue(statement.execute("SELECT 1;SELECT 2;"));
 
         try (ResultSet resultSet = statement.getResultSet()) {
           assertTrue(resultSet.next());

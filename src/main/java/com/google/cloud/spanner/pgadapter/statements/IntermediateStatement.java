@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
@@ -49,6 +50,7 @@ public class IntermediateStatement {
   protected Future<StatementResult> futureStatementResult;
   protected SpannerException exception;
   protected final ParsedStatement parsedStatement;
+  protected final Statement originalStatement;
   protected final String command;
   protected String commandTag;
   protected boolean executed;
@@ -58,19 +60,29 @@ public class IntermediateStatement {
   public IntermediateStatement(
       OptionsMetadata options,
       ParsedStatement parsedStatement,
+      Statement originalStatement,
       ConnectionHandler connectionHandler) {
-    this(connectionHandler, options, parsedStatement);
+    this(connectionHandler, options, parsedStatement, originalStatement);
   }
 
   protected IntermediateStatement(
       ConnectionHandler connectionHandler,
       OptionsMetadata options,
-      ParsedStatement parsedStatement) {
+      ParsedStatement parsedStatement,
+      Statement originalStatement) {
     this.connectionHandler = connectionHandler;
     this.options = options;
-    this.parsedStatement =
+    ParsedStatement potentiallyReplacedStatement =
         SimpleQueryStatement.replaceKnownUnsupportedQueries(
             this.connectionHandler.getWellKnownClient(), this.options, parsedStatement);
+    // Check if we need to create a new 'original' statement. The original statement is what will be
+    // sent to Cloud Spanner, as the statement might include query hints in comments.
+    if (potentiallyReplacedStatement == parsedStatement) {
+      this.originalStatement = originalStatement;
+    } else {
+      this.originalStatement = Statement.of(potentiallyReplacedStatement.getSqlWithoutComments());
+    }
+    this.parsedStatement = potentiallyReplacedStatement;
     this.connection = connectionHandler.getSpannerConnection();
     this.command = StatementParser.parseCommand(this.parsedStatement.getSqlWithoutComments());
     this.commandTag = this.command;

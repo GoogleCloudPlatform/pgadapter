@@ -53,8 +53,9 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       ConnectionHandler connectionHandler,
       OptionsMetadata options,
       String name,
-      ParsedStatement parsedStatement) {
-    super(connectionHandler, options, parsedStatement);
+      ParsedStatement parsedStatement,
+      Statement originalStatement) {
+    super(connectionHandler, options, parsedStatement, originalStatement);
     this.name = name;
     this.parameterDataTypes = null;
   }
@@ -109,10 +110,14 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       List<Short> resultFormatCodes) {
     IntermediatePortalStatement portal =
         new IntermediatePortalStatement(
-            this.connectionHandler, this.options, name, this.parsedStatement);
+            this.connectionHandler,
+            this.options,
+            name,
+            this.parsedStatement,
+            this.originalStatement);
     portal.setParameterFormatCodes(parameterFormatCodes);
     portal.setResultFormatCodes(resultFormatCodes);
-    Statement.Builder builder = Statement.newBuilder(this.parsedStatement.getSqlWithoutComments());
+    Statement.Builder builder = this.originalStatement.toBuilder();
     for (int index = 0; index < parameters.length; index++) {
       short formatCode = portal.getParameterFormatCode(index);
       int type = this.parseType(parameters, index);
