@@ -50,7 +50,7 @@ public class DdlTransactionModeAutocommitExplicitTest
   @Test
   public void testMixedBatchWithExplicitTransaction() throws SQLException {
     String sql =
-        "BEGIN; INSERT INTO FOO VALUES (1); CREATE TABLE foo (id bigint primary key); COMMIT;";
+        "BEGIN;INSERT INTO FOO VALUES (1);CREATE TABLE foo (id bigint primary key);COMMIT;";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -83,7 +83,7 @@ public class DdlTransactionModeAutocommitExplicitTest
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // Start an explicit transaction before executing batch
-        assertFalse(statement.execute("BEGIN; SELECT 1"));
+        assertFalse(statement.execute("BEGIN;SELECT 1"));
         assertEquals(0, statement.getUpdateCount());
 
         assertTrue(statement.getMoreResults());
@@ -97,7 +97,7 @@ public class DdlTransactionModeAutocommitExplicitTest
         assertEquals(-1, statement.getUpdateCount());
 
         // Execute batch
-        assertTrue(statement.execute("SELECT 2; CREATE TABLE BAR (id bigint primary key);"));
+        assertTrue(statement.execute("SELECT 2;CREATE TABLE BAR (id bigint primary key);"));
         assertNotNull(statement.getResultSet());
         assertFalse(statement.getMoreResults());
         assertEquals(0, statement.getUpdateCount());
@@ -128,7 +128,7 @@ public class DdlTransactionModeAutocommitExplicitTest
   public void testDdlInExplicitTransactionSwitchedToImplicit() throws SQLException {
     String sql =
         String.format(
-            "BEGIN; %s; CREATE TABLE foo (id bigint primary key); %s; %s; COMMIT;",
+            "BEGIN;%s;CREATE TABLE foo (id bigint primary key);%s;%s;COMMIT;",
             INSERT_STATEMENT, UPDATE_STATEMENT, INVALID_DML);
     addDdlResponseToSpannerAdmin();
 
