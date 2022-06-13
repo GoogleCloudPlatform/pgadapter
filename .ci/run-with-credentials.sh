@@ -44,20 +44,6 @@ integration)
 uber-jar-build)
   mvn package -Pshade -DskipTests -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
   ;;
-uber-jar-release)
-  PGADAPTER_VERSION="$(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=project.version -q -DforceStdout)"
-  UBER_JAR="google-cloud-spanner-pgadapter-${PGADAPTER_VERSION}.jar"
-  gsutil cp target/"pgadapter.jar" "gs://${UBER_JAR_GCS_BUCKET}/${UBER_JAR_GCS_PATH}/${UBER_JAR}"
-  ;;
-docker-configure)
-  gcloud auth configure-docker "${DOCKER_HOSTNAME}" -q
-  ;;
-docker-build)
-  docker build -f "${DOCKERFILE}" -t "${DOCKER_HOSTNAME}/${GOOGLE_CLOUD_PROJECT}/${DOCKER_REPOSITORY}/${DOCKER_IMAGE}" .
-  ;;
-docker-push)
-  docker push "${DOCKER_HOSTNAME}/${GOOGLE_CLOUD_PROJECT}/${DOCKER_REPOSITORY}/${DOCKER_IMAGE}"
-  ;;
 e2e-psql)
   PSQL_VERSION="$2"
   GOOGLE_CLOUD_DATABASE_WITH_VERSION="${GOOGLE_CLOUD_DATABASE}_v${PSQL_VERSION}_${RANDOM}"
