@@ -79,7 +79,7 @@ public class DdlTransactionModeBatchTest extends DdlTransactionModeNoneTest {
   @Test
   public void testMixedBatchDmlFirst() throws SQLException {
     String sql =
-        "INSERT INTO FOO VALUES (1); UPDATE FOO SET BAR=1 WHERE BAZ=2; CREATE TABLE foo (id bigint primary key);";
+        "INSERT INTO FOO VALUES (1);UPDATE FOO SET BAR=1 WHERE BAZ=2;CREATE TABLE foo (id bigint primary key);";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -98,7 +98,7 @@ public class DdlTransactionModeBatchTest extends DdlTransactionModeNoneTest {
 
   @Test
   public void testMixedBatchDqlFirst() throws SQLException {
-    String sql = "SELECT 1; CREATE TABLE foo (id bigint primary key);";
+    String sql = "SELECT 1;CREATE TABLE foo (id bigint primary key);";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -144,7 +144,7 @@ public class DdlTransactionModeBatchTest extends DdlTransactionModeNoneTest {
   @Test
   public void testMixedBatchWithExplicitTransaction() throws SQLException {
     String sql =
-        "BEGIN; INSERT INTO FOO VALUES (1); CREATE TABLE foo (id bigint primary key); COMMIT;";
+        "BEGIN;INSERT INTO FOO VALUES (1);CREATE TABLE foo (id bigint primary key);COMMIT;";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {

@@ -15,18 +15,21 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.api.core.InternalApi;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
+import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
@@ -51,6 +54,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 /**
  * Handles a connection from a client to Spanner. This {@link ConnectionHandler} uses {@link
@@ -83,6 +87,7 @@ public class ConnectionHandler extends Thread {
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
   private Connection spannerConnection;
+  private WellKnownClient wellKnownClient;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
 
   ConnectionHandler(ProxyServer server, Socket socket) {
@@ -100,7 +105,7 @@ public class ConnectionHandler extends Thread {
   }
 
   @InternalApi
-  public void connectToSpanner(String database) {
+  public void connectToSpanner(String database, @Nullable GoogleCredentials credentials) {
     OptionsMetadata options = getServer().getOptions();
     String uri =
         options.hasDefaultConnectionUrl()
@@ -110,6 +115,9 @@ public class ConnectionHandler extends Thread {
       uri = uri.substring("jdbc:".length());
     }
     uri = appendPropertiesToUrl(uri, getServer().getProperties());
+    if (credentials != null) {
+      uri = uri + ";encodedCredentials=";
+    }
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
       uri =
           uri
@@ -128,8 +136,12 @@ public class ConnectionHandler extends Thread {
                 + System.getProperty(CHANNEL_PROVIDER_PROPERTY));
       }
     }
-    ConnectionOptions connectionOptions = ConnectionOptions.newBuilder().setUri(uri).build();
-    Connection spannerConnection = connectionOptions.getConnection();
+    ConnectionOptions.Builder connectionOptionsBuilder = ConnectionOptions.newBuilder().setUri(uri);
+    if (credentials != null) {
+      connectionOptionsBuilder =
+          ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
+    }
+    Connection spannerConnection = connectionOptionsBuilder.build().getConnection();
     try {
       // Note: Calling getDialect() will cause a SpannerException if the connection itself is
       // invalid, for example as a result of the credentials being wrong.
@@ -465,6 +477,14 @@ public class ConnectionHandler extends Thread {
 
   public synchronized void setStatus(ConnectionStatus status) {
     this.status = status;
+  }
+
+  public WellKnownClient getWellKnownClient() {
+    return wellKnownClient;
+  }
+
+  public void setWellKnownClient(WellKnownClient wellKnownClient) {
+    this.wellKnownClient = wellKnownClient;
   }
 
   /** Status of a {@link ConnectionHandler} */

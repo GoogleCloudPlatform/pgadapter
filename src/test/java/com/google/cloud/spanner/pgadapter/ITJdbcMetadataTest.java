@@ -36,7 +36,6 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Types;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -67,18 +66,13 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   public static void setup() {
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
-    testEnv.startPGAdapterServerWithDefaultDatabase(
-        database.getId(), getAdditionalPGAdapterOptions());
+    testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), ImmutableList.of());
   }
 
   @AfterClass
   public static void teardown() {
     testEnv.stopPGAdapterServer();
     testEnv.cleanUp();
-  }
-
-  private static Iterable<String> getAdditionalPGAdapterOptions() {
-    return Collections.singleton("-jdbc");
   }
 
   private static Iterable<String> getDdlStatements() {
