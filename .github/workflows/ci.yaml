@@ -40,7 +40,6 @@ jobs:
     - uses: actions/setup-python@v3
       with:
         python-version: '3.9'
-        cache: 'pip'
     - run: pip install -r ./src/test/python/requirements.txt
     - run: .ci/run-with-credentials.sh units
 

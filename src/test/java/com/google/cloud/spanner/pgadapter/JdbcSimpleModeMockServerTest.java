@@ -121,6 +121,69 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testQueryHint() throws SQLException {
+    String sql = "/* @OPTIMIZER_VERSION=1 */ SELECT 1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(com.google.cloud.spanner.Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(sql, executeRequest.getSql());
+  }
+
+  @Test
+  public void testQueryHintBatch() throws SQLException {
+    String sql =
+        "/* @OPTIMIZER_VERSION=1 */ SELECT 1; /* @OPTIMIZER_VERSION=2 */ SELECT 2 /* This is just a ; comment */";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.of("/* @OPTIMIZER_VERSION=1 */ SELECT 1"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.of(
+                "/* @OPTIMIZER_VERSION=2 */ SELECT 2 /* This is just a ; comment */"),
+            SELECT2_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        assertTrue(statement.execute(sql));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(2L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+        assertEquals(-1, statement.getUpdateCount());
+      }
+    }
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(
+        "/* @OPTIMIZER_VERSION=1 */ SELECT 1",
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+    assertEquals(
+        "/* @OPTIMIZER_VERSION=2 */ SELECT 2 /* This is just a ; comment */",
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1).getSql());
+  }
+
+  @Test
   public void testDml() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
