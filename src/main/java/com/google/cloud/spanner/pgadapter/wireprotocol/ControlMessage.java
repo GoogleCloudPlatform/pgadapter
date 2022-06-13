@@ -23,9 +23,12 @@ import com.google.cloud.spanner.pgadapter.metadata.SendResultSetState;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.EmptyQueryResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireoutput.PortalSuspendedResponse;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,9 +40,29 @@ import java.util.List;
  */
 @InternalApi
 public abstract class ControlMessage extends WireMessage {
+  /**
+   * Token that is used to mark {@link ControlMessage}s that are manually created to execute a
+   * {@link QueryMessage}.
+   */
+  public enum ManuallyCreatedToken {
+    MANUALLY_CREATED_TOKEN
+  }
+
+  private final ManuallyCreatedToken manuallyCreatedToken;
 
   public ControlMessage(ConnectionHandler connection) throws IOException {
     super(connection, connection.getConnectionMetadata().getInputStream().readInt());
+    this.manuallyCreatedToken = null;
+  }
+
+  /** Constructor for manually created Control messages. */
+  protected ControlMessage(ConnectionHandler connection, int length, ManuallyCreatedToken token) {
+    super(connection, length);
+    this.manuallyCreatedToken = token;
+  }
+
+  protected boolean isExtendedProtocol() {
+    return manuallyCreatedToken == null;
   }
 
   /**
@@ -133,16 +156,11 @@ public abstract class ControlMessage extends WireMessage {
   /**
    * Takes an Exception Object and relates its results to the user within the client.
    *
-   * @param e The exception to be related.
+   * @param exception The exception to be related.
    * @throws Exception if there is some issue in the sending of the error messages.
    */
-  protected void handleError(Exception e) throws Exception {
-    new ErrorResponse(this.outputStream, e, State.RaiseException).send(false);
-    if (connection.getSpannerConnection().isInTransaction()) {
-      connection.getSpannerConnection().rollbackAsync();
-      connection.setStatus(ConnectionStatus.TRANSACTION_ABORTED);
-    }
-    this.outputStream.flush();
+  protected void handleError(Exception exception) throws Exception {
+    new ErrorResponse(this.outputStream, exception, State.RaiseException).send(false);
   }
 
   /**
@@ -154,37 +172,40 @@ public abstract class ControlMessage extends WireMessage {
    *
    * <p>NOTE: This method does not flush the output stream.
    */
-  public boolean sendSpannerResult(
-      int resultIndex, IntermediateStatement statement, QueryMode mode, long maxRows)
+  public void sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
-    String command = statement.getCommandTag(resultIndex);
-    switch (statement.getStatementType(resultIndex)) {
+    String command = statement.getCommandTag();
+    if (Strings.isNullOrEmpty(command)) {
+      new EmptyQueryResponse(this.outputStream).send(false);
+      return;
+    }
+
+    switch (statement.getStatementType()) {
       case DDL:
       case CLIENT_SIDE:
         new CommandCompleteResponse(this.outputStream, command).send(false);
-        return false;
+        break;
       case QUERY:
-        SendResultSetState state = sendResultSet(resultIndex, statement, mode, maxRows);
-        statement.setHasMoreData(resultIndex, state.hasMoreRows());
+        SendResultSetState state = sendResultSet(statement, mode, maxRows);
+        statement.setHasMoreData(state.hasMoreRows());
         if (state.hasMoreRows()) {
           new PortalSuspendedResponse(this.outputStream).send(false);
         } else {
-          statement.close(resultIndex);
+          statement.close();
           new CommandCompleteResponse(this.outputStream, "SELECT " + state.getNumberOfRowsSent())
               .send(false);
         }
-        return state.hasMoreRows();
+        break;
       case UPDATE:
         // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
         // inserted. oid used to be the object ID of the inserted row if rows was 1 and the target
         // table had OIDs, but OIDs system columns are not supported anymore; therefore oid is
         // always 0.
-        command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount(resultIndex);
+        command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
         new CommandCompleteResponse(this.outputStream, command).send(false);
-        return false;
+        break;
       default:
-        throw new IllegalStateException(
-            "Unknown statement type: " + statement.getStatement(resultIndex));
+        throw new IllegalStateException("Unknown statement type: " + statement.getStatement());
     }
   }
 
@@ -199,18 +220,15 @@ public abstract class ControlMessage extends WireMessage {
    * @throws com.google.cloud.spanner.SpannerException if traversing the {@link ResultSet} fails.
    */
   public SendResultSetState sendResultSet(
-      int resultIndex, IntermediateStatement describedResult, QueryMode mode, long maxRows)
-      throws Exception {
+      IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
+    Preconditions.checkArgument(
+        describedResult.containsResultSet(), "The statement result must be a result set");
     long rows = 0;
-    boolean hasData = describedResult.isHasMoreData(resultIndex);
-    ResultSet resultSet = describedResult.getStatementResult(resultIndex);
+    ResultSet resultSet = describedResult.getStatementResult().getResultSet();
+    boolean hasData = describedResult.isHasMoreData();
     while (hasData) {
       new DataRowResponse(
-              this.outputStream,
-              resultIndex,
-              describedResult,
-              this.connection.getServer().getOptions(),
-              mode)
+              this.outputStream, describedResult, this.connection.getServer().getOptions(), mode)
           .send(false);
       rows++;
       hasData = resultSet.next();

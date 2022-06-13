@@ -15,19 +15,14 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
-import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -41,7 +36,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.postgresql.core.Oid;
@@ -51,9 +45,6 @@ import org.postgresql.core.Oid;
  */
 @InternalApi
 public class IntermediatePreparedStatement extends IntermediateStatement {
-  private static final Logger logger =
-      Logger.getLogger(IntermediatePreparedStatement.class.getName());
-
   private final String name;
   protected int[] parameterDataTypes;
   protected Statement statement;
@@ -62,8 +53,9 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       ConnectionHandler connectionHandler,
       OptionsMetadata options,
       String name,
-      ParsedStatement parsedStatement) {
-    super(connectionHandler, options, parsedStatement);
+      ParsedStatement parsedStatement,
+      Statement originalStatement) {
+    super(connectionHandler, options, parsedStatement, originalStatement);
     this.name = name;
     this.parameterDataTypes = null;
   }
@@ -93,52 +85,12 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   }
 
   @Override
-  public void execute() {
-    // TODO(230579451): Refactor to use ClientSideStatement information.
-    if (connectionHandler.getStatus() == ConnectionStatus.TRANSACTION_ABORTED) {
-      handleTransactionAborted();
-      return;
-    }
-
+  public void executeAsync(BackendConnection backendConnection) {
     // If the portal has already been described, the statement has already been executed, and we
     // don't need to do that once more.
-    if (getStatementResult(0) == null) {
-      this.executedCount++;
-      try {
-        if (!connection.isInTransaction()
-            // TODO(230579451): Refactor to use ClientSideStatement information.
-            && this.parsedStatement.getType().equals(StatementType.CLIENT_SIDE)
-            && (this.commands.get(0).equals("ROLLBACK") || this.commands.get(0).equals("COMMIT"))) {
-          // TODO(230579929): Return warning that no transaction if connection status == IDLE.
-          connectionHandler.setStatus(ConnectionStatus.IDLE);
-        } else {
-          StatementResult result = connection.execute(this.statement);
-          this.updateResultCount(0, result);
-          connectionHandler.setStatus(
-              connection.isInTransaction() ? ConnectionStatus.TRANSACTION : ConnectionStatus.IDLE);
-        }
-      } catch (SpannerException exception) {
-        handleExecutionExceptionAndTransactionStatus(0, exception);
-      }
-    }
-  }
-
-  private void handleTransactionAborted() {
-    // TODO(230579451): Refactor to use ClientSideStatement information.
-    String command = getCommand(0);
-    if ("COMMIT".equals(command) || "ROLLBACK".equals(command)) {
-      connectionHandler.setStatus(ConnectionStatus.IDLE);
-      // COMMIT rollbacks aborted transaction
-      commandTags.set(0, "ROLLBACK");
-      if (connection.isInTransaction()) {
-        connection.rollback();
-      }
-    } else {
-      handleExecutionException(
-          executedCount,
-          SpannerExceptionFactory.newSpannerException(
-              ErrorCode.INVALID_ARGUMENT, TRANSACTION_ABORTED_ERROR));
-      executedCount++;
+    if (futureStatementResult == null && getStatementResult() == null) {
+      this.executed = true;
+      setFutureStatementResult(backendConnection.execute(parsedStatement, statement));
     }
   }
 
@@ -158,10 +110,14 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       List<Short> resultFormatCodes) {
     IntermediatePortalStatement portal =
         new IntermediatePortalStatement(
-            this.connectionHandler, this.options, name, this.parsedStatement);
+            this.connectionHandler,
+            this.options,
+            name,
+            this.parsedStatement,
+            this.originalStatement);
     portal.setParameterFormatCodes(parameterFormatCodes);
     portal.setResultFormatCodes(resultFormatCodes);
-    Statement.Builder builder = Statement.newBuilder(this.parsedStatement.getSqlWithoutComments());
+    Statement.Builder builder = this.originalStatement.toBuilder();
     for (int index = 0; index < parameters.length; index++) {
       short formatCode = portal.getParameterFormatCode(index);
       int type = this.parseType(parameters, index);
@@ -175,7 +131,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   }
 
   @Override
-  public DescribeMetadata describe() {
+  public DescribeMetadata<?> describe() {
     Set<String> parameters =
         ImmutableSortedSet.<String>orderedBy(Comparator.comparing(o -> o.substring(1)))
             .addAll(PARSER.getQueryParameters(this.parsedStatement.getSqlWithoutComments()))
@@ -194,8 +150,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       } else if (parameters.size() != this.parameterDataTypes.length
           || Arrays.stream(this.parameterDataTypes).anyMatch(p -> p == 0)) {
         // Note: We are only asking the backend to parse the types if there is at least one
-        // parameter
-        // with unspecified type. Otherwise, we will rely on the types given in PARSE.
+        // parameter with unspecified type. Otherwise, we will rely on the types given in PARSE.
 
         // Transform the statement into a select statement that selects the parameters, and then
         // extract the types from the result set metadata.
@@ -203,8 +158,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
         if (selectParamsStatement == null) {
           // The transformation failed. Just rely on the types given in the PARSE message. If the
           // transformation failed because the statement was malformed, the backend will catch that
-          // at
-          // a later stage.
+          // at a later stage.
           describeFailed = true;
           ensureParameterLength(parameters.size());
         } else {
@@ -226,11 +180,9 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
           && (describeFailed || !Strings.isNullOrEmpty(this.name))) {
         // Let the backend analyze the statement if it is a named prepared statement or if the query
         // that was used to determine the parameter types failed, so we can return a reasonable
-        // error
-        // message if the statement is invalid. If it is the unnamed statement or getting the param
-        // types succeeded, we will let the following EXECUTE message handle that, instead of
-        // sending
-        // the statement twice to the backend.
+        // error message if the statement is invalid. If it is the unnamed statement or getting the
+        // param types succeeded, we will let the following EXECUTE message handle that, instead of
+        // sending the statement twice to the backend.
         connection.analyzeUpdate(
             Statement.of(this.parsedStatement.getSqlWithoutComments()), QueryAnalyzeMode.PLAN);
       }
@@ -284,7 +236,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * statement.
    */
   private Statement transformDmlToSelectParams(Set<String> parameters) {
-    switch (getCommand(0)) {
+    switch (getCommand()) {
       case "INSERT":
         return transformInsertToSelectParams(
             this.connection, this.parsedStatement.getSqlWithoutComments(), parameters);

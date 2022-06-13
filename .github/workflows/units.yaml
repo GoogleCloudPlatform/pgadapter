@@ -19,6 +19,15 @@ jobs:
         with:
           go-version: '^1.17.7'
       - run: go version
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.9'
+      - run: python --version
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.9'
+      - run: pip install -r ./src/test/python/requirements.txt
       - run: mvn -B test -Ptest-all
   windows:
     runs-on: windows-latest
@@ -33,4 +42,13 @@ jobs:
           distribution: zulu
           java-version: ${{matrix.java}}
       - run: java -version
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.9'
+      - run: python --version
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.9'
+      - run: pip install -r ./src/test/python/requirements.txt
       - run: mvn -B test

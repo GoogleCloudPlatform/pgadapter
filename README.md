@@ -8,6 +8,9 @@ PGAdapter can be used with the following clients:
 2. `JDBC`: Versions 42.x and higher have __limited support__. See [JDBC support](docs/jdbc.md) for more details.
 3. `pgx`: Version 4.15 and higher have __limited support__. See [pgx support](docs/pgx.md) for more details.
 
+## FAQ
+See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
+
 ## Usage
 PGAdapter can be started both as a Docker container, a standalone process as well as an
 in-process server (the latter is only supported for Java applications).
@@ -145,6 +148,8 @@ The following options are required to run the proxy:
 
 #### Optional
 
+See [DDL Options](docs/ddl.md) for more details for the `-ddl` command line argument.
+
 The following options are optional:
 
 ```    
@@ -159,6 +164,10 @@ The following options are optional:
     using psql from one of these distributions, you either need to use 'psql -h /tmp'
     or change the default Unix domain socket directory used by PGAdapter to '/var/run/postgresql'.
 
+-ddl <ddl-transaction-mode>
+  * Determines the behavior of the proxy when DDL statements are executed in transactions.
+    See DDL options for more information.
+
 -a
   * Use authentication when connecting. Currently authentication is not strictly
     implemented in the proxy layer, as it is expected to be run locally, and
@@ -167,18 +176,6 @@ The following options are optional:
     authenticate. Note that SSL is not included for the same reason that
     authentication logic is not: since all connections are local, sniffing
     traffic should not generally be a concern.
-
--q
-  * PSQL Mode. Use this option when fronting PSQL. This option will incur some
-    performance penalties due to query matching and translation and as such is
-    not recommended for production. It is further not guaranteed to perfectly
-    match PSQL logic. Please only use this mode when using PSQL.
-    
--jdbc
-  * JDBC Mode. Use this option when fronting the native PostgreSQL JDBC driver.
-    This option will inspect queries to look for native JDBC metadata queries and
-    replace these with queries that are suppported by Cloud Spanner PostgreSQL
-    databases.
     
 -c <multi-statementcommand>
     Runs a single command before exiting. This command can be comprised of multiple 

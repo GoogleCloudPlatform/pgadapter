@@ -105,7 +105,7 @@ public abstract class AbstractMockServerTest {
                           .build())
                   .build())
           .build();
-  private static final com.google.spanner.v1.ResultSet SELECT1_RESULTSET =
+  protected static final com.google.spanner.v1.ResultSet SELECT1_RESULTSET =
       com.google.spanner.v1.ResultSet.newBuilder()
           .addRows(
               ListValue.newBuilder()
@@ -113,7 +113,7 @@ public abstract class AbstractMockServerTest {
                   .build())
           .setMetadata(SELECT1_METADATA)
           .build();
-  private static final com.google.spanner.v1.ResultSet SELECT2_RESULTSET =
+  protected static final com.google.spanner.v1.ResultSet SELECT2_RESULTSET =
       com.google.spanner.v1.ResultSet.newBuilder()
           .addRows(
               ListValue.newBuilder()
