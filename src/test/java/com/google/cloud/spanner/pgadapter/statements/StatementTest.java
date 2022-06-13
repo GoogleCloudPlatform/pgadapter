@@ -99,7 +99,8 @@ public class StatementTest {
     String sql = "SELECT * FROM users";
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
+        new IntermediatePortalStatement(
+            connectionHandler, options, "", parse(sql), Statement.of(sql));
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("SELECT", intermediateStatement.getCommand());
@@ -121,7 +122,8 @@ public class StatementTest {
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
+        new IntermediatePortalStatement(
+            connectionHandler, options, "", parse(sql), Statement.of(sql));
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("UPDATE", intermediateStatement.getCommand());
@@ -149,7 +151,8 @@ public class StatementTest {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connection.execute(Statement.of(sql))).thenReturn(statementResult);
     IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
+        new IntermediatePortalStatement(
+            connectionHandler, options, "", parse(sql), Statement.of(sql));
     BackendConnection backendConnection =
         new BackendConnection(connection, DdlTransactionMode.Batch);
 
@@ -179,7 +182,8 @@ public class StatementTest {
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
+        new IntermediatePortalStatement(
+            connectionHandler, options, "", parse(sql), Statement.of(sql));
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("CREATE", intermediateStatement.getCommand());
@@ -203,8 +207,9 @@ public class StatementTest {
 
   @Test
   public void testDescribeBasicStatementThrowsException() {
+    String sql = "SELECT * FROM users";
     IntermediateStatement intermediateStatement =
-        new IntermediateStatement(options, parse("SELECT * FROM users"), connectionHandler);
+        new IntermediateStatement(options, parse(sql), Statement.of(sql), connectionHandler);
 
     assertThrows(IllegalStateException.class, intermediateStatement::describe);
   }
@@ -218,7 +223,8 @@ public class StatementTest {
     when(connection.execute(Statement.of(sql))).thenThrow(thrownException);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
+        new IntermediatePortalStatement(
+            connectionHandler, options, "", parse(sql), Statement.of(sql));
     BackendConnection backendConnection =
         new BackendConnection(connection, DdlTransactionMode.Batch);
 
@@ -248,7 +254,8 @@ public class StatementTest {
         new BackendConnection(connection, DdlTransactionMode.Batch);
 
     IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(connectionHandler, options, "", parse(sqlStatement));
+        new IntermediatePreparedStatement(
+            connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
     intermediateStatement.setParameterDataTypes(parameterDataTypes);
 
     assertEquals(sqlStatement, intermediateStatement.getSql());
@@ -274,7 +281,8 @@ public class StatementTest {
     int[] parameterDataTypes = new int[] {Oid.JSON};
 
     IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(connectionHandler, options, "", parse(sqlStatement));
+        new IntermediatePreparedStatement(
+            connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
     intermediateStatement.setParameterDataTypes(parameterDataTypes);
 
     byte[][] parameters = {"{}".getBytes()};
@@ -292,7 +300,8 @@ public class StatementTest {
         .thenReturn(resultSet);
 
     IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(connectionHandler, options, "", parse(sqlStatement));
+        new IntermediatePreparedStatement(
+            connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
     int[] parameters = new int[3];
     Arrays.fill(parameters, Oid.INT8);
     intermediateStatement.setParameterDataTypes(parameters);
@@ -306,7 +315,8 @@ public class StatementTest {
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
 
     IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(connectionHandler, options, "", parse(sqlStatement));
+        new IntermediatePortalStatement(
+            connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
     BackendConnection backendConnection =
         new BackendConnection(connection, DdlTransactionMode.Batch);
 
@@ -349,7 +359,8 @@ public class StatementTest {
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
 
     IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(connectionHandler, options, "", parse(sqlStatement));
+        new IntermediatePortalStatement(
+            connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
     BackendConnection backendConnection =
         new BackendConnection(connection, DdlTransactionMode.Batch);
 
@@ -387,7 +398,7 @@ public class StatementTest {
     assertEquals(
         "INSERT INTO users (name) VALUES (';;test;;')", simpleQueryStatement.getStatement(0));
     assertEquals(
-        "INSERT INTO users (name1, name2) VALUES ('''''', ';'';')",
+        "/* Comment;; Comment; */INSERT INTO users (name1, name2) VALUES ('''''', ';'';')",
         simpleQueryStatement.getStatement(1));
   }
 
@@ -396,9 +407,10 @@ public class StatementTest {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     setupQueryInformationSchemaResults();
 
+    String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement statement =
         new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"));
+            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
     statement.execute();
 
     byte[] payload = "2 3\n".getBytes();
@@ -421,7 +433,7 @@ public class StatementTest {
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     IntermediateStatement intermediateStatement =
-        new IntermediateStatement(options, parse(sql), connectionHandler);
+        new IntermediateStatement(options, parse(sql), Statement.of(sql), connectionHandler);
 
     assertThrows(
         UnsupportedOperationException.class,
@@ -434,7 +446,7 @@ public class StatementTest {
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     IntermediateStatement intermediateStatement =
-        new IntermediateStatement(options, parse(sql), connectionHandler);
+        new IntermediateStatement(options, parse(sql), Statement.of(sql), connectionHandler);
 
     assertThrows(
         UnsupportedOperationException.class,
@@ -447,7 +459,8 @@ public class StatementTest {
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(connectionHandler, options, "", parse(sql));
+        new IntermediatePortalStatement(
+            connectionHandler, options, "", parse(sql), Statement.of(sql));
     BackendConnection backendConnection =
         new BackendConnection(connection, DdlTransactionMode.Batch);
 

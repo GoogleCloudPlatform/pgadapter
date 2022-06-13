@@ -19,9 +19,12 @@ import static org.junit.Assert.assertEquals;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.common.collect.ImmutableList;
+import com.google.spanner.v1.DatabaseName;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.SessionName;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -77,6 +80,26 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
     for (int i = 0; i < requests.size(); i++) {
       assertEquals(databases.get(i), SessionName.parse(requests.get(i).getSession()).getDatabase());
     }
+  }
+
+  @Test
+  public void testConnectToFullDatabasePath() throws Exception {
+    String databaseName =
+        "projects/full-path-test-project/instances/full-path-test-instance/databases/full-path-test-database";
+    // Note that we need to URL encode the database name as it contains multiple forward slashes.
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl(URLEncoder.encode(databaseName, StandardCharsets.UTF_8.name())))) {
+      connection.createStatement().execute(INSERT1);
+    }
+
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(1, requests.size());
+    SessionName sessionName = SessionName.parse(requests.get(0).getSession());
+    DatabaseName gotDatabaseName =
+        DatabaseName.of(
+            sessionName.getProject(), sessionName.getInstance(), sessionName.getDatabase());
+    assertEquals(DatabaseName.parse(databaseName), gotDatabaseName);
   }
 
   @Test

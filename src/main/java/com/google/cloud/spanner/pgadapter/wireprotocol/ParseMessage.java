@@ -40,7 +40,8 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   public ParseMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.name = this.readString();
-    ParsedStatement parsedStatement = PARSER.parse(Statement.of(this.readString()));
+    Statement originalStatement = Statement.of(this.readString());
+    ParsedStatement parsedStatement = PARSER.parse(originalStatement);
     short numberOfParameters = this.inputStream.readShort();
     this.parameterDataTypes = new int[numberOfParameters];
     for (int i = 0; i < numberOfParameters; i++) {
@@ -48,14 +49,19 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
     }
     this.statement =
         new IntermediatePreparedStatement(
-            connection, connection.getServer().getOptions(), name, parsedStatement);
+            connection,
+            connection.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
     this.statement.setParameterDataTypes(this.parameterDataTypes);
   }
 
   /**
    * Constructor for manually created Parse messages that originate from the simple query protocol.
    */
-  public ParseMessage(ConnectionHandler connection, ParsedStatement parsedStatement) {
+  public ParseMessage(
+      ConnectionHandler connection, ParsedStatement parsedStatement, Statement originalStatement) {
     super(
         connection,
         5 + parsedStatement.getSqlWithoutComments().length(),
@@ -64,7 +70,11 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
     this.parameterDataTypes = new int[0];
     this.statement =
         new IntermediatePreparedStatement(
-            connection, connection.getServer().getOptions(), name, parsedStatement);
+            connection,
+            connection.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
     this.statement.setParameterDataTypes(this.parameterDataTypes);
   }
 
