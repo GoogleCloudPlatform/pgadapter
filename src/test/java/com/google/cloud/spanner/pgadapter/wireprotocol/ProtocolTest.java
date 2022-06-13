@@ -169,7 +169,7 @@ public class ProtocolTest {
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
-    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSqlWithoutComments());
+    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSql());
 
     QueryMessage messageSpy = (QueryMessage) spy(message);
 
@@ -196,7 +196,7 @@ public class ProtocolTest {
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
     assertNotNull(((QueryMessage) message).getSimpleQueryStatement());
-    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSqlWithoutComments());
+    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSql());
   }
 
   @Test
@@ -1211,7 +1211,7 @@ public class ProtocolTest {
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
-    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSqlWithoutComments());
+    assertEquals(expectedSQL, ((QueryMessage) message).getStatement().getSql());
 
     message.send();
 
@@ -1320,8 +1320,9 @@ public class ProtocolTest {
     when(spannerType.next()).thenReturn(true, true, false);
     when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
 
+    String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(connectionHandler, options, parse("COPY keyvalue FROM STDIN;"));
+        new CopyStatement(connectionHandler, options, parse(sql), Statement.of(sql));
     copyStatement.execute();
 
     when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
@@ -1422,9 +1423,10 @@ public class ProtocolTest {
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));
 
+    String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
         new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"));
+            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
     copyStatement.execute();
 
     MutationWriter mw = copyStatement.getMutationWriter();
@@ -1443,9 +1445,10 @@ public class ProtocolTest {
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
 
+    String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
         new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"));
+            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
 
     assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
@@ -1475,9 +1478,10 @@ public class ProtocolTest {
 
     byte[] payload = "1\t'one'\n2".getBytes();
 
+    String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
         new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"));
+            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
 
     assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
@@ -1507,9 +1511,10 @@ public class ProtocolTest {
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/test-copy-output.txt"));
 
+    String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
         new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse("COPY keyvalue FROM STDIN;"));
+            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
     assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
     assertTrue(copyStatement.isExecuted());
@@ -1549,8 +1554,9 @@ public class ProtocolTest {
       assertTrue(outputFile.delete());
     }
 
+    String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(connectionHandler, options, parse("COPY keyvalue FROM STDIN;"));
+        new CopyStatement(connectionHandler, options, parse(sql), Statement.of(sql));
     assertFalse(copyStatement.isExecuted());
     copyStatement.execute();
     assertTrue(copyStatement.isExecuted());
