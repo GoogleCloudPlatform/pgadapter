@@ -27,6 +27,7 @@ import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandle
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
@@ -83,6 +84,7 @@ public class ConnectionHandler extends Thread {
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
   private Connection spannerConnection;
+  private WellKnownClient wellKnownClient;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
 
   ConnectionHandler(ProxyServer server, Socket socket) {
@@ -465,6 +467,14 @@ public class ConnectionHandler extends Thread {
 
   public synchronized void setStatus(ConnectionStatus status) {
     this.status = status;
+  }
+
+  public WellKnownClient getWellKnownClient() {
+    return wellKnownClient;
+  }
+
+  public void setWellKnownClient(WellKnownClient wellKnownClient) {
+    this.wellKnownClient = wellKnownClient;
   }
 
   /** Status of a {@link ConnectionHandler} */

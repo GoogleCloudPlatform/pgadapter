@@ -23,6 +23,7 @@ import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.commands.Command;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
@@ -66,10 +67,13 @@ public class SimpleQueryStatement {
     // Do a Parse-Describe-Bind-Execute round-trip for each statement in the query string.
     // Finish with a Sync to close any implicit transaction and to return the results.
     for (ParsedStatement statement : this.statements) {
-      if (options.requiresMatcher()) {
+      if (options.requiresMatcher()
+          || connectionHandler.getWellKnownClient() == WellKnownClient.PSQL) {
         statement = translatePotentialMetadataCommand(statement, connectionHandler);
       }
-      statement = replaceKnownUnsupportedQueries(this.options, statement);
+      statement =
+          replaceKnownUnsupportedQueries(
+              this.connectionHandler.getWellKnownClient(), this.options, statement);
       new ParseMessage(connectionHandler, statement).send();
       new BindMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
       new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
@@ -80,8 +84,8 @@ public class SimpleQueryStatement {
 
   /** Replaces any known unsupported query (e.g. JDBC metadata queries). */
   static ParsedStatement replaceKnownUnsupportedQueries(
-      OptionsMetadata options, ParsedStatement parsedStatement) {
-    if (options.isReplaceJdbcMetadataQueries()
+      WellKnownClient client, OptionsMetadata options, ParsedStatement parsedStatement) {
+    if ((options.isReplaceJdbcMetadataQueries() || client == WellKnownClient.JDBC)
         && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(
             parsedStatement.getSqlWithoutComments())) {
       return PARSER.parse(
