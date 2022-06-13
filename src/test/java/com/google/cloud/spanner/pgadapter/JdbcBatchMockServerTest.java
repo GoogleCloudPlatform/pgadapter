@@ -78,8 +78,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // Statement#execute(String) returns false if the result is an update count or no result.
-        assertFalse(
-            statement.execute(String.format("%s; %s;", INSERT_STATEMENT, UPDATE_STATEMENT)));
+        assertFalse(statement.execute(String.format("%s;%s;", INSERT_STATEMENT, UPDATE_STATEMENT)));
 
         // Note that we have sent two DML statements to the database in one string. These should be
         // treated as separate statements, and there should therefore be two results coming back
@@ -116,11 +115,11 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testBatchInActiveTransaction() throws SQLException {
-    String sql = String.format("%s; %s; %s;", INSERT_STATEMENT, "COMMIT", SELECT2);
+    String sql = String.format("%s;%s;%s;", INSERT_STATEMENT, "COMMIT", SELECT2);
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // Start an explicit transaction before executing batch
-        assertFalse(statement.execute("BEGIN; SELECT 1"));
+        assertFalse(statement.execute("BEGIN;SELECT 1"));
         assertEquals(0, statement.getUpdateCount());
 
         assertTrue(statement.getMoreResults());
@@ -173,7 +172,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
         SQLException exception =
             assertThrows(
                 SQLException.class,
-                () -> statement.execute(String.format("%s; %s;", INSERT_STATEMENT, INVALID_DML)));
+                () -> statement.execute(String.format("%s;%s;", INSERT_STATEMENT, INVALID_DML)));
         assertTrue(exception.getMessage().contains("INVALID_ARGUMENT: Statement is invalid."));
       }
     }
@@ -196,8 +195,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
   public void testErrorHandlingInExplicitTransactionWithCommit() throws SQLException {
     String sql =
         String.format(
-            "%s; %s; %s; %s; %s;",
-            INSERT_STATEMENT, "BEGIN", UPDATE_STATEMENT, INVALID_DML, "COMMIT");
+            "%s;%s;%s;%s;%s;", INSERT_STATEMENT, "BEGIN", UPDATE_STATEMENT, INVALID_DML, "COMMIT");
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
@@ -245,7 +243,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
   @Test
   public void testErrorHandlingInExplicitTransactionWithoutCommit() throws SQLException {
     String sql =
-        String.format("%s; %s; %s; %s;", INSERT_STATEMENT, "BEGIN", UPDATE_STATEMENT, INVALID_DML);
+        String.format("%s;%s;%s;%s;", INSERT_STATEMENT, "BEGIN", UPDATE_STATEMENT, INVALID_DML);
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
@@ -282,8 +280,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
   public void testErrorHandlingOfDmlBatchAfterCommit() throws SQLException {
     String sql =
         String.format(
-            "%s; %s; %s; %s; %s;",
-            INSERT_STATEMENT, "COMMIT", UPDATE_STATEMENT, INVALID_DML, SELECT1);
+            "%s;%s;%s;%s;%s;", INSERT_STATEMENT, "COMMIT", UPDATE_STATEMENT, INVALID_DML, SELECT1);
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
@@ -313,7 +310,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
   public void testErrorHandlingInImplicitTransaction() throws SQLException {
     String sql =
         String.format(
-            "%s; %s; %s; %s; %s;", INSERT_STATEMENT, "COMMIT", SELECT1, INVALID_SELECT, SELECT2);
+            "%s;%s;%s;%s;%s;", INSERT_STATEMENT, "COMMIT", SELECT1, INVALID_SELECT, SELECT2);
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
@@ -358,7 +355,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // Statement#execute(String) returns true if the result is a result set.
-        assertTrue(statement.execute("SELECT 1; SELECT 2;"));
+        assertTrue(statement.execute("SELECT 1;SELECT 2;"));
 
         try (ResultSet resultSet = statement.getResultSet()) {
           assertTrue(resultSet.next());
@@ -401,7 +398,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // batch a BEGIN [TRANSACTION] statement together with an update statement.
-        assertFalse(statement.execute(String.format("BEGIN; %s;", UPDATE_STATEMENT)));
+        assertFalse(statement.execute(String.format("BEGIN;%s;", UPDATE_STATEMENT)));
         assertEquals(0, statement.getUpdateCount());
 
         assertFalse(statement.getMoreResults());
@@ -438,7 +435,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
   @Test
   public void testTransactionStatementsInBatch() throws SQLException {
     String sql =
-        "BEGIN TRANSACTION; INSERT INTO FOO VALUES (1); UPDATE FOO SET BAR=1 WHERE BAZ=2; COMMIT;";
+        "BEGIN TRANSACTION;INSERT INTO FOO VALUES (1);UPDATE FOO SET BAR=1 WHERE BAZ=2;COMMIT;";
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
         // Send a complete transaction as a single batch.
@@ -478,11 +475,11 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
   @Test
   public void testBeginInExplicitTransaction() throws SQLException {
     String sql =
-        "BEGIN TRANSACTION; INSERT INTO FOO VALUES (1); UPDATE FOO SET BAR=1 WHERE BAZ=2; COMMIT;";
+        "BEGIN TRANSACTION;INSERT INTO FOO VALUES (1);UPDATE FOO SET BAR=1 WHERE BAZ=2;COMMIT;";
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // Start an explicit transaction before executing batch
-        assertFalse(statement.execute("BEGIN; SELECT 1"));
+        assertFalse(statement.execute("BEGIN;SELECT 1"));
         assertEquals(0, statement.getUpdateCount());
 
         assertTrue(statement.getMoreResults());
@@ -530,7 +527,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testSelectAtStartOfBatch() throws SQLException {
-    String sql = "SELECT 1; INSERT INTO FOO VALUES (1); SELECT 2;";
+    String sql = "SELECT 1;INSERT INTO FOO VALUES (1);SELECT 2;";
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
         assertTrue(statement.execute(sql));
