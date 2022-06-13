@@ -610,17 +610,19 @@ public class OptionsMetadata {
   }
 
   static void printDeprecatedWarnings(CommandLine commandLine) {
-    if (commandLine.hasOption(OPTION_PSQL_MODE)) {
-      System.out.printf(
-          "It is no longer necessary to add psql mode (-%s) to the command line arguments.\n"
-              + "PGAdapter now automatically recognizes connections from psql.\n",
-          OPTION_PSQL_MODE);
-    }
-    if (commandLine.hasOption(OPTION_JDBC_MODE)) {
-      System.out.printf(
-          "It is no longer necessary to add JDBC mode (-%s) to the command line arguments.\n"
-              + "PGAdapter now automatically recognizes connections from the PostgreSQL JDBC driver.\n",
-          OPTION_JDBC_MODE);
+    if (!commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT)) {
+      if (commandLine.hasOption(OPTION_PSQL_MODE)) {
+        System.out.printf(
+            "It is no longer necessary to add psql mode (-%s) to the command line arguments.\n"
+                + "PGAdapter now automatically recognizes connections from psql.\n",
+            OPTION_PSQL_MODE);
+      }
+      if (commandLine.hasOption(OPTION_JDBC_MODE)) {
+        System.out.printf(
+            "It is no longer necessary to add JDBC mode (-%s) to the command line arguments.\n"
+                + "PGAdapter now automatically recognizes connections from the PostgreSQL JDBC driver.\n",
+            OPTION_JDBC_MODE);
+      }
     }
   }
 
