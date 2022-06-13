@@ -14,13 +14,19 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import static com.google.cloud.spanner.pgadapter.utils.StatementParser.singleQuoteEscape;
 import static com.google.cloud.spanner.pgadapter.utils.StatementParser.skipDollarQuotedString;
 import static com.google.cloud.spanner.pgadapter.utils.StatementParser.skipMultiLineComment;
 import static com.google.cloud.spanner.pgadapter.utils.StatementParser.skipQuotedString;
 import static com.google.cloud.spanner.pgadapter.utils.StatementParser.skipSingleLineComment;
 import static com.google.cloud.spanner.pgadapter.utils.StatementParser.splitStatements;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -28,6 +34,134 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class StatementParserTest {
+  private final AbstractStatementParser parser =
+      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+
+  @Test
+  public void testRemoveCommentsAndTrim() {
+
+    String sqlStatement = "-- This is a one line comment\nSELECT * FROM FOO";
+    String expectedResult = "SELECT * FROM FOO";
+    String result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, expectedResult);
+
+    sqlStatement = "/* This is a simple multi line comment */\nSELECT * FROM FOO";
+    expectedResult = "SELECT * FROM FOO";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, expectedResult);
+
+    sqlStatement = "/* This is a \nmulti line comment */\nSELECT * FROM FOO";
+    expectedResult = "SELECT * FROM FOO";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, expectedResult);
+
+    sqlStatement = "/* This\nis\na\nmulti\nline\ncomment */\nSELECT * FROM FOO";
+    expectedResult = "SELECT * FROM FOO";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, expectedResult);
+
+    sqlStatement =
+        "/*\n"
+            + " * Script for testing invalid/unrecognized statements\n"
+            + " */\n"
+            + "\n"
+            + "-- MERGE into test comment MERGE -- \n"
+            + "@EXPECT EXCEPTION INVALID_ARGUMENT 'INVALID_ARGUMENT: Unknown statement'\n"
+            + "MERGE INTO Singers s\n"
+            + "/*** test ****/"
+            + "USING (VALUES (1, 'John', 'Doe')) v\n"
+            + "ON v.column1 = s.SingerId\n"
+            + "WHEN NOT MATCHED \n"
+            + "  INSERT VALUES (v.column1, v.column2, v.column3)\n"
+            + "WHEN MATCHED\n"
+            + "  UPDATE SET FirstName = v.column2,\n"
+            + "             LastName = v.column3;";
+    expectedResult =
+        "@EXPECT EXCEPTION INVALID_ARGUMENT 'INVALID_ARGUMENT: Unknown statement'\n"
+            + "MERGE INTO Singers s\n"
+            + "USING (VALUES (1, 'John', 'Doe')) v\n"
+            + "ON v.column1 = s.SingerId\n"
+            + "WHEN NOT MATCHED \n"
+            + "  INSERT VALUES (v.column1, v.column2, v.column3)\n"
+            + "WHEN MATCHED\n"
+            + "  UPDATE SET FirstName = v.column2,\n"
+            + "             LastName = v.column3";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, expectedResult);
+
+    // Dollar Quoted
+    sqlStatement = "$$--foo$$";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, sqlStatement);
+
+    sqlStatement = "$$\nline 1\n--line2$$";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, sqlStatement);
+
+    sqlStatement = "$bar$--foo$bar$";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, sqlStatement);
+
+    sqlStatement = "SELECT FOO$BAR FROM SOME_TABLE";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, sqlStatement);
+
+    sqlStatement = "SELECT FOO$BAR -- This is a comment\nFROM SOME_TABLE";
+    expectedResult = "SELECT FOO$BAR \nFROM SOME_TABLE";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, expectedResult);
+
+    // Embedded Comments
+    sqlStatement =
+        "/* This is a comment /* This is an embedded comment */ This is after the embedded comment */ SELECT 1";
+    expectedResult = "SELECT 1";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, expectedResult);
+
+    // No effect HashTag Comment
+    sqlStatement = "# this is a comment\nselect * from foo";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, sqlStatement);
+
+    sqlStatement = "select *\nfrom foo # this is a comment\nwhere bar=1";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, sqlStatement);
+
+    // When parameters are mixed with dollar-quoted string
+    sqlStatement = "$1 $$?it$?s$$ $2";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, sqlStatement);
+
+    sqlStatement = "$1 $tag$?it$$?s$tag$ $2";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, sqlStatement);
+
+    sqlStatement = "$1 $$?it\\'?s \n ?it\\'?s$$ $2";
+    result = parser.removeCommentsAndTrim(sqlStatement);
+    assertEquals(result, sqlStatement);
+  }
+
+  @Test
+  public void testRemoveCommentsAndTrimWithUnterminatedComment() {
+    String sqlStatement =
+        "/* This is a comment /* This is still a comment */ this is unterminated SELECT 1";
+    SpannerException exception =
+        assertThrows(SpannerException.class, () -> parser.removeCommentsAndTrim(sqlStatement));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
+    assertEquals(
+        "INVALID_ARGUMENT: SQL statement contains an unterminated block comment: /* This is a comment /* This is still a comment */ this is unterminated SELECT 1",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testEscapes() {
+    String sql = "Bobby\\'O\\'Bob'; DROP TABLE USERS; select'";
+    String expectedSql = "Bobby\\''O\\''Bob''; DROP TABLE USERS; select''";
+    assertEquals(expectedSql, singleQuoteEscape(sql));
+
+    assertEquals("''test''", singleQuoteEscape("'test'"));
+    assertEquals("''''test''''", singleQuoteEscape("''test''"));
+  }
 
   @Test
   public void testSkipQuotedString() {
@@ -94,6 +228,27 @@ public class StatementParserTest {
 
     assertEquals(ImmutableList.of("select 1", "select 2"), splitStatements("select 1; select 2"));
     assertEquals(ImmutableList.of("select 1", "select 2"), splitStatements("select 1; select 2;"));
+
+    assertEquals(ImmutableList.of("select 1 -- Comment"), splitStatements("select 1 -- Comment"));
+    assertEquals(
+        ImmutableList.of("-- Comment \nselect 1"), splitStatements("-- Comment \nselect 1"));
+    assertEquals(
+        ImmutableList.of("select 1 --; select 2", "select 3"),
+        splitStatements("select 1 --; select 2\n;select 3"));
+    assertEquals(
+        ImmutableList.of("-- select 1;\nselect 2", "select 3"),
+        splitStatements("-- select 1;\nselect 2;select 3"));
+
+    assertEquals(
+        ImmutableList.of("select 1 /* Comment */"), splitStatements("select 1 /* Comment */"));
+    assertEquals(
+        ImmutableList.of("/* Comment */ select 1"), splitStatements("/* Comment */ select 1"));
+    assertEquals(
+        ImmutableList.of("select 1 /*; select 2 */", "select 3"),
+        splitStatements("select 1 /*; select 2 */;select 3"));
+    assertEquals(
+        ImmutableList.of("/* select 1; */select 2", "select 3"),
+        splitStatements("/* select 1; */select 2;select 3"));
 
     assertEquals(
         ImmutableList.of("select 'Hello World!'"), splitStatements("select 'Hello World!'"));
