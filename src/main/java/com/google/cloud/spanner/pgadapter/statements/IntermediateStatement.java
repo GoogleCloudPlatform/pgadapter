@@ -73,7 +73,8 @@ public class IntermediateStatement {
     this.connectionHandler = connectionHandler;
     this.options = options;
     ParsedStatement potentiallyReplacedStatement =
-        SimpleQueryStatement.replaceKnownUnsupportedQueries(this.options, parsedStatement);
+        SimpleQueryStatement.replaceKnownUnsupportedQueries(
+            this.connectionHandler.getWellKnownClient(), this.options, parsedStatement);
     // Check if we need to create a new 'original' statement. The original statement is what will be
     // sent to Cloud Spanner, as the statement might include query hints in comments.
     if (potentiallyReplacedStatement == parsedStatement) {

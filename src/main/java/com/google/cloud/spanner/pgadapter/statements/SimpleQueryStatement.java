@@ -25,6 +25,7 @@ import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.commands.Command;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
@@ -64,10 +65,13 @@ public class SimpleQueryStatement {
     for (Statement originalStatement : this.statements) {
       ParsedStatement originalParsedStatement = PARSER.parse(originalStatement);
       ParsedStatement parsedStatement = originalParsedStatement;
-      if (options.requiresMatcher()) {
+      if (options.requiresMatcher()
+          || connectionHandler.getWellKnownClient() == WellKnownClient.PSQL) {
         parsedStatement = translatePotentialMetadataCommand(parsedStatement, connectionHandler);
       }
-      parsedStatement = replaceKnownUnsupportedQueries(this.options, parsedStatement);
+      parsedStatement =
+          replaceKnownUnsupportedQueries(
+              this.connectionHandler.getWellKnownClient(), this.options, parsedStatement);
       if (parsedStatement != originalParsedStatement) {
         // The original statement was replaced.
         originalStatement = Statement.of(parsedStatement.getSqlWithoutComments());
@@ -82,8 +86,8 @@ public class SimpleQueryStatement {
 
   /** Replaces any known unsupported query (e.g. JDBC metadata queries). */
   static ParsedStatement replaceKnownUnsupportedQueries(
-      OptionsMetadata options, ParsedStatement parsedStatement) {
-    if (options.isReplaceJdbcMetadataQueries()
+      WellKnownClient client, OptionsMetadata options, ParsedStatement parsedStatement) {
+    if ((options.isReplaceJdbcMetadataQueries() || client == WellKnownClient.JDBC)
         && JdbcMetadataStatementHelper.isPotentialJdbcMetadataStatement(
             parsedStatement.getSqlWithoutComments())) {
       return PARSER.parse(
