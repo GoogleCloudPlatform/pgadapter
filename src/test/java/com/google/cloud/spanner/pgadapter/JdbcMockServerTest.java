@@ -33,6 +33,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedTy
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
@@ -124,6 +125,26 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertTrue(request.getTransaction().hasSingleUse());
       assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
     }
+  }
+
+  @Test
+  public void testQueryHint() throws SQLException {
+    String sql = "/* @OPTIMIZER_VERSION=1 */ SELECT 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(sql, executeRequest.getSql());
   }
 
   @Test
@@ -258,6 +279,56 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
       mockSpanner.clearRequests();
     }
+  }
+
+  @Test
+  public void testQueryWithNonExistingTable() throws SQLException {
+    String sql = "select * from non_existing_table where id=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql),
+            Status.NOT_FOUND
+                .withDescription("Table non_existing_table not found")
+                .asRuntimeException()));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        SQLException exception = assertThrows(SQLException.class, preparedStatement::executeQuery);
+        assertTrue(
+            exception.getMessage(),
+            exception.getMessage().contains("Table non_existing_table not found"));
+      }
+    }
+
+    // PGAdapter tries to execute the query directly when describing the portal, so we receive one
+    // ExecuteSqlRequest in normal execute mode.
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(1, requests.size());
+    assertEquals(sql, requests.get(0).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(0).getQueryMode());
+  }
+
+  @Test
+  public void testDmlWithNonExistingTable() throws SQLException {
+    String sql = "update non_existing_table set value=$2 where id=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql),
+            Status.NOT_FOUND
+                .withDescription("Table non_existing_table not found")
+                .asRuntimeException()));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        SQLException exception = assertThrows(SQLException.class, preparedStatement::executeUpdate);
+        assertTrue(
+            exception.getMessage(),
+            exception.getMessage().contains("Table non_existing_table not found"));
+      }
+    }
+
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(1, requests.size());
+    assertEquals(sql, requests.get(0).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(0).getQueryMode());
   }
 
   @Test
@@ -419,8 +490,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         // The PG JDBC driver will internally split the following SQL string into two statements and
         // execute these sequentially. We still get the results back as if they were executed as one
         // batch on the same statement.
-        assertFalse(
-            statement.execute(String.format("%s; %s;", INSERT_STATEMENT, UPDATE_STATEMENT)));
+        assertFalse(statement.execute(String.format("%s;%s;", INSERT_STATEMENT, UPDATE_STATEMENT)));
 
         // Note that we have sent two DML statements to the database in one string. These should be
         // treated as separate statements, and there should therefore be two results coming back
@@ -443,12 +513,14 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
 
     // The DML statements are split by the JDBC driver and sent as separate statements to PgAdapter.
-    // PgAdapter therefore also simply executes these as separate DML statements.
-    assertTrue(mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).isEmpty());
-    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(2, requests.size());
-    assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
-    assertEquals(UPDATE_STATEMENT.getSql(), requests.get(1).getSql());
+    // The Sync message is however sent after the second DML statement, which means that PGAdapter
+    // is able to batch these together into one ExecuteBatchDml statement.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
+    assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
   }
 
   @Test
@@ -465,15 +537,15 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
     }
 
-    // The PostgreSQL JDBC driver will send the DML statements as separated statements to PG when
-    // executing a batch using simple mode. This means that Spanner will receive two separate DML
-    // requests.
-    assertTrue(mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).isEmpty());
-    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-
-    assertEquals(2, requests.size());
-    assertEquals(INSERT_STATEMENT.getSql(), requests.get(0).getSql());
-    assertEquals(UPDATE_STATEMENT.getSql(), requests.get(1).getSql());
+    // The PostgreSQL JDBC driver will send the DML statements as separated statements to PG, but it
+    // will only send a Sync after the second statement. This means that PGAdapter is able to batch
+    // these together in one ExecuteBatchDml request.
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
+    assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
   }
 
   @Test
@@ -481,7 +553,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // Statement#execute(String) returns true if the result is a result set.
-        assertTrue(statement.execute("SELECT 1; SELECT 2;"));
+        assertTrue(statement.execute("SELECT 1;SELECT 2;"));
 
         try (ResultSet resultSet = statement.getResultSet()) {
           assertTrue(resultSet.next());
@@ -528,6 +600,37 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(1, updateDatabaseDdlRequests.size());
     assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
     assertEquals(sql, updateDatabaseDdlRequests.get(0).getStatements(0));
+  }
+
+  @Test
+  public void testDdlBatch() throws SQLException {
+    ImmutableList<String> statements =
+        ImmutableList.of(
+            "CREATE TABLE foo (id bigint primary key)",
+            "CREATE TABLE bar (id bigint primary key, value text)",
+            "CREATE INDEX idx_foo ON bar (text)");
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        for (String sql : statements) {
+          statement.addBatch(sql);
+        }
+        int[] updateCounts = statement.executeBatch();
+        assertArrayEquals(new int[] {0, 0, 0}, updateCounts);
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(3, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    for (int i = 0; i < statements.size(); i++) {
+      assertEquals(statements.get(i), updateDatabaseDdlRequests.get(0).getStatements(i));
+    }
   }
 
   @Test

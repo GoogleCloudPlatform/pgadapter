@@ -36,7 +36,6 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Types;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -53,11 +52,11 @@ import org.junit.runners.JUnit4;
 public class ITJdbcMetadataTest implements IntegrationTest {
   private static final String[] VERSIONS =
       new String[] {
-        "42.3.3", "42.3.2", "42.3.1", "42.3.0", "42.2.25", "42.2.24", "42.2.23", "42.2.22",
-        "42.2.21", "42.2.20", "42.2.19", "42.2.18", "42.2.17", "42.2.16", "42.2.15", "42.2.14",
-        "42.2.13", "42.2.12", "42.2.11", "42.2.10", "42.2.9", "42.2.8", "42.2.7", "42.2.6",
-        "42.2.5", "42.2.4", "42.2.3", "42.2.2", "42.2.1", "42.2.0", "42.1.4", "42.1.3", "42.1.2",
-        "42.1.1", "42.1.0", "42.0.0"
+        "42.3.6", "42.3.5", "42.3.4", "42.3.3", "42.3.2", "42.3.1", "42.3.0", "42.2.25", "42.2.24",
+        "42.2.23", "42.2.22", "42.2.21", "42.2.20", "42.2.19", "42.2.18", "42.2.17", "42.2.16",
+        "42.2.15", "42.2.14", "42.2.13", "42.2.12", "42.2.11", "42.2.10", "42.2.9", "42.2.8",
+        "42.2.7", "42.2.6", "42.2.5", "42.2.4", "42.2.3", "42.2.2", "42.2.1", "42.2.0", "42.1.4",
+        "42.1.3", "42.1.2", "42.1.1", "42.1.0", "42.0.0"
       };
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
@@ -67,18 +66,13 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   public static void setup() {
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
-    testEnv.startPGAdapterServerWithDefaultDatabase(
-        database.getId(), getAdditionalPGAdapterOptions());
+    testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), ImmutableList.of());
   }
 
   @AfterClass
   public static void teardown() {
     testEnv.stopPGAdapterServer();
     testEnv.cleanUp();
-  }
-
-  private static Iterable<String> getAdditionalPGAdapterOptions() {
-    return Collections.singleton("-jdbc");
   }
 
   private static Iterable<String> getDdlStatements() {

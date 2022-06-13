@@ -14,18 +14,28 @@
 
 package com.google.cloud.spanner.pgadapter.golang;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Key;
+import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -45,9 +55,26 @@ public class ITPgxTest implements IntegrationTest {
 
   @Parameter public String preferQueryMode;
 
-  @Parameters(name = "preferQueryMode = {0}")
-  public static Object[] data() {
-    return new Object[] {"extended", "simple"};
+  @Parameter(1)
+  public boolean useDomainSocket;
+
+  @Parameters(name = "preferQueryMode = {0}, useDomainSocket = {1}")
+  public static List<Object[]> data() {
+    OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
+    boolean[] useDomainSockets;
+    if (options.isDomainSocketEnabled()) {
+      useDomainSockets = new boolean[] {true, false};
+    } else {
+      useDomainSockets = new boolean[] {false};
+    }
+    String[] queryModes = {"extended", "simple"};
+    List<Object[]> parameters = new ArrayList<>();
+    for (String queryMode : queryModes) {
+      for (boolean useDomainSocket : useDomainSockets) {
+        parameters.add(new Object[] {queryMode, useDomainSocket});
+      }
+    }
+    return parameters;
   }
 
   @BeforeClass
@@ -80,6 +107,12 @@ public class ITPgxTest implements IntegrationTest {
   }
 
   private GoString createConnString() {
+    if (useDomainSocket) {
+      return new GoString(
+          String.format(
+              "host=/tmp port=%d prefer_simple_protocol=%s",
+              testEnv.getServer().getLocalPort(), preferQueryMode.equals("simple")));
+    }
     return new GoString(
         String.format(
             "postgres://uid:pwd@localhost:%d/?sslmode=disable&prefer_simple_protocol=%s",
@@ -152,5 +185,63 @@ public class ITPgxTest implements IntegrationTest {
         databaseId, Collections.singletonList(Mutation.delete("all_types", Key.of(100L))));
 
     assertNull(pgxTest.TestInsertNullsAllDataTypes(createConnString()));
+  }
+
+  @Test
+  public void testInsertBatch() {
+    // Make sure the table is empty before we execute the test.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(
+        databaseId, Collections.singletonList(Mutation.delete("all_types", KeySet.all())));
+    DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM all_types"))) {
+      assertTrue(resultSet.next());
+      assertEquals(0L, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
+
+    assertNull(pgxTest.TestInsertBatch(createConnString()));
+
+    final long batchSize = 10L;
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM all_types"))) {
+      assertTrue(resultSet.next());
+      assertEquals(batchSize, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
+  }
+
+  @Test
+  public void testMixedBatch() {
+    // Make sure the table is empty before we execute the test.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(
+        databaseId, Collections.singletonList(Mutation.delete("all_types", KeySet.all())));
+    DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM all_types"))) {
+      assertTrue(resultSet.next());
+      assertEquals(0L, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
+
+    assertNull(pgxTest.TestMixedBatch(createConnString()));
+
+    final long batchSize = 5L;
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM all_types"))) {
+      assertTrue(resultSet.next());
+      assertEquals(batchSize, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
+    try (ResultSet resultSet =
+        client
+            .singleUse()
+            .executeQuery(Statement.of("SELECT COUNT(*) FROM all_types WHERE col_bool=true"))) {
+      assertTrue(resultSet.next());
+      assertEquals(0L, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
   }
 }

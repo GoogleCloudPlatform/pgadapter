@@ -16,8 +16,10 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
+import com.google.common.collect.ImmutableList;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.List;
@@ -28,17 +30,17 @@ import java.util.List;
  * unless it fails.
  */
 @InternalApi
-public class BindMessage extends ControlMessage {
-
+public class BindMessage extends AbstractQueryProtocolMessage {
   protected static final char IDENTIFIER = 'B';
 
-  private String portalName;
-  private String statementName;
-  private List<Short> formatCodes;
-  private List<Short> resultFormatCodes;
-  private byte[][] parameters;
-  private IntermediatePreparedStatement statement;
+  private final String portalName;
+  private final String statementName;
+  private final List<Short> formatCodes;
+  private final List<Short> resultFormatCodes;
+  private final byte[][] parameters;
+  private final IntermediatePreparedStatement statement;
 
+  /** Constructor for Bind messages that are received from the front-end. */
   public BindMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.portalName = this.readString();
@@ -49,18 +51,32 @@ public class BindMessage extends ControlMessage {
     this.statement = connection.getStatement(this.statementName);
   }
 
-  /**
-   * Given the prepared statement, bind it and save it locally.
-   *
-   * @throws Exception If the binding fails.
-   */
+  /** Constructor for Bind messages that are constructed to execute a Query message. */
+  public BindMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
+    super(connection, 4, manuallyCreatedToken);
+    this.portalName = "";
+    this.statementName = "";
+    this.formatCodes = ImmutableList.of();
+    this.resultFormatCodes = ImmutableList.of();
+    this.parameters = new byte[0][];
+    this.statement = connection.getStatement("");
+  }
+
+  /** Given the prepared statement, bind it and save it locally. */
   @Override
-  protected void sendPayload() throws Exception {
+  void buffer(BackendConnection backendConnection) {
     this.connection.registerPortal(
         this.portalName,
         this.statement.bind(
             this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes));
-    new BindCompleteResponse(this.outputStream).send();
+  }
+
+  @Override
+  public void flush() throws Exception {
+    // The simple query protocol does not expect a BindComplete response.
+    if (isExtendedProtocol()) {
+      new BindCompleteResponse(this.outputStream).send();
+    }
   }
 
   @Override

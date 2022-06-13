@@ -15,10 +15,15 @@
 package com.google.cloud.spanner.pgadapter.metadata;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.pgadapter.Server;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.spanner.v1.DatabaseName;
+import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -61,13 +66,15 @@ public class OptionsMetadata {
   private static final String DEFAULT_USER_AGENT = "pg-adapter";
 
   private static final String OPTION_SERVER_PORT = "s";
-  private static final String OPTION_SOCKET_FILE = "f";
+  private static final String OPTION_SOCKET_DIR = "dir";
+  private static final String OPTION_MAX_BACKLOG = "max_backlog";
   private static final String OPTION_PROJECT_ID = "p";
   private static final String OPTION_INSTANCE_ID = "i";
   private static final String OPTION_DATABASE_NAME = "d";
   private static final String OPTION_CREDENTIALS_FILE = "c";
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
+  private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
   private static final String OPTION_PSQL_MODE = "q";
   private static final String OPTION_DDL_TRANSACTION_MODE = "ddl";
   private static final String OPTION_JDBC_MODE = "jdbc";
@@ -78,7 +85,9 @@ public class OptionsMetadata {
   private static final String OPTION_HELP = "h";
   private static final String DEFAULT_PORT = "5432";
   private static final int MIN_PORT = 0, MAX_PORT = 65535;
-  private static final String DEFAULT_SOCKET_FILE = "/tmp/.s.PGSQL.%d";
+  private static final String DEFAULT_SOCKET_DIR = "/tmp";
+  private static final String SOCKET_FILE_NAME = ".s.PGSQL.%d";
+  private static final int DEFAULT_MAX_BACKLOG = 1000;
   /*Note: this is a private preview feature, not meant for GA version. */
   private static final String OPTION_SPANNER_ENDPOINT = "e";
   private static final String OPTION_JDBC_PROPERTIES = "r";
@@ -91,9 +100,11 @@ public class OptionsMetadata {
   private final String defaultConnectionUrl;
   private final int proxyPort;
   private final String socketFile;
+  private final int maxBacklog;
   private final TextFormat textFormat;
   private final boolean binaryFormat;
   private final boolean authenticate;
+  private final boolean disableAutoDetectClient;
   private final boolean requiresMatcher;
   private final DdlTransactionMode ddlTransactionMode;
   private final boolean replaceJdbcMetadataQueries;
@@ -111,7 +122,27 @@ public class OptionsMetadata {
     this.osName = osName;
     this.commandLine = buildOptions(args);
     this.commandMetadataParser = new CommandMetadataParser();
-    if (this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
+    if (this.commandLine.hasOption(OPTION_AUTHENTICATE)
+        && this.commandLine.hasOption(OPTION_CREDENTIALS_FILE)
+        && !Strings.isNullOrEmpty(this.commandLine.getOptionValue(OPTION_CREDENTIALS_FILE))) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          "Cannot enable authentication on PGAdapter when a credentials file is used. "
+              + "Use either -a to require the client to supply the credentials as a username/password combination, "
+              + "OR use -c to set the credentials in PGAdapter and use these credentials for all connections.");
+    }
+    if (this.commandLine.hasOption(OPTION_DATABASE_NAME)
+        && !(this.commandLine.hasOption(OPTION_PROJECT_ID)
+            && this.commandLine.hasOption(OPTION_INSTANCE_ID))) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          "Cannot specify a database ID without also specifying a project ID and instance ID. "
+              + "Use the options -p <project-id> -i <instance-id> -d <database-id> to specify the "
+              + "database that all connections to this instance of PGAdapter should use.");
+    }
+    if (this.commandLine.hasOption(OPTION_PROJECT_ID)
+        && this.commandLine.hasOption(OPTION_INSTANCE_ID)
+        && this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
       this.defaultConnectionUrl =
           buildConnectionURL(this.commandLine.getOptionValue(OPTION_DATABASE_NAME));
     } else {
@@ -119,9 +150,11 @@ public class OptionsMetadata {
     }
     this.proxyPort = buildProxyPort(commandLine);
     this.socketFile = buildSocketFile(commandLine);
+    this.maxBacklog = buildMaxBacklog(commandLine);
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
+    this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
     this.requiresMatcher =
         commandLine.hasOption(OPTION_PSQL_MODE)
             || commandLine.hasOption(OPTION_COMMAND_METADATA_FILE);
@@ -171,10 +204,12 @@ public class OptionsMetadata {
     this.commandMetadataParser = new CommandMetadataParser();
     this.defaultConnectionUrl = defaultConnectionUrl;
     this.proxyPort = proxyPort;
-    this.socketFile = isWindows() ? "" : DEFAULT_SOCKET_FILE;
+    this.socketFile = isWindows() ? "" : DEFAULT_SOCKET_DIR + File.separatorChar + SOCKET_FILE_NAME;
+    this.maxBacklog = DEFAULT_MAX_BACKLOG;
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
+    this.disableAutoDetectClient = false;
     this.requiresMatcher = requiresMatcher;
     this.ddlTransactionMode = DdlTransactionMode.AutocommitImplicitTransaction;
     this.replaceJdbcMetadataQueries = replaceJdbcMetadataQueries;
@@ -230,9 +265,27 @@ public class OptionsMetadata {
 
   private String buildSocketFile(CommandLine commandLine) {
     // Unix domain sockets are disabled by default on Windows.
-    return commandLine
-        .getOptionValue(OPTION_SOCKET_FILE, isWindows() ? "" : DEFAULT_SOCKET_FILE)
-        .trim();
+    String directory =
+        commandLine.getOptionValue(OPTION_SOCKET_DIR, isWindows() ? "" : DEFAULT_SOCKET_DIR).trim();
+    if (!Strings.isNullOrEmpty(directory)) {
+      if (directory.charAt(directory.length() - 1) != File.separatorChar) {
+        directory += File.separatorChar;
+      }
+      return directory + SOCKET_FILE_NAME;
+    }
+    return "";
+  }
+
+  private int buildMaxBacklog(CommandLine commandLine) {
+    int backlog =
+        Integer.parseInt(
+            commandLine
+                .getOptionValue(OPTION_MAX_BACKLOG, String.valueOf(DEFAULT_MAX_BACKLOG))
+                .trim());
+    if (backlog <= 0) {
+      throw new IllegalArgumentException("Max backlog must be greater than 0");
+    }
+    return backlog;
   }
 
   /**
@@ -241,16 +294,27 @@ public class OptionsMetadata {
    *
    * @return The absolute path of the credentials file.
    */
-  private String buildCredentialsFile() {
+  @VisibleForTesting
+  String buildCredentialsFile() {
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
       try {
         // This will throw an IOException if no default credentials are available.
-        GoogleCredentials.getApplicationDefault();
+        tryGetDefaultCredentials();
       } catch (IOException e) {
-        throw SpannerExceptionFactory.asSpannerException(e);
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.FAILED_PRECONDITION,
+            "There are no credentials specified in the command line arguments for PGAdapter, "
+                + "and there are no default credentials in the current runtime environment. Start PGAdapter with the -c <credentials-file.json> option "
+                + "or set the GOOGLE_APPLICATION_CREDENTIALS environment variable.",
+            e);
       }
     }
     return commandLine.getOptionValue(OPTION_CREDENTIALS_FILE);
+  }
+
+  @VisibleForTesting
+  void tryGetDefaultCredentials() throws IOException {
+    GoogleCredentials.getApplicationDefault();
   }
 
   /**
@@ -260,33 +324,24 @@ public class OptionsMetadata {
    */
   public String buildConnectionURL(String database) {
     Preconditions.checkNotNull(database);
+    // Check if it is a full database name, or only a database ID.
+    DatabaseName databaseName = getDatabaseName(database);
     String host = commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT, "");
-    String jdbcEndpoint;
+    String endpoint;
     if (host.isEmpty()) {
-      jdbcEndpoint = "jdbc:cloudspanner:/";
+      endpoint = "cloudspanner:/";
     } else {
-      jdbcEndpoint = "jdbc:cloudspanner://" + host + "/";
+      endpoint = "cloudspanner://" + host + "/";
       logger.log(
           Level.INFO,
           () ->
               String.format(
-                  "PG Adapter will connect to the following Cloud Spanner service endpoint %s",
+                  "PG Adapter will connect to the following Cloud Spanner service endpoint: %s",
                   host));
     }
 
     // Note that Credentials here is the credentials file, not the actual credentials
-    String url =
-        String.format(
-            jdbcEndpoint
-                + "projects/%s/"
-                + "instances/%s/"
-                + "databases/%s"
-                + ";dialect=postgresql"
-                + ";userAgent=%s",
-            commandLine.getOptionValue(OPTION_PROJECT_ID),
-            commandLine.getOptionValue(OPTION_INSTANCE_ID),
-            database,
-            DEFAULT_USER_AGENT);
+    String url = String.format("%s%s;userAgent=%s", endpoint, databaseName, DEFAULT_USER_AGENT);
 
     String credentials = buildCredentialsFile();
     if (!Strings.isNullOrEmpty(credentials)) {
@@ -294,6 +349,49 @@ public class OptionsMetadata {
     }
 
     return url;
+  }
+
+  @VisibleForTesting
+  DatabaseName getDatabaseName(String database) {
+    DatabaseName databaseName;
+    if (DatabaseName.isParsableFrom(database)) {
+      databaseName = DatabaseName.parse(database);
+    } else {
+      String projectId;
+      if (commandLine.hasOption(OPTION_PROJECT_ID)) {
+        projectId = commandLine.getOptionValue(OPTION_PROJECT_ID);
+      } else {
+        projectId = getDefaultProjectId();
+      }
+      if (Strings.isNullOrEmpty(projectId)) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.FAILED_PRECONDITION,
+            "The database name does not include a project ID, and there is no default project ID in the environment. "
+                + "Either start PGAdapter with the -p <project-id> command line argument, set the GOOGLE_CLOUD_PROJECT environment variable, "
+                + "or specify the database as a fully qualified database name in the format 'projects/my-project/instances/my-instance/database/my-database'.");
+      }
+      String instanceId;
+      if (commandLine.hasOption(OPTION_INSTANCE_ID)) {
+        instanceId = commandLine.getOptionValue(OPTION_INSTANCE_ID);
+      } else {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.FAILED_PRECONDITION,
+            "The database name does not include an instance ID, and there is no default instance ID in the command line arguments of PGAdapter. "
+                + "Either start PGAdapter with the -i <instance-id> command line argument, or specify the database as a fully qualified database name in the format 'projects/my-project/instances/my-instance/database/my-database'.");
+      }
+      databaseName =
+          DatabaseName.newBuilder()
+              .setProject(projectId)
+              .setInstance(instanceId)
+              .setDatabase(database)
+              .build();
+    }
+    return databaseName;
+  }
+
+  @VisibleForTesting
+  String getDefaultProjectId() {
+    return SpannerOptions.getDefaultProjectId();
   }
 
   /**
@@ -348,20 +446,26 @@ public class OptionsMetadata {
     options.addOption(
         OPTION_SERVER_PORT, "server-port", true, "This proxy's port number (Default 5432).");
     options.addOption(
-        OPTION_SOCKET_FILE,
-        "server-socket-file",
+        null,
+        OPTION_SOCKET_DIR,
         true,
         String.format(
-            "This proxy's domain socket file (Default %s). "
+            "This proxy's domain socket directory (Default %s). "
                 + "Domain sockets are disabled by default on Windows. Set this property to a non-empty value on Windows to enable domain sockets. "
                 + "Set this property to the empty string on other operating systems to disable domain sockets.",
-            String.format(DEFAULT_SOCKET_FILE, 5432)));
-    options.addRequiredOption(
+            DEFAULT_SOCKET_DIR));
+    options.addOption(
+        null,
+        OPTION_MAX_BACKLOG,
+        true,
+        String.format(
+            "Maximum queue length of incoming connections. Defaults to %d.", DEFAULT_MAX_BACKLOG));
+    options.addOption(
         OPTION_PROJECT_ID,
         "project",
         true,
         "The id of the GCP project wherein lives the Spanner database.");
-    options.addRequiredOption(
+    options.addOption(
         OPTION_INSTANCE_ID,
         "instance",
         true,
@@ -389,10 +493,18 @@ public class OptionsMetadata {
         false,
         "Whether you wish the proxy to perform an authentication step.");
     options.addOption(
+        null,
+        OPTION_DISABLE_AUTO_DETECT_CLIENT,
+        false,
+        "This option turns off automatic detection of well-known clients. "
+            + "Use this option if you do not want PGAdapter to automatically apply query "
+            + "replacements based on the client that is connected to PGAdapter.");
+    options.addOption(
         OPTION_PSQL_MODE,
         "psql-mode",
         false,
-        "This option turns on PSQL mode. This mode allows better compatibility to PSQL, with an"
+        "DEPRECATED: PGAdapter will automatically detect connections from psql."
+            + " This option turns on PSQL mode. This mode allows better compatibility to PSQL, with an"
             + " added performance cost. PSQL mode is implemented using predefined dynamic matchers"
             + " and as such cannot be used with the option -j. This mode should not be used for"
             + " production, and we do not guarantee its functionality beyond the basics.");
@@ -420,7 +532,8 @@ public class OptionsMetadata {
         OPTION_JDBC_MODE,
         "jdbc-mode",
         false,
-        "This option turns on JDBC mode. This mode allows better compatibility with the "
+        "DEPRECATED: PGAdapter will automatically detect connections from JDBC. "
+            + "This option turns on JDBC mode. This mode allows better compatibility with the "
             + "PostgreSQL JDBC driver. It will automatically inspect incoming queries to look for "
             + "known JDBC metadata queries, and replace these with queries that are compatible with "
             + "Cloud Spanner. JDBC mode is implemented using predefined fixed matchers and should "
@@ -488,10 +601,26 @@ public class OptionsMetadata {
         help.printHelp(CLI_ARGS, options);
         System.exit(0);
       }
+      printDeprecatedWarnings(commandLine);
       return commandLine;
     } catch (ParseException e) {
       help.printHelp(CLI_ARGS, options);
       throw new IllegalArgumentException(e.getMessage());
+    }
+  }
+
+  static void printDeprecatedWarnings(CommandLine commandLine) {
+    if (commandLine.hasOption(OPTION_PSQL_MODE)) {
+      System.out.printf(
+          "It is no longer necessary to add psql mode (-%s) to the command line arguments.\n"
+              + "PGAdapter now automatically recognizes connections from psql.\n",
+          OPTION_PSQL_MODE);
+    }
+    if (commandLine.hasOption(OPTION_JDBC_MODE)) {
+      System.out.printf(
+          "It is no longer necessary to add JDBC mode (-%s) to the command line arguments.\n"
+              + "PGAdapter now automatically recognizes connections from the PostgreSQL JDBC driver.\n",
+          OPTION_JDBC_MODE);
     }
   }
 
@@ -551,12 +680,20 @@ public class OptionsMetadata {
     return String.format(this.socketFile, localPort);
   }
 
+  public int getMaxBacklog() {
+    return this.maxBacklog;
+  }
+
   public TextFormat getTextFormat() {
     return this.textFormat;
   }
 
   public boolean shouldAuthenticate() {
     return this.authenticate;
+  }
+
+  public boolean shouldAutoDetectClient() {
+    return !this.disableAutoDetectClient;
   }
 
   public boolean requiresMatcher() {
@@ -581,7 +718,7 @@ public class OptionsMetadata {
 
   /** Returns true if the OS is Windows. */
   public boolean isWindows() {
-    return osName.toLowerCase().contains("win");
+    return osName.toLowerCase().startsWith("windows");
   }
 
   /**

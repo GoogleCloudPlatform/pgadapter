@@ -65,13 +65,14 @@ public class CopyStatement extends IntermediateStatement {
   public CopyStatement(
       ConnectionHandler connectionHandler,
       OptionsMetadata options,
-      ParsedStatement parsedStatement) {
-    super(connectionHandler, options, parsedStatement);
+      ParsedStatement parsedStatement,
+      Statement originalStatement) {
+    super(connectionHandler, options, parsedStatement, originalStatement);
   }
 
   public Exception getException() {
     // Do not clear exceptions on a CopyStatement.
-    return this.exceptions[0];
+    return this.exception;
   }
 
   @Override
@@ -83,7 +84,7 @@ public class CopyStatement extends IntermediateStatement {
     super.close();
   }
 
-  public Long getUpdateCount() {
+  public long getUpdateCount() {
     try {
       return updateCount.get();
     } catch (ExecutionException e) {
@@ -94,7 +95,7 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   @Override
-  public StatementType getStatementType(int index) {
+  public StatementType getStatementType() {
     return StatementType.UPDATE;
   }
 
@@ -289,19 +290,14 @@ public class CopyStatement extends IntermediateStatement {
     return 0;
   }
 
-  public void handleExecutionException(SpannerException e) {
-    this.handleExecutionException(0, e);
-  }
-
   @Override
-  public void handleExecutionException(int index, SpannerException exception) {
+  public void handleExecutionException(SpannerException exception) {
     executor.shutdownNow();
-    super.handleExecutionException(index, exception);
+    super.handleExecutionException(exception);
   }
 
-  @Override
   public void execute() {
-    this.executedCount++;
+    this.executed = true;
     try {
       parseCopyStatement();
       queryInformationSchema();

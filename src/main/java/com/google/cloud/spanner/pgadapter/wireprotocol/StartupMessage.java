@@ -15,12 +15,18 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
+import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
-import com.google.cloud.spanner.pgadapter.wireoutput.MD5AuthenticationRequest;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationCleartextPasswordResponse;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 /**
  * The first (non-encryption, non-admin) message expected in from a client in a connection loop.
@@ -28,7 +34,8 @@ import java.util.Map;
  */
 @InternalApi
 public class StartupMessage extends BootstrapMessage {
-
+  private static final Logger logger = Logger.getLogger(StartupMessage.class.getName());
+  static final String DATABASE_KEY = "database";
   private static final String USER_KEY = "user";
   public static final int IDENTIFIER = 196608; // First Hextet: 3 (version), Second Hextet: 0
 
@@ -38,31 +45,46 @@ public class StartupMessage extends BootstrapMessage {
   public StartupMessage(ConnectionHandler connection, int length) throws Exception {
     super(connection, length);
     this.authenticate = connection.getServer().getOptions().shouldAuthenticate();
-    this.parameters = this.parseParameters(this.readAll());
+    String rawParameters = this.readAll();
+    this.parameters = this.parseParameters(rawParameters);
+    if (connection.getServer().getOptions().shouldAutoDetectClient()) {
+      WellKnownClient wellKnownClient =
+          ClientAutoDetector.detectClient(this.parseParameterKeys(rawParameters), this.parameters);
+      if (wellKnownClient != null) {
+        logger.log(
+            Level.INFO,
+            () ->
+                String.format(
+                    "Well-known client %s detected for connection %d.",
+                    wellKnownClient, connection.getConnectionId()));
+        connection.setWellKnownClient(wellKnownClient);
+      }
+    }
   }
 
   @Override
   protected void sendPayload() throws Exception {
     if (!authenticate) {
-      this.connection.connectToSpanner(this.parameters.get("database"));
-      sendStartupMessage(
-          this.outputStream,
-          this.connection.getConnectionId(),
-          this.connection.getSecret(),
-          this.connection.getServer().getOptions());
-      this.connection.setStatus(ConnectionStatus.IDLE);
+      createConnectionAndSendStartupMessage(
+          this.connection, this.parameters.get(DATABASE_KEY), null);
     } else {
-      new MD5AuthenticationRequest(this.outputStream, 0).send();
+      new AuthenticationCleartextPasswordResponse(this.outputStream).send();
     }
   }
 
-  /**
-   * Here we expect the nextHandler to be {@link PasswordMessage} if we authenticate. Otherwise
-   * default.
-   *
-   * @return PasswordMessage if auth is set to true, else default.
-   * @throws Exception
-   */
+  static void createConnectionAndSendStartupMessage(
+      ConnectionHandler connection, String database, @Nullable GoogleCredentials credentials)
+      throws Exception {
+    connection.connectToSpanner(database, credentials);
+    sendStartupMessage(
+        connection.getConnectionMetadata().getOutputStream(),
+        connection.getConnectionId(),
+        connection.getSecret(),
+        connection.getServer().getOptions());
+    connection.setStatus(ConnectionStatus.AUTHENTICATED);
+  }
+
+  /** Here we expect the nextHandler to be {@link PasswordMessage} if we authenticate. */
   @Override
   public void nextHandler() throws Exception {
     if (authenticate) {
@@ -74,8 +96,7 @@ public class StartupMessage extends BootstrapMessage {
                 + "', but got: "
                 + protocol);
       }
-      this.connection.setMessageState(
-          new PasswordMessage(this.connection, this.parameters.get(USER_KEY)));
+      this.connection.setMessageState(new PasswordMessage(this.connection, this.parameters));
     } else {
       super.nextHandler();
     }

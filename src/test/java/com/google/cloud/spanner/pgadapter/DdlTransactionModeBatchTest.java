@@ -14,12 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.RollbackRequest;
@@ -31,9 +31,9 @@ import java.util.Collections;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class DdlTransactionModeBatchTest extends DdlTransactionModeNoneTest {
 
   @BeforeClass
@@ -79,7 +79,7 @@ public class DdlTransactionModeBatchTest extends DdlTransactionModeNoneTest {
   @Test
   public void testMixedBatchDmlFirst() throws SQLException {
     String sql =
-        "INSERT INTO FOO VALUES (1); UPDATE FOO SET BAR=1 WHERE BAZ=2; CREATE TABLE foo (id bigint primary key);";
+        "INSERT INTO FOO VALUES (1);UPDATE FOO SET BAR=1 WHERE BAZ=2;CREATE TABLE foo (id bigint primary key);";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -98,7 +98,7 @@ public class DdlTransactionModeBatchTest extends DdlTransactionModeNoneTest {
 
   @Test
   public void testMixedBatchDqlFirst() throws SQLException {
-    String sql = "SELECT 1; CREATE TABLE foo (id bigint primary key);";
+    String sql = "SELECT 1;CREATE TABLE foo (id bigint primary key);";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -144,7 +144,7 @@ public class DdlTransactionModeBatchTest extends DdlTransactionModeNoneTest {
   @Test
   public void testMixedBatchWithExplicitTransaction() throws SQLException {
     String sql =
-        "BEGIN; INSERT INTO FOO VALUES (1); CREATE TABLE foo (id bigint primary key); COMMIT;";
+        "BEGIN;INSERT INTO FOO VALUES (1);CREATE TABLE foo (id bigint primary key);COMMIT;";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -159,8 +159,7 @@ public class DdlTransactionModeBatchTest extends DdlTransactionModeNoneTest {
             assertThrows(
                 SQLException.class, () -> statement.execute("show transaction isolation level"));
         assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains(IntermediateStatement.TRANSACTION_ABORTED_ERROR));
+            exception.getMessage(), exception.getMessage().contains(TRANSACTION_ABORTED_ERROR));
       }
     }
 

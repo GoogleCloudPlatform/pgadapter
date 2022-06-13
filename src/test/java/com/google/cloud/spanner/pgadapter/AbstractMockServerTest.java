@@ -105,7 +105,7 @@ public abstract class AbstractMockServerTest {
                           .build())
                   .build())
           .build();
-  private static final com.google.spanner.v1.ResultSet SELECT1_RESULTSET =
+  protected static final com.google.spanner.v1.ResultSet SELECT1_RESULTSET =
       com.google.spanner.v1.ResultSet.newBuilder()
           .addRows(
               ListValue.newBuilder()
@@ -113,7 +113,7 @@ public abstract class AbstractMockServerTest {
                   .build())
           .setMetadata(SELECT1_METADATA)
           .build();
-  private static final com.google.spanner.v1.ResultSet SELECT2_RESULTSET =
+  protected static final com.google.spanner.v1.ResultSet SELECT2_RESULTSET =
       com.google.spanner.v1.ResultSet.newBuilder()
           .addRows(
               ListValue.newBuilder()
@@ -369,13 +369,15 @@ public abstract class AbstractMockServerTest {
 
   @AfterClass
   public static void stopMockSpannerAndPgAdapterServers() throws Exception {
-    try {
-      pgServer.stopServer();
-    } catch (IllegalStateException exception) {
-      logger.warning(
-          String.format(
-              "Ignoring %s as this can happen if the server is sent multiple invalid messages",
-              exception.getMessage()));
+    if (pgServer != null) {
+      try {
+        pgServer.stopServer();
+      } catch (IllegalStateException exception) {
+        logger.warning(
+            String.format(
+                "Ignoring %s as this can happen if the server is sent multiple invalid messages",
+                exception.getMessage()));
+      }
     }
     try {
       SpannerPool.closeSpannerPool();
@@ -394,8 +396,10 @@ public abstract class AbstractMockServerTest {
         throw exception;
       }
     }
-    spannerServer.shutdown();
-    spannerServer.awaitTermination(10L, TimeUnit.SECONDS);
+    if (spannerServer != null) {
+      spannerServer.shutdown();
+      spannerServer.awaitTermination(10L, TimeUnit.SECONDS);
+    }
   }
 
   /**
