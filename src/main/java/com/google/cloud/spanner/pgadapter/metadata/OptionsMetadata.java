@@ -15,10 +15,14 @@
 package com.google.cloud.spanner.pgadapter.metadata;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.pgadapter.Server;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.spanner.v1.DatabaseName;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -118,7 +122,27 @@ public class OptionsMetadata {
     this.osName = osName;
     this.commandLine = buildOptions(args);
     this.commandMetadataParser = new CommandMetadataParser();
-    if (this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
+    if (this.commandLine.hasOption(OPTION_AUTHENTICATE)
+        && this.commandLine.hasOption(OPTION_CREDENTIALS_FILE)
+        && !Strings.isNullOrEmpty(this.commandLine.getOptionValue(OPTION_CREDENTIALS_FILE))) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          "Cannot enable authentication on PGAdapter when a credentials file is used. "
+              + "Use either -a to require the client to supply the credentials as a username/password combination, "
+              + "OR use -c to set the credentials in PGAdapter and use these credentials for all connections.");
+    }
+    if (this.commandLine.hasOption(OPTION_DATABASE_NAME)
+        && !(this.commandLine.hasOption(OPTION_PROJECT_ID)
+            && this.commandLine.hasOption(OPTION_INSTANCE_ID))) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          "Cannot specify a database ID without also specifying a project ID and instance ID. "
+              + "Use the options -p <project-id> -i <instance-id> -d <database-id> to specify the "
+              + "database that all connections to this instance of PGAdapter should use.");
+    }
+    if (this.commandLine.hasOption(OPTION_PROJECT_ID)
+        && this.commandLine.hasOption(OPTION_INSTANCE_ID)
+        && this.commandLine.hasOption(OPTION_DATABASE_NAME)) {
       this.defaultConnectionUrl =
           buildConnectionURL(this.commandLine.getOptionValue(OPTION_DATABASE_NAME));
     } else {
@@ -270,16 +294,27 @@ public class OptionsMetadata {
    *
    * @return The absolute path of the credentials file.
    */
-  private String buildCredentialsFile() {
+  @VisibleForTesting
+  String buildCredentialsFile() {
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
       try {
         // This will throw an IOException if no default credentials are available.
-        GoogleCredentials.getApplicationDefault();
+        tryGetDefaultCredentials();
       } catch (IOException e) {
-        throw SpannerExceptionFactory.asSpannerException(e);
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.FAILED_PRECONDITION,
+            "There are no credentials specified in the command line arguments for PGAdapter, "
+                + "and there are no default credentials in the current runtime environment. Start PGAdapter with the -c <credentials-file.json> option "
+                + "or set the GOOGLE_APPLICATION_CREDENTIALS environment variable.",
+            e);
       }
     }
     return commandLine.getOptionValue(OPTION_CREDENTIALS_FILE);
+  }
+
+  @VisibleForTesting
+  void tryGetDefaultCredentials() throws IOException {
+    GoogleCredentials.getApplicationDefault();
   }
 
   /**
@@ -289,33 +324,24 @@ public class OptionsMetadata {
    */
   public String buildConnectionURL(String database) {
     Preconditions.checkNotNull(database);
+    // Check if it is a full database name, or only a database ID.
+    DatabaseName databaseName = getDatabaseName(database);
     String host = commandLine.getOptionValue(OPTION_SPANNER_ENDPOINT, "");
-    String jdbcEndpoint;
+    String endpoint;
     if (host.isEmpty()) {
-      jdbcEndpoint = "jdbc:cloudspanner:/";
+      endpoint = "cloudspanner:/";
     } else {
-      jdbcEndpoint = "jdbc:cloudspanner://" + host + "/";
+      endpoint = "cloudspanner://" + host + "/";
       logger.log(
           Level.INFO,
           () ->
               String.format(
-                  "PG Adapter will connect to the following Cloud Spanner service endpoint %s",
+                  "PG Adapter will connect to the following Cloud Spanner service endpoint: %s",
                   host));
     }
 
     // Note that Credentials here is the credentials file, not the actual credentials
-    String url =
-        String.format(
-            jdbcEndpoint
-                + "projects/%s/"
-                + "instances/%s/"
-                + "databases/%s"
-                + ";dialect=postgresql"
-                + ";userAgent=%s",
-            commandLine.getOptionValue(OPTION_PROJECT_ID),
-            commandLine.getOptionValue(OPTION_INSTANCE_ID),
-            database,
-            DEFAULT_USER_AGENT);
+    String url = String.format("%s%s;userAgent=%s", endpoint, databaseName, DEFAULT_USER_AGENT);
 
     String credentials = buildCredentialsFile();
     if (!Strings.isNullOrEmpty(credentials)) {
@@ -323,6 +349,49 @@ public class OptionsMetadata {
     }
 
     return url;
+  }
+
+  @VisibleForTesting
+  DatabaseName getDatabaseName(String database) {
+    DatabaseName databaseName;
+    if (DatabaseName.isParsableFrom(database)) {
+      databaseName = DatabaseName.parse(database);
+    } else {
+      String projectId;
+      if (commandLine.hasOption(OPTION_PROJECT_ID)) {
+        projectId = commandLine.getOptionValue(OPTION_PROJECT_ID);
+      } else {
+        projectId = getDefaultProjectId();
+      }
+      if (Strings.isNullOrEmpty(projectId)) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.FAILED_PRECONDITION,
+            "The database name does not include a project ID, and there is no default project ID in the environment. "
+                + "Either start PGAdapter with the -p <project-id> command line argument, set the GOOGLE_CLOUD_PROJECT environment variable, "
+                + "or specify the database as a fully qualified database name in the format 'projects/my-project/instances/my-instance/database/my-database'.");
+      }
+      String instanceId;
+      if (commandLine.hasOption(OPTION_INSTANCE_ID)) {
+        instanceId = commandLine.getOptionValue(OPTION_INSTANCE_ID);
+      } else {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.FAILED_PRECONDITION,
+            "The database name does not include an instance ID, and there is no default instance ID in the command line arguments of PGAdapter. "
+                + "Either start PGAdapter with the -i <instance-id> command line argument, or specify the database as a fully qualified database name in the format 'projects/my-project/instances/my-instance/database/my-database'.");
+      }
+      databaseName =
+          DatabaseName.newBuilder()
+              .setProject(projectId)
+              .setInstance(instanceId)
+              .setDatabase(database)
+              .build();
+    }
+    return databaseName;
+  }
+
+  @VisibleForTesting
+  String getDefaultProjectId() {
+    return SpannerOptions.getDefaultProjectId();
   }
 
   /**
@@ -391,12 +460,12 @@ public class OptionsMetadata {
         true,
         String.format(
             "Maximum queue length of incoming connections. Defaults to %d.", DEFAULT_MAX_BACKLOG));
-    options.addRequiredOption(
+    options.addOption(
         OPTION_PROJECT_ID,
         "project",
         true,
         "The id of the GCP project wherein lives the Spanner database.");
-    options.addRequiredOption(
+    options.addOption(
         OPTION_INSTANCE_ID,
         "instance",
         true,
