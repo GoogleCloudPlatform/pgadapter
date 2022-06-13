@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.5.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.4.2...v0.5.0) (2022-06-13)
+
+
+### Features
+
+* add support for describe statement ([#125](https://github.com/GoogleCloudPlatform/pgadapter/issues/125)) ([52452d7](https://github.com/GoogleCloudPlatform/pgadapter/commit/52452d72d284009deea69b29f2a77dd885f0e1fe))
+* add support for extended query protocol batching ([#168](https://github.com/GoogleCloudPlatform/pgadapter/issues/168)) ([30607f0](https://github.com/GoogleCloudPlatform/pgadapter/commit/30607f017b0001dce74d2874f1031a98d75ef917))
+* automatically detect client that is connected ([#169](https://github.com/GoogleCloudPlatform/pgadapter/issues/169)) ([f11f459](https://github.com/GoogleCloudPlatform/pgadapter/commit/f11f4593a0b5e7e32e70795d4c4bb3b929873672))
+* enable authentication ([#174](https://github.com/GoogleCloudPlatform/pgadapter/issues/174)) ([2e34c84](https://github.com/GoogleCloudPlatform/pgadapter/commit/2e34c84f954a770902374d9f16ae9c41e1342ee9))
+* handle implicit transactions and errors in batches ([#127](https://github.com/GoogleCloudPlatform/pgadapter/issues/127)) ([23702ee](https://github.com/GoogleCloudPlatform/pgadapter/commit/23702ee0e584f767fb5d62162f5961ed10d8e90a))
+* support unix domain sockets ([#150](https://github.com/GoogleCloudPlatform/pgadapter/issues/150)) ([cec7d43](https://github.com/GoogleCloudPlatform/pgadapter/commit/cec7d43bc49f6d2140c420449bb45927442ddf0d))
+
+
+### Bug Fixes
+
+* clear statement tag before auto rollback ([#147](https://github.com/GoogleCloudPlatform/pgadapter/issues/147)) ([994976f](https://github.com/GoogleCloudPlatform/pgadapter/commit/994976ff675661a2877b7a87e8a3b21560404b23)), closes [#146](https://github.com/GoogleCloudPlatform/pgadapter/issues/146)
+* error handling for extended query protocol ([#149](https://github.com/GoogleCloudPlatform/pgadapter/issues/149)) ([6696531](https://github.com/GoogleCloudPlatform/pgadapter/commit/669653161974978618e9089dd5ac534b41cd74c5))
+* handle errors if domain socket file is invalid ([#164](https://github.com/GoogleCloudPlatform/pgadapter/issues/164)) ([4a6d865](https://github.com/GoogleCloudPlatform/pgadapter/commit/4a6d865441f509dd19470c751e82f2d605dc4389))
+* lower case single statement commands were not recognized ([#148](https://github.com/GoogleCloudPlatform/pgadapter/issues/148)) ([f069eaf](https://github.com/GoogleCloudPlatform/pgadapter/commit/f069eaf6f3e4823839b6841cc95f5bbbba946ec5))
+* print version number at startup ([#142](https://github.com/GoogleCloudPlatform/pgadapter/issues/142)) ([9f4d230](https://github.com/GoogleCloudPlatform/pgadapter/commit/9f4d23063ca9bef6080c7617bded50d1607abbfd))
+* send comments to the backend to support hints ([#170](https://github.com/GoogleCloudPlatform/pgadapter/issues/170)) ([f329578](https://github.com/GoogleCloudPlatform/pgadapter/commit/f3295786ddcb48e0dee6b390009c5cfde6f96ee7))
+* split statement did not correctly parse escaped quotes ([#152](https://github.com/GoogleCloudPlatform/pgadapter/issues/152)) ([cfbec96](https://github.com/GoogleCloudPlatform/pgadapter/commit/cfbec96654a522cb6db776828a76c576e5421de9))
+* terminate connection for invalid messages ([#154](https://github.com/GoogleCloudPlatform/pgadapter/issues/154)) ([6ed6266](https://github.com/GoogleCloudPlatform/pgadapter/commit/6ed6266ff7c625ccdd2824db2bf73fb76a512b83))
+* use assembly instead of fat jar ([#145](https://github.com/GoogleCloudPlatform/pgadapter/issues/145)) ([dd8d3d1](https://github.com/GoogleCloudPlatform/pgadapter/commit/dd8d3d13ef2c388ca50dc572e9966af8d6c01f6b))
+
+
+### Dependencies
+
+* bump Spanner to 6.24 ([#155](https://github.com/GoogleCloudPlatform/pgadapter/issues/155)) ([836271e](https://github.com/GoogleCloudPlatform/pgadapter/commit/836271e3147e0a89734668bc5117640e7e3adc2a))
+* bump Spanner to 6.25 ([#161](https://github.com/GoogleCloudPlatform/pgadapter/issues/161)) ([d66e0e6](https://github.com/GoogleCloudPlatform/pgadapter/commit/d66e0e612537e0245866c05dd5842ccef944edfa))
+* bump Spanner to 6.25.5 ([#172](https://github.com/GoogleCloudPlatform/pgadapter/issues/172)) ([c986a25](https://github.com/GoogleCloudPlatform/pgadapter/commit/c986a25a184d1a3c9d617989bd1c94f966eecb00))
+
+
+### Documentation
+
+* add FAQ and DDL options documentation ([#171](https://github.com/GoogleCloudPlatform/pgadapter/issues/171)) ([e3016d1](https://github.com/GoogleCloudPlatform/pgadapter/commit/e3016d144e1a538e7bebae2666d7a2ad860af8b6))
+
 ### [0.4.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.4.1...v0.4.2) (2022-05-03)
 
 
