@@ -51,7 +51,7 @@ public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionMode
   @Test
   public void testMixedBatchDdlFirst() throws SQLException {
     String sql =
-        "CREATE TABLE foo (id bigint primary key); INSERT INTO FOO VALUES (1); UPDATE FOO SET BAR=1 WHERE BAZ=2;";
+        "CREATE TABLE foo (id bigint primary key);INSERT INTO FOO VALUES (1);UPDATE FOO SET BAR=1 WHERE BAZ=2;";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -74,7 +74,7 @@ public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionMode
   @Test
   public void testMixedBatchDmlFirst() throws SQLException {
     String sql =
-        "INSERT INTO FOO VALUES (1); UPDATE FOO SET BAR=1 WHERE BAZ=2; CREATE TABLE foo (id bigint primary key);";
+        "INSERT INTO FOO VALUES (1);UPDATE FOO SET BAR=1 WHERE BAZ=2;CREATE TABLE foo (id bigint primary key);";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -122,7 +122,7 @@ public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionMode
 
   @Test
   public void testMixedBatchDqlFirstDmlAfter() throws SQLException {
-    String sql = "SELECT 1; CREATE TABLE foo (id bigint primary key); INSERT INTO FOO VALUES (1);";
+    String sql = "SELECT 1;CREATE TABLE foo (id bigint primary key);INSERT INTO FOO VALUES (1);";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -147,7 +147,7 @@ public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionMode
   @Test
   public void testMixedBatchWithExplicitTransaction() throws SQLException {
     String sql =
-        "BEGIN; INSERT INTO FOO VALUES (1); CREATE TABLE foo (id bigint primary key); COMMIT;";
+        "BEGIN;INSERT INTO FOO VALUES (1);CREATE TABLE foo (id bigint primary key);COMMIT;";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -173,7 +173,7 @@ public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionMode
   @Test
   public void testMixedBatch() throws SQLException {
     String sql =
-        "CREATE TABLE foo (id bigint primary key); INSERT INTO FOO VALUES (1); UPDATE FOO SET BAR=1 WHERE BAZ=2;";
+        "CREATE TABLE foo (id bigint primary key);INSERT INTO FOO VALUES (1);UPDATE FOO SET BAR=1 WHERE BAZ=2;";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -249,7 +249,7 @@ public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionMode
 
   @Test
   public void testSelectAndDdlInBatch() throws SQLException {
-    String sql = "SELECT 1; SELECT 2; CREATE TABLE foo (id bigint primary key);";
+    String sql = "SELECT 1;SELECT 2;CREATE TABLE foo (id bigint primary key);";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -305,7 +305,7 @@ public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionMode
 
   @Test
   public void testDdlAndSelectInBatch() throws SQLException {
-    String sql = "CREATE TABLE foo (id bigint primary key); SELECT 1; SELECT 2;";
+    String sql = "CREATE TABLE foo (id bigint primary key);SELECT 1;SELECT 2;";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -368,7 +368,7 @@ public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionMode
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // Start an explicit transaction before executing batch
-        assertFalse(statement.execute("BEGIN; SELECT 1"));
+        assertFalse(statement.execute("BEGIN;SELECT 1"));
         assertEquals(0, statement.getUpdateCount());
 
         assertTrue(statement.getMoreResults());

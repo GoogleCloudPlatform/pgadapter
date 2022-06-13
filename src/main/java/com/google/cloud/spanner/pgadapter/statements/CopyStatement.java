@@ -65,8 +65,9 @@ public class CopyStatement extends IntermediateStatement {
   public CopyStatement(
       ConnectionHandler connectionHandler,
       OptionsMetadata options,
-      ParsedStatement parsedStatement) {
-    super(connectionHandler, options, parsedStatement);
+      ParsedStatement parsedStatement,
+      Statement originalStatement) {
+    super(connectionHandler, options, parsedStatement, originalStatement);
   }
 
   public Exception getException() {

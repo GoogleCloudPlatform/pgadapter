@@ -74,6 +74,7 @@ public class OptionsMetadata {
   private static final String OPTION_CREDENTIALS_FILE = "c";
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
+  private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
   private static final String OPTION_PSQL_MODE = "q";
   private static final String OPTION_DDL_TRANSACTION_MODE = "ddl";
   private static final String OPTION_JDBC_MODE = "jdbc";
@@ -103,6 +104,7 @@ public class OptionsMetadata {
   private final TextFormat textFormat;
   private final boolean binaryFormat;
   private final boolean authenticate;
+  private final boolean disableAutoDetectClient;
   private final boolean requiresMatcher;
   private final DdlTransactionMode ddlTransactionMode;
   private final boolean replaceJdbcMetadataQueries;
@@ -152,6 +154,7 @@ public class OptionsMetadata {
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
+    this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
     this.requiresMatcher =
         commandLine.hasOption(OPTION_PSQL_MODE)
             || commandLine.hasOption(OPTION_COMMAND_METADATA_FILE);
@@ -206,6 +209,7 @@ public class OptionsMetadata {
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
+    this.disableAutoDetectClient = false;
     this.requiresMatcher = requiresMatcher;
     this.ddlTransactionMode = DdlTransactionMode.AutocommitImplicitTransaction;
     this.replaceJdbcMetadataQueries = replaceJdbcMetadataQueries;
@@ -489,10 +493,18 @@ public class OptionsMetadata {
         false,
         "Whether you wish the proxy to perform an authentication step.");
     options.addOption(
+        null,
+        OPTION_DISABLE_AUTO_DETECT_CLIENT,
+        false,
+        "This option turns off automatic detection of well-known clients. "
+            + "Use this option if you do not want PGAdapter to automatically apply query "
+            + "replacements based on the client that is connected to PGAdapter.");
+    options.addOption(
         OPTION_PSQL_MODE,
         "psql-mode",
         false,
-        "This option turns on PSQL mode. This mode allows better compatibility to PSQL, with an"
+        "DEPRECATED: PGAdapter will automatically detect connections from psql."
+            + " This option turns on PSQL mode. This mode allows better compatibility to PSQL, with an"
             + " added performance cost. PSQL mode is implemented using predefined dynamic matchers"
             + " and as such cannot be used with the option -j. This mode should not be used for"
             + " production, and we do not guarantee its functionality beyond the basics.");
@@ -520,7 +532,8 @@ public class OptionsMetadata {
         OPTION_JDBC_MODE,
         "jdbc-mode",
         false,
-        "This option turns on JDBC mode. This mode allows better compatibility with the "
+        "DEPRECATED: PGAdapter will automatically detect connections from JDBC. "
+            + "This option turns on JDBC mode. This mode allows better compatibility with the "
             + "PostgreSQL JDBC driver. It will automatically inspect incoming queries to look for "
             + "known JDBC metadata queries, and replace these with queries that are compatible with "
             + "Cloud Spanner. JDBC mode is implemented using predefined fixed matchers and should "
@@ -588,10 +601,26 @@ public class OptionsMetadata {
         help.printHelp(CLI_ARGS, options);
         System.exit(0);
       }
+      printDeprecatedWarnings(commandLine);
       return commandLine;
     } catch (ParseException e) {
       help.printHelp(CLI_ARGS, options);
       throw new IllegalArgumentException(e.getMessage());
+    }
+  }
+
+  static void printDeprecatedWarnings(CommandLine commandLine) {
+    if (commandLine.hasOption(OPTION_PSQL_MODE)) {
+      System.out.printf(
+          "It is no longer necessary to add psql mode (-%s) to the command line arguments.\n"
+              + "PGAdapter now automatically recognizes connections from psql.\n",
+          OPTION_PSQL_MODE);
+    }
+    if (commandLine.hasOption(OPTION_JDBC_MODE)) {
+      System.out.printf(
+          "It is no longer necessary to add JDBC mode (-%s) to the command line arguments.\n"
+              + "PGAdapter now automatically recognizes connections from the PostgreSQL JDBC driver.\n",
+          OPTION_JDBC_MODE);
     }
   }
 
@@ -661,6 +690,10 @@ public class OptionsMetadata {
 
   public boolean shouldAuthenticate() {
     return this.authenticate;
+  }
+
+  public boolean shouldAutoDetectClient() {
+    return !this.disableAutoDetectClient;
   }
 
   public boolean requiresMatcher() {

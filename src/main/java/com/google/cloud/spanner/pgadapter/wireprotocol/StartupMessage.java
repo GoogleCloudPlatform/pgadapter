@@ -18,10 +18,14 @@ import com.google.api.core.InternalApi;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationCleartextPasswordResponse;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 /**
@@ -30,8 +34,9 @@ import javax.annotation.Nullable;
  */
 @InternalApi
 public class StartupMessage extends BootstrapMessage {
-
+  private static final Logger logger = Logger.getLogger(StartupMessage.class.getName());
   static final String DATABASE_KEY = "database";
+  private static final String USER_KEY = "user";
   public static final int IDENTIFIER = 196608; // First Hextet: 3 (version), Second Hextet: 0
 
   private final boolean authenticate;
@@ -40,7 +45,21 @@ public class StartupMessage extends BootstrapMessage {
   public StartupMessage(ConnectionHandler connection, int length) throws Exception {
     super(connection, length);
     this.authenticate = connection.getServer().getOptions().shouldAuthenticate();
-    this.parameters = this.parseParameters(this.readAll());
+    String rawParameters = this.readAll();
+    this.parameters = this.parseParameters(rawParameters);
+    if (connection.getServer().getOptions().shouldAutoDetectClient()) {
+      WellKnownClient wellKnownClient =
+          ClientAutoDetector.detectClient(this.parseParameterKeys(rawParameters), this.parameters);
+      if (wellKnownClient != null) {
+        logger.log(
+            Level.INFO,
+            () ->
+                String.format(
+                    "Well-known client %s detected for connection %d.",
+                    wellKnownClient, connection.getConnectionId()));
+        connection.setWellKnownClient(wellKnownClient);
+      }
+    }
   }
 
   @Override
@@ -65,13 +84,7 @@ public class StartupMessage extends BootstrapMessage {
     connection.setStatus(ConnectionStatus.AUTHENTICATED);
   }
 
-  /**
-   * Here we expect the nextHandler to be {@link PasswordMessage} if we authenticate. Otherwise
-   * default.
-   *
-   * @return PasswordMessage if auth is set to true, else default.
-   * @throws Exception
-   */
+  /** Here we expect the nextHandler to be {@link PasswordMessage} if we authenticate. */
   @Override
   public void nextHandler() throws Exception {
     if (authenticate) {
