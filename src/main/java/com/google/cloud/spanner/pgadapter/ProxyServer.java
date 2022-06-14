@@ -28,11 +28,12 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.nio.channels.Channels;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -44,8 +45,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.newsclub.net.unix.AFUNIXServerSocket;
-import org.newsclub.net.unix.AFUNIXSocketAddress;
 
 /**
  * The proxy server listens for incoming client connections and starts a new {@link
@@ -56,7 +55,27 @@ public class ProxyServer extends AbstractApiService {
   private static final Logger logger = Logger.getLogger(ProxyServer.class.getName());
   private final OptionsMetadata options;
   private final Properties properties;
+  private final ServerSocketFactory serverSocketFactory = createServerSocketFactory();
   private final List<ConnectionHandler> handlers = Collections.synchronizedList(new LinkedList<>());
+
+  static ServerSocketFactory createServerSocketFactory() {
+    try {
+      return (ServerSocketFactory)
+          Class.forName("com.google.cloud.spanner.pgadapter.Java17ServerSocketFactory")
+              .getConstructor()
+              .newInstance();
+    } catch (Exception ignore) {
+    }
+    try {
+      return (ServerSocketFactory)
+          Class.forName("com.google.cloud.spanner.pgadapter.Java8ServerSocketFactory")
+              .getConstructor()
+              .newInstance();
+    } catch (Exception ignore) {
+    }
+    throw SpannerExceptionFactory.newSpannerException(
+        ErrorCode.FAILED_PRECONDITION, "No socket factory found!");
+  }
 
   /**
    * Latch that is closed when the TCP server has started. We need this to know the exact port that
@@ -68,7 +87,8 @@ public class ProxyServer extends AbstractApiService {
    * optionally one Unix domain socket, but could in theory be expanded to contain multiple sockets
    * of each type.
    */
-  private final List<ServerSocket> serverSockets = Collections.synchronizedList(new LinkedList<>());
+  private final List<ServerSocketChannel> serverSocketChannels =
+      Collections.synchronizedList(new LinkedList<>());
 
   private int localPort;
 
@@ -170,24 +190,40 @@ public class ProxyServer extends AbstractApiService {
 
   @Override
   protected void doStop() {
-    for (ServerSocket serverSocket : this.serverSockets) {
+    for (ServerSocketChannel serverSocketChannel : this.serverSocketChannels) {
       try {
         logger.log(
-            Level.INFO, () -> String.format("Server on socket %s is stopping", serverSocket));
-        serverSocket.close();
+            Level.INFO,
+            () ->
+                String.format(
+                    "Server on socket channel %s is stopping", toString(serverSocketChannel)));
+        serverSocketChannel.close();
         logger.log(
-            Level.INFO, () -> String.format("Server socket on socket %s closed", serverSocket));
+            Level.INFO,
+            () ->
+                String.format("Server socket on socket %s closed", toString(serverSocketChannel)));
       } catch (IOException exception) {
         logger.log(
             Level.WARNING,
             exception,
-            () -> String.format("Closing server socket %s failed: %s", serverSocket, exception));
+            () ->
+                String.format(
+                    "Closing server socket %s failed: %s",
+                    toString(serverSocketChannel), exception));
       }
     }
     for (ConnectionHandler handler : this.handlers) {
       handler.terminate();
     }
     notifyStopped();
+  }
+
+  private String toString(ServerSocketChannel channel) {
+    try {
+      return channel.getLocalAddress().toString();
+    } catch (IOException e) {
+      return "(unknown)";
+    }
   }
 
   /** Safely stops the server (iff started), closing specific socket and cleaning up. */
@@ -202,12 +238,12 @@ public class ProxyServer extends AbstractApiService {
    * @throws IOException if ServerSocket cannot start.
    */
   void runTcpServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch) throws IOException {
-    ServerSocket tcpSocket =
-        new ServerSocket(this.options.getProxyPort(), this.options.getMaxBacklog());
-    this.serverSockets.add(tcpSocket);
-    this.localPort = tcpSocket.getLocalPort();
+    ServerSocketChannel tcpSocketChannel =
+        this.serverSocketFactory.createTcpServerSocketChannel(this.options);
+    this.serverSocketChannels.add(tcpSocketChannel);
+    this.localPort = ((InetSocketAddress) tcpSocketChannel.getLocalAddress()).getPort();
     tcpStartedLatch.countDown();
-    runServer(tcpSocket, startupLatch, stoppedLatch);
+    runServer(tcpSocketChannel, startupLatch, stoppedLatch);
   }
 
   void runDomainSocketServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch)
@@ -218,38 +254,36 @@ public class ProxyServer extends AbstractApiService {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.DEADLINE_EXCEEDED, "Timeout while waiting for TCP server to start");
     }
-    File tempDir = new File(this.options.getSocketFile(getLocalPort()));
+    ServerSocketChannel channel = null;
     try {
-      if (tempDir.getParentFile() != null && !tempDir.getParentFile().exists()) {
-        tempDir.mkdirs();
-      }
-      AFUNIXServerSocket domainSocket = AFUNIXServerSocket.newInstance();
-      domainSocket.bind(AFUNIXSocketAddress.of(tempDir), this.options.getMaxBacklog());
-      this.serverSockets.add(domainSocket);
-      runServer(domainSocket, startupLatch, stoppedLatch);
+      channel = serverSocketFactory.creatUnixDomainSocketChannel(options, getLocalPort());
+      this.serverSocketChannels.add(channel);
+      runServer(channel, startupLatch, stoppedLatch);
     } catch (SocketException socketException) {
       logger.log(
           Level.SEVERE,
           String.format(
               "Failed to bind to Unix domain socket. Please verify that the user running PGAdapter has write permission for file %s",
-              tempDir),
+              channel == null ? "(unknown)" : channel.getLocalAddress()),
           socketException);
       startupLatch.countDown();
     }
   }
 
   void runServer(
-      ServerSocket serverSocket, CountDownLatch startupLatch, CountDownLatch stoppedLatch)
+      ServerSocketChannel serverSocketChannel,
+      CountDownLatch startupLatch,
+      CountDownLatch stoppedLatch)
       throws IOException {
     startupLatch.countDown();
     awaitRunning();
     try {
       while (isRunning()) {
-        Socket socket = serverSocket.accept();
+        SocketChannel socketChannel = serverSocketChannel.accept();
         try {
-          createConnectionHandler(socket);
+          createConnectionHandler(socketChannel);
         } catch (SpannerException exception) {
-          handleConnectionError(exception, socket);
+          handleConnectionError(exception, socketChannel);
         }
       }
     } catch (SocketException e) {
@@ -259,9 +293,9 @@ public class ProxyServer extends AbstractApiService {
           () ->
               String.format(
                   "Socket exception on socket %s: %s. This is normal when the server is stopped.",
-                  serverSocket, e));
+                  serverSocketChannel, e));
     } finally {
-      logger.log(Level.INFO, () -> String.format("Socket %s stopped", serverSocket));
+      logger.log(Level.INFO, () -> String.format("Socket %s stopped", serverSocketChannel));
       stoppedLatch.countDown();
     }
   }
@@ -270,9 +304,9 @@ public class ProxyServer extends AbstractApiService {
    * Sends a message to the client that the connection could not be established.
    *
    * @param exception The exception that caused the connection request to fail.
-   * @param socket The socket that was created for the connection.
+   * @param socketChannel The socketChannel that was created for the connection.
    */
-  private void handleConnectionError(SpannerException exception, Socket socket) {
+  private void handleConnectionError(SpannerException exception, SocketChannel socketChannel) {
     logger.log(
         Level.SEVERE,
         exception,
@@ -282,7 +316,7 @@ public class ProxyServer extends AbstractApiService {
                 exception.getMessage()));
     try {
       DataOutputStream output =
-          new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+          new DataOutputStream(new BufferedOutputStream(Channels.newOutputStream(socketChannel)));
       new ErrorResponse(output, exception, ErrorResponse.State.ConnectionException, Severity.FATAL)
           .send();
       output.flush();
@@ -297,12 +331,12 @@ public class ProxyServer extends AbstractApiService {
   /**
    * Creates and runs the {@link ConnectionHandler}, saving an instance of it locally.
    *
-   * @param socket The socket the {@link ConnectionHandler} will read from.
+   * @param socketChannel The socketChannel the {@link ConnectionHandler} will read from.
    * @throws SpannerException if the {@link ConnectionHandler} is unable to connect to Cloud Spanner
    *     or if the dialect of the database is not PostgreSQL.
    */
-  void createConnectionHandler(Socket socket) {
-    ConnectionHandler handler = new ConnectionHandler(this, socket);
+  void createConnectionHandler(SocketChannel socketChannel) throws IOException {
+    ConnectionHandler handler = new ConnectionHandler(this, socketChannel);
     register(handler);
     handler.start();
   }
