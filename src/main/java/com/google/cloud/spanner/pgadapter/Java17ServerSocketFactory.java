@@ -50,11 +50,12 @@ class Java17ServerSocketFactory implements ServerSocketFactory {
 
   public ServerSocketChannel creatUnixDomainSocketChannel(OptionsMetadata options, int localPort)
       throws IOException {
-    File tempDir = new File(options.getSocketFile(localPort));
-    Path path = Path.of(tempDir.toURI());
-    if (tempDir.getParentFile() != null && !tempDir.getParentFile().exists()) {
-      tempDir.mkdirs();
+    File socketFile = new File(options.getSocketFile(localPort));
+    Path path = Path.of(socketFile.toURI());
+    if (socketFile.getParentFile() != null && !socketFile.getParentFile().exists()) {
+      socketFile.mkdirs();
     }
+    socketFile.deleteOnExit();
     UnixDomainSocketAddress address = UnixDomainSocketAddress.of(path);
     ServerSocketChannel domainSocketChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
     domainSocketChannel.configureBlocking(true);
