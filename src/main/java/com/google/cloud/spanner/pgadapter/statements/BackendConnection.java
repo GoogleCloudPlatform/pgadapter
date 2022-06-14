@@ -115,6 +115,11 @@ public class BackendConnection {
     void execute() {
       try {
         checkConnectionState();
+        // TODO(b/235719478): If the statement is a BEGIN statement and there is a COMMIT statement
+        //  at a later point in the batch, and all the statements in the transaction block are
+        //  SELECT statements, then we should create a read-only transaction. Also, if a transaction
+        //  block always ends with a ROLLBACK, PGAdapter should skip the entire execution of that
+        //  block.
         if (connectionState == ConnectionState.ABORTED
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
