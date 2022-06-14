@@ -21,6 +21,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 
 import com.google.common.collect.ImmutableList;
+import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -105,6 +106,10 @@ public class DomainSocketsTest extends AbstractMockServerTest {
 
   @Test
   public void testPGAdapterStartFailsWithInvalidSocketFile() throws Exception {
+    assumeFalse(
+        "Skip test if the test container allows writing to the root directory",
+        new File("/test.txt").canWrite());
+
     doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of("-dir", "/"));
 
     // Verify that we cannot connect to the invalid (not permitted) domain socket.
