@@ -18,6 +18,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.api.client.json.GenericJson;
@@ -51,6 +52,8 @@ public class ITAuthTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() throws ClassNotFoundException {
+    assumeFalse(
+        "Auth test requires PGAdapter to be started with -a", testEnv.isUsingExternalPGAdapter());
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
 

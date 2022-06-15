@@ -21,6 +21,7 @@ import java.net.InetSocketAddress;
 import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 // If your IDE is complaining about this file not being compatible with the language level
@@ -55,7 +56,16 @@ class Java17ServerSocketFactory implements ServerSocketFactory {
     if (socketFile.getParentFile() != null && !socketFile.getParentFile().exists()) {
       socketFile.mkdirs();
     }
-    socketFile.deleteOnExit();
+
+    // deleteOnExit() does not work when PGAdapter is built as a native image. It also does not get
+    // deleted if the JVM crashes. We therefore need to try to delete the file at startup to ensure
+    // we don't get a lot of 'address already in use' errors.
+    try {
+      Files.deleteIfExists(path);
+    } catch (IOException ignore) {
+      // Ignore and let the Unix domain socket subsystem throw an 'Address in use' error.
+    }
+
     UnixDomainSocketAddress address = UnixDomainSocketAddress.of(path);
     ServerSocketChannel domainSocketChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
     domainSocketChannel.configureBlocking(true);

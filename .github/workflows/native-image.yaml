@@ -1,0 +1,56 @@
+on:
+  # This allows manual activation of this action for testing.
+  workflow_dispatch:
+  pull_request:
+name: native-image
+env:
+  GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
+  GOOGLE_CLOUD_INSTANCE: "pgadapter-testing"
+  GOOGLE_CLOUD_DATABASE: "testdb_integration"
+  GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
+jobs:
+  check-env:
+    outputs:
+      has-key: ${{ steps.project-id.outputs.defined }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: project-id
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        if: "${{ env.GCP_PROJECT_ID != '' }}"
+        run: echo "::set-output name=defined::true"
+
+  build-native-image:
+    needs: [check-env]
+    if: needs.check-env.outputs.has-key == 'true'
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          version: 'latest'
+          java-version: '17'
+          components: 'native-image'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup GCloud
+        uses: google-github-actions/setup-gcloud@v0
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
+          export_default_credentials: true
+      - name: Build and run PGAdapter native image
+        run: |
+          mvn package -Passembly -Pnative-image -DskipTests
+          cd "target/pgadapter"
+          native-image -H:IncludeResources=".*metadata.*json$" -jar pgadapter.jar --no-fallback
+          ./pgadapter -p ${{env.GOOGLE_CLOUD_PROJECT}} -i ${{env.GOOGLE_CLOUD_INSTANCE}} &
+      - name: Run integration tests
+        run: |
+          mvn verify \
+                -Dclirr.skip=true \
+                -DskipITs=false \
+                -DPG_ADAPTER_ADDRESS="localhost" \
+                -DPG_ADAPTER_SOCKET_DIR="/tmp" \
+                -DPG_ADAPTER_LOCAL_PORT="5432" \
+                -DPG_ADAPTER_DATABASE="${{env.GOOGLE_CLOUD_DATABASE}}"

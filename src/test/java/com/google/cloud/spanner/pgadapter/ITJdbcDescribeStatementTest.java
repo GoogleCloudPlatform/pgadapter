@@ -101,7 +101,9 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   }
 
   private String getConnectionUrl() {
-    return String.format("jdbc:postgresql://%s/", testEnv.getPGAdapterHostAndPort());
+    return String.format(
+        "jdbc:postgresql://%s/%s",
+        testEnv.getPGAdapterHostAndPort(), database.getId().getDatabase());
   }
 
   @Test

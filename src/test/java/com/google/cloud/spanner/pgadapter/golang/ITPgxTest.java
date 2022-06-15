@@ -110,13 +110,18 @@ public class ITPgxTest implements IntegrationTest {
     if (useDomainSocket) {
       return new GoString(
           String.format(
-              "host=/tmp port=%d prefer_simple_protocol=%s",
-              testEnv.getServer().getLocalPort(), preferQueryMode.equals("simple")));
+              "host=%s port=%d database=%s prefer_simple_protocol=%s",
+              testEnv.getPGAdapterSocketDir(),
+              testEnv.getPGAdapterPort(),
+              database.getId().getDatabase(),
+              preferQueryMode.equals("simple")));
     }
     return new GoString(
         String.format(
-            "postgres://uid:pwd@localhost:%d/?sslmode=disable&prefer_simple_protocol=%s",
-            testEnv.getServer().getLocalPort(), preferQueryMode.equals("simple")));
+            "postgres://uid:pwd@%s/%s?sslmode=disable&prefer_simple_protocol=%s",
+            testEnv.getPGAdapterHostAndPort(),
+            database.getId().getDatabase(),
+            preferQueryMode.equals("simple")));
   }
 
   @Before

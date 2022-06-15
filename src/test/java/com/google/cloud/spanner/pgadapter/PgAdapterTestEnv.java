@@ -36,6 +36,7 @@ import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -76,8 +77,12 @@ public class PgAdapterTestEnv {
   // PgAdapter host address (when using an external PGAdapter instance).
   public static final String PG_ADAPTER_ADDRESS = System.getProperty("PG_ADAPTER_ADDRESS", null);
 
+  // PgAdapter socket directory (when using an external PGAdapter instance).
+  public static final String PG_ADAPTER_SOCKET_DIR =
+      System.getProperty("PG_ADAPTER_SOCKET_DIR", "/tmp");
+
   // PgAdapter port should be set through this system property.
-  public static final String PG_ADAPTER_PORT = "PG_ADAPTER_PORT";
+  public static final String PG_ADAPTER_PORT = System.getProperty("PG_ADAPTER_PORT", "5432");
 
   // Environment variable that can be used to force the test env to assume that the test database
   // already exists. This can be used to speed up local testing by manually creating the test
@@ -217,6 +222,15 @@ public class PgAdapterTestEnv {
     return gcpCredentials;
   }
 
+  /**
+   * Returns true if the current test environment is using an externally started instance of
+   * PGAdapter. Some tests do not support this, as they require PGAdapter to be started with
+   * specific arguments.
+   */
+  public boolean isUsingExternalPGAdapter() {
+    return PG_ADAPTER_ADDRESS != null;
+  }
+
   public String getPGAdapterHostAndPort() {
     if (server != null) {
       return String.format("localhost:%d", server.getLocalPort());
@@ -229,6 +243,21 @@ public class PgAdapterTestEnv {
       return "localhost";
     }
     return PG_ADAPTER_ADDRESS;
+  }
+
+  public String getPGAdapterSocketDir() {
+    if (server != null) {
+      String file = server.getOptions().getSocketFile(getPGAdapterPort());
+      return new File(file).toPath().getParent().toString();
+    }
+    return PG_ADAPTER_SOCKET_DIR;
+  }
+
+  public String getPGAdapterSocketFile() {
+    if (server != null) {
+      return server.getOptions().getSocketFile(getPGAdapterPort());
+    }
+    return String.format("%s/.s.PGSQL.%d", PG_ADAPTER_SOCKET_DIR, getPGAdapterPort());
   }
 
   public int getPGAdapterPort() {
