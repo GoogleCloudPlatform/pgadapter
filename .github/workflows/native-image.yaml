@@ -26,7 +26,7 @@ jobs:
     needs: [check-env]
     if: needs.check-env.outputs.has-key == 'true'
     timeout-minutes: 60
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
       - uses: graalvm/setup-graalvm@v1
@@ -41,11 +41,16 @@ jobs:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           service_account_key: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
           export_default_credentials: true
+      - name: Set up swap space
+        if: runner.os == 'Linux'
+        uses: pierotofy/set-swap-space@v1.0
+        with:
+          swap-size-gb: 12
       - name: Build and run PGAdapter native image
         run: |
           mvn package -Passembly -Pnative-image -DskipTests
           cd "target/pgadapter"
-          native-image -J-Xmx12g -H:IncludeResources=".*metadata.*json$" -jar pgadapter.jar --no-fallback
+          native-image -J-Xmx14g -H:IncludeResources=".*metadata.*json$" -jar pgadapter.jar --no-fallback
           ./pgadapter -p ${{env.GOOGLE_CLOUD_PROJECT}} -i ${{env.GOOGLE_CLOUD_INSTANCE}} &
       - name: Run integration tests
         run: |
@@ -54,5 +59,5 @@ jobs:
                 -DskipITs=false \
                 -DPG_ADAPTER_ADDRESS="localhost" \
                 -DPG_ADAPTER_SOCKET_DIR="/tmp" \
-                -DPG_ADAPTER_LOCAL_PORT="5432" \
+                -DPG_ADAPTER_PORT="5432" \
                 -DPG_ADAPTER_DATABASE="${{env.GOOGLE_CLOUD_DATABASE}}"
