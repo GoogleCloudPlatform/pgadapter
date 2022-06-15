@@ -57,7 +57,9 @@ jobs:
           mvn verify \
                 -Dclirr.skip=true \
                 -DskipITs=false \
+                -DPG_ADAPTER_PROJECT="${{env.GOOGLE_CLOUD_PROJECT}}"
+                -DPG_ADAPTER_INSTANCE="${{env.GOOGLE_CLOUD_INSTANCE}}"
+                -DPG_ADAPTER_DATABASE="${{env.GOOGLE_CLOUD_DATABASE}}"
                 -DPG_ADAPTER_ADDRESS="localhost" \
                 -DPG_ADAPTER_SOCKET_DIR="/tmp" \
                 -DPG_ADAPTER_PORT="5432" \
-                -DPG_ADAPTER_DATABASE="${{env.GOOGLE_CLOUD_DATABASE}}"
