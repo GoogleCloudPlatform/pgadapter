@@ -1,6 +1,7 @@
 on:
   # This allows manual activation of this action for testing.
   workflow_dispatch:
+  pull_request:
   schedule:
     - cron: '0 2 * * 1,2,3,4,5'
 name: native-image
