@@ -1,7 +1,8 @@
 on:
   # This allows manual activation of this action for testing.
   workflow_dispatch:
-  pull_request:
+  schedule:
+    - cron: '0 2 * * 1,2,3,4,5'
 name: native-image
 env:
   GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
@@ -43,7 +44,7 @@ jobs:
         run: |
           mvn package -Passembly -Pnative-image -DskipTests
           cd "target/pgadapter"
-          native-image -H:IncludeResources=".*metadata.*json$" -jar pgadapter.jar --no-fallback
+          native-image -J-Xmx12g -H:IncludeResources=".*metadata.*json$" -jar pgadapter.jar --no-fallback
           ./pgadapter -p ${{env.GOOGLE_CLOUD_PROJECT}} -i ${{env.GOOGLE_CLOUD_INSTANCE}} &
       - name: Run integration tests
         run: |
