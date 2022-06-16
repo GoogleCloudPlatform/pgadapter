@@ -71,6 +71,7 @@ import javax.annotation.Nullable;
 @InternalApi
 public class ConnectionHandler extends Thread {
   private static final Logger logger = Logger.getLogger(ConnectionHandler.class.getName());
+  private static final int SOCKET_BUFFER_SIZE = 1 << 16;
   private static final AtomicLong CONNECTION_HANDLER_ID_GENERATOR = new AtomicLong(0L);
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
 
@@ -202,10 +203,12 @@ public class ConnectionHandler extends Thread {
 
     try (DataInputStream input =
             new DataInputStream(
-                new BufferedInputStream(Channels.newInputStream(socketChannel), 1 << 16));
+                new BufferedInputStream(
+                    Channels.newInputStream(socketChannel), SOCKET_BUFFER_SIZE));
         DataOutputStream output =
             new DataOutputStream(
-                new BufferedOutputStream(Channels.newOutputStream(socketChannel), 1 << 16))) {
+                new BufferedOutputStream(
+                    Channels.newOutputStream(socketChannel), SOCKET_BUFFER_SIZE))) {
       if (!server.getOptions().disableLocalhostCheck()
           && this.remoteAddress != null
           && !this.remoteAddress.getAddress().isAnyLocalAddress()

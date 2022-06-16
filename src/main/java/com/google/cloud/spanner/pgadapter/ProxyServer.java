@@ -22,16 +22,11 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
-import java.io.BufferedOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
-import java.nio.channels.Channels;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Collections;
@@ -279,12 +274,7 @@ public class ProxyServer extends AbstractApiService {
     awaitRunning();
     try {
       while (isRunning()) {
-        SocketChannel socketChannel = serverSocketChannel.accept();
-        try {
-          createConnectionHandler(socketChannel);
-        } catch (SpannerException exception) {
-          handleConnectionError(exception, socketChannel);
-        }
+        createConnectionHandler(serverSocketChannel.accept());
       }
     } catch (SocketException e) {
       // This is a normal exception, as this will occur when Server#stopServer() is called.
@@ -297,35 +287,6 @@ public class ProxyServer extends AbstractApiService {
     } finally {
       logger.log(Level.INFO, () -> String.format("Socket %s stopped", serverSocketChannel));
       stoppedLatch.countDown();
-    }
-  }
-
-  /**
-   * Sends a message to the client that the connection could not be established.
-   *
-   * @param exception The exception that caused the connection request to fail.
-   * @param socketChannel The socketChannel that was created for the connection.
-   */
-  private void handleConnectionError(SpannerException exception, SocketChannel socketChannel) {
-    logger.log(
-        Level.SEVERE,
-        exception,
-        () ->
-            String.format(
-                "Something went wrong in establishing a Spanner connection: %s",
-                exception.getMessage()));
-    try {
-      DataOutputStream output =
-          new DataOutputStream(
-              new BufferedOutputStream(Channels.newOutputStream(socketChannel), 1 << 16));
-      new ErrorResponse(output, exception, ErrorResponse.State.ConnectionException, Severity.FATAL)
-          .send();
-      output.flush();
-    } catch (Exception e) {
-      logger.log(
-          Level.WARNING,
-          e,
-          () -> String.format("Failed to send fatal error message to client: %s", e.getMessage()));
     }
   }
 

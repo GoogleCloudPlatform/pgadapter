@@ -420,6 +420,80 @@ func TestMixedBatch(connString string) *C.char {
 	return nil
 }
 
+//export TestBatchError
+func TestBatchError(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	batch := &pgx.Batch{}
+	batchSize := 5
+	if err := insertBatch(batch, connString, batchSize); err != nil {
+		return C.CString(err.Error())
+	}
+	// This statement will fail.
+	batch.Queue("select count(*) from non_existent_table where col_bool=$1", true)
+	// This statement will not be executed as the previous statement failed.
+	batch.Queue("update all_types set col_bool=false where col_bool=$1", true)
+
+	res := conn.SendBatch(ctx, batch)
+
+	// Try to get results from the batch execution. Even though the error occurred for the select
+	// statement, it is returned for the first statement in the batch.
+	_, err = res.Exec()
+	if err == nil {
+		return C.CString(fmt.Sprintf("expected error for batch, but got nil"))
+	}
+	if err := res.Close(); err != nil {
+		return C.CString(err.Error())
+	}
+
+	return nil
+}
+
+//export TestBatchExecutionError
+func TestBatchExecutionError(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	batch := &pgx.Batch{}
+	batchSize := 3
+	if err := insertBatch(batch, connString, batchSize); err != nil {
+		return C.CString(err.Error())
+	}
+
+	res := conn.SendBatch(ctx, batch)
+
+	// Try to get results from the batch execution.
+	tag, err := res.Exec()
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to execute first insert statement: %v", err))
+	}
+	if !tag.Insert() {
+		return C.CString("the first statement was not recognized as an insert")
+	}
+	if g, w := tag.RowsAffected(), int64(1); g != w {
+		return C.CString(fmt.Sprintf("rows affected mismatch for first statement:\n Got: %v\nWant: %v", g, w))
+	}
+
+	_, err = res.Exec()
+	if err == nil {
+		return C.CString(fmt.Sprintf("expected error for second statement, but got nil"))
+	}
+	if err := res.Close(); err != nil {
+		return C.CString(fmt.Sprintf("closing batch result returned error: %v", err.Error()))
+	}
+
+	return nil
+}
+
 func insertBatch(batch *pgx.Batch, connString string, batchSize int) error {
 	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
 	numeric := pgtype.Numeric{}
