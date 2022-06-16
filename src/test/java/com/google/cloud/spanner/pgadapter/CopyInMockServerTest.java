@@ -132,6 +132,48 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCopyIn_Large_FailsWhenAtomic() throws SQLException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  copyManager.copyIn(
+                      "copy all_types from stdin;",
+                      new FileInputStream("./src/test/resources/all_types_data.txt")));
+      // The JDBC driver CopyManager takes the COPY protocol quite literally, and as the COPY
+      // protocol does not include any error handling, the JDBC driver will just send all data to
+      // the server and ignore any error messages the server might send during the copy operation.
+      // PGAdapter therefore drops the connection if it continues to receive CopyData messages after
+      // it sent back an error message.
+      assertTrue(exception.getMessage().contains("Database connection failed"));
+    }
+  }
+
+  @Test
+  public void testCopyIn_Large_SucceedsWhenNonAtomic() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection
+          .createStatement()
+          .execute("set spanner.autocommit_dml_mode='partitioned_non_atomic'");
+
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      long copyCount =
+          copyManager.copyIn(
+              "copy all_types from stdin;",
+              new FileInputStream("./src/test/resources/all_types_data.txt"));
+      assertEquals(10_000L, copyCount);
+    }
+  }
+
+  @Test
   public void testCopyInError() throws SQLException {
     setupCopyInformationSchemaResults();
     mockSpanner.setCommitExecutionTime(
