@@ -25,10 +25,6 @@ jobs:
         with:
           python-version: '3.9'
       - run: python --version
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v3
-        with:
-          python-version: '3.9'
       - run: pip install -r ./src/test/python/requirements.txt
       - run: mvn -B test -Ptest-all
   windows:
@@ -50,10 +46,6 @@ jobs:
         with:
           python-version: '3.9'
       - run: python --version
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v3
-        with:
-          python-version: '3.9'
       - run: pip install -r ./src/test/python/requirements.txt
       - run: mvn -B test
   macos:
@@ -79,9 +71,8 @@ jobs:
         with:
           python-version: '3.9'
       - run: python --version
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v3
-        with:
-          python-version: '3.9'
       - run: pip install -r ./src/test/python/requirements.txt
+      - uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: '6.0.x'
       - run: mvn -B test -Ptest-all
