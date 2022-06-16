@@ -201,10 +201,11 @@ public class ConnectionHandler extends Thread {
                 "Connection handler with ID %s starting for client %s", getName(), remoteClient));
 
     try (DataInputStream input =
-            new DataInputStream(new BufferedInputStream(Channels.newInputStream(socketChannel)));
+            new DataInputStream(
+                new BufferedInputStream(Channels.newInputStream(socketChannel), 1 << 16));
         DataOutputStream output =
             new DataOutputStream(
-                new BufferedOutputStream(Channels.newOutputStream(socketChannel)))) {
+                new BufferedOutputStream(Channels.newOutputStream(socketChannel), 1 << 16))) {
       if (!server.getOptions().disableLocalhostCheck()
           && this.remoteAddress != null
           && !this.remoteAddress.getAddress().isAnyLocalAddress()
