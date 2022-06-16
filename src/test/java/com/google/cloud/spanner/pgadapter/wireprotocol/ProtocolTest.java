@@ -1535,7 +1535,7 @@ public class ProtocolTest {
     assertTrue(outputFile.exists());
     assertTrue(outputFile.isFile());
 
-    assertTrue(outputFile.delete());
+    deleteLogFile();
     copyStatement.close();
   }
 
@@ -1568,7 +1568,7 @@ public class ProtocolTest {
     assertTrue(outputFile.exists());
     assertTrue(outputFile.isFile());
 
-    assertTrue(outputFile.delete());
+    deleteLogFile();
     copyStatement.close();
   }
 
