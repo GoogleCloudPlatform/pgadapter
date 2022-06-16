@@ -21,6 +21,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
@@ -33,6 +34,7 @@ import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
@@ -44,7 +46,10 @@ import java.util.List;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
+import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyIn;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
@@ -53,8 +58,16 @@ import org.postgresql.core.QueryExecutorBase;
 import org.postgresql.core.v3.CopyOperationImpl;
 import org.postgresql.core.v3.QueryExecutorImpl;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class CopyInMockServerTest extends AbstractMockServerTest {
+
+  @Parameter public boolean useDomainSocket;
+
+  @Parameters(name = "useDomainSocket = {0}")
+  public static Object[] data() {
+    OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
+    return options.isDomainSocketEnabled() ? new Object[] {true, false} : new Object[] {false};
+  }
 
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
@@ -67,6 +80,13 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
    * mode for queries and DML statements.
    */
   private String createUrl() {
+    if (useDomainSocket) {
+      return String.format(
+          "jdbc:postgresql://localhost/?"
+              + "socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
+              + "&socketFactoryArg=/tmp/.s.PGSQL.%d",
+          pgServer.getLocalPort());
+    }
     return String.format("jdbc:postgresql://localhost:%d/", pgServer.getLocalPort());
   }
 
@@ -94,6 +114,21 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     Mutation mutation = commitRequest.getMutations(0);
     assertEquals(OperationCase.INSERT, mutation.getOperationCase());
     assertEquals(3, mutation.getInsert().getValuesCount());
+  }
+
+  @Test
+  public void testCopyIn_Small() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      long copyCount =
+          copyManager.copyIn(
+              "copy all_types from stdin;",
+              new FileInputStream("./src/test/resources/all_types_data_small.txt"));
+      assertEquals(100L, copyCount);
+    }
   }
 
   @Test
@@ -365,6 +400,64 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                 .to("users")
                 .build(),
             resultSet));
+    com.google.spanner.v1.ResultSet allTypesResultSet =
+        com.google.spanner.v1.ResultSet.newBuilder()
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("col_bigint").build())
+                    .addValues(Value.newBuilder().setStringValue("bigint").build())
+                    .build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("col_bool").build())
+                    .addValues(Value.newBuilder().setStringValue("boolean").build())
+                    .build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("col_bytea").build())
+                    .addValues(Value.newBuilder().setStringValue("bytea").build())
+                    .build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("col_float8").build())
+                    .addValues(Value.newBuilder().setStringValue("float8").build())
+                    .build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("col_int").build())
+                    .addValues(Value.newBuilder().setStringValue("bigint").build())
+                    .build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("col_numeric").build())
+                    .addValues(Value.newBuilder().setStringValue("numeric").build())
+                    .build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("col_timestamptz").build())
+                    .addValues(
+                        Value.newBuilder().setStringValue("timestamp with time zone").build())
+                    .build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("col_date").build())
+                    .addValues(Value.newBuilder().setStringValue("date").build())
+                    .build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("col_varchar").build())
+                    .addValues(Value.newBuilder().setStringValue("character varying").build())
+                    .build())
+            .setMetadata(metadata)
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.newBuilder(
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1")
+                .bind("p1")
+                .to("all_types")
+                .build(),
+            allTypesResultSet));
 
     String indexedColumnsCountSql =
         "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3, $4)";
@@ -400,5 +493,52 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                 .to("name")
                 .build(),
             indexedColumnsCountResultSet));
+
+    String allTypesIndexedColumnsCountSql =
+        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3, $4, $5, $6, $7, $8, $9, $10)";
+    ResultSetMetadata allTypesIndexedColumnsCountMetadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                            .build())
+                    .build())
+            .build();
+    com.google.spanner.v1.ResultSet allTypesIndexedColumnsCountResultSet =
+        com.google.spanner.v1.ResultSet.newBuilder()
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("1").build())
+                    .build())
+            .setMetadata(allTypesIndexedColumnsCountMetadata)
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.newBuilder(allTypesIndexedColumnsCountSql)
+                .bind("p1")
+                .to("all_types")
+                .bind("p2")
+                .to("col_bigint")
+                .bind("p3")
+                .to("col_bool")
+                .bind("p4")
+                .to("col_bytea")
+                .bind("p5")
+                .to("col_float8")
+                .bind("p6")
+                .to("col_int")
+                .bind("p7")
+                .to("col_numeric")
+                .bind("p8")
+                .to("col_timestamptz")
+                .bind("p9")
+                .to("col_date")
+                .bind("p10")
+                .to("col_varchar")
+                .build(),
+            allTypesIndexedColumnsCountResultSet));
   }
 }
