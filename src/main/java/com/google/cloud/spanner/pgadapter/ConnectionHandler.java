@@ -189,9 +189,10 @@ public class ConnectionHandler extends Thread {
                 getName(), socket.getInetAddress().getHostAddress()));
 
     try (DataInputStream input =
-            new DataInputStream(new BufferedInputStream(this.socket.getInputStream()));
+            new DataInputStream(new BufferedInputStream(this.socket.getInputStream(), 1 << 16));
         DataOutputStream output =
-            new DataOutputStream(new BufferedOutputStream(this.socket.getOutputStream()))) {
+            new DataOutputStream(
+                new BufferedOutputStream(this.socket.getOutputStream(), 1 << 16))) {
       if (!server.getOptions().disableLocalhostCheck()
           && !this.socket.getInetAddress().isAnyLocalAddress()
           && !this.socket.getInetAddress().isLoopbackAddress()) {

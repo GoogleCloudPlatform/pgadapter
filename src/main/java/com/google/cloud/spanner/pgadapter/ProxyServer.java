@@ -282,7 +282,7 @@ public class ProxyServer extends AbstractApiService {
                 exception.getMessage()));
     try {
       DataOutputStream output =
-          new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+          new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), 1 << 16));
       new ErrorResponse(output, exception, ErrorResponse.State.ConnectionException, Severity.FATAL)
           .send();
       output.flush();
