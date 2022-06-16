@@ -129,7 +129,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
                   getPortalMetadata().getMetadata(),
                   this.connection.getServer().getOptions(),
                   this.queryMode)
-              .send();
+              .send(false);
         } catch (SpannerException exception) {
           this.handleError(exception);
         }
@@ -137,7 +137,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
         // The simple query protocol does not expect a NoData response in case of a non-query
         // statement.
         if (isExtendedProtocol()) {
-          new NoDataResponse(this.outputStream).send();
+          new NoDataResponse(this.outputStream).send(false);
         }
       }
     }
@@ -165,7 +165,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   public void handleDescribeStatement() throws Exception {
     try {
       DescribeStatementMetadata metadata = (DescribeStatementMetadata) this.statement.describe();
-      new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send();
+      new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send(false);
       if (metadata.getResultSet() != null) {
         new RowDescriptionResponse(
                 this.outputStream,
@@ -173,9 +173,9 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
                 metadata.getResultSet(),
                 this.connection.getServer().getOptions(),
                 this.queryMode)
-            .send();
+            .send(false);
       } else {
-        new NoDataResponse(this.outputStream).send();
+        new NoDataResponse(this.outputStream).send(false);
       }
     } catch (SpannerException exception) {
       this.handleError(exception);
