@@ -56,7 +56,7 @@ jobs:
       - name: Run integration tests
         run: mvn verify -B -Dclirr.skip=true -DskipITs=false -DPG_ADAPTER_HOST="https://$GOOGLE_CLOUD_ENDPOINT" -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
         with:
           directory: ./target/site/jacoco-merged-test-coverage-report
           fail_ci_if_error: true
