@@ -23,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Mutation;
@@ -110,11 +111,11 @@ public class MutationWriterTest {
             .build();
     Connection connection = mock(Connection.class);
     DatabaseClient databaseClient = mock(DatabaseClient.class);
+    when(connection.getDatabaseClient()).thenReturn(databaseClient);
     MutationWriter mutationWriter =
         new MutationWriter(
             CopyTransactionMode.ImplicitAtomic,
             connection,
-            databaseClient,
             "numbers",
             tableColumns,
             /* indexedColumnsCount = */ 1,
@@ -187,12 +188,12 @@ public class MutationWriterTest {
               .build();
       Connection connection = mock(Connection.class);
       DatabaseClient databaseClient = mock(DatabaseClient.class);
+      when(connection.getDatabaseClient()).thenReturn(databaseClient);
 
       MutationWriter mutationWriter =
           new MutationWriter(
               CopyTransactionMode.ImplicitNonAtomic,
               connection,
-              databaseClient,
               "numbers",
               tableColumns,
               /* indexedColumnsCount = */ 1,
@@ -264,12 +265,12 @@ public class MutationWriterTest {
               .build();
       Connection connection = mock(Connection.class);
       DatabaseClient databaseClient = mock(DatabaseClient.class);
+      when(connection.getDatabaseClient()).thenReturn(databaseClient);
 
       MutationWriter mutationWriter =
           new MutationWriter(
               CopyTransactionMode.ImplicitNonAtomic,
               connection,
-              databaseClient,
               "numbers",
               tableColumns,
               /* indexedColumnsCount = */ 1,
@@ -308,12 +309,12 @@ public class MutationWriterTest {
             .build();
     Connection connection = mock(Connection.class);
     DatabaseClient databaseClient = mock(DatabaseClient.class);
+    when(connection.getDatabaseClient()).thenReturn(databaseClient);
 
     MutationWriter mutationWriter =
         new MutationWriter(
             CopyTransactionMode.ImplicitNonAtomic,
             connection,
-            databaseClient,
             "numbers",
             tableColumns,
             /* indexedColumnsCount = */ 1,

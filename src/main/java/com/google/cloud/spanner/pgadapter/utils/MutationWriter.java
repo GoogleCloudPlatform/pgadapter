@@ -28,7 +28,6 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -45,7 +44,6 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.PrintWriter;
 import java.io.Reader;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.format.DateTimeParseException;
@@ -124,7 +122,6 @@ public class MutationWriter implements Callable<Long>, Closeable {
   private boolean isHeaderParsed;
   private long rowCount;
   private final Connection connection;
-  private DatabaseClient databaseClient;
   private final String tableName;
   private final Map<String, TypeCode> tableColumns;
   private final int maxBatchSize;
@@ -153,31 +150,8 @@ public class MutationWriter implements Callable<Long>, Closeable {
       CSVFormat format,
       boolean hasHeader)
       throws IOException {
-    this(
-        transactionMode,
-        connection,
-        null,
-        tableName,
-        tableColumns,
-        indexedColumnsCount,
-        format,
-        hasHeader);
-  }
-
-  @VisibleForTesting
-  MutationWriter(
-      CopyTransactionMode transactionMode,
-      Connection connection,
-      DatabaseClient databaseClient,
-      String tableName,
-      Map<String, TypeCode> tableColumns,
-      int indexedColumnsCount,
-      CSVFormat format,
-      boolean hasHeader)
-      throws IOException {
     this.transactionMode = transactionMode;
     this.connection = connection;
-    this.databaseClient = databaseClient;
     this.hasHeader = hasHeader;
     this.isHeaderParsed = false;
     this.tableName = tableName;
@@ -404,7 +378,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
     // blocked until there is room in the deque.
     activeCommitFutures.put(settableApiFuture);
 
-    DatabaseClient dbClient = getDatabaseClient();
+    DatabaseClient dbClient = connection.getDatabaseClient();
     ImmutableList<Mutation> immutableMutations = ImmutableList.copyOf(mutations);
     ListenableFuture<Void> listenableFuture =
         executorService.submit(
@@ -432,23 +406,6 @@ public class MutationWriter implements Callable<Long>, Closeable {
         },
         MoreExecutors.directExecutor());
     return settableApiFuture;
-  }
-
-  private DatabaseClient getDatabaseClient() {
-    if (databaseClient == null) {
-      try {
-        // TODO: Replace with connection.getDatabaseClient() when 6.21 has been released.
-        Class<?> connectionImplClass =
-            Class.forName("com.google.cloud.spanner.connection.ConnectionImpl");
-        Field dbClientField = connectionImplClass.getDeclaredField("dbClient");
-        dbClientField.setAccessible(true);
-        databaseClient = (DatabaseClient) dbClientField.get(this.connection);
-      } catch (Exception e) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INTERNAL, "Failed to get database client from connection", e);
-      }
-    }
-    return databaseClient;
   }
 
   private int calculateSize(Mutation mutation) {
