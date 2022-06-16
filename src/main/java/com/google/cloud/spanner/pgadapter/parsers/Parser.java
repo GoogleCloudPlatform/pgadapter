@@ -25,7 +25,6 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import org.postgresql.core.Oid;
-import org.postgresql.util.PGbytea;
 
 /**
  * Parser is the parsing superclass, used to take wire format data types and convert them
@@ -51,41 +50,6 @@ public abstract class Parser<T> {
   public static final long PG_EPOCH_DAYS = PG_EPOCH_SECONDS / 86400L;
   protected static final Charset UTF8 = StandardCharsets.UTF_8;
   protected T item;
-
-  /**
-   * TODO: Remove when we have full support for DescribeStatement.
-   *
-   * <p>Guess the type of a parameter with unspecified type.
-   *
-   * @param item The value to guess the type for
-   * @param formatCode The encoding that is used for the value
-   * @return The {@link Oid} type code that is guessed for the value or {@link Oid#UNSPECIFIED} if
-   *     no type could be guessed.
-   */
-  private static int guessType(byte[] item, FormatCode formatCode) {
-    // TODO: Put 'guessType' behind a command line flag so it is only enabled when wanted.
-    if (formatCode == FormatCode.TEXT && item != null) {
-      String value = new String(item, StandardCharsets.UTF_8);
-      if (value.equals("t") || value.equals("f")) {
-        return Oid.BOOL;
-      }
-      if (value.length() >= 2 && value.charAt(0) == '\\' && value.charAt(1) == 'x') {
-        try {
-          PGbytea.toBytes(item);
-          return Oid.BYTEA;
-        } catch (Exception e) {
-          // ignore and fall through
-        }
-      }
-      if (TimestampParser.isTimestamp(value)) {
-        return Oid.TIMESTAMPTZ;
-      }
-      if (DateParser.isDate(value)) {
-        return Oid.DATE;
-      }
-    }
-    return Oid.UNSPECIFIED;
-  }
 
   /**
    * Factory method to create a Parser subtype with a designated type from a byte array.
@@ -124,13 +88,7 @@ public abstract class Parser<T> {
       case Oid.TIMESTAMPTZ:
         return new TimestampParser(item, formatCode);
       case Oid.UNSPECIFIED:
-        // Try to guess the type based on the value. Use an unspecified parser if no type could be
-        // determined.
-        int type = guessType(item, formatCode);
-        if (type == Oid.UNSPECIFIED) {
-          return new UnspecifiedParser(item, formatCode);
-        }
-        return create(item, type, formatCode);
+        return new UnspecifiedParser(item, formatCode);
       default:
         throw new IllegalArgumentException("Unsupported parameter type: " + oidType);
     }
