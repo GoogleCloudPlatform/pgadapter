@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.golang;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -23,7 +24,9 @@ import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -42,6 +45,7 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.Status;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -647,6 +651,144 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     ByteString transactionId = ((CommitRequest) allRequests.get(11)).getTransactionId();
     assertEquals(transactionId, ((ExecuteSqlRequest) allRequests.get(9)).getTransaction().getId());
     assertEquals(transactionId, ((ExecuteSqlRequest) allRequests.get(10)).getTransaction().getId());
+  }
+
+  @Test
+  public void testBatchPrepareError() {
+    String insertSql =
+        "INSERT INTO all_types "
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 0L));
+    String describeInsertSql =
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9 from all_types) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeInsertSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING)))
+                .build()));
+    // This select statement will fail during the PREPARE phase that pgx executes for all statements
+    // before actually executing the batch.
+    String invalidSelectSql = "select count(*) from non_existent_table where col_bool=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(invalidSelectSql), Status.NOT_FOUND.asRuntimeException()));
+    // This statement will never be analyzed or executed.
+    String updateSql = "update all_types set col_bool=false where col_bool=$1";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 0L));
+
+    String res = pgxTest.TestBatchError(createConnString());
+
+    assertNotNull(res);
+    assertTrue(res, res.contains("NOT_FOUND"));
+    assertTrue(res, res.contains(invalidSelectSql));
+
+    // pgx will not execute any of the statements in the batch, as the select statement failed when
+    // it was prepared.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    // pgx will try to execute PREPARE for all the statements in the batch, but then stop at the
+    // first error. There is no guarantee in which order pgx will prepare the statements, so we
+    // don't know exactly which ones are being prepared and which ones are not.
+    List<ExecuteSqlRequest> prepareRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertTrue(prepareRequests.size() > 0);
+    assertTrue(
+        prepareRequests.stream()
+            .anyMatch(
+                request ->
+                    request.getSql().equals(invalidSelectSql)
+                        && request.getQueryMode() == QueryMode.PLAN));
+    assertFalse(
+        prepareRequests.stream().anyMatch(request -> request.getQueryMode() == QueryMode.NORMAL));
+  }
+
+  @Test
+  public void testBatchExecutionError() {
+    String insertSql =
+        "INSERT INTO all_types "
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+    String describeInsertSql =
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9 from all_types) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeInsertSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING)))
+                .build()));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 0L));
+    int batchSize = 3;
+    for (int i = 0; i < batchSize; i++) {
+      Statement statement =
+          Statement.newBuilder(insertSql)
+              .bind("p1")
+              .to(100L + i)
+              .bind("p2")
+              .to(i % 2 == 0)
+              .bind("p3")
+              .to(ByteArray.copyFrom(i + "test_bytes"))
+              .bind("p4")
+              .to(3.14d + i)
+              .bind("p5")
+              .to(i)
+              .bind("p6")
+              .to(com.google.cloud.spanner.Value.pgNumeric(i + ".123"))
+              .bind("p7")
+              .to(Timestamp.parseTimestamp(String.format("2022-03-24T%02d:39:10.123456000Z", i)))
+              .bind("p8")
+              .to(Date.parseDate(String.format("2022-04-%02d", i + 1)))
+              .bind("p9")
+              .to("test_string" + i)
+              .build();
+      if (i == 1) {
+        mockSpanner.putStatementResult(
+            StatementResult.exception(statement, Status.ALREADY_EXISTS.asRuntimeException()));
+      } else {
+        mockSpanner.putStatementResult(StatementResult.update(statement, 1L));
+      }
+    }
+
+    String res = pgxTest.TestBatchExecutionError(createConnString());
+
+    assertNotNull(res);
+    assertTrue(res, res.contains("closing batch result returned error"));
+    assertTrue(res, res.contains("ALREADY_EXISTS"));
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).stream()
+            .findAny()
+            .orElseThrow(
+                () ->
+                    SpannerExceptionFactory.newSpannerException(
+                        ErrorCode.NOT_FOUND, "ExecuteBatchDmlRequest not found"));
+    assertEquals(3, request.getStatementsCount());
+    for (ExecuteBatchDmlRequest.Statement statement : request.getStatementsList()) {
+      assertEquals(insertSql, statement.getSql());
+    }
   }
 
   @Test
