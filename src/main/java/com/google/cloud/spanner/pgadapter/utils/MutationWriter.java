@@ -408,7 +408,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
     return settableApiFuture;
   }
 
-  private int calculateSize(Mutation mutation) {
+  static int calculateSize(Mutation mutation) {
     int size = 0;
     for (Value value : mutation.getValues()) {
       switch (value.getType().getCode()) {
@@ -442,6 +442,8 @@ public class MutationWriter implements Callable<Long>, Closeable {
               size += value.getBoolArray().size();
               break;
             case FLOAT64:
+              size += value.getFloat64Array().size() * 8;
+              break;
             case INT64:
               size += value.getInt64Array().size() * 8;
               break;
