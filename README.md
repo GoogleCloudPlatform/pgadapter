@@ -5,8 +5,8 @@ equivalent for Spanner databases [that use the PostgreSQL interface](https://clo
 
 PGAdapter can be used with the following clients:
 1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
-2. `JDBC`: Versions 42.x and higher have __limited support__. See [JDBC support](docs/jdbc.md) for more details.
-3. `pgx`: Version 4.15 and higher have __limited support__. See [pgx support](docs/pgx.md) for more details.
+2. `JDBC`: Versions 42.x and higher have __experimental support__. See [JDBC support](docs/jdbc.md) for more details.
+3. `pgx`: Version 4.15 and higher have __experimental support__. See [pgx support](docs/pgx.md) for more details.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
