@@ -25,7 +25,6 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import org.postgresql.core.Oid;
-import org.postgresql.util.PGbytea;
 
 /**
  * Parser is the parsing superclass, used to take wire format data types and convert them
@@ -66,22 +65,8 @@ public abstract class Parser<T> {
     // TODO: Put 'guessType' behind a command line flag so it is only enabled when wanted.
     if (formatCode == FormatCode.TEXT && item != null) {
       String value = new String(item, StandardCharsets.UTF_8);
-      if (value.equals("t") || value.equals("f")) {
-        return Oid.BOOL;
-      }
-      if (value.length() >= 2 && value.charAt(0) == '\\' && value.charAt(1) == 'x') {
-        try {
-          PGbytea.toBytes(item);
-          return Oid.BYTEA;
-        } catch (Exception e) {
-          // ignore and fall through
-        }
-      }
       if (TimestampParser.isTimestamp(value)) {
         return Oid.TIMESTAMPTZ;
-      }
-      if (DateParser.isDate(value)) {
-        return Oid.DATE;
       }
     }
     return Oid.UNSPECIFIED;
