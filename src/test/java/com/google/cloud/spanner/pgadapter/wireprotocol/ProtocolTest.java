@@ -136,8 +136,15 @@ public class ProtocolTest {
 
   @AfterClass
   public static void cleanup() throws IOException {
+    deleteLogFile();
+  }
+
+  private static void deleteLogFile() {
     // TODO: Make error log file configurable and turn off writing to a file during tests.
-    Files.deleteIfExists(new File("output.txt").toPath());
+    try {
+      Files.deleteIfExists(new File("output.txt").toPath());
+    } catch (IOException ignore) {
+    }
   }
 
   @Test
@@ -1497,7 +1504,7 @@ public class ProtocolTest {
 
     copyStatement.close();
 
-    Files.deleteIfExists(new File("output.txt").toPath());
+    deleteLogFile();
   }
 
   @Test
@@ -1514,7 +1521,7 @@ public class ProtocolTest {
     copyStatement.execute();
     assertTrue(copyStatement.isExecuted());
 
-    Files.deleteIfExists(new File("output.txt").toPath());
+    deleteLogFile();
 
     MutationWriter mw = copyStatement.getMutationWriter();
     mw.addCopyData(payload);
@@ -1540,8 +1547,7 @@ public class ProtocolTest {
         Files.readAllBytes(Paths.get("./src/test/resources/test-copy-start-output.txt"));
 
     // Pre-emptively try to delete the output file if it is lingering from a previous test run.
-    // TODO: Make the output file for COPY configurable, so we can use a temp file for this.
-    Files.deleteIfExists(new File("output.txt").toPath());
+    deleteLogFile();
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
