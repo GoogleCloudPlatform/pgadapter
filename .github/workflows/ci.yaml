@@ -11,6 +11,16 @@ env:
   GOOGLE_CLOUD_ENDPOINT: "spanner.googleapis.com"
   JSON_SERVICE_ACCOUNT_CREDENTIALS: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
 jobs:
+  check-env:
+    outputs:
+      has-key: ${{ steps.project-id.outputs.defined }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: project-id
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        if: "${{ env.GCP_PROJECT_ID != '' }}"
+        run: echo "::set-output name=defined::true"
   units:
     runs-on: ubuntu-latest
     strategy:
@@ -56,6 +66,8 @@ jobs:
       - run: java -version
       - run: .ci/run-with-credentials.sh clirr
   e2e-psql-v11:
+    needs: [check-env]
+    if: needs.check-env.outputs.has-key == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -79,6 +91,8 @@ jobs:
     - run: .ci/run-with-credentials.sh uber-jar-build
     - run: .ci/run-with-credentials.sh e2e-psql 11
   e2e-psql-v12:
+    needs: [check-env]
+    if: needs.check-env.outputs.has-key == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -102,6 +116,8 @@ jobs:
     - run: .ci/run-with-credentials.sh uber-jar-build
     - run: .ci/run-with-credentials.sh e2e-psql 12
   e2e-psql-v13:
+    needs: [check-env]
+    if: needs.check-env.outputs.has-key == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -125,6 +141,8 @@ jobs:
     - run: .ci/run-with-credentials.sh uber-jar-build
     - run: .ci/run-with-credentials.sh e2e-psql 13
   e2e-psql-v14:
+    needs: [check-env]
+    if: needs.check-env.outputs.has-key == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
