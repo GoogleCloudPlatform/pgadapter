@@ -29,7 +29,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: zulu
-          java-version: 8
+          java-version: 17
       - run: java -version
       - name: Setup Go
         uses: actions/setup-go@v3
