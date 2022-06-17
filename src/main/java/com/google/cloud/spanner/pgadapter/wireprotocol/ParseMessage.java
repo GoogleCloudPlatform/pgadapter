@@ -90,7 +90,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
   public void flush() throws Exception {
     // The simple query protocol does not need the ParseComplete response.
     if (isExtendedProtocol()) {
-      new ParseCompleteResponse(this.outputStream).send();
+      new ParseCompleteResponse(this.outputStream).send(false);
     }
   }
 
