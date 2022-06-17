@@ -14,9 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.EMPTY_LOCAL_STATEMENTS;
+
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.AbstractQueryProtocolMessage;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -31,10 +35,15 @@ public class ExtendedQueryProtocolHandler {
 
   /** Creates an {@link ExtendedQueryProtocolHandler} for the given connection. */
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
+    ImmutableList<LocalStatement> localStatements =
+        connectionHandler.getWellKnownClient() == null
+            ? EMPTY_LOCAL_STATEMENTS
+            : connectionHandler.getWellKnownClient().getLocalStatements(connectionHandler);
     this.backendConnection =
         new BackendConnection(
             connectionHandler.getSpannerConnection(),
-            connectionHandler.getServer().getOptions().getDdlTransactionMode());
+            connectionHandler.getServer().getOptions().getDdlTransactionMode(),
+            localStatements);
   }
 
   /** Constructor only intended for testing. */

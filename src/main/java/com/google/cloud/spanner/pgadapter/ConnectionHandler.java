@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter;
 
 import com.google.api.core.InternalApi;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
@@ -88,6 +89,7 @@ public class ConnectionHandler extends Thread {
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
   private Connection spannerConnection;
+  private DatabaseId databaseId;
   private WellKnownClient wellKnownClient;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
 
@@ -142,7 +144,8 @@ public class ConnectionHandler extends Thread {
       connectionOptionsBuilder =
           ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
     }
-    Connection spannerConnection = connectionOptionsBuilder.build().getConnection();
+    ConnectionOptions connectionOptions = connectionOptionsBuilder.build();
+    Connection spannerConnection = connectionOptions.getConnection();
     try {
       // Note: Calling getDialect() will cause a SpannerException if the connection itself is
       // invalid, for example as a result of the credentials being wrong.
@@ -159,6 +162,7 @@ public class ConnectionHandler extends Thread {
       throw e;
     }
     this.spannerConnection = spannerConnection;
+    this.databaseId = connectionOptions.getDatabaseId();
     this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
   }
 
@@ -444,6 +448,10 @@ public class ConnectionHandler extends Thread {
 
   public Connection getSpannerConnection() {
     return this.spannerConnection;
+  }
+
+  public DatabaseId getDatabaseId() {
+    return this.databaseId;
   }
 
   public int getConnectionId() {
