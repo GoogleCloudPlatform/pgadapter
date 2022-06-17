@@ -28,7 +28,7 @@ jobs:
         java: [8, 11]
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@v3
       with:
         java-version: ${{matrix.java}}
         distribution: 'zulu'
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@v3
       with:
         java-version: 11
         distribution: 'zulu'
@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-java@v1
+      - uses: actions/setup-java@v3
         with:
           java-version: 8
           distribution: 'zulu'
@@ -74,7 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@v3
       with:
         java-version: 11
         distribution: 'zulu'
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@v3
       with:
         java-version: 11
         distribution: 'zulu'
@@ -126,7 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@v3
       with:
         java-version: 11
         distribution: 'zulu'
@@ -152,7 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@v3
       with:
         java-version: 11
         distribution: 'zulu'
