@@ -47,6 +47,8 @@ jobs:
       - run: pip install -r ./src/test/python/requirements.txt
       - name: Run unit tests
         run: mvn test -B -Ptest-all
+      - name: Run unit tests for native image
+        run: mvn test -B -Pnative-image
       - name: Setup GCloud
         uses: google-github-actions/setup-gcloud@v0
         with:
