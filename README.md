@@ -50,10 +50,10 @@ java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 Use the `-s` option to specify a different local port than the default 5432 if you already have
 PostgreSQL running on your local system.
 
-You can also download a specific version of the jar. Example (replace `v0.4.0` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.5.0` with the version you want to download):
 
 ```shell
-VERSION=v0.4.0
+VERSION=v0.5.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 ```
@@ -117,16 +117,20 @@ path; All other items map directly to previously mentioned CLI options.
 
 ### Options
 
-#### Required
+#### Connection Options
 
-The following options are required to run the proxy:
+See [connection options](docs/connection_options.md) for more details.
 
 ```    
 -p <projectname>
-  * The project name where the Spanner database(s) is/are running.
+  * The project name where the Spanner database(s) is/are running. If omitted, all connection
+    requests must use a fully qualified database name in the format
+    'projects/my-project/instances/my-instance/databases/my-database'.
     
 -i <instanceid>
-  * The instance ID where the Spanner database(s) is/are running.
+  * The instance ID where the Spanner database(s) is/are running. If omitted, all connection
+    requests must use a fully qualified database name in the format
+    'projects/my-project/instances/my-instance/databases/my-database'.
 
 -d <databasename>
   * The default Spanner database name to connect to. This is only required if you want PGAdapter to
