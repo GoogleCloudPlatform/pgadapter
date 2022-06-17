@@ -134,11 +134,16 @@ public class ProtocolTest {
   }
 
   @AfterClass
-  public static void cleanup() {
+  public static void cleanup() throws IOException {
+    deleteLogFile();
+  }
+
+  private static void deleteLogFile() {
     // TODO: Make error log file configurable and turn off writing to a file during tests.
-    File outputFile = new File("output.txt");
-    //noinspection ResultOfMethodCallIgnored
-    outputFile.delete();
+    try {
+      Files.deleteIfExists(new File("output.txt").toPath());
+    } catch (IOException ignore) {
+    }
   }
 
   @Test
@@ -1494,10 +1499,7 @@ public class ProtocolTest {
 
     copyStatement.close();
 
-    File outputFile = new File("output.txt");
-    if (outputFile.exists()) {
-      assertTrue(outputFile.delete());
-    }
+    deleteLogFile();
   }
 
   @Test
@@ -1514,10 +1516,7 @@ public class ProtocolTest {
     copyStatement.execute();
     assertTrue(copyStatement.isExecuted());
 
-    File outputFile = new File("output.txt");
-    if (outputFile.exists()) {
-      assertTrue(outputFile.delete());
-    }
+    deleteLogFile();
 
     MutationWriter mw = copyStatement.getMutationWriter();
     mw.addCopyData(payload);
@@ -1527,11 +1526,11 @@ public class ProtocolTest {
     assertEquals(
         "INVALID_ARGUMENT: Invalid input syntax for type INT64:\"'5'\"", thrown.getMessage());
 
-    outputFile = new File("output.txt");
+    File outputFile = new File("output.txt");
     assertTrue(outputFile.exists());
     assertTrue(outputFile.isFile());
 
-    assertTrue(outputFile.delete());
+    deleteLogFile();
     copyStatement.close();
   }
 
@@ -1543,11 +1542,7 @@ public class ProtocolTest {
         Files.readAllBytes(Paths.get("./src/test/resources/test-copy-start-output.txt"));
 
     // Pre-emptively try to delete the output file if it is lingering from a previous test run.
-    // TODO: Make the output file for COPY configurable, so we can use a temp file for this.
-    File outputFile = new File("output.txt");
-    if (outputFile.exists()) {
-      assertTrue(outputFile.delete());
-    }
+    deleteLogFile();
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
@@ -1564,11 +1559,11 @@ public class ProtocolTest {
     assertEquals(
         "INVALID_ARGUMENT: Invalid input syntax for type INT64:\"'1'\"", thrown.getMessage());
 
-    outputFile = new File("output.txt");
+    File outputFile = new File("output.txt");
     assertTrue(outputFile.exists());
     assertTrue(outputFile.isFile());
 
-    assertTrue(outputFile.delete());
+    deleteLogFile();
     copyStatement.close();
   }
 
