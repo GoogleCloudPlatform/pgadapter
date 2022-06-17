@@ -105,13 +105,18 @@ public class PasswordMessage extends ControlMessage {
       // The username is potentially an email address. That means that the password could be a
       // private key. Try to parse it as such.
       try {
+        String privateKeyText = password.replace("\\n", "\n");
         Section privateKeySection =
-            PemReader.readFirstSectionAndClose(new StringReader(password), "PRIVATE KEY");
+            PemReader.readFirstSectionAndClose(new StringReader(privateKeyText), "PRIVATE KEY");
         if (privateKeySection != null) {
           // Successfully identified as a private key. Manually create a ServiceAccountCredentials
           // instance and try to use this when connecting to Spanner.
           return ServiceAccountCredentials.fromPkcs8(
-              /*clientId=*/ null, username, password, /*privateKeyId=*/ null, /*scopes=*/ null);
+              /*clientId=*/ null,
+              username,
+              privateKeyText,
+              /*privateKeyId=*/ null,
+              /*scopes=*/ null);
         }
       } catch (IOException ioException) {
         // Ignore and try to parse it as a credentials file.

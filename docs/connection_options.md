@@ -57,6 +57,7 @@ java -jar pgadapter.jar -p my-project -i my-instance
 psql -h /tmp -d my-database
 
 # Use a fully qualified database name to connect to a database on a different instance.
-psql -h /tmp -d projects/other-project/instances/other-instance/databases/other-database
+# Note that you must enclose the database name in quotes as it contains slashes.
+psql -h /tmp -d "projects/other-project/instances/other-instance/databases/other-database"
 ```
 
