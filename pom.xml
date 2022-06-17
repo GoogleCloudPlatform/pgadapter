@@ -30,6 +30,7 @@
     </excludedTests>
 
     <spanner.version>6.25.5</spanner.version>
+    <junixsocket.version>2.5.0</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -46,7 +47,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.2.7</version>
+    <version>1.5.0</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -79,13 +80,13 @@
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>
       <artifactId>junixsocket-core</artifactId>
-      <version>2.5.0</version>
+      <version>${junixsocket.version}</version>
       <type>pom</type>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>
       <artifactId>junixsocket-common</artifactId>
-      <version>2.5.0</version>
+      <version>${junixsocket.version}</version>
     </dependency>
     <dependency>
       <groupId>com.googlecode.json-simple</groupId>
@@ -105,7 +106,7 @@
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
-      <version>3.8.5</version>
+      <version>3.8.6</version>
     </dependency>
 
     <!-- Test dependencies -->
@@ -138,7 +139,7 @@
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
-      <version>4.5.1</version>
+      <version>4.6.1</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -151,7 +152,6 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-shade-plugin</artifactId>
-            <version>3.2.1</version>
             <executions>
               <execution>
                 <goals>
@@ -218,7 +218,6 @@
         <plugins>
           <plugin>
             <artifactId>maven-resources-plugin</artifactId>
-            <version>3.2.0</version>
             <executions>
               <execution>
                 <id>copy-resources</id>
@@ -290,7 +289,6 @@
       <plugin>
         <groupId>com.coveo</groupId>
         <artifactId>fmt-maven-plugin</artifactId>
-        <version>2.5.1</version>
         <executions>
           <execution>
             <goals>
@@ -302,7 +300,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>3.0.0-M5</version>
         <configuration>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
           <argLine>${surefire.jacoco.args}</argLine>
@@ -319,7 +316,6 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.7</version>
         <executions>
           <execution>
             <goals>
@@ -403,7 +399,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
-        <version>3.0.0-M4</version>
         <executions>
           <execution>
             <goals>
