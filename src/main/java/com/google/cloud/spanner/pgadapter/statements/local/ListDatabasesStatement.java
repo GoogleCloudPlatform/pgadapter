@@ -30,9 +30,11 @@ import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -42,7 +44,21 @@ public class ListDatabasesStatement implements LocalStatement {
   private final ConnectionHandler connectionHandler;
 
   public ListDatabasesStatement(ConnectionHandler connectionHandler) {
-    this.connectionHandler = connectionHandler;
+    this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (!(other instanceof ListDatabasesStatement)) {
+      return false;
+    }
+    return Objects.equals(
+        this.connectionHandler, ((ListDatabasesStatement) other).connectionHandler);
+  }
+
+  @Override
+  public int hashCode() {
+    return this.connectionHandler.hashCode();
   }
 
   @Override

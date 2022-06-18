@@ -75,6 +75,14 @@ sed -i "s/---[-]*//g" .ci/e2e-result/backslash-dn-param.txt
 diff -i -w -s .ci/e2e-result/backslash-dn-param.txt .ci/e2e-expected/backslash-dn-param.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
+echo "------Test \"\\l\"------"
+echo "\l" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/backslash-dn.txt
+# ignore effective_timestamp
+sed -i -E 's/[0-9]{16,}//' .ci/e2e-result/backslash-l.txt
+sed -i "s/---[-]*//g" .ci/e2e-result/backslash-l.txt
+diff -i -w -s .ci/e2e-result/backslash-l.txt .ci/e2e-expected/backslash-l.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
 echo "------Test \"-c option dml batching\"------"
 /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "$(cat .ci/e2e-batching/dml-batch.txt)" > .ci/e2e-result/dml-batching.txt
 diff -i -w -s .ci/e2e-result/dml-batching.txt .ci/e2e-expected/dml-batching.txt
