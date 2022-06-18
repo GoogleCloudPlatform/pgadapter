@@ -1,6 +1,6 @@
                                List of databases
-         Name        | Owner | Encoding | Collate | Ctype | Access privileges
----------------------+-------+----------+---------+-------+-------------------
+  Name | Owner | Encoding | Collate | Ctype | Access privileges
++++++
  testdb_e2e_psql_v?? |       | UTF8     |         |       |
 (1 row)
 
