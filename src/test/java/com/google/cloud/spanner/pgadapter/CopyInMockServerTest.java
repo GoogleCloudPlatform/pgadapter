@@ -18,10 +18,12 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
@@ -33,16 +35,22 @@ import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Collections;
 import java.util.List;
+import java.util.Scanner;
+import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -80,14 +88,19 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
    * mode for queries and DML statements.
    */
   private String createUrl() {
+    return createUrl("extended");
+  }
+
+  private String createUrl(String queryMode) {
     if (useDomainSocket) {
       return String.format(
           "jdbc:postgresql://localhost/?"
               + "socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
-              + "&socketFactoryArg=/tmp/.s.PGSQL.%d",
-          pgServer.getLocalPort());
+              + "&socketFactoryArg=/tmp/.s.PGSQL.%d"
+              + "&preferQueryMode=%s",
+          pgServer.getLocalPort(), queryMode);
     }
-    return String.format("jdbc:postgresql://localhost:%d/", pgServer.getLocalPort());
+    return String.format("jdbc:postgresql://localhost:%d/?preferQueryMode=%s", pgServer.getLocalPort(), queryMode);
   }
 
   @Test
@@ -386,6 +399,53 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
     assertTrue(commitRequests.isEmpty());
+  }
+
+  private static boolean isPsqlAvailable() {
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand = new String[] {"psql", "--version"};
+    builder.command(psqlCommand);
+    try {
+      Process process = builder.start();
+      int res = process.waitFor();
+
+      return res == 0;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  @Test
+  public void testCopyInBatch() throws Exception {
+    assumeTrue("This test requires psql to be installed", isPsqlAvailable());
+    setupCopyInformationSchemaResults();
+
+    String host = useDomainSocket ? "/tmp" : "localhost";
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand = new String[] {"psql", "-h", host, "-p", String.valueOf(pgServer.getLocalPort())};
+    builder.command(psqlCommand);
+    Process process = builder.start();
+    String errors;
+    String output;
+
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream()); BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream())); BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      writer.write(
+          "SELECT 1\\;copy users from stdin\\;copy users from stdin\\;SELECT 1;\n"
+              + "1\t1\t1\n"
+              + "\\.\n"
+              + "2\t2\t2\n"
+              + "\\.\n"
+              + "\n"
+              + "\\q\n");
+      writer.flush();
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    assertEquals("", errors);
+    assertEquals(" C \n---\n 1\n(1 row)\n", output);
+    int res = process.waitFor();
+    assertEquals(0, res);
   }
 
   private void setupCopyInformationSchemaResults() {

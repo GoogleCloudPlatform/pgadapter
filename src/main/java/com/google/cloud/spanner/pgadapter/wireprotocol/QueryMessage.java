@@ -37,40 +37,40 @@ public class QueryMessage extends ControlMessage {
   public static final String COPY = "COPY";
 
   private final Statement originalStatement;
-  private final CopyStatement copyStatement;
+//  private final CopyStatement copyStatement;
   private final SimpleQueryStatement simpleQueryStatement;
-  private final boolean isCopy;
+//  private final boolean isCopy;
 
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.originalStatement = Statement.of(this.readAll());
-    ParsedStatement parsedStatement = PARSER.parse(originalStatement);
-    this.isCopy = StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments());
-    if (isCopy) {
-      this.copyStatement =
-          new CopyStatement(
-              connection,
-              connection.getServer().getOptions(),
-              parsedStatement,
-              this.originalStatement);
-      this.simpleQueryStatement = null;
-      this.connection.addActiveStatement(this.copyStatement);
-    } else {
+//    ParsedStatement parsedStatement = PARSER.parse(originalStatement);
+//    this.isCopy = StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments());
+//    if (isCopy) {
+//      this.copyStatement =
+//          new CopyStatement(
+//              connection,
+//              connection.getServer().getOptions(),
+//              parsedStatement,
+//              this.originalStatement);
+//      this.simpleQueryStatement = null;
+//      this.connection.addActiveStatement(this.copyStatement);
+//    } else {
       this.simpleQueryStatement =
           new SimpleQueryStatement(
               connection.getServer().getOptions(), this.originalStatement, this.connection);
-      this.copyStatement = null;
-    }
+//      this.copyStatement = null;
+//    }
   }
 
   @Override
   protected void sendPayload() throws Exception {
-    if (this.isCopy) {
-      this.copyStatement.execute();
-      handleCopy();
-    } else {
+//    if (this.isCopy) {
+//      this.copyStatement.execute();
+//      handleCopy();
+//    } else {
       this.simpleQueryStatement.execute();
-    }
+//    }
   }
 
   @Override
@@ -97,24 +97,24 @@ public class QueryMessage extends ControlMessage {
     return this.simpleQueryStatement;
   }
 
-  private void handleCopy() throws Exception {
-    if (this.copyStatement.hasException()) {
-      handleError(this.copyStatement.getException());
-      new ReadyResponse(
-              this.outputStream,
-              connection
-                  .getExtendedQueryProtocolHandler()
-                  .getBackendConnection()
-                  .getConnectionState()
-                  .getReadyResponseStatus())
-          .send();
-    } else {
-      new CopyInResponse(
-              this.outputStream,
-              copyStatement.getTableColumns().size(),
-              copyStatement.getFormatCode())
-          .send();
-      this.connection.setStatus(ConnectionStatus.COPY_IN);
-    }
-  }
+//  private void handleCopy() throws Exception {
+//    if (this.copyStatement.hasException()) {
+//      handleError(this.copyStatement.getException());
+//      new ReadyResponse(
+//              this.outputStream,
+//              connection
+//                  .getExtendedQueryProtocolHandler()
+//                  .getBackendConnection()
+//                  .getConnectionState()
+//                  .getReadyResponseStatus())
+//          .send();
+//    } else {
+//      new CopyInResponse(
+//              this.outputStream,
+//              copyStatement.getTableColumns().size(),
+//              copyStatement.getFormatCode())
+//          .send();
+//      this.connection.setStatus(ConnectionStatus.COPY_IN);
+//    }
+//  }
 }

@@ -57,17 +57,18 @@ public class CopyDoneMessage extends ControlMessage {
           // Spanner returned an error when trying to commit the batch of mutations.
           mutationWriter.writeErrorFile(e);
           mutationWriter.closeErrorFile();
-          this.connection.setStatus(ConnectionStatus.AUTHENTICATED);
-          this.connection.removeActiveStatement(this.statement);
+//          this.connection.setStatus(ConnectionStatus.AUTHENTICATED);
+//          this.connection.removeActiveStatement(this.statement);
           throw e;
         }
       } else {
         mutationWriter.closeErrorFile();
       }
     }
-    this.connection.setStatus(ConnectionStatus.AUTHENTICATED);
-    this.connection.removeActiveStatement(this.statement);
-    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
+    // Clear the COPY_IN status to indicate that we finished successfully.
+    this.connection.setStatus(ConnectionStatus.COPY_DONE);
+//    this.connection.removeActiveStatement(this.statement);
+//    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
   }
 
   @Override

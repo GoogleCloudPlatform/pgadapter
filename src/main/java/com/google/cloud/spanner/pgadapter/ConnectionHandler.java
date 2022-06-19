@@ -42,6 +42,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.net.Socket;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
@@ -220,15 +222,7 @@ public class ConnectionHandler extends Thread {
           }
         }
         while (this.status != ConnectionStatus.TERMINATED) {
-          try {
-            message.nextHandler();
-            message.send();
-          } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
-            this.handleError(output, fatalException);
-            this.status = ConnectionStatus.TERMINATED;
-          } catch (Exception e) {
-            this.handleError(output, e);
-          }
+          handleMessages(output);
         }
       } catch (Exception e) {
         this.handleError(output, e);
@@ -259,6 +253,18 @@ public class ConnectionHandler extends Thread {
       this.server.deregister(this);
       logger.log(
           Level.INFO, () -> String.format("Connection handler with ID %s closed", getName()));
+    }
+  }
+
+  public void handleMessages(DataOutputStream output) throws Exception {
+    try {
+      message.nextHandler();
+      message.send();
+    } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
+      this.handleError(output, fatalException);
+      this.status = ConnectionStatus.TERMINATED;
+    } catch (Exception e) {
+      this.handleError(output, e);
     }
   }
 
@@ -296,22 +302,23 @@ public class ConnectionHandler extends Thread {
   /**
    * Takes an Exception Object and relates its results to the user within the client.
    *
-   * @param e The exception to be related.
+   * @param exception The exception to be related.
    * @throws IOException if there is some issue in the sending of the error messages.
    */
-  private void handleError(DataOutputStream output, Exception e) throws Exception {
+  private void handleError(DataOutputStream output, Exception exception) throws Exception {
     logger.log(
         Level.WARNING,
-        e,
-        () -> String.format("Exception on connection handler with ID %s: %s", getName(), e));
+        exception,
+        () -> String.format("Exception on connection handler with ID %s: %s", getName(), exception));
     if (this.status == ConnectionStatus.TERMINATED) {
-      new ErrorResponse(output, e, ErrorResponse.State.InternalError, Severity.FATAL).send();
+      new ErrorResponse(output, exception, ErrorResponse.State.InternalError, Severity.FATAL).send();
       new TerminateResponse(output).send();
     } else if (this.status == ConnectionStatus.COPY_IN) {
-      new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
+      // Bubble the exception up so the copy handler can handle the exception.
+      throw exception;
     } else {
       this.status = ConnectionStatus.AUTHENTICATED;
-      new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
+      new ErrorResponse(output, exception, ErrorResponse.State.InternalError).send();
       new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
     }
   }
@@ -495,6 +502,8 @@ public class ConnectionHandler extends Thread {
     UNAUTHENTICATED,
     AUTHENTICATED,
     COPY_IN,
+    COPY_DONE,
+    COPY_FAILED,
     TERMINATED,
   }
 

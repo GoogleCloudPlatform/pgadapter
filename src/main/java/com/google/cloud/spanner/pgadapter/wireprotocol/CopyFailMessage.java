@@ -57,7 +57,8 @@ public class CopyFailMessage extends ControlMessage {
             .send();
       }
     }
-    this.connection.setStatus(ConnectionStatus.AUTHENTICATED);
+    // TODO: Test this message
+    this.connection.setStatus(ConnectionStatus.COPY_FAILED);
     this.connection.removeActiveStatement(this.statement);
     new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
   }
