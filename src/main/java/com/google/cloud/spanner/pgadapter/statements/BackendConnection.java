@@ -135,6 +135,8 @@ public class BackendConnection {
           result.set(NO_RESULT);
         } else if (statement.getSql().isEmpty()) {
           result.set(NO_RESULT);
+        } else if (ddlExecutor != null && parsedStatement.isDdl()) {
+          result.set(ddlExecutor.execute(parsedStatement, statement));
         } else {
           result.set(spannerConnection.execute(statement));
         }
@@ -151,8 +153,10 @@ public class BackendConnection {
 
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
+  private final String currentSchema = "public";
   private final LinkedList<BufferedStatement<?>> bufferedStatements = new LinkedList<>();
   private final Connection spannerConnection;
+  private final DdlExecutor ddlExecutor;
   private final DdlTransactionMode ddlTransactionMode;
 
   /**
@@ -160,7 +164,16 @@ public class BackendConnection {
    * DdlTransactionMode}.
    */
   BackendConnection(Connection spannerConnection, DdlTransactionMode ddlTransactionMode) {
+    // TODO: Make DDL translation configurable.
+    this(spannerConnection, ddlTransactionMode, true);
+  }
+
+  private BackendConnection(
+      Connection spannerConnection,
+      DdlTransactionMode ddlTransactionMode,
+      boolean translateDdlStatements) {
     this.spannerConnection = spannerConnection;
+    this.ddlExecutor = translateDdlStatements ? new DdlExecutor(this) : null;
     this.ddlTransactionMode = ddlTransactionMode;
   }
 
@@ -195,6 +208,14 @@ public class BackendConnection {
     } finally {
       endImplicitTransaction();
     }
+  }
+
+  Connection getSpannerConnection() {
+    return this.spannerConnection;
+  }
+
+  String getCurrentSchema() {
+    return this.currentSchema;
   }
 
   /**
@@ -463,7 +484,13 @@ public class BackendConnection {
     while (index < getStatementCount()) {
       StatementType statementType = getStatementType(index);
       if (canBeBatchedTogether(batchType, statementType)) {
-        spannerConnection.execute(bufferedStatements.get(index).statement);
+        if (batchType == StatementType.DDL && ddlExecutor != null) {
+          ddlExecutor.execute(
+              bufferedStatements.get(index).parsedStatement,
+              bufferedStatements.get(index).statement);
+        } else {
+          spannerConnection.execute(bufferedStatements.get(index).statement);
+        }
         index++;
       } else {
         // End the batch here, as the statement type on this index can not be batched together with
@@ -503,7 +530,7 @@ public class BackendConnection {
   public static final class NoResult implements StatementResult {
     private final String commandTag;
 
-    private NoResult() {
+    NoResult() {
       this.commandTag = null;
     }
 
