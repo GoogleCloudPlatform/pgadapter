@@ -155,7 +155,11 @@ public class BackendConnection {
     private final MutationWriter mutationWriter;
     private final ListeningExecutorService executor;
 
-    Copy(ParsedStatement parsedStatement, Statement statement, MutationWriter mutationWriter, ExecutorService executor) {
+    Copy(
+        ParsedStatement parsedStatement,
+        Statement statement,
+        MutationWriter mutationWriter,
+        ExecutorService executor) {
       super(parsedStatement, statement);
       this.mutationWriter = mutationWriter;
       this.executor = MoreExecutors.listeningDecorator(executor);
@@ -220,7 +224,11 @@ public class BackendConnection {
     return execute.result;
   }
 
-  public Future<StatementResult> executeCopy(ParsedStatement parsedStatement, Statement statement, MutationWriter mutationWriter, ExecutorService executor) {
+  public Future<StatementResult> executeCopy(
+      ParsedStatement parsedStatement,
+      Statement statement,
+      MutationWriter mutationWriter,
+      ExecutorService executor) {
     Copy copy = new Copy(parsedStatement, statement, mutationWriter, executor);
     bufferedStatements.add(copy);
     return copy.result;
@@ -471,11 +479,11 @@ public class BackendConnection {
   }
 
   private boolean canBeBatchedTogether(StatementType statementType1, StatementType statementType2) {
-    if (Objects.equals(statementType1, StatementType.QUERY)
-        || Objects.equals(statementType1, StatementType.CLIENT_SIDE)) {
-      return false;
+    if (Objects.equals(statementType1, StatementType.DDL)
+        || Objects.equals(statementType2, StatementType.UPDATE)) {
+      return Objects.equals(statementType1, statementType2);
     }
-    return Objects.equals(statementType1, statementType2);
+    return false;
   }
 
   /**

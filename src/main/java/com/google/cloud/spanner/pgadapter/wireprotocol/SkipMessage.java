@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import java.io.EOFException;
 import java.io.IOException;
 import java.text.MessageFormat;
 
@@ -31,8 +30,7 @@ public class SkipMessage extends ControlMessage {
   }
 
   @Override
-  protected void sendPayload() throws Exception {
-  }
+  protected void sendPayload() throws Exception {}
 
   @Override
   protected String getMessageName() {

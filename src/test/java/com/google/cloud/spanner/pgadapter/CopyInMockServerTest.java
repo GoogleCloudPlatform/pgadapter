@@ -42,6 +42,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -157,7 +158,11 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                   copyManager.copyIn(
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
-      assertTrue(exception.getMessage(), exception.getMessage().contains("FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000."));
+      assertTrue(
+          exception.getMessage(),
+          exception
+              .getMessage()
+              .contains("FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000."));
     }
   }
 
@@ -194,7 +199,8 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               () ->
                   copyManager.copyIn(
                       "COPY users FROM STDIN;", new StringReader("5\t5\t5\n6\t6\t6\n7\t7\t7\n")));
-      assertTrue(exception.getMessage(),
+      assertTrue(
+          exception.getMessage(),
           exception.getMessage().contains("io.grpc.StatusRuntimeException: INVALID_ARGUMENT"));
     }
 
@@ -230,7 +236,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCopyInWithInvalidRow() throws SQLException {
+  public void testCopyInWithInvalidRow() throws SQLException, IOException {
     setupCopyInformationSchemaResults();
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
@@ -245,7 +251,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               .getMessage()
               .contains("Row length mismatched. Expected 3 columns, but only found 1"));
     } finally {
-      assertTrue(new File("output.txt").delete());
+      Files.deleteIfExists(new File("output.txt").toPath());
     }
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
@@ -612,7 +618,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
           receivedErrorMessage = true;
           // Read and ignore the length.
           stream.receiveInteger4();
-          while(stream.receiveChar() > 0) {
+          while (stream.receiveChar() > 0) {
             errorMessage.append(stream.receiveString()).append('\n');
           }
         } else {

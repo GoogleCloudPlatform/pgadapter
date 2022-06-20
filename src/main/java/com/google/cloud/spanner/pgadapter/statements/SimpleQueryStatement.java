@@ -15,30 +15,21 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.utils.StatementParser.splitStatements;
-import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
-import com.google.cloud.spanner.ErrorCode;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.commands.Command;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
-import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.FlushMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.common.annotations.VisibleForTesting;
@@ -74,34 +65,6 @@ public class SimpleQueryStatement {
     for (Statement originalStatement : this.statements) {
       ParsedStatement originalParsedStatement = PARSER.parse(originalStatement);
       ParsedStatement parsedStatement = originalParsedStatement;
-//      if (StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments())) {
-//        // A COPY statement needs to flush any changes to the backend before we can continue.
-//        new FlushMessage(connectionHandler).send();
-//
-//        CopyStatement copyStatement =
-//            new CopyStatement(
-//                connectionHandler,
-//                connectionHandler.getServer().getOptions(),
-//                parsedStatement,
-//                originalStatement);
-//        try {
-//          this.connectionHandler.addActiveStatement(copyStatement);
-//          copyStatement.execute();
-//          handleCopy(copyStatement);
-//        } catch (Exception exception) {
-//          new ErrorResponse(
-//                  connectionHandler.getConnectionMetadata().getOutputStream(),
-//                  exception,
-//                  State.RaiseException)
-//              .send();
-//          // Ignore all further statements in the Query message.
-//          break;
-//        } finally {
-//          this.connectionHandler.removeActiveStatement(copyStatement);
-//        }
-//        continue;
-//      }
-
       if (options.requiresMatcher()
           || connectionHandler.getWellKnownClient() == WellKnownClient.PSQL) {
         parsedStatement = translatePotentialMetadataCommand(parsedStatement, connectionHandler);
@@ -119,35 +82,6 @@ public class SimpleQueryStatement {
       new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
     }
     new SyncMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
-  }
-
-  private void handleCopy(CopyStatement copyStatement) throws Exception {
-    if (copyStatement.hasException()) {
-      throw copyStatement.getException();
-    } else {
-      new CopyInResponse(
-              this.connectionHandler.getConnectionMetadata().getOutputStream(),
-              copyStatement.getTableColumns().size(),
-              copyStatement.getFormatCode())
-          .send();
-      try {
-        this.connectionHandler.setStatus(ConnectionStatus.COPY_IN);
-        // Block here until COPY_IN mode has finished.
-        while (this.connectionHandler.getStatus() == ConnectionStatus.COPY_IN) {
-          this.connectionHandler.handleMessages(
-              this.connectionHandler.getConnectionMetadata().getOutputStream());
-        }
-        if (this.connectionHandler.getStatus() == ConnectionStatus.COPY_FAILED) {
-          if (copyStatement.hasException()) {
-            throw copyStatement.getException();
-          } else {
-            throw SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "Copy failed");
-          }
-        }
-      } finally {
-        this.connectionHandler.setStatus(ConnectionStatus.AUTHENTICATED);
-      }
-    }
   }
 
   /** Replaces any known unsupported query (e.g. JDBC metadata queries). */

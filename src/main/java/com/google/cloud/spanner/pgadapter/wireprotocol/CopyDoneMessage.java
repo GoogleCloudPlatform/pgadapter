@@ -17,11 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
-import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.ResultNotReadyBehavior;
-import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import java.text.MessageFormat;
 
 /**
@@ -44,23 +40,23 @@ public class CopyDoneMessage extends ControlMessage {
   protected void sendPayload() throws Exception {
     // If backend error occurred during copy-in mode, drop any subsequent CopyDone messages.
     if (this.statement != null) {
-//      MutationWriter mutationWriter = this.statement.getMutationWriter();
+      //      MutationWriter mutationWriter = this.statement.getMutationWriter();
       statement.close();
-//      if (!statement.hasException()) {
-//        try {
-//          long rowCount = this.statement.getUpdateCount(ResultNotReadyBehavior.BLOCK);
-//          statement.setStatementResult(
-//              new UpdateCount(rowCount)); // Set the row count of number of rows copied.
-//          this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
-//        } catch (Exception e) {
-//          // Spanner returned an error when trying to commit the batch of mutations.
-//          mutationWriter.writeErrorFile(e);
-//          mutationWriter.closeErrorFile();
-//          throw e;
-//        }
-//      } else {
-//        mutationWriter.closeErrorFile();
-//      }
+      //      if (!statement.hasException()) {
+      //        try {
+      //          long rowCount = this.statement.getUpdateCount(ResultNotReadyBehavior.BLOCK);
+      //          statement.setStatementResult(
+      //              new UpdateCount(rowCount)); // Set the row count of number of rows copied.
+      //          this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
+      //        } catch (Exception e) {
+      //          // Spanner returned an error when trying to commit the batch of mutations.
+      //          mutationWriter.writeErrorFile(e);
+      //          mutationWriter.closeErrorFile();
+      //          throw e;
+      //        }
+      //      } else {
+      //        mutationWriter.closeErrorFile();
+      //      }
     }
     // Clear the COPY_IN status to indicate that we finished successfully.
     this.connection.setStatus(ConnectionStatus.COPY_DONE);

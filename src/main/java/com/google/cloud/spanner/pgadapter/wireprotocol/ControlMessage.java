@@ -14,11 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
-import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
-
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -36,7 +33,6 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Generic representation for a control wire message: that is, a message which does not handle any

@@ -15,16 +15,10 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.ErrorCode;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
-import com.google.cloud.spanner.pgadapter.parsers.copy.Copy;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
 import java.text.MessageFormat;
 
 /** Executes a portal. */
@@ -120,5 +114,4 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
     }
     this.connection.cleanUp(this.statement);
   }
-
 }

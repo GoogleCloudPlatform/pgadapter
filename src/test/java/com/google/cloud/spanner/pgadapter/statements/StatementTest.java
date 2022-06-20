@@ -25,6 +25,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
@@ -51,6 +52,10 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -89,9 +94,15 @@ public class StatementTest {
 
   @AfterClass
   public static void cleanup() {
+    deleteLogFile();
+  }
+
+  private static void deleteLogFile() {
     // TODO: Make error log file configurable and turn off writing to a file during tests.
-    File outputFile = new File("output.txt");
-    outputFile.delete();
+    try {
+      Files.deleteIfExists(new File("output.txt").toPath());
+    } catch (IOException ignore) {
+    }
   }
 
   @Test
@@ -411,7 +422,11 @@ public class StatementTest {
     CopyStatement statement =
         new CopyStatement(
             connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
-    statement.executeAsync(mock(BackendConnection.class));
+
+    BackendConnection backendConnection =
+        new BackendConnection(connection, DdlTransactionMode.Batch);
+    statement.executeAsync(backendConnection);
+    backendConnection.flush();
 
     byte[] payload = "2 3\n".getBytes();
     MutationWriter mutationWriter = statement.getMutationWriter();
@@ -469,7 +484,77 @@ public class StatementTest {
     assertThrows(IllegalStateException.class, intermediateStatement::getStatementResult);
   }
 
+  @Test
+  public void testCopyBatchSizeLimit() throws Exception {
+    setupQueryInformationSchemaResults();
+    BackendConnection backendConnection =
+        new BackendConnection(connection, DdlTransactionMode.Batch);
+
+    byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
+
+    String sql = "COPY keyvalue FROM STDIN;";
+    CopyStatement copyStatement =
+        new CopyStatement(
+            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+
+    assertFalse(copyStatement.isExecuted());
+    copyStatement.executeAsync(backendConnection);
+    assertTrue(copyStatement.isExecuted());
+
+    backendConnection.flush();
+    MutationWriter mw = copyStatement.getMutationWriter();
+    // Inject a mock DatabaseClient for now.
+    // TODO: Fix this once we can use the Connection API.
+    Field databaseClientField = MutationWriter.class.getDeclaredField("databaseClient");
+    databaseClientField.setAccessible(true);
+    databaseClientField.set(mw, mock(DatabaseClient.class));
+    mw.addCopyData(payload);
+    mw.close();
+
+    assertEquals("TEXT", copyStatement.getFormatType());
+    assertEquals('\t', copyStatement.getDelimiterChar());
+    assertFalse(copyStatement.hasException());
+    assertEquals(12L, copyStatement.getUpdateCount());
+    assertEquals(12L, mw.getRowCount());
+
+    copyStatement.close();
+  }
+
+  @Test
+  public void testCopyDataRowLengthMismatchLimit() throws Exception {
+    setupQueryInformationSchemaResults();
+    BackendConnection backendConnection =
+        new BackendConnection(connection, DdlTransactionMode.Batch);
+
+    byte[] payload = "1\t'one'\n2".getBytes();
+
+    String sql = "COPY keyvalue FROM STDIN;";
+    CopyStatement copyStatement =
+        new CopyStatement(
+            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+
+    assertFalse(copyStatement.isExecuted());
+    copyStatement.executeAsync(backendConnection);
+    assertTrue(copyStatement.isExecuted());
+
+    backendConnection.flush();
+    MutationWriter mw = copyStatement.getMutationWriter();
+    mw.addCopyData(payload);
+    mw.close();
+
+    SpannerException thrown = assertThrows(SpannerException.class, copyStatement::getUpdateCount);
+    assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
+    assertEquals(
+        "INVALID_ARGUMENT: Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
+        thrown.getMessage());
+
+    copyStatement.close();
+
+    deleteLogFile();
+  }
+
   private void setupQueryInformationSchemaResults() {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     ResultSet spannerType = mock(ResultSet.class);
     when(spannerType.getString("column_name")).thenReturn("key", "value");
     when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
@@ -480,7 +565,7 @@ public class StatementTest {
                     statement != null && statement.getSql().startsWith("SELECT column_name"))))
         .thenReturn(spannerType);
 
-    ResultSet countResult = Mockito.mock(ResultSet.class);
+    ResultSet countResult = mock(ResultSet.class);
     when(countResult.getLong(0)).thenReturn(2L);
     when(countResult.next()).thenReturn(true, false);
     when(connection.executeQuery(

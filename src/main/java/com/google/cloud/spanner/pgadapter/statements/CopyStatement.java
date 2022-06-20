@@ -48,7 +48,6 @@ import org.apache.commons.csv.CSVFormat;
 
 @InternalApi
 public class CopyStatement extends IntermediatePortalStatement {
-
   private static final String COLUMN_NAME = "column_name";
   private static final String DATA_TYPE = "data_type";
 
@@ -59,7 +58,6 @@ public class CopyStatement extends IntermediatePortalStatement {
   private Map<String, TypeCode> tableColumns;
   private int indexedColumnsCount;
   private MutationWriter mutationWriter;
-//  private Future<Long> updateCount;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
   public CopyStatement(
@@ -77,7 +75,7 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   @Override
-  public Exception getException() {
+  public SpannerException getException() {
     // Do not clear exceptions on a CopyStatement.
     return this.exception;
   }
@@ -308,16 +306,6 @@ public class CopyStatement extends IntermediatePortalStatement {
     super.handleExecutionException(exception);
   }
 
-//  @Override
-//  public void executeAsync(BackendConnection backendConnection) {
-//    // If the portal has already been described, the statement has already been executed, and we
-//    // don't need to do that once more.
-//    if (futureStatementResult == null && getStatementResult() == null) {
-//      this.executed = true;
-//      setFutureStatementResult(backendConnection.execute(parsedStatement, statement));
-//    }
-//  }
-
   @Override
   public void executeAsync(BackendConnection backendConnection) {
     this.executed = true;
@@ -334,8 +322,8 @@ public class CopyStatement extends IntermediatePortalStatement {
               indexedColumnsCount,
               getParserFormat(),
               hasHeader());
-      //      updateCount = executor.submit(mutationWriter);
-      setFutureStatementResult(backendConnection.executeCopy(parsedStatement, statement, mutationWriter, executor));
+      setFutureStatementResult(
+          backendConnection.executeCopy(parsedStatement, statement, mutationWriter, executor));
     } catch (Exception e) {
       SpannerException spannerException = SpannerExceptionFactory.asSpannerException(e);
       handleExecutionException(spannerException);
@@ -348,9 +336,9 @@ public class CopyStatement extends IntermediatePortalStatement {
     } else {
       this.connectionHandler.addActiveStatement(this);
       new CopyInResponse(
-          this.connectionHandler.getConnectionMetadata().getOutputStream(),
-          getTableColumns().size(),
-          getFormatCode())
+              this.connectionHandler.getConnectionMetadata().getOutputStream(),
+              getTableColumns().size(),
+              getFormatCode())
           .send(false);
       ConnectionStatus initialConnectionStatus = this.connectionHandler.getStatus();
       try {
@@ -360,7 +348,8 @@ public class CopyStatement extends IntermediatePortalStatement {
           this.connectionHandler.handleMessages(
               this.connectionHandler.getConnectionMetadata().getOutputStream());
         }
-        if (this.connectionHandler.getStatus() == ConnectionStatus.COPY_FAILED) {
+        if (hasException(ResultNotReadyBehavior.BLOCK)
+            || this.connectionHandler.getStatus() == ConnectionStatus.COPY_FAILED) {
           if (hasException(ResultNotReadyBehavior.BLOCK)) {
             throw getException();
           } else {
@@ -369,6 +358,7 @@ public class CopyStatement extends IntermediatePortalStatement {
         }
       } finally {
         this.connectionHandler.removeActiveStatement(this);
+        close();
         this.connectionHandler.setStatus(initialConnectionStatus);
       }
     }

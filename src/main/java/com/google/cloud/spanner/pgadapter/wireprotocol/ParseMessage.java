@@ -51,7 +51,8 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
     for (int i = 0; i < numberOfParameters; i++) {
       parameterDataTypes[i] = this.inputStream.readInt();
     }
-    this.statement = createStatement(connection, name, parsedStatement, originalStatement, parameterDataTypes);
+    this.statement =
+        createStatement(connection, name, parsedStatement, originalStatement, parameterDataTypes);
   }
 
   /**
@@ -65,18 +66,23 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
         ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
     this.name = "";
     this.parameterDataTypes = new int[0];
-    this.statement = createStatement(connection, name, parsedStatement, originalStatement, parameterDataTypes);
+    this.statement =
+        createStatement(connection, name, parsedStatement, originalStatement, parameterDataTypes);
   }
 
-  static IntermediatePreparedStatement createStatement(ConnectionHandler connectionHandler, String name, ParsedStatement parsedStatement, Statement originalStatement, int[] parameterDataTypes) {
+  static IntermediatePreparedStatement createStatement(
+      ConnectionHandler connectionHandler,
+      String name,
+      ParsedStatement parsedStatement,
+      Statement originalStatement,
+      int[] parameterDataTypes) {
     if (StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments())) {
-      return
-          new CopyStatement(
-              connectionHandler,
-              connectionHandler.getServer().getOptions(),
-              name,
-              parsedStatement,
-              originalStatement);
+      return new CopyStatement(
+          connectionHandler,
+          connectionHandler.getServer().getOptions(),
+          name,
+          parsedStatement,
+          originalStatement);
     } else {
       IntermediatePreparedStatement statement =
           new IntermediatePreparedStatement(

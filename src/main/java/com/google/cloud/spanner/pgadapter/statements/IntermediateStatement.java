@@ -137,6 +137,9 @@ public class IntermediateStatement {
 
   public long getUpdateCount(ResultNotReadyBehavior resultNotReadyBehavior) {
     initFutureResult(resultNotReadyBehavior);
+    if (hasException()) {
+      throw getException();
+    }
     switch (this.parsedStatement.getType()) {
       case QUERY:
         return -1L;
@@ -182,15 +185,16 @@ public class IntermediateStatement {
 
   private void initFutureResult(ResultNotReadyBehavior resultNotReadyBehavior) {
     if (this.futureStatementResult != null) {
-      if (resultNotReadyBehavior == ResultNotReadyBehavior.FAIL && !this.futureStatementResult.isDone()) {
+      if (resultNotReadyBehavior == ResultNotReadyBehavior.FAIL
+          && !this.futureStatementResult.isDone()) {
         throw new IllegalStateException("Statement result cannot be retrieved before flush/sync");
       }
       try {
         setStatementResult(this.futureStatementResult.get());
       } catch (ExecutionException executionException) {
-        this.exception = SpannerExceptionFactory.asSpannerException(executionException.getCause());
+        setException(SpannerExceptionFactory.asSpannerException(executionException.getCause()));
       } catch (InterruptedException interruptedException) {
-        this.exception = SpannerExceptionFactory.propagateInterrupt(interruptedException);
+        setException(SpannerExceptionFactory.propagateInterrupt(interruptedException));
       } finally {
         this.futureStatementResult = null;
       }
@@ -228,10 +232,14 @@ public class IntermediateStatement {
     return this.parsedStatement.getSqlWithoutComments();
   }
 
-  public Exception getException() {
-    Exception e = this.exception;
-    this.exception = null;
-    return e;
+  public SpannerException getException() {
+    return this.exception;
+  }
+
+  void setException(SpannerException exception) {
+    if (this.exception == null) {
+      this.exception = exception;
+    }
   }
 
   /**
@@ -240,7 +248,7 @@ public class IntermediateStatement {
    * @param exception The exception to store.
    */
   protected void handleExecutionException(SpannerException exception) {
-    this.exception = exception;
+    setException(exception);
     this.hasMoreData = false;
   }
 

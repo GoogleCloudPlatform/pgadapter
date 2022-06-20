@@ -16,10 +16,8 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -30,11 +28,11 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -52,7 +50,6 @@ import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
@@ -64,7 +61,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -951,7 +947,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    Exception testException = new Exception("test error");
+    SpannerException testException =
+        SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT, "test error");
     when(intermediatePortalStatement.hasException()).thenReturn(true);
     when(intermediatePortalStatement.getException()).thenReturn(testException);
     when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
@@ -1128,10 +1125,8 @@ public class ProtocolTest {
     byte[] value = Bytes.concat(messageMetadata, length);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
-    ByteArrayOutputStream result = new ByteArrayOutputStream();
-    DataOutputStream outputStream = new DataOutputStream(result);
+    DataOutputStream outputStream = mock(DataOutputStream.class);
 
-    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1143,11 +1138,8 @@ public class ProtocolTest {
 
     message.send();
 
-    // ReadyResponse
-    DataInputStream outputResult = inputStreamFromOutputStream(result);
-    assertEquals('Z', outputResult.readByte());
-    assertEquals(5, outputResult.readInt());
-    assertEquals('I', outputResult.readByte());
+    verify(extendedQueryProtocolHandler).flush();
+    verify(extendedQueryProtocolHandler, never()).sync();
   }
 
   @Test
@@ -1159,13 +1151,10 @@ public class ProtocolTest {
     byte[] value = Bytes.concat(messageMetadata, length);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
-    ByteArrayOutputStream result = new ByteArrayOutputStream();
-    DataOutputStream outputStream = new DataOutputStream(result);
+    DataOutputStream outputStream = mock(DataOutputStream.class);
 
-    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
-    when(connection.isInTransaction()).thenReturn(true);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1175,11 +1164,8 @@ public class ProtocolTest {
 
     message.send();
 
-    // ReadyResponse
-    DataInputStream outputResult = inputStreamFromOutputStream(result);
-    assertEquals('Z', outputResult.readByte());
-    assertEquals(5, outputResult.readInt());
-    assertEquals('T', outputResult.readByte());
+    verify(extendedQueryProtocolHandler).flush();
+    verify(extendedQueryProtocolHandler, never()).sync();
   }
 
   @Test
@@ -1377,18 +1363,13 @@ public class ProtocolTest {
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    MutationWriter mb = mock(MutationWriter.class);
-    when(copyStatement.getMutationWriter()).thenReturn(mb);
     WireMessage message = ControlMessage.create(connectionHandler);
 
     assertEquals(CopyDoneMessage.class, message.getClass());
     CopyDoneMessage messageSpy = (CopyDoneMessage) spy(message);
-    doNothing()
-        .when(messageSpy)
-        .sendSpannerResult(any(IntermediateStatement.class), any(QueryMode.class), anyLong());
 
     messageSpy.send();
-    verify(messageSpy).sendSpannerResult(copyStatement, QueryMode.SIMPLE, 0L);
+    verify(messageSpy).sendPayload();
   }
 
   @Test
@@ -1442,134 +1423,6 @@ public class ProtocolTest {
 
     copyStatement.close();
     verify(resultSet, never()).close();
-  }
-
-  @Test
-  public void testCopyBatchSizeLimit() throws Exception {
-    setupQueryInformationSchemaResults();
-
-    byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
-
-    String sql = "COPY keyvalue FROM STDIN;";
-    CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
-
-    assertFalse(copyStatement.isExecuted());
-    copyStatement.executeAsync(mock(BackendConnection.class));
-    assertTrue(copyStatement.isExecuted());
-
-    MutationWriter mw = copyStatement.getMutationWriter();
-    // Inject a mock DatabaseClient for now.
-    // TODO: Fix this once we can use the Connection API.
-    Field databaseClientField = MutationWriter.class.getDeclaredField("databaseClient");
-    databaseClientField.setAccessible(true);
-    databaseClientField.set(mw, mock(DatabaseClient.class));
-    mw.addCopyData(payload);
-    mw.close();
-
-    assertEquals("TEXT", copyStatement.getFormatType());
-    assertEquals('\t', copyStatement.getDelimiterChar());
-    assertFalse(copyStatement.hasException());
-    assertEquals(12L, copyStatement.getUpdateCount());
-    assertEquals(12L, mw.getRowCount());
-
-    copyStatement.close();
-  }
-
-  @Test
-  public void testCopyDataRowLengthMismatchLimit() throws Exception {
-    setupQueryInformationSchemaResults();
-
-    byte[] payload = "1\t'one'\n2".getBytes();
-
-    String sql = "COPY keyvalue FROM STDIN;";
-    CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
-
-    assertFalse(copyStatement.isExecuted());
-    copyStatement.executeAsync(mock(BackendConnection.class));
-    assertTrue(copyStatement.isExecuted());
-
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(payload);
-    mw.close();
-
-    SpannerException thrown = assertThrows(SpannerException.class, copyStatement::getUpdateCount);
-    assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
-    assertEquals(
-        "INVALID_ARGUMENT: Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
-        thrown.getMessage());
-
-    copyStatement.close();
-
-    deleteLogFile();
-  }
-
-  @Test
-  public void testCopyResumeErrorOutputFile() throws Exception {
-    setupQueryInformationSchemaResults();
-
-    byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/test-copy-output.txt"));
-
-    String sql = "COPY keyvalue FROM STDIN;";
-    CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
-    assertFalse(copyStatement.isExecuted());
-    copyStatement.executeAsync(mock(BackendConnection.class));
-    assertTrue(copyStatement.isExecuted());
-
-    deleteLogFile();
-
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(payload);
-
-    SpannerException thrown = assertThrows(SpannerException.class, copyStatement::getUpdateCount);
-    assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
-    assertEquals(
-        "INVALID_ARGUMENT: Invalid input syntax for type INT64:\"'5'\"", thrown.getMessage());
-
-    File outputFile = new File("output.txt");
-    assertTrue(outputFile.exists());
-    assertTrue(outputFile.isFile());
-
-    deleteLogFile();
-    copyStatement.close();
-  }
-
-  @Test
-  public void testCopyResumeErrorStartOutputFile() throws Exception {
-    setupQueryInformationSchemaResults();
-
-    byte[] payload =
-        Files.readAllBytes(Paths.get("./src/test/resources/test-copy-start-output.txt"));
-
-    // Pre-emptively try to delete the output file if it is lingering from a previous test run.
-    deleteLogFile();
-
-    String sql = "COPY keyvalue FROM STDIN;";
-    CopyStatement copyStatement =
-        new CopyStatement(connectionHandler, options, "", parse(sql), Statement.of(sql));
-    assertFalse(copyStatement.isExecuted());
-    copyStatement.executeAsync(mock(BackendConnection.class));
-    assertTrue(copyStatement.isExecuted());
-
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(payload);
-
-    SpannerException thrown = assertThrows(SpannerException.class, copyStatement::getUpdateCount);
-    assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
-    assertEquals(
-        "INVALID_ARGUMENT: Invalid input syntax for type INT64:\"'1'\"", thrown.getMessage());
-
-    File outputFile = new File("output.txt");
-    assertTrue(outputFile.exists());
-    assertTrue(outputFile.isFile());
-
-    deleteLogFile();
-    copyStatement.close();
   }
 
   @Test
