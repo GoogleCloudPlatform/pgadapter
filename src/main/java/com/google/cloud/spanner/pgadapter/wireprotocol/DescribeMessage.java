@@ -21,6 +21,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
+import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterDescriptionResponse;
@@ -38,7 +39,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
 
   private final PreparedType type;
   private final String name;
-  private final IntermediateStatement statement;
+  private final IntermediatePreparedStatement statement;
   private Future<DescribePortalMetadata> describePortalMetadata;
 
   public DescribeMessage(ConnectionHandler connection) throws Exception {
@@ -109,6 +110,11 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   @Override
   protected int getHeaderLength() {
     return 5;
+  }
+
+  @Override
+  public IntermediatePreparedStatement getStatement() {
+    return this.statement;
   }
 
   /**

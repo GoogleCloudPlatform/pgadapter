@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
@@ -21,7 +23,9 @@ import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
 import java.text.MessageFormat;
@@ -47,14 +51,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
     for (int i = 0; i < numberOfParameters; i++) {
       parameterDataTypes[i] = this.inputStream.readInt();
     }
-    this.statement =
-        new IntermediatePreparedStatement(
-            connection,
-            connection.getServer().getOptions(),
-            name,
-            parsedStatement,
-            originalStatement);
-    this.statement.setParameterDataTypes(this.parameterDataTypes);
+    this.statement = createStatement(connection, name, parsedStatement, originalStatement, parameterDataTypes);
   }
 
   /**
@@ -68,14 +65,29 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
         ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
     this.name = "";
     this.parameterDataTypes = new int[0];
-    this.statement =
-        new IntermediatePreparedStatement(
-            connection,
-            connection.getServer().getOptions(),
-            name,
-            parsedStatement,
-            originalStatement);
-    this.statement.setParameterDataTypes(this.parameterDataTypes);
+    this.statement = createStatement(connection, name, parsedStatement, originalStatement, parameterDataTypes);
+  }
+
+  static IntermediatePreparedStatement createStatement(ConnectionHandler connectionHandler, String name, ParsedStatement parsedStatement, Statement originalStatement, int[] parameterDataTypes) {
+    if (StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments())) {
+      return
+          new CopyStatement(
+              connectionHandler,
+              connectionHandler.getServer().getOptions(),
+              name,
+              parsedStatement,
+              originalStatement);
+    } else {
+      IntermediatePreparedStatement statement =
+          new IntermediatePreparedStatement(
+              connectionHandler,
+              connectionHandler.getServer().getOptions(),
+              name,
+              parsedStatement,
+              originalStatement);
+      statement.setParameterDataTypes(parameterDataTypes);
+      return statement;
+    }
   }
 
   @Override
@@ -113,6 +125,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
     return String.valueOf(IDENTIFIER);
   }
 
+  @Override
   public IntermediatePreparedStatement getStatement() {
     return this.statement;
   }

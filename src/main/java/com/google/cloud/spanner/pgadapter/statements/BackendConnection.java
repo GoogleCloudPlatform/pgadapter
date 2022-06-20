@@ -27,12 +27,18 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.LinkedList;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 /**
@@ -145,6 +151,40 @@ public class BackendConnection {
     }
   }
 
+  private final class Copy extends BufferedStatement<StatementResult> {
+    private final MutationWriter mutationWriter;
+    private final ListeningExecutorService executor;
+
+    Copy(ParsedStatement parsedStatement, Statement statement, MutationWriter mutationWriter, ExecutorService executor) {
+      super(parsedStatement, statement);
+      this.mutationWriter = mutationWriter;
+      this.executor = MoreExecutors.listeningDecorator(executor);
+    }
+
+    @Override
+    void execute() {
+      try {
+        checkConnectionState();
+        ListenableFuture<StatementResult> updateCount = executor.submit(mutationWriter);
+        updateCount.addListener(
+            () -> {
+              try {
+                result.set(updateCount.get());
+              } catch (ExecutionException executionException) {
+                result.setException(executionException.getCause());
+              } catch (InterruptedException interruptedException) {
+                result.setException(
+                    SpannerExceptionFactory.propagateInterrupt(interruptedException));
+              }
+            },
+            MoreExecutors.directExecutor());
+      } catch (Exception exception) {
+        result.setException(exception);
+        throw exception;
+      }
+    }
+  }
+
   private static final StatementResult NO_RESULT = new NoResult();
   private static final StatementResult ROLLBACK_RESULT = new NoResult("ROLLBACK");
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
@@ -178,6 +218,12 @@ public class BackendConnection {
     Execute execute = new Execute(parsedStatement, statement);
     bufferedStatements.add(execute);
     return execute.result;
+  }
+
+  public Future<StatementResult> executeCopy(ParsedStatement parsedStatement, Statement statement, MutationWriter mutationWriter, ExecutorService executor) {
+    Copy copy = new Copy(parsedStatement, statement, mutationWriter, executor);
+    bufferedStatements.add(copy);
+    return copy.result;
   }
 
   /** Flushes the buffered statements to Spanner. */

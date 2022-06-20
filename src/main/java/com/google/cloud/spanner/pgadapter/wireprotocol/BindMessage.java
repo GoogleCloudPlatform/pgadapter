@@ -117,6 +117,11 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     return this.statementName;
   }
 
+  @Override
+  public IntermediatePreparedStatement getStatement() {
+    return statement;
+  }
+
   public byte[][] getParameters() {
     return this.parameters;
   }

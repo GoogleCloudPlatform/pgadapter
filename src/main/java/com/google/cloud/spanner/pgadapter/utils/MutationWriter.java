@@ -28,6 +28,8 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.FutureCallback;
@@ -70,7 +72,7 @@ import org.apache.commons.csv.CSVRecord;
 import org.postgresql.jdbc.TimestampUtils;
 
 @InternalApi
-public class MutationWriter implements Callable<Long>, Closeable {
+public class MutationWriter implements Callable<StatementResult>, Closeable {
   public enum CopyTransactionMode {
     /**
      * 'Normal' auto-commit mode. The entire COPY operation is atomic. If the number of mutations
@@ -228,8 +230,12 @@ public class MutationWriter implements Callable<Long>, Closeable {
     try {
       this.payload.write(payload);
     } catch (IOException e) {
-      throw SpannerExceptionFactory.newSpannerException(
-          ErrorCode.INTERNAL, "Could not write copy data to buffer", e);
+      // Ignore error if the executor has already been shutdown. That means that an error occurred
+      // that ended the COPY operation while we were writing data to the buffer.
+      if (!executorService.isShutdown()) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INTERNAL, "Could not write copy data to buffer", e);
+      }
     }
   }
 
@@ -248,7 +254,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
   }
 
   @Override
-  public Long call() throws Exception {
+  public StatementResult call() throws Exception {
     // This LinkedBlockingDeque holds a reference to all transactions that are currently active. The
     // max capacity of this deque is what ensures that we never have more than maxParallelism
     // transactions running at the same time. We could also achieve that by using a thread pool with
@@ -366,7 +372,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
       this.parser.close();
       closeErrorFile();
     }
-    return rowCount;
+    return new UpdateCount(rowCount);
   }
 
   private long addMutationAndMaybeFlushTransaction(

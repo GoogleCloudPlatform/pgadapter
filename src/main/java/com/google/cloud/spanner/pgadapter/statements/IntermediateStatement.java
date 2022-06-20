@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.SpannerException;
@@ -41,6 +43,11 @@ import java.util.concurrent.Future;
  */
 @InternalApi
 public class IntermediateStatement {
+  public enum ResultNotReadyBehavior {
+    FAIL,
+    BLOCK;
+  }
+
   protected static final PostgreSQLStatementParser PARSER =
       (PostgreSQLStatementParser) AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
 
@@ -125,7 +132,11 @@ public class IntermediateStatement {
    *     QUERY.
    */
   public long getUpdateCount() {
-    initFutureResult();
+    return getUpdateCount(ResultNotReadyBehavior.FAIL);
+  }
+
+  public long getUpdateCount(ResultNotReadyBehavior resultNotReadyBehavior) {
+    initFutureResult(resultNotReadyBehavior);
     switch (this.parsedStatement.getType()) {
       case QUERY:
         return -1L;
@@ -134,6 +145,9 @@ public class IntermediateStatement {
       case CLIENT_SIDE:
       case DDL:
       case UNKNOWN:
+        if (StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments())) {
+          return this.statementResult.getUpdateCount();
+        }
       default:
         return 0L;
     }
@@ -141,7 +155,11 @@ public class IntermediateStatement {
 
   /** @return True if at some point in execution, and exception was thrown. */
   public boolean hasException() {
-    initFutureResult();
+    return hasException(ResultNotReadyBehavior.FAIL);
+  }
+
+  boolean hasException(ResultNotReadyBehavior resultNotReadyBehavior) {
+    initFutureResult(resultNotReadyBehavior);
     return this.exception != null;
   }
 
@@ -162,9 +180,9 @@ public class IntermediateStatement {
     return this.parsedStatement.getSqlWithoutComments();
   }
 
-  private void initFutureResult() {
+  private void initFutureResult(ResultNotReadyBehavior resultNotReadyBehavior) {
     if (this.futureStatementResult != null) {
-      if (!this.futureStatementResult.isDone()) {
+      if (resultNotReadyBehavior == ResultNotReadyBehavior.FAIL && !this.futureStatementResult.isDone()) {
         throw new IllegalStateException("Statement result cannot be retrieved before flush/sync");
       }
       try {
@@ -180,7 +198,11 @@ public class IntermediateStatement {
   }
 
   public StatementResult getStatementResult() {
-    initFutureResult();
+    return getStatementResult(ResultNotReadyBehavior.FAIL);
+  }
+
+  StatementResult getStatementResult(ResultNotReadyBehavior resultNotReadyBehavior) {
+    initFutureResult(resultNotReadyBehavior);
     return this.statementResult;
   }
 

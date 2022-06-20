@@ -14,8 +14,11 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -33,6 +36,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Generic representation for a control wire message: that is, a message which does not handle any
@@ -82,6 +86,10 @@ public abstract class ControlMessage extends WireMessage {
           return new CopyDataMessage(connection);
         case CopyFailMessage.IDENTIFIER:
           return new CopyFailMessage(connection);
+        case SyncMessage.IDENTIFIER:
+        case FlushMessage.IDENTIFIER:
+          // Skip sync/flush in COPY_IN.
+          return new SkipMessage(connection);
         default:
           // Drop the connection if we receive an invalid message to prevent further CopyData
           // messages from coming in. There is no error handling in the COPY protocol, and some
@@ -115,6 +123,11 @@ public abstract class ControlMessage extends WireMessage {
           return new FunctionCallMessage(connection);
         case FlushMessage.IDENTIFIER:
           return new FlushMessage(connection);
+        case CopyDoneMessage.IDENTIFIER:
+        case CopyDataMessage.IDENTIFIER:
+        case CopyFailMessage.IDENTIFIER:
+          // Skip COPY messages in non-COPY mode.
+          return new SkipMessage(connection);
         default:
           throw new IllegalStateException(String.format("Unknown message: %c", nextMsg));
       }
@@ -204,6 +217,7 @@ public abstract class ControlMessage extends WireMessage {
         command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
         new CommandCompleteResponse(this.outputStream, command).send(false);
         break;
+      case UNKNOWN:
       default:
         throw new IllegalStateException("Unknown statement type: " + statement.getStatement());
     }

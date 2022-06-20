@@ -27,27 +27,27 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
+import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
 import com.google.common.base.Strings;
 import com.google.spanner.v1.TypeCode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.csv.CSVFormat;
 
 @InternalApi
-public class CopyStatement extends IntermediateStatement {
+public class CopyStatement extends IntermediatePortalStatement {
 
   private static final String COLUMN_NAME = "column_name";
   private static final String DATA_TYPE = "data_type";
@@ -59,20 +59,32 @@ public class CopyStatement extends IntermediateStatement {
   private Map<String, TypeCode> tableColumns;
   private int indexedColumnsCount;
   private MutationWriter mutationWriter;
-  private Future<Long> updateCount;
+//  private Future<Long> updateCount;
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
   public CopyStatement(
       ConnectionHandler connectionHandler,
       OptionsMetadata options,
+      String name,
       ParsedStatement parsedStatement,
       Statement originalStatement) {
-    super(connectionHandler, options, parsedStatement, originalStatement);
+    super(connectionHandler, options, name, parsedStatement, originalStatement);
   }
 
+  @Override
+  public boolean hasException() {
+    return this.exception != null;
+  }
+
+  @Override
   public Exception getException() {
     // Do not clear exceptions on a CopyStatement.
     return this.exception;
+  }
+
+  @Override
+  public long getUpdateCount() {
+    return getUpdateCount(ResultNotReadyBehavior.BLOCK);
   }
 
   @Override
@@ -82,16 +94,6 @@ public class CopyStatement extends IntermediateStatement {
     }
     this.executor.shutdown();
     super.close();
-  }
-
-  public long getUpdateCount() {
-    try {
-      return updateCount.get();
-    } catch (ExecutionException e) {
-      throw SpannerExceptionFactory.asSpannerException(e.getCause());
-    } catch (InterruptedException e) {
-      throw SpannerExceptionFactory.propagateInterrupt(e);
-    }
   }
 
   @Override
@@ -291,12 +293,33 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   @Override
+  public IntermediatePortalStatement bind(
+      String name,
+      byte[][] parameters,
+      List<Short> parameterFormatCodes,
+      List<Short> resultFormatCodes) {
+    // COPY does not support binding any parameters, so we just return the same statement.
+    return this;
+  }
+
+  @Override
   public void handleExecutionException(SpannerException exception) {
     executor.shutdownNow();
     super.handleExecutionException(exception);
   }
 
-  public void execute() {
+//  @Override
+//  public void executeAsync(BackendConnection backendConnection) {
+//    // If the portal has already been described, the statement has already been executed, and we
+//    // don't need to do that once more.
+//    if (futureStatementResult == null && getStatementResult() == null) {
+//      this.executed = true;
+//      setFutureStatementResult(backendConnection.execute(parsedStatement, statement));
+//    }
+//  }
+
+  @Override
+  public void executeAsync(BackendConnection backendConnection) {
     this.executed = true;
     try {
       parseCopyStatement();
@@ -311,10 +334,43 @@ public class CopyStatement extends IntermediateStatement {
               indexedColumnsCount,
               getParserFormat(),
               hasHeader());
-      updateCount = executor.submit(mutationWriter);
+      //      updateCount = executor.submit(mutationWriter);
+      setFutureStatementResult(backendConnection.executeCopy(parsedStatement, statement, mutationWriter, executor));
     } catch (Exception e) {
       SpannerException spannerException = SpannerExceptionFactory.asSpannerException(e);
       handleExecutionException(spannerException);
+    }
+  }
+
+  public void handleCopy() throws Exception {
+    if (hasException()) {
+      throw getException();
+    } else {
+      this.connectionHandler.addActiveStatement(this);
+      new CopyInResponse(
+          this.connectionHandler.getConnectionMetadata().getOutputStream(),
+          getTableColumns().size(),
+          getFormatCode())
+          .send(false);
+      ConnectionStatus initialConnectionStatus = this.connectionHandler.getStatus();
+      try {
+        this.connectionHandler.setStatus(ConnectionStatus.COPY_IN);
+        // Loop here until COPY_IN mode has finished.
+        while (this.connectionHandler.getStatus() == ConnectionStatus.COPY_IN) {
+          this.connectionHandler.handleMessages(
+              this.connectionHandler.getConnectionMetadata().getOutputStream());
+        }
+        if (this.connectionHandler.getStatus() == ConnectionStatus.COPY_FAILED) {
+          if (hasException(ResultNotReadyBehavior.BLOCK)) {
+            throw getException();
+          } else {
+            throw SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "Copy failed");
+          }
+        }
+      } finally {
+        this.connectionHandler.removeActiveStatement(this);
+        this.connectionHandler.setStatus(initialConnectionStatus);
+      }
     }
   }
 

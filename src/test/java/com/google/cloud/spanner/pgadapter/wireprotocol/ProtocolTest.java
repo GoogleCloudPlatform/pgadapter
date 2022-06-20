@@ -1327,8 +1327,8 @@ public class ProtocolTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(connectionHandler, options, parse(sql), Statement.of(sql));
-    copyStatement.execute();
+        new CopyStatement(connectionHandler, options, "", parse(sql), Statement.of(sql));
+    copyStatement.executeAsync(mock(BackendConnection.class));
 
     when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
@@ -1431,8 +1431,8 @@ public class ProtocolTest {
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
         new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
-    copyStatement.execute();
+            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+    copyStatement.executeAsync(mock(BackendConnection.class));
 
     MutationWriter mw = copyStatement.getMutationWriter();
     mw.addCopyData(payload);
@@ -1453,10 +1453,10 @@ public class ProtocolTest {
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
         new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
+            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
     assertFalse(copyStatement.isExecuted());
-    copyStatement.execute();
+    copyStatement.executeAsync(mock(BackendConnection.class));
     assertTrue(copyStatement.isExecuted());
 
     MutationWriter mw = copyStatement.getMutationWriter();
@@ -1486,10 +1486,10 @@ public class ProtocolTest {
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
         new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
+            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
     assertFalse(copyStatement.isExecuted());
-    copyStatement.execute();
+    copyStatement.executeAsync(mock(BackendConnection.class));
     assertTrue(copyStatement.isExecuted());
 
     MutationWriter mw = copyStatement.getMutationWriter();
@@ -1516,9 +1516,9 @@ public class ProtocolTest {
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
         new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
+            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
     assertFalse(copyStatement.isExecuted());
-    copyStatement.execute();
+    copyStatement.executeAsync(mock(BackendConnection.class));
     assertTrue(copyStatement.isExecuted());
 
     deleteLogFile();
@@ -1551,9 +1551,9 @@ public class ProtocolTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(connectionHandler, options, parse(sql), Statement.of(sql));
+        new CopyStatement(connectionHandler, options, "", parse(sql), Statement.of(sql));
     assertFalse(copyStatement.isExecuted());
-    copyStatement.execute();
+    copyStatement.executeAsync(mock(BackendConnection.class));
     assertTrue(copyStatement.isExecuted());
 
     MutationWriter mw = copyStatement.getMutationWriter();

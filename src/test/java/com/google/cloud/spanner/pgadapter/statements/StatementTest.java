@@ -410,8 +410,8 @@ public class StatementTest {
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement statement =
         new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
-    statement.execute();
+            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+    statement.executeAsync(mock(BackendConnection.class));
 
     byte[] payload = "2 3\n".getBytes();
     MutationWriter mutationWriter = statement.getMutationWriter();

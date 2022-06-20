@@ -144,7 +144,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCopyIn_Large_FailsWhenAtomic() throws SQLException {
+  public void testCopyIn_Large_FailsWhenAtomic() throws Exception {
     setupCopyInformationSchemaResults();
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
@@ -157,12 +157,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                   copyManager.copyIn(
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
-      // The JDBC driver CopyManager takes the COPY protocol quite literally, and as the COPY
-      // protocol does not include any error handling, the JDBC driver will just send all data to
-      // the server and ignore any error messages the server might send during the copy operation.
-      // PGAdapter therefore drops the connection if it continues to receive CopyData messages after
-      // it sent back an error message.
-      assertTrue(exception.getMessage().contains("Database connection failed"));
+      assertTrue(exception.getMessage(), exception.getMessage().contains("FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000."));
     }
   }
 
@@ -199,7 +194,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               () ->
                   copyManager.copyIn(
                       "COPY users FROM STDIN;", new StringReader("5\t5\t5\n6\t6\t6\n7\t7\t7\n")));
-      assertTrue(
+      assertTrue(exception.getMessage(),
           exception.getMessage().contains("io.grpc.StatusRuntimeException: INVALID_ARGUMENT"));
     }
 
@@ -557,6 +552,104 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         "8",
         commitRequests
             .get(1)
+            .getMutations(0)
+            .getInsert()
+            .getValues(0)
+            .getValues(2)
+            .getStringValue());
+  }
+
+  @Test
+  public void testCopyInBatchWithCopyFail() throws Exception {
+    setupCopyInformationSchemaResults();
+
+    byte[] row1 = "5\t6\t7\n".getBytes(StandardCharsets.UTF_8);
+    byte[] row2 = "8\t9\t10\n".getBytes(StandardCharsets.UTF_8);
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PgConnection pgConnection = connection.unwrap(PgConnection.class);
+      QueryExecutorImpl queryExecutor = (QueryExecutorImpl) pgConnection.getQueryExecutor();
+      // Use reflection to get hold of the underlying stream, so we can send any message that we
+      // want.
+      java.lang.reflect.Field pgStreamField = QueryExecutorBase.class.getDeclaredField("pgStream");
+      pgStreamField.setAccessible(true);
+      PGStream stream = (PGStream) pgStreamField.get(queryExecutor);
+
+      String sql = "SELECT 1;copy users from stdin;copy users from stdin;SELECT 2;";
+      int length = sql.getBytes(StandardCharsets.UTF_8).length + 5;
+      stream.sendChar('Q');
+      stream.sendInteger4(length);
+      stream.send(sql.getBytes(StandardCharsets.UTF_8));
+      stream.sendChar(0);
+      stream.flush();
+
+      // Send CopyData + CopyDone for the first copy operation.
+      stream.sendChar('d');
+      stream.sendInteger4(row1.length + 4);
+      stream.send(row1);
+      stream.sendChar('c');
+      stream.sendInteger4(4);
+      stream.flush();
+
+      // Send CopyData + CopyFail for the second copy operation.
+      stream.sendChar('d');
+      stream.sendInteger4(row2.length + 4);
+      stream.send(row2);
+      String error = "Changed my mind";
+      stream.sendChar('f');
+      stream.sendInteger4(4 + error.getBytes(StandardCharsets.UTF_8).length + 1);
+      stream.send(error.getBytes(StandardCharsets.UTF_8));
+      stream.sendChar(0);
+      stream.flush();
+
+      boolean receivedReadyForQuery = false;
+      boolean receivedErrorMessage = false;
+      StringBuilder errorMessage = new StringBuilder();
+      while (!receivedReadyForQuery) {
+        int command = stream.receiveChar();
+        if (command == 'Z') {
+          receivedReadyForQuery = true;
+        } else if (command == 'E') {
+          receivedErrorMessage = true;
+          // Read and ignore the length.
+          stream.receiveInteger4();
+          while(stream.receiveChar() > 0) {
+            errorMessage.append(stream.receiveString()).append('\n');
+          }
+        } else {
+          // Just skip everything in the message.
+          length = stream.receiveInteger4();
+          stream.skip(length - 4);
+        }
+      }
+      assertTrue(receivedErrorMessage);
+      assertEquals("ERROR\n" + "P0001\n" + "CANCELLED: Changed my mind\n", errorMessage.toString());
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.get(0).getMutationsCount());
+    assertEquals(
+        "5",
+        commitRequests
+            .get(0)
+            .getMutations(0)
+            .getInsert()
+            .getValues(0)
+            .getValues(0)
+            .getStringValue());
+    assertEquals(
+        "6",
+        commitRequests
+            .get(0)
+            .getMutations(0)
+            .getInsert()
+            .getValues(0)
+            .getValues(1)
+            .getStringValue());
+    assertEquals(
+        "7",
+        commitRequests
+            .get(0)
             .getMutations(0)
             .getInsert()
             .getValues(0)

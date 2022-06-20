@@ -28,6 +28,7 @@ import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -124,9 +125,9 @@ public class MutationWriterTest {
     mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
     mutationWriter.close();
 
-    long updateCount = mutationWriter.call();
+    StatementResult updateCount = mutationWriter.call();
 
-    assertEquals(2L, updateCount);
+    assertEquals(2L, updateCount.getUpdateCount().longValue());
     List<Mutation> expectedMutations =
         ImmutableList.of(
             Mutation.newInsertBuilder("numbers").set("number").to(1L).set("name").to("One").build(),
@@ -204,9 +205,9 @@ public class MutationWriterTest {
               .getBytes(StandardCharsets.UTF_8));
       mutationWriter.close();
 
-      long updateCount = mutationWriter.call();
+      StatementResult updateCount = mutationWriter.call();
 
-      assertEquals(5L, updateCount);
+      assertEquals(5L, updateCount.getUpdateCount().longValue());
       verify(databaseClient, times(3)).write(anyIterable());
     } finally {
       System.getProperties().remove("copy_in_mutation_limit");
@@ -281,9 +282,9 @@ public class MutationWriterTest {
               .getBytes(StandardCharsets.UTF_8));
       mutationWriter.close();
 
-      long updateCount = mutationWriter.call();
+      StatementResult updateCount = mutationWriter.call();
 
-      assertEquals(5L, updateCount);
+      assertEquals(5L, updateCount.getUpdateCount().longValue());
       // We expect two batches, because:
       // 1. The commit limit is 80 bytes. That is for safety halved down to 40 bytes.
       // 2. Each record is 20 bytes.
@@ -338,9 +339,9 @@ public class MutationWriterTest {
           mutationWriter.close();
           return null;
         });
-    Future<Long> updateCount = executor.submit(mutationWriter);
+    Future<StatementResult> updateCount = executor.submit(mutationWriter);
 
-    assertEquals(5L, updateCount.get().longValue());
+    assertEquals(5L, updateCount.get().getUpdateCount().longValue());
     List<Mutation> expectedMutations =
         ImmutableList.of(
             Mutation.newInsertBuilder("numbers").set("number").to(1L).set("name").to("One").build(),

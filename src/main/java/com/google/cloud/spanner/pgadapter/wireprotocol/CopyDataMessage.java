@@ -56,16 +56,12 @@ public class CopyDataMessage extends ControlMessage {
       try {
         mutationWriter.addCopyData(this.payload);
       } catch (SpannerException exception) {
-        mutationWriter.writeErrorFile(exception);
-        statement.handleExecutionException(exception);
-        throw exception;
+        if (!statement.hasException()) {
+          mutationWriter.writeErrorFile(exception);
+          statement.handleExecutionException(exception);
+          throw exception;
+        }
       }
-    } else {
-      // If we get another CopyData message after we have already failed, then we drop the
-      // connection to ensure that the client is not overflowing us with messages. Some clients do
-      // not check for error messages during a COPY operation.
-      connection.setStatus(ConnectionStatus.TERMINATED);
-      throw statement.getException();
     }
   }
 

@@ -15,9 +15,16 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
+import com.google.cloud.spanner.pgadapter.parsers.copy.Copy;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
+import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
 import java.text.MessageFormat;
 
 /** Executes a portal. */
@@ -27,7 +34,7 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
 
   private final String name;
   private final int maxRows;
-  private final IntermediateStatement statement;
+  private final IntermediatePreparedStatement statement;
 
   public ExecuteMessage(ConnectionHandler connection) throws Exception {
     super(connection);
@@ -83,13 +90,25 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
     return 8;
   }
 
+  @Override
+  public IntermediatePreparedStatement getStatement() {
+    return this.statement;
+  }
+
   /**
    * Called when an execute message is received.
    *
    * @throws Exception if sending the message back to the client causes an error.
    */
   private void handleExecute() throws Exception {
-    if (this.statement.hasException()) {
+    if (this.statement instanceof CopyStatement) {
+      try {
+        ((CopyStatement) this.statement).handleCopy();
+        this.sendSpannerResult(this.statement, this.queryMode, this.maxRows);
+      } catch (Exception exception) {
+        handleError(exception);
+      }
+    } else if (this.statement.hasException()) {
       this.handleError(this.statement.getException());
     } else {
       try {
@@ -101,4 +120,5 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
     }
     this.connection.cleanUp(this.statement);
   }
+
 }

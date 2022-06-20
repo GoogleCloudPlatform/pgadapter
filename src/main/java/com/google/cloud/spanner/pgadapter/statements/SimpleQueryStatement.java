@@ -38,6 +38,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.FlushMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.common.annotations.VisibleForTesting;
@@ -73,30 +74,33 @@ public class SimpleQueryStatement {
     for (Statement originalStatement : this.statements) {
       ParsedStatement originalParsedStatement = PARSER.parse(originalStatement);
       ParsedStatement parsedStatement = originalParsedStatement;
-      if (StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments())) {
-        CopyStatement copyStatement =
-            new CopyStatement(
-                connectionHandler,
-                connectionHandler.getServer().getOptions(),
-                parsedStatement,
-                originalStatement);
-        try {
-          this.connectionHandler.addActiveStatement(copyStatement);
-          copyStatement.execute();
-          handleCopy(copyStatement);
-        } catch (Exception exception) {
-          new ErrorResponse(
-                  connectionHandler.getConnectionMetadata().getOutputStream(),
-                  exception,
-                  State.RaiseException)
-              .send();
-          // Ignore all further statements in the Query message.
-          break;
-        } finally {
-          this.connectionHandler.removeActiveStatement(copyStatement);
-        }
-        continue;
-      }
+//      if (StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments())) {
+//        // A COPY statement needs to flush any changes to the backend before we can continue.
+//        new FlushMessage(connectionHandler).send();
+//
+//        CopyStatement copyStatement =
+//            new CopyStatement(
+//                connectionHandler,
+//                connectionHandler.getServer().getOptions(),
+//                parsedStatement,
+//                originalStatement);
+//        try {
+//          this.connectionHandler.addActiveStatement(copyStatement);
+//          copyStatement.execute();
+//          handleCopy(copyStatement);
+//        } catch (Exception exception) {
+//          new ErrorResponse(
+//                  connectionHandler.getConnectionMetadata().getOutputStream(),
+//                  exception,
+//                  State.RaiseException)
+//              .send();
+//          // Ignore all further statements in the Query message.
+//          break;
+//        } finally {
+//          this.connectionHandler.removeActiveStatement(copyStatement);
+//        }
+//        continue;
+//      }
 
       if (options.requiresMatcher()
           || connectionHandler.getWellKnownClient() == WellKnownClient.PSQL) {
