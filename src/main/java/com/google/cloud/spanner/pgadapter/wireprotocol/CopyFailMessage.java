@@ -15,13 +15,13 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
+import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import java.text.MessageFormat;
 
 /**
@@ -32,35 +32,33 @@ import java.text.MessageFormat;
  */
 @InternalApi
 public class CopyFailMessage extends ControlMessage {
-
   protected static final char IDENTIFIER = 'f';
-  private CopyStatement statement;
 
-  private String errorMessage;
+  private final CopyStatement statement;
+  private final String errorMessage;
 
   public CopyFailMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.errorMessage = this.readAll();
-    this.statement = (CopyStatement) connection.getActiveStatement();
+    IntermediateStatement activeStatement = connection.getActiveStatement();
+    if (activeStatement instanceof CopyStatement) {
+      this.statement = (CopyStatement) activeStatement;
+    } else {
+      this.statement = null;
+    }
   }
 
   @Override
   protected void sendPayload() throws Exception {
-    // If backend error occurred during copy-in mode, drop any subsequent CopyFail messages.
     if (this.statement != null) {
       MutationWriter mutationWriter = this.statement.getMutationWriter();
       mutationWriter.rollback();
       mutationWriter.closeErrorFile();
       statement.close();
-      if (!statement.hasException()) {
-        new ErrorResponse(this.outputStream, new Exception(this.errorMessage), State.IOError)
-            .send();
-      }
+      this.statement.handleExecutionException(
+          SpannerExceptionFactory.newSpannerException(ErrorCode.CANCELLED, this.errorMessage));
     }
-    // TODO: Test this message
     this.connection.setStatus(ConnectionStatus.COPY_FAILED);
-    this.connection.removeActiveStatement(this.statement);
-    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
   }
 
   @Override

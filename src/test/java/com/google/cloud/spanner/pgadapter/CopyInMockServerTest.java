@@ -23,7 +23,6 @@ import static org.junit.Assume.assumeTrue;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
@@ -47,9 +46,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Collections;
 import java.util.List;
-import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -65,6 +62,7 @@ import org.postgresql.core.PGStream;
 import org.postgresql.core.QueryExecutorBase;
 import org.postgresql.core.v3.CopyOperationImpl;
 import org.postgresql.core.v3.QueryExecutorImpl;
+import org.postgresql.jdbc.PgConnection;
 
 @RunWith(Parameterized.class)
 public class CopyInMockServerTest extends AbstractMockServerTest {
@@ -100,7 +98,8 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               + "&preferQueryMode=%s",
           pgServer.getLocalPort(), queryMode);
     }
-    return String.format("jdbc:postgresql://localhost:%d/?preferQueryMode=%s", pgServer.getLocalPort(), queryMode);
+    return String.format(
+        "jdbc:postgresql://localhost:%d/?preferQueryMode=%s", pgServer.getLocalPort(), queryMode);
   }
 
   @Test
@@ -416,21 +415,26 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCopyInBatch() throws Exception {
+  public void testCopyInBatchPsql() throws Exception {
     assumeTrue("This test requires psql to be installed", isPsqlAvailable());
     setupCopyInformationSchemaResults();
 
     String host = useDomainSocket ? "/tmp" : "localhost";
     ProcessBuilder builder = new ProcessBuilder();
-    String[] psqlCommand = new String[] {"psql", "-h", host, "-p", String.valueOf(pgServer.getLocalPort())};
+    String[] psqlCommand =
+        new String[] {"psql", "-h", host, "-p", String.valueOf(pgServer.getLocalPort())};
     builder.command(psqlCommand);
     Process process = builder.start();
     String errors;
     String output;
 
-    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream()); BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream())); BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
       writer.write(
-          "SELECT 1\\;copy users from stdin\\;copy users from stdin\\;SELECT 1;\n"
+          "SELECT 1\\;copy users from stdin\\;copy users from stdin\\;SELECT 2;\n"
               + "1\t1\t1\n"
               + "\\.\n"
               + "2\t2\t2\n"
@@ -443,9 +447,121 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     }
 
     assertEquals("", errors);
-    assertEquals(" C \n---\n 1\n(1 row)\n", output);
+    assertEquals(" C \n---\n 2\n(1 row)\n", output);
     int res = process.waitFor();
     assertEquals(0, res);
+  }
+
+  @Test
+  public void testCopyInBatch() throws Exception {
+    setupCopyInformationSchemaResults();
+
+    byte[] row1 = "5\t6\t7\n".getBytes(StandardCharsets.UTF_8);
+    byte[] row2 = "6\t7\t8\n".getBytes(StandardCharsets.UTF_8);
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PgConnection pgConnection = connection.unwrap(PgConnection.class);
+      QueryExecutorImpl queryExecutor = (QueryExecutorImpl) pgConnection.getQueryExecutor();
+      // Use reflection to get hold of the underlying stream, so we can send any message that we
+      // want.
+      java.lang.reflect.Field pgStreamField = QueryExecutorBase.class.getDeclaredField("pgStream");
+      pgStreamField.setAccessible(true);
+      PGStream stream = (PGStream) pgStreamField.get(queryExecutor);
+
+      String sql = "SELECT 1;copy users from stdin;copy users from stdin;SELECT 2;";
+      int length = sql.length() + 5;
+      stream.sendChar('Q');
+      stream.sendInteger4(length);
+      stream.send(sql.getBytes(StandardCharsets.UTF_8));
+      stream.sendChar(0);
+      stream.flush();
+
+      // Send CopyData + CopyDone for the first copy operation.
+      stream.sendChar('d');
+      stream.sendInteger4(row1.length + 4);
+      stream.send(row1);
+      stream.sendChar('c');
+      stream.sendInteger4(4);
+      stream.flush();
+
+      // Send CopyData + CopyDone for the second copy operation.
+      stream.sendChar('d');
+      stream.sendInteger4(row2.length + 4);
+      stream.send(row2);
+      stream.sendChar('c');
+      stream.sendInteger4(4);
+      stream.flush();
+
+      boolean receivedReadyForQuery = false;
+      while (!receivedReadyForQuery) {
+        int command = stream.receiveChar();
+        if (command == 'Z') {
+          receivedReadyForQuery = true;
+        } else {
+          // Just skip everything in the message.
+          length = stream.receiveInteger4();
+          stream.skip(length - 4);
+        }
+      }
+    }
+
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.get(0).getMutationsCount());
+    assertEquals(
+        "5",
+        commitRequests
+            .get(0)
+            .getMutations(0)
+            .getInsert()
+            .getValues(0)
+            .getValues(0)
+            .getStringValue());
+    assertEquals(
+        "6",
+        commitRequests
+            .get(0)
+            .getMutations(0)
+            .getInsert()
+            .getValues(0)
+            .getValues(1)
+            .getStringValue());
+    assertEquals(
+        "7",
+        commitRequests
+            .get(0)
+            .getMutations(0)
+            .getInsert()
+            .getValues(0)
+            .getValues(2)
+            .getStringValue());
+    assertEquals(1, commitRequests.get(1).getMutationsCount());
+    assertEquals(
+        "6",
+        commitRequests
+            .get(1)
+            .getMutations(0)
+            .getInsert()
+            .getValues(0)
+            .getValues(0)
+            .getStringValue());
+    assertEquals(
+        "7",
+        commitRequests
+            .get(1)
+            .getMutations(0)
+            .getInsert()
+            .getValues(0)
+            .getValues(1)
+            .getStringValue());
+    assertEquals(
+        "8",
+        commitRequests
+            .get(1)
+            .getMutations(0)
+            .getInsert()
+            .getValues(0)
+            .getValues(2)
+            .getStringValue());
   }
 
   private void setupCopyInformationSchemaResults() {

@@ -19,6 +19,8 @@ import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -32,7 +34,6 @@ import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
@@ -43,7 +44,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
-import org.apache.http.auth.AUTH;
 
 /**
  * Class that represents a simple query protocol statement. This statement can contain multiple
@@ -122,20 +122,25 @@ public class SimpleQueryStatement {
       throw copyStatement.getException();
     } else {
       new CopyInResponse(
-          this.connectionHandler.getConnectionMetadata().getOutputStream(),
-          copyStatement.getTableColumns().size(),
-          copyStatement.getFormatCode())
+              this.connectionHandler.getConnectionMetadata().getOutputStream(),
+              copyStatement.getTableColumns().size(),
+              copyStatement.getFormatCode())
           .send();
       try {
         this.connectionHandler.setStatus(ConnectionStatus.COPY_IN);
         // Block here until COPY_IN mode has finished.
         while (this.connectionHandler.getStatus() == ConnectionStatus.COPY_IN) {
-          this.connectionHandler.handleMessages(this.connectionHandler.getConnectionMetadata().getOutputStream());
+          this.connectionHandler.handleMessages(
+              this.connectionHandler.getConnectionMetadata().getOutputStream());
         }
         if (this.connectionHandler.getStatus() == ConnectionStatus.COPY_FAILED) {
-          // TODO: Handle COPY_FAILED.
+          if (copyStatement.hasException()) {
+            throw copyStatement.getException();
+          } else {
+            throw SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "Copy failed");
+          }
         }
-      } finally{
+      } finally {
         this.connectionHandler.setStatus(ConnectionStatus.AUTHENTICATED);
       }
     }

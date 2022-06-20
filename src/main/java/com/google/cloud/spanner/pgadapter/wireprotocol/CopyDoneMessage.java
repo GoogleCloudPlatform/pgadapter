@@ -21,7 +21,6 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import java.text.MessageFormat;
 
 /**
@@ -52,13 +51,10 @@ public class CopyDoneMessage extends ControlMessage {
           statement.setStatementResult(
               new UpdateCount(rowCount)); // Set the row count of number of rows copied.
           this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
-          this.outputStream.flush();
         } catch (Exception e) {
           // Spanner returned an error when trying to commit the batch of mutations.
           mutationWriter.writeErrorFile(e);
           mutationWriter.closeErrorFile();
-//          this.connection.setStatus(ConnectionStatus.AUTHENTICATED);
-//          this.connection.removeActiveStatement(this.statement);
           throw e;
         }
       } else {
@@ -67,8 +63,6 @@ public class CopyDoneMessage extends ControlMessage {
     }
     // Clear the COPY_IN status to indicate that we finished successfully.
     this.connection.setStatus(ConnectionStatus.COPY_DONE);
-//    this.connection.removeActiveStatement(this.statement);
-//    new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
   }
 
   @Override

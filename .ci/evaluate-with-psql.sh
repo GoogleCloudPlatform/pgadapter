@@ -121,6 +121,17 @@ echo "------Test \"COPY FROM STDIN\"------"
 17	17	17
 \.
 EOF
-echo "SELECT * FROM users;" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/copy-from-stdin.txt
+echo "SELECT * FROM users order by id;" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/copy-from-stdin.txt
 diff -i -w -s .ci/e2e-result/copy-from-stdin.txt .ci/e2e-expected/copy-from-stdin.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"COPY FROM STDIN in batch\"------"
+/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -c "select 0; COPY users FROM STDIN; COPY users FROM STDIN; select 1;" <<EOF
+18	18	18
+\.
+19	19	19
+\.
+EOF
+echo "SELECT * FROM users order by id;" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/copy-from-stdin-batch.txt
+diff -i -w -s .ci/e2e-result/copy-from-stdin-batch.txt .ci/e2e-expected/copy-from-stdin-batch.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))

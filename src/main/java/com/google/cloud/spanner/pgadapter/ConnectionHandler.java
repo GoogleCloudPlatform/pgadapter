@@ -42,8 +42,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.net.Socket;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
@@ -309,9 +307,11 @@ public class ConnectionHandler extends Thread {
     logger.log(
         Level.WARNING,
         exception,
-        () -> String.format("Exception on connection handler with ID %s: %s", getName(), exception));
+        () ->
+            String.format("Exception on connection handler with ID %s: %s", getName(), exception));
     if (this.status == ConnectionStatus.TERMINATED) {
-      new ErrorResponse(output, exception, ErrorResponse.State.InternalError, Severity.FATAL).send();
+      new ErrorResponse(output, exception, ErrorResponse.State.InternalError, Severity.FATAL)
+          .send();
       new TerminateResponse(output).send();
     } else if (this.status == ConnectionStatus.COPY_IN) {
       // Bubble the exception up so the copy handler can handle the exception.
