@@ -257,7 +257,7 @@ public class CopyStatement extends IntermediatePortalStatement {
             .bind("p1")
             .to(getTableName())
             .build();
-    try (ResultSet result = connection.executeQuery(statement)) {
+    try (ResultSet result = connection.getDatabaseClient().singleUse().executeQuery(statement)) {
       while (result.next()) {
         String columnName = result.getString(COLUMN_NAME);
         TypeCode type = parsePostgreSQLDataType(result.getString(DATA_TYPE));
@@ -296,7 +296,7 @@ public class CopyStatement extends IntermediatePortalStatement {
       paramIndex++;
     }
     Statement statement = builder.build();
-    try (ResultSet resultSet = connection.executeQuery(statement)) {
+    try (ResultSet resultSet = connection.getDatabaseClient().singleUse().executeQuery(statement)) {
       if (resultSet.next()) {
         return (int) resultSet.getLong(0);
       }
