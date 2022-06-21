@@ -285,7 +285,7 @@ Other `psql` meta-commands are __not__ supported.
 Spanner database. `COPY` operations are atomic by default, but the standard transaction limits of
 Cloud Spanner apply to these transactions. That means that at most 20,000 mutations can be included
 in one `COPY` operation. `COPY` can also be executed in non-atomic mode by executing the statement
-`SET AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing the copy operation.
+`SET SPANNER.AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing the copy operation.
 
 Although only `STDIN` is supported, export files can still be imported using `COPY` by piping files
 into `psql`. See the examples below.
@@ -307,7 +307,7 @@ create table numbers (number bigint not null primary key, name varchar);
 ```
 
 ```shell
-cat numbers.txt | psql -h localhost -d test-db -c "set autocommit_dml_mode='partitioned_non_atomic'" -c "copy numbers from stdin;"
+cat numbers.txt | psql -h localhost -d test-db -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; copy numbers from stdin;"
 ```
 
 The above operation will automatically split the data over multiple transactions if the file
@@ -340,8 +340,7 @@ Larger datasets require that the Cloud Spanner database is set to `PARTITIONED_N
 psql -h localhost -p 5432 -d my-local-db \
   -c "copy (select i, to_char(i, 'fm000') from generate_series(1, 1000000) s(i)) to stdout" \
   | psql -h localhost -p 5433 -d my-spanner-db \
-  -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'" \
-  -c "copy numbers from stdin;"
+  -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; copy numbers from stdin;"
 ```
 
 ## Limitations

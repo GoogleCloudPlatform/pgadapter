@@ -61,7 +61,6 @@ import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 import org.postgresql.core.PGStream;
 import org.postgresql.core.QueryExecutorBase;
-import org.postgresql.core.v3.CopyOperationImpl;
 import org.postgresql.core.v3.QueryExecutorImpl;
 import org.postgresql.jdbc.PgConnection;
 
@@ -127,6 +126,63 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     Mutation mutation = commitRequest.getMutations(0);
     assertEquals(OperationCase.INSERT, mutation.getOperationCase());
     assertEquals(3, mutation.getInsert().getValuesCount());
+  }
+
+  @Test
+  public void testCopyInWithExplicitTransaction() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\t5\t5\n6\t6\t6\n7\t7\t7\n"));
+
+      // Verify that we can use the connection for normal queries.
+      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Verify that the transaction has not yet been committed.
+      assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+
+      connection.commit();
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsert().getValuesCount());
+  }
+
+  @Test
+  public void testCopyInWithExplicitTransaction_Rollback() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\t5\t5\n6\t6\t6\n7\t7\t7\n"));
+
+      // Verify that we can use the connection for normal queries.
+      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+
+      connection.rollback();
+    }
+
+    // Verify that the COPY operation was not committed.
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -367,20 +423,27 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
 
     byte[] payload = "5\t5\t5\n".getBytes(StandardCharsets.UTF_8);
     try (Connection connection = DriverManager.getConnection(createUrl())) {
-      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
-      // Start a copy operation and then try to execute a query during the copy.
-      CopyIn copyOperation = copyManager.copyIn("COPY users FROM STDIN;");
-      copyOperation.writeToCopy(payload, 0, payload.length);
-      copyOperation.flushCopy();
-
-      // Use reflection to get hold of the underlying stream, so we can send an invalid message.
-      java.lang.reflect.Field queryExecutorField =
-          CopyOperationImpl.class.getDeclaredField("queryExecutor");
-      queryExecutorField.setAccessible(true);
-      QueryExecutorImpl queryExecutor = (QueryExecutorImpl) queryExecutorField.get(copyOperation);
+      PgConnection pgConnection = connection.unwrap(PgConnection.class);
+      QueryExecutorImpl queryExecutor = (QueryExecutorImpl) pgConnection.getQueryExecutor();
+      // Use reflection to get hold of the underlying stream, so we can send any message that we
+      // want.
       java.lang.reflect.Field pgStreamField = QueryExecutorBase.class.getDeclaredField("pgStream");
       pgStreamField.setAccessible(true);
       PGStream stream = (PGStream) pgStreamField.get(queryExecutor);
+
+      String sql = "copy users from stdin;";
+      int length = sql.length() + 5;
+      stream.sendChar('Q');
+      stream.sendInteger4(length);
+      stream.send(sql.getBytes(StandardCharsets.UTF_8));
+      stream.sendChar(0);
+      stream.flush();
+
+      // Send a CopyData message and then a 'Q', which is not allowed.
+      stream.sendChar('d');
+      stream.sendInteger4(payload.length + 4);
+      stream.send(payload);
+
       stream.sendChar('Q');
       // Length = 4 + 8 + 1 = 13
       // (msg length 4 bytes, 8 bytes for SELECT 1, 1 byte for \0)
@@ -389,14 +452,28 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar(0);
       stream.flush();
 
-      // PGAdapter drops the connection if an invalid message is received during a COPY. This is a
-      // safety measure as there is no other error handling in the COPY protocol, and the server
-      // could otherwise have been completely flushed with garbage if it continued to receive
-      // messages after receiving an invalid message.
-      SQLException exception = assertThrows(SQLException.class, copyOperation::endCopy);
+      boolean receivedErrorMessage = false;
+      StringBuilder errorMessage = new StringBuilder();
+      while (!receivedErrorMessage) {
+        int command = stream.receiveChar();
+        if (command == 'E') {
+          receivedErrorMessage = true;
+          // Read and ignore the length.
+          stream.receiveInteger4();
+          while (stream.receiveChar() > 0) {
+            errorMessage.append(stream.receiveString()).append('\n');
+          }
+        } else {
+          // Just skip everything in the message.
+          length = stream.receiveInteger4();
+          stream.skip(length - 4);
+        }
+      }
       assertEquals(
-          "ERROR: Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: 'Q'",
-          exception.getMessage());
+          "ERROR\n"
+              + "XX000\n"
+              + "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: 'Q'\n",
+          errorMessage.toString());
     }
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
@@ -438,9 +515,9 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
       writer.write(
           "SELECT 1\\;copy users from stdin\\;copy users from stdin\\;SELECT 2;\n"
-              + "1\t1\t1\n"
+              + "1\t2\t3\n"
               + "\\.\n"
-              + "2\t2\t2\n"
+              + "4\t5\t6\n"
               + "\\.\n"
               + "\n"
               + "\\q\n");
@@ -453,6 +530,30 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     assertEquals(" C \n---\n 2\n(1 row)\n", output);
     int res = process.waitFor();
     assertEquals(0, res);
+
+    // The batch is executed as one implicit transaction.
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+    // We buffer 2 mutations, but the proto builder in the Java client library combines these two
+    // mutations into 1 mutation with 2 rows.
+    assertEquals(2, commitRequest.getMutations(0).getInsert().getValuesCount());
+    assertEquals(OperationCase.INSERT, commitRequest.getMutations(0).getOperationCase());
+    assertEquals(3, commitRequest.getMutations(0).getInsert().getColumnsCount());
+    assertEquals(
+        "1", commitRequest.getMutations(0).getInsert().getValues(0).getValues(0).getStringValue());
+    assertEquals(
+        "2", commitRequest.getMutations(0).getInsert().getValues(0).getValues(1).getStringValue());
+    assertEquals(
+        "3", commitRequest.getMutations(0).getInsert().getValues(0).getValues(2).getStringValue());
+    assertEquals(OperationCase.INSERT, commitRequest.getMutations(0).getOperationCase());
+    assertEquals(
+        "4", commitRequest.getMutations(0).getInsert().getValues(1).getValues(0).getStringValue());
+    assertEquals(
+        "5", commitRequest.getMutations(0).getInsert().getValues(1).getValues(1).getStringValue());
+    assertEquals(
+        "6", commitRequest.getMutations(0).getInsert().getValues(1).getValues(2).getStringValue());
   }
 
   @Test
@@ -507,64 +608,22 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       }
     }
 
-    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
-    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertEquals(1, commitRequests.get(0).getMutationsCount());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+    assertEquals(2, commitRequest.getMutations(0).getInsert().getValuesCount());
     assertEquals(
-        "5",
-        commitRequests
-            .get(0)
-            .getMutations(0)
-            .getInsert()
-            .getValues(0)
-            .getValues(0)
-            .getStringValue());
+        "5", commitRequest.getMutations(0).getInsert().getValues(0).getValues(0).getStringValue());
     assertEquals(
-        "6",
-        commitRequests
-            .get(0)
-            .getMutations(0)
-            .getInsert()
-            .getValues(0)
-            .getValues(1)
-            .getStringValue());
+        "6", commitRequest.getMutations(0).getInsert().getValues(0).getValues(1).getStringValue());
     assertEquals(
-        "7",
-        commitRequests
-            .get(0)
-            .getMutations(0)
-            .getInsert()
-            .getValues(0)
-            .getValues(2)
-            .getStringValue());
-    assertEquals(1, commitRequests.get(1).getMutationsCount());
+        "7", commitRequest.getMutations(0).getInsert().getValues(0).getValues(2).getStringValue());
     assertEquals(
-        "6",
-        commitRequests
-            .get(1)
-            .getMutations(0)
-            .getInsert()
-            .getValues(0)
-            .getValues(0)
-            .getStringValue());
+        "6", commitRequest.getMutations(0).getInsert().getValues(1).getValues(0).getStringValue());
     assertEquals(
-        "7",
-        commitRequests
-            .get(1)
-            .getMutations(0)
-            .getInsert()
-            .getValues(0)
-            .getValues(1)
-            .getStringValue());
+        "7", commitRequest.getMutations(0).getInsert().getValues(1).getValues(1).getStringValue());
     assertEquals(
-        "8",
-        commitRequests
-            .get(1)
-            .getMutations(0)
-            .getInsert()
-            .getValues(0)
-            .getValues(2)
-            .getStringValue());
+        "8", commitRequest.getMutations(0).getInsert().getValues(1).getValues(2).getStringValue());
   }
 
   @Test
@@ -630,39 +689,16 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         }
       }
       assertTrue(receivedErrorMessage);
-      assertEquals("ERROR\n" + "P0001\n" + "CANCELLED: Changed my mind\n", errorMessage.toString());
+      assertEquals(
+          "ERROR\n"
+              + "P0001\n"
+              + "CANCELLED: Changed my mind\n"
+              + "ERROR\n"
+              + "P0001\n"
+              + "INVALID_ARGUMENT: current transaction is aborted, commands ignored until end of transaction block\n",
+          errorMessage.toString());
     }
-
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertEquals(1, commitRequests.get(0).getMutationsCount());
-    assertEquals(
-        "5",
-        commitRequests
-            .get(0)
-            .getMutations(0)
-            .getInsert()
-            .getValues(0)
-            .getValues(0)
-            .getStringValue());
-    assertEquals(
-        "6",
-        commitRequests
-            .get(0)
-            .getMutations(0)
-            .getInsert()
-            .getValues(0)
-            .getValues(1)
-            .getStringValue());
-    assertEquals(
-        "7",
-        commitRequests
-            .get(0)
-            .getMutations(0)
-            .getInsert()
-            .getValues(0)
-            .getValues(2)
-            .getStringValue());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   private void setupCopyInformationSchemaResults() {

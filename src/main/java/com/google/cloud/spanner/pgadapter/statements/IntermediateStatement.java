@@ -177,7 +177,7 @@ public class IntermediateStatement {
    * @return True if at some point in execution an exception was thrown. Fails or blocks depending
    *     on the given {@link ResultNotReadyBehavior} if execution has not yet finished.
    */
-  boolean hasException(ResultNotReadyBehavior resultNotReadyBehavior) {
+  public boolean hasException(ResultNotReadyBehavior resultNotReadyBehavior) {
     initFutureResult(resultNotReadyBehavior);
     return this.exception != null;
   }

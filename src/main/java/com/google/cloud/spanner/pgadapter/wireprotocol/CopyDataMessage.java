@@ -47,7 +47,10 @@ public class CopyDataMessage extends ControlMessage {
   @Override
   protected void sendPayload() throws Exception {
     if (statement == null) {
-      throw new IllegalStateException("This connection is no (longer) in COPY IN mode.");
+      // Do not handle this message if there is no CopyStatement available anymore. This means that
+      // the copy operation failed and stopped while the client was still sending data to the
+      // server.
+      return;
     }
     // If backend error occurred during copy-in mode, drop any subsequent CopyData messages.
     MutationWriter mutationWriter = this.statement.getMutationWriter();

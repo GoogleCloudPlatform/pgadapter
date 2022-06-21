@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
@@ -27,15 +29,20 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
+import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.LinkedList;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
@@ -160,15 +167,18 @@ public class BackendConnection {
    * database.
    */
   private final class Copy extends BufferedStatement<StatementResult> {
+    private final CopyDataReceiver copyDataReceiver;
     private final MutationWriter mutationWriter;
     private final ListeningExecutorService executor;
 
     Copy(
         ParsedStatement parsedStatement,
         Statement statement,
+        CopyDataReceiver copyDataReceiver,
         MutationWriter mutationWriter,
         ExecutorService executor) {
       super(parsedStatement, statement);
+      this.copyDataReceiver = copyDataReceiver;
       this.mutationWriter = mutationWriter;
       this.executor = MoreExecutors.listeningDecorator(executor);
     }
@@ -177,7 +187,19 @@ public class BackendConnection {
     void execute() {
       try {
         checkConnectionState();
-        result.setFuture(executor.submit(mutationWriter));
+        // Execute the MutationWriter and the CopyDataReceiver both asynchronously and wait for both
+        // to finish before continuing with the next statement. This ensures that all statements are
+        // applied in sequential order.
+        ListenableFuture<Void> copyDataReceiverFuture = executor.submit(copyDataReceiver);
+        ListenableFuture<StatementResult> statementResultFuture = executor.submit(mutationWriter);
+        this.result.setFuture(statementResultFuture);
+        Futures.allAsList(copyDataReceiverFuture, statementResultFuture).get();
+      } catch (ExecutionException executionException) {
+        result.setException(executionException.getCause());
+        throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
+      } catch (InterruptedException interruptedException) {
+        result.setException(SpannerExceptionFactory.propagateInterrupt(interruptedException));
+        throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
       } catch (Exception exception) {
         result.setException(exception);
         throw exception;
@@ -228,9 +250,10 @@ public class BackendConnection {
   public Future<StatementResult> executeCopy(
       ParsedStatement parsedStatement,
       Statement statement,
+      CopyDataReceiver copyDataReceiver,
       MutationWriter mutationWriter,
       ExecutorService executor) {
-    Copy copy = new Copy(parsedStatement, statement, mutationWriter, executor);
+    Copy copy = new Copy(parsedStatement, statement, copyDataReceiver, mutationWriter, executor);
     bufferedStatements.add(copy);
     return copy.result;
   }
@@ -328,7 +351,7 @@ public class BackendConnection {
     // We need to start an implicit transaction.
     // Check if a read-only transaction suffices.
     spannerConnection.beginTransaction();
-    if (isSync && !hasDmlStatementsAfter(index)) {
+    if (isSync && !hasDmlOrCopyStatementsAfter(index)) {
       spannerConnection.setTransactionMode(
           com.google.cloud.spanner.connection.TransactionMode.READ_ONLY_TRANSACTION);
     }
@@ -461,14 +484,19 @@ public class BackendConnection {
     return isBegin(index) || isCommit(index) || isRollback(index);
   }
 
-  private boolean hasDmlStatementsAfter(int index) {
-    return bufferedStatements.subList(index, bufferedStatements.size()).stream()
-        .anyMatch(statement -> statement.parsedStatement.getType() == StatementType.UPDATE);
-  }
-
   private boolean hasOnlyDmlStatementsAfter(int index) {
     return bufferedStatements.subList(index, bufferedStatements.size()).stream()
         .allMatch(statement -> statement.parsedStatement.getType() == StatementType.UPDATE);
+  }
+
+  private boolean hasDmlOrCopyStatementsAfter(int index) {
+    return bufferedStatements.subList(index, bufferedStatements.size()).stream()
+        .anyMatch(
+            statement ->
+                statement.parsedStatement.getType() == StatementType.UPDATE
+                    || statement.parsedStatement.getType() == StatementType.UNKNOWN
+                        && StatementParser.isCommand(
+                            COPY, statement.parsedStatement.getSqlWithoutComments()));
   }
 
   private int getStatementCount() {

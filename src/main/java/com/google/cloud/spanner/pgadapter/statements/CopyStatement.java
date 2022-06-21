@@ -27,13 +27,12 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
+import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
-import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
 import com.google.common.base.Strings;
 import com.google.spanner.v1.TypeCode;
 import java.util.LinkedHashMap;
@@ -63,7 +62,13 @@ public class CopyStatement extends IntermediatePortalStatement {
   private Map<String, TypeCode> tableColumns;
   private int indexedColumnsCount;
   private MutationWriter mutationWriter;
-  private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  // We need two threads to execute a CopyStatement:
+  // 1. A thread to receive the CopyData messages from the client.
+  // 2. A thread to write the received data to Cloud Spanner.
+  // The two are kept separate to allow each to execute at the maximum speed that it can.
+  // The link between them is a piped output/input stream that ensures that backpressure is applied
+  // to the client if the client is sending data at a higher speed than that the writer can handle.
+  private final ExecutorService executor = Executors.newFixedThreadPool(2);
 
   public CopyStatement(
       ConnectionHandler connectionHandler,
@@ -332,54 +337,15 @@ public class CopyStatement extends IntermediatePortalStatement {
               getParserFormat(),
               hasHeader());
       setFutureStatementResult(
-          backendConnection.executeCopy(parsedStatement, statement, mutationWriter, executor));
+          backendConnection.executeCopy(
+              parsedStatement,
+              statement,
+              new CopyDataReceiver(this, this.connectionHandler),
+              mutationWriter,
+              executor));
     } catch (Exception e) {
       SpannerException spannerException = SpannerExceptionFactory.asSpannerException(e);
       handleExecutionException(spannerException);
-    }
-  }
-
-  /**
-   * Sends a {@link CopyInResponse} to the client and then waits for copy data, done and fail
-   * messages. The incoming data messages are fed into the {@link MutationWriter} that is associated
-   * with this {@link CopyStatement}. The method blocks until it sees a {@link
-   * com.google.cloud.spanner.pgadapter.wireprotocol.CopyDoneMessage} or {@link
-   * com.google.cloud.spanner.pgadapter.wireprotocol.CopyFailMessage}, or until the {@link
-   * MutationWriter} changes the status of the connection to a non-COPY_IN status, for example as a
-   * result of an error while copying the data to Cloud Spanner.
-   */
-  public void handleCopy() throws Exception {
-    if (hasException()) {
-      throw getException();
-    } else {
-      this.connectionHandler.addActiveStatement(this);
-      new CopyInResponse(
-              this.connectionHandler.getConnectionMetadata().getOutputStream(),
-              getTableColumns().size(),
-              getFormatCode())
-          .send(false);
-      ConnectionStatus initialConnectionStatus = this.connectionHandler.getStatus();
-      try {
-        this.connectionHandler.setStatus(ConnectionStatus.COPY_IN);
-        // Loop here until COPY_IN mode has finished.
-        while (this.connectionHandler.getStatus() == ConnectionStatus.COPY_IN) {
-          this.connectionHandler.handleMessages(
-              this.connectionHandler.getConnectionMetadata().getOutputStream());
-        }
-        if (hasException(ResultNotReadyBehavior.BLOCK)
-            || this.connectionHandler.getStatus() == ConnectionStatus.COPY_FAILED) {
-          if (hasException(ResultNotReadyBehavior.BLOCK)) {
-            throw getException();
-          } else {
-            throw SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INTERNAL, "Copy failed with unknown reason");
-          }
-        }
-      } finally {
-        this.connectionHandler.removeActiveStatement(this);
-        close();
-        this.connectionHandler.setStatus(initialConnectionStatus);
-      }
     }
   }
 

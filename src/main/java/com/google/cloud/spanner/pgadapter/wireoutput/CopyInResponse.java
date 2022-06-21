@@ -52,7 +52,7 @@ public class CopyInResponse extends WireOutput {
     this.outputStream.writeByte(this.formatCode);
     this.outputStream.writeShort(this.numColumns);
     this.outputStream.write(this.columnFormat);
-    this.outputStream.flush();
+    //    this.outputStream.flush();
   }
 
   @Override

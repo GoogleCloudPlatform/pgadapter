@@ -221,7 +221,7 @@ public class ConnectionHandler extends Thread {
           }
         }
         while (this.status != ConnectionStatus.TERMINATED) {
-          handleMessages(output);
+          handleMessages();
         }
       } catch (Exception e) {
         this.handleError(output, e);
@@ -256,19 +256,19 @@ public class ConnectionHandler extends Thread {
   }
 
   /**
-   * Reads and handles wire-protocol messages from the given {@link DataOutputStream}. This method
-   * is normally only called from this {@link ConnectionHandler}, but certain sub-protocols such as
-   * the COPY protocol also need to process messages in line.
+   * Reads and handles wire-protocol messages. This method is normally only called from this {@link
+   * ConnectionHandler}, but certain sub-protocols such as the COPY protocol also need to process
+   * messages in line.
    */
-  public void handleMessages(DataOutputStream output) throws Exception {
+  public void handleMessages() throws Exception {
     try {
       message.nextHandler();
       message.send();
     } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
-      this.handleError(output, fatalException);
+      this.handleError(getConnectionMetadata().getOutputStream(), fatalException);
       this.status = ConnectionStatus.TERMINATED;
     } catch (Exception e) {
-      this.handleError(output, e);
+      this.handleError(getConnectionMetadata().getOutputStream(), e);
     }
   }
 
@@ -320,10 +320,8 @@ public class ConnectionHandler extends Thread {
           .send();
       new TerminateResponse(output).send();
     } else if (this.status == ConnectionStatus.COPY_IN) {
-      // Bubble the exception up so the copy handler can handle the exception.
-      throw exception;
+      new ErrorResponse(output, exception, ErrorResponse.State.InternalError).send();
     } else {
-      this.status = ConnectionStatus.AUTHENTICATED;
       new ErrorResponse(output, exception, ErrorResponse.State.InternalError).send();
       new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
     }

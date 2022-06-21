@@ -31,6 +31,10 @@ public class FlushMessage extends ControlMessage {
     super(connection);
   }
 
+  public FlushMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
+    super(connection, 4, manuallyCreatedToken);
+  }
+
   @Override
   protected void sendPayload() throws Exception {
     connection.getExtendedQueryProtocolHandler().flush();
