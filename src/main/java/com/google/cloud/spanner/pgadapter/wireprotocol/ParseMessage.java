@@ -131,7 +131,6 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
     return String.valueOf(IDENTIFIER);
   }
 
-  @Override
   public IntermediatePreparedStatement getStatement() {
     return this.statement;
   }

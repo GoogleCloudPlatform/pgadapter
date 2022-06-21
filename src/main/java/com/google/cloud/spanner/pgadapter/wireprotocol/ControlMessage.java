@@ -84,7 +84,9 @@ public abstract class ControlMessage extends WireMessage {
           return new CopyFailMessage(connection);
         case SyncMessage.IDENTIFIER:
         case FlushMessage.IDENTIFIER:
-          // Skip sync/flush in COPY_IN.
+          // Skip sync/flush in COPY_IN. This is consistent with real PostgreSQL which also does
+          // this to accommodate clients that do not check what type of statement they sent in an
+          // ExecuteMessage, and instead always blindly send a flush/sync after each execute.
           return new SkipMessage(connection);
         default:
           // Drop the connection if we receive an invalid message to prevent further CopyData
@@ -122,7 +124,8 @@ public abstract class ControlMessage extends WireMessage {
         case CopyDoneMessage.IDENTIFIER:
         case CopyDataMessage.IDENTIFIER:
         case CopyFailMessage.IDENTIFIER:
-          // Skip COPY messages in non-COPY mode.
+          // Silently skip COPY messages in non-COPY mode. This is consistent with the PG wire
+          // protocol.
           return new SkipMessage(connection);
         default:
           throw new IllegalStateException(String.format("Unknown message: %c", nextMsg));

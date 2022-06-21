@@ -14,8 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
-
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.SpannerException;
@@ -43,6 +41,14 @@ import java.util.concurrent.Future;
  */
 @InternalApi
 public class IntermediateStatement {
+  /**
+   * Indicates whether an attempt to get the result of a statement should block or fail if the
+   * result is not yet available. Normal SQL commands that can be executed directly on Cloud Spanner
+   * should always have their results available when a sync/flush message is received. COPY
+   * statements do not have that, as they require additional messages after a flush/sync has been
+   * received. Attempts to get the result of a COPY statement should therefore block until it is
+   * available, which is after a CopyDone or CopyFail message has been received.
+   */
   public enum ResultNotReadyBehavior {
     FAIL,
     BLOCK;
@@ -129,18 +135,24 @@ public class IntermediateStatement {
 
   /**
    * @return The number of items that were modified by this execution for DML. 0 for DDL and -1 for
-   *     QUERY.
+   *     QUERY. Fails if the result is not yet available.
    */
   public long getUpdateCount() {
     return getUpdateCount(ResultNotReadyBehavior.FAIL);
   }
 
+  /**
+   * @return The number of items that were modified by this execution for DML. 0 for DDL and -1 for
+   *     QUERY. Will block or fail depending on the given {@link ResultNotReadyBehavior} if the
+   *     result is not yet available.
+   */
   public long getUpdateCount(ResultNotReadyBehavior resultNotReadyBehavior) {
     initFutureResult(resultNotReadyBehavior);
     if (hasException()) {
       throw getException();
     }
-    switch (this.parsedStatement.getType()) {
+    // Note: getStatementType() returns UPDATE for COPY statements.
+    switch (getStatementType()) {
       case QUERY:
         return -1L;
       case UPDATE:
@@ -148,19 +160,23 @@ public class IntermediateStatement {
       case CLIENT_SIDE:
       case DDL:
       case UNKNOWN:
-        if (StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments())) {
-          return this.statementResult.getUpdateCount();
-        }
       default:
         return 0L;
     }
   }
 
-  /** @return True if at some point in execution, and exception was thrown. */
+  /**
+   * @return True if at some point in execution an exception was thrown. Fails if execution has not
+   *     yet finished.
+   */
   public boolean hasException() {
     return hasException(ResultNotReadyBehavior.FAIL);
   }
 
+  /**
+   * @return True if at some point in execution an exception was thrown. Fails or blocks depending
+   *     on the given {@link ResultNotReadyBehavior} if execution has not yet finished.
+   */
   boolean hasException(ResultNotReadyBehavior resultNotReadyBehavior) {
     initFutureResult(resultNotReadyBehavior);
     return this.exception != null;
@@ -201,12 +217,12 @@ public class IntermediateStatement {
     }
   }
 
+  /**
+   * Returns the result of this statement as a {@link StatementResult}. Fails if the result is not
+   * yet available.
+   */
   public StatementResult getStatementResult() {
-    return getStatementResult(ResultNotReadyBehavior.FAIL);
-  }
-
-  StatementResult getStatementResult(ResultNotReadyBehavior resultNotReadyBehavior) {
-    initFutureResult(resultNotReadyBehavior);
+    initFutureResult(ResultNotReadyBehavior.FAIL);
     return this.statementResult;
   }
 
@@ -232,11 +248,15 @@ public class IntermediateStatement {
     return this.parsedStatement.getSqlWithoutComments();
   }
 
+  /** Returns any execution exception registered for this statement. */
   public SpannerException getException() {
     return this.exception;
   }
 
   void setException(SpannerException exception) {
+    // Do not override any exception that has already been registered. COPY statements can receive
+    // multiple errors as they execute asynchronously while receiving a stream of data from the
+    // client. We always return the first exception that we encounter.
     if (this.exception == null) {
       this.exception = exception;
     }

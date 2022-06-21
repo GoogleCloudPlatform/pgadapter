@@ -14,16 +14,24 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import java.io.IOException;
 import java.text.MessageFormat;
 
+/**
+ * {@link SkipMessage} is a pseudo wire-protocol message that is used to read and skip messages that
+ * we receive that we do not want at that time. This applies to COPY messages during normal
+ * operation, and sync/flush messages during COPY operation.
+ */
+@InternalApi
 public class SkipMessage extends ControlMessage {
 
   public SkipMessage(ConnectionHandler connectionHandler) throws IOException {
     super(connectionHandler);
     int skipLength = this.length - 4;
     int skipped = 0;
+    // Read and skip bytes until we have reached the total message length.
     while (skipped < skipLength) {
       skipped += connection.getConnectionMetadata().getInputStream().skip(skipLength - skipped);
     }

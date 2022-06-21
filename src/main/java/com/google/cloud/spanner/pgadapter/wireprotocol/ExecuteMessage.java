@@ -84,11 +84,6 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
     return 8;
   }
 
-  @Override
-  public IntermediatePreparedStatement getStatement() {
-    return this.statement;
-  }
-
   /**
    * Called when an execute message is received.
    *

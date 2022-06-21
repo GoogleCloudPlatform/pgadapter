@@ -111,11 +111,6 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
     return 5;
   }
 
-  @Override
-  public IntermediatePreparedStatement getStatement() {
-    return this.statement;
-  }
-
   /**
    * Called when a describe message of type 'P' is received.
    *

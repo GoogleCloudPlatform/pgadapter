@@ -230,8 +230,8 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     try {
       this.payload.write(payload);
     } catch (IOException e) {
-      // Ignore error if the executor has already been shutdown. That means that an error occurred
-      // that ended the COPY operation while we were writing data to the buffer.
+      // Ignore the exception if the executor has already been shutdown. That means that an error
+      // occurred that ended the COPY operation while we were writing data to the buffer.
       if (!executorService.isShutdown()) {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INTERNAL, "Could not write copy data to buffer", e);

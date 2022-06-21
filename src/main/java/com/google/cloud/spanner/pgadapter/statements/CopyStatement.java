@@ -46,6 +46,11 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.csv.CSVFormat;
 
+/**
+ * {@link CopyStatement} models a `COPY table FROM STDIN` statement. The same class is used both as
+ * an {@link IntermediatePreparedStatement} and {@link IntermediatePortalStatement}, as COPY does
+ * not support any statement parameters, which means that there is no difference between the two.
+ */
 @InternalApi
 public class CopyStatement extends IntermediatePortalStatement {
   private static final String COLUMN_NAME = "column_name";
@@ -82,6 +87,10 @@ public class CopyStatement extends IntermediatePortalStatement {
 
   @Override
   public long getUpdateCount() {
+    // COPY statements continue to execute while the server continues to receive a stream of
+    // CopyData messages AFTER we have received a flush/sync message. We therefore need to block
+    // while waiting for the update count to be available once the server has received a CopyDone
+    // or CopyFailed message.
     return getUpdateCount(ResultNotReadyBehavior.BLOCK);
   }
 
@@ -330,6 +339,15 @@ public class CopyStatement extends IntermediatePortalStatement {
     }
   }
 
+  /**
+   * Sends a {@link CopyInResponse} to the client and then waits for copy data, done and fail
+   * messages. The incoming data messages are fed into the {@link MutationWriter} that is associated
+   * with this {@link CopyStatement}. The method blocks until it sees a {@link
+   * com.google.cloud.spanner.pgadapter.wireprotocol.CopyDoneMessage} or {@link
+   * com.google.cloud.spanner.pgadapter.wireprotocol.CopyFailMessage}, or until the {@link
+   * MutationWriter} changes the status of the connection to a non-COPY_IN status, for example as a
+   * result of an error while copying the data to Cloud Spanner.
+   */
   public void handleCopy() throws Exception {
     if (hasException()) {
       throw getException();
@@ -353,7 +371,8 @@ public class CopyStatement extends IntermediatePortalStatement {
           if (hasException(ResultNotReadyBehavior.BLOCK)) {
             throw getException();
           } else {
-            throw SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "Copy failed");
+            throw SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INTERNAL, "Copy failed with unknown reason");
           }
         }
       } finally {

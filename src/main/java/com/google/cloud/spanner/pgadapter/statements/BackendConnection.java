@@ -31,13 +31,11 @@ import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.LinkedList;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
@@ -151,6 +149,16 @@ public class BackendConnection {
     }
   }
 
+  /**
+   * This statement represents a COPY table FROM STDIN statement. This has no one-on-one mapping
+   * with a Cloud Spanner SQL statement and is therefore executed using a custom {@link
+   * MutationWriter}. As the COPY implementation uses mutations instead of DML, it has slightly
+   * different transaction semantics than in real PostgreSQL. A COPY operation will by default be
+   * atomic, but can be configured to behave non-atomically for large batches. Also, if a COPY
+   * operation is executed in a transaction (both implicit and explicit), it will commit the
+   * transaction when the COPY operation is done. This is required to flush the mutations to the
+   * database.
+   */
   private final class Copy extends BufferedStatement<StatementResult> {
     private final MutationWriter mutationWriter;
     private final ListeningExecutorService executor;
@@ -169,19 +177,7 @@ public class BackendConnection {
     void execute() {
       try {
         checkConnectionState();
-        ListenableFuture<StatementResult> updateCount = executor.submit(mutationWriter);
-        updateCount.addListener(
-            () -> {
-              try {
-                result.set(updateCount.get());
-              } catch (ExecutionException executionException) {
-                result.setException(executionException.getCause());
-              } catch (InterruptedException interruptedException) {
-                result.setException(
-                    SpannerExceptionFactory.propagateInterrupt(interruptedException));
-              }
-            },
-            MoreExecutors.directExecutor());
+        result.setFuture(executor.submit(mutationWriter));
       } catch (Exception exception) {
         result.setException(exception);
         throw exception;
@@ -224,6 +220,11 @@ public class BackendConnection {
     return execute.result;
   }
 
+  /**
+   * Buffers the given COPY operation for execution on the backend connection when the next
+   * flush/sync message is received. The returned future will contain the result of the COPY
+   * operation when execution has finished.
+   */
   public Future<StatementResult> executeCopy(
       ParsedStatement parsedStatement,
       Statement statement,

@@ -40,25 +40,11 @@ public class CopyDoneMessage extends ControlMessage {
   protected void sendPayload() throws Exception {
     // If backend error occurred during copy-in mode, drop any subsequent CopyDone messages.
     if (this.statement != null) {
-      //      MutationWriter mutationWriter = this.statement.getMutationWriter();
       statement.close();
-      //      if (!statement.hasException()) {
-      //        try {
-      //          long rowCount = this.statement.getUpdateCount(ResultNotReadyBehavior.BLOCK);
-      //          statement.setStatementResult(
-      //              new UpdateCount(rowCount)); // Set the row count of number of rows copied.
-      //          this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
-      //        } catch (Exception e) {
-      //          // Spanner returned an error when trying to commit the batch of mutations.
-      //          mutationWriter.writeErrorFile(e);
-      //          mutationWriter.closeErrorFile();
-      //          throw e;
-      //        }
-      //      } else {
-      //        mutationWriter.closeErrorFile();
-      //      }
     }
-    // Clear the COPY_IN status to indicate that we finished successfully.
+    // Clear the COPY_IN status to indicate that we finished successfully. This will cause the
+    // inline handling of incoming (copy) messages to stop and the server to resume normal
+    // operation.
     this.connection.setStatus(ConnectionStatus.COPY_DONE);
   }
 

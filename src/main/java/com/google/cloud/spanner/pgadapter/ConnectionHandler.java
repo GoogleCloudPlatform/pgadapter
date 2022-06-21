@@ -254,6 +254,11 @@ public class ConnectionHandler extends Thread {
     }
   }
 
+  /**
+   * Reads and handles wire-protocol messages from the given {@link DataOutputStream}. This method
+   * is normally only called from this {@link ConnectionHandler}, but certain sub-protocols such as
+   * the COPY protocol also need to process messages in line.
+   */
   public void handleMessages(DataOutputStream output) throws Exception {
     try {
       message.nextHandler();

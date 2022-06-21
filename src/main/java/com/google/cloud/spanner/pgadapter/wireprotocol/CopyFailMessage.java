@@ -58,6 +58,9 @@ public class CopyFailMessage extends ControlMessage {
       this.statement.handleExecutionException(
           SpannerExceptionFactory.newSpannerException(ErrorCode.CANCELLED, this.errorMessage));
     }
+    // Clear the COPY_IN status to indicate that we finished unsuccessfully. This will cause the
+    // inline handling of incoming (copy) messages to stop and the server to return an error message
+    // and to resume normal operation.
     this.connection.setStatus(ConnectionStatus.COPY_FAILED);
   }
 

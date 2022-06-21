@@ -476,12 +476,11 @@ public class ITJdbcTest implements IntegrationTest {
                   copyManager.copyIn(
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
-      // The JDBC driver CopyManager takes the COPY protocol quite literally, and as the COPY
-      // protocol does not include any error handling, the JDBC driver will just send all data to
-      // the server and ignore any error messages the server might send during the copy operation.
-      // PGAdapter therefore drops the connection if it continues to receive CopyData messages after
-      // it sent back an error message.
-      assertTrue(exception.getMessage().contains("Database connection failed"));
+      assertTrue(
+          exception.getMessage(),
+          exception
+              .getMessage()
+              .matches("FAILED_PRECONDITION: Record count: \\d+ has exceeded the limit: \\d+."));
     }
 
     // Verify that the table is still empty.

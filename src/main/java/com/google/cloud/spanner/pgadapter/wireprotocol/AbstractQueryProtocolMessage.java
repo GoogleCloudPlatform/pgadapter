@@ -19,7 +19,6 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
-import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import java.io.IOException;
 
 /**
@@ -55,8 +54,6 @@ public abstract class AbstractQueryProtocolMessage extends ControlMessage {
   abstract void buffer(BackendConnection backendConnection) throws Exception;
 
   public abstract void flush() throws Exception;
-
-  public abstract IntermediatePreparedStatement getStatement();
 
   public boolean isReturnedErrorResponse() {
     return returnedErrorResponse;
