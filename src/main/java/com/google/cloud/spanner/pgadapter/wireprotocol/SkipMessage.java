@@ -26,7 +26,6 @@ import java.text.MessageFormat;
  */
 @InternalApi
 public class SkipMessage extends ControlMessage {
-
   public SkipMessage(ConnectionHandler connectionHandler) throws IOException {
     super(connectionHandler);
     int skipLength = this.length - 4;

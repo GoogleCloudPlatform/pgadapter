@@ -1357,6 +1357,8 @@ public class ProtocolTest {
     DataOutputStream outputStream = new DataOutputStream(result);
 
     CopyStatement copyStatement = mock(CopyStatement.class);
+    MutationWriter mutationWriter = mock(MutationWriter.class);
+    when(copyStatement.getMutationWriter()).thenReturn(mutationWriter);
     when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
@@ -1370,6 +1372,7 @@ public class ProtocolTest {
 
     messageSpy.send();
     verify(messageSpy).sendPayload();
+    verify(mutationWriter).commit();
   }
 
   @Test

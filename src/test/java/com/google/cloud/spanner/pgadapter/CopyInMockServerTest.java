@@ -394,7 +394,9 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       // could otherwise have been completely flushed with garbage if it continued to receive
       // messages after receiving an invalid message.
       SQLException exception = assertThrows(SQLException.class, copyOperation::endCopy);
-      assertEquals("Database connection failed when ending copy", exception.getMessage());
+      assertEquals(
+          "ERROR: Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: 'Q'",
+          exception.getMessage());
     }
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);

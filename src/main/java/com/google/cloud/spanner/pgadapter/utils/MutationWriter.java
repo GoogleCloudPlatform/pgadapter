@@ -56,6 +56,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -137,7 +138,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final CSVParser parser;
   private PrintWriter errorFileWriter;
   private final PipedOutputStream payload = new PipedOutputStream();
+  private final AtomicBoolean commit = new AtomicBoolean(false);
   private final AtomicBoolean rollback = new AtomicBoolean(false);
+  private final CountDownLatch closedLatch = new CountDownLatch(1);
   private final ListeningExecutorService executorService =
       MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
 
@@ -239,6 +242,11 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     }
   }
 
+  /** Indicate that this mutation writer should commit. */
+  public void commit() {
+    this.commit.set(true);
+  }
+
   /**
    * Indicate that this mutation writer should be rolled back. This will not rollback any changes
    * that have already been committed if the mutation writer is running in {@link
@@ -251,6 +259,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   @Override
   public void close() throws IOException {
     this.payload.close();
+    this.closedLatch.countDown();
   }
 
   @Override
@@ -338,7 +347,13 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
         if (transactionMode == CopyTransactionMode.Explicit) {
           connection.bufferedWrite(mutations);
         } else {
-          allCommitFutures.add(writeToSpannerAsync(activeCommitFutures, mutations));
+          // Wait until we have received a CopyDone message before writing the remaining data to
+          // Spanner. If we are in a non-atomic transaction, there might already be data that have
+          // been written to Spanner.
+          closedLatch.await();
+          if (commit.get()) {
+            allCommitFutures.add(writeToSpannerAsync(activeCommitFutures, mutations));
+          }
         }
       }
       // Wait for all commits to finish. We do this even if something went wrong, as it ensures two

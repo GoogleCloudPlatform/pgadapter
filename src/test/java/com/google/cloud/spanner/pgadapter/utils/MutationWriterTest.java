@@ -123,6 +123,7 @@ public class MutationWriterTest {
             false);
 
     mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+    mutationWriter.commit();
     mutationWriter.close();
 
     StatementResult updateCount = mutationWriter.call();
@@ -203,6 +204,7 @@ public class MutationWriterTest {
       mutationWriter.addCopyData(
           "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
               .getBytes(StandardCharsets.UTF_8));
+      mutationWriter.commit();
       mutationWriter.close();
 
       StatementResult updateCount = mutationWriter.call();
@@ -280,6 +282,7 @@ public class MutationWriterTest {
       mutationWriter.addCopyData(
           "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
               .getBytes(StandardCharsets.UTF_8));
+      mutationWriter.commit();
       mutationWriter.close();
 
       StatementResult updateCount = mutationWriter.call();
@@ -324,6 +327,7 @@ public class MutationWriterTest {
     mutationWriter.addCopyData(
         "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
             .getBytes(StandardCharsets.UTF_8));
+    mutationWriter.commit();
     mutationWriter.close();
 
     ExecutorService executor = Executors.newFixedThreadPool(2);

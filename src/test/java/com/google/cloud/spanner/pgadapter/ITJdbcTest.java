@@ -476,11 +476,11 @@ public class ITJdbcTest implements IntegrationTest {
                   copyManager.copyIn(
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
-      assertTrue(
-          exception.getMessage(),
-          exception
-              .getMessage()
-              .matches("FAILED_PRECONDITION: Record count: \\d+ has exceeded the limit: \\d+."));
+      assertEquals(
+          "ERROR: FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.\n"
+              + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
+              + "Execute `SET AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.",
+          exception.getMessage());
     }
 
     // Verify that the table is still empty.

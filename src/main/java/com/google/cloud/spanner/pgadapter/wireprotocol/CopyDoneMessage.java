@@ -40,6 +40,7 @@ public class CopyDoneMessage extends ControlMessage {
   protected void sendPayload() throws Exception {
     // If backend error occurred during copy-in mode, drop any subsequent CopyDone messages.
     if (this.statement != null) {
+      statement.getMutationWriter().commit();
       statement.close();
     }
     // Clear the COPY_IN status to indicate that we finished successfully. This will cause the

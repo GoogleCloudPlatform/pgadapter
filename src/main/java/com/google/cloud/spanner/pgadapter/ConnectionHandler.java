@@ -87,6 +87,7 @@ public class ConnectionHandler extends Thread {
   private static final AtomicInteger incrementingConnectionId = new AtomicInteger(0);
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
+  private int invalidMessagesCount;
   private Connection spannerConnection;
   private WellKnownClient wellKnownClient;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
@@ -472,6 +473,18 @@ public class ConnectionHandler extends Thread {
 
   public void setMessageState(WireMessage message) {
     this.message = this.server.recordMessage(message);
+  }
+
+  public int getInvalidMessageCount() {
+    return this.invalidMessagesCount;
+  }
+
+  public void increaseInvalidMessageCount() {
+    this.invalidMessagesCount++;
+  }
+
+  public void clearInvalidMessageCount() {
+    this.invalidMessagesCount = 0;
   }
 
   public ConnectionMetadata getConnectionMetadata() {

@@ -340,7 +340,7 @@ Larger datasets require that the Cloud Spanner database is set to `PARTITIONED_N
 psql -h localhost -p 5432 -d my-local-db \
   -c "copy (select i, to_char(i, 'fm000') from generate_series(1, 1000000) s(i)) to stdout" \
   | psql -h localhost -p 5433 -d my-spanner-db \
-  -c "set autocommit_dml_mode='partitioned_non_atomic'" \
+  -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'" \
   -c "copy numbers from stdin;"
 ```
 
