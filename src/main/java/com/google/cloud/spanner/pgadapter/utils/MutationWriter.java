@@ -345,11 +345,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       // Write any remaining mutations in the buffer.
       if (!rollback.get() && !mutations.isEmpty()) {
         if (transactionMode == CopyTransactionMode.Explicit) {
-          if (connection.isAutocommit()) {
-            connection.write(mutations);
-          } else {
-            connection.bufferedWrite(mutations);
-          }
+          connection.write(mutations);
         } else {
           // Wait until we have received a CopyDone message before writing the remaining data to
           // Spanner. If we are in a non-atomic transaction, there might already be data that have

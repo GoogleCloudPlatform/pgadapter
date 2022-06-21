@@ -28,8 +28,10 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ReadContext;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
@@ -1305,12 +1307,6 @@ public class ProtocolTest {
     DataInputStream inputStream2 = new DataInputStream(new ByteArrayInputStream(value2));
     DataInputStream inputStream3 = new DataInputStream(new ByteArrayInputStream(value3));
 
-    ResultSet spannerType = mock(ResultSet.class);
-    when(spannerType.getString("column_name")).thenReturn("key", "value");
-    when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
-    when(spannerType.next()).thenReturn(true, true, false);
-    when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
-
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
         new CopyStatement(connectionHandler, options, "", parse(sql), Statement.of(sql));
@@ -1695,12 +1691,16 @@ public class ProtocolTest {
   }
 
   private void setupQueryInformationSchemaResults() {
+    DatabaseClient databaseClient = mock(DatabaseClient.class);
+    ReadContext singleUseReadContext = mock(ReadContext.class);
+    when(databaseClient.singleUse()).thenReturn(singleUseReadContext);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connection.getDatabaseClient()).thenReturn(databaseClient);
     ResultSet spannerType = mock(ResultSet.class);
     when(spannerType.getString("column_name")).thenReturn("key", "value");
     when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
     when(spannerType.next()).thenReturn(true, true, false);
-    when(connection.executeQuery(
+    when(singleUseReadContext.executeQuery(
             ArgumentMatchers.argThat(
                 statement ->
                     statement != null && statement.getSql().startsWith("SELECT column_name"))))
@@ -1709,7 +1709,7 @@ public class ProtocolTest {
     ResultSet countResult = mock(ResultSet.class);
     when(countResult.getLong(0)).thenReturn(2L);
     when(countResult.next()).thenReturn(true, false);
-    when(connection.executeQuery(
+    when(singleUseReadContext.executeQuery(
             ArgumentMatchers.argThat(
                 statement ->
                     statement != null && statement.getSql().startsWith("SELECT COUNT(*)"))))

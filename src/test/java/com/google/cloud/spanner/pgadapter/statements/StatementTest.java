@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ReadContext;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
@@ -554,12 +555,16 @@ public class StatementTest {
   }
 
   private void setupQueryInformationSchemaResults() {
+    DatabaseClient databaseClient = mock(DatabaseClient.class);
+    ReadContext singleUseReadContext = mock(ReadContext.class);
+    when(databaseClient.singleUse()).thenReturn(singleUseReadContext);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connection.getDatabaseClient()).thenReturn(databaseClient);
     ResultSet spannerType = mock(ResultSet.class);
     when(spannerType.getString("column_name")).thenReturn("key", "value");
     when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
     when(spannerType.next()).thenReturn(true, true, false);
-    when(connection.executeQuery(
+    when(singleUseReadContext.executeQuery(
             ArgumentMatchers.argThat(
                 statement ->
                     statement != null && statement.getSql().startsWith("SELECT column_name"))))
@@ -568,7 +573,7 @@ public class StatementTest {
     ResultSet countResult = mock(ResultSet.class);
     when(countResult.getLong(0)).thenReturn(2L);
     when(countResult.next()).thenReturn(true, false);
-    when(connection.executeQuery(
+    when(singleUseReadContext.executeQuery(
             ArgumentMatchers.argThat(
                 statement ->
                     statement != null && statement.getSql().startsWith("SELECT COUNT(*)"))))
