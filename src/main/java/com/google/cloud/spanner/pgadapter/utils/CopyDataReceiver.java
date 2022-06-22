@@ -25,6 +25,11 @@ import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.concurrent.Callable;
 
+/**
+ * This message receiver is activated when the COPY sub-protocol is activated by a COPY statement.
+ * This handler will run and receive all incoming messages until the state of the connection changes
+ * from COPY_IN to either COPY_DONE or COPY_FAILED.
+ */
 @InternalApi
 public class CopyDataReceiver implements Callable<Void> {
   private final CopyStatement copyStatement;

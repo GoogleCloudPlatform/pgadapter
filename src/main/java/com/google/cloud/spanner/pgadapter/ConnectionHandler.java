@@ -473,14 +473,27 @@ public class ConnectionHandler extends Thread {
     this.message = this.server.recordMessage(message);
   }
 
+  /**
+   * Returns the number of invalid messages that this connection has received in a row. This can for
+   * example happen if a client has initiated a COPY operation and the copy operation fails on the
+   * server. The server will then respond with an error response, but if the client fails to read
+   * that message and continues to send copy data messages, the server could get flooded. This value
+   * is used to detect such a situation and breaks the connection if too many invalid messages in a
+   * row are received.
+   */
   public int getInvalidMessageCount() {
     return this.invalidMessagesCount;
   }
 
+  /** Increases the number of invalid messages that was received in a row by 1. */
   public void increaseInvalidMessageCount() {
     this.invalidMessagesCount++;
   }
 
+  /**
+   * Clears the number of invalid messages that was received. This is called whenever a valid
+   * message is encountered.
+   */
   public void clearInvalidMessageCount() {
     this.invalidMessagesCount = 0;
   }

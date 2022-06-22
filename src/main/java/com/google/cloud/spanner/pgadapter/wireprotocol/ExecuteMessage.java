@@ -89,20 +89,11 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
    * @throws Exception if sending the message back to the client causes an error.
    */
   private void handleExecute() throws Exception {
-    //    if (this.statement instanceof CopyStatement) {
-    //      try {
-    //        ((CopyStatement) this.statement).handleCopy();
-    //        this.sendSpannerResult(this.statement, this.queryMode, this.maxRows);
-    //      } catch (Exception exception) {
-    //        handleError(exception);
-    //      }
-    //    } else
     if (this.statement.hasException()) {
       this.handleError(this.statement.getException());
     } else {
       try {
         this.sendSpannerResult(this.statement, this.queryMode, this.maxRows);
-        //        this.outputStream.flush();
       } catch (Exception exception) {
         handleError(exception);
       }
