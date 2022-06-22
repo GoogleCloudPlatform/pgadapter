@@ -294,8 +294,7 @@ public class OptionsMetadata {
    *
    * @return The absolute path of the credentials file.
    */
-  @VisibleForTesting
-  String buildCredentialsFile() {
+  public String buildCredentialsFile() {
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
       try {
         // This will throw an IOException if no default credentials are available.
@@ -351,8 +350,8 @@ public class OptionsMetadata {
     return url;
   }
 
-  @VisibleForTesting
-  DatabaseName getDatabaseName(String database) {
+  /** Returns the fully qualified database name based on the given database id or name. */
+  public DatabaseName getDatabaseName(String database) {
     DatabaseName databaseName;
     if (DatabaseName.isParsableFrom(database)) {
       databaseName = DatabaseName.parse(database);
