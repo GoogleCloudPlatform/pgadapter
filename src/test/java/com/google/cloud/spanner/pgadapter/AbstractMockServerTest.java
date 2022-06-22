@@ -452,4 +452,11 @@ public abstract class AbstractMockServerTest {
     mockDatabaseAdmin.addException(
         Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException());
   }
+
+  protected static void addIfNotExistsDdlException() {
+    mockDatabaseAdmin.addException(
+        Status.INVALID_ARGUMENT
+            .withDescription("<IF NOT EXISTS> clause is not supported in <CREATE TABLE> statement.")
+            .asRuntimeException());
+  }
 }

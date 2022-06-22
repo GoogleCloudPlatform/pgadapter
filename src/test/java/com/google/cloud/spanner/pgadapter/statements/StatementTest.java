@@ -154,7 +154,8 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch);
+        new BackendConnection(
+            connectionHandler.getDatabaseId(), connection, DdlTransactionMode.Batch);
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("UPDATE", intermediateStatement.getCommand());
@@ -226,7 +227,8 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch);
+        new BackendConnection(
+            connectionHandler.getDatabaseId(), connection, DdlTransactionMode.Batch);
 
     intermediateStatement.executeAsync(backendConnection);
     backendConnection.flush();
@@ -251,7 +253,8 @@ public class StatementTest {
             .to(30)
             .build();
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch);
+        new BackendConnection(
+            connectionHandler.getDatabaseId(), connection, DdlTransactionMode.Batch);
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(
@@ -318,7 +321,8 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch);
+        new BackendConnection(
+            connectionHandler.getDatabaseId(), connection, DdlTransactionMode.Batch);
 
     intermediateStatement.describeAsync(backendConnection);
     backendConnection.flush();
@@ -362,7 +366,8 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch);
+        new BackendConnection(
+            connectionHandler.getDatabaseId(), connection, DdlTransactionMode.Batch);
 
     when(connection.execute(Statement.of(sqlStatement)))
         .thenThrow(
@@ -462,7 +467,8 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch);
+        new BackendConnection(
+            connectionHandler.getDatabaseId(), connection, DdlTransactionMode.Batch);
 
     intermediateStatement.executeAsync(backendConnection);
 

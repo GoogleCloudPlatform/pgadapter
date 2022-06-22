@@ -635,6 +635,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCreateTableIfNotExists_tableDoesNotExist() throws SQLException {
+    addIfNotExistsDdlException();
     String sql = "CREATE TABLE IF NOT EXISTS foo (id bigint primary key)";
     addDdlResponseToSpannerAdmin();
     mockSpanner.putStatementResult(
@@ -671,6 +672,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCreateTableIfNotExists_tableExists() throws SQLException {
+    addIfNotExistsDdlException();
     String sql = "CREATE TABLE IF NOT EXISTS foo (id bigint primary key)";
     addDdlResponseToSpannerAdmin();
     mockSpanner.putStatementResult(
@@ -703,6 +705,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCreateIndexIfNotExists_indexDoesNotExist() throws SQLException {
+    addIfNotExistsDdlException();
     String sql = "CREATE INDEX IF NOT EXISTS foo on bar (value)";
     addDdlResponseToSpannerAdmin();
     mockSpanner.putStatementResult(
@@ -738,6 +741,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCreateIndexIfNotExists_indexExists() throws SQLException {
+    addIfNotExistsDdlException();
     String sql = "CREATE INDEX IF NOT EXISTS foo on bar (value)";
     addDdlResponseToSpannerAdmin();
     mockSpanner.putStatementResult(
@@ -770,6 +774,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testDropTableIfExists_tableDoesNotExist() throws SQLException {
+    addIfNotExistsDdlException();
     String sql = "DROP TABLE IF EXISTS foo";
     addDdlResponseToSpannerAdmin();
     mockSpanner.putStatementResult(
@@ -802,6 +807,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testDropTableIfExists_tableExists() throws SQLException {
+    addIfNotExistsDdlException();
     String sql = "DROP TABLE IF EXISTS foo";
     addDdlResponseToSpannerAdmin();
     mockSpanner.putStatementResult(
@@ -836,6 +842,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testDropIndexIfExists_indexDoesNotExist() throws SQLException {
+    addIfNotExistsDdlException();
     String sql = "DROP INDEX IF EXISTS foo";
     addDdlResponseToSpannerAdmin();
     mockSpanner.putStatementResult(
@@ -868,6 +875,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testDropIndexIfExists_indexExists() throws SQLException {
+    addIfNotExistsDdlException();
     String sql = "DROP INDEX IF EXISTS foo";
     addDdlResponseToSpannerAdmin();
     mockSpanner.putStatementResult(
@@ -902,6 +910,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testDdlBatchWithIfNotExists() throws SQLException {
+    addIfNotExistsDdlException();
     ImmutableList<String> statements =
         ImmutableList.of(
             "CREATE TABLE IF NOT EXISTS \"Foo\" (id bigint primary key)",
@@ -910,7 +919,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(
-                    "select 1 from information_schema.tables where table_schema=$1 and index_name=$2")
+                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
                 .bind("p1")
                 .to("public")
                 .bind("p2")
@@ -920,7 +929,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(
-                    "select 1 from information_schema.tables where table_schema=$1 and index_name=$2")
+                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
                 .bind("p1")
                 .to("public")
                 .bind("p2")

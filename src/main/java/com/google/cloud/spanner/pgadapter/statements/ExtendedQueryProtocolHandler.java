@@ -33,6 +33,7 @@ public class ExtendedQueryProtocolHandler {
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
     this.backendConnection =
         new BackendConnection(
+            connectionHandler.getDatabaseId(),
             connectionHandler.getSpannerConnection(),
             connectionHandler.getServer().getOptions().getDdlTransactionMode());
   }

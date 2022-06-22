@@ -14,13 +14,23 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.cloud.spanner.AbstractLazyInitializer;
+import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.DatabaseId;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Spanner;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
-import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
 /**
@@ -28,13 +38,102 @@ import java.util.function.Function;
  * features that are not (yet) supported by the backend.
  */
 class DdlExecutor {
-  private static final NoResult NO_RESULT = new NoResult();
+  static class BackendSupportsIfExists extends AbstractLazyInitializer<Boolean> {
+    private final DatabaseId databaseId;
+    private final Connection connection;
+
+    BackendSupportsIfExists(DatabaseId databaseId, Connection connection) {
+      this.databaseId = databaseId;
+      this.connection = connection;
+    }
+
+    @Override
+    protected Boolean initialize() {
+      Spanner spanner = ConnectionOptionsHelper.getSpanner(this.connection);
+      DatabaseAdminClient adminClient = spanner.getDatabaseAdminClient();
+      try {
+        adminClient
+            .updateDatabaseDdl(
+                this.databaseId.getInstanceId().getInstance(),
+                this.databaseId.getDatabase(),
+                ImmutableList.of(
+                    "create table if not exists test (id bigint primary key)",
+                    "create table invalid (id primary key)"),
+                null)
+            .get();
+        // This statement should not be reachable, as at least one of the statements should fail.
+        return Boolean.TRUE;
+      } catch (ExecutionException exception) {
+        SpannerException spannerException =
+            SpannerExceptionFactory.asSpannerException(exception.getCause());
+        if (spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
+            && spannerException
+                .getMessage()
+                .contains("<IF NOT EXISTS> clause is not supported in <CREATE TABLE> statement")) {
+          return Boolean.FALSE;
+        }
+        return Boolean.TRUE;
+      } catch (InterruptedException interruptedException) {
+        throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+      }
+    }
+  }
+
+  static final class NotExecuted implements StatementResult {
+    @Override
+    public ResultType getResultType() {
+      return ResultType.NO_RESULT;
+    }
+
+    @Override
+    public ClientSideStatementType getClientSideStatementType() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ResultSet getResultSet() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Long getUpdateCount() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  private static final NotExecuted NOT_EXECUTED = new NotExecuted();
+  private final AbstractLazyInitializer<Boolean> backendSupportsIfExists;
   private final BackendConnection backendConnection;
   private final Connection connection;
 
+  /**
+   * Constructor only intended for testing. This will create an executor that always assumes that
+   * the backend does not support 'if [not] exists'.
+   */
+  @VisibleForTesting
   DdlExecutor(BackendConnection backendConnection) {
+    this(
+        new AbstractLazyInitializer<Boolean>() {
+          @Override
+          protected Boolean initialize() {
+            return Boolean.FALSE;
+          }
+        },
+        backendConnection);
+  }
+
+  DdlExecutor(DatabaseId databaseId, BackendConnection backendConnection) {
+    this(
+        new BackendSupportsIfExists(databaseId, backendConnection.getSpannerConnection()),
+        backendConnection);
+  }
+
+  private DdlExecutor(
+      AbstractLazyInitializer<Boolean> backendSupportsIfExists,
+      BackendConnection backendConnection) {
     this.backendConnection = backendConnection;
     this.connection = backendConnection.getSpannerConnection();
+    this.backendSupportsIfExists = backendSupportsIfExists;
   }
 
   static String unquoteIdentifier(String identifier) {
@@ -52,7 +151,7 @@ class DdlExecutor {
     if (translated != null) {
       return connection.execute(translated);
     }
-    return NO_RESULT;
+    return NOT_EXECUTED;
   }
 
   Statement translate(ParsedStatement parsedStatement, Statement statement) {
@@ -112,22 +211,8 @@ class DdlExecutor {
     if (!parser.eat("if", "not", "exists")) {
       return statement;
     }
-    int identifierPosition = parser.getPos();
-    if (identifierPosition >= parser.getSql().length()) {
-      return statement;
-    }
-    String name = parser.readIdentifier();
-    if (name == null) {
-      return statement;
-    }
-    // Check if the table exists or not.
-    if (existsFunction.apply(name)) {
-      // Return null to indicate that the statement should be skipped.
-      return null;
-    }
-
-    // Return the DDL statement without the 'if not exists' clause.
-    return Statement.of("create " + type + parser.getSql().substring(identifierPosition));
+    return maybeExecuteStatement(
+        parser, statement, "create", type, name -> !existsFunction.apply(name));
   }
 
   private Statement translateDropTableOrIndex(
@@ -138,6 +223,18 @@ class DdlExecutor {
     if (!parser.eat("if", "exists")) {
       return statement;
     }
+    return maybeExecuteStatement(parser, statement, "drop", type, existsFunction);
+  }
+
+  Statement maybeExecuteStatement(
+      SimpleParser parser,
+      Statement statement,
+      String command,
+      String type,
+      Function<String, Boolean> shouldExecuteFunction) {
+    if (backendSupportsIfExists()) {
+      return statement;
+    }
     int identifierPosition = parser.getPos();
     if (identifierPosition >= parser.getSql().length()) {
       return statement;
@@ -147,13 +244,13 @@ class DdlExecutor {
       return statement;
     }
     // Check if the table exists or not.
-    if (!existsFunction.apply(name)) {
+    if (!shouldExecuteFunction.apply(name)) {
       // Return null to indicate that the statement should be skipped.
       return null;
     }
 
-    // Return the DDL statement without the 'if exists' clause.
-    return Statement.of("drop " + type + parser.getSql().substring(identifierPosition));
+    // Return the DDL statement without the 'if [not] exists' clause.
+    return Statement.of(command + " " + type + parser.getSql().substring(identifierPosition));
   }
 
   boolean tableExists(String name) {
@@ -187,6 +284,14 @@ class DdlExecutor {
                     .to(unquoteIdentifier(name))
                     .build())) {
       return resultSet.next();
+    }
+  }
+
+  boolean backendSupportsIfExists() {
+    try {
+      return backendSupportsIfExists.get();
+    } catch (Exception exception) {
+      throw SpannerExceptionFactory.asSpannerException(exception);
     }
   }
 }

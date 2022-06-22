@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerBatchUpdateException;
@@ -27,11 +28,15 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.SettableFuture;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Future;
 
@@ -163,17 +168,10 @@ public class BackendConnection {
    * Creates a PG backend connection that uses the given Spanner {@link Connection} and {@link
    * DdlTransactionMode}.
    */
-  BackendConnection(Connection spannerConnection, DdlTransactionMode ddlTransactionMode) {
-    // TODO: Make DDL translation configurable.
-    this(spannerConnection, ddlTransactionMode, true);
-  }
-
-  private BackendConnection(
-      Connection spannerConnection,
-      DdlTransactionMode ddlTransactionMode,
-      boolean translateDdlStatements) {
+  BackendConnection(
+      DatabaseId databaseId, Connection spannerConnection, DdlTransactionMode ddlTransactionMode) {
     this.spannerConnection = spannerConnection;
-    this.ddlExecutor = translateDdlStatements ? new DdlExecutor(this) : null;
+    this.ddlExecutor = new DdlExecutor(databaseId, this);
     this.ddlTransactionMode = ddlTransactionMode;
   }
 
@@ -480,14 +478,16 @@ public class BackendConnection {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, "Statement type is not supported for batching");
     }
+    List<StatementResult> statementResults = new ArrayList<>(getStatementCount());
     int index = fromIndex;
     while (index < getStatementCount()) {
       StatementType statementType = getStatementType(index);
       if (canBeBatchedTogether(batchType, statementType)) {
-        if (batchType == StatementType.DDL && ddlExecutor != null) {
-          ddlExecutor.execute(
-              bufferedStatements.get(index).parsedStatement,
-              bufferedStatements.get(index).statement);
+        if (batchType == StatementType.DDL) {
+          statementResults.add(
+              ddlExecutor.execute(
+                  bufferedStatements.get(index).parsedStatement,
+                  bufferedStatements.get(index).statement));
         } else {
           spannerConnection.execute(bufferedStatements.get(index).statement);
         }
@@ -500,15 +500,43 @@ public class BackendConnection {
     }
     try {
       long[] counts = spannerConnection.runBatch();
+      if (batchType == StatementType.DDL) {
+        counts = extractDdlUpdateCounts(statementResults, counts);
+      }
       updateBatchResultCount(fromIndex, counts);
     } catch (SpannerBatchUpdateException batchUpdateException) {
-      long[] counts = batchUpdateException.getUpdateCounts();
+      long[] counts;
+      if (batchType == StatementType.DDL) {
+        counts = extractDdlUpdateCounts(statementResults, batchUpdateException.getUpdateCounts());
+      } else {
+        counts = batchUpdateException.getUpdateCounts();
+      }
       updateBatchResultCount(fromIndex, counts);
       Execute failedExecute = (Execute) bufferedStatements.get(fromIndex + counts.length);
       failedExecute.result.setException(batchUpdateException);
       throw batchUpdateException;
     }
     return index - fromIndex;
+  }
+
+  static long[] extractDdlUpdateCounts(
+      List<StatementResult> statementResults, long[] returnedUpdateCounts) {
+    int index = 0;
+    int successfullyExecutedCount = 0;
+    while (index < returnedUpdateCounts.length
+        && successfullyExecutedCount < statementResults.size()) {
+      if (!(statementResults.get(successfullyExecutedCount) instanceof NotExecuted)) {
+        index++;
+      }
+      successfullyExecutedCount++;
+    }
+    while (successfullyExecutedCount < statementResults.size()
+        && statementResults.get(successfullyExecutedCount) instanceof NotExecuted) {
+      successfullyExecutedCount++;
+    }
+    long[] updateCounts = new long[successfullyExecutedCount];
+    Arrays.fill(updateCounts, 1L);
+    return updateCounts;
   }
 
   /** Updates the results of the buffered statements after finishing executing a batch. */
