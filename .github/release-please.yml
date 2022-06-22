@@ -2,7 +2,7 @@ primaryBranch: postgresql-dialect
 releaseType: java-yoshi
 bumpMinorPreMajor: true
 handleGHRelease: true
-extra-files: [
+extraFiles: [
   {
     type: "generic",
     path: "README.md",
