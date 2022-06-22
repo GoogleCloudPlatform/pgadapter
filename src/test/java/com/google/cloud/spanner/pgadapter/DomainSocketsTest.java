@@ -22,6 +22,8 @@ import static org.junit.Assume.assumeFalse;
 
 import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -106,9 +108,15 @@ public class DomainSocketsTest extends AbstractMockServerTest {
 
   @Test
   public void testPGAdapterStartFailsWithInvalidSocketFile() throws Exception {
+    File file = new File("/test.txt");
+    boolean canCreate = false;
+    try {
+      Files.createFile(file.toPath());
+      canCreate = true;
+    } catch (IOException ignored) {
+    }
     assumeFalse(
-        "Skip test if the test container allows writing to the root directory",
-        new File("/test.txt").canWrite());
+        "Skip test if the test container allows creating files in the root directory", canCreate);
 
     doStartMockSpannerAndPgAdapterServers(null, ImmutableList.of("-dir", "/"));
 

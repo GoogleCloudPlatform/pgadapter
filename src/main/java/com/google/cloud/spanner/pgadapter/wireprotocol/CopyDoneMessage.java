@@ -55,14 +55,10 @@ public class CopyDoneMessage extends ControlMessage {
           this.outputStream.flush();
         } catch (Exception e) {
           // Spanner returned an error when trying to commit the batch of mutations.
-          mutationWriter.writeErrorFile(e);
-          mutationWriter.closeErrorFile();
           this.connection.setStatus(ConnectionStatus.AUTHENTICATED);
           this.connection.removeActiveStatement(this.statement);
           throw e;
         }
-      } else {
-        mutationWriter.closeErrorFile();
       }
     }
     this.connection.setStatus(ConnectionStatus.AUTHENTICATED);

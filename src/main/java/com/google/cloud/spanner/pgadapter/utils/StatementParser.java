@@ -140,10 +140,17 @@ public class StatementParser {
   }
 
   static int skipMultiLineComment(String sql, int startIndex) {
+    int level = 1;
     int i = startIndex + 2;
     while (i < sql.length()) {
+      if (sql.charAt(i) == SLASH && sql.length() > (i + 1) && sql.charAt(i + 1) == ASTERISK) {
+        level++;
+      }
       if (sql.charAt(i) == ASTERISK && sql.length() > (i + 1) && sql.charAt(i + 1) == SLASH) {
-        return i + 2;
+        level--;
+        if (level == 0) {
+          return i + 2;
+        }
       }
       i++;
     }

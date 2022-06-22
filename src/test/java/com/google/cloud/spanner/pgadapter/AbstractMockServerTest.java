@@ -25,6 +25,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.admin.database.v1.MockDatabaseAdminImpl;
+import com.google.cloud.spanner.admin.instance.v1.MockInstanceAdminImpl;
 import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
@@ -243,6 +244,7 @@ public abstract class AbstractMockServerTest {
 
   protected static MockSpannerServiceImpl mockSpanner;
   protected static MockDatabaseAdminImpl mockDatabaseAdmin;
+  protected static MockInstanceAdminImpl mockInstanceAdmin;
   private static Server spannerServer;
   protected static ProxyServer pgServer;
 
@@ -316,12 +318,14 @@ public abstract class AbstractMockServerTest {
     mockSpanner.putStatementResult(StatementResult.exception(INVALID_DDL, EXCEPTION));
 
     mockDatabaseAdmin = new MockDatabaseAdminImpl();
+    mockInstanceAdmin = new MockInstanceAdminImpl();
 
     InetSocketAddress address = new InetSocketAddress("localhost", 0);
     spannerServer =
         NettyServerBuilder.forAddress(address)
             .addService(mockSpanner)
             .addService(mockDatabaseAdmin)
+            .addService(mockInstanceAdmin)
             .intercept(
                 new ServerInterceptor() {
                   @Override
@@ -429,6 +433,7 @@ public abstract class AbstractMockServerTest {
   public void clearRequests() {
     mockSpanner.clearRequests();
     mockDatabaseAdmin.reset();
+    mockInstanceAdmin.reset();
     if (pgServer != null) {
       pgServer.clearDebugMessages();
     }
