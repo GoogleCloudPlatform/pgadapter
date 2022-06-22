@@ -217,6 +217,10 @@ public class StatementParserTest {
     assertEquals(13, skipMultiLineComment("bar /* foo */", 4));
     assertEquals(13, skipMultiLineComment("bar /* foo */bar", 4));
     assertEquals(10, skipMultiLineComment("bar /* foo", 4));
+
+    assertEquals(
+        "/* foo /* inner comment */ not in inner comment */".length(),
+        skipMultiLineComment("/* foo /* inner comment */ not in inner comment */ bar", 0));
   }
 
   @Test
@@ -294,6 +298,29 @@ public class StatementParserTest {
     assertEquals(
         ImmutableList.of("select * from \"my';table\"", "select 1"),
         splitStatements("select * from \"my';table\"; select 1"));
+    assertEquals(
+        ImmutableList.of(
+            "/* This block comment surrounds a query which itself has a block comment...\n"
+                + "SELECT /* embedded single line */ 'embedded' AS x2;\n"
+                + "*/\n"
+                + "SELECT 1"),
+        splitStatements(
+            "/* This block comment surrounds a query which itself has a block comment...\n"
+                + "SELECT /* embedded single line */ 'embedded' AS x2;\n"
+                + "*/\n"
+                + "SELECT 1;"));
+    assertEquals(
+        ImmutableList.of(
+            "/* This block comment surrounds a query which itself has a block comment...\n"
+                + "SELECT /* embedded single line */ 'embedded' AS x2;\n"
+                + "*/\n"
+                + "SELECT 1",
+            "SELECT 2"),
+        splitStatements(
+            "/* This block comment surrounds a query which itself has a block comment...\n"
+                + "SELECT /* embedded single line */ 'embedded' AS x2;\n"
+                + "*/\n"
+                + "SELECT 1; SELECT 2;"));
 
     assertEquals(
         ImmutableList.of("select $$Hello World!$$"), splitStatements("select $$Hello World!$$"));

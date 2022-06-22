@@ -15,6 +15,8 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
@@ -27,6 +29,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import org.junit.BeforeClass;
@@ -115,5 +118,35 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
     assertEquals(2, request.getStatementsCount());
     assertEquals(INSERT1, request.getStatements(0).getSql());
     assertEquals(INSERT2, request.getStatements(1).getSql());
+  }
+
+  @Test
+  public void testNestedBlockComment() throws SQLException {
+    String sql1 =
+        "/* This block comment surrounds a query which itself has a block comment...\n"
+            + "SELECT /* embedded single line */ 'embedded' AS x2;\n"
+            + "*/\n"
+            + "SELECT 1";
+    String sql2 = "-- This is a line comment\n SELECT 2";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql1), SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), SELECT2_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertTrue(statement.execute(String.format("%s;%s;", sql1, sql2)));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(2L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.getMoreResults());
+      }
+    }
   }
 }
