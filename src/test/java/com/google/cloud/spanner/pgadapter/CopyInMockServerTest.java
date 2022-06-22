@@ -33,7 +33,6 @@ import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringReader;
@@ -237,8 +236,6 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
           exception
               .getMessage()
               .contains("Row length mismatched. Expected 3 columns, but only found 1"));
-    } finally {
-      assertTrue(new File("output.txt").delete());
     }
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
