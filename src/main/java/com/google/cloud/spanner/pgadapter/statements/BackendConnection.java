@@ -34,6 +34,7 @@ import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -489,7 +490,8 @@ public class BackendConnection {
         .allMatch(statement -> statement.parsedStatement.getType() == StatementType.UPDATE);
   }
 
-  private boolean hasDmlOrCopyStatementsAfter(int index) {
+  @VisibleForTesting
+  boolean hasDmlOrCopyStatementsAfter(int index) {
     return bufferedStatements.subList(index, bufferedStatements.size()).stream()
         .anyMatch(
             statement ->

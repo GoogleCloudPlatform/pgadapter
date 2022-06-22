@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import static com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.MAX_INVALID_MESSAGE_COUNT;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -21,6 +22,7 @@ import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -1288,6 +1290,26 @@ public class ProtocolTest {
   }
 
   @Test
+  public void testCopyDataMessageWithNoCopyStatement() throws Exception {
+    byte[] messageMetadata = {'d'};
+    byte[] payload = "This is the payload".getBytes();
+    byte[] length = intToBytes(4 + payload.length);
+    byte[] value = Bytes.concat(messageMetadata, length, payload);
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+
+    when(connectionHandler.getActiveStatement()).thenReturn(null);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
+    // This should be a no-op.
+    message.sendPayload();
+  }
+
+  @Test
   public void testMultipleCopyDataMessages() throws Exception {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
@@ -1688,6 +1710,174 @@ public class ProtocolTest {
     describeMessage.buffer(backendConnection);
 
     assertThrows(IllegalStateException.class, describeMessage::getPortalMetadata);
+  }
+
+  @Test
+  public void testSkipMessage() throws Exception {
+    byte[] messageMetadata = {0, 0, 0, 45};
+    String payload = "INSERT INTO users (name) VALUES ('test')\0";
+    byte[] value = Bytes.concat(messageMetadata, payload.getBytes());
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+
+    SkipMessage message = new SkipMessage(connectionHandler);
+    message.send();
+
+    // Verify that nothing was written to the output.
+    assertEquals(0, result.size());
+    assertEquals("Skip", message.getMessageName());
+    assertEquals("", message.getIdentifier());
+    assertEquals("Length: 45", message.getPayloadString());
+  }
+
+  @Test
+  public void testFlushSkippedInCopyMode() throws Exception {
+    byte[] messageMetadata = {FlushMessage.IDENTIFIER, 0, 0, 0, 4};
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(messageMetadata));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
+
+    ControlMessage message = ControlMessage.create(connectionHandler);
+
+    assertEquals(SkipMessage.class, message.getClass());
+    // Verify that nothing was written to the output.
+    assertEquals(0, result.size());
+  }
+
+  @Test
+  public void testSyncSkippedInCopyMode() throws Exception {
+    byte[] messageMetadata = {SyncMessage.IDENTIFIER, 0, 0, 0, 4};
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(messageMetadata));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
+
+    ControlMessage message = ControlMessage.create(connectionHandler);
+
+    assertEquals(SkipMessage.class, message.getClass());
+    // Verify that nothing was written to the output.
+    assertEquals(0, result.size());
+  }
+
+  @Test
+  public void testCopyDataSkippedInNormalMode() throws Exception {
+    byte[] messageMetadata = {CopyDataMessage.IDENTIFIER, 0, 0, 0, 4};
+    String payload = "1\t'One'\n2\t'Two'\n";
+    byte[] value = Bytes.concat(messageMetadata, payload.getBytes());
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
+
+    ControlMessage message = ControlMessage.create(connectionHandler);
+
+    assertEquals(SkipMessage.class, message.getClass());
+    // Verify that nothing was written to the output.
+    assertEquals(0, result.size());
+  }
+
+  @Test
+  public void testCopyDoneSkippedInNormalMode() throws Exception {
+    byte[] messageMetadata = {CopyDoneMessage.IDENTIFIER, 0, 0, 0, 4};
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(messageMetadata));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
+
+    ControlMessage message = ControlMessage.create(connectionHandler);
+
+    assertEquals(SkipMessage.class, message.getClass());
+    // Verify that nothing was written to the output.
+    assertEquals(0, result.size());
+  }
+
+  @Test
+  public void testCopyFailSkippedInNormalMode() throws Exception {
+    byte[] messageMetadata = {CopyFailMessage.IDENTIFIER, 0, 0, 0, 4};
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(messageMetadata));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
+
+    ControlMessage message = ControlMessage.create(connectionHandler);
+
+    assertEquals(SkipMessage.class, message.getClass());
+    // Verify that nothing was written to the output.
+    assertEquals(0, result.size());
+  }
+
+  @Test
+  public void testRepeatedCopyDataInNormalMode_TerminatesConnectionAndReturnsError()
+      throws Exception {
+    String payload = "1\t'One'\n2\t'Two'\n";
+    byte[] messageMetadata = {
+      CopyDataMessage.IDENTIFIER,
+      0,
+      0,
+      0,
+      (byte) (4 + payload.getBytes(StandardCharsets.UTF_8).length)
+    };
+    byte[] value = new byte[0];
+    for (int i = 0; i <= MAX_INVALID_MESSAGE_COUNT; i++) {
+      value = Bytes.concat(value, messageMetadata, payload.getBytes());
+    }
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
+    doCallRealMethod().when(connectionHandler).increaseInvalidMessageCount();
+    when(connectionHandler.getInvalidMessageCount()).thenCallRealMethod();
+    doCallRealMethod().when(connectionHandler).clearInvalidMessageCount();
+
+    for (int i = 0; i < MAX_INVALID_MESSAGE_COUNT; i++) {
+      ControlMessage message = ControlMessage.create(connectionHandler);
+      assertEquals(SkipMessage.class, message.getClass());
+      // Verify that nothing was written to the output.
+      assertEquals(0, result.size());
+      verify(connectionHandler, never()).setStatus(ConnectionStatus.TERMINATED);
+    }
+
+    ControlMessage.create(connectionHandler);
+    verify(connectionHandler).setStatus(ConnectionStatus.TERMINATED);
+    byte[] resultBytes = result.toByteArray();
+    assertEquals('E', resultBytes[0]);
   }
 
   private void setupQueryInformationSchemaResults() {

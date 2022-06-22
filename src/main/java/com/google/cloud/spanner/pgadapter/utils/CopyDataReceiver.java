@@ -22,6 +22,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.ResultNotReadyBehavior;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.concurrent.Callable;
 
 @InternalApi
@@ -49,7 +50,8 @@ public class CopyDataReceiver implements Callable<Void> {
    * MutationWriter} changes the status of the connection to a non-COPY_IN status, for example as a
    * result of an error while copying the data to Cloud Spanner.
    */
-  private void handleCopy() throws Exception {
+  @VisibleForTesting
+  void handleCopy() throws Exception {
     if (copyStatement.hasException()) {
       throw copyStatement.getException();
     } else {

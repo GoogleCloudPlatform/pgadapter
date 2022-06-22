@@ -42,7 +42,7 @@ import java.util.List;
 @InternalApi
 public abstract class ControlMessage extends WireMessage {
   /** Maximum number of invalid messages in a row allowed before we terminate the connection. */
-  private static final int MAX_INVALID_MESSAGE_COUNT = 50;
+  static final int MAX_INVALID_MESSAGE_COUNT = 50;
 
   /**
    * Token that is used to mark {@link ControlMessage}s that are manually created to execute a
