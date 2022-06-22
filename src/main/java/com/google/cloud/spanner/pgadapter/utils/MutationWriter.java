@@ -36,8 +36,6 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.spanner.v1.TypeCode;
 import java.io.Closeable;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PipedInputStream;
@@ -89,7 +87,6 @@ public class MutationWriter implements Callable<Long>, Closeable {
   }
 
   private static final Logger logger = Logger.getLogger(MutationWriter.class.getName());
-  private static final String ERROR_FILE = "output.txt";
 
   private static final int DEFAULT_MUTATION_LIMIT = 20_000; // 20k mutation count limit
   private static final int DEFAULT_COMMIT_LIMIT =
@@ -202,8 +199,11 @@ public class MutationWriter implements Callable<Long>, Closeable {
     try {
       this.payload.write(payload);
     } catch (IOException e) {
-      throw SpannerExceptionFactory.newSpannerException(
-          ErrorCode.INTERNAL, "Could not write copy data to buffer", e);
+      SpannerException spannerException =
+          SpannerExceptionFactory.newSpannerException(
+              ErrorCode.INTERNAL, "Could not write copy data to buffer", e);
+      logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
+      throw spannerException;
     }
   }
 
@@ -338,7 +338,6 @@ public class MutationWriter implements Callable<Long>, Closeable {
       }
       this.payload.close();
       this.parser.close();
-      closeErrorFile();
     }
     return rowCount;
   }
@@ -536,25 +535,30 @@ public class MutationWriter implements Callable<Long>, Closeable {
             break;
         }
       } catch (NumberFormatException | DateTimeParseException e) {
-        handleError(e);
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            "Invalid input syntax for type "
-                + columnType.toString()
-                + ":"
-                + "\""
-                + recordValue
-                + "\"",
-            e);
+        SpannerException spannerException =
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INVALID_ARGUMENT,
+                "Invalid input syntax for type "
+                    + columnType.toString()
+                    + ":"
+                    + "\""
+                    + recordValue
+                    + "\"",
+                e);
+        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
+        throw spannerException;
       } catch (IllegalArgumentException e) {
-        handleError(e);
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            "Invalid input syntax for column \"" + columnName + "\"",
-            e);
+        SpannerException spannerException =
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INVALID_ARGUMENT,
+                "Invalid input syntax for column \"" + columnName + "\"",
+                e);
+        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
+        throw spannerException;
       } catch (Exception e) {
-        handleError(e);
-        throw SpannerExceptionFactory.asSpannerException(e);
+        SpannerException spannerException = SpannerExceptionFactory.asSpannerException(e);
+        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
+        throw spannerException;
       }
     }
     return builder.build();
@@ -576,32 +580,5 @@ public class MutationWriter implements Callable<Long>, Closeable {
       parser = CSVParser.parse(reader, this.format);
     }
     return parser;
-  }
-
-  public void handleError(Exception exception) {
-    writeErrorFile(exception);
-  }
-
-  private void createErrorFile() {
-    File unsuccessfulCopy = new File(ERROR_FILE);
-    try {
-      this.errorFileWriter = new PrintWriter(new FileWriter(unsuccessfulCopy, false));
-    } catch (IOException e) {
-      throw SpannerExceptionFactory.asSpannerException(e);
-    }
-  }
-
-  /** Writes any error that occurred during a COPY operation to the error file. */
-  public void writeErrorFile(Exception exception) {
-    if (this.errorFileWriter == null) {
-      createErrorFile();
-    }
-    exception.printStackTrace(errorFileWriter);
-  }
-
-  public void closeErrorFile() {
-    if (this.errorFileWriter != null) {
-      this.errorFileWriter.close();
-    }
   }
 }

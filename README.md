@@ -50,13 +50,14 @@ java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 Use the `-s` option to specify a different local port than the default 5432 if you already have
 PostgreSQL running on your local system.
 
+<!--- x-release-please-start-version -->
 You can also download a specific version of the jar. Example (replace `v0.5.0` with the version you want to download):
-
 ```shell
 VERSION=v0.5.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 ```
+<!--- x-release-please-end -->
 
 See [Options](#Options) for an explanation of all further options.
 
@@ -80,6 +81,7 @@ This option is only available for Java/JVM-based applications.
 
 1. Add `google-cloud-spanner-pgadapter` as a dependency to your project by adding this to your `pom.xml` file:
 
+<!--- x-release-please-start-version -->
 ```xml
 <dependency>
   <groupId>com.google.cloud</groupId>
@@ -87,6 +89,8 @@ This option is only available for Java/JVM-based applications.
   <version>0.5.0</version>
 </dependency>
 ```
+<!--- x-release-please-end -->
+
 
 2. Build a server using the `com.google.cloud.spanner.pgadapter.ProxyServer` class:
 
