@@ -64,7 +64,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -1447,6 +1446,7 @@ public class ProtocolTest {
   @Test
   public void testCopyBatchSizeLimit() throws Exception {
     setupQueryInformationSchemaResults();
+    when(connection.getDatabaseClient()).thenReturn(mock(DatabaseClient.class));
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
 
@@ -1460,11 +1460,6 @@ public class ProtocolTest {
     assertTrue(copyStatement.isExecuted());
 
     MutationWriter mw = copyStatement.getMutationWriter();
-    // Inject a mock DatabaseClient for now.
-    // TODO: Fix this once we can use the Connection API.
-    Field databaseClientField = MutationWriter.class.getDeclaredField("databaseClient");
-    databaseClientField.setAccessible(true);
-    databaseClientField.set(mw, mock(DatabaseClient.class));
     mw.addCopyData(payload);
     mw.close();
 

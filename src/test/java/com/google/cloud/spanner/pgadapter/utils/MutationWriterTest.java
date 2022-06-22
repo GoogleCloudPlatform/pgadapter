@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import static com.google.cloud.spanner.pgadapter.utils.MutationWriter.calculateSize;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -23,10 +24,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.common.collect.ImmutableList;
@@ -110,11 +116,11 @@ public class MutationWriterTest {
             .build();
     Connection connection = mock(Connection.class);
     DatabaseClient databaseClient = mock(DatabaseClient.class);
+    when(connection.getDatabaseClient()).thenReturn(databaseClient);
     MutationWriter mutationWriter =
         new MutationWriter(
             CopyTransactionMode.ImplicitAtomic,
             connection,
-            databaseClient,
             "numbers",
             tableColumns,
             /* indexedColumnsCount = */ 1,
@@ -187,12 +193,12 @@ public class MutationWriterTest {
               .build();
       Connection connection = mock(Connection.class);
       DatabaseClient databaseClient = mock(DatabaseClient.class);
+      when(connection.getDatabaseClient()).thenReturn(databaseClient);
 
       MutationWriter mutationWriter =
           new MutationWriter(
               CopyTransactionMode.ImplicitNonAtomic,
               connection,
-              databaseClient,
               "numbers",
               tableColumns,
               /* indexedColumnsCount = */ 1,
@@ -264,12 +270,12 @@ public class MutationWriterTest {
               .build();
       Connection connection = mock(Connection.class);
       DatabaseClient databaseClient = mock(DatabaseClient.class);
+      when(connection.getDatabaseClient()).thenReturn(databaseClient);
 
       MutationWriter mutationWriter =
           new MutationWriter(
               CopyTransactionMode.ImplicitNonAtomic,
               connection,
-              databaseClient,
               "numbers",
               tableColumns,
               /* indexedColumnsCount = */ 1,
@@ -308,12 +314,12 @@ public class MutationWriterTest {
             .build();
     Connection connection = mock(Connection.class);
     DatabaseClient databaseClient = mock(DatabaseClient.class);
+    when(connection.getDatabaseClient()).thenReturn(databaseClient);
 
     MutationWriter mutationWriter =
         new MutationWriter(
             CopyTransactionMode.ImplicitNonAtomic,
             connection,
-            databaseClient,
             "numbers",
             tableColumns,
             /* indexedColumnsCount = */ 1,
@@ -366,5 +372,120 @@ public class MutationWriterTest {
     verify(databaseClient).write(expectedMutations);
 
     executor.shutdown();
+  }
+
+  @Test
+  public void testCalculateSize() {
+    assertEquals(
+        8, calculateSize(Mutation.newInsertBuilder("my_table").set("my_col").to(1L).build()));
+    assertEquals(
+        1, calculateSize(Mutation.newInsertBuilder("my_table").set("my_col").to(true).build()));
+    assertEquals(
+        3,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .to(ByteArray.copyFrom(new byte[] {1, 2, 3}))
+                .build()));
+    assertEquals(
+        8, calculateSize(Mutation.newInsertBuilder("my_table").set("my_col").to(3.14d).build()));
+    assertEquals(
+        5,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .to(Value.pgNumeric("6.626"))
+                .build()));
+    assertEquals(
+        30,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .to(Timestamp.parseTimestamp("2022-06-16T18:15:30.123456789Z"))
+                .build()));
+    assertEquals(
+        10,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .to(Date.parseDate("2022-06-16"))
+                .build()));
+    assertEquals(
+        12, calculateSize(Mutation.newInsertBuilder("my_table").set("my_col").to("foo").build()));
+    assertEquals(
+        12,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table").set("my_col").to(Value.json("foo")).build()));
+
+    assertEquals(
+        16,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .toInt64Array(ImmutableList.of(1L, 2L))
+                .build()));
+    assertEquals(
+        2,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .toBoolArray(ImmutableList.of(true, false))
+                .build()));
+    assertEquals(
+        5,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .toBytesArray(
+                    ImmutableList.of(
+                        ByteArray.copyFrom(new byte[] {1, 2}),
+                        ByteArray.copyFrom(new byte[] {3, 4, 5})))
+                .build()));
+    assertEquals(
+        16,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .toFloat64Array(ImmutableList.of(3.14d, 6.626d))
+                .build()));
+    assertEquals(
+        9,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .toPgNumericArray(ImmutableList.of("6.626", "3.14"))
+                .build()));
+    assertEquals(
+        60,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .toTimestampArray(
+                    ImmutableList.of(
+                        Timestamp.parseTimestamp("2022-06-16T18:15:30.123456789Z"),
+                        Timestamp.parseTimestamp("2000-06-16T18:15:30.123456789Z")))
+                .build()));
+    assertEquals(
+        20,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .toDateArray(
+                    ImmutableList.of(Date.parseDate("2000-01-01"), Date.parseDate("2022-06-16")))
+                .build()));
+    assertEquals(
+        16,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .toStringArray(ImmutableList.of("foo", "a"))
+                .build()));
+    assertEquals(
+        16,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table")
+                .set("my_col")
+                .toJsonArray(ImmutableList.of("foo", "a"))
+                .build()));
   }
 }
