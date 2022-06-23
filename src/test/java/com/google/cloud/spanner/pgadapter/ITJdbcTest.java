@@ -38,6 +38,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -147,6 +148,18 @@ public class ITJdbcTest implements IntegrationTest {
         assertTrue(resultSet.next());
         assertEquals("Hello World!", resultSet.getString(1));
         assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testCreateTableIfNotExists() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // This table already exists, so it should be a no-op.
+        assertFalse(
+            statement.execute("create table if not exists all_types (id bigint primary key)"));
+        assertFalse(statement.getMoreResults());
       }
     }
   }

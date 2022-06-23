@@ -99,8 +99,8 @@ public class PgAdapterTestEnv {
 
   static final ImmutableList<String> DEFAULT_DATA_MODEL =
       ImmutableList.of(
-          "create table if not exists numbers (num int not null primary key, name varchar(100))",
-          "create table if not exists all_types ("
+          "create table numbers (num int not null primary key, name varchar(100))",
+          "create table all_types ("
               + "col_bigint bigint not null primary key, "
               + "col_bool bool, "
               + "col_bytea bytea, "
