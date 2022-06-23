@@ -966,6 +966,37 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCreateTableIfNotExists_withBackendSupport() throws SQLException {
+    // Add a generic error that is returned for DDL statements. This will cause PGAdapter to think
+    // that the backend supports `IF [NOT] EXISTS`, as it does not receive a specific error
+    // regarding an `IF NOT EXISTS` statement.
+    addDdlExceptionToSpannerAdmin();
+    String sql = "CREATE TABLE IF NOT EXISTS foo (id bigint primary key)";
+    // Add a response for the DDL statement that is sent to Spanner.
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result was either an update count or there
+        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    assertEquals(
+        "CREATE TABLE IF NOT EXISTS foo (id bigint primary key)",
+        updateDatabaseDdlRequests.get(0).getStatements(0));
+  }
+
+  @Test
   public void testPreparedStatement() throws SQLException {
     mockSpanner.putStatementResult(
         StatementResult.update(
