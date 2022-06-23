@@ -62,9 +62,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -75,7 +73,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.json.simple.parser.JSONParser;
-import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -132,19 +129,6 @@ public class ProtocolTest {
 
   private static ParsedStatement parse(String sql) {
     return PARSER.parse(Statement.of(sql));
-  }
-
-  @AfterClass
-  public static void cleanup() throws IOException {
-    deleteLogFile();
-  }
-
-  private static void deleteLogFile() {
-    // TODO: Make error log file configurable and turn off writing to a file during tests.
-    try {
-      Files.deleteIfExists(new File("output.txt").toPath());
-    } catch (IOException ignore) {
-    }
   }
 
   @Test
@@ -1447,6 +1431,7 @@ public class ProtocolTest {
   @Test
   public void testCopyBatchSizeLimit() throws Exception {
     setupQueryInformationSchemaResults();
+    when(connection.getDatabaseClient()).thenReturn(mock(DatabaseClient.class));
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
 
@@ -1460,11 +1445,6 @@ public class ProtocolTest {
     assertTrue(copyStatement.isExecuted());
 
     MutationWriter mw = copyStatement.getMutationWriter();
-    // Inject a mock DatabaseClient for now.
-    // TODO: Fix this once we can use the Connection API.
-    Field databaseClientField = MutationWriter.class.getDeclaredField("databaseClient");
-    databaseClientField.setAccessible(true);
-    databaseClientField.set(mw, mock(DatabaseClient.class));
     mw.addCopyData(payload);
     mw.close();
 
@@ -1503,8 +1483,6 @@ public class ProtocolTest {
         thrown.getMessage());
 
     copyStatement.close();
-
-    deleteLogFile();
   }
 
   @Test
@@ -1521,8 +1499,6 @@ public class ProtocolTest {
     copyStatement.execute();
     assertTrue(copyStatement.isExecuted());
 
-    deleteLogFile();
-
     MutationWriter mw = copyStatement.getMutationWriter();
     mw.addCopyData(payload);
 
@@ -1531,11 +1507,6 @@ public class ProtocolTest {
     assertEquals(
         "INVALID_ARGUMENT: Invalid input syntax for type INT64:\"'5'\"", thrown.getMessage());
 
-    File outputFile = new File("output.txt");
-    assertTrue(outputFile.exists());
-    assertTrue(outputFile.isFile());
-
-    deleteLogFile();
     copyStatement.close();
   }
 
@@ -1545,9 +1516,6 @@ public class ProtocolTest {
 
     byte[] payload =
         Files.readAllBytes(Paths.get("./src/test/resources/test-copy-start-output.txt"));
-
-    // Pre-emptively try to delete the output file if it is lingering from a previous test run.
-    deleteLogFile();
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
@@ -1564,11 +1532,6 @@ public class ProtocolTest {
     assertEquals(
         "INVALID_ARGUMENT: Invalid input syntax for type INT64:\"'1'\"", thrown.getMessage());
 
-    File outputFile = new File("output.txt");
-    assertTrue(outputFile.exists());
-    assertTrue(outputFile.isFile());
-
-    deleteLogFile();
     copyStatement.close();
   }
 
