@@ -700,14 +700,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN ESCAPE '\\';";
       parse(sql, options);
 
-      SpannerException exception =
-          assertThrows(
-              SpannerException.class,
-              () -> StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)));
-      assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
-      assertEquals(
-          "INVALID_ARGUMENT: SQL statement contains an unclosed literal: COPY users FROM STDIN ESCAPE '\\';",
-          exception.getMessage());
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertEquals("users", options.getTableName());
       assertEquals(FromTo.FROM, options.getFromTo());
       assertEquals(Format.TEXT, options.getFormat());
@@ -751,10 +744,7 @@ public class ParserTest {
         CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
         String sql = "COPY users FROM STDIN (QUOTE '" + value + "');";
         parse(sql, options);
-        // These characters are not currently allowed since removeCommentsAndTrim() has special
-        // cases for their use: [' " \]  ('\'' and '\"' are actually allowed if they are wrapped by
-        // the other character)
-        if (value == '\'' || value == '\\') {
+        if (value == '\'') {
           SpannerException exception =
               assertThrows(
                   SpannerException.class,
@@ -785,7 +775,7 @@ public class ParserTest {
                 + value2
                 + "');";
         parse(sql, options);
-        if (value >= '%' && value <= '\'' || value >= 'Z' && value <= '\\') {
+        if (value >= '%' && value <= '\'') {
           SpannerException exception =
               assertThrows(
                   SpannerException.class,
