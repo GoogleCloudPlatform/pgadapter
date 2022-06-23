@@ -68,8 +68,7 @@ public abstract class Command {
       commandList.add(new DynamicCommand(sql, currentMetadata));
     }
 
-    commandList.addAll(
-        Arrays.asList(new ListCommand(sql, connection), new InvalidMetaCommand(sql)));
+    commandList.addAll(Arrays.asList(new ListCommand(sql), new InvalidMetaCommand(sql)));
 
     return commandList;
   }

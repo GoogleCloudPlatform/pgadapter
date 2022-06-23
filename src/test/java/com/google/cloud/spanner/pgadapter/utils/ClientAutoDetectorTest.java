@@ -14,9 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.EMPTY_LOCAL_STATEMENTS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
+import static org.mockito.Mockito.mock;
 
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -143,6 +147,10 @@ public class ClientAutoDetectorTest {
                   "DateStyle", "ISO",
                   "TimeZone", "some-time-zone")));
     }
+
+    assertEquals(
+        EMPTY_LOCAL_STATEMENTS,
+        WellKnownClient.JDBC.getLocalStatements(mock(ConnectionHandler.class)));
   }
 
   @Test
@@ -182,6 +190,11 @@ public class ClientAutoDetectorTest {
         WellKnownClient.PSQL,
         ClientAutoDetector.detectClient(
             ImmutableList.of("application_name"), ImmutableMap.of("application_name", "PSQL")));
+
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    assertEquals(
+        ImmutableList.of(new ListDatabasesStatement(connectionHandler)),
+        WellKnownClient.PSQL.getLocalStatements(connectionHandler));
   }
 
   @Test
@@ -193,5 +206,9 @@ public class ClientAutoDetectorTest {
         WellKnownClient.PGX,
         ClientAutoDetector.detectClient(
             ImmutableList.of("some-param"), ImmutableMap.of("some-param", "some-value")));
+
+    assertEquals(
+        EMPTY_LOCAL_STATEMENTS,
+        WellKnownClient.PGX.getLocalStatements(mock(ConnectionHandler.class)));
   }
 }

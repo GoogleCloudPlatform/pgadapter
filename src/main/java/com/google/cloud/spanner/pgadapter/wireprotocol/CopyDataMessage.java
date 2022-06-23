@@ -58,11 +58,8 @@ public class CopyDataMessage extends ControlMessage {
       try {
         mutationWriter.addCopyData(this.payload);
       } catch (SpannerException exception) {
-        if (!statement.hasException()) {
-          mutationWriter.writeErrorFile(exception);
-          statement.handleExecutionException(exception);
-          throw exception;
-        }
+        statement.handleExecutionException(exception);
+        throw exception;
       }
     }
   }

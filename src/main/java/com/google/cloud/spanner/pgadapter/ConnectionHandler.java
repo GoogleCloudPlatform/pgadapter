@@ -16,9 +16,18 @@ package com.google.cloud.spanner.pgadapter;
 
 import com.google.api.core.InternalApi;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.DatabaseAdminClient;
+import com.google.cloud.spanner.DatabaseId;
+import com.google.cloud.spanner.DatabaseNotFoundException;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.Instance;
+import com.google.cloud.spanner.InstanceAdminClient;
+import com.google.cloud.spanner.InstanceNotFoundException;
+import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
@@ -36,6 +45,8 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import com.google.spanner.admin.database.v1.InstanceName;
+import com.google.spanner.v1.DatabaseName;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -89,6 +100,7 @@ public class ConnectionHandler extends Thread {
   private WireMessage message;
   private int invalidMessagesCount;
   private Connection spannerConnection;
+  private DatabaseId databaseId;
   private WellKnownClient wellKnownClient;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
 
@@ -117,9 +129,6 @@ public class ConnectionHandler extends Thread {
       uri = uri.substring("jdbc:".length());
     }
     uri = appendPropertiesToUrl(uri, getServer().getProperties());
-    if (credentials != null) {
-      uri = uri + ";encodedCredentials=";
-    }
     if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
       uri =
           uri
@@ -143,7 +152,8 @@ public class ConnectionHandler extends Thread {
       connectionOptionsBuilder =
           ConnectionOptionsHelper.setCredentials(connectionOptionsBuilder, credentials);
     }
-    Connection spannerConnection = connectionOptionsBuilder.build().getConnection();
+    ConnectionOptions connectionOptions = connectionOptionsBuilder.build();
+    Connection spannerConnection = connectionOptions.getConnection();
     try {
       // Note: Calling getDialect() will cause a SpannerException if the connection itself is
       // invalid, for example as a result of the credentials being wrong.
@@ -155,11 +165,32 @@ public class ConnectionHandler extends Thread {
                     + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
                 spannerConnection.getDialect()));
       }
+    } catch (InstanceNotFoundException | DatabaseNotFoundException notFoundException) {
+      SpannerException exceptionToThrow = notFoundException;
+      //noinspection finally
+      try {
+        // Include more information about the available databases if someone tried to connect using
+        // psql.
+        if (getWellKnownClient() == WellKnownClient.PSQL) {
+          Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
+          String availableDatabases =
+              listDatabasesOrInstances(
+                  notFoundException, getServer().getOptions().getDatabaseName(database), spanner);
+          exceptionToThrow =
+              SpannerExceptionFactory.newSpannerException(
+                  notFoundException.getErrorCode(),
+                  notFoundException.getMessage() + "\n" + availableDatabases);
+        }
+      } finally {
+        spannerConnection.close();
+        throw exceptionToThrow;
+      }
     } catch (SpannerException e) {
       spannerConnection.close();
       throw e;
     }
     this.spannerConnection = spannerConnection;
+    this.databaseId = connectionOptions.getDatabaseId();
     this.extendedQueryProtocolHandler = new ExtendedQueryProtocolHandler(this);
   }
 
@@ -286,20 +317,18 @@ public class ConnectionHandler extends Thread {
    * shutting down while the connection is still active.
    */
   void terminate() {
-    if (this.status != ConnectionStatus.TERMINATED) {
-      handleTerminate();
-      try {
-        if (!socket.isClosed()) {
-          socket.close();
-        }
-      } catch (IOException exception) {
-        logger.log(
-            Level.WARNING,
-            exception,
-            () ->
-                String.format(
-                    "Failed to close connection handler with ID %s: %s", getName(), exception));
+    handleTerminate();
+    try {
+      if (!socket.isClosed()) {
+        socket.close();
       }
+    } catch (IOException exception) {
+      logger.log(
+          Level.WARNING,
+          exception,
+          () ->
+              String.format(
+                  "Failed to close connection handler with ID %s: %s", getName(), exception));
     }
   }
 
@@ -457,6 +486,10 @@ public class ConnectionHandler extends Thread {
     return this.spannerConnection;
   }
 
+  public DatabaseId getDatabaseId() {
+    return this.databaseId;
+  }
+
   public int getConnectionId() {
     if (this.connectionId == 0) {
       this.connectionId = ConnectionHandler.incrementingConnectionId.incrementAndGet();
@@ -543,5 +576,39 @@ public class ConnectionHandler extends Thread {
   public enum QueryMode {
     SIMPLE,
     EXTENDED
+  }
+
+  static String listDatabasesOrInstances(
+      ResourceNotFoundException notFoundException, DatabaseName databaseName, Spanner spanner) {
+    StringBuilder result = new StringBuilder();
+    if (notFoundException instanceof InstanceNotFoundException) {
+      InstanceAdminClient instanceAdminClient = spanner.getInstanceAdminClient();
+      result
+          .append("Instance ")
+          .append(InstanceName.of(databaseName.getProject(), databaseName.getInstance()))
+          .append(" not found.\n\n")
+          .append("These instances are available in project ")
+          .append(databaseName.getProject())
+          .append(":\n");
+      for (Instance instance : instanceAdminClient.listInstances().iterateAll()) {
+        result.append("\t").append(instance.getId()).append("\n");
+      }
+    } else {
+      DatabaseAdminClient databaseAdminClient = spanner.getDatabaseAdminClient();
+      result
+          .append("Database ")
+          .append(databaseName)
+          .append(" not found.\n\n")
+          .append("These PostgreSQL databases are available on instance ")
+          .append(InstanceName.of(databaseName.getProject(), databaseName.getInstance()))
+          .append(":\n");
+      for (Database database :
+          databaseAdminClient.listDatabases(databaseName.getInstance()).iterateAll()) {
+        if (database.getDialect() == Dialect.POSTGRESQL) {
+          result.append("\t").append(database.getId()).append("\n");
+        }
+      }
+    }
+    return result.toString();
   }
 }

@@ -63,7 +63,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -75,7 +74,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.json.simple.parser.JSONParser;
-import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -132,19 +130,6 @@ public class ProtocolTest {
 
   private static ParsedStatement parse(String sql) {
     return PARSER.parse(Statement.of(sql));
-  }
-
-  @AfterClass
-  public static void cleanup() throws IOException {
-    deleteLogFile();
-  }
-
-  private static void deleteLogFile() {
-    // TODO: Make error log file configurable and turn off writing to a file during tests.
-    try {
-      Files.deleteIfExists(new File("output.txt").toPath());
-    } catch (IOException ignore) {
-    }
   }
 
   @Test
@@ -1864,7 +1849,6 @@ public class ProtocolTest {
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
     doCallRealMethod().when(connectionHandler).increaseInvalidMessageCount();
     when(connectionHandler.getInvalidMessageCount()).thenCallRealMethod();
-    doCallRealMethod().when(connectionHandler).clearInvalidMessageCount();
 
     for (int i = 0; i < MAX_INVALID_MESSAGE_COUNT; i++) {
       ControlMessage message = ControlMessage.create(connectionHandler);

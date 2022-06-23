@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.5.0...v0.5.1) (2022-06-22)
+
+
+### Bug Fixes
+
+* correctly skip nested block comments ([#219](https://github.com/GoogleCloudPlatform/pgadapter/issues/219)) ([c9903da](https://github.com/GoogleCloudPlatform/pgadapter/commit/c9903da8d5fda6bf45f4cbfdff9d243be97f68dd))
+* unix domain sockets failed for msg size > 8Kb on MacOS ([#188](https://github.com/GoogleCloudPlatform/pgadapter/issues/188)) ([bc778ec](https://github.com/GoogleCloudPlatform/pgadapter/commit/bc778ec252c9f98c4dabb98d61e532623b6a1ce5))
+
+
+### Dependencies
+
+* bump junixsockets to 2.5.0 ([#186](https://github.com/GoogleCloudPlatform/pgadapter/issues/186)) ([58d09cb](https://github.com/GoogleCloudPlatform/pgadapter/commit/58d09cb4d94b0e7b3b85fc83f63e4c4e27e80291))
+* enable dependabot ([#187](https://github.com/GoogleCloudPlatform/pgadapter/issues/187)) ([1bf14c8](https://github.com/GoogleCloudPlatform/pgadapter/commit/1bf14c8c51aaf55f3038734dab0228d1b96d0b71))
+* remove custom Maven plugin versions ([#214](https://github.com/GoogleCloudPlatform/pgadapter/issues/214)) ([1392a7a](https://github.com/GoogleCloudPlatform/pgadapter/commit/1392a7af55a40f58ca287bf0ec537994b097f807))
+
+
+### Documentation
+
+* add documentation for connection options ([#212](https://github.com/GoogleCloudPlatform/pgadapter/issues/212)) ([837fe31](https://github.com/GoogleCloudPlatform/pgadapter/commit/837fe31cc8777095961e4b402ef70ed754342d19))
+* mark drivers as having experimental support ([#189](https://github.com/GoogleCloudPlatform/pgadapter/issues/189)) ([5ab7caa](https://github.com/GoogleCloudPlatform/pgadapter/commit/5ab7caaf9fe0e67e78f6101439ee87d1932cce04))
+* update README to reflect recent updates ([#190](https://github.com/GoogleCloudPlatform/pgadapter/issues/190)) ([d0c52bf](https://github.com/GoogleCloudPlatform/pgadapter/commit/d0c52bff3d4ab43012bb94da5bfdbc3689343e50))
+
 ## [0.5.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.4.2...v0.5.0) (2022-06-13)
 
 

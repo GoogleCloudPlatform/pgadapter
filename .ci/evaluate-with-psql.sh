@@ -7,6 +7,7 @@ sed -i "s/testdb_e2e_psql_v../$GOOGLE_CLOUD_DATABASE_WITH_VERSION/" .ci/e2e-expe
 sed -i "s/testdb_e2e_psql_v../$GOOGLE_CLOUD_DATABASE_WITH_VERSION/" .ci/e2e-expected/backslash-di-param.txt
 sed -i "s/testdb_e2e_psql_v../$GOOGLE_CLOUD_DATABASE_WITH_VERSION/" .ci/e2e-expected/backslash-dn.txt
 sed -i "s/testdb_e2e_psql_v../$GOOGLE_CLOUD_DATABASE_WITH_VERSION/" .ci/e2e-expected/backslash-dn-param.txt
+sed -i "s/testdb_e2e_psql_v../$GOOGLE_CLOUD_DATABASE_WITH_VERSION/" .ci/e2e-expected/backslash-l.txt
 # remove --- hyphenated formatting lines for diff comparison
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dt.txt
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dt-param.txt
@@ -14,6 +15,7 @@ sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-di.txt
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-di-param.txt
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dn.txt
 sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-dn-param.txt
+sed -i "s/---[-]*//g" .ci/e2e-expected/backslash-l.txt
 
 echo "------Test \"select 1::int8\"------"
 echo "select 1::int8;" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h /tmp -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/select-one.txt
@@ -73,6 +75,14 @@ echo "\dn public" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost 
 sed -i -E 's/[0-9]{16,}//' .ci/e2e-result/backslash-dn-param.txt
 sed -i "s/---[-]*//g" .ci/e2e-result/backslash-dn-param.txt
 diff -i -w -s .ci/e2e-result/backslash-dn-param.txt .ci/e2e-expected/backslash-dn-param.txt
+RETURN_CODE=$((${RETURN_CODE}||$?))
+
+echo "------Test \"\\l\"------"
+echo "\l" | /usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -h localhost -p 4242 -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" > .ci/e2e-result/backslash-l.txt
+# ignore effective_timestamp
+sed -i -E 's/[0-9]{16,}//' .ci/e2e-result/backslash-l.txt
+sed -i "s/---[-]*//g" .ci/e2e-result/backslash-l.txt
+diff -i -w -s .ci/e2e-result/backslash-l.txt .ci/e2e-expected/backslash-l.txt
 RETURN_CODE=$((${RETURN_CODE}||$?))
 
 echo "------Test \"-c option dml batching\"------"

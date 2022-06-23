@@ -29,6 +29,7 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
@@ -36,16 +37,20 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.LinkedList;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 /**
  * This class emulates a backend PostgreSQL connection. Statements are buffered in memory until a
@@ -132,7 +137,11 @@ public class BackendConnection {
         //  SELECT statements, then we should create a read-only transaction. Also, if a transaction
         //  block always ends with a ROLLBACK, PGAdapter should skip the entire execution of that
         //  block.
-        if (connectionState == ConnectionState.ABORTED
+        if (!localStatements.isEmpty() && localStatements.containsKey(statement.getSql())) {
+          result.set(
+              Objects.requireNonNull(localStatements.get(statement.getSql()))
+                  .execute(spannerConnection));
+        } else if (connectionState == ConnectionState.ABORTED
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
           result.set(ROLLBACK_RESULT);
@@ -191,8 +200,8 @@ public class BackendConnection {
         // Execute the MutationWriter and the CopyDataReceiver both asynchronously and wait for both
         // to finish before continuing with the next statement. This ensures that all statements are
         // applied in sequential order.
-        ListenableFuture<Void> copyDataReceiverFuture = executor.submit(copyDataReceiver);
         ListenableFuture<StatementResult> statementResultFuture = executor.submit(mutationWriter);
+        ListenableFuture<Void> copyDataReceiverFuture = executor.submit(copyDataReceiver);
         this.result.setFuture(statementResultFuture);
         Futures.allAsList(copyDataReceiverFuture, statementResultFuture).get();
       } catch (ExecutionException executionException) {
@@ -208,10 +217,13 @@ public class BackendConnection {
     }
   }
 
+  private static final ImmutableMap<String, LocalStatement> EMPTY_LOCAL_STATEMENTS =
+      ImmutableMap.of();
   private static final StatementResult NO_RESULT = new NoResult();
   private static final StatementResult ROLLBACK_RESULT = new NoResult("ROLLBACK");
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
+  private final ImmutableMap<String, LocalStatement> localStatements;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
   private final LinkedList<BufferedStatement<?>> bufferedStatements = new LinkedList<>();
@@ -222,9 +234,22 @@ public class BackendConnection {
    * Creates a PG backend connection that uses the given Spanner {@link Connection} and {@link
    * DdlTransactionMode}.
    */
-  BackendConnection(Connection spannerConnection, DdlTransactionMode ddlTransactionMode) {
+  BackendConnection(
+      Connection spannerConnection,
+      DdlTransactionMode ddlTransactionMode,
+      ImmutableList<LocalStatement> localStatements) {
     this.spannerConnection = spannerConnection;
     this.ddlTransactionMode = ddlTransactionMode;
+    //noinspection UnstableApiUsage
+    this.localStatements =
+        localStatements.isEmpty()
+            ? EMPTY_LOCAL_STATEMENTS
+            : ImmutableMap.copyOf(
+                localStatements.stream()
+                    .map(
+                        localStatement ->
+                            new SimpleImmutableEntry<>(localStatement.getSql(), localStatement))
+                    .collect(Collectors.toList()));
   }
 
   /** Returns the current connection state. */
@@ -655,6 +680,35 @@ public class BackendConnection {
     @Override
     public Long getUpdateCount() {
       return updateCount;
+    }
+  }
+
+  @InternalApi
+  public static final class QueryResult implements StatementResult {
+    private final ResultSet resultSet;
+
+    public QueryResult(ResultSet resultSet) {
+      this.resultSet = resultSet;
+    }
+
+    @Override
+    public ResultType getResultType() {
+      return ResultType.RESULT_SET;
+    }
+
+    @Override
+    public ClientSideStatementType getClientSideStatementType() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ResultSet getResultSet() {
+      return resultSet;
+    }
+
+    @Override
+    public Long getUpdateCount() {
+      throw new UnsupportedOperationException();
     }
   }
 }

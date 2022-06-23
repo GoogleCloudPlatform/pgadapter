@@ -30,7 +30,6 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -39,15 +38,12 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.spanner.v1.TypeCode;
 import java.io.Closeable;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.PrintWriter;
 import java.io.Reader;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.format.DateTimeParseException;
@@ -94,7 +90,6 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   }
 
   private static final Logger logger = Logger.getLogger(MutationWriter.class.getName());
-  private static final String ERROR_FILE = "output.txt";
 
   private static final int DEFAULT_MUTATION_LIMIT = 20_000; // 20k mutation count limit
   private static final int DEFAULT_COMMIT_LIMIT =
@@ -127,7 +122,6 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private boolean isHeaderParsed;
   private long rowCount;
   private final Connection connection;
-  private DatabaseClient databaseClient;
   private final String tableName;
   private final Map<String, TypeCode> tableColumns;
   private final int maxBatchSize;
@@ -158,31 +152,8 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       CSVFormat format,
       boolean hasHeader)
       throws IOException {
-    this(
-        transactionMode,
-        connection,
-        null,
-        tableName,
-        tableColumns,
-        indexedColumnsCount,
-        format,
-        hasHeader);
-  }
-
-  @VisibleForTesting
-  MutationWriter(
-      CopyTransactionMode transactionMode,
-      Connection connection,
-      DatabaseClient databaseClient,
-      String tableName,
-      Map<String, TypeCode> tableColumns,
-      int indexedColumnsCount,
-      CSVFormat format,
-      boolean hasHeader)
-      throws IOException {
     this.transactionMode = transactionMode;
     this.connection = connection;
-    this.databaseClient = databaseClient;
     this.hasHeader = hasHeader;
     this.isHeaderParsed = false;
     this.tableName = tableName;
@@ -236,8 +207,11 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       // Ignore the exception if the executor has already been shutdown. That means that an error
       // occurred that ended the COPY operation while we were writing data to the buffer.
       if (!executorService.isShutdown()) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INTERNAL, "Could not write copy data to buffer", e);
+        SpannerException spannerException =
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INTERNAL, "Could not write copy data to buffer", e);
+        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
+        throw spannerException;
       }
     }
   }
@@ -385,7 +359,6 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       }
       this.payload.close();
       this.parser.close();
-      closeErrorFile();
     }
     return new UpdateCount(rowCount);
   }
@@ -425,7 +398,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     // blocked until there is room in the deque.
     activeCommitFutures.put(settableApiFuture);
 
-    DatabaseClient dbClient = getDatabaseClient();
+    DatabaseClient dbClient = connection.getDatabaseClient();
     ImmutableList<Mutation> immutableMutations = ImmutableList.copyOf(mutations);
     ListenableFuture<Void> listenableFuture =
         executorService.submit(
@@ -455,24 +428,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     return settableApiFuture;
   }
 
-  private DatabaseClient getDatabaseClient() {
-    if (databaseClient == null) {
-      try {
-        // TODO: Replace with connection.getDatabaseClient() when 6.21 has been released.
-        Class<?> connectionImplClass =
-            Class.forName("com.google.cloud.spanner.connection.ConnectionImpl");
-        Field dbClientField = connectionImplClass.getDeclaredField("dbClient");
-        dbClientField.setAccessible(true);
-        databaseClient = (DatabaseClient) dbClientField.get(this.connection);
-      } catch (Exception e) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INTERNAL, "Failed to get database client from connection", e);
-      }
-    }
-    return databaseClient;
-  }
-
-  private int calculateSize(Mutation mutation) {
+  static int calculateSize(Mutation mutation) {
     int size = 0;
     for (Value value : mutation.getValues()) {
       switch (value.getType().getCode()) {
@@ -506,6 +462,8 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
               size += value.getBoolArray().size();
               break;
             case FLOAT64:
+              size += value.getFloat64Array().size() * 8;
+              break;
             case INT64:
               size += value.getInt64Array().size() * 8;
               break;
@@ -598,25 +556,30 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
             break;
         }
       } catch (NumberFormatException | DateTimeParseException e) {
-        handleError(e);
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            "Invalid input syntax for type "
-                + columnType.toString()
-                + ":"
-                + "\""
-                + recordValue
-                + "\"",
-            e);
+        SpannerException spannerException =
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INVALID_ARGUMENT,
+                "Invalid input syntax for type "
+                    + columnType.toString()
+                    + ":"
+                    + "\""
+                    + recordValue
+                    + "\"",
+                e);
+        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
+        throw spannerException;
       } catch (IllegalArgumentException e) {
-        handleError(e);
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            "Invalid input syntax for column \"" + columnName + "\"",
-            e);
+        SpannerException spannerException =
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INVALID_ARGUMENT,
+                "Invalid input syntax for column \"" + columnName + "\"",
+                e);
+        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
+        throw spannerException;
       } catch (Exception e) {
-        handleError(e);
-        throw SpannerExceptionFactory.asSpannerException(e);
+        SpannerException spannerException = SpannerExceptionFactory.asSpannerException(e);
+        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
+        throw spannerException;
       }
     }
     return builder.build();
@@ -638,32 +601,5 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       parser = CSVParser.parse(reader, this.format);
     }
     return parser;
-  }
-
-  public void handleError(Exception exception) {
-    writeErrorFile(exception);
-  }
-
-  private void createErrorFile() {
-    File unsuccessfulCopy = new File(ERROR_FILE);
-    try {
-      this.errorFileWriter = new PrintWriter(new FileWriter(unsuccessfulCopy, false));
-    } catch (IOException e) {
-      throw SpannerExceptionFactory.asSpannerException(e);
-    }
-  }
-
-  /** Writes any error that occurred during a COPY operation to the error file. */
-  public void writeErrorFile(Exception exception) {
-    if (this.errorFileWriter == null) {
-      createErrorFile();
-    }
-    exception.printStackTrace(errorFileWriter);
-  }
-
-  public void closeErrorFile() {
-    if (this.errorFileWriter != null) {
-      this.errorFileWriter.close();
-    }
   }
 }

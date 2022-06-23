@@ -15,6 +15,10 @@
 package com.google.cloud.spanner.pgadapter.utils;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 
@@ -24,13 +28,21 @@ import java.util.Map;
  */
 @InternalApi
 public class ClientAutoDetector {
+  public static final ImmutableList<LocalStatement> EMPTY_LOCAL_STATEMENTS = ImmutableList.of();
+
   public enum WellKnownClient {
     PSQL {
+
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
         // PSQL makes it easy for us, as it sends its own name in the application_name parameter.
         return parameters.containsKey("application_name")
             && parameters.get("application_name").equals("psql");
+      }
+
+      @Override
+      public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
       }
     },
     JDBC {
@@ -76,6 +88,10 @@ public class ClientAutoDetector {
     };
 
     abstract boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters);
+
+    public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+      return EMPTY_LOCAL_STATEMENTS;
+    }
   }
 
   /**

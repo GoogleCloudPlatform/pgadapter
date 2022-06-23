@@ -35,14 +35,12 @@ import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -306,8 +304,6 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
           exception
               .getMessage()
               .contains("Row length mismatched. Expected 3 columns, but only found 1"));
-    } finally {
-      Files.deleteIfExists(new File("output.txt").toPath());
     }
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
@@ -327,7 +323,9 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               () ->
                   copyManager.copyIn(
                       "COPY users FROM STDIN;", new StringReader("5\t5\t5\n6\t6\t6\n7\t7\t7\n")));
-      assertTrue(exception.getMessage().contains("Commit size: 20 has exceeded the limit: 10"));
+      assertTrue(
+          exception.getMessage(),
+          exception.getMessage().contains("Commit size: 20 has exceeded the limit: 10"));
     } finally {
       System.getProperties().remove("copy_in_commit_limit");
     }
@@ -474,6 +472,12 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               + "XX000\n"
               + "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: 'Q'\n",
           errorMessage.toString());
+
+      stream.sendChar('c');
+      stream.sendInteger4(4);
+      stream.sendChar('x');
+      stream.sendInteger4(4);
+      stream.flush();
     }
 
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
