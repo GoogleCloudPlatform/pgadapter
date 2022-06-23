@@ -23,7 +23,9 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ParameterStatusResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import java.io.DataOutputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
@@ -79,6 +81,19 @@ public abstract class BootstrapMessage extends WireMessage {
       parameters.put(paramArray[i], paramArray[i + 1]);
     }
     return parameters;
+  }
+
+  /**
+   * Parses the parameter keys from the given raw parameter string and returns these in the received
+   * order. This can be used to detect the client that is connecting to PGAdapter.
+   */
+  protected List<String> parseParameterKeys(String rawParameters) {
+    List<String> keys = new ArrayList<>();
+    String[] paramArray = rawParameters.split(new String(new byte[] {(byte) 0}));
+    for (int i = 0; i < paramArray.length; i = i + 2) {
+      keys.add(paramArray[i]);
+    }
+    return keys;
   }
 
   /**

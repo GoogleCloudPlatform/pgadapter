@@ -52,11 +52,10 @@ public class CopyDataMessage extends ControlMessage {
     }
     // If backend error occurred during copy-in mode, drop any subsequent CopyData messages.
     MutationWriter mutationWriter = this.statement.getMutationWriter();
-    if (!statement.hasException(0)) {
+    if (!statement.hasException()) {
       try {
         mutationWriter.addCopyData(this.payload);
       } catch (SpannerException exception) {
-        mutationWriter.writeErrorFile(exception);
         statement.handleExecutionException(exception);
         throw exception;
       }

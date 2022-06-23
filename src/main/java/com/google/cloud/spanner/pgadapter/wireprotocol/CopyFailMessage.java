@@ -50,14 +50,13 @@ public class CopyFailMessage extends ControlMessage {
     if (this.statement != null) {
       MutationWriter mutationWriter = this.statement.getMutationWriter();
       mutationWriter.rollback();
-      mutationWriter.closeErrorFile();
       statement.close();
-      if (!statement.hasException(0)) {
+      if (!statement.hasException()) {
         new ErrorResponse(this.outputStream, new Exception(this.errorMessage), State.IOError)
             .send();
       }
     }
-    this.connection.setStatus(ConnectionStatus.IDLE);
+    this.connection.setStatus(ConnectionStatus.AUTHENTICATED);
     this.connection.removeActiveStatement(this.statement);
     new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
   }

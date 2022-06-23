@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.when;
@@ -369,7 +370,7 @@ public class ParserTest {
 
   @Test
   public void testNumericParsing() {
-    BigDecimal value = new BigDecimal("1234567890.1234567890");
+    String value = "1234567890.1234567890";
 
     byte[] byteResult = ByteConverter.numeric(new BigDecimal("1234567890.1234567890"));
     byte[] stringResult = {
@@ -386,8 +387,29 @@ public class ParserTest {
   }
 
   @Test
+  public void testNumericParsingNull() {
+    NumericParser parser = new NumericParser(null);
+
+    assertNull(parser.stringParse());
+    assertNull(parser.binaryParse());
+  }
+
+  @Test
+  public void testNumericParsingInvalid() {
+    NumericParser parser = new NumericParser("invalid-number");
+
+    // String parsing will work, and will just propagate the nonsense number to the frontend.
+    assertEquals("invalid-number", parser.stringParse());
+
+    // Binary parsing fails, as it tries to convert it to a number, so it can be encoded in a byte
+    // array.
+    SpannerException binaryException = assertThrows(SpannerException.class, parser::binaryParse);
+    assertEquals(ErrorCode.INVALID_ARGUMENT, binaryException.getErrorCode());
+  }
+
+  @Test
   public void testNumericParsingNaN() {
-    Number value = Double.NaN;
+    String value = "NaN";
 
     byte[] stringResult = {'N', 'a', 'N'};
 
@@ -678,14 +700,7 @@ public class ParserTest {
       String sql = "COPY users FROM STDIN ESCAPE '\\';";
       parse(sql, options);
 
-      SpannerException exception =
-          assertThrows(
-              SpannerException.class,
-              () -> StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)));
-      assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
-      assertEquals(
-          "INVALID_ARGUMENT: SQL statement contains an unclosed literal: COPY users FROM STDIN ESCAPE '\\';",
-          exception.getMessage());
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
       assertEquals("users", options.getTableName());
       assertEquals(FromTo.FROM, options.getFromTo());
       assertEquals(Format.TEXT, options.getFormat());
@@ -729,10 +744,7 @@ public class ParserTest {
         CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
         String sql = "COPY users FROM STDIN (QUOTE '" + value + "');";
         parse(sql, options);
-        // These characters are not currently allowed since removeCommentsAndTrim() has special
-        // cases for their use: [' " \]  ('\'' and '\"' are actually allowed if they are wrapped by
-        // the other character)
-        if (value == '\'' || value == '\\') {
+        if (value == '\'') {
           SpannerException exception =
               assertThrows(
                   SpannerException.class,
@@ -763,7 +775,7 @@ public class ParserTest {
                 + value2
                 + "');";
         parse(sql, options);
-        if (value >= '%' && value <= '\'' || value >= 'Z' && value <= '\\') {
+        if (value >= '%' && value <= '\'') {
           SpannerException exception =
               assertThrows(
                   SpannerException.class,

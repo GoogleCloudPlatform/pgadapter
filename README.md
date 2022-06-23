@@ -5,8 +5,11 @@ equivalent for Spanner databases [that use the PostgreSQL interface](https://clo
 
 PGAdapter can be used with the following clients:
 1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
-2. `JDBC`: Versions 42.x and higher have __limited support__. See [JDBC support](docs/jdbc.md) for more details.
-3. `pgx`: Version 4.15 and higher have __limited support__. See [pgx support](docs/pgx.md) for more details.
+2. `JDBC`: Versions 42.x and higher have __experimental support__. See [JDBC support](docs/jdbc.md) for more details.
+3. `pgx`: Version 4.15 and higher have __experimental support__. See [pgx support](docs/pgx.md) for more details.
+
+## FAQ
+See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
 
 ## Usage
 PGAdapter can be started both as a Docker container, a standalone process as well as an
@@ -47,13 +50,14 @@ java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 Use the `-s` option to specify a different local port than the default 5432 if you already have
 PostgreSQL running on your local system.
 
-You can also download a specific version of the jar. Example (replace `v0.4.0` with the version you want to download):
-
+<!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
+You can also download a specific version of the jar. Example (replace `v0.5.1` with the version you want to download):
 ```shell
-VERSION=v0.4.0
+VERSION=v0.5.1
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 ```
+<!--- {x-version-update-end} -->
 
 See [Options](#Options) for an explanation of all further options.
 
@@ -77,13 +81,16 @@ This option is only available for Java/JVM-based applications.
 
 1. Add `google-cloud-spanner-pgadapter` as a dependency to your project by adding this to your `pom.xml` file:
 
+<!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
 ```xml
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.3.0</version>
+  <version>0.5.1</version>
 </dependency>
 ```
+<!--- {x-version-update-end} -->
+
 
 2. Build a server using the `com.google.cloud.spanner.pgadapter.ProxyServer` class:
 
@@ -114,16 +121,20 @@ path; All other items map directly to previously mentioned CLI options.
 
 ### Options
 
-#### Required
+#### Connection Options
 
-The following options are required to run the proxy:
+See [connection options](docs/connection_options.md) for more details.
 
 ```    
 -p <projectname>
-  * The project name where the Spanner database(s) is/are running.
+  * The project name where the Spanner database(s) is/are running. If omitted, all connection
+    requests must use a fully qualified database name in the format
+    'projects/my-project/instances/my-instance/databases/my-database'.
     
 -i <instanceid>
-  * The instance ID where the Spanner database(s) is/are running.
+  * The instance ID where the Spanner database(s) is/are running. If omitted, all connection
+    requests must use a fully qualified database name in the format
+    'projects/my-project/instances/my-instance/databases/my-database'.
 
 -d <databasename>
   * The default Spanner database name to connect to. This is only required if you want PGAdapter to
@@ -135,6 +146,7 @@ The following options are required to run the proxy:
     in psql will change the underlying database that PGAdapter connects to.
 
 -c <credentialspath>
+  * This argument should not be used in combination with -a (authentication mode).
   * This is only required if you have not already set up default credentials on the system where you
     are running PGAdapter. See https://cloud.google.com/spanner/docs/getting-started/set-up#set_up_authentication_and_authorization
     for more information on setting up authentication for Cloud Spanner.
@@ -144,6 +156,8 @@ The following options are required to run the proxy:
 ```
 
 #### Optional
+
+See [DDL Options](docs/ddl.md) for more details for the `-ddl` command line argument.
 
 The following options are optional:
 
@@ -159,36 +173,19 @@ The following options are optional:
     using psql from one of these distributions, you either need to use 'psql -h /tmp'
     or change the default Unix domain socket directory used by PGAdapter to '/var/run/postgresql'.
 
--a
-  * Use authentication when connecting. Currently authentication is not strictly
-    implemented in the proxy layer, as it is expected to be run locally, and
-    will ignore any connection not stemming from localhost. However, it is a
-    useful compatibility option if the PostgreSQL client is set to always 
-    authenticate. Note that SSL is not included for the same reason that
-    authentication logic is not: since all connections are local, sniffing
-    traffic should not generally be a concern.
+-ddl <ddl-transaction-mode>
+  * Determines the behavior of the proxy when DDL statements are executed in transactions.
+    See DDL options for more information.
 
--q
-  * PSQL Mode. Use this option when fronting PSQL. This option will incur some
-    performance penalties due to query matching and translation and as such is
-    not recommended for production. It is further not guaranteed to perfectly
-    match PSQL logic. Please only use this mode when using PSQL.
-    
--jdbc
-  * JDBC Mode. Use this option when fronting the native PostgreSQL JDBC driver.
-    This option will inspect queries to look for native JDBC metadata queries and
-    replace these with queries that are suppported by Cloud Spanner PostgreSQL
-    databases.
-    
--c <multi-statementcommand>
-    Runs a single command before exiting. This command can be comprised of multiple 
-    statments separated by ';'. Each SQL command string passed to -c is sent to the 
-    server as a single request. Because of this, the server executes it as a single 
-    transaction even if the string contains multiple SQL commands. There are some
-    limitations in Cloud Spanner which require this option to operate in a different
-    manner from PSQL. 'SELECT' statements are not allowed in batched commands. Mixing
-    DML and DDL is not allowed in a single multi-statement command. Also, 
-    'BEGIN TRANSACTION' and 'COMMIT' statements are not allowed in batched commands.
+-a
+  * Turns on authentication for the proxy server. Clients are then requested
+    to supply a username and password during a connection request.
+  * The username and password must contain one of the following:
+    1. The password field must contain the JSON payload of a credentials file, for example from a service account key file. The username will be ignored in this case.
+    2. The password field must contain the private key from a service account key file. The username must contain the email address of the corresponding service account.
+  * Note that SSL is not supported for the connection between the client and
+    PGAdapter. The proxy should therefore only be used within a private network.
+    The connection between PGAdapter and Cloud Spanner is always secured with SSL.
 
 -b
   * Force the server to send data back in binary PostgreSQL format when no
@@ -271,15 +268,12 @@ a transformation of the [PostgreSQL wire protocol](https://www.postgresql.org/do
 except for some cases concerning PSQL, wherein the query itself is translated.
 
 Simple query mode and extended query mode are supported, and any data type
-supported by Spanner is also supported. Items, tables and language not native to
-Spanner are not supported, unless otherwise specified.
+supported by Spanner is also supported. Cloud Spanner databases created with
+PostgreSQL dialect do not support all `pg_catalog` tables.
 
-Though the majority of functionality inherent in most PostgreSQL clients
-(including PSQL and JDBC) are included out of the box, the following items are
-not supported:
-* Prepared Statement DESCRIBE
+Though the majority of functionality inherent in most PostgreSQL clients are included
+out of the box, the following items are not supported:
 * SSL
-* Functions
 * COPY <table_name> TO ...
 * COPY <table_name> FROM <filename | PROGRAM program>
 
@@ -361,13 +355,13 @@ psql -h localhost -p 5432 -d my-local-db \
 ## Limitations
 
 PGAdapter has the following known limitations at this moment:
-- [PostgreSQL prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are not
-- fully supported. It is not recommended to use this feature.
-  Note: This limitation relates specifically to server side PostgreSQL prepared statements.
-  The JDBC `java.sql.PreparedStatement` interface is supported.
-- DESCRIBE statement wire-protocol messages currently return `Oid.UNSPECIFIED` for all parameters in the query.
-- DESCRIBE statement wire-protocol messages return `NoData` as the row description of the statement.
+- SSL connections are not supported.
+- Only [password authentication](https://www.postgresql.org/docs/current/auth-password.html) using
+  the `password` method is supported. All other authentication methods are not supported.
 - The COPY protocol only supports COPY FROM STDIN.
+- DDL transactions are not supported. PGAdapter allows DDL statements in implicit transactions,
+  and executes SQL strings that contain multiple DDL statements as a single DDL batch on Cloud
+  Spanner. See [DDL transaction options](docs/ddl.md) for more information.
 
 ## Logging
 

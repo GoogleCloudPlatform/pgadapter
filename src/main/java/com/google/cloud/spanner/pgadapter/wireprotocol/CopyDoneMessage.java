@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
@@ -45,25 +46,22 @@ public class CopyDoneMessage extends ControlMessage {
     if (this.statement != null) {
       MutationWriter mutationWriter = this.statement.getMutationWriter();
       statement.close();
-      if (!statement.hasException(0)) {
+      if (!statement.hasException()) {
         try {
           long rowCount = this.statement.getUpdateCount();
-          statement.setUpdateCount(0, rowCount); // Set the row count of number of rows copied.
-          this.sendSpannerResult(0, this.statement, QueryMode.SIMPLE, 0L);
+          statement.setStatementResult(
+              new UpdateCount(rowCount)); // Set the row count of number of rows copied.
+          this.sendSpannerResult(this.statement, QueryMode.SIMPLE, 0L);
           this.outputStream.flush();
         } catch (Exception e) {
           // Spanner returned an error when trying to commit the batch of mutations.
-          mutationWriter.writeErrorFile(e);
-          mutationWriter.closeErrorFile();
-          this.connection.setStatus(ConnectionStatus.IDLE);
+          this.connection.setStatus(ConnectionStatus.AUTHENTICATED);
           this.connection.removeActiveStatement(this.statement);
           throw e;
         }
-      } else {
-        mutationWriter.closeErrorFile();
       }
     }
-    this.connection.setStatus(ConnectionStatus.IDLE);
+    this.connection.setStatus(ConnectionStatus.AUTHENTICATED);
     this.connection.removeActiveStatement(this.statement);
     new ReadyResponse(this.outputStream, ReadyResponse.Status.IDLE).send();
   }

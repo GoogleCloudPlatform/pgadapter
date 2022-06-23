@@ -20,6 +20,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
@@ -27,7 +28,7 @@ import java.text.MessageFormat;
 
 /** Creates a prepared statement. */
 @InternalApi
-public class ParseMessage extends ControlMessage {
+public class ParseMessage extends AbstractQueryProtocolMessage {
   private static final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
   protected static final char IDENTIFIER = 'P';
@@ -39,7 +40,8 @@ public class ParseMessage extends ControlMessage {
   public ParseMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.name = this.readString();
-    ParsedStatement parsedStatement = PARSER.parse(Statement.of(this.readString()));
+    Statement originalStatement = Statement.of(this.readString());
+    ParsedStatement parsedStatement = PARSER.parse(originalStatement);
     short numberOfParameters = this.inputStream.readShort();
     this.parameterDataTypes = new int[numberOfParameters];
     for (int i = 0; i < numberOfParameters; i++) {
@@ -47,17 +49,49 @@ public class ParseMessage extends ControlMessage {
     }
     this.statement =
         new IntermediatePreparedStatement(
-            connection, connection.getServer().getOptions(), name, parsedStatement);
+            connection,
+            connection.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+    this.statement.setParameterDataTypes(this.parameterDataTypes);
+  }
+
+  /**
+   * Constructor for manually created Parse messages that originate from the simple query protocol.
+   */
+  public ParseMessage(
+      ConnectionHandler connection, ParsedStatement parsedStatement, Statement originalStatement) {
+    super(
+        connection,
+        5 + parsedStatement.getSqlWithoutComments().length(),
+        ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
+    this.name = "";
+    this.parameterDataTypes = new int[0];
+    this.statement =
+        new IntermediatePreparedStatement(
+            connection,
+            connection.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
     this.statement.setParameterDataTypes(this.parameterDataTypes);
   }
 
   @Override
-  protected void sendPayload() throws Exception {
+  void buffer(BackendConnection backendConnection) {
     if (!Strings.isNullOrEmpty(this.name) && this.connection.hasStatement(this.name)) {
       throw new IllegalStateException("Must close statement before reusing name.");
     }
     this.connection.registerStatement(this.name, this.statement);
-    new ParseCompleteResponse(this.outputStream).send();
+  }
+
+  @Override
+  public void flush() throws Exception {
+    // The simple query protocol does not need the ParseComplete response.
+    if (isExtendedProtocol()) {
+      new ParseCompleteResponse(this.outputStream).send(false);
+    }
   }
 
   @Override

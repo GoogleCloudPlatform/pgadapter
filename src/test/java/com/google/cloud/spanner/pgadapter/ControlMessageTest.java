@@ -65,10 +65,9 @@ public final class ControlMessageTest {
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    when(intermediateStatement.getStatementType(0)).thenReturn(StatementType.UPDATE);
-    when(intermediateStatement.getCommandTag(0)).thenReturn("INSERT");
-    when(intermediateStatement.getUpdateCount(0)).thenReturn(1L);
-    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(intermediateStatement.getStatementType()).thenReturn(StatementType.UPDATE);
+    when(intermediateStatement.getCommandTag()).thenReturn("INSERT");
+    when(intermediateStatement.getUpdateCount()).thenReturn(1L);
 
     JSONParser parser = new JSONParser();
     JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
@@ -86,7 +85,7 @@ public final class ControlMessageTest {
     when(connectionHandler.getServer()).thenReturn(server);
 
     ControlMessage controlMessage = ControlMessage.create(connectionHandler);
-    controlMessage.sendSpannerResult(0, intermediateStatement, QueryMode.SIMPLE, 0L);
+    controlMessage.sendSpannerResult(intermediateStatement, QueryMode.SIMPLE, 0L);
 
     DataInputStream outputReader =
         new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));

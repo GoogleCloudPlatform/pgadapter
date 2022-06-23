@@ -39,6 +39,14 @@ public interface PgxTest extends Library {
 
   String TestPrepareSelectStatement(GoString connString);
 
+  String TestInsertBatch(GoString connString);
+
+  String TestMixedBatch(GoString connString);
+
+  String TestBatchError(GoString connString);
+
+  String TestBatchExecutionError(GoString connString);
+
   String TestWrongDialect(GoString connString);
 
   static PgxTest compile() throws IOException, InterruptedException {

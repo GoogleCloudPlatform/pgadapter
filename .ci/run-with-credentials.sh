@@ -44,27 +44,13 @@ integration)
 uber-jar-build)
   mvn package -Pshade -DskipTests -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
   ;;
-uber-jar-release)
-  PGADAPTER_VERSION="$(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=project.version -q -DforceStdout)"
-  UBER_JAR="google-cloud-spanner-pgadapter-${PGADAPTER_VERSION}.jar"
-  gsutil cp target/"pgadapter.jar" "gs://${UBER_JAR_GCS_BUCKET}/${UBER_JAR_GCS_PATH}/${UBER_JAR}"
-  ;;
-docker-configure)
-  gcloud auth configure-docker "${DOCKER_HOSTNAME}" -q
-  ;;
-docker-build)
-  docker build -f "${DOCKERFILE}" -t "${DOCKER_HOSTNAME}/${GOOGLE_CLOUD_PROJECT}/${DOCKER_REPOSITORY}/${DOCKER_IMAGE}" .
-  ;;
-docker-push)
-  docker push "${DOCKER_HOSTNAME}/${GOOGLE_CLOUD_PROJECT}/${DOCKER_REPOSITORY}/${DOCKER_IMAGE}"
-  ;;
 e2e-psql)
   PSQL_VERSION="$2"
   GOOGLE_CLOUD_DATABASE_WITH_VERSION="${GOOGLE_CLOUD_DATABASE}_v${PSQL_VERSION}_${RANDOM}"
 #  create testing database
   gcloud config set api_endpoint_overrides/spanner "https://${GOOGLE_CLOUD_ENDPOINT}/"
   gcloud alpha spanner databases create "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --instance="${GOOGLE_CLOUD_INSTANCE}" --database-dialect=POSTGRESQL
-  gcloud spanner databases ddl update "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --instance="${GOOGLE_CLOUD_INSTANCE}" --ddl='CREATE TABLE users (id bigint PRIMARY KEY, age bigint, name text);'
+  gcloud spanner databases ddl update "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" --instance="${GOOGLE_CLOUD_INSTANCE}" --ddl='CREATE TABLE users (id bigint PRIMARY KEY, age bigint, name text); create index idx_users_name on users (name);'
   for i in 1 2 3
   do
     # attempt this up to 3 times since it sometimes fails
@@ -76,7 +62,7 @@ e2e-psql)
   echo "Starting PGAdapter"
   ls -lh target
   UBER_JAR="pgadapter.jar"
-  (java -jar target/"${UBER_JAR}" -p "${GOOGLE_CLOUD_PROJECT}" -i "${GOOGLE_CLOUD_INSTANCE}" -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -e "${GOOGLE_CLOUD_ENDPOINT}" -s 4242 -q -ddl AutocommitImplicitTransaction > /dev/null 2>&1) &
+  (java -jar target/"${UBER_JAR}" -p "${GOOGLE_CLOUD_PROJECT}" -i "${GOOGLE_CLOUD_INSTANCE}" -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -e "${GOOGLE_CLOUD_ENDPOINT}" -s 4242 -ddl AutocommitImplicitTransaction > /dev/null 2>&1) &
   BACK_PID=$!
   sleep 1
 #  execute psql and evaluate result

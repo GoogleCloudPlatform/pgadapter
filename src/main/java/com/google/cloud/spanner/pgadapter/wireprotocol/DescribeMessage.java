@@ -16,25 +16,30 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterDescriptionResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
+import com.google.common.annotations.VisibleForTesting;
 import java.text.MessageFormat;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 /** Calls describe on a portal or prepared statement. */
 @InternalApi
-public class DescribeMessage extends ControlMessage {
+public class DescribeMessage extends AbstractQueryProtocolMessage {
 
   protected static final char IDENTIFIER = 'D';
 
   private final PreparedType type;
   private final String name;
   private final IntermediateStatement statement;
+  private Future<DescribePortalMetadata> describePortalMetadata;
 
   public DescribeMessage(ConnectionHandler connection) throws Exception {
     super(connection);
@@ -47,8 +52,25 @@ public class DescribeMessage extends ControlMessage {
     }
   }
 
+  /** Constructor for manually created Describe messages from the simple query protocol. */
+  public DescribeMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
+    super(connection, 4, manuallyCreatedToken);
+    this.type = PreparedType.Portal;
+    this.name = "";
+    this.statement = this.connection.getPortal(this.name);
+  }
+
+  @SuppressWarnings("unchecked")
   @Override
-  protected void sendPayload() throws Exception {
+  void buffer(BackendConnection backendConnection) {
+    if (this.type == PreparedType.Portal && this.statement.containsResultSet()) {
+      describePortalMetadata =
+          (Future<DescribePortalMetadata>) this.statement.describeAsync(backendConnection);
+    }
+  }
+
+  @Override
+  public void flush() throws Exception {
     try {
       if (this.type == PreparedType.Portal) {
         this.handleDescribePortal();
@@ -94,30 +116,44 @@ public class DescribeMessage extends ControlMessage {
    *
    * @throws Exception if sending the message back to the client causes an error.
    */
-  public void handleDescribePortal() throws Exception {
-    if (this.statement.hasException(0)) {
-      this.handleError(this.statement.getException(0));
+  @VisibleForTesting
+  void handleDescribePortal() throws Exception {
+    if (this.statement.hasException()) {
+      throw this.statement.getException();
     } else {
-      switch (this.statement.getStatementType(0)) {
-        case UPDATE:
-        case DDL:
-        case CLIENT_SIDE:
-          new NoDataResponse(this.outputStream).send();
-          break;
-        case QUERY:
-          try {
-            new RowDescriptionResponse(
-                    this.outputStream,
-                    this.statement,
-                    ((DescribePortalMetadata) this.statement.describe()).getMetadata(),
-                    this.connection.getServer().getOptions(),
-                    QueryMode.EXTENDED)
-                .send();
-            break;
-          } catch (SpannerException exception) {
-            this.handleError(exception);
-          }
+      if (this.statement.containsResultSet()) {
+        try {
+          new RowDescriptionResponse(
+                  this.outputStream,
+                  this.statement,
+                  getPortalMetadata().getMetadata(),
+                  this.connection.getServer().getOptions(),
+                  this.queryMode)
+              .send(false);
+        } catch (SpannerException exception) {
+          this.handleError(exception);
+        }
+      } else {
+        // The simple query protocol does not expect a NoData response in case of a non-query
+        // statement.
+        if (isExtendedProtocol()) {
+          new NoDataResponse(this.outputStream).send(false);
+        }
       }
+    }
+  }
+
+  @VisibleForTesting
+  DescribePortalMetadata getPortalMetadata() {
+    if (!this.describePortalMetadata.isDone()) {
+      throw new IllegalStateException("Trying to get Portal Metadata before it has been described");
+    }
+    try {
+      return this.describePortalMetadata.get();
+    } catch (ExecutionException executionException) {
+      throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
+    } catch (InterruptedException interruptedException) {
+      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
     }
   }
 
@@ -129,17 +165,17 @@ public class DescribeMessage extends ControlMessage {
   public void handleDescribeStatement() throws Exception {
     try {
       DescribeStatementMetadata metadata = (DescribeStatementMetadata) this.statement.describe();
-      new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send();
+      new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send(false);
       if (metadata.getResultSet() != null) {
         new RowDescriptionResponse(
                 this.outputStream,
                 this.statement,
                 metadata.getResultSet(),
                 this.connection.getServer().getOptions(),
-                QueryMode.EXTENDED)
-            .send();
+                this.queryMode)
+            .send(false);
       } else {
-        new NoDataResponse(this.outputStream).send();
+        new NoDataResponse(this.outputStream).send(false);
       }
     } catch (SpannerException exception) {
       this.handleError(exception);

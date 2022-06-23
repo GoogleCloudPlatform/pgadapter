@@ -20,6 +20,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -31,12 +32,13 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class DdlTransactionModeAutocommitExplicitTest
     extends DdlTransactionModeAutocommitImplicitTest {
   @BeforeClass
@@ -48,7 +50,7 @@ public class DdlTransactionModeAutocommitExplicitTest
   @Test
   public void testMixedBatchWithExplicitTransaction() throws SQLException {
     String sql =
-        "BEGIN; INSERT INTO FOO VALUES (1); CREATE TABLE foo (id bigint primary key); COMMIT;";
+        "BEGIN;INSERT INTO FOO VALUES (1);CREATE TABLE foo (id bigint primary key);COMMIT;";
     addDdlResponseToSpannerAdmin();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -81,7 +83,7 @@ public class DdlTransactionModeAutocommitExplicitTest
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         // Start an explicit transaction before executing batch
-        assertFalse(statement.execute("BEGIN; SELECT 1"));
+        assertFalse(statement.execute("BEGIN;SELECT 1"));
         assertEquals(0, statement.getUpdateCount());
 
         assertTrue(statement.getMoreResults());
@@ -95,7 +97,7 @@ public class DdlTransactionModeAutocommitExplicitTest
         assertEquals(-1, statement.getUpdateCount());
 
         // Execute batch
-        assertTrue(statement.execute("SELECT 2; CREATE TABLE BAR (id bigint primary key);"));
+        assertTrue(statement.execute("SELECT 2;CREATE TABLE BAR (id bigint primary key);"));
         assertNotNull(statement.getResultSet());
         assertFalse(statement.getMoreResults());
         assertEquals(0, statement.getUpdateCount());
@@ -126,7 +128,7 @@ public class DdlTransactionModeAutocommitExplicitTest
   public void testDdlInExplicitTransactionSwitchedToImplicit() throws SQLException {
     String sql =
         String.format(
-            "BEGIN; %s; CREATE TABLE foo (id bigint primary key); %s; %s; COMMIT;",
+            "BEGIN;%s;CREATE TABLE foo (id bigint primary key);%s;%s;COMMIT;",
             INSERT_STATEMENT, UPDATE_STATEMENT, INVALID_DML);
     addDdlResponseToSpannerAdmin();
 
@@ -161,5 +163,25 @@ public class DdlTransactionModeAutocommitExplicitTest
     assertTrue(batchDmlRequests.get(0).getTransaction().getBegin().hasReadWrite());
     // The transaction fails and is automatically rolled back.
     assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testSingleDdlStatementInExplicitTransaction() throws SQLException {
+    String sql = "CREATE TABLE foo (id bigint primary key)";
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        statement.execute("begin");
+        assertFalse(statement.execute(sql));
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
   }
 }

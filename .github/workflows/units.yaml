@@ -4,6 +4,8 @@ name: units
 jobs:
   ubuntu:
     runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: true
     strategy:
       fail-fast: false
       matrix:
@@ -15,23 +17,20 @@ jobs:
           distribution: zulu
           java-version: ${{matrix.java}}
       - run: java -version
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
           go-version: '^1.17.7'
       - run: go version
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - run: python --version
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v3
-        with:
-          python-version: '3.9'
-          cache: 'pip'
       - run: pip install -r ./src/test/python/requirements.txt
       - run: mvn -B test -Ptest-all
   windows:
     runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
     strategy:
       fail-fast: false
       matrix:
@@ -43,14 +42,37 @@ jobs:
           distribution: zulu
           java-version: ${{matrix.java}}
       - run: java -version
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - run: python --version
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v3
-        with:
-          python-version: '3.9'
-          cache: 'pip'
       - run: pip install -r ./src/test/python/requirements.txt
       - run: mvn -B test
+  macos:
+    runs-on: macos-latest
+    env:
+      DOTNET_NOLOGO: true
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [8, 11, 17]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
+        with:
+          distribution: zulu
+          java-version: ${{matrix.java}}
+      - run: java -version
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '^1.17.7'
+      - run: go version
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - run: python --version
+      - run: pip install -r ./src/test/python/requirements.txt
+      - uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: '6.0.x'
+      - run: mvn -B test -Ptest-all
