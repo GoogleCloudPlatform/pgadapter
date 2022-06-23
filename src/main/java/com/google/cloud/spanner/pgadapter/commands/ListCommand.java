@@ -15,14 +15,10 @@
 package com.google.cloud.spanner.pgadapter.commands;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import java.util.regex.Pattern;
 
-/**
- * This command is equivalent to the PSQL \l and \l <param> meta-commands. The original expectation
- * would be to print database and database attributes, however As we do not have easy access to
- * those, we just print the current database name.
- */
+/** This command is equivalent to the PSQL \l and \l <param> meta-commands. */
 @InternalApi
 public class ListCommand extends Command {
 
@@ -35,13 +31,8 @@ public class ListCommand extends Command {
               + "FROM pg_catalog\\.pg_database d\n.*\n?"
               + "ORDER BY 1;?$");
 
-  private static final String OUTPUT_QUERY = "SELECT '%s' AS Name;";
-
-  private final Connection connection;
-
-  ListCommand(String sql, Connection connection) {
+  ListCommand(String sql) {
     super(sql);
-    this.connection = connection;
   }
 
   @Override
@@ -51,7 +42,6 @@ public class ListCommand extends Command {
 
   @Override
   public String translate() {
-    // TODO: Pass in the database name, or add it to the Connection API surface and get it here.
-    return String.format(OUTPUT_QUERY, "");
+    return ListDatabasesStatement.LIST_DATABASES_SQL;
   }
 }
