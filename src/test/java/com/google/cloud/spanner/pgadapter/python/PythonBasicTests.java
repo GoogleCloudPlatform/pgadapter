@@ -190,4 +190,243 @@ public class PythonBasicTests extends PythonTestSetup {
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
+
+  @Test
+  public void testBasicSelectWithNamedParameters() throws IOException, InterruptedException {
+    String sql =
+        "SELECT * FROM some_table where COLUMN_NAME1 = %(NAME1)s and COLUMN_NAME2 = %(NAME2)s";
+
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("NAME1");
+    parameters.add("VALUE1");
+    parameters.add("NAME2");
+    parameters.add("VALUE2");
+
+    String sql2 =
+        "SELECT * FROM some_table where COLUMN_NAME1 = 'VALUE1' and COLUMN_NAME2 = 'VALUE2'";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
+
+    String actualOutput =
+        executeWithNamedParameters(pgServer.getLocalPort(), sql, "query", parameters);
+    String expectedOutput = "(1, 'abcd')\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBasicUpdateWithNamedParameters() throws IOException, InterruptedException {
+    String sql = "UPDATE SET column_name=%(NAME1)s where column_name2 = %(NAME2)s";
+    ArrayList<String> parameters = new ArrayList<>();
+
+    parameters.add("NAME1");
+    parameters.add("VALUE1");
+    parameters.add("NAME2");
+    parameters.add("VALUE2");
+
+    String sql2 = "UPDATE SET column_name='VALUE1' where column_name2 = 'VALUE2'";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 10));
+
+    String actualOutput =
+        executeWithNamedParameters(pgServer.getLocalPort(), sql, "update", parameters);
+    String expectedOutput = "10\n";
+
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBasicInsertWithNamedParameters() throws IOException, InterruptedException {
+    String sql = "INSERT INTO SOME_TABLE(COLUMN_NAME) VALUES (%(NAME)s)";
+
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("NAME");
+    parameters.add("VALUE");
+
+    String sql2 = "INSERT INTO SOME_TABLE(COLUMN_NAME) VALUES ('VALUE')";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 1));
+
+    String actualOutput =
+        executeWithNamedParameters(pgServer.getLocalPort(), sql, "update", parameters);
+    String expectedOutput = "1\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBasicDeleteWithNamedParameters() throws IOException, InterruptedException {
+    String sql = "DELETE FROM SOME_TABLE WHERE COLUMN_NAME = %(NAME)s";
+
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("NAME");
+    parameters.add("VALUE");
+
+    String sql2 = "DELETE FROM SOME_TABLE WHERE COLUMN_NAME = 'VALUE'";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 12));
+
+    String actualOutput =
+        executeWithNamedParameters(pgServer.getLocalPort(), sql, "update", parameters);
+    String expectedOutput = "12\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBasicSelectWithNamedParametersIntDataType()
+      throws IOException, InterruptedException {
+    String sql =
+        "SELECT * FROM some_table where COLUMN_NAME1 = %(NAME1)s and COLUMN_NAME2 = %(NAME2)s";
+
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("NAME1");
+    parameters.add("int");
+    parameters.add("2");
+    parameters.add("NAME2");
+    parameters.add("int");
+    parameters.add("3");
+
+    String sql2 = "SELECT * FROM some_table where COLUMN_NAME1 = 2 and COLUMN_NAME2 = 3";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
+
+    String actualOutput =
+        executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
+    String expectedOutput = "(1, 'abcd')\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBasicSelectWithNamedParametersBoolDataType()
+      throws IOException, InterruptedException {
+    String sql =
+        "SELECT * FROM some_table where COLUMN_NAME1 = %(NAME1)s and COLUMN_NAME2 = %(NAME2)s";
+
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("NAME1");
+    parameters.add("bool");
+    parameters.add("True");
+    parameters.add("NAME2");
+    parameters.add("bool");
+    parameters.add("False");
+
+    String sql2 = "SELECT * FROM some_table where COLUMN_NAME1 = true and COLUMN_NAME2 = false";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
+
+    String actualOutput =
+        executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
+    String expectedOutput = "(1, 'abcd')\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBasicSelectWithNamedParametersFloatDataType()
+      throws IOException, InterruptedException {
+    String sql =
+        "SELECT * FROM some_table where COLUMN_NAME1 = %(NAME1)s and COLUMN_NAME2 = %(NAME2)s";
+
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("NAME1");
+    parameters.add("float");
+    parameters.add("2.24");
+    parameters.add("NAME2");
+    parameters.add("float");
+    parameters.add("3.14");
+
+    String sql2 = "SELECT * FROM some_table where COLUMN_NAME1 = 2.24 and COLUMN_NAME2 = 3.14";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
+
+    String actualOutput =
+        executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
+    String expectedOutput = "(1, 'abcd')\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBasicSelectWithNamedParametersByteaDataType()
+      throws IOException, InterruptedException {
+    String sql =
+        "SELECT * FROM some_table where COLUMN_NAME1 = %(NAME1)s and COLUMN_NAME2 = %(NAME2)s or COLUMN_NAME3 = %(NAME3)s";
+
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("NAME1");
+    parameters.add("memoryview");
+    parameters.add("b'VALUE1'");
+    parameters.add("NAME2");
+    parameters.add("bytearray");
+    parameters.add("b'VALUE2'");
+    parameters.add("NAME3");
+    parameters.add("bytes");
+    parameters.add("b'VALUE3'");
+
+    String sql2 =
+        "SELECT * FROM some_table where COLUMN_NAME1 = 'VALUE1'::bytea and COLUMN_NAME2 = 'VALUE2'::bytea or COLUMN_NAME3 = 'VALUE3'::bytea";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
+
+    String actualOutput =
+        executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
+    String expectedOutput = "(1, 'abcd')\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBasicSelectWithNamedParametersDateDataType()
+      throws IOException, InterruptedException {
+    String sql =
+        "SELECT * FROM some_table where COLUMN_NAME1 = %(NAME1)s and COLUMN_NAME2 = %(NAME2)s";
+
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("NAME1");
+    parameters.add("datetime.date");
+    parameters.add("2022, 10, 2");
+    parameters.add("NAME2");
+    parameters.add("datetime.datetime");
+    parameters.add("2019, 2, 3, 6, 30, 15, 0, pytz.UTC");
+
+    String sql2 =
+        "SELECT * FROM some_table where COLUMN_NAME1 = '2022-10-02'::date and COLUMN_NAME2 = '2019-02-03T06:30:15+00:00'::timestamptz";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
+
+    String actualOutput =
+        executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
+    String expectedOutput = "(1, 'abcd')\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBasicSelectWithNamedParametersTupleListDataType()
+      throws IOException, InterruptedException {
+    String sql =
+        "SELECT * FROM some_table where COLUMN_NAME1 in %(NAME1)s and COLUMN_NAME2 = ANY(%(NAME2)s)";
+
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("NAME1");
+    parameters.add("tuple");
+    parameters.add("(1 , 2, 3)");
+    parameters.add("NAME2");
+    parameters.add("list");
+    parameters.add("[1, 2, 3]");
+
+    String sql2 =
+        "SELECT * FROM some_table where COLUMN_NAME1 in (1, 2, 3) and COLUMN_NAME2 = ANY(ARRAY[1,2,3])";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
+
+    String actualOutput =
+        executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
+    String expectedOutput = "(1, 'abcd')\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
 }
