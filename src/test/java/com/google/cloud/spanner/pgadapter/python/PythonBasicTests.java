@@ -76,6 +76,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -90,6 +91,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -103,6 +105,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -116,6 +119,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -136,6 +140,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -155,6 +160,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -172,6 +178,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -189,6 +196,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -212,6 +220,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -234,6 +243,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -253,6 +263,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -272,6 +283,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -297,6 +309,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -322,6 +335,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -347,6 +361,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -376,6 +391,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -402,6 +418,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -428,5 +445,6 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 }
