@@ -51,9 +51,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- x-release-please-start-version -->
-You can also download a specific version of the jar. Example (replace `v0.5.0` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.5.2-SNAPSHOT` with the version you want to download):
 ```shell
-VERSION=v0.5.0
+VERSION=v0.5.2-SNAPSHOT
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 ```
@@ -86,7 +86,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.5.0</version>
+  <version>0.5.2-SNAPSHOT</version>
 </dependency>
 ```
 <!--- x-release-please-end -->
