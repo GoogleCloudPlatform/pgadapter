@@ -50,13 +50,14 @@ java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 Use the `-s` option to specify a different local port than the default 5432 if you already have
 PostgreSQL running on your local system.
 
-You can also download a specific version of the jar. Example (replace `v0.4.0` with the version you want to download):
-
+<!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
+You can also download a specific version of the jar. Example (replace `v0.5.1` with the version you want to download):
 ```shell
-VERSION=v0.4.0
+VERSION=v0.5.1
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 ```
+<!--- {x-version-update-end} -->
 
 See [Options](#Options) for an explanation of all further options.
 
@@ -80,13 +81,16 @@ This option is only available for Java/JVM-based applications.
 
 1. Add `google-cloud-spanner-pgadapter` as a dependency to your project by adding this to your `pom.xml` file:
 
+<!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
 ```xml
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.5.0</version>
+  <version>0.5.1</version>
 </dependency>
 ```
+<!--- {x-version-update-end} -->
+
 
 2. Build a server using the `com.google.cloud.spanner.pgadapter.ProxyServer` class:
 
@@ -117,16 +121,20 @@ path; All other items map directly to previously mentioned CLI options.
 
 ### Options
 
-#### Required
+#### Connection Options
 
-The following options are required to run the proxy:
+See [connection options](docs/connection_options.md) for more details.
 
 ```    
 -p <projectname>
-  * The project name where the Spanner database(s) is/are running.
+  * The project name where the Spanner database(s) is/are running. If omitted, all connection
+    requests must use a fully qualified database name in the format
+    'projects/my-project/instances/my-instance/databases/my-database'.
     
 -i <instanceid>
-  * The instance ID where the Spanner database(s) is/are running.
+  * The instance ID where the Spanner database(s) is/are running. If omitted, all connection
+    requests must use a fully qualified database name in the format
+    'projects/my-project/instances/my-instance/databases/my-database'.
 
 -d <databasename>
   * The default Spanner database name to connect to. This is only required if you want PGAdapter to

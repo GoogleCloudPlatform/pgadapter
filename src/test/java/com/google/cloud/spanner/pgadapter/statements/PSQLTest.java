@@ -25,6 +25,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.CommandMetadataParser;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.junit.Before;
@@ -283,7 +284,7 @@ public class PSQLTest {
             + "       pg_catalog.array_to_string(d.datacl, '\\n') AS \"Access privileges\"\n"
             + "FROM pg_catalog.pg_database d\n"
             + "ORDER BY 1;";
-    String expected = "SELECT '' AS Name";
+    String expected = ListDatabasesStatement.LIST_DATABASES_SQL;
 
     assertEquals(expected, translate(sql));
   }
@@ -299,7 +300,7 @@ public class PSQLTest {
             + "FROM pg_catalog.pg_database d\n"
             + "WHERE d.datname OPERATOR(pg_catalog.~) '^(users)$'\n"
             + "ORDER BY 1;";
-    String expected = "SELECT '' AS Name";
+    String expected = ListDatabasesStatement.LIST_DATABASES_SQL;
 
     assertEquals(expected, translate(sql));
   }
@@ -315,10 +316,8 @@ public class PSQLTest {
             + "FROM pg_catalog.pg_database d\n"
             + "WHERE d.datname OPERATOR(pg_catalog.~) '^(users)$'\n"
             + "ORDER BY 1;";
-    String expected = "SELECT '' AS Name";
+    String expected = ListDatabasesStatement.LIST_DATABASES_SQL;
 
-    // TODO: Add Connection#getDatabase() to Connection API and test here what happens if that
-    // method throws an exception.
     assertEquals(expected, translate(sql));
   }
 

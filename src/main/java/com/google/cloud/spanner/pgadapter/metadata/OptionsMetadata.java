@@ -15,7 +15,9 @@
 package com.google.cloud.spanner.pgadapter.metadata;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.InstanceId;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.pgadapter.Server;
@@ -294,8 +296,7 @@ public class OptionsMetadata {
    *
    * @return The absolute path of the credentials file.
    */
-  @VisibleForTesting
-  String buildCredentialsFile() {
+  public String buildCredentialsFile() {
     if (!commandLine.hasOption(OPTION_CREDENTIALS_FILE)) {
       try {
         // This will throw an IOException if no default credentials are available.
@@ -351,8 +352,8 @@ public class OptionsMetadata {
     return url;
   }
 
-  @VisibleForTesting
-  DatabaseName getDatabaseName(String database) {
+  /** Returns the fully qualified database name based on the given database id or name. */
+  public DatabaseName getDatabaseName(String database) {
     DatabaseName databaseName;
     if (DatabaseName.isParsableFrom(database)) {
       databaseName = DatabaseName.parse(database);
@@ -657,6 +658,31 @@ public class OptionsMetadata {
    */
   public boolean hasDefaultConnectionUrl() {
     return this.defaultConnectionUrl != null;
+  }
+
+  /** Returns the id of the default database or null if no default has been selected. */
+  public DatabaseId getDefaultDatabaseId() {
+    return this.hasDefaultConnectionUrl()
+        ? DatabaseId.of(
+            commandLine.getOptionValue(OPTION_PROJECT_ID),
+            commandLine.getOptionValue(OPTION_INSTANCE_ID),
+            commandLine.getOptionValue(OPTION_DATABASE_NAME))
+        : null;
+  }
+
+  /** Returns true if these options contain a default instance id. */
+  public boolean hasDefaultInstanceId() {
+    return commandLine.hasOption(OPTION_PROJECT_ID) && commandLine.hasOption(OPTION_INSTANCE_ID);
+  }
+
+  /** Returns the id of the default instance or null if no default has been selected. */
+  public InstanceId getDefaultInstanceId() {
+    if (hasDefaultInstanceId()) {
+      return InstanceId.of(
+          commandLine.getOptionValue(OPTION_PROJECT_ID),
+          commandLine.getOptionValue(OPTION_INSTANCE_ID));
+    }
+    return null;
   }
 
   /**

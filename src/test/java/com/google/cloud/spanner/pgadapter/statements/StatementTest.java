@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.EMPTY_LOCAL_STATEMENTS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -154,7 +155,7 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch);
+        new BackendConnection(connection, DdlTransactionMode.Batch, EMPTY_LOCAL_STATEMENTS);
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("UPDATE", intermediateStatement.getCommand());
@@ -226,7 +227,7 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch);
+        new BackendConnection(connection, DdlTransactionMode.Batch, EMPTY_LOCAL_STATEMENTS);
 
     intermediateStatement.executeAsync(backendConnection);
     backendConnection.flush();
@@ -251,7 +252,7 @@ public class StatementTest {
             .to(30)
             .build();
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch);
+        new BackendConnection(connection, DdlTransactionMode.Batch, EMPTY_LOCAL_STATEMENTS);
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(
@@ -318,7 +319,7 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch);
+        new BackendConnection(connection, DdlTransactionMode.Batch, EMPTY_LOCAL_STATEMENTS);
 
     intermediateStatement.describeAsync(backendConnection);
     backendConnection.flush();
@@ -362,7 +363,7 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch);
+        new BackendConnection(connection, DdlTransactionMode.Batch, EMPTY_LOCAL_STATEMENTS);
 
     when(connection.execute(Statement.of(sqlStatement)))
         .thenThrow(
@@ -462,7 +463,7 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch);
+        new BackendConnection(connection, DdlTransactionMode.Batch, EMPTY_LOCAL_STATEMENTS);
 
     intermediateStatement.executeAsync(backendConnection);
 
