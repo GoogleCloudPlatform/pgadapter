@@ -149,7 +149,7 @@ public class BackendConnection {
           result.set(NO_RESULT);
         } else if (statement.getSql().isEmpty()) {
           result.set(NO_RESULT);
-        } else if (ddlExecutor != null && parsedStatement.isDdl()) {
+        } else if (parsedStatement.isDdl()) {
           result.set(ddlExecutor.execute(parsedStatement, statement));
         } else {
           result.set(spannerConnection.execute(statement));
@@ -508,6 +508,9 @@ public class BackendConnection {
     while (index < getStatementCount()) {
       StatementType statementType = getStatementType(index);
       if (canBeBatchedTogether(batchType, statementType)) {
+        // Send DDL statements to the DdlExecutor instead of executing them directly on the
+        // connection, so we can support certain DDL constructs that are currently not supported by
+        // the backend, such as IF [NOT] EXISTS.
         if (batchType == StatementType.DDL) {
           statementResults.add(
               ddlExecutor.execute(
@@ -544,6 +547,12 @@ public class BackendConnection {
     return index - fromIndex;
   }
 
+  /**
+   * Extracts the update count for a list of DDL statements. It could be that the DdlExecutor
+   * decided to skip some DDL statements. This is indicated by the executor returning a {@link
+   * NotExecuted} result for that statement. The result that we return to the client should still
+   * indicate that the statement was 'executed'.
+   */
   static long[] extractDdlUpdateCounts(
       List<StatementResult> statementResults, long[] returnedUpdateCounts) {
     int index = 0;

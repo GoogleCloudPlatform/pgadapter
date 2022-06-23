@@ -38,6 +38,12 @@ import java.util.function.Function;
  * features that are not (yet) supported by the backend.
  */
 class DdlExecutor {
+  /**
+   * This class checks whether the backend supports 'if [not] exists' style statements. This is used
+   * to determine whether PGAdapter should do the existence check itself, or whether it should send
+   * the DDL statement unmodified to the backend. The check is only executed once for each
+   * connection, and only if at least one 'if [not] exists' statement is executed.
+   */
   static class BackendSupportsIfExists extends AbstractLazyInitializer<Boolean> {
     private final DatabaseId databaseId;
     private final Connection connection;
@@ -52,6 +58,11 @@ class DdlExecutor {
       Spanner spanner = ConnectionOptionsHelper.getSpanner(this.connection);
       DatabaseAdminClient adminClient = spanner.getDatabaseAdminClient();
       try {
+        // NOTE: This update will *NEVER* succeed. Either, the first statement fails to parse
+        // because the backend does not support 'if [not] exists'-style statements, or the second
+        // statement fails because it misses a data type for the `id` column. The error that is
+        // returned indicates whether the backend supports `if [not] exists`, as Spanner will parse
+        // the statements in order, and return an error for the first statement that fails.
         adminClient
             .updateDatabaseDdl(
                 this.databaseId.getInstanceId().getInstance(),
@@ -79,6 +90,10 @@ class DdlExecutor {
     }
   }
 
+  /**
+   * {@link NotExecuted} is used to indicate that a statement was skipped because the 'if [not]
+   * exists' check indicated that the statement should be skipped.
+   */
   static final class NotExecuted implements StatementResult {
     @Override
     public ResultType getResultType() {
@@ -122,6 +137,7 @@ class DdlExecutor {
         backendConnection);
   }
 
+  /** Constructor for a {@link DdlExecutor} for the given database and connection. */
   DdlExecutor(DatabaseId databaseId, BackendConnection backendConnection) {
     this(
         new BackendSupportsIfExists(databaseId, backendConnection.getSpannerConnection()),
@@ -136,16 +152,26 @@ class DdlExecutor {
     this.backendSupportsIfExists = backendSupportsIfExists;
   }
 
+  /**
+   * Removes any quotes around the given identifier, and folds the identifier to lower case if it
+   * was not quoted.
+   */
   static String unquoteIdentifier(String identifier) {
     if (identifier.length() < 2) {
       return identifier;
     }
+    // TODO: Support identifiers with an alias or schema prefix, e.g. `"my_schema"."my_table"`
     if (identifier.startsWith("\"")) {
       return identifier.substring(1, identifier.length() - 1);
     }
     return identifier.toLowerCase();
   }
 
+  /**
+   * Executes the given DDL statement. This can include translating the statement into a check
+   * whether the to create/drop object exists, and skipping the actual execution of the DDL
+   * statement depending on the result of the `if [not] exists` check.
+   */
   StatementResult execute(ParsedStatement parsedStatement, Statement statement) {
     Statement translated = translate(parsedStatement, statement);
     if (translated != null) {
@@ -154,6 +180,10 @@ class DdlExecutor {
     return NOT_EXECUTED;
   }
 
+  /**
+   * Translates a DDL statement that can contain an `if [not] exists` statement into one that is
+   * supported by the backend.
+   */
   Statement translate(ParsedStatement parsedStatement, Statement statement) {
     SimpleParser parser = new SimpleParser(parsedStatement.getSqlWithoutComments());
     if (parser.eat("create")) {
@@ -226,6 +256,7 @@ class DdlExecutor {
     return maybeExecuteStatement(parser, statement, "drop", type, existsFunction);
   }
 
+  /** Executes the given DDL statement if the shouldExecuteFunction indicates so. */
   Statement maybeExecuteStatement(
       SimpleParser parser,
       Statement statement,
@@ -287,6 +318,10 @@ class DdlExecutor {
     }
   }
 
+  /**
+   * Returns true if the backend supports `if [not] exists`-style statements. This will cause the
+   * {@link DdlExecutor} to send these statements unmodified to the backend.
+   */
   boolean backendSupportsIfExists() {
     try {
       return backendSupportsIfExists.get();
