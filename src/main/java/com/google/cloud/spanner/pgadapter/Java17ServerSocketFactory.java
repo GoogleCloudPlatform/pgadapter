@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static java.net.StandardSocketOptions.SO_RCVBUF;
+
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.io.File;
 import java.io.IOException;
@@ -69,6 +71,7 @@ class Java17ServerSocketFactory implements ServerSocketFactory {
     UnixDomainSocketAddress address = UnixDomainSocketAddress.of(path);
     ServerSocketChannel domainSocketChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX);
     domainSocketChannel.configureBlocking(true);
+    domainSocketChannel.setOption(SO_RCVBUF, 65536);
     domainSocketChannel.bind(address, options.getMaxBacklog());
 
     return domainSocketChannel;
