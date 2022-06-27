@@ -49,6 +49,7 @@ db.user=admin
 db.passwd=admin
 EOT
 
-./bin/ycsb run jdbc -P workloads/workloadd -threads 1 -p operationcount=1000 -P uds.properties -cp "jdbc-binding/lib/*"
+export YCSB_PROPERTY_FILE=uds.properties
+export YCSB_COMMAND=run
+export WORKLOAD=workloadd
 
-psql -h /tmp -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; delete from usertable;"
