@@ -14,13 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.golang;
 
-import static org.junit.Assert.assertEquals;
 
 import com.sun.jna.Library;
-import com.sun.jna.Native;
-import java.io.File;
-import java.io.IOException;
 
+/** Interface for the pgx tests. Each method in this class represents a test method in pgx.go. */
 public interface PgxTest extends Library {
 
   String TestHelloWorld(GoString connString);
@@ -48,22 +45,4 @@ public interface PgxTest extends Library {
   String TestBatchExecutionError(GoString connString);
 
   String TestWrongDialect(GoString connString);
-
-  static PgxTest compile() throws IOException, InterruptedException {
-    // Compile the Go code to ensure that we always have the most recent test code.
-    ProcessBuilder builder = new ProcessBuilder();
-    String[] compileCommand = "go build -o pgx_test.so -buildmode=c-shared pgx.go".split(" ");
-    builder.command(compileCommand);
-    builder.directory(new File("./src/test/golang/pgadapter_pgx_tests"));
-    Process process = builder.start();
-    int res = process.waitFor();
-    assertEquals(0, res);
-
-    // We explicitly use the full path to force JNA to look in a specific directory, instead of in
-    // standard library directories.
-    String currentPath = new java.io.File(".").getCanonicalPath();
-    return Native.load(
-        String.format("%s/src/test/golang/pgadapter_pgx_tests/pgx_test.so", currentPath),
-        PgxTest.class);
-  }
 }

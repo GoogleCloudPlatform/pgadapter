@@ -76,7 +76,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void compile() throws IOException, InterruptedException {
-    pgxTest = PgxTest.compile();
+    pgxTest = GolangTest.compile("pgadapter_pgx_tests/pgx.go", PgxTest.class);
   }
 
   private GoString createConnString() {
