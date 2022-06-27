@@ -208,7 +208,7 @@ public final class RowDescriptionTest {
     // type modifier
     assertEquals(DEFAULT_FLAG, outputReader.readInt());
     // format code
-    assertEquals(1, outputReader.readShort());
+    assertEquals(0, outputReader.readShort());
   }
 
   @Test

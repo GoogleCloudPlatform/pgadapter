@@ -169,4 +169,25 @@ public class GormMockServerTest extends AbstractMockServerTest {
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }
+
+  @Test
+  public void testQueryAllDataTypes() {
+    String sql = "SELECT * FROM \"all_types\" ORDER BY \"all_types\".\"col_bigint\" LIMIT 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
+
+    String res = gormTest.TestQueryAllDataTypes(createConnString());
+
+    assertNull(res);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // pgx by default always uses prepared statements. As this statement does not contain any
+    // parameters, we don't need to describe the parameter types, so it is 'only' sent twice to the
+    // backend.
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
+    assertEquals(sql, describeRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = requests.get(1);
+    assertEquals(sql, executeRequest.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+  }
 }

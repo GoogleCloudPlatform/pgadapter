@@ -18,8 +18,11 @@ import "C"
 import (
 	"database/sql"
 	"fmt"
+	"github.com/shopspring/decimal"
+	"reflect"
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -45,6 +48,18 @@ type User struct {
 	ActivatedAt  sql.NullTime
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+type AllTypes struct {
+	ColBigint      *int64
+	ColBool        *bool
+	ColBytea       *[]byte
+	ColFloat8      *float64
+	ColInt         *int
+	ColNumeric     *decimal.Decimal
+	ColTimestamptz *time.Time
+	ColDate        *datatypes.Date
+	ColVarchar     *string
 }
 
 //export TestFirst
@@ -95,7 +110,89 @@ func TestFirst(connString string) *C.char {
 	return nil
 }
 
+//export TestQueryAllDataTypes
+func TestQueryAllDataTypes(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	row := AllTypes{}
+	db.First(&row)
+
+	// First verify that nothing is null.
+	if row.ColBigint == nil {
+		return C.CString("ColBigint is null")
+	}
+	if row.ColBool == nil {
+		return C.CString("ColBool is null")
+	}
+	if row.ColBytea == nil {
+		return C.CString("ColBytea is null")
+	}
+	if row.ColFloat8 == nil {
+		return C.CString("ColFloat8 is null")
+	}
+	if row.ColInt == nil {
+		return C.CString("ColInt is null")
+	}
+	if row.ColNumeric == nil {
+		return C.CString("ColNumeric is null")
+	}
+	if row.ColTimestamptz == nil {
+		return C.CString("ColTimestamptz is null")
+	}
+	if row.ColDate == nil {
+		return C.CString("ColDate is null")
+	}
+	if row.ColVarchar == nil {
+		return C.CString("ColVarchar is null")
+	}
+
+	if g, w := *row.ColBigint, int64(1); g != w {
+		return C.CString(fmt.Sprintf("ColBigint mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+	if g, w := *row.ColBool, true; g != w {
+		return C.CString(fmt.Sprintf("ColBool mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+	if g, w := *row.ColBytea, []byte("test"); !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColBytea mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+	if g, w := *row.ColFloat8, 3.14; g != w {
+		return C.CString(fmt.Sprintf("ColFloat8 mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+	if g, w := *row.ColInt, 100; g != w {
+		return C.CString(fmt.Sprintf("ColInt mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+	if g, w := *row.ColNumeric, decimal.RequireFromString("6.626"); !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColNumeric mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+	if g, w := row.ColTimestamptz.UTC(), parseTimestamp("2022-02-16T13:18:02.123456Z"); g != w {
+		return C.CString(fmt.Sprintf("ColTimestamptz mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+	if g, w := *row.ColDate, parseDate("2022-03-29"); !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("ColDate mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+	if g, w := *row.ColVarchar, "test"; g != w {
+		return C.CString(fmt.Sprintf("ColVarchar mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
 func parseTimestamp(ts string) time.Time {
 	t, _ := time.Parse(time.RFC3339Nano, ts)
 	return t.UTC()
+}
+
+// parseDate returns the given date string as a Date. The Date contains a Time instance at the given
+// date with all time components set to zero in the local timezone.
+func parseDate(ds string) datatypes.Date {
+	date := datatypes.Date{}
+	_, offset := time.Now().Zone()
+	ts := parseTimestamp(ds + "T00:00:00Z")
+	ts.Add(-time.Second * time.Duration(offset))
+	fmt.Println(ts)
+	_ = date.Scan(ts)
+
+	return date
 }

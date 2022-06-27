@@ -20,4 +20,6 @@ import com.sun.jna.Library;
 public interface GormTest extends Library {
 
   String TestFirst(GoString connString);
+
+  String TestQueryAllDataTypes(GoString connString);
 }

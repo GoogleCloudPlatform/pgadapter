@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.golang;
 
-
 import com.sun.jna.Library;
 
 /** Interface for the pgx tests. Each method in this class represents a test method in pgx.go. */

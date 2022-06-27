@@ -105,9 +105,7 @@ public class RowDescriptionResponse extends WireOutput {
       short format =
           this.statement == null
               ? defaultFormat.getCode()
-              : this.statement.getResultFormatCode(column_index) == 0
-                  ? defaultFormat.getCode()
-                  : this.statement.getResultFormatCode(column_index);
+              : this.statement.getResultFormatCode(column_index);
       this.outputStream.writeShort(format);
     }
   }
