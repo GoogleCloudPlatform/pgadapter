@@ -68,6 +68,11 @@ func TestFirst(connString string) *C.char {
 	if err != nil {
 		return C.CString(err.Error())
 	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
 	user := User{}
 	db.First(&user)
 
@@ -116,6 +121,11 @@ func TestQueryAllDataTypes(connString string) *C.char {
 	if err != nil {
 		return C.CString(err.Error())
 	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
 	row := AllTypes{}
 	db.First(&row)
 
