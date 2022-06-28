@@ -236,6 +236,42 @@ func TestInsertNullsAllDataTypes(connString string) *C.char {
 	return nil
 }
 
+//export TestUpdateAllDataTypes
+func TestUpdateAllDataTypes(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	sql := "UPDATE \"all_types\" SET \"col_bigint\"=$1,\"col_bool\"=$2,\"col_bytea\"=$3,\"col_float8\"=$4,\"col_int\"=$5,\"col_numeric\"=$6,\"col_timestamptz\"=$7,\"col_date\"=$8,\"col_varchar\"=$9 WHERE \"col_varchar\" = $10"
+	numeric := pgtype.Numeric{}
+	_ = numeric.Set("6.626")
+	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T07:39:10.123456789+01:00")
+	var tag pgconn.CommandTag
+	date := pgtype.Date{}
+	_ = date.Set("2022-04-02")
+	if strings.Contains(connString, "prefer_simple_protocol=true") {
+		// Simple mode will format the date as '2022-04-02 00:00:00Z', which is not supported by the
+		// backend yet.
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string")
+	} else {
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string")
+	}
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to execute update statement: %v", err))
+	}
+	if !tag.Update() {
+		return C.CString("statement was not recognized as an update")
+	}
+	if g, w := tag.RowsAffected(), int64(1); g != w {
+		return C.CString(fmt.Sprintf("rows affected mismatch:\n Got: %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
 //export TestPrepareStatement
 func TestPrepareStatement(connString string) *C.char {
 	ctx := context.Background()

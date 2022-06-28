@@ -22,4 +22,14 @@ public interface GormTest extends Library {
   String TestFirst(GoString connString);
 
   String TestQueryAllDataTypes(GoString connString);
+
+  String TestQueryNullsAllDataTypes(GoString connString);
+
+  String TestInsertAllDataTypes(GoString connString);
+
+  String TestInsertNullsAllDataTypes(GoString connString);
+
+  String TestUpdateAllDataTypes(GoString connString);
+
+  String TestDelete(GoString connString);
 }

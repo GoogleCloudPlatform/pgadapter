@@ -31,6 +31,8 @@ public interface PgxTest extends Library {
 
   String TestInsertNullsAllDataTypes(GoString connString);
 
+  String TestUpdateAllDataTypes(GoString connString);
+
   String TestPrepareStatement(GoString connString);
 
   String TestPrepareSelectStatement(GoString connString);

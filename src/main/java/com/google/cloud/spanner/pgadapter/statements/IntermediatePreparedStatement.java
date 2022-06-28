@@ -133,7 +133,8 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   @Override
   public DescribeMetadata<?> describe() {
     Set<String> parameters =
-        ImmutableSortedSet.<String>orderedBy(Comparator.comparing(o -> o.substring(1)))
+        ImmutableSortedSet.<String>orderedBy(
+                Comparator.comparing(o -> Integer.valueOf(o.substring(1))))
             .addAll(PARSER.getQueryParameters(this.parsedStatement.getSqlWithoutComments()))
             .build();
 

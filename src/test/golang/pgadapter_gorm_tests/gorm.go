@@ -59,7 +59,7 @@ type AllTypes struct {
 	ColNumeric     *decimal.Decimal
 	ColTimestamptz *time.Time
 	ColDate        *datatypes.Date
-	ColVarchar     *string
+	ColVarchar     *string `gorm:"primaryKey"`
 }
 
 //export TestFirst
@@ -189,6 +189,205 @@ func TestQueryAllDataTypes(connString string) *C.char {
 	return nil
 }
 
+//export TestQueryNullsAllDataTypes
+func TestQueryNullsAllDataTypes(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+	row := AllTypes{}
+	db.First(&row)
+
+	// Verify that all columns are null.
+	if row.ColBigint != nil {
+		return C.CString("ColBigint is not null")
+	}
+	if row.ColBool != nil {
+		return C.CString("ColBool is not null")
+	}
+	if row.ColBytea != nil {
+		return C.CString("ColBytea is not null")
+	}
+	if row.ColFloat8 != nil {
+		return C.CString("ColFloat8 is not null")
+	}
+	if row.ColInt != nil {
+		return C.CString("ColInt is not null")
+	}
+	if row.ColNumeric != nil {
+		return C.CString("ColNumeric is not null")
+	}
+	if row.ColTimestamptz != nil {
+		return C.CString("ColTimestamptz is not null")
+	}
+	if row.ColDate != nil {
+		return C.CString("ColDate is not null")
+	}
+	if row.ColVarchar != nil {
+		return C.CString("ColVarchar is not null")
+	}
+
+	return nil
+}
+
+//export TestInsertAllDataTypes
+func TestInsertAllDataTypes(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+
+	row := AllTypes{
+		ColBigint:      int64Ref(100),
+		ColBool:        boolRef(true),
+		ColBytea:       bytesRef([]byte("test_bytes")),
+		ColFloat8:      float64Ref(3.14),
+		ColInt:         intRef(1),
+		ColNumeric:     decimalRef(decimal.RequireFromString("6.626")),
+		ColTimestamptz: timeRef(parseTimestamp("2022-03-24T07:39:10.123456789+01:00")),
+		ColDate:        dateRef(parseDate("2022-04-02")),
+		ColVarchar:     stringRef("test_string"),
+	}
+	res := db.Create(&row)
+	if res.Error != nil {
+		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", res.Error))
+	}
+	if g, w := res.RowsAffected, int64(1); g != w {
+		return C.CString(fmt.Sprintf("rows affected mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
+//export TestInsertNullsAllDataTypes
+func TestInsertNullsAllDataTypes(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+
+	// Only set the primary key value and leave all other values empty (null).
+	row := AllTypes{ColBigint: int64Ref(100)}
+	res := db.Create(&row)
+	if res.Error != nil {
+		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", res.Error))
+	}
+	if g, w := res.RowsAffected, int64(1); g != w {
+		return C.CString(fmt.Sprintf("rows affected mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
+//export TestUpdateAllDataTypes
+func TestUpdateAllDataTypes(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+
+	row := AllTypes{
+		ColBigint:      int64Ref(100),
+		ColBool:        boolRef(true),
+		ColBytea:       bytesRef([]byte("test_bytes")),
+		ColFloat8:      float64Ref(3.14),
+		ColInt:         intRef(1),
+		ColNumeric:     decimalRef(decimal.RequireFromString("6.626")),
+		ColTimestamptz: timeRef(parseTimestamp("2022-03-24T07:39:10.123456789+01:00")),
+		ColDate:        dateRef(parseDate("2022-04-02")),
+		ColVarchar:     stringRef("test_string"),
+	}
+	res := db.Save(row)
+	if res.Error != nil {
+		return C.CString(fmt.Sprintf("failed to execute update statement: %v", res.Error))
+	}
+	if g, w := res.RowsAffected, int64(1); g != w {
+		return C.CString(fmt.Sprintf("rows affected mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
+//export TestDelete
+func TestDelete(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+
+	row := AllTypes{ColVarchar: stringRef("test_string")}
+	res := db.Delete(row)
+	if res.Error != nil {
+		return C.CString(fmt.Sprintf("failed to execute delete statement: %v", res.Error))
+	}
+	if g, w := res.RowsAffected, int64(1); g != w {
+		return C.CString(fmt.Sprintf("rows affected mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
+func int64Ref(val int64) *int64 {
+	return &val
+}
+
+func boolRef(val bool) *bool {
+	return &val
+}
+
+func bytesRef(val []byte) *[]byte {
+	return &val
+}
+
+func float64Ref(val float64) *float64 {
+	return &val
+}
+
+func intRef(val int) *int {
+	return &val
+}
+
+func decimalRef(val decimal.Decimal) *decimal.Decimal {
+	return &val
+}
+
+func timeRef(val time.Time) *time.Time {
+	return &val
+}
+
+func dateRef(val datatypes.Date) *datatypes.Date {
+	return &val
+}
+
+func stringRef(val string) *string {
+	return &val
+}
+
 func parseTimestamp(ts string) time.Time {
 	t, _ := time.Parse(time.RFC3339Nano, ts)
 	return t.UTC()
@@ -201,7 +400,6 @@ func parseDate(ds string) datatypes.Date {
 	_, offset := time.Now().Zone()
 	ts := parseTimestamp(ds + "T00:00:00Z")
 	ts.Add(-time.Second * time.Duration(offset))
-	fmt.Println(ts)
 	_ = date.Scan(ts)
 
 	return date
