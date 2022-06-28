@@ -132,10 +132,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   @Override
   public DescribeMetadata<?> describe() {
-    Set<String> parameters =
-        ImmutableSortedSet.<String>orderedBy(Comparator.comparing(o -> o.substring(1)))
-            .addAll(PARSER.getQueryParameters(this.parsedStatement.getSqlWithoutComments()))
-            .build();
+    Set<String> parameters = extractParameters(this.parsedStatement.getSqlWithoutComments());
 
     ResultSet columnsResultSet = null;
     try {
@@ -192,6 +189,19 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
         columnsResultSet.close();
       }
     }
+  }
+
+  /**
+   * Extracts the statement parameters from the given sql string and returns these as a sorted set.
+   * The parameters are ordered by their index and not by the textual value (i.e. "$9" comes before
+   * "$10").
+   */
+  @VisibleForTesting
+  static ImmutableSortedSet<String> extractParameters(String sql) {
+    return ImmutableSortedSet.<String>orderedBy(
+            Comparator.comparing(o -> Integer.valueOf(o.substring(1))))
+        .addAll(PARSER.getQueryParameters(sql))
+        .build();
   }
 
   /**
