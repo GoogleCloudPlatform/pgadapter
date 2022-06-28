@@ -412,6 +412,34 @@ func TestTransaction(connString string) *C.char {
 	return nil
 }
 
+//export TestReadOnlyTransaction
+func TestReadOnlyTransaction(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+
+	err = db.Transaction(func(tx *gorm.DB) error {
+		row1 := AllTypes{ColVarchar: stringRef("1")}
+		row2 := AllTypes{ColVarchar: stringRef("2")}
+
+		tx.Find(&row1)
+		tx.Find(&row2)
+
+		return tx.Error
+	}, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to execute read-only transaction: %v", err))
+	}
+
+	return nil
+}
+
 func int64Ref(val int64) *int64 {
 	return &val
 }

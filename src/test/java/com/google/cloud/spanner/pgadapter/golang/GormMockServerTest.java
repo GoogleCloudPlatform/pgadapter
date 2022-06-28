@@ -28,6 +28,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
@@ -676,5 +677,57 @@ public class GormMockServerTest extends AbstractMockServerTest {
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
     CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
     assertEquals(executeRequest2.getTransaction().getId(), commitRequest.getTransactionId());
+  }
+
+  @Test
+  public void testReadOnlyTransaction() {
+    String sql = "SELECT * FROM \"all_types\" WHERE \"all_types\".\"col_varchar\" = $1";
+    String describeSql =
+        "select $1 from (SELECT * FROM \"all_types\" WHERE \"all_types\".\"col_varchar\" = $1) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeSql),
+            ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .build()));
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to("1").build(), ALL_TYPES_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to("2").build(), ALL_TYPES_RESULTSET));
+
+    String res = gormTest.TestReadOnlyTransaction(createConnString());
+
+    assertNull(res);
+    assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+    BeginTransactionRequest beginRequest =
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class).get(0);
+    assertTrue(beginRequest.getOptions().hasReadOnly());
+
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(4, requests.size());
+
+    ExecuteSqlRequest describeRequest = requests.get(0);
+    assertEquals(sql, describeRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+    assertTrue(describeRequest.getTransaction().hasId());
+
+    ExecuteSqlRequest describeParamsRequest = requests.get(1);
+    assertEquals(describeSql, describeParamsRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
+    assertEquals(
+        describeParamsRequest.getTransaction().getId(), describeRequest.getTransaction().getId());
+
+    ExecuteSqlRequest executeRequest = requests.get(2);
+    assertEquals(sql, executeRequest.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(
+        describeParamsRequest.getTransaction().getId(), executeRequest.getTransaction().getId());
+
+    // The read-only transaction is 'committed', but that does not cause a CommitRequest to be sent
+    // to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 }

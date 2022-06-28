@@ -36,4 +36,6 @@ public interface GormTest extends Library {
   String TestCreateInBatches(GoString connString);
 
   String TestTransaction(GoString connString);
+
+  String TestReadOnlyTransaction(GoString connString);
 }
