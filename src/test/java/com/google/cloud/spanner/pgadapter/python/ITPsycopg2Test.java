@@ -29,8 +29,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-@Category(PythonTest.class)
-public class ITPsycopg2Test extends PythonTestSetup implements IntegrationTest {
+@Category(IntegrationTest.class)
+public class ITPsycopg2Test extends PythonTestSetup {
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
