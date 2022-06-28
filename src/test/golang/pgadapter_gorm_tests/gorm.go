@@ -352,6 +352,66 @@ func TestDelete(connString string) *C.char {
 	return nil
 }
 
+//export TestCreateInBatches
+func TestCreateInBatches(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+
+	res := db.CreateInBatches([]*AllTypes{
+		{ColVarchar: stringRef("1")},
+		{ColVarchar: stringRef("2")},
+		{ColVarchar: stringRef("3")},
+	}, 10)
+	if res.Error != nil {
+		return C.CString(fmt.Sprintf("failed to execute insert batch: %v", res.Error))
+	}
+	if g, w := res.RowsAffected, int64(3); g != w {
+		return C.CString(fmt.Sprintf("rows affected mismatch\nGot:  %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
+//export TestTransaction
+func TestTransaction(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+
+	err = db.Transaction(func(tx *gorm.DB) error {
+		tx.Omit(
+			"col_bigint",
+			"col_bool",
+			"col_bytea",
+			"col_float8",
+			"col_int",
+			"col_numeric",
+			"col_timestamptz",
+			"col_date",
+		).Create(AllTypes{ColVarchar: stringRef("1")}).Create(AllTypes{ColVarchar: stringRef("2")})
+
+		return tx.Error
+	})
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to execute transaction: %v", err))
+	}
+
+	return nil
+}
+
 func int64Ref(val int64) *int64 {
 	return &val
 }

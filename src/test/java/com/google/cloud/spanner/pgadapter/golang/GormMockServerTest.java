@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.golang;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -27,6 +28,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
@@ -172,6 +174,9 @@ public class GormMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.hasTransaction());
+    assertTrue(executeRequest.getTransaction().hasSingleUse());
+    assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
   }
 
   @Test
@@ -193,6 +198,9 @@ public class GormMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.hasTransaction());
+    assertTrue(executeRequest.getTransaction().hasSingleUse());
+    assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
   }
 
   @Test
@@ -215,6 +223,9 @@ public class GormMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.hasTransaction());
+    assertTrue(executeRequest.getTransaction().hasSingleUse());
+    assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
   }
 
   @Test
@@ -281,12 +292,26 @@ public class GormMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest describeParamsRequest = requests.get(0);
     assertEquals(describeSql, describeParamsRequest.getSql());
     assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
+    assertTrue(describeParamsRequest.hasTransaction());
+    assertTrue(describeParamsRequest.getTransaction().hasBegin());
+    assertTrue(describeParamsRequest.getTransaction().getBegin().hasReadWrite());
+
     ExecuteSqlRequest describeRequest = requests.get(1);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasId());
+
     ExecuteSqlRequest executeRequest = requests.get(2);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.hasTransaction());
+    assertTrue(executeRequest.getTransaction().hasId());
+    assertEquals(describeRequest.getTransaction().getId(), executeRequest.getTransaction().getId());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(executeRequest.getTransaction().getId(), commitRequest.getTransactionId());
   }
 
   @Test
@@ -468,5 +493,188 @@ public class GormMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = requests.get(2);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+  }
+
+  @Test
+  public void testCreateInBatches() {
+    String sql =
+        "INSERT INTO \"all_types\" (\"col_bigint\",\"col_bool\",\"col_bytea\",\"col_float8\",\"col_int\",\"col_numeric\",\"col_timestamptz\",\"col_date\",\"col_varchar\") "
+            + "VALUES "
+            + "($1,$2,$3,$4,$5,$6,$7,$8,$9),"
+            + "($10,$11,$12,$13,$14,$15,$16,$17,$18),"
+            + "($19,$20,$21,$22,$23,$24,$25,$26,$27)";
+    String describeSql =
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27 from "
+            + "(select \"col_bigint\"=$1, \"col_bool\"=$2, \"col_bytea\"=$3, \"col_float8\"=$4, \"col_int\"=$5, \"col_numeric\"=$6, \"col_timestamptz\"=$7, \"col_date\"=$8, \"col_varchar\"=$9, \"col_bigint\"=$10, \"col_bool\"=$11, \"col_bytea\"=$12, \"col_float8\"=$13, \"col_int\"=$14, \"col_numeric\"=$15, \"col_timestamptz\"=$16, \"col_date\"=$17, \"col_varchar\"=$18, \"col_bigint\"=$19, \"col_bool\"=$20, \"col_bytea\"=$21, \"col_float8\"=$22, \"col_int\"=$23, \"col_numeric\"=$24, \"col_timestamptz\"=$25, \"col_date\"=$26, \"col_varchar\"=$27 from \"all_types\") p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING,
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING,
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING)))
+                .build()));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to((Long) null)
+                .bind("p2")
+                .to((Boolean) null)
+                .bind("p3")
+                .to((ByteArray) null)
+                .bind("p4")
+                .to((Double) null)
+                .bind("p5")
+                .to((Long) null)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric(null))
+                .bind("p7")
+                .to((Timestamp) null)
+                .bind("p8")
+                .to((Date) null)
+                .bind("p9")
+                .to("1")
+                .bind("p10")
+                .to((Long) null)
+                .bind("p11")
+                .to((Boolean) null)
+                .bind("p12")
+                .to((ByteArray) null)
+                .bind("p13")
+                .to((Double) null)
+                .bind("p14")
+                .to((Long) null)
+                .bind("p15")
+                .to(com.google.cloud.spanner.Value.pgNumeric(null))
+                .bind("p16")
+                .to((Timestamp) null)
+                .bind("p17")
+                .to((Date) null)
+                .bind("p18")
+                .to("2")
+                .bind("p19")
+                .to((Long) null)
+                .bind("p20")
+                .to((Boolean) null)
+                .bind("p21")
+                .to((ByteArray) null)
+                .bind("p22")
+                .to((Double) null)
+                .bind("p23")
+                .to((Long) null)
+                .bind("p24")
+                .to(com.google.cloud.spanner.Value.pgNumeric(null))
+                .bind("p25")
+                .to((Timestamp) null)
+                .bind("p26")
+                .to((Date) null)
+                .bind("p27")
+                .to("3")
+                .build(),
+            3L));
+
+    String res = gormTest.TestCreateInBatches(createConnString());
+
+    assertNull(res);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // pgx by default always uses prepared statements. That means that each request is sent three
+    // times to the backend the first time it is executed:
+    // 1. DescribeStatement (parameters)
+    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
+    // 3. Execute
+    assertEquals(3, requests.size());
+    ExecuteSqlRequest describeParamsRequest = requests.get(0);
+    assertEquals(describeSql, describeParamsRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
+    ExecuteSqlRequest describeRequest = requests.get(1);
+    assertEquals(sql, describeRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = requests.get(2);
+    assertEquals(sql, executeRequest.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+  }
+
+  @Test
+  public void testTransaction() {
+    String sql = "INSERT INTO \"all_types\" (\"col_varchar\") VALUES ($1)";
+    String describeSql = "select $1 from (select \"col_varchar\"=$1 from \"all_types\") p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeSql),
+            ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .build()));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("1").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("2").build(), 1L));
+
+    String res = gormTest.TestTransaction(createConnString());
+
+    assertNull(res);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(4, requests.size());
+    ExecuteSqlRequest describeParamsRequest = requests.get(0);
+    assertEquals(describeSql, describeParamsRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
+    assertTrue(describeParamsRequest.hasTransaction());
+    assertTrue(describeParamsRequest.getTransaction().hasBegin());
+    assertTrue(describeParamsRequest.getTransaction().getBegin().hasReadWrite());
+
+    ExecuteSqlRequest describeRequest = requests.get(1);
+    assertEquals(sql, describeRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasId());
+
+    ExecuteSqlRequest executeRequest1 = requests.get(2);
+    assertEquals(sql, executeRequest1.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest1.getQueryMode());
+    assertTrue(executeRequest1.hasTransaction());
+    assertTrue(executeRequest1.getTransaction().hasId());
+    assertEquals(
+        describeRequest.getTransaction().getId(), executeRequest1.getTransaction().getId());
+
+    ExecuteSqlRequest executeRequest2 = requests.get(2);
+    assertEquals(sql, executeRequest2.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest2.getQueryMode());
+    assertTrue(executeRequest2.hasTransaction());
+    assertTrue(executeRequest2.getTransaction().hasId());
+    assertEquals(
+        describeRequest.getTransaction().getId(), executeRequest2.getTransaction().getId());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(executeRequest2.getTransaction().getId(), commitRequest.getTransactionId());
   }
 }

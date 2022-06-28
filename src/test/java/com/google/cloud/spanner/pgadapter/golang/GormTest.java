@@ -32,4 +32,8 @@ public interface GormTest extends Library {
   String TestUpdateAllDataTypes(GoString connString);
 
   String TestDelete(GoString connString);
+
+  String TestCreateInBatches(GoString connString);
+
+  String TestTransaction(GoString connString);
 }
