@@ -17,7 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import java.text.MessageFormat;
 
 /** Executes a portal. */
@@ -27,7 +27,7 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
 
   private final String name;
   private final int maxRows;
-  private final IntermediateStatement statement;
+  private final IntermediatePreparedStatement statement;
 
   public ExecuteMessage(ConnectionHandler connection) throws Exception {
     super(connection);
@@ -94,7 +94,6 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
     } else {
       try {
         this.sendSpannerResult(this.statement, this.queryMode, this.maxRows);
-        this.outputStream.flush();
       } catch (Exception exception) {
         handleError(exception);
       }
