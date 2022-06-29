@@ -165,6 +165,19 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @Test
+  public void testCreateTableIfNotExists_withSchemaPrefix() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // This table already exists, so it should be a no-op.
+        assertFalse(
+            statement.execute(
+                "create table if not exists public.all_types (id bigint primary key)"));
+        assertFalse(statement.getMoreResults());
+      }
+    }
+  }
+
+  @Test
   public void testSelectWithParameters() throws SQLException {
     boolean isSimpleMode = "simple".equalsIgnoreCase(preferQueryMode);
     String sql =

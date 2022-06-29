@@ -28,6 +28,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.util.concurrent.ExecutionException;
@@ -160,7 +161,6 @@ class DdlExecutor {
     if (identifier.length() < 2) {
       return identifier;
     }
-    // TODO: Support identifiers with an alias or schema prefix, e.g. `"my_schema"."my_table"`
     if (identifier.startsWith("\"")) {
       return identifier.substring(1, identifier.length() - 1);
     }
@@ -237,7 +237,7 @@ class DdlExecutor {
       SimpleParser parser,
       Statement statement,
       String type,
-      Function<String, Boolean> existsFunction) {
+      Function<TableOrIndexName, Boolean> existsFunction) {
     if (!parser.eat("if", "not", "exists")) {
       return statement;
     }
@@ -249,7 +249,7 @@ class DdlExecutor {
       SimpleParser parser,
       Statement statement,
       String type,
-      Function<String, Boolean> existsFunction) {
+      Function<TableOrIndexName, Boolean> existsFunction) {
     if (!parser.eat("if", "exists")) {
       return statement;
     }
@@ -262,7 +262,7 @@ class DdlExecutor {
       Statement statement,
       String command,
       String type,
-      Function<String, Boolean> shouldExecuteFunction) {
+      Function<TableOrIndexName, Boolean> shouldExecuteFunction) {
     if (backendSupportsIfExists()) {
       return statement;
     }
@@ -270,7 +270,7 @@ class DdlExecutor {
     if (identifierPosition >= parser.getSql().length()) {
       return statement;
     }
-    String name = parser.readIdentifier();
+    TableOrIndexName name = parser.readTableOrIndexName();
     if (name == null) {
       return statement;
     }
@@ -284,7 +284,7 @@ class DdlExecutor {
     return Statement.of(command + " " + type + parser.getSql().substring(identifierPosition));
   }
 
-  boolean tableExists(String name) {
+  boolean tableExists(TableOrIndexName tableName) {
     DatabaseClient client = connection.getDatabaseClient();
     try (ResultSet resultSet =
         client
@@ -293,15 +293,19 @@ class DdlExecutor {
                 Statement.newBuilder(
                         "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
                     .bind("p1")
-                    .to(backendConnection.getCurrentSchema())
+                    .to(
+                        unquoteIdentifier(
+                            tableName.schema == null
+                                ? backendConnection.getCurrentSchema()
+                                : tableName.schema))
                     .bind("p2")
-                    .to(unquoteIdentifier(name))
+                    .to(unquoteIdentifier(tableName.name))
                     .build())) {
       return resultSet.next();
     }
   }
 
-  boolean indexExists(String name) {
+  boolean indexExists(TableOrIndexName indexName) {
     DatabaseClient client = connection.getDatabaseClient();
     try (ResultSet resultSet =
         client
@@ -310,9 +314,13 @@ class DdlExecutor {
                 Statement.newBuilder(
                         "select 1 from information_schema.indexes where table_schema=$1 and index_name=$2")
                     .bind("p1")
-                    .to(backendConnection.getCurrentSchema())
+                    .to(
+                        unquoteIdentifier(
+                            indexName.schema == null
+                                ? backendConnection.getCurrentSchema()
+                                : indexName.schema))
                     .bind("p2")
-                    .to(unquoteIdentifier(name))
+                    .to(unquoteIdentifier(indexName.name))
                     .build())) {
       return resultSet.next();
     }
