@@ -37,5 +37,7 @@ public interface GormTest extends Library {
 
   String TestTransaction(GoString connString);
 
+  String TestNestedTransaction(GoString connString);
+
   String TestReadOnlyTransaction(GoString connString);
 }

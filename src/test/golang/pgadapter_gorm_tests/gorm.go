@@ -412,6 +412,53 @@ func TestTransaction(connString string) *C.char {
 	return nil
 }
 
+//export TestNestedTransaction
+func TestNestedTransaction(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+
+	err = db.Transaction(func(tx *gorm.DB) error {
+		tx.Omit(
+			"col_bigint",
+			"col_bool",
+			"col_bytea",
+			"col_float8",
+			"col_int",
+			"col_numeric",
+			"col_timestamptz",
+			"col_date",
+		).Create(AllTypes{ColVarchar: stringRef("1")})
+		if tx.Error != nil {
+			return tx.Error
+		}
+
+		return tx.Transaction(func(tx2 *gorm.DB) error {
+			return tx2.Omit(
+				"col_bigint",
+				"col_bool",
+				"col_bytea",
+				"col_float8",
+				"col_int",
+				"col_numeric",
+				"col_timestamptz",
+				"col_date",
+			).Create(AllTypes{ColVarchar: stringRef("2")}).Error
+		})
+	})
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to execute nested transaction: %v", err))
+	}
+
+	return nil
+}
+
 //export TestReadOnlyTransaction
 func TestReadOnlyTransaction(connString string) *C.char {
 	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})

@@ -680,6 +680,30 @@ public class GormMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testNestedTransaction() {
+    String sql = "INSERT INTO \"all_types\" (\"col_varchar\") VALUES ($1)";
+    String describeSql = "select $1 from (select \"col_varchar\"=$1 from \"all_types\") p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeSql),
+            ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .build()));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("1").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("2").build(), 1L));
+
+    // Nested transactions are not supported, as we don't support savepoints.
+    String res = gormTest.TestNestedTransaction(createConnString());
+    assertEquals(
+        "failed to execute nested transaction: ERROR: INVALID_ARGUMENT: current transaction is aborted, commands ignored until end of transaction block (SQLSTATE P0001)",
+        res);
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
   public void testReadOnlyTransaction() {
     String sql = "SELECT * FROM \"all_types\" WHERE \"all_types\".\"col_varchar\" = $1";
     String describeSql =
