@@ -8,6 +8,7 @@ do
           -threads ${THREADS} \
           -p operationcount=${OPERATION_COUNT} \
           -p jdbc.batchupdateapi=true \
+          -p db.batchsize=${BATCH_SIZE} \
           -P ${YCSB_PROPERTY_FILE} \
           -cp "jdbc-binding/lib/*" > output.txt
 
