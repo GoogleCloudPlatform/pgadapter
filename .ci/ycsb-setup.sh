@@ -31,6 +31,8 @@ psql -h /tmp -p ${PORT} -c "CREATE TABLE IF NOT EXISTS usertable (
                   insert_p99      float,
                   primary key (deployment, workload, threads, batch_size, operation_count)
                 );"
+pkill -f pgadapter
+
 cd ~
 git clone git@github.com:brianfrankcooper/YCSB.git
 cd YCSB
@@ -42,12 +44,18 @@ cd lib
 wget https://repo1.maven.org/maven2/org/postgresql/postgresql/42.4.0/postgresql-42.4.0.jar
 wget https://repo1.maven.org/maven2/com/kohlschutter/junixsocket/junixsocket-common/2.5.0/junixsocket-common-2.5.0.jar
 wget https://repo1.maven.org/maven2/com/kohlschutter/junixsocket/junixsocket-native-common/2.5.0/junixsocket-native-common-2.5.0.jar
-cd ../..
 
+cd ~/pgadapter
+mvn package -Passembly -DskipTests
+cd target/pgadapter
+java -jar pgadapter.jar -p appdev-soda-spanner-staging -i knut-test-ycsb -d ycsb -s ${PORT} &> pgadapter.log &
+sleep 1
 psql -h /tmp -p ${PORT} -c "delete from run;"
 psql -h /tmp -p ${PORT} -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; delete from usertable;"
 pkill -f pgadapter
+cd ~/YCSB
 
+rm uds.properties
 cat <<EOT >> uds.properties
 db.driver=org.postgresql.Driver
 db.url=jdbc:postgresql://localhost/ycsb?socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory\$FactoryArg&socketFactoryArg=/tmp/.s.PGSQL.${PORT}
@@ -55,9 +63,10 @@ db.user=admin
 db.passwd=admin
 EOT
 
+rm tcp.properties
 cat <<EOT >> tcp.properties
 db.driver=org.postgresql.Driver
-db.url=jdbc:postgresql://localhost:${PORT}
+db.url=jdbc:postgresql://localhost:${PORT}/ycsb
 db.user=admin
 db.passwd=admin
 EOT
