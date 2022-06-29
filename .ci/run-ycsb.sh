@@ -1,8 +1,8 @@
-for OPERATION_COUNT in 1000
+for OPERATION_COUNT in 5000 10000 50000
 do
-  for THREADS in 1 5
+  for THREADS in 1 5 20 50
   do
-    for BATCH_SIZE in 1 5
+    for BATCH_SIZE in ${BATCH_SIZES}
     do
       ./bin/ycsb ${YCSB_COMMAND} jdbc -P workloads/${WORKLOAD} \
           -threads ${THREADS} \
@@ -34,7 +34,7 @@ do
           values ('${DEPLOYMENT}', '${WORKLOAD}', ${THREADS}, ${BATCH_SIZE}, ${OPERATION_COUNT}, ${RUNTIME}, ${THROUGHPUT},
                   ${READ_AVG}, ${READ_P95}, ${READ_P99}, ${INSERT_AVG}, ${INSERT_P95}, ${INSERT_P99});"
 
-      psql -h /tmp -p ${PORT} -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; delete from usertable;"
+      if [ "$YCSB_DELETE_AFTER" == "YES" ]; then psql -h /tmp -p ${PORT} -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; delete from usertable;"; fi
     done
   done
 done

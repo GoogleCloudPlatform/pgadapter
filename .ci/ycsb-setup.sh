@@ -55,14 +55,65 @@ db.user=admin
 db.passwd=admin
 EOT
 
+cat <<EOT >> tcp.properties
+db.driver=org.postgresql.Driver
+db.url=jdbc:postgresql://localhost:${PORT}
+db.user=admin
+db.passwd=admin
+EOT
+
+# Run Unix Domain Socket Java 8
 cd ../pgadapter
 mvn clean package -Passembly -DskipTests
 cd target/pgadapter
 java -jar pgadapter.jar -p appdev-soda-spanner-staging -i knut-test-ycsb -d ycsb -s ${PORT} &> pgadapter.log &
-export DEPLOYMENT=jar-java8
+export DEPLOYMENT=jar-java8-uds
 export YCSB_PROPERTY_FILE=uds.properties
 export YCSB_COMMAND=run
 export WORKLOAD=workloadd
-
+export YCSB_DELETE_AFTER=YES
+export BATCH_SIZES="1 5 20 50 100"
 cd ../../../YCSB
 ../pgadapter/.ci/run-ycsb.sh
+pkill -f pgadapter
+# Run Unix Domain Socket Java 17
+cd ../pgadapter
+mvn clean package -Passembly -Pnative-image -DskipTests
+cd target/pgadapter
+java -jar pgadapter.jar -p appdev-soda-spanner-staging -i knut-test-ycsb -d ycsb -s ${PORT} &> pgadapter.log &
+export DEPLOYMENT=jar-java17-uds
+export YCSB_PROPERTY_FILE=uds.properties
+export YCSB_COMMAND=run
+export WORKLOAD=workloadd
+export YCSB_DELETE_AFTER=YES
+export BATCH_SIZES="1 5 20 50 100"
+cd ../../../YCSB
+../pgadapter/.ci/run-ycsb.sh
+pkill -f pgadapter
+# Run TCP Java 8
+cd ../pgadapter
+mvn clean package -Passembly -DskipTests
+cd target/pgadapter
+java -jar pgadapter.jar -p appdev-soda-spanner-staging -i knut-test-ycsb -d ycsb -s ${PORT} &> pgadapter.log &
+export DEPLOYMENT=jar-java8-tcp
+export YCSB_PROPERTY_FILE=tcp.properties
+export YCSB_COMMAND=run
+export WORKLOAD=workloadd
+export YCSB_DELETE_AFTER=YES
+export BATCH_SIZES="1 5 20 50 100"
+cd ../../../YCSB
+../pgadapter/.ci/run-ycsb.sh
+pkill -f pgadapter
+cd ../pgadapter
+mvn clean package -Passembly -Pnative-image -DskipTests
+cd target/pgadapter
+java -jar pgadapter.jar -p appdev-soda-spanner-staging -i knut-test-ycsb -d ycsb -s ${PORT} &> pgadapter.log &
+export DEPLOYMENT=jar-java17-tcp
+export YCSB_PROPERTY_FILE=tcp.properties
+export YCSB_COMMAND=run
+export WORKLOAD=workloadd
+export YCSB_DELETE_AFTER=YES
+export BATCH_SIZES="1 5 20 50 100"
+cd ../../../YCSB
+../pgadapter/.ci/run-ycsb.sh
+pkill -f pgadapter
