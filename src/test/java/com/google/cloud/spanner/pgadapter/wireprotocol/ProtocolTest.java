@@ -1711,7 +1711,7 @@ public class ProtocolTest {
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
 
-    SkipMessage message = new SkipMessage(connectionHandler);
+    SkipMessage message = SkipMessage.createForValidStream(connectionHandler);
     message.send();
 
     // Verify that nothing was written to the output.
