@@ -20,6 +20,13 @@ do
       INSERT_P95=$(sed -En 's/\[INSERT\], 95thPercentileLatency\(us\), (.+)$/\1/p' output.txt)
       INSERT_P99=$(sed -En 's/\[INSERT\], 99thPercentileLatency\(us\), (.+)$/\1/p' output.txt)
 
+      if [ "$READ_AVG" == "NaN" ]; then $READ_AVG=0; fi
+      if [ "$READ_P95" == "NaN" ]; then $READ_P95=0; fi
+      if [ "$READ_P99" == "NaN" ]; then $READ_P99=0; fi
+      if [ "$INSERT_AVG" == "NaN" ]; then $INSERT_AVG=0; fi
+      if [ "$INSERT_P95" == "NaN" ]; then $INSERT_P95=0; fi
+      if [ "$INSERT_P99" == "NaN" ]; then $INSERT_P99=0; fi
+
       psql -h /tmp -p ${PORT} -c "
           insert into run (deployment, workload, threads, batch_size, operation_count, run_time, throughput,
                            read_avg, read_p95, read_p99, insert_avg, insert_p95, insert_p99)
