@@ -1,5 +1,6 @@
 
 # native-image -J-Xmx10g -H:IncludeResources=".*metadata.*json$" -jar pgadapter.jar --no-fallback
+export GOOGLE_APPLICATION_CREDENTIALS=
 export PORT=5433
 
 git clone git@github.com:GoogleCloudPlatform/pgadapter.git
@@ -85,6 +86,7 @@ export BATCH_SIZES="1 5 20 50 100"
 cd ../../../YCSB
 ../pgadapter/.ci/run-ycsb.sh
 pkill -f pgadapter
+
 # Run Unix Domain Socket Java 17
 cd ../pgadapter
 mvn clean package -Passembly -Pnative-image -DskipTests
@@ -99,6 +101,7 @@ export BATCH_SIZES="1 5 20 50 100"
 cd ../../../YCSB
 ../pgadapter/.ci/run-ycsb.sh
 pkill -f pgadapter
+
 # Run TCP Java 8
 cd ../pgadapter
 mvn clean package -Passembly -DskipTests
@@ -113,6 +116,8 @@ export BATCH_SIZES="1 5 20 50 100"
 cd ../../../YCSB
 ../pgadapter/.ci/run-ycsb.sh
 pkill -f pgadapter
+
+# Run TCP Java 17
 cd ../pgadapter
 mvn clean package -Passembly -Pnative-image -DskipTests
 cd target/pgadapter
@@ -124,5 +129,36 @@ export WORKLOAD=workloadd
 export YCSB_DELETE_AFTER=YES
 export BATCH_SIZES="1 5 20 50 100"
 cd ../../../YCSB
+../pgadapter/.ci/run-ycsb.sh
+pkill -f pgadapter
+
+# Run native image Unix domain sockets
+# This assumes that the native image has been uploaded manually to the VM.
+#cd ../pgadapter
+#mvn clean package -Passembly -Pnative-image -DskipTests
+#cd target/pgadapter
+#native-image -J-Xmx10g -H:IncludeResources=".*metadata.*json$" -jar pgadapter.jar --no-fallback
+cd ~/native
+./pgadapter -p appdev-soda-spanner-staging -i knut-test-ycsb -d ycsb -s ${PORT} &> pgadapter.log &
+export DEPLOYMENT=native-uds
+export YCSB_PROPERTY_FILE=uds.properties
+export YCSB_COMMAND=run
+export WORKLOAD=workloadd
+export YCSB_DELETE_AFTER=YES
+export BATCH_SIZES="1 5 20 50 100"
+cd ~/YCSB
+../pgadapter/.ci/run-ycsb.sh
+pkill -f pgadapter
+
+# Run native image TCP
+cd ~/native
+./pgadapter -p appdev-soda-spanner-staging -i knut-test-ycsb -d ycsb -s ${PORT} &> pgadapter.log &
+export DEPLOYMENT=native-tcp
+export YCSB_PROPERTY_FILE=tcp.properties
+export YCSB_COMMAND=run
+export WORKLOAD=workloadd
+export YCSB_DELETE_AFTER=YES
+export BATCH_SIZES="1 5 20 50 100"
+cd ~/YCSB
 ../pgadapter/.ci/run-ycsb.sh
 pkill -f pgadapter
