@@ -215,8 +215,11 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       assertTrue(
           exception.getMessage(),
           exception
-              .getMessage()
-              .contains("FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000."));
+                  .getMessage()
+                  .contains("FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.")
+              || exception
+                  .getMessage()
+                  .contains("Database connection failed when canceling copy operation"));
     }
   }
 
