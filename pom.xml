@@ -302,6 +302,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
+          <forkedProcessExitTimeoutInSeconds>3</forkedProcessExitTimeoutInSeconds>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
           <argLine>${surefire.jacoco.args}</argLine>
           <excludedGroups>${excludedTests}</excludedGroups>

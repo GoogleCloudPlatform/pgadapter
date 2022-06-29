@@ -115,11 +115,14 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
         outputStream.flush();
 
         // Read until the end of the stream. The stream should be closed by the backend.
-        int bytesRead = 0;
-        while (inputStream.read() > -1 && bytesRead < 1 << 16) {
-          bytesRead++;
+        try {
+          int bytesRead = 0;
+          while (inputStream.read() > -1 && bytesRead < 1 << 16) {
+            bytesRead++;
+          }
+          assertEquals(-1, inputStream.read());
+        } catch (IOException ignore) {
         }
-        assertEquals(-1, inputStream.read());
       }
     }
   }

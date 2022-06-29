@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,33 +16,32 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import java.io.IOException;
 import java.text.MessageFormat;
 
 /**
- * Handles a flush command from the user. This flushes any pending changes to Cloud Spanner and then
- * sends any pending messages to the client.
+ * {@link SkipMessage} is a pseudo wire-protocol message that is used to read and skip messages that
+ * we receive that we do not want at that time. This applies to COPY messages during normal
+ * operation, and sync/flush messages during COPY operation.
  */
 @InternalApi
-public class FlushMessage extends ControlMessage {
-
-  protected static final char IDENTIFIER = 'H';
-
-  public FlushMessage(ConnectionHandler connection) throws Exception {
-    super(connection);
-  }
-
-  public FlushMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
-    super(connection, 4, manuallyCreatedToken);
+public class SkipMessage extends ControlMessage {
+  public SkipMessage(ConnectionHandler connectionHandler) throws IOException {
+    super(connectionHandler);
+    int skipLength = this.length - 4;
+    int skipped = 0;
+    // Read and skip bytes until we have reached the total message length.
+    while (skipped < skipLength) {
+      skipped += connection.getConnectionMetadata().getInputStream().skip(skipLength - skipped);
+    }
   }
 
   @Override
-  protected void sendPayload() throws Exception {
-    connection.getExtendedQueryProtocolHandler().flush();
-  }
+  protected void sendPayload() throws Exception {}
 
   @Override
   protected String getMessageName() {
-    return "Flush";
+    return "Skip";
   }
 
   @Override
@@ -52,6 +51,6 @@ public class FlushMessage extends ControlMessage {
 
   @Override
   protected String getIdentifier() {
-    return String.valueOf(IDENTIFIER);
+    return "";
   }
 }
