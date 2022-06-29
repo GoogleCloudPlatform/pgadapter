@@ -15,6 +15,8 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
@@ -25,6 +27,8 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -98,5 +102,22 @@ public final class ControlMessageTest {
     byte[] bytes = new byte[numOfBytes];
     assertEquals(numOfBytes, outputReader.read(bytes, 0, numOfBytes));
     assertEquals(resultMessage, new String(bytes, UTF8));
+  }
+
+  @Test
+  public void testUnknownStatementTypeThrowsError() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ExecuteMessage executeMessage =
+        new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
+    IntermediateStatement intermediateStatement = mock(IntermediateStatement.class);
+    when(intermediateStatement.getCommandTag()).thenReturn("PARSE");
+    when(intermediateStatement.getStatementType()).thenReturn(StatementType.UNKNOWN);
+    when(intermediateStatement.getStatement()).thenReturn("parse foo from bar");
+
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () -> executeMessage.sendSpannerResult(intermediateStatement, QueryMode.SIMPLE, 0L));
+    assertEquals("Unknown statement type: parse foo from bar", exception.getMessage());
   }
 }

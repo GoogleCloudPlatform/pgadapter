@@ -103,6 +103,7 @@ public class ConnectionHandler extends Thread {
   private static final AtomicInteger incrementingConnectionId = new AtomicInteger(0);
   private ConnectionMetadata connectionMetadata;
   private WireMessage message;
+  private int invalidMessagesCount;
   private Connection spannerConnection;
   private DatabaseId databaseId;
   private WellKnownClient wellKnownClient;
@@ -266,15 +267,7 @@ public class ConnectionHandler extends Thread {
           }
         }
         while (this.status != ConnectionStatus.TERMINATED) {
-          try {
-            message.nextHandler();
-            message.send();
-          } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
-            this.handleError(output, fatalException);
-            this.status = ConnectionStatus.TERMINATED;
-          } catch (Exception e) {
-            this.handleError(output, e);
-          }
+          handleMessages();
         }
       } catch (Exception e) {
         this.handleError(output, e);
@@ -308,6 +301,23 @@ public class ConnectionHandler extends Thread {
     }
   }
 
+  /**
+   * Reads and handles wire-protocol messages. This method is normally only called from this {@link
+   * ConnectionHandler}, but certain sub-protocols such as the COPY protocol also need to process
+   * messages in line.
+   */
+  public void handleMessages() throws Exception {
+    try {
+      message.nextHandler();
+      message.send();
+    } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
+      this.handleError(getConnectionMetadata().getOutputStream(), fatalException);
+      this.status = ConnectionStatus.TERMINATED;
+    } catch (Exception e) {
+      this.handleError(getConnectionMetadata().getOutputStream(), e);
+    }
+  }
+
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
   public void handleTerminate() {
     closeAllPortals();
@@ -322,40 +332,39 @@ public class ConnectionHandler extends Thread {
    * shutting down while the connection is still active.
    */
   void terminate() {
-    if (this.status != ConnectionStatus.TERMINATED) {
-      handleTerminate();
-      try {
-        socketChannel.close();
-      } catch (IOException exception) {
-        logger.log(
-            Level.WARNING,
-            exception,
-            () ->
-                String.format(
-                    "Failed to close connection handler with ID %s: %s", getName(), exception));
-      }
+    handleTerminate();
+    try {
+      socketChannel.close();
+    } catch (IOException exception) {
+      logger.log(
+          Level.WARNING,
+          exception,
+          () ->
+              String.format(
+                  "Failed to close connection handler with ID %s: %s", getName(), exception));
     }
   }
 
   /**
    * Takes an Exception Object and relates its results to the user within the client.
    *
-   * @param e The exception to be related.
+   * @param exception The exception to be related.
    * @throws IOException if there is some issue in the sending of the error messages.
    */
-  private void handleError(DataOutputStream output, Exception e) throws Exception {
+  private void handleError(DataOutputStream output, Exception exception) throws Exception {
     logger.log(
         Level.WARNING,
-        e,
-        () -> String.format("Exception on connection handler with ID %s: %s", getName(), e));
+        exception,
+        () ->
+            String.format("Exception on connection handler with ID %s: %s", getName(), exception));
     if (this.status == ConnectionStatus.TERMINATED) {
-      new ErrorResponse(output, e, ErrorResponse.State.InternalError, Severity.FATAL).send();
+      new ErrorResponse(output, exception, ErrorResponse.State.InternalError, Severity.FATAL)
+          .send();
       new TerminateResponse(output).send();
     } else if (this.status == ConnectionStatus.COPY_IN) {
-      new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
+      new ErrorResponse(output, exception, ErrorResponse.State.InternalError).send();
     } else {
-      this.status = ConnectionStatus.AUTHENTICATED;
-      new ErrorResponse(output, e, ErrorResponse.State.InternalError).send();
+      new ErrorResponse(output, exception, ErrorResponse.State.InternalError).send();
       new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
     }
   }
@@ -510,6 +519,31 @@ public class ConnectionHandler extends Thread {
     this.message = this.server.recordMessage(message);
   }
 
+  /**
+   * Returns the number of invalid messages that this connection has received in a row. This can for
+   * example happen if a client has initiated a COPY operation and the copy operation fails on the
+   * server. The server will then respond with an error response, but if the client fails to read
+   * that message and continues to send copy data messages, the server could get flooded. This value
+   * is used to detect such a situation and breaks the connection if too many invalid messages in a
+   * row are received.
+   */
+  public int getInvalidMessageCount() {
+    return this.invalidMessagesCount;
+  }
+
+  /** Increases the number of invalid messages that was received in a row by 1. */
+  public void increaseInvalidMessageCount() {
+    this.invalidMessagesCount++;
+  }
+
+  /**
+   * Clears the number of invalid messages that was received. This is called whenever a valid
+   * message is encountered.
+   */
+  public void clearInvalidMessageCount() {
+    this.invalidMessagesCount = 0;
+  }
+
   public ConnectionMetadata getConnectionMetadata() {
     return connectionMetadata;
   }
@@ -543,6 +577,8 @@ public class ConnectionHandler extends Thread {
     UNAUTHENTICATED,
     AUTHENTICATED,
     COPY_IN,
+    COPY_DONE,
+    COPY_FAILED,
     TERMINATED,
   }
 

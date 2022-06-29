@@ -14,10 +14,21 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.internal.verification.VerificationModeFactory.times;
 
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.channels.ByteChannel;
 import org.junit.Test;
@@ -39,18 +50,18 @@ public class ConnectionHandlerTest {
   }
 
   @Test
-  public void testTerminateDoesNotCloseSocketTwice() throws IOException {
+  public void testTerminateClosesSocketTwice() throws IOException {
     ProxyServer server = mock(ProxyServer.class);
     ByteChannel channel = mock(ByteChannel.class);
 
     ConnectionHandler connection = new ConnectionHandler(server, channel);
 
     connection.terminate();
-    // Calling terminate a second time should be a no-op.
+    // Calling terminate a second time will close the channel once more, but that is a no-op.
     connection.terminate();
 
-    // Verify that close was only called once.
-    verify(channel).close();
+    // Verify that close was called twice.
+    verify(channel, times(2)).close();
   }
 
   @Test
@@ -64,5 +75,57 @@ public class ConnectionHandlerTest {
 
     connection.terminate();
     verify(socket).close();
+  }
+
+  @Test
+  public void testHandleMessages_NonFatalException() throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    ByteChannel socket = mock(ByteChannel.class);
+    DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.FAILED_PRECONDITION, "non-fatal test exception"))
+        .when(message)
+        .send();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+
+    connection.setMessageState(message);
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.UNAUTHENTICATED, connection.getStatus());
+  }
+
+  @Test
+  public void testHandleMessages_FatalException() throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    ByteChannel socket = mock(ByteChannel.class);
+    DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(new EOFException("fatal test exception")).when(message).send();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+
+    connection.setMessageState(message);
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
   }
 }

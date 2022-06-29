@@ -28,6 +28,8 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -50,6 +52,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -66,7 +69,7 @@ import org.apache.commons.csv.CSVRecord;
 import org.postgresql.jdbc.TimestampUtils;
 
 @InternalApi
-public class MutationWriter implements Callable<Long>, Closeable {
+public class MutationWriter implements Callable<StatementResult>, Closeable {
   public enum CopyTransactionMode {
     /**
      * 'Normal' auto-commit mode. The entire COPY operation is atomic. If the number of mutations
@@ -129,7 +132,9 @@ public class MutationWriter implements Callable<Long>, Closeable {
   private final CSVParser parser;
   private PrintWriter errorFileWriter;
   private final PipedOutputStream payload = new PipedOutputStream();
+  private final AtomicBoolean commit = new AtomicBoolean(false);
   private final AtomicBoolean rollback = new AtomicBoolean(false);
+  private final CountDownLatch closedLatch = new CountDownLatch(1);
   private final ListeningExecutorService executorService =
       MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
 
@@ -199,12 +204,21 @@ public class MutationWriter implements Callable<Long>, Closeable {
     try {
       this.payload.write(payload);
     } catch (IOException e) {
-      SpannerException spannerException =
-          SpannerExceptionFactory.newSpannerException(
-              ErrorCode.INTERNAL, "Could not write copy data to buffer", e);
-      logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
-      throw spannerException;
+      // Ignore the exception if the executor has already been shutdown. That means that an error
+      // occurred that ended the COPY operation while we were writing data to the buffer.
+      if (!executorService.isShutdown()) {
+        SpannerException spannerException =
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.INTERNAL, "Could not write copy data to buffer", e);
+        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
+        throw spannerException;
+      }
     }
+  }
+
+  /** Indicate that this mutation writer should commit. */
+  public void commit() {
+    this.commit.set(true);
   }
 
   /**
@@ -219,10 +233,11 @@ public class MutationWriter implements Callable<Long>, Closeable {
   @Override
   public void close() throws IOException {
     this.payload.close();
+    this.closedLatch.countDown();
   }
 
   @Override
-  public Long call() throws Exception {
+  public StatementResult call() throws Exception {
     // This LinkedBlockingDeque holds a reference to all transactions that are currently active. The
     // max capacity of this deque is what ensures that we never have more than maxParallelism
     // transactions running at the same time. We could also achieve that by using a thread pool with
@@ -304,9 +319,15 @@ public class MutationWriter implements Callable<Long>, Closeable {
       // Write any remaining mutations in the buffer.
       if (!rollback.get() && !mutations.isEmpty()) {
         if (transactionMode == CopyTransactionMode.Explicit) {
-          connection.bufferedWrite(mutations);
+          connection.write(mutations);
         } else {
-          allCommitFutures.add(writeToSpannerAsync(activeCommitFutures, mutations));
+          // Wait until we have received a CopyDone message before writing the remaining data to
+          // Spanner. If we are in a non-atomic transaction, there might already be data that have
+          // been written to Spanner.
+          closedLatch.await();
+          if (commit.get()) {
+            allCommitFutures.add(writeToSpannerAsync(activeCommitFutures, mutations));
+          }
         }
       }
       // Wait for all commits to finish. We do this even if something went wrong, as it ensures two
@@ -339,7 +360,7 @@ public class MutationWriter implements Callable<Long>, Closeable {
       this.payload.close();
       this.parser.close();
     }
-    return rowCount;
+    return new UpdateCount(rowCount);
   }
 
   private long addMutationAndMaybeFlushTransaction(
