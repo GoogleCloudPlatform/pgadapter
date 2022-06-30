@@ -411,6 +411,8 @@
         </executions>
         <configuration>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
+          <forkCount>8</forkCount>
+          <reuseForks>true</reuseForks>
           <argLine>${failsafe.jacoco.args}</argLine>
           <skipITs>${skipITs}</skipITs>
         </configuration>
