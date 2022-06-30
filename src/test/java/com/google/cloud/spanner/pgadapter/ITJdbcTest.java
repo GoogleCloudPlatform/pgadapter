@@ -135,6 +135,14 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   private String getConnectionUrl() {
+    if (useDomainSocket) {
+      return String.format(
+          "jdbc:postgresql://localhost/%s?"
+              + "preferQueryMode=%s"
+              + "&socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
+              + "&socketFactoryArg=/tmp/.s.PGSQL.%d",
+          database.getId().getDatabase(), preferQueryMode, testEnv.getPGAdapterPort());
+    }
     return String.format(
         "jdbc:postgresql://%s/%s?preferQueryMode=%s",
         testEnv.getPGAdapterHostAndPort(), database.getId().getDatabase(), preferQueryMode);
