@@ -93,11 +93,11 @@ public abstract class ControlMessage extends WireMessage {
             // Skip sync/flush in COPY_IN. This is consistent with real PostgreSQL which also does
             // this to accommodate clients that do not check what type of statement they sent in an
             // ExecuteMessage, and instead always blindly send a flush/sync after each execute.
-            return new SkipMessage(connection);
+            return SkipMessage.createForValidStream(connection);
           default:
             // Skip other unexpected messages and throw an exception to fail the copy operation.
             validMessage = false;
-            new SkipMessage(connection);
+            SkipMessage.createForInvalidStream(connection);
             throw new IllegalStateException(
                 String.format(
                     "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: '%c'",
@@ -133,7 +133,8 @@ public abstract class ControlMessage extends WireMessage {
             // terminate the connection to prevent the server from being flooded with invalid
             // messages.
             validMessage = false;
-            return new SkipMessage(connection);
+            // Note: The stream itself is still valid as we received a message that we recognized.
+            return SkipMessage.createForValidStream(connection);
           default:
             throw new IllegalStateException(String.format("Unknown message: %c", nextMsg));
         }

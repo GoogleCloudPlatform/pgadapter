@@ -47,6 +47,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ParameterMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -532,6 +533,55 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
     assertEquals(sql, requests.get(1).getSql());
     assertEquals(QueryMode.PLAN, requests.get(1).getQueryMode());
+  }
+
+  @Test
+  public void testDescribeDmlWithSchemaPrefix() throws SQLException {
+    String sql = "update public.my_table set value=? where id=?";
+    String describeSql = "select $1, $2 from (select value=$1 from public.my_table where id=$2) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.INT64)))
+                .build()));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        ParameterMetaData metadata = preparedStatement.getParameterMetaData();
+        assertEquals(Types.VARCHAR, metadata.getParameterType(1));
+        assertEquals(Types.BIGINT, metadata.getParameterType(2));
+      }
+    }
+
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(1, requests.size());
+    assertEquals(describeSql, requests.get(0).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
+  }
+
+  @Test
+  public void testDescribeDmlWithQuotedSchemaPrefix() throws SQLException {
+    String sql = "update \"public\".\"my_table\" set value=? where id=?";
+    String describeSql =
+        "select $1, $2 from (select value=$1 from \"public\".\"my_table\" where id=$2) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.INT64)))
+                .build()));
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        ParameterMetaData metadata = preparedStatement.getParameterMetaData();
+        assertEquals(Types.VARCHAR, metadata.getParameterType(1));
+        assertEquals(Types.BIGINT, metadata.getParameterType(2));
+      }
+    }
+
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(1, requests.size());
+    assertEquals(describeSql, requests.get(0).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
   }
 
   @Test
