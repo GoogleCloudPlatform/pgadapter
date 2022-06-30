@@ -484,11 +484,14 @@ public class ITJdbcTest implements IntegrationTest {
                   copyManager.copyIn(
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
-      assertEquals(
-          "ERROR: FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.\n\n"
-              + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n\n"
-              + "Execute `SET AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.\n\n",
-          exception.getMessage());
+      assertTrue(
+          exception.getMessage(),
+          exception
+                  .getMessage()
+                  .contains("FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.")
+              || exception
+                  .getMessage()
+                  .contains("Database connection failed when canceling copy operation"));
     }
 
     // Verify that the table is still empty.
