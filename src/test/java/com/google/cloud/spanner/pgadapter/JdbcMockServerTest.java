@@ -66,7 +66,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.postgresql.PGStatement;
-import org.postgresql.core.Oid;
 import org.postgresql.jdbc.PgStatement;
 
 @RunWith(JUnit4.class)
@@ -93,12 +92,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
    * mode for queries and DML statements.
    */
   private String createUrl() {
-    // Force binary transfer of date parameters to prevent PostgreSQL from sending them with type
-    // Oid.UNSPECIFIED. This setting is however at this moment ignored and depends on this PR:
-    // https://github.com/pgjdbc/pgjdbc/pull/2476
-    return String.format(
-        "jdbc:postgresql://localhost:%d/?binaryTransferEnable=%d",
-        pgServer.getLocalPort(), Oid.DATE);
+    return String.format("jdbc:postgresql://localhost:%d/", pgServer.getLocalPort());
   }
 
   @Test
@@ -732,6 +726,369 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     for (int i = 0; i < statements.size(); i++) {
       assertEquals(statements.get(i), updateDatabaseDdlRequests.get(0).getStatements(i));
     }
+  }
+
+  @Test
+  public void testCreateTableIfNotExists_tableDoesNotExist() throws SQLException {
+    addIfNotExistsDdlException();
+    String sql = "CREATE TABLE IF NOT EXISTS foo (id bigint primary key)";
+    addDdlResponseToSpannerAdmin();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to("foo")
+                .build(),
+            EMPTY_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result was either an update count or there
+        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    assertEquals(
+        "create table foo (id bigint primary key)",
+        updateDatabaseDdlRequests.get(0).getStatements(0));
+  }
+
+  @Test
+  public void testCreateTableIfNotExists_tableExists() throws SQLException {
+    addIfNotExistsDdlException();
+    String sql = "CREATE TABLE IF NOT EXISTS foo (id bigint primary key)";
+    addDdlResponseToSpannerAdmin();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to("foo")
+                .build(),
+            SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result was either an update count or there
+        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(0, updateDatabaseDdlRequests.size());
+  }
+
+  @Test
+  public void testCreateIndexIfNotExists_indexDoesNotExist() throws SQLException {
+    addIfNotExistsDdlException();
+    String sql = "CREATE INDEX IF NOT EXISTS foo on bar (value)";
+    addDdlResponseToSpannerAdmin();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "select 1 from information_schema.indexes where table_schema=$1 and index_name=$2")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to("foo")
+                .build(),
+            EMPTY_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result was either an update count or there
+        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    assertEquals(
+        "create index foo on bar (value)", updateDatabaseDdlRequests.get(0).getStatements(0));
+  }
+
+  @Test
+  public void testCreateIndexIfNotExists_indexExists() throws SQLException {
+    addIfNotExistsDdlException();
+    String sql = "CREATE INDEX IF NOT EXISTS foo on bar (value)";
+    addDdlResponseToSpannerAdmin();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "select 1 from information_schema.indexes where table_schema=$1 and index_name=$2")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to("foo")
+                .build(),
+            SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result was either an update count or there
+        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(0, updateDatabaseDdlRequests.size());
+  }
+
+  @Test
+  public void testDropTableIfExists_tableDoesNotExist() throws SQLException {
+    addIfNotExistsDdlException();
+    String sql = "DROP TABLE IF EXISTS foo";
+    addDdlResponseToSpannerAdmin();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to("foo")
+                .build(),
+            EMPTY_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result was either an update count or there
+        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(0, updateDatabaseDdlRequests.size());
+  }
+
+  @Test
+  public void testDropTableIfExists_tableExists() throws SQLException {
+    addIfNotExistsDdlException();
+    String sql = "DROP TABLE IF EXISTS foo";
+    addDdlResponseToSpannerAdmin();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to("foo")
+                .build(),
+            SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result was either an update count or there
+        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    assertEquals("drop table foo", updateDatabaseDdlRequests.get(0).getStatements(0));
+  }
+
+  @Test
+  public void testDropIndexIfExists_indexDoesNotExist() throws SQLException {
+    addIfNotExistsDdlException();
+    String sql = "DROP INDEX IF EXISTS foo";
+    addDdlResponseToSpannerAdmin();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "select 1 from information_schema.indexes where table_schema=$1 and index_name=$2")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to("foo")
+                .build(),
+            EMPTY_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result was either an update count or there
+        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(0, updateDatabaseDdlRequests.size());
+  }
+
+  @Test
+  public void testDropIndexIfExists_indexExists() throws SQLException {
+    addIfNotExistsDdlException();
+    String sql = "DROP INDEX IF EXISTS foo";
+    addDdlResponseToSpannerAdmin();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "select 1 from information_schema.indexes where table_schema=$1 and index_name=$2")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to("foo")
+                .build(),
+            SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result was either an update count or there
+        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    assertEquals("drop index foo", updateDatabaseDdlRequests.get(0).getStatements(0));
+  }
+
+  @Test
+  public void testDdlBatchWithIfNotExists() throws SQLException {
+    addIfNotExistsDdlException();
+    ImmutableList<String> statements =
+        ImmutableList.of(
+            "CREATE TABLE IF NOT EXISTS \"Foo\" (id bigint primary key)",
+            "CREATE TABLE IF NOT EXISTS bar (id bigint primary key, value text)",
+            "CREATE INDEX IF NOT EXISTS idx_foo ON bar (text)");
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to("Foo")
+                .build(),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "select 1 from information_schema.tables where table_schema=$1 and table_name=$2")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to("bar")
+                .build(),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "select 1 from information_schema.indexes where table_schema=$1 and index_name=$2")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to("idx_foo")
+                .build(),
+            SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        for (String sql : statements) {
+          statement.addBatch(sql);
+        }
+        int[] updateCounts = statement.executeBatch();
+        assertArrayEquals(new int[] {0, 0, 0}, updateCounts);
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(0, updateDatabaseDdlRequests.size());
+  }
+
+  @Test
+  public void testCreateTableIfNotExists_withBackendSupport() throws SQLException {
+    // Add a generic error that is returned for DDL statements. This will cause PGAdapter to think
+    // that the backend supports `IF [NOT] EXISTS`, as it does not receive a specific error
+    // regarding an `IF NOT EXISTS` statement.
+    addDdlExceptionToSpannerAdmin();
+    String sql = "CREATE TABLE IF NOT EXISTS foo (id bigint primary key)";
+    // Add a response for the DDL statement that is sent to Spanner.
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Statement#execute(String) returns false if the result was either an update count or there
+        // was no result. Statement#getUpdateCount() returns 0 if there was no result.
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(1, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    assertEquals(
+        "CREATE TABLE IF NOT EXISTS foo (id bigint primary key)",
+        updateDatabaseDdlRequests.get(0).getStatements(0));
   }
 
   @Test

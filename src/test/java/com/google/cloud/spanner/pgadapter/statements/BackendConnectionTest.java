@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.extractDdlUpdateCounts;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
@@ -26,6 +28,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
@@ -35,7 +38,9 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
+import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
@@ -53,6 +58,59 @@ import org.junit.runners.JUnit4;
 public class BackendConnectionTest {
   private final AbstractStatementParser PARSER =
       AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+  private static final NotExecuted NOT_EXECUTED = new NotExecuted();
+  private static final NoResult NO_RESULT = new NoResult();
+
+  @Test
+  public void testExtractDdlUpdateCounts() {
+    assertArrayEquals(new long[] {}, extractDdlUpdateCounts(ImmutableList.of(), new long[] {}));
+    assertArrayEquals(
+        new long[] {1L}, extractDdlUpdateCounts(ImmutableList.of(NO_RESULT), new long[] {1L}));
+    assertArrayEquals(
+        new long[] {1L, 1L},
+        extractDdlUpdateCounts(ImmutableList.of(NO_RESULT, NOT_EXECUTED), new long[] {1L}));
+    assertArrayEquals(
+        new long[] {1L, 1L},
+        extractDdlUpdateCounts(ImmutableList.of(NOT_EXECUTED, NO_RESULT), new long[] {1L}));
+    assertArrayEquals(
+        new long[] {1L, 1L},
+        extractDdlUpdateCounts(
+            ImmutableList.of(NOT_EXECUTED, NO_RESULT, NO_RESULT), new long[] {1L}));
+    assertArrayEquals(
+        new long[] {1L, 1L, 1L},
+        extractDdlUpdateCounts(
+            ImmutableList.of(NOT_EXECUTED, NO_RESULT, NOT_EXECUTED), new long[] {1L}));
+    assertArrayEquals(
+        new long[] {1L, 1L, 1L, 1L},
+        extractDdlUpdateCounts(
+            ImmutableList.of(NOT_EXECUTED, NOT_EXECUTED, NO_RESULT, NOT_EXECUTED),
+            new long[] {1L}));
+    assertArrayEquals(
+        new long[] {1L, 1L, 1L, 1L},
+        extractDdlUpdateCounts(
+            ImmutableList.of(NOT_EXECUTED, NOT_EXECUTED, NO_RESULT, NOT_EXECUTED, NO_RESULT),
+            new long[] {1L}));
+    assertArrayEquals(
+        new long[] {1L, 1L},
+        extractDdlUpdateCounts(
+            ImmutableList.of(NOT_EXECUTED, NO_RESULT, NO_RESULT, NOT_EXECUTED), new long[] {1L}));
+    assertArrayEquals(
+        new long[] {1L, 1L, 1L, 1L, 1L, 1L},
+        extractDdlUpdateCounts(
+            ImmutableList.of(
+                NOT_EXECUTED,
+                NO_RESULT,
+                NO_RESULT,
+                NOT_EXECUTED,
+                NOT_EXECUTED,
+                NO_RESULT,
+                NO_RESULT),
+            new long[] {1L, 1L, 1L}));
+    assertArrayEquals(
+        new long[] {1L, 1L, 1L},
+        extractDdlUpdateCounts(
+            ImmutableList.of(NOT_EXECUTED, NOT_EXECUTED, NOT_EXECUTED), new long[] {}));
+  }
 
   @Test
   public void testCopyPropagatesNonSpannerException() {
@@ -67,7 +125,11 @@ public class BackendConnectionTest {
     doThrow(rejectedExecutionException).when(executor).execute(any(Runnable.class));
 
     BackendConnection backendConnection =
-        new BackendConnection(spannerConnection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            spannerConnection,
+            DdlTransactionMode.Batch,
+            ImmutableList.of());
     Future<StatementResult> result =
         backendConnection.executeCopy(parsedStatement, statement, receiver, writer, executor);
     backendConnection.flush();
@@ -100,21 +162,33 @@ public class BackendConnectionTest {
     ParsedStatement parsedUnknownStatement = PARSER.parse(unknownStatement);
 
     BackendConnection onlyDmlStatements =
-        new BackendConnection(spannerConnection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            spannerConnection,
+            DdlTransactionMode.Batch,
+            ImmutableList.of());
     onlyDmlStatements.execute(parsedUpdateStatement, updateStatement);
     onlyDmlStatements.execute(parsedUpdateStatement, updateStatement);
     assertTrue(onlyDmlStatements.hasDmlOrCopyStatementsAfter(0));
     assertTrue(onlyDmlStatements.hasDmlOrCopyStatementsAfter(1));
 
     BackendConnection onlyCopyStatements =
-        new BackendConnection(spannerConnection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            spannerConnection,
+            DdlTransactionMode.Batch,
+            ImmutableList.of());
     onlyCopyStatements.executeCopy(parsedCopyStatement, copyStatement, receiver, writer, executor);
     onlyCopyStatements.executeCopy(parsedCopyStatement, copyStatement, receiver, writer, executor);
     assertTrue(onlyCopyStatements.hasDmlOrCopyStatementsAfter(0));
     assertTrue(onlyCopyStatements.hasDmlOrCopyStatementsAfter(1));
 
     BackendConnection dmlAndCopyStatements =
-        new BackendConnection(spannerConnection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            spannerConnection,
+            DdlTransactionMode.Batch,
+            ImmutableList.of());
     dmlAndCopyStatements.execute(parsedUpdateStatement, updateStatement);
     dmlAndCopyStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
@@ -122,35 +196,55 @@ public class BackendConnectionTest {
     assertTrue(dmlAndCopyStatements.hasDmlOrCopyStatementsAfter(1));
 
     BackendConnection onlySelectStatements =
-        new BackendConnection(spannerConnection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            spannerConnection,
+            DdlTransactionMode.Batch,
+            ImmutableList.of());
     onlySelectStatements.execute(parsedSelectStatement, selectStatement);
     onlySelectStatements.execute(parsedSelectStatement, selectStatement);
     assertFalse(onlySelectStatements.hasDmlOrCopyStatementsAfter(0));
     assertFalse(onlySelectStatements.hasDmlOrCopyStatementsAfter(1));
 
     BackendConnection onlyClientSideStatements =
-        new BackendConnection(spannerConnection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            spannerConnection,
+            DdlTransactionMode.Batch,
+            ImmutableList.of());
     onlyClientSideStatements.execute(parsedClientSideStatement, clientSideStatement);
     onlyClientSideStatements.execute(parsedClientSideStatement, clientSideStatement);
     assertFalse(onlyClientSideStatements.hasDmlOrCopyStatementsAfter(0));
     assertFalse(onlyClientSideStatements.hasDmlOrCopyStatementsAfter(1));
 
     BackendConnection onlyUnknownStatements =
-        new BackendConnection(spannerConnection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            spannerConnection,
+            DdlTransactionMode.Batch,
+            ImmutableList.of());
     onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement);
     onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement);
     assertFalse(onlyUnknownStatements.hasDmlOrCopyStatementsAfter(0));
     assertFalse(onlyUnknownStatements.hasDmlOrCopyStatementsAfter(1));
 
     BackendConnection dmlAndSelectStatements =
-        new BackendConnection(spannerConnection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            spannerConnection,
+            DdlTransactionMode.Batch,
+            ImmutableList.of());
     dmlAndSelectStatements.execute(parsedUpdateStatement, updateStatement);
     dmlAndSelectStatements.execute(parsedSelectStatement, selectStatement);
     assertTrue(dmlAndSelectStatements.hasDmlOrCopyStatementsAfter(0));
     assertFalse(dmlAndSelectStatements.hasDmlOrCopyStatementsAfter(1));
 
     BackendConnection copyAndSelectStatements =
-        new BackendConnection(spannerConnection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            spannerConnection,
+            DdlTransactionMode.Batch,
+            ImmutableList.of());
     copyAndSelectStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
     copyAndSelectStatements.execute(parsedSelectStatement, selectStatement);
@@ -158,7 +252,11 @@ public class BackendConnectionTest {
     assertFalse(copyAndSelectStatements.hasDmlOrCopyStatementsAfter(1));
 
     BackendConnection copyAndUnknownStatements =
-        new BackendConnection(spannerConnection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            spannerConnection,
+            DdlTransactionMode.Batch,
+            ImmutableList.of());
     copyAndUnknownStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
     copyAndUnknownStatements.execute(parsedUnknownStatement, unknownStatement);
@@ -180,7 +278,8 @@ public class BackendConnectionTest {
         .thenReturn(ListDatabasesStatement.LIST_DATABASES_SQL);
 
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch, localStatements);
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"), connection, DdlTransactionMode.Batch, localStatements);
     Future<StatementResult> resultFuture =
         backendConnection.execute(
             parsedListDatabasesStatement, Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL));
@@ -208,7 +307,8 @@ public class BackendConnectionTest {
     when(connection.execute(statement)).thenReturn(statementResult);
 
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch, localStatements);
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"), connection, DdlTransactionMode.Batch, localStatements);
     Future<StatementResult> resultFuture = backendConnection.execute(parsedStatement, statement);
     backendConnection.flush();
 

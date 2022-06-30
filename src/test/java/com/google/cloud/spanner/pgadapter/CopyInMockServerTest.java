@@ -48,7 +48,9 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
@@ -64,6 +66,7 @@ import org.postgresql.jdbc.PgConnection;
 
 @RunWith(Parameterized.class)
 public class CopyInMockServerTest extends AbstractMockServerTest {
+  @Rule public Timeout globalTimeout = Timeout.seconds(10);
 
   @Parameter public boolean useDomainSocket;
 

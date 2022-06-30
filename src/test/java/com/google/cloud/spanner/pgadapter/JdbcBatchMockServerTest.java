@@ -57,7 +57,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
 
   @Parameter public String preferQueryMode;
 
-  @Parameters(name = "preferQueryMode = {0}, useDomainSocket = {1}")
+  @Parameters(name = "preferQueryMode = {0}")
   public static List<Object[]> data() {
     String[] queryModes = {"extended", "simple"};
     List<Object[]> parameters = new ArrayList<>();
