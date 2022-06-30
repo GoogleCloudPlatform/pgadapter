@@ -45,7 +45,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -296,10 +296,7 @@ public class PgAdapterTestEnv {
     if (databaseId == null) {
       databaseId = System.getProperty(TEST_DATABASE_PROPERTY, DEFAULT_DATABASE_ID);
     }
-    String id =
-        String.format(
-            "%s_%d_%d",
-            databaseId, System.currentTimeMillis(), new Random().nextInt(Short.MAX_VALUE));
+    String id = String.format("%s_%s", databaseId, UUID.randomUUID().toString().replace('-', '_'));
     // Make sure the database id is not longer than the max allowed 30 characters.
     if (id.length() > 30) {
       id = id.substring(0, 30);
