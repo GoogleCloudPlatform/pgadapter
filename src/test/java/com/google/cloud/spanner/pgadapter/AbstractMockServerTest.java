@@ -106,6 +106,8 @@ public abstract class AbstractMockServerTest {
                           .build())
                   .build())
           .build();
+  protected static final com.google.spanner.v1.ResultSet EMPTY_RESULTSET =
+      com.google.spanner.v1.ResultSet.newBuilder().setMetadata(SELECT1_METADATA).build();
   protected static final com.google.spanner.v1.ResultSet SELECT1_RESULTSET =
       com.google.spanner.v1.ResultSet.newBuilder()
           .addRows(
@@ -455,5 +457,12 @@ public abstract class AbstractMockServerTest {
   protected void addDdlExceptionToSpannerAdmin() {
     mockDatabaseAdmin.addException(
         Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException());
+  }
+
+  protected static void addIfNotExistsDdlException() {
+    mockDatabaseAdmin.addException(
+        Status.INVALID_ARGUMENT
+            .withDescription("<IF NOT EXISTS> clause is not supported in <CREATE TABLE> statement.")
+            .asRuntimeException());
   }
 }

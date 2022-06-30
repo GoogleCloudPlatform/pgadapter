@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ReadContext;
@@ -167,7 +168,11 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch, EMPTY_LOCAL_STATEMENTS);
+        new BackendConnection(
+            connectionHandler.getDatabaseId(),
+            connection,
+            DdlTransactionMode.Batch,
+            EMPTY_LOCAL_STATEMENTS);
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("UPDATE", intermediateStatement.getCommand());
@@ -239,7 +244,11 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch, EMPTY_LOCAL_STATEMENTS);
+        new BackendConnection(
+            connectionHandler.getDatabaseId(),
+            connection,
+            DdlTransactionMode.Batch,
+            EMPTY_LOCAL_STATEMENTS);
 
     intermediateStatement.executeAsync(backendConnection);
     backendConnection.flush();
@@ -264,7 +273,11 @@ public class StatementTest {
             .to(30)
             .build();
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch, EMPTY_LOCAL_STATEMENTS);
+        new BackendConnection(
+            connectionHandler.getDatabaseId(),
+            connection,
+            DdlTransactionMode.Batch,
+            EMPTY_LOCAL_STATEMENTS);
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(
@@ -331,7 +344,11 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch, EMPTY_LOCAL_STATEMENTS);
+        new BackendConnection(
+            connectionHandler.getDatabaseId(),
+            connection,
+            DdlTransactionMode.Batch,
+            EMPTY_LOCAL_STATEMENTS);
 
     intermediateStatement.describeAsync(backendConnection);
     backendConnection.flush();
@@ -375,7 +392,11 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch, EMPTY_LOCAL_STATEMENTS);
+        new BackendConnection(
+            connectionHandler.getDatabaseId(),
+            connection,
+            DdlTransactionMode.Batch,
+            EMPTY_LOCAL_STATEMENTS);
 
     when(connection.execute(Statement.of(sqlStatement)))
         .thenThrow(
@@ -426,7 +447,8 @@ public class StatementTest {
             connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"), connection, DdlTransactionMode.Batch, ImmutableList.of());
     statement.executeAsync(backendConnection);
     backendConnection.flush();
 
@@ -479,7 +501,11 @@ public class StatementTest {
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch, EMPTY_LOCAL_STATEMENTS);
+        new BackendConnection(
+            connectionHandler.getDatabaseId(),
+            connection,
+            DdlTransactionMode.Batch,
+            EMPTY_LOCAL_STATEMENTS);
 
     intermediateStatement.executeAsync(backendConnection);
 
@@ -490,7 +516,8 @@ public class StatementTest {
   public void testCopyBatchSizeLimit() throws Exception {
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"), connection, DdlTransactionMode.Batch, ImmutableList.of());
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
 
@@ -526,7 +553,8 @@ public class StatementTest {
   public void testCopyDataRowLengthMismatchLimit() throws Exception {
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
-        new BackendConnection(connection, DdlTransactionMode.Batch, ImmutableList.of());
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"), connection, DdlTransactionMode.Batch, ImmutableList.of());
 
     byte[] payload = "1\t'one'\n2".getBytes();
 
