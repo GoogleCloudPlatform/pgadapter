@@ -14,11 +14,20 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -73,5 +82,61 @@ public class ConnectionHandlerTest {
 
     connection.terminate();
     verify(socket).close();
+  }
+
+  @Test
+  public void testHandleMessages_NonFatalException() throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(
+            SpannerExceptionFactory.newSpannerException(
+                ErrorCode.FAILED_PRECONDITION, "non-fatal test exception"))
+        .when(message)
+        .send();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+
+    connection.setMessageState(message);
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.UNAUTHENTICATED, connection.getStatus());
+  }
+
+  @Test
+  public void testHandleMessages_FatalException() throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    WireMessage message = mock(WireMessage.class);
+    when(server.recordMessage(message)).thenReturn(message);
+    doThrow(new EOFException("fatal test exception")).when(message).send();
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          public ConnectionMetadata getConnectionMetadata() {
+            return connectionMetadata;
+          }
+        };
+
+    connection.setMessageState(message);
+    connection.handleMessages();
+
+    assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
   }
 }
