@@ -48,3 +48,9 @@ line argument `-ddl=Single`. This option prohibits PGAdapter from executing batc
 You can solve this problem by either:
 1. Execute the DDL statements as single statements instead of as a batch.
 2. Remove the `-ddl=Single` command line argument when starting PGAdapter.
+
+## COPY Statement
+PGAdapter supports `COPY table_name FROM STDIN`. See [copy support](copy.md) for more information.
+
+Other `COPY` variants, such as `COPY table_name FROM file_name` or `COPY table_name FROM PROGRAM`,
+are not supported. `COPY table_name TO ...` is also not supported.
