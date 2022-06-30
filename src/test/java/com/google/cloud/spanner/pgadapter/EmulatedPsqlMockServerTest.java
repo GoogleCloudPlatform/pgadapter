@@ -22,7 +22,6 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
-import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.common.collect.ImmutableList;
 import com.google.rpc.ResourceInfo;
 import com.google.spanner.admin.database.v1.Database;
@@ -177,7 +176,7 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
           exception.getMessage(),
           exception.getMessage().contains("\tprojects/p/instances/i/databases/google-sql-db\n"));
     } finally {
-      SpannerPool.closeSpannerPool();
+      closeSpannerPool(true);
     }
   }
 
@@ -215,7 +214,7 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
       assertTrue(
           exception.getMessage(), exception.getMessage().contains("\tprojects/p/instances/i\n"));
     } finally {
-      SpannerPool.closeSpannerPool();
+      closeSpannerPool(true);
     }
   }
 
