@@ -66,7 +66,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.postgresql.PGStatement;
-import org.postgresql.core.Oid;
 import org.postgresql.jdbc.PgStatement;
 
 @RunWith(JUnit4.class)
@@ -93,12 +92,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
    * mode for queries and DML statements.
    */
   private String createUrl() {
-    // Force binary transfer of date parameters to prevent PostgreSQL from sending them with type
-    // Oid.UNSPECIFIED. This setting is however at this moment ignored and depends on this PR:
-    // https://github.com/pgjdbc/pgjdbc/pull/2476
-    return String.format(
-        "jdbc:postgresql://localhost:%d/?binaryTransferEnable=%d",
-        pgServer.getLocalPort(), Oid.DATE);
+    return String.format("jdbc:postgresql://localhost:%d/", pgServer.getLocalPort());
   }
 
   @Test
