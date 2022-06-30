@@ -47,6 +47,7 @@ import java.sql.SQLException;
 import java.util.List;
 import org.junit.After;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -54,6 +55,8 @@ import org.postgresql.PGProperty;
 
 @RunWith(JUnit4.class)
 public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
+  // @Rule public Timeout globalTimeout = Timeout.seconds(10);
+
   private static final String INSERT1 = "insert into foo values (1)";
   private static final String INSERT2 = "insert into foo values (2)";
 
@@ -129,10 +132,12 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
     assertEquals(DatabaseName.parse(databaseName), gotDatabaseName);
   }
 
+  @Ignore(
+      "Skipped because of a bug in the gRPC server implementation that causes random NullPointerExceptions")
   @Test
   public void testConnectToNonExistingDatabase() {
     try {
-      mockSpanner.setExecuteStreamingSqlExecutionTime(
+      mockSpanner.setBatchCreateSessionsExecutionTime(
           SimulatedExecutionTime.stickyDatabaseNotFoundException("non-existing-db"));
       // The Connection API calls listInstanceConfigs(..) once first when the connection is a
       // localhost connection. It does so to verify that the connection is valid and to quickly
