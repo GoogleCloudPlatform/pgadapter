@@ -316,7 +316,6 @@ public class CopyStatement extends IntermediatePortalStatement {
 
   @Override
   public void handleExecutionException(SpannerException exception) {
-    executor.shutdownNow();
     super.handleExecutionException(exception);
   }
 

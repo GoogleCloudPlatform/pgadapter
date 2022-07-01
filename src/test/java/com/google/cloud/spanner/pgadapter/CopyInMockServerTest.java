@@ -48,9 +48,7 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
@@ -66,7 +64,7 @@ import org.postgresql.jdbc.PgConnection;
 
 @RunWith(Parameterized.class)
 public class CopyInMockServerTest extends AbstractMockServerTest {
-  @Rule public Timeout globalTimeout = Timeout.seconds(10);
+  // @Rule public Timeout globalTimeout = Timeout.seconds(10);
 
   @Parameter public boolean useDomainSocket;
 
@@ -215,14 +213,14 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                   copyManager.copyIn(
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
-      assertTrue(
-          exception.getMessage(),
-          exception
-                  .getMessage()
-                  .contains("FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.")
-              || exception
-                  .getMessage()
-                  .contains("Database connection failed when canceling copy operation"));
+
+      assertEquals(
+          "ERROR: FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.\n"
+              + "\n"
+              + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
+              + "\n"
+              + "Execute `SET AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.\n\n",
+          exception.getMessage());
     }
   }
 
@@ -291,8 +289,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       }
     }
 
-    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertTrue(commitRequests.isEmpty());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -443,6 +440,18 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar(0);
       stream.flush();
 
+      // Wait for the CopyInResponse.
+      boolean receivedCopyInResponse = false;
+      while (!receivedCopyInResponse) {
+        int command = stream.receiveChar();
+        if (command == 'G') {
+          receivedCopyInResponse = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
+
       // Send a CopyData message and then a 'Q', which is not allowed.
       stream.sendChar('d');
       stream.sendInteger4(payload.length + 4);
@@ -454,14 +463,23 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendInteger4(13);
       stream.send("SELECT 1".getBytes(StandardCharsets.UTF_8));
       stream.sendChar(0);
+
+      String error = "Error";
+      stream.sendChar('f');
+      stream.sendInteger4(4 + error.getBytes(StandardCharsets.UTF_8).length + 1);
+      stream.send(error.getBytes(StandardCharsets.UTF_8));
+      stream.sendChar(0);
       stream.flush();
 
-      boolean receivedErrorMessage = false;
+      boolean receivedReadyForQuery = false;
       StringBuilder errorMessage = new StringBuilder();
-      while (!receivedErrorMessage) {
+      while (!receivedReadyForQuery) {
         int command = stream.receiveChar();
-        if (command == 'E') {
-          receivedErrorMessage = true;
+        if (command == 'Z') {
+          receivedReadyForQuery = true;
+          // Skip the status flag.
+          stream.skip(1);
+        } else if (command == 'E') {
           // Read and ignore the length.
           stream.receiveInteger4();
           while (stream.receiveChar() > 0) {
@@ -476,11 +494,12 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       assertEquals(
           "ERROR\n"
               + "XX000\n"
-              + "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: 'Q'\n",
+              + "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: 'Q'\n"
+              + "ERROR\n"
+              + "P0001\n"
+              + "CANCELLED: Error\n",
           errorMessage.toString());
 
-      stream.sendChar('c');
-      stream.sendInteger4(4);
       stream.sendChar('x');
       stream.sendInteger4(4);
       stream.flush();
@@ -589,6 +608,18 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar(0);
       stream.flush();
 
+      // Wait for the first CopyInResponse.
+      boolean receivedCopyInResponse = false;
+      while (!receivedCopyInResponse) {
+        int command = stream.receiveChar();
+        if (command == 'G') {
+          receivedCopyInResponse = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
+
       // Send CopyData + CopyDone for the first copy operation.
       stream.sendChar('d');
       stream.sendInteger4(row1.length + 4);
@@ -596,6 +627,30 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar('c');
       stream.sendInteger4(4);
       stream.flush();
+
+      // Wait for CommandComplete
+      boolean receivedCommandComplete = false;
+      while (!receivedCommandComplete) {
+        int command = stream.receiveChar();
+        if (command == 'C') {
+          receivedCommandComplete = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
+
+      // Wait for the second CopyInResponse.
+      receivedCopyInResponse = false;
+      while (!receivedCopyInResponse) {
+        int command = stream.receiveChar();
+        if (command == 'G') {
+          receivedCopyInResponse = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
 
       // Send CopyData + CopyDone for the second copy operation.
       stream.sendChar('d');
@@ -610,11 +665,10 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         int command = stream.receiveChar();
         if (command == 'Z') {
           receivedReadyForQuery = true;
-        } else {
-          // Just skip everything in the message.
-          length = stream.receiveInteger4();
-          stream.skip(length - 4);
         }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
       }
     }
 
@@ -659,6 +713,18 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar(0);
       stream.flush();
 
+      // Wait for the CopyInResponse.
+      boolean receivedCopyInResponse = false;
+      while (!receivedCopyInResponse) {
+        int command = stream.receiveChar();
+        if (command == 'G') {
+          receivedCopyInResponse = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
+
       // Send CopyData + CopyDone for the first copy operation.
       stream.sendChar('d');
       stream.sendInteger4(row1.length + 4);
@@ -666,6 +732,30 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar('c');
       stream.sendInteger4(4);
       stream.flush();
+
+      // Wait for CommandComplete
+      boolean receivedCommandComplete = false;
+      while (!receivedCommandComplete) {
+        int command = stream.receiveChar();
+        if (command == 'C') {
+          receivedCommandComplete = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
+
+      // Wait for the second CopyInResponse.
+      receivedCopyInResponse = false;
+      while (!receivedCopyInResponse) {
+        int command = stream.receiveChar();
+        if (command == 'G') {
+          receivedCopyInResponse = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
 
       // Send CopyData + CopyFail for the second copy operation.
       stream.sendChar('d');
@@ -685,6 +775,8 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         int command = stream.receiveChar();
         if (command == 'Z') {
           receivedReadyForQuery = true;
+          // Skip the status flag.
+          stream.skip(1);
         } else if (command == 'E') {
           receivedErrorMessage = true;
           // Read and ignore the length.

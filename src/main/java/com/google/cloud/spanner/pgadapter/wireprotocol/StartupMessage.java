@@ -77,7 +77,7 @@ public class StartupMessage extends BootstrapMessage {
       throws Exception {
     connection.connectToSpanner(database, credentials);
     sendStartupMessage(
-        connection.getConnectionMetadata().getOutputStream(),
+        connection.getConnectionMetadata().peekOutputStream(),
         connection.getConnectionId(),
         connection.getSecret(),
         connection.getServer().getOptions());

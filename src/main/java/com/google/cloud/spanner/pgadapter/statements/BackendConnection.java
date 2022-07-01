@@ -210,6 +210,10 @@ public class BackendConnection {
         ListenableFuture<StatementResult> statementResultFuture = executor.submit(mutationWriter);
         ListenableFuture<Void> copyDataReceiverFuture = executor.submit(copyDataReceiver);
         this.result.setFuture(statementResultFuture);
+
+        //noinspection UnstableApiUsage
+        Futures.successfulAsList(copyDataReceiverFuture, statementResultFuture).get();
+        //noinspection UnstableApiUsage
         Futures.allAsList(copyDataReceiverFuture, statementResultFuture).get();
       } catch (ExecutionException executionException) {
         result.setException(executionException.getCause());

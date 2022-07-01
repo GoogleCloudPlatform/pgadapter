@@ -47,9 +47,6 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -221,22 +218,17 @@ public class ConnectionHandler extends Thread {
                 "Connection handler with ID %s starting for client %s",
                 getName(), socket.getInetAddress().getHostAddress()));
 
-    try (DataInputStream input =
-            new DataInputStream(
-                new BufferedInputStream(this.socket.getInputStream(), SOCKET_BUFFER_SIZE));
-        DataOutputStream output =
-            new DataOutputStream(
-                new BufferedOutputStream(this.socket.getOutputStream(), SOCKET_BUFFER_SIZE))) {
+    try (ConnectionMetadata connectionMetadata =
+        new ConnectionMetadata(this.socket.getInputStream(), this.socket.getOutputStream())) {
+      this.connectionMetadata = connectionMetadata;
       if (!server.getOptions().disableLocalhostCheck()
           && !this.socket.getInetAddress().isAnyLocalAddress()
           && !this.socket.getInetAddress().isLoopbackAddress()) {
-        handleError(
-            output, new IllegalAccessException("This proxy may only be accessed from localhost."));
+        handleError(new IllegalAccessException("This proxy may only be accessed from localhost."));
         return;
       }
 
       try {
-        this.connectionMetadata = new ConnectionMetadata(input, output);
         this.message = this.server.recordMessage(BootstrapMessage.create(this));
         this.message.send();
         while (this.status == ConnectionStatus.UNAUTHENTICATED) {
@@ -255,7 +247,7 @@ public class ConnectionHandler extends Thread {
           handleMessages();
         }
       } catch (Exception e) {
-        this.handleError(output, e);
+        this.handleError(e);
       }
     } catch (Exception e) {
       logger.log(
@@ -296,14 +288,14 @@ public class ConnectionHandler extends Thread {
       message.nextHandler();
       message.send();
     } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
-      this.handleError(getConnectionMetadata().getOutputStream(), fatalException);
+      this.handleError(fatalException);
       if (this.status == ConnectionStatus.COPY_IN) {
-        this.status = ConnectionStatus.COPY_FAILED;
+        //        this.status = ConnectionStatus.COPY_FAILED;
       } else {
         terminate();
       }
     } catch (Exception e) {
-      this.handleError(getConnectionMetadata().getOutputStream(), e);
+      this.handleError(e);
     }
   }
 
@@ -342,12 +334,13 @@ public class ConnectionHandler extends Thread {
    * @param exception The exception to be related.
    * @throws IOException if there is some issue in the sending of the error messages.
    */
-  private void handleError(DataOutputStream output, Exception exception) throws Exception {
+  private void handleError(Exception exception) throws Exception {
     logger.log(
         Level.WARNING,
         exception,
         () ->
             String.format("Exception on connection handler with ID %s: %s", getName(), exception));
+    DataOutputStream output = getConnectionMetadata().peekOutputStream();
     if (this.status == ConnectionStatus.TERMINATED) {
       new ErrorResponse(output, exception, ErrorResponse.State.InternalError, Severity.FATAL)
           .send();
