@@ -14,15 +14,15 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import static com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.MAX_INVALID_MESSAGE_COUNT;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -33,8 +33,10 @@ import static org.mockito.Mockito.when;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ReadContext;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -52,7 +54,6 @@ import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
@@ -935,7 +936,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    Exception testException = new Exception("test error");
+    SpannerException testException =
+        SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT, "test error");
     when(intermediatePortalStatement.hasException()).thenReturn(true);
     when(intermediatePortalStatement.getException()).thenReturn(testException);
     when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
@@ -1112,10 +1114,8 @@ public class ProtocolTest {
     byte[] value = Bytes.concat(messageMetadata, length);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
-    ByteArrayOutputStream result = new ByteArrayOutputStream();
-    DataOutputStream outputStream = new DataOutputStream(result);
+    DataOutputStream outputStream = mock(DataOutputStream.class);
 
-    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1127,11 +1127,8 @@ public class ProtocolTest {
 
     message.send();
 
-    // ReadyResponse
-    DataInputStream outputResult = inputStreamFromOutputStream(result);
-    assertEquals('Z', outputResult.readByte());
-    assertEquals(5, outputResult.readInt());
-    assertEquals('I', outputResult.readByte());
+    verify(extendedQueryProtocolHandler).flush();
+    verify(extendedQueryProtocolHandler, never()).sync();
   }
 
   @Test
@@ -1143,13 +1140,10 @@ public class ProtocolTest {
     byte[] value = Bytes.concat(messageMetadata, length);
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
-    ByteArrayOutputStream result = new ByteArrayOutputStream();
-    DataOutputStream outputStream = new DataOutputStream(result);
+    DataOutputStream outputStream = mock(DataOutputStream.class);
 
-    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
-    when(connection.isInTransaction()).thenReturn(true);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
@@ -1159,11 +1153,8 @@ public class ProtocolTest {
 
     message.send();
 
-    // ReadyResponse
-    DataInputStream outputResult = inputStreamFromOutputStream(result);
-    assertEquals('Z', outputResult.readByte());
-    assertEquals(5, outputResult.readInt());
-    assertEquals('T', outputResult.readByte());
+    verify(extendedQueryProtocolHandler).flush();
+    verify(extendedQueryProtocolHandler, never()).sync();
   }
 
   @Test
@@ -1284,6 +1275,26 @@ public class ProtocolTest {
   }
 
   @Test
+  public void testCopyDataMessageWithNoCopyStatement() throws Exception {
+    byte[] messageMetadata = {'d'};
+    byte[] payload = "This is the payload".getBytes();
+    byte[] length = intToBytes(4 + payload.length);
+    byte[] value = Bytes.concat(messageMetadata, length, payload);
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+
+    when(connectionHandler.getActiveStatement()).thenReturn(null);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = ControlMessage.create(connectionHandler);
+    // This should be a no-op.
+    message.sendPayload();
+  }
+
+  @Test
   public void testMultipleCopyDataMessages() throws Exception {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
@@ -1303,16 +1314,10 @@ public class ProtocolTest {
     DataInputStream inputStream2 = new DataInputStream(new ByteArrayInputStream(value2));
     DataInputStream inputStream3 = new DataInputStream(new ByteArrayInputStream(value3));
 
-    ResultSet spannerType = mock(ResultSet.class);
-    when(spannerType.getString("column_name")).thenReturn("key", "value");
-    when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
-    when(spannerType.next()).thenReturn(true, true, false);
-    when(connection.executeQuery(any(Statement.class))).thenReturn(spannerType);
-
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(connectionHandler, options, parse(sql), Statement.of(sql));
-    copyStatement.execute();
+        new CopyStatement(connectionHandler, options, "", parse(sql), Statement.of(sql));
+    copyStatement.executeAsync(mock(BackendConnection.class));
 
     when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
@@ -1355,24 +1360,22 @@ public class ProtocolTest {
     DataOutputStream outputStream = new DataOutputStream(result);
 
     CopyStatement copyStatement = mock(CopyStatement.class);
+    MutationWriter mutationWriter = mock(MutationWriter.class);
+    when(copyStatement.getMutationWriter()).thenReturn(mutationWriter);
     when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
-    MutationWriter mb = mock(MutationWriter.class);
-    when(copyStatement.getMutationWriter()).thenReturn(mb);
     WireMessage message = ControlMessage.create(connectionHandler);
 
     assertEquals(CopyDoneMessage.class, message.getClass());
     CopyDoneMessage messageSpy = (CopyDoneMessage) spy(message);
-    doNothing()
-        .when(messageSpy)
-        .sendSpannerResult(any(IntermediateStatement.class), any(QueryMode.class), anyLong());
 
     messageSpy.send();
-    verify(messageSpy).sendSpannerResult(copyStatement, QueryMode.SIMPLE, 0L);
+    verify(messageSpy).sendPayload();
+    verify(mutationWriter).commit();
   }
 
   @Test
@@ -1415,8 +1418,8 @@ public class ProtocolTest {
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
         new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
-    copyStatement.execute();
+            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+    copyStatement.executeAsync(mock(BackendConnection.class));
 
     MutationWriter mw = copyStatement.getMutationWriter();
     mw.addCopyData(payload);
@@ -1426,113 +1429,6 @@ public class ProtocolTest {
 
     copyStatement.close();
     verify(resultSet, never()).close();
-  }
-
-  @Test
-  public void testCopyBatchSizeLimit() throws Exception {
-    setupQueryInformationSchemaResults();
-    when(connection.getDatabaseClient()).thenReturn(mock(DatabaseClient.class));
-
-    byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
-
-    String sql = "COPY keyvalue FROM STDIN;";
-    CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
-
-    assertFalse(copyStatement.isExecuted());
-    copyStatement.execute();
-    assertTrue(copyStatement.isExecuted());
-
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(payload);
-    mw.close();
-
-    assertEquals("TEXT", copyStatement.getFormatType());
-    assertEquals('\t', copyStatement.getDelimiterChar());
-    assertFalse(copyStatement.hasException());
-    assertEquals(12L, copyStatement.getUpdateCount());
-    assertEquals(12L, mw.getRowCount());
-
-    copyStatement.close();
-  }
-
-  @Test
-  public void testCopyDataRowLengthMismatchLimit() throws Exception {
-    setupQueryInformationSchemaResults();
-
-    byte[] payload = "1\t'one'\n2".getBytes();
-
-    String sql = "COPY keyvalue FROM STDIN;";
-    CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
-
-    assertFalse(copyStatement.isExecuted());
-    copyStatement.execute();
-    assertTrue(copyStatement.isExecuted());
-
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(payload);
-    mw.close();
-
-    SpannerException thrown = assertThrows(SpannerException.class, copyStatement::getUpdateCount);
-    assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
-    assertEquals(
-        "INVALID_ARGUMENT: Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
-        thrown.getMessage());
-
-    copyStatement.close();
-  }
-
-  @Test
-  public void testCopyResumeErrorOutputFile() throws Exception {
-    setupQueryInformationSchemaResults();
-
-    byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/test-copy-output.txt"));
-
-    String sql = "COPY keyvalue FROM STDIN;";
-    CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), parse(sql), Statement.of(sql));
-    assertFalse(copyStatement.isExecuted());
-    copyStatement.execute();
-    assertTrue(copyStatement.isExecuted());
-
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(payload);
-
-    SpannerException thrown = assertThrows(SpannerException.class, copyStatement::getUpdateCount);
-    assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
-    assertEquals(
-        "INVALID_ARGUMENT: Invalid input syntax for type INT64:\"'5'\"", thrown.getMessage());
-
-    copyStatement.close();
-  }
-
-  @Test
-  public void testCopyResumeErrorStartOutputFile() throws Exception {
-    setupQueryInformationSchemaResults();
-
-    byte[] payload =
-        Files.readAllBytes(Paths.get("./src/test/resources/test-copy-start-output.txt"));
-
-    String sql = "COPY keyvalue FROM STDIN;";
-    CopyStatement copyStatement =
-        new CopyStatement(connectionHandler, options, parse(sql), Statement.of(sql));
-    assertFalse(copyStatement.isExecuted());
-    copyStatement.execute();
-    assertTrue(copyStatement.isExecuted());
-
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(payload);
-
-    SpannerException thrown = assertThrows(SpannerException.class, copyStatement::getUpdateCount);
-    assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
-    assertEquals(
-        "INVALID_ARGUMENT: Invalid input syntax for type INT64:\"'1'\"", thrown.getMessage());
-
-    copyStatement.close();
   }
 
   @Test
@@ -1801,13 +1697,184 @@ public class ProtocolTest {
     assertThrows(IllegalStateException.class, describeMessage::getPortalMetadata);
   }
 
+  @Test
+  public void testSkipMessage() throws Exception {
+    byte[] messageMetadata = {0, 0, 0, 45};
+    String payload = "INSERT INTO users (name) VALUES ('test')\0";
+    byte[] value = Bytes.concat(messageMetadata, payload.getBytes());
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+
+    SkipMessage message = SkipMessage.createForValidStream(connectionHandler);
+    message.send();
+
+    // Verify that nothing was written to the output.
+    assertEquals(0, result.size());
+    assertEquals("Skip", message.getMessageName());
+    assertEquals("", message.getIdentifier());
+    assertEquals("Length: 45", message.getPayloadString());
+  }
+
+  @Test
+  public void testFlushSkippedInCopyMode() throws Exception {
+    byte[] messageMetadata = {FlushMessage.IDENTIFIER, 0, 0, 0, 4};
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(messageMetadata));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
+
+    ControlMessage message = ControlMessage.create(connectionHandler);
+
+    assertEquals(SkipMessage.class, message.getClass());
+    // Verify that nothing was written to the output.
+    assertEquals(0, result.size());
+  }
+
+  @Test
+  public void testSyncSkippedInCopyMode() throws Exception {
+    byte[] messageMetadata = {SyncMessage.IDENTIFIER, 0, 0, 0, 4};
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(messageMetadata));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
+
+    ControlMessage message = ControlMessage.create(connectionHandler);
+
+    assertEquals(SkipMessage.class, message.getClass());
+    // Verify that nothing was written to the output.
+    assertEquals(0, result.size());
+  }
+
+  @Test
+  public void testCopyDataSkippedInNormalMode() throws Exception {
+    byte[] messageMetadata = {CopyDataMessage.IDENTIFIER, 0, 0, 0, 4};
+    String payload = "1\t'One'\n2\t'Two'\n";
+    byte[] value = Bytes.concat(messageMetadata, payload.getBytes());
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
+
+    ControlMessage message = ControlMessage.create(connectionHandler);
+
+    assertEquals(SkipMessage.class, message.getClass());
+    // Verify that nothing was written to the output.
+    assertEquals(0, result.size());
+  }
+
+  @Test
+  public void testCopyDoneSkippedInNormalMode() throws Exception {
+    byte[] messageMetadata = {CopyDoneMessage.IDENTIFIER, 0, 0, 0, 4};
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(messageMetadata));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
+
+    ControlMessage message = ControlMessage.create(connectionHandler);
+
+    assertEquals(SkipMessage.class, message.getClass());
+    // Verify that nothing was written to the output.
+    assertEquals(0, result.size());
+  }
+
+  @Test
+  public void testCopyFailSkippedInNormalMode() throws Exception {
+    byte[] messageMetadata = {CopyFailMessage.IDENTIFIER, 0, 0, 0, 4};
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(messageMetadata));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
+
+    ControlMessage message = ControlMessage.create(connectionHandler);
+
+    assertEquals(SkipMessage.class, message.getClass());
+    // Verify that nothing was written to the output.
+    assertEquals(0, result.size());
+  }
+
+  @Test
+  public void testRepeatedCopyDataInNormalMode_TerminatesConnectionAndReturnsError()
+      throws Exception {
+    String payload = "1\t'One'\n2\t'Two'\n";
+    byte[] messageMetadata = {
+      CopyDataMessage.IDENTIFIER,
+      0,
+      0,
+      0,
+      (byte) (4 + payload.getBytes(StandardCharsets.UTF_8).length)
+    };
+    byte[] value = new byte[0];
+    for (int i = 0; i <= MAX_INVALID_MESSAGE_COUNT; i++) {
+      value = Bytes.concat(value, messageMetadata, payload.getBytes());
+    }
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
+    doCallRealMethod().when(connectionHandler).increaseInvalidMessageCount();
+    when(connectionHandler.getInvalidMessageCount()).thenCallRealMethod();
+
+    for (int i = 0; i < MAX_INVALID_MESSAGE_COUNT; i++) {
+      ControlMessage message = ControlMessage.create(connectionHandler);
+      assertEquals(SkipMessage.class, message.getClass());
+      // Verify that nothing was written to the output.
+      assertEquals(0, result.size());
+      verify(connectionHandler, never()).setStatus(ConnectionStatus.TERMINATED);
+    }
+
+    ControlMessage.create(connectionHandler);
+    verify(connectionHandler).setStatus(ConnectionStatus.TERMINATED);
+    byte[] resultBytes = result.toByteArray();
+    assertEquals('E', resultBytes[0]);
+  }
+
   private void setupQueryInformationSchemaResults() {
+    DatabaseClient databaseClient = mock(DatabaseClient.class);
+    ReadContext singleUseReadContext = mock(ReadContext.class);
+    when(databaseClient.singleUse()).thenReturn(singleUseReadContext);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connection.getDatabaseClient()).thenReturn(databaseClient);
     ResultSet spannerType = mock(ResultSet.class);
     when(spannerType.getString("column_name")).thenReturn("key", "value");
     when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
     when(spannerType.next()).thenReturn(true, true, false);
-    when(connection.executeQuery(
+    when(singleUseReadContext.executeQuery(
             ArgumentMatchers.argThat(
                 statement ->
                     statement != null && statement.getSql().startsWith("SELECT column_name"))))
@@ -1816,7 +1883,7 @@ public class ProtocolTest {
     ResultSet countResult = mock(ResultSet.class);
     when(countResult.getLong(0)).thenReturn(2L);
     when(countResult.next()).thenReturn(true, false);
-    when(connection.executeQuery(
+    when(singleUseReadContext.executeQuery(
             ArgumentMatchers.argThat(
                 statement ->
                     statement != null && statement.getSql().startsWith("SELECT COUNT(*)"))))
