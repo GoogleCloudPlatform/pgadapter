@@ -195,7 +195,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testInsertParametrized() throws IOException, InterruptedException {
+  public void testInsertParameterized() throws IOException, InterruptedException {
     String sql =
         "Insert into all_types("
             + "col_bigint, "
@@ -254,7 +254,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testSelectParametrized() throws IOException, InterruptedException {
+  public void testSelectParameterized() throws IOException, InterruptedException {
     String sql =
         "Select "
             + "col_bigint, "
@@ -278,7 +278,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testUpdateParametrized() throws IOException, InterruptedException {
+  public void testUpdateParameterized() throws IOException, InterruptedException {
     String sql =
         "UPDATE all_types SET "
             + "col_bool = %(bool)s,"
@@ -345,7 +345,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testDeleteParametrized() throws IOException, InterruptedException {
+  public void testDeleteParameterized() throws IOException, InterruptedException {
     String sql = "DELETE FROM all_types where col_varchar = %s";
 
     ArrayList<String> parameters = new ArrayList<>();
