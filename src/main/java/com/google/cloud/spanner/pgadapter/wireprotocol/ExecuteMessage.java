@@ -91,7 +91,11 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
    */
   private void handleExecute() throws Exception {
     // Copy response is handled directly in the COPY protocol.
-    if (!(this.statement instanceof CopyStatement)) {
+    if (this.statement instanceof CopyStatement) {
+      if (this.statement.hasException()) {
+        throw this.statement.getException();
+      }
+    } else {
       if (this.statement.hasException()) {
         this.handleError(this.statement.getException());
       } else {

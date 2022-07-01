@@ -20,6 +20,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
+import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -29,6 +30,7 @@ import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.Mutation;
 import com.google.spanner.v1.Mutation.OperationCase;
 import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
@@ -588,6 +590,49 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCopyInBatchPsqlWithError() throws Exception {
+    assumeTrue("This test requires psql to be installed", isPsqlAvailable());
+    setupCopyInformationSchemaResults();
+
+    String host = useDomainSocket ? "/tmp" : "localhost";
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand =
+        new String[] {"psql", "-h", host, "-p", String.valueOf(pgServer.getLocalPort())};
+    builder.command(psqlCommand);
+    Process process = builder.start();
+    String errors;
+    String output;
+
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      // The 'INSERT INTO FOO VALUES ('abc')' statement will return an error.
+      writer.write(
+          "SELECT 1\\;copy users from stdin\\;INSERT INTO FOO VALUES ('abc')\\;copy users from stdin\\;SELECT 2;\n"
+              + "1\t2\t3\n"
+              + "\\.\n"
+              + "\n"
+              + "\\q\n");
+      writer.flush();
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    assertEquals(
+        "ERROR:  INVALID_ARGUMENT: com.google.api.gax.rpc.InvalidArgumentException: io.grpc.StatusRuntimeException: INVALID_ARGUMENT: Statement is invalid.",
+        errors);
+    assertEquals("", output);
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    // The batch is executed as one implicit transaction. That transaction should be rolled back.
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
   public void testCopyInBatch() throws Exception {
     setupCopyInformationSchemaResults();
 
@@ -793,14 +838,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         }
       }
       assertTrue(receivedErrorMessage);
-      assertEquals(
-          "ERROR\n"
-              + "P0001\n"
-              + "CANCELLED: Changed my mind\n"
-              + "ERROR\n"
-              + "P0001\n"
-              + "INVALID_ARGUMENT: current transaction is aborted, commands ignored until end of transaction block\n",
-          errorMessage.toString());
+      assertEquals("ERROR\n" + "P0001\n" + "CANCELLED: Changed my mind\n", errorMessage.toString());
     }
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
@@ -810,6 +848,11 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   private void setupCopyInformationSchemaResults(boolean tableFound) {
+    setupCopyInformationSchemaResults(mockSpanner, tableFound);
+  }
+
+  public static void setupCopyInformationSchemaResults(
+      MockSpannerServiceImpl mockSpanner, boolean tableFound) {
     ResultSetMetadata metadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
