@@ -28,6 +28,7 @@ import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSortedSet;
@@ -290,7 +291,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       return null;
     }
     parser.eat("into");
-    String table = parser.readIdentifier();
+    TableOrIndexName table = parser.readTableOrIndexName();
     if (table == null) {
       return null;
     }
@@ -356,10 +357,10 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * without a column list. The query that is used does not use the INFORMATION_SCHEMA, but queries
    * the table directly, so it can use the same transaction as the actual insert statement.
    */
-  static List<String> getAllColumns(Connection connection, String table) {
+  static List<String> getAllColumns(Connection connection, TableOrIndexName table) {
     try (ResultSet resultSet =
         connection.analyzeQuery(
-            Statement.of("SELECT * FROM \"" + table + "\" LIMIT 1"), QueryAnalyzeMode.PLAN)) {
+            Statement.of("SELECT * FROM " + table + " LIMIT 1"), QueryAnalyzeMode.PLAN)) {
       return resultSet.getType().getStructFields().stream()
           .map(StructField::getName)
           .collect(Collectors.toList());
@@ -387,7 +388,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       return null;
     }
     parser.eat("only");
-    String table = parser.readIdentifier();
+    TableOrIndexName table = parser.readTableOrIndexName();
     if (table == null) {
       return null;
     }
@@ -437,7 +438,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       return null;
     }
     parser.eat("from");
-    String table = parser.readIdentifier();
+    TableOrIndexName table = parser.readTableOrIndexName();
     if (table == null) {
       return null;
     }

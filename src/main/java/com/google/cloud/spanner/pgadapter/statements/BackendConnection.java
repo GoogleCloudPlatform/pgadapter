@@ -14,7 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
+
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerBatchUpdateException;
@@ -27,16 +30,30 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
+import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
+import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
+import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
@@ -144,9 +161,62 @@ public class BackendConnection {
           result.set(NO_RESULT);
         } else if (statement.getSql().isEmpty()) {
           result.set(NO_RESULT);
+        } else if (parsedStatement.isDdl()) {
+          result.set(ddlExecutor.execute(parsedStatement, statement));
         } else {
           result.set(spannerConnection.execute(statement));
         }
+      } catch (Exception exception) {
+        result.setException(exception);
+        throw exception;
+      }
+    }
+  }
+
+  /**
+   * This statement represents a COPY table FROM STDIN statement. This has no one-on-one mapping
+   * with a Cloud Spanner SQL statement and is therefore executed using a custom {@link
+   * MutationWriter}. As the COPY implementation uses mutations instead of DML, it has slightly
+   * different transaction semantics than in real PostgreSQL. A COPY operation will by default be
+   * atomic, but can be configured to behave non-atomically for large batches. Also, if a COPY
+   * operation is executed in a transaction (both implicit and explicit), it will commit the
+   * transaction when the COPY operation is done. This is required to flush the mutations to the
+   * database.
+   */
+  private final class Copy extends BufferedStatement<StatementResult> {
+    private final CopyDataReceiver copyDataReceiver;
+    private final MutationWriter mutationWriter;
+    private final ListeningExecutorService executor;
+
+    Copy(
+        ParsedStatement parsedStatement,
+        Statement statement,
+        CopyDataReceiver copyDataReceiver,
+        MutationWriter mutationWriter,
+        ExecutorService executor) {
+      super(parsedStatement, statement);
+      this.copyDataReceiver = copyDataReceiver;
+      this.mutationWriter = mutationWriter;
+      this.executor = MoreExecutors.listeningDecorator(executor);
+    }
+
+    @Override
+    void execute() {
+      try {
+        checkConnectionState();
+        // Execute the MutationWriter and the CopyDataReceiver both asynchronously and wait for both
+        // to finish before continuing with the next statement. This ensures that all statements are
+        // applied in sequential order.
+        ListenableFuture<StatementResult> statementResultFuture = executor.submit(mutationWriter);
+        ListenableFuture<Void> copyDataReceiverFuture = executor.submit(copyDataReceiver);
+        this.result.setFuture(statementResultFuture);
+        Futures.allAsList(copyDataReceiverFuture, statementResultFuture).get();
+      } catch (ExecutionException executionException) {
+        result.setException(executionException.getCause());
+        throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
+      } catch (InterruptedException interruptedException) {
+        result.setException(SpannerExceptionFactory.propagateInterrupt(interruptedException));
+        throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
       } catch (Exception exception) {
         result.setException(exception);
         throw exception;
@@ -163,8 +233,10 @@ public class BackendConnection {
   private final ImmutableMap<String, LocalStatement> localStatements;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
+  private final String currentSchema = "public";
   private final LinkedList<BufferedStatement<?>> bufferedStatements = new LinkedList<>();
   private final Connection spannerConnection;
+  private final DdlExecutor ddlExecutor;
   private final DdlTransactionMode ddlTransactionMode;
 
   /**
@@ -172,10 +244,12 @@ public class BackendConnection {
    * DdlTransactionMode}.
    */
   BackendConnection(
+      DatabaseId databaseId,
       Connection spannerConnection,
       DdlTransactionMode ddlTransactionMode,
       ImmutableList<LocalStatement> localStatements) {
     this.spannerConnection = spannerConnection;
+    this.ddlExecutor = new DdlExecutor(databaseId, this);
     this.ddlTransactionMode = ddlTransactionMode;
     //noinspection UnstableApiUsage
     this.localStatements =
@@ -205,6 +279,22 @@ public class BackendConnection {
     return execute.result;
   }
 
+  /**
+   * Buffers the given COPY operation for execution on the backend connection when the next
+   * flush/sync message is received. The returned future will contain the result of the COPY
+   * operation when execution has finished.
+   */
+  public Future<StatementResult> executeCopy(
+      ParsedStatement parsedStatement,
+      Statement statement,
+      CopyDataReceiver copyDataReceiver,
+      MutationWriter mutationWriter,
+      ExecutorService executor) {
+    Copy copy = new Copy(parsedStatement, statement, copyDataReceiver, mutationWriter, executor);
+    bufferedStatements.add(copy);
+    return copy.result;
+  }
+
   /** Flushes the buffered statements to Spanner. */
   void flush() {
     flush(false);
@@ -220,6 +310,14 @@ public class BackendConnection {
     } finally {
       endImplicitTransaction();
     }
+  }
+
+  Connection getSpannerConnection() {
+    return this.spannerConnection;
+  }
+
+  String getCurrentSchema() {
+    return this.currentSchema;
   }
 
   /**
@@ -298,7 +396,7 @@ public class BackendConnection {
     // We need to start an implicit transaction.
     // Check if a read-only transaction suffices.
     spannerConnection.beginTransaction();
-    if (isSync && !hasDmlStatementsAfter(index)) {
+    if (isSync && !hasDmlOrCopyStatementsAfter(index)) {
       spannerConnection.setTransactionMode(
           com.google.cloud.spanner.connection.TransactionMode.READ_ONLY_TRANSACTION);
     }
@@ -431,14 +529,20 @@ public class BackendConnection {
     return isBegin(index) || isCommit(index) || isRollback(index);
   }
 
-  private boolean hasDmlStatementsAfter(int index) {
-    return bufferedStatements.subList(index, bufferedStatements.size()).stream()
-        .anyMatch(statement -> statement.parsedStatement.getType() == StatementType.UPDATE);
-  }
-
   private boolean hasOnlyDmlStatementsAfter(int index) {
     return bufferedStatements.subList(index, bufferedStatements.size()).stream()
         .allMatch(statement -> statement.parsedStatement.getType() == StatementType.UPDATE);
+  }
+
+  @VisibleForTesting
+  boolean hasDmlOrCopyStatementsAfter(int index) {
+    return bufferedStatements.subList(index, bufferedStatements.size()).stream()
+        .anyMatch(
+            statement ->
+                statement.parsedStatement.getType() == StatementType.UPDATE
+                    || statement.parsedStatement.getType() == StatementType.UNKNOWN
+                        && StatementParser.isCommand(
+                            COPY, statement.parsedStatement.getSqlWithoutComments()));
   }
 
   private int getStatementCount() {
@@ -450,11 +554,11 @@ public class BackendConnection {
   }
 
   private boolean canBeBatchedTogether(StatementType statementType1, StatementType statementType2) {
-    if (Objects.equals(statementType1, StatementType.QUERY)
-        || Objects.equals(statementType1, StatementType.CLIENT_SIDE)) {
-      return false;
+    if (Objects.equals(statementType1, StatementType.DDL)
+        || Objects.equals(statementType2, StatementType.UPDATE)) {
+      return Objects.equals(statementType1, statementType2);
     }
-    return Objects.equals(statementType1, statementType2);
+    return false;
   }
 
   /**
@@ -484,11 +588,22 @@ public class BackendConnection {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, "Statement type is not supported for batching");
     }
+    List<StatementResult> statementResults = new ArrayList<>(getStatementCount());
     int index = fromIndex;
     while (index < getStatementCount()) {
       StatementType statementType = getStatementType(index);
       if (canBeBatchedTogether(batchType, statementType)) {
-        spannerConnection.execute(bufferedStatements.get(index).statement);
+        // Send DDL statements to the DdlExecutor instead of executing them directly on the
+        // connection, so we can support certain DDL constructs that are currently not supported by
+        // the backend, such as IF [NOT] EXISTS.
+        if (batchType == StatementType.DDL) {
+          statementResults.add(
+              ddlExecutor.execute(
+                  bufferedStatements.get(index).parsedStatement,
+                  bufferedStatements.get(index).statement));
+        } else {
+          spannerConnection.execute(bufferedStatements.get(index).statement);
+        }
         index++;
       } else {
         // End the batch here, as the statement type on this index can not be batched together with
@@ -498,15 +613,49 @@ public class BackendConnection {
     }
     try {
       long[] counts = spannerConnection.runBatch();
+      if (batchType == StatementType.DDL) {
+        counts = extractDdlUpdateCounts(statementResults, counts);
+      }
       updateBatchResultCount(fromIndex, counts);
     } catch (SpannerBatchUpdateException batchUpdateException) {
-      long[] counts = batchUpdateException.getUpdateCounts();
+      long[] counts;
+      if (batchType == StatementType.DDL) {
+        counts = extractDdlUpdateCounts(statementResults, batchUpdateException.getUpdateCounts());
+      } else {
+        counts = batchUpdateException.getUpdateCounts();
+      }
       updateBatchResultCount(fromIndex, counts);
       Execute failedExecute = (Execute) bufferedStatements.get(fromIndex + counts.length);
       failedExecute.result.setException(batchUpdateException);
       throw batchUpdateException;
     }
     return index - fromIndex;
+  }
+
+  /**
+   * Extracts the update count for a list of DDL statements. It could be that the DdlExecutor
+   * decided to skip some DDL statements. This is indicated by the executor returning a {@link
+   * NotExecuted} result for that statement. The result that we return to the client should still
+   * indicate that the statement was 'executed'.
+   */
+  static long[] extractDdlUpdateCounts(
+      List<StatementResult> statementResults, long[] returnedUpdateCounts) {
+    int index = 0;
+    int successfullyExecutedCount = 0;
+    while (index < returnedUpdateCounts.length
+        && successfullyExecutedCount < statementResults.size()) {
+      if (!(statementResults.get(successfullyExecutedCount) instanceof NotExecuted)) {
+        index++;
+      }
+      successfullyExecutedCount++;
+    }
+    while (successfullyExecutedCount < statementResults.size()
+        && statementResults.get(successfullyExecutedCount) instanceof NotExecuted) {
+      successfullyExecutedCount++;
+    }
+    long[] updateCounts = new long[successfullyExecutedCount];
+    Arrays.fill(updateCounts, 1L);
+    return updateCounts;
   }
 
   /** Updates the results of the buffered statements after finishing executing a batch. */
@@ -528,7 +677,7 @@ public class BackendConnection {
   public static final class NoResult implements StatementResult {
     private final String commandTag;
 
-    private NoResult() {
+    NoResult() {
       this.commandTag = null;
     }
 
