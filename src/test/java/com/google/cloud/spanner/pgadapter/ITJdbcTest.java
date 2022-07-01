@@ -38,6 +38,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -134,6 +135,14 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   private String getConnectionUrl() {
+    if (useDomainSocket) {
+      return String.format(
+          "jdbc:postgresql://localhost/%s?"
+              + "preferQueryMode=%s"
+              + "&socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
+              + "&socketFactoryArg=/tmp/.s.PGSQL.%d",
+          database.getId().getDatabase(), preferQueryMode, testEnv.getPGAdapterPort());
+    }
     return String.format(
         "jdbc:postgresql://%s/%s?preferQueryMode=%s",
         testEnv.getPGAdapterHostAndPort(), database.getId().getDatabase(), preferQueryMode);
@@ -147,6 +156,31 @@ public class ITJdbcTest implements IntegrationTest {
         assertTrue(resultSet.next());
         assertEquals("Hello World!", resultSet.getString(1));
         assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testCreateTableIfNotExists() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // This table already exists, so it should be a no-op.
+        assertFalse(
+            statement.execute("create table if not exists all_types (id bigint primary key)"));
+        assertFalse(statement.getMoreResults());
+      }
+    }
+  }
+
+  @Test
+  public void testCreateTableIfNotExists_withSchemaPrefix() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // This table already exists, so it should be a no-op.
+        assertFalse(
+            statement.execute(
+                "create table if not exists public.all_types (id bigint primary key)"));
+        assertFalse(statement.getMoreResults());
       }
     }
   }
@@ -476,12 +510,14 @@ public class ITJdbcTest implements IntegrationTest {
                   copyManager.copyIn(
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
-      // The JDBC driver CopyManager takes the COPY protocol quite literally, and as the COPY
-      // protocol does not include any error handling, the JDBC driver will just send all data to
-      // the server and ignore any error messages the server might send during the copy operation.
-      // PGAdapter therefore drops the connection if it continues to receive CopyData messages after
-      // it sent back an error message.
-      assertTrue(exception.getMessage().contains("Database connection failed"));
+      assertTrue(
+          exception.getMessage(),
+          exception
+                  .getMessage()
+                  .contains("FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.")
+              || exception
+                  .getMessage()
+                  .contains("Database connection failed when canceling copy operation"));
     }
 
     // Verify that the table is still empty.

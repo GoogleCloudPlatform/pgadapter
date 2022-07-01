@@ -16,13 +16,11 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import java.text.MessageFormat;
 
 /**
- * Handles a flush command from the user. JDBC does not require this step, so server-side this is a
- * noop.
+ * Handles a flush command from the user. This flushes any pending changes to Cloud Spanner and then
+ * sends any pending messages to the client.
  */
 @InternalApi
 public class FlushMessage extends ControlMessage {
@@ -33,13 +31,13 @@ public class FlushMessage extends ControlMessage {
     super(connection);
   }
 
+  public FlushMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
+    super(connection, 4, manuallyCreatedToken);
+  }
+
   @Override
   protected void sendPayload() throws Exception {
     connection.getExtendedQueryProtocolHandler().flush();
-    boolean inTransaction = connection.getSpannerConnection().isInTransaction();
-    new ReadyResponse(
-            this.outputStream, inTransaction ? Status.TRANSACTION : ReadyResponse.Status.IDLE)
-        .send();
   }
 
   @Override

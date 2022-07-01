@@ -17,7 +17,6 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import java.text.MessageFormat;
@@ -48,7 +47,10 @@ public class CopyDataMessage extends ControlMessage {
   @Override
   protected void sendPayload() throws Exception {
     if (statement == null) {
-      throw new IllegalStateException("This connection is no (longer) in COPY IN mode.");
+      // Do not handle this message if there is no CopyStatement available anymore. This means that
+      // the copy operation failed and stopped while the client was still sending data to the
+      // server.
+      return;
     }
     // If backend error occurred during copy-in mode, drop any subsequent CopyData messages.
     MutationWriter mutationWriter = this.statement.getMutationWriter();
@@ -59,12 +61,6 @@ public class CopyDataMessage extends ControlMessage {
         statement.handleExecutionException(exception);
         throw exception;
       }
-    } else {
-      // If we get another CopyData message after we have already failed, then we drop the
-      // connection to ensure that the client is not overflowing us with messages. Some clients do
-      // not check for error messages during a COPY operation.
-      connection.setStatus(ConnectionStatus.TERMINATED);
-      throw statement.getException();
     }
   }
 

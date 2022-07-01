@@ -15,18 +15,18 @@ docker run \
   -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
   -e GOOGLE_APPLICATION_CREDENTIALS \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
-  -p my-project -i my-instance -d my-database \
+  -p my-project -i my-instance \
   -x
 ```
 
-Then connect to PGAdapter like this:
+Then connect to PGAdapter using TCP like this:
 
 ```go
 // pwd:uid is not used by PGAdapter, but it is required in the connection string.
 // Replace localhost and 5432 with the host and port number where PGAdapter is running.
 // sslmode=disable instructs pgx to try plain text mode directly. Otherwise, pgx will try two times
 // with SSL enabled before trying plain text.
-connString := "postgres://uid:pwd@localhost:5432/?sslmode=disable"
+connString := "postgres://uid:pwd@localhost:5432/my-database?sslmode=disable"
 ctx := context.Background()
 conn, err := pgx.Connect(ctx, connString)
 if err != nil {
@@ -42,7 +42,64 @@ if err != nil {
 fmt.Printf("Greeting from Cloud Spanner PostgreSQL: %v\n", greeting)
 ```
 
+You can also connect to PGAdapter using Unix Domain Sockets if PGAdapter is running on the same host
+as the client application:
+
+```go
+// '/tmp' is the default domain socket directory for PGAdapter. This can be changed using the -dir
+// command line argument. 5432 is the default port number used by PGAdapter. Change this in the
+// connection string if PGAdapter is running on a custom port.
+connString := "host=/tmp port=5432 database=my-database"
+ctx := context.Background()
+conn, err := pgx.Connect(ctx, connString)
+if err != nil {
+    return err
+}
+defer conn.Close(ctx)
+
+var greeting string
+err = conn.QueryRow(ctx, "select 'Hello world!' as hello").Scan(&greeting)
+if err != nil {
+    return err
+}
+fmt.Printf("Greeting from Cloud Spanner PostgreSQL: %v\n", greeting)
+```
+
+
 ## Running PGAdapter
 
 This example uses the pre-built Docker image to run PGAdapter.
 See [README](../README.md) for more possibilities on how to run PGAdapter.
+
+
+## Performance Considerations
+
+The following will give you the best possible performance when using pgx with PGAdapter.
+
+### Unix Domain Sockets
+Use Unix Domain Socket connections for the lowest possible latency when PGAdapter and the client
+application are running on the same host. See https://pkg.go.dev/github.com/jackc/pgx#ConnConfig
+for more information on connection options for pgx.
+
+### Batching
+Use the pgx batching API when executing multiple DDL or DML statements. PGAdapter will combine
+DML and DDL statements that are executed in a batch into a single request on Cloud Spanner.
+This can significantly reduce the overhead of executing multiple DML or DDL statements.
+
+Example for DML statements:
+
+```go
+batch := &pgx.Batch{}
+batch.Queue("insert into my_table (key, value) values ($1, $2)", "k1", "value1")
+batch.Queue("insert into my_table (key, value) values ($1, $2)", "k2", "value2")
+res := conn.SendBatch(context.Background(), batch)
+```
+
+Example for DDL statements:
+
+```go
+batch := &pgx.Batch{}
+batch.Queue("create table singers (singerid varchar primary key, name varchar)")
+batch.Queue("create index idx_singers_name on singers (name)")
+res := conn.SendBatch(context.Background(), batch)
+```
