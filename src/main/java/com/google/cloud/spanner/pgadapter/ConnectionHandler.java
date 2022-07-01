@@ -76,7 +76,6 @@ import javax.annotation.Nullable;
 @InternalApi
 public class ConnectionHandler extends Thread {
   private static final Logger logger = Logger.getLogger(ConnectionHandler.class.getName());
-  private static final int SOCKET_BUFFER_SIZE = 1 << 16;
   private static final AtomicLong CONNECTION_HANDLER_ID_GENERATOR = new AtomicLong(0L);
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
 
@@ -289,9 +288,9 @@ public class ConnectionHandler extends Thread {
       message.send();
     } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
       this.handleError(fatalException);
-      if (this.status == ConnectionStatus.COPY_IN) {
-        //        this.status = ConnectionStatus.COPY_FAILED;
-      } else {
+      // Only terminate the connection if we are not in COPY_IN mode. In COPY_IN mode the mode will
+      // switch to normal mode in these cases.
+      if (this.status != ConnectionStatus.COPY_IN) {
         terminate();
       }
     } catch (Exception e) {

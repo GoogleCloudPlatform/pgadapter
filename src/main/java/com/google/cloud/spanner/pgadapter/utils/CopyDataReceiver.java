@@ -62,6 +62,8 @@ public class CopyDataReceiver implements Callable<Void> {
       throw copyStatement.getException();
     } else {
       try {
+        // Push a new set of input/output streams for the connection. This ensures that the COPY
+        // process does not use the buffers of the normal protocol.
         this.connectionHandler.getConnectionMetadata().pushNewStreams();
         this.connectionHandler.addActiveStatement(copyStatement);
         new CopyInResponse(
@@ -76,12 +78,18 @@ public class CopyDataReceiver implements Callable<Void> {
           while (this.connectionHandler.getStatus() == ConnectionStatus.COPY_IN) {
             this.connectionHandler.handleMessages();
           }
+          // Return CommandComplete if the COPY succeeded. This should not be cached until a flush.
+          // Note that if an error occurred during the COPY, the message handler will automatically
+          // respond with an ErrorResponse. That is why we do not check for COPY_FAILED here, and do
+          // not return an ErrorResponse.
           if (connectionHandler.getStatus() == ConnectionStatus.COPY_DONE) {
             new CommandCompleteResponse(
                     this.connectionHandler.getConnectionMetadata().peekOutputStream(),
                     "COPY " + copyStatement.getUpdateCount(ResultNotReadyBehavior.BLOCK))
                 .send();
           }
+          // Throw an exception if the COPY failed. This ensures that the BackendConnection receives
+          // an error and marks the current (implicit) transaction as aborted.
           if (copyStatement.hasException(ResultNotReadyBehavior.BLOCK)
               || this.connectionHandler.getStatus() == ConnectionStatus.COPY_FAILED) {
             if (copyStatement.hasException(ResultNotReadyBehavior.BLOCK)) {
@@ -97,6 +105,7 @@ public class CopyDataReceiver implements Callable<Void> {
           this.connectionHandler.setStatus(initialConnectionStatus);
         }
       } finally {
+        // Pop the COPY input/output streams to return to the normal protocol and streams.
         this.connectionHandler.getConnectionMetadata().popStreams();
       }
     }

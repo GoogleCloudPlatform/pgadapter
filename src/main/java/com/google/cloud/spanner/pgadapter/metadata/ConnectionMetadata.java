@@ -34,6 +34,10 @@ public class ConnectionMetadata implements AutoCloseable {
   private final Stack<DataInputStream> inputStream = new Stack<>();
   private final Stack<DataOutputStream> outputStream = new Stack<>();
 
+  /**
+   * Creates a {@link DataInputStream} and a {@link DataOutputStream} from the given raw streams and
+   * pushes these as the current streams to use for communication for a connection.
+   */
   public ConnectionMetadata(InputStream rawInputStream, OutputStream rawOutputStream) {
     this.rawInputStream = Preconditions.checkNotNull(rawInputStream);
     this.rawOutputStream = Preconditions.checkNotNull(rawOutputStream);
@@ -46,6 +50,12 @@ public class ConnectionMetadata implements AutoCloseable {
     this.rawOutputStream.close();
   }
 
+  /**
+   * Creates a new buffered {@link DataInputStream} and {@link DataOutputStream} tuple to use for
+   * the connection. This is used for the COPY sub-protocol to prevent mixing the buffers used for
+   * the normal protocol with the COPY protocol, as that would cause multithreaded access to those
+   * buffers.
+   */
   public Tuple<DataInputStream, DataOutputStream> pushNewStreams() {
     return Tuple.of(
         this.inputStream.push(
@@ -55,14 +65,20 @@ public class ConnectionMetadata implements AutoCloseable {
                 new BufferedOutputStream(this.rawOutputStream, SOCKET_BUFFER_SIZE))));
   }
 
+  /**
+   * Pops the current {@link DataInputStream} and {@link DataOutputStream} from the connection. This
+   * is done when the COPY sub-protocol has finished.
+   */
   public Tuple<DataInputStream, DataOutputStream> popStreams() {
     return Tuple.of(this.inputStream.pop(), this.outputStream.pop());
   }
 
+  /** Returns the current {@link DataInputStream} for the connection. */
   public DataInputStream peekInputStream() {
     return inputStream.peek();
   }
 
+  /** Returns the current {@link DataOutputStream} for the connection. */
   public DataOutputStream peekOutputStream() {
     return outputStream.peek();
   }
