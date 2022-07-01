@@ -16,24 +16,27 @@ package com.google.cloud.spanner.pgadapter.python;
 
 import static org.junit.Assert.assertEquals;
 
+import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.junit.runners.MethodSorters;
 
 @RunWith(JUnit4.class)
 @Category(IntegrationTest.class)
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class ITPsycopg2Test extends PythonTestSetup {
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
@@ -60,6 +63,33 @@ public class ITPsycopg2Test extends PythonTestSetup {
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
   }
 
+  @Before
+  public void insertTestData() {
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(
+        databaseId,
+        Collections.singletonList(
+            Mutation.newInsertOrUpdateBuilder("all_types")
+                .set("col_bigint")
+                .to(1L)
+                .set("col_bool")
+                .to(true)
+                .set("col_bytea")
+                .to(ByteArray.copyFrom("test"))
+                .set("col_float8")
+                .to(3.14d)
+                .set("col_int")
+                .to(100)
+                .set("col_numeric")
+                .to(new BigDecimal("6.626"))
+                .set("col_timestamptz")
+                .to(Timestamp.parseTimestamp("2022-02-16T14:18:02+01:00"))
+                .set("col_date")
+                .to(Date.parseDate("2022-03-29"))
+                .set("col_varchar")
+                .to("test")
+                .build()));
+  }
   @AfterClass
   public static void teardown() {
     testEnv.stopPGAdapterServer();
@@ -67,7 +97,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void test1Insert() throws IOException, InterruptedException {
+  public void testInsert() throws IOException, InterruptedException {
     String sql =
         "Insert into all_types("
             + "col_bigint, "
@@ -96,7 +126,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void test2Select() throws IOException, InterruptedException {
+  public void testSelect() throws IOException, InterruptedException {
     String sql =
         "Select "
             + "col_bigint, "
@@ -107,15 +137,15 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_timestamptz , "
             + "col_date , "
             + "col_varchar "
-            + "from all_types where col_bigint = 2";
+            + "from all_types where col_bigint = 1";
     String actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql, "query");
     String expectedOutput =
-        "(2, True, 9.7, 10, Decimal('300.321'), datetime.datetime(2018, 3, 11, 10, 0, tzinfo=datetime.timezone.utc), datetime.date(2022, 10, 2), 'some string')\n";
+        "(1, True, 3.14, 100, Decimal('6.626'), datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), datetime.date(2022, 3, 29), 'test')\n";
     assertEquals(expectedOutput, actualOutput);
   }
 
   @Test
-  public void test3Update() throws IOException, InterruptedException {
+  public void testUpdate() throws IOException, InterruptedException {
     String sql =
         "UPDATE all_types SET "
             + "col_bool = 'off',"
@@ -125,7 +155,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_timestamptz = '2019-05-12 14:30:00'::timestamptz, "
             + "col_date = '1989-09-02', "
             + "col_varchar = 'new string' "
-            + "where col_bigint = 2";
+            + "where col_bigint = 1";
 
     String actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql, "update");
     String expectedOutput = "1\n";
@@ -141,23 +171,23 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_timestamptz , "
             + "col_date , "
             + "col_varchar "
-            + "from all_types where col_bigint = 2";
+            + "from all_types where col_bigint = 1";
 
     actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql, "query");
     expectedOutput =
-        "(2, False, 3.14, 20, Decimal('99.99'), datetime.datetime(2019, 5, 12, 21, 30, tzinfo=datetime.timezone.utc), datetime.date(1989, 9, 2), 'new string')\n";
+        "(1, False, 3.14, 20, Decimal('99.99'), datetime.datetime(2019, 5, 12, 21, 30, tzinfo=datetime.timezone.utc), datetime.date(1989, 9, 2), 'new string')\n";
     assertEquals(expectedOutput, actualOutput);
   }
 
   @Test
-  public void test4Delete() throws IOException, InterruptedException {
-    String sql = "DELETE FROM all_types where col_bigint = 2";
+  public void testDelete() throws IOException, InterruptedException {
+    String sql = "DELETE FROM all_types where col_bigint = 1";
 
     String actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql, "update");
     String expectedOutput = "1\n";
     assertEquals(expectedOutput, actualOutput);
 
-    sql = "Select COUNT(*) from all_types where col_bigint = 2";
+    sql = "Select COUNT(*) from all_types where col_bigint = 1";
 
     actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql, "query");
     expectedOutput = "(0,)\n";
@@ -165,7 +195,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void test1InsertParametrized() throws IOException, InterruptedException {
+  public void testInsertParametrized() throws IOException, InterruptedException {
     String sql =
         "Insert into all_types("
             + "col_bigint, "
@@ -224,7 +254,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void test2SelectParametrized() throws IOException, InterruptedException {
+  public void testSelectParametrized() throws IOException, InterruptedException {
     String sql =
         "Select "
             + "col_bigint, "
@@ -238,17 +268,17 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "from all_types where col_varchar = %s";
 
     ArrayList<String> parameters = new ArrayList<>();
-    parameters.add("hello world");
+    parameters.add("test");
 
     String actualOutput =
         executeWithParameters(testEnv.getPGAdapterPort(), sql, "query", parameters);
     String expectedOutput =
-        "(3, True, 89.23, 34, Decimal('33.546'), datetime.datetime(2019, 2, 3, 6, 30, 15, tzinfo=datetime.timezone.utc), datetime.date(2022, 7, 1), 'hello world')\n";
+        "(1, True, 3.14, 100, Decimal('6.626'), datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), datetime.date(2022, 3, 29), 'test')\n";
     assertEquals(expectedOutput, actualOutput);
   }
 
   @Test
-  public void test3UpdateParametrized() throws IOException, InterruptedException {
+  public void testUpdateParametrized() throws IOException, InterruptedException {
     String sql =
         "UPDATE all_types SET "
             + "col_bool = %(bool)s,"
@@ -281,7 +311,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("2021, 12, 23");
     parameters.add("bigint");
     parameters.add("int");
-    parameters.add("3");
+    parameters.add("1");
     parameters.add("int");
     parameters.add("int");
     parameters.add("69");
@@ -305,21 +335,21 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.clear();
     parameters.add("bigint");
     parameters.add("int");
-    parameters.add("3");
+    parameters.add("1");
 
     actualOutput =
         executeWithNamedParameters(testEnv.getPGAdapterPort(), sql, "data_type_query", parameters);
     expectedOutput =
-        "(3, False, 98.6, 69, Decimal('77.46'), datetime.datetime(2022, 10, 2, 14, 34, 26, tzinfo=datetime.timezone.utc), datetime.date(2021, 12, 23), 'hello psycopg2')\n";
+        "(1, False, 98.6, 69, Decimal('77.46'), datetime.datetime(2022, 10, 2, 14, 34, 26, tzinfo=datetime.timezone.utc), datetime.date(2021, 12, 23), 'hello psycopg2')\n";
     assertEquals(expectedOutput, actualOutput);
   }
 
   @Test
-  public void test4DeleteParametrized() throws IOException, InterruptedException {
+  public void testDeleteParametrized() throws IOException, InterruptedException {
     String sql = "DELETE FROM all_types where col_varchar = %s";
 
     ArrayList<String> parameters = new ArrayList<>();
-    parameters.add("hello psycopg2");
+    parameters.add("test");
     String actualOutput =
         executeWithParameters(testEnv.getPGAdapterPort(), sql, "update", parameters);
     String expectedOutput = "1\n";
@@ -329,7 +359,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.clear();
     parameters.add("bigint");
     parameters.add("int");
-    parameters.add("3");
+    parameters.add("1");
 
     actualOutput =
         executeWithNamedParameters(testEnv.getPGAdapterPort(), sql, "data_type_query", parameters);
