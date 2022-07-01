@@ -30,6 +30,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
+import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.common.base.Strings;
@@ -38,17 +39,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.csv.CSVFormat;
 
+/**
+ * {@link CopyStatement} models a `COPY table FROM STDIN` statement. The same class is used both as
+ * an {@link IntermediatePreparedStatement} and {@link IntermediatePortalStatement}, as COPY does
+ * not support any statement parameters, which means that there is no difference between the two.
+ */
 @InternalApi
-public class CopyStatement extends IntermediateStatement {
-
+public class CopyStatement extends IntermediatePortalStatement {
   private static final String COLUMN_NAME = "column_name";
   private static final String DATA_TYPE = "data_type";
 
@@ -59,20 +62,41 @@ public class CopyStatement extends IntermediateStatement {
   private Map<String, TypeCode> tableColumns;
   private int indexedColumnsCount;
   private MutationWriter mutationWriter;
-  private Future<Long> updateCount;
-  private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  // We need two threads to execute a CopyStatement:
+  // 1. A thread to receive the CopyData messages from the client.
+  // 2. A thread to write the received data to Cloud Spanner.
+  // The two are kept separate to allow each to execute at the maximum speed that it can.
+  // The link between them is a piped output/input stream that ensures that backpressure is applied
+  // to the client if the client is sending data at a higher speed than that the writer can handle.
+  private final ExecutorService executor = Executors.newFixedThreadPool(2);
 
   public CopyStatement(
       ConnectionHandler connectionHandler,
       OptionsMetadata options,
+      String name,
       ParsedStatement parsedStatement,
       Statement originalStatement) {
-    super(connectionHandler, options, parsedStatement, originalStatement);
+    super(connectionHandler, options, name, parsedStatement, originalStatement);
   }
 
-  public Exception getException() {
+  @Override
+  public boolean hasException() {
+    return this.exception != null;
+  }
+
+  @Override
+  public SpannerException getException() {
     // Do not clear exceptions on a CopyStatement.
     return this.exception;
+  }
+
+  @Override
+  public long getUpdateCount() {
+    // COPY statements continue to execute while the server continues to receive a stream of
+    // CopyData messages AFTER we have received a flush/sync message. We therefore need to block
+    // while waiting for the update count to be available once the server has received a CopyDone
+    // or CopyFailed message.
+    return getUpdateCount(ResultNotReadyBehavior.BLOCK);
   }
 
   @Override
@@ -82,16 +106,6 @@ public class CopyStatement extends IntermediateStatement {
     }
     this.executor.shutdown();
     super.close();
-  }
-
-  public long getUpdateCount() {
-    try {
-      return updateCount.get();
-    } catch (ExecutionException e) {
-      throw SpannerExceptionFactory.asSpannerException(e.getCause());
-    } catch (InterruptedException e) {
-      throw SpannerExceptionFactory.propagateInterrupt(e);
-    }
   }
 
   @Override
@@ -243,7 +257,7 @@ public class CopyStatement extends IntermediateStatement {
             .bind("p1")
             .to(getTableName())
             .build();
-    try (ResultSet result = connection.executeQuery(statement)) {
+    try (ResultSet result = connection.getDatabaseClient().singleUse().executeQuery(statement)) {
       while (result.next()) {
         String columnName = result.getString(COLUMN_NAME);
         TypeCode type = parsePostgreSQLDataType(result.getString(DATA_TYPE));
@@ -282,7 +296,7 @@ public class CopyStatement extends IntermediateStatement {
       paramIndex++;
     }
     Statement statement = builder.build();
-    try (ResultSet resultSet = connection.executeQuery(statement)) {
+    try (ResultSet resultSet = connection.getDatabaseClient().singleUse().executeQuery(statement)) {
       if (resultSet.next()) {
         return (int) resultSet.getLong(0);
       }
@@ -291,12 +305,23 @@ public class CopyStatement extends IntermediateStatement {
   }
 
   @Override
+  public IntermediatePortalStatement bind(
+      String name,
+      byte[][] parameters,
+      List<Short> parameterFormatCodes,
+      List<Short> resultFormatCodes) {
+    // COPY does not support binding any parameters, so we just return the same statement.
+    return this;
+  }
+
+  @Override
   public void handleExecutionException(SpannerException exception) {
     executor.shutdownNow();
     super.handleExecutionException(exception);
   }
 
-  public void execute() {
+  @Override
+  public void executeAsync(BackendConnection backendConnection) {
     this.executed = true;
     try {
       parseCopyStatement();
@@ -311,7 +336,13 @@ public class CopyStatement extends IntermediateStatement {
               indexedColumnsCount,
               getParserFormat(),
               hasHeader());
-      updateCount = executor.submit(mutationWriter);
+      setFutureStatementResult(
+          backendConnection.executeCopy(
+              parsedStatement,
+              statement,
+              new CopyDataReceiver(this, this.connectionHandler),
+              mutationWriter,
+              executor));
     } catch (Exception e) {
       SpannerException spannerException = SpannerExceptionFactory.asSpannerException(e);
       handleExecutionException(spannerException);

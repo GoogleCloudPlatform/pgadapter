@@ -14,14 +14,52 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Objects;
 import javax.annotation.Nullable;
 
+/** A very simple parser that can interpret SQL statements to find specific parts in the string. */
 class SimpleParser {
-  private static final Set<Character> OPERATORS = ImmutableSet.of('+', '-', '*', '/', '!');
+  /** Name of table or index. */
+  static class TableOrIndexName {
+    /** Schema is an optional schema name prefix. */
+    final String schema;
+    /** Name is the actual object name. */
+    final String name;
+
+    TableOrIndexName(String name) {
+      this.schema = null;
+      this.name = name;
+    }
+
+    TableOrIndexName(String schema, String name) {
+      this.schema = schema;
+      this.name = name;
+    }
+
+    @Override
+    public String toString() {
+      if (schema == null) {
+        return name;
+      }
+      return schema + "." + name;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof TableOrIndexName)) {
+        return false;
+      }
+      TableOrIndexName other = (TableOrIndexName) o;
+      return Objects.equals(this.schema, other.schema) && Objects.equals(this.name, other.name);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(this.schema, this.name);
+    }
+  }
 
   private final String sql;
   private int pos;
@@ -103,7 +141,22 @@ class SimpleParser {
     return sql.substring(start, pos).trim();
   }
 
-  String readIdentifier() {
+  TableOrIndexName readTableOrIndexName() {
+    String nameOrSchema = readTableOrIndexNamePart();
+    if (nameOrSchema == null) {
+      return null;
+    }
+    if (eat(".")) {
+      String name = readTableOrIndexNamePart();
+      if (name == null) {
+        name = "";
+      }
+      return new TableOrIndexName(nameOrSchema, name);
+    }
+    return new TableOrIndexName(nameOrSchema);
+  }
+
+  String readTableOrIndexNamePart() {
     skipWhitespaces();
     boolean quoted = sql.charAt(pos) == '"';
     int start = pos;
@@ -112,11 +165,18 @@ class SimpleParser {
     }
     while (pos < sql.length()) {
       if (quoted) {
-        if (sql.charAt(pos) == '"' && sql.charAt(pos - 1) != '\\') {
-          return sql.substring(start, ++pos);
+        if (sql.charAt(pos) == '"') {
+          if (pos < (sql.length() - 1) && sql.charAt(pos + 1) == '"') {
+            pos++;
+          } else {
+            return sql.substring(start, ++pos);
+          }
         }
       } else {
-        if (Character.isWhitespace(sql.charAt(pos))) {
+        if (Character.isWhitespace(sql.charAt(pos))
+            || sql.charAt(pos) == '.'
+            || sql.charAt(pos) == ','
+            || sql.charAt(pos) == '"') {
           return sql.substring(start, pos);
         }
       }
