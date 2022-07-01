@@ -56,6 +56,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+import org.postgresql.core.Oid;
 
 /**
  * Tests PGAdapter using the native Go pgx driver. The Go code can be found in
@@ -214,20 +215,41 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     String sql = "SELECT * FROM all_types WHERE col_bigint=1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
-    String res = pgxTest.TestQueryAllDataTypes(createConnString());
+    // Request the data of each column once in both text and binary format to ensure that we support
+    // each format for all data types, *AND* that PGAdapter actually uses the format that the client
+    // requests.
+    for (int oid :
+        new int[] {
+          Oid.INT8,
+          Oid.BOOL,
+          Oid.BYTEA,
+          Oid.FLOAT8,
+          Oid.INT4,
+          Oid.NUMERIC,
+          Oid.DATE,
+          Oid.TIMESTAMPTZ,
+          Oid.VARCHAR
+        }) {
+      for (int format : new int[] {0, 1}) {
+        String res = pgxTest.TestQueryAllDataTypes(createConnString(), oid, format);
 
-    assertNull(res);
-    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. As this statement does not contain any
-    // parameters, we don't need to describe the parameter types, so it is 'only' sent twice to the
-    // backend.
-    assertEquals(2, requests.size());
-    ExecuteSqlRequest describeRequest = requests.get(0);
-    assertEquals(sql, describeRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(1);
-    assertEquals(sql, executeRequest.getSql());
-    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+        assertNull(res);
+        List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+        // pgx by default always uses prepared statements. As this statement does not contain any
+        // parameters, we don't need to describe the parameter types, so it is 'only' sent twice to
+        // the
+        // backend.
+        assertEquals(2, requests.size());
+        ExecuteSqlRequest describeRequest = requests.get(0);
+        assertEquals(sql, describeRequest.getSql());
+        assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+        ExecuteSqlRequest executeRequest = requests.get(1);
+        assertEquals(sql, executeRequest.getSql());
+        assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+
+        mockSpanner.clearRequests();
+      }
+    }
   }
 
   @Test

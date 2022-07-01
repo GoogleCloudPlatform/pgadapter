@@ -102,7 +102,7 @@ func TestQueryWithParameter(connString string) *C.char {
 }
 
 //export TestQueryAllDataTypes
-func TestQueryAllDataTypes(connString string) *C.char {
+func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
@@ -120,7 +120,19 @@ func TestQueryAllDataTypes(connString string) *C.char {
 	var dateValue time.Time
 	var varcharValue string
 
-	row := conn.QueryRow(ctx, "SELECT * FROM all_types WHERE col_bigint=1")
+	var row pgx.Row
+	if oid != 0 {
+		formats := make(pgx.QueryResultFormatsByOID)
+		for _, o := range []uint32{
+			pgtype.Int8OID, pgtype.BoolOID, pgtype.ByteaOID, pgtype.Float8OID, pgtype.Int4OID,
+			pgtype.NumericOID, pgtype.TimestamptzOID, pgtype.DateOID, pgtype.VarcharOID} {
+			formats[o] = conn.ConnInfo().ResultFormatCodeForOID(o)
+		}
+		formats[uint32(oid)] = format
+		row = conn.QueryRow(ctx, "SELECT * FROM all_types WHERE col_bigint=1", formats)
+	} else {
+		row = conn.QueryRow(ctx, "SELECT * FROM all_types WHERE col_bigint=1")
+	}
 	err = row.Scan(
 		&bigintValue,
 		&boolValue,
@@ -161,7 +173,7 @@ func TestQueryAllDataTypes(connString string) *C.char {
 	}
 	// Encoding the timestamp values as a parameter will truncate it to microsecond precision.
 	wantTimestamptzValue, _ := time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456+00:00")
-	if strings.Contains(connString, "prefer_simple_protocol=true") {
+	if strings.Contains(connString, "prefer_simple_protocol=true") || (oid == pgtype.TimestamptzOID && format == 0) {
 		// Simple protocol writes the timestamp as a string and preserves nanosecond precision.
 		wantTimestamptzValue, _ = time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456789+00:00")
 	}
