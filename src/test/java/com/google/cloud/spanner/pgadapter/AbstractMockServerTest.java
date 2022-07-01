@@ -106,6 +106,8 @@ public abstract class AbstractMockServerTest {
                           .build())
                   .build())
           .build();
+  protected static final com.google.spanner.v1.ResultSet EMPTY_RESULTSET =
+      com.google.spanner.v1.ResultSet.newBuilder().setMetadata(SELECT1_METADATA).build();
   protected static final com.google.spanner.v1.ResultSet SELECT1_RESULTSET =
       com.google.spanner.v1.ResultSet.newBuilder()
           .addRows(
@@ -405,11 +407,15 @@ public abstract class AbstractMockServerTest {
     }
   }
 
+  protected void closeSpannerPool() {
+    closeSpannerPool(false);
+  }
+
   /**
    * Closes all open Spanner instances in the pool. Use this to force the recreation of a Spanner
    * instance for a test case. This method will ignore any errors and retry if closing fails.
    */
-  protected void closeSpannerPool() {
+  protected void closeSpannerPool(boolean ignoreException) {
     SpannerException exception = null;
     for (int attempt = 0; attempt < 1000; attempt++) {
       try {
@@ -424,7 +430,9 @@ public abstract class AbstractMockServerTest {
         exception = e;
       }
     }
-    throw exception;
+    if (!ignoreException) {
+      throw exception;
+    }
   }
 
   @Before
@@ -449,5 +457,12 @@ public abstract class AbstractMockServerTest {
   protected void addDdlExceptionToSpannerAdmin() {
     mockDatabaseAdmin.addException(
         Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException());
+  }
+
+  protected static void addIfNotExistsDdlException() {
+    mockDatabaseAdmin.addException(
+        Status.INVALID_ARGUMENT
+            .withDescription("<IF NOT EXISTS> clause is not supported in <CREATE TABLE> statement.")
+            .asRuntimeException());
   }
 }
