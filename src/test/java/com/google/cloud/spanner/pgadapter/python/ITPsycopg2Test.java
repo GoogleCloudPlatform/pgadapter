@@ -90,6 +90,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
                 .to("test")
                 .build()));
   }
+
   @AfterClass
   public static void teardown() {
     testEnv.stopPGAdapterServer();
