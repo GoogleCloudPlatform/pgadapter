@@ -19,6 +19,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import java.util.Arrays;
 import java.util.Collections;
 import org.junit.Test;
@@ -46,16 +47,55 @@ public class SimpleParserTest {
   }
 
   @Test
-  public void testReadIdentifier() {
-    assertEquals("foo", new SimpleParser("foo bar").readIdentifier());
-    assertEquals("foo", new SimpleParser("foo").readIdentifier());
-    assertEquals("\"foo\"", new SimpleParser("\"foo\" bar").readIdentifier());
-    assertEquals("\"foo\"", new SimpleParser("\"foo\"").readIdentifier());
-    assertEquals("foo", new SimpleParser(" foo bar").readIdentifier());
-    assertEquals("foo", new SimpleParser("\tfoo").readIdentifier());
-    assertEquals("\"foo\"", new SimpleParser("\n\"foo\" bar").readIdentifier());
-    assertEquals("\"foo\"", new SimpleParser("    \"foo\"").readIdentifier());
-    assertNull(new SimpleParser("\"foo").readIdentifier());
+  public void testReadTableOrIndexNamePart() {
+    assertEquals("foo", new SimpleParser("foo bar").readTableOrIndexNamePart());
+    assertEquals("foo", new SimpleParser("foo").readTableOrIndexNamePart());
+    assertEquals("\"foo\"", new SimpleParser("\"foo\" bar").readTableOrIndexNamePart());
+    assertEquals("\"foo\"", new SimpleParser("\"foo\"").readTableOrIndexNamePart());
+    assertEquals("foo", new SimpleParser(" foo bar").readTableOrIndexNamePart());
+    assertEquals("foo", new SimpleParser("\tfoo").readTableOrIndexNamePart());
+    assertEquals("\"foo\"", new SimpleParser("\n\"foo\" bar").readTableOrIndexNamePart());
+    assertEquals("\"foo\"", new SimpleParser("    \"foo\"").readTableOrIndexNamePart());
+    assertEquals("\"foo\"\"bar\"", new SimpleParser("\"foo\"\"bar\"").readTableOrIndexNamePart());
+    assertEquals("foo", new SimpleParser("foo\"bar\"").readTableOrIndexNamePart());
+    assertEquals("foo", new SimpleParser("foo.bar").readTableOrIndexNamePart());
+    assertEquals("foo", new SimpleParser("foo").readTableOrIndexNamePart());
+    assertEquals("\"foo\"", new SimpleParser("\"foo\".bar").readTableOrIndexNamePart());
+    assertEquals("\"foo\"", new SimpleParser("\"foo\"").readTableOrIndexNamePart());
+    assertNull(new SimpleParser("\"foo").readTableOrIndexNamePart());
+  }
+
+  @Test
+  public void testReadTableOrIndexName() {
+    assertEquals(new TableOrIndexName("foo"), new SimpleParser("foo bar").readTableOrIndexName());
+    assertEquals(new TableOrIndexName("foo"), new SimpleParser("foo").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("\"foo\""), new SimpleParser("\"foo\" bar").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("\"foo\""), new SimpleParser("\"foo\"").readTableOrIndexName());
+    assertEquals(new TableOrIndexName("foo"), new SimpleParser(" foo bar").readTableOrIndexName());
+    assertEquals(new TableOrIndexName("foo"), new SimpleParser("\tfoo").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("\"foo\""), new SimpleParser("\n\"foo\" bar").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("\"foo\""), new SimpleParser("    \"foo\"").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("\"foo\"\"bar\""),
+        new SimpleParser("\"foo\"\"bar\"").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("foo"), new SimpleParser("foo\"bar\"").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("foo", "bar"), new SimpleParser("foo.bar").readTableOrIndexName());
+    assertEquals(new TableOrIndexName("foo"), new SimpleParser("foo").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("\"foo\"", "bar"),
+        new SimpleParser("\"foo\".bar").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("\"foo\"", "\"bar\""),
+        new SimpleParser("\"foo\".\"bar\"").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("\"foo\""), new SimpleParser("\"foo\"").readTableOrIndexName());
+    assertNull(new SimpleParser("\"foo").readTableOrIndexName());
   }
 
   @Test
