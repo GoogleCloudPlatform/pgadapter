@@ -186,6 +186,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                     "copy_in_pipe_buffer_size", String.valueOf(DEFAULT_PIPE_BUFFER_SIZE))),
             1024);
     this.format = format;
+    // TODO(b/237831799): Support binary format for COPY.
     this.parser = createParser();
   }
 
@@ -600,14 +601,6 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       }
     }
     return builder.build();
-  }
-
-  private String unescapeValue(String value) {
-    // Should normally not happen, but to be sure.
-    if (value == null) {
-      return null;
-    }
-    return value;
   }
 
   private CSVParser createParser() throws IOException {
