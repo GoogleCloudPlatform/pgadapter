@@ -1,11 +1,14 @@
 on:
   pull_request:
+  schedule:
+    # Run at 04:52UTC every day
+    - cron: '52 4 * * *'
   workflow_dispatch:
     inputs:
-      endpoint:
-        description: "The Cloud Spanner endpoint to use for the integration tests"
+      staging:
+        description: "Run the integration tests on the staging environment?"
         required: false
-        type: string
+        type: boolean
 name: integration
 env:
   GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
@@ -23,13 +26,14 @@ jobs:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         if: "${{ env.GCP_PROJECT_ID != '' }}"
         run: echo "::set-output name=defined::true"
-      - id: endpoint
-        if: "${{ inputs.endpoint != '' }}"
+      - id: set-manual-endpoint
+        if: "${{ inputs.staging }}"
         run: |
-          echo "Running integration tests on endpoint: $GOOGLE_CLOUD_ENDPOINT"
-        env:
-          GOOGLE_CLOUD_ENDPOINT: ${{ inputs.endpoint }}
-
+          echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
+      - id: set-scheduled-endpoint
+        if: github.event.schedule=='52 4 * * *'
+        run: |
+          echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
   integration-test:
     needs: [check-env]
     if: needs.check-env.outputs.has-key == 'true'
