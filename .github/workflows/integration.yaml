@@ -25,6 +25,8 @@ jobs:
         run: echo "::set-output name=defined::true"
       - id: endpoint
         if: "${{ inputs.endpoint != '' }}"
+        run: |
+          echo "Running integration tests on endpoint: $GOOGLE_CLOUD_ENDPOINT"
         env:
           GOOGLE_CLOUD_ENDPOINT: ${{ inputs.endpoint }}
 
@@ -34,8 +36,6 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          echo "Running integration tests on endpoint: $GOOGLE_CLOUD_ENDPOINT"
       - uses: actions/checkout@v3
       - name: Setup Java
         uses: actions/setup-java@v3
