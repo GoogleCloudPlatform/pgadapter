@@ -159,7 +159,7 @@ public class ITPgxTest implements IntegrationTest {
 
   @Test
   public void testQueryAllDataTypes() {
-    assertNull(pgxTest.TestQueryAllDataTypes(createConnString()));
+    assertNull(pgxTest.TestQueryAllDataTypes(createConnString(), 0, 0));
   }
 
   @Test

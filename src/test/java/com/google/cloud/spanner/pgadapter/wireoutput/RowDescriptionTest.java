@@ -161,6 +161,79 @@ public final class RowDescriptionTest {
   }
 
   @Test
+  public void SendPayloadStatementWithBinarayAndTextOptionTest() throws Exception {
+    Type rowType =
+        Type.struct(
+            StructField.of("numeric-text", Type.pgNumeric()),
+            StructField.of("numeric-binary", Type.pgNumeric()));
+    when(metadata.getColumnCount()).thenReturn(rowType.getStructFields().size());
+    when(metadata.getType()).thenReturn(rowType);
+    when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Type.pgNumeric());
+    when(statement.getResultFormatCode(0)).thenReturn((short) 0);
+    when(statement.getResultFormatCode(1)).thenReturn((short) 1);
+    JSONParser parser = new JSONParser();
+    JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
+    OptionsMetadata options =
+        new OptionsMetadata(
+            "jdbc:cloudspanner:/projects/test-project/instances/test-instance/databases/test-database",
+            8888,
+            TextFormat.POSTGRESQL,
+            true,
+            false,
+            false,
+            false,
+            commandMetadata);
+    QueryMode mode = QueryMode.EXTENDED;
+    RowDescriptionResponse response =
+        new RowDescriptionResponse(output, statement, metadata, options, mode);
+    response.sendPayload();
+    DataInputStream outputReader =
+        new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));
+
+    // column count
+    assertEquals(2, outputReader.readShort());
+    // column name
+    int numOfBytes = "numeric-text".getBytes(UTF8).length;
+    byte[] bytes = new byte[numOfBytes];
+    assertEquals(numOfBytes, outputReader.read(bytes, 0, numOfBytes));
+    assertEquals("numeric-text", new String(bytes, UTF8));
+    // null terminator
+    assertEquals(DEFAULT_FLAG, outputReader.readByte());
+    // table oid
+    assertEquals(DEFAULT_FLAG, outputReader.readInt());
+    // column index
+    assertEquals(DEFAULT_FLAG, outputReader.readShort());
+    // type oid
+    assertEquals(Oid.NUMERIC, outputReader.readInt());
+    // type size
+    assertEquals(-1, outputReader.readShort());
+    // type modifier
+    assertEquals(DEFAULT_FLAG, outputReader.readInt());
+    // format code
+    assertEquals(0, outputReader.readShort());
+
+    // column name
+    numOfBytes = "numeric-binary".getBytes(UTF8).length;
+    bytes = new byte[numOfBytes];
+    assertEquals(numOfBytes, outputReader.read(bytes, 0, numOfBytes));
+    assertEquals("numeric-binary", new String(bytes, UTF8));
+    // null terminator
+    assertEquals(DEFAULT_FLAG, outputReader.readByte());
+    // table oid
+    assertEquals(DEFAULT_FLAG, outputReader.readInt());
+    // column index
+    assertEquals(DEFAULT_FLAG, outputReader.readShort());
+    // type oid
+    assertEquals(Oid.NUMERIC, outputReader.readInt());
+    // type size
+    assertEquals(-1, outputReader.readShort());
+    // type modifier
+    assertEquals(DEFAULT_FLAG, outputReader.readInt());
+    // format code
+    assertEquals(1, outputReader.readShort());
+  }
+
+  @Test
   public void SendPayloadStatementWithBinaryOptionTest() throws Exception {
     int COLUMN_COUNT = 1;
     String COLUMN_NAME = "default-column-name";
@@ -168,7 +241,7 @@ public final class RowDescriptionTest {
     when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
     when(metadata.getType()).thenReturn(rowType);
     when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Type.int64());
-    when(statement.getResultFormatCode(Mockito.anyInt())).thenReturn((short) 0);
+    when(statement.getResultFormatCode(Mockito.anyInt())).thenReturn((short) 1);
     JSONParser parser = new JSONParser();
     JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
     OptionsMetadata options =
