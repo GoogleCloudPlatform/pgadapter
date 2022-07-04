@@ -190,7 +190,7 @@ public class BackendConnection {
   }
 
   private static final int MAX_PARTITIONS =
-      Math.max(4, 2 * Runtime.getRuntime().availableProcessors());
+      Math.max(16, 2 * Runtime.getRuntime().availableProcessors());
 
   private final class CopyOut extends BufferedStatement<StatementResult> {
 
