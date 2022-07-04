@@ -297,7 +297,11 @@ public class ConnectionHandler extends Thread {
       message.send();
     } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
       this.handleError(getConnectionMetadata().getOutputStream(), fatalException);
-      this.status = ConnectionStatus.TERMINATED;
+      if (this.status == ConnectionStatus.COPY_IN) {
+        this.status = ConnectionStatus.COPY_FAILED;
+      } else {
+        terminate();
+      }
     } catch (Exception e) {
       this.handleError(getConnectionMetadata().getOutputStream(), e);
     }

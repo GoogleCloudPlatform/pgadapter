@@ -29,7 +29,7 @@ public interface PgxTest extends Library {
 
   String TestQueryWithParameter(GoString connString);
 
-  String TestQueryAllDataTypes(GoString connString);
+  String TestQueryAllDataTypes(GoString connString, int oid, int format);
 
   String TestInsertAllDataTypes(GoString connString);
 

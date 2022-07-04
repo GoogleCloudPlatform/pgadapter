@@ -24,6 +24,7 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.protobuf.ListValue;
+import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.Mutation;
@@ -48,7 +49,9 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
@@ -64,6 +67,7 @@ import org.postgresql.jdbc.PgConnection;
 
 @RunWith(Parameterized.class)
 public class CopyInMockServerTest extends AbstractMockServerTest {
+  @Rule public Timeout globalTimeout = Timeout.seconds(10);
 
   @Parameter public boolean useDomainSocket;
 
@@ -124,6 +128,37 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     Mutation mutation = commitRequest.getMutations(0);
     assertEquals(OperationCase.INSERT, mutation.getOperationCase());
     assertEquals(3, mutation.getInsert().getValuesCount());
+  }
+
+  @Test
+  public void testCopyInNullValues() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn(
+          "COPY users FROM STDIN;", new StringReader("5\t\\N\t\\N\n6\t\\N\t\\N\n7\t\\N\t\\N\n"));
+
+      // Verify that we can use the connection for normal queries.
+      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsert().getValuesCount());
+    Value nullValue = Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build();
+    assertEquals("5", mutation.getInsert().getValues(0).getValues(0).getStringValue());
+    assertEquals(nullValue, mutation.getInsert().getValues(0).getValues(1));
+    assertEquals(nullValue, mutation.getInsert().getValues(0).getValues(2));
   }
 
   @Test
@@ -195,6 +230,35 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               "copy all_types from stdin;",
               new FileInputStream("./src/test/resources/all_types_data_small.txt"));
       assertEquals(100L, copyCount);
+    }
+  }
+
+  @Test
+  public void testCopyIn_Nulls() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      long copyCount =
+          copyManager.copyIn(
+              "copy all_types from stdin;",
+              new FileInputStream("./src/test/resources/all_types_data_nulls.txt"));
+      assertEquals(1L, copyCount);
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(1, mutation.getInsert().getValuesCount());
+    Value nullValue = Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build();
+    // The first column is not null, as it is the primary key.
+    for (int col = 1; col < mutation.getInsert().getColumnsCount(); col++) {
+      assertEquals(nullValue, mutation.getInsert().getValues(0).getValues(col));
     }
   }
 
