@@ -15,6 +15,8 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
+import com.google.api.gax.grpc.GrpcCallContext;
+import com.google.api.gax.rpc.ApiCallContext;
 import com.google.cloud.spanner.BatchClient;
 import com.google.cloud.spanner.BatchReadOnlyTransaction;
 import com.google.cloud.spanner.BatchTransactionId;
@@ -22,6 +24,7 @@ import com.google.cloud.spanner.Partition;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
@@ -45,6 +48,8 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import io.grpc.Context;
+import io.grpc.MethodDescriptor;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -54,6 +59,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.threeten.bp.Duration;
 
 /**
  * Generic representation for a control wire message: that is, a message which does not handle any
@@ -319,7 +325,9 @@ public abstract class ControlMessage extends WireMessage {
       BatchTransactionId batchTransactionId,
       List<Partition> partitions) {
     ListeningExecutorService executorService =
-        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(partitions.size()));
+        MoreExecutors.listeningDecorator(
+            Executors.newFixedThreadPool(
+                Math.min(8 * Runtime.getRuntime().availableProcessors(), partitions.size())));
     List<ListenableFuture<Long>> futures = new ArrayList<>(partitions.size());
     SettableFuture<Boolean> prefixSent = SettableFuture.create();
     Connection spannerConnection = connection.getSpannerConnection();
@@ -327,16 +335,28 @@ public abstract class ControlMessage extends WireMessage {
     BatchClient batchClient = spanner.getBatchClient(connection.getDatabaseId());
     BatchReadOnlyTransaction batchReadOnlyTransaction =
         batchClient.batchReadOnlyTransaction(batchTransactionId);
+    Context context =
+        Context.current()
+            .withValue(
+                SpannerOptions.CALL_CONTEXT_CONFIGURATOR_KEY,
+                new SpannerOptions.CallContextConfigurator() {
+                  @Override
+                  public <ReqT, RespT> ApiCallContext configure(
+                      ApiCallContext context, ReqT request, MethodDescriptor<ReqT, RespT> method) {
+                    return GrpcCallContext.createDefault().withTimeout(Duration.ofHours(24L));
+                  }
+                });
     for (int i = 0; i < partitions.size(); i++) {
       futures.add(
           executorService.submit(
-              SendResultSetRunnable.forPartition(
-                  describedResult,
-                  batchReadOnlyTransaction,
-                  partitions.get(i),
-                  mode,
-                  i == 0,
-                  prefixSent)));
+              context.wrap(
+                  SendResultSetRunnable.forPartition(
+                      describedResult,
+                      batchReadOnlyTransaction,
+                      partitions.get(i),
+                      mode,
+                      i == 0,
+                      prefixSent))));
     }
     executorService.shutdown();
     try {
