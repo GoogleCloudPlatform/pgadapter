@@ -66,6 +66,8 @@ public class SimpleQueryStatement {
     // Do a Parse-Describe-Bind-Execute round-trip for each statement in the query string.
     // Finish with a Sync to close any implicit transaction and to return the results.
     for (Statement originalStatement : this.statements) {
+      boolean isFirst = this.statements.get(0) == originalStatement;
+      boolean isLast = this.statements.get(this.statements.size() - 1) == originalStatement;
       ParsedStatement originalParsedStatement = PARSER.parse(originalStatement);
       ParsedStatement parsedStatement = originalParsedStatement;
       if (options.requiresMatcher()
@@ -83,14 +85,18 @@ public class SimpleQueryStatement {
       // require additional messages to be sent back and forth, and this ensures that we get
       // everything in the correct order.
       boolean isCopy = StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments());
-      if (isCopy) {
+      if (!isFirst && isCopy) {
         new FlushMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
       }
       new ParseMessage(connectionHandler, parsedStatement, originalStatement).send();
       new BindMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
-      new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
+      if (!isCopy) {
+        new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
+      }
       new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
-      if (isCopy) {
+      // Only flush the pipeline if this is not the last command. Otherwise, we'll just rely on the
+      // sync at the end.
+      if (!isLast && isCopy) {
         new FlushMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
       }
     }

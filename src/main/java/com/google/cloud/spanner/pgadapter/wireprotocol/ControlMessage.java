@@ -15,25 +15,45 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.BatchClient;
+import com.google.cloud.spanner.BatchReadOnlyTransaction;
+import com.google.cloud.spanner.BatchTransactionId;
+import com.google.cloud.spanner.Partition;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Spanner;
+import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
+import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.SendResultSetState;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.PartitionQueryResult;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.EmptyQueryResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireoutput.PortalSuspendedResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.SettableFuture;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Generic representation for a control wire message: that is, a message which does not handle any
@@ -41,6 +61,8 @@ import java.util.List;
  */
 @InternalApi
 public abstract class ControlMessage extends WireMessage {
+  private static final Logger logger = Logger.getLogger(ControlMessage.class.getName());
+
   /** Maximum number of invalid messages in a row allowed before we terminate the connection. */
   static final int MAX_INVALID_MESSAGE_COUNT = 50;
 
@@ -231,8 +253,7 @@ public abstract class ControlMessage extends WireMessage {
           new PortalSuspendedResponse(this.outputStream).send(false);
         } else {
           statement.close();
-          new CommandCompleteResponse(this.outputStream, "SELECT " + state.getNumberOfRowsSent())
-              .send(false);
+          new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows()).send(false);
         }
         break;
       case UPDATE:
@@ -263,19 +284,199 @@ public abstract class ControlMessage extends WireMessage {
       IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
     Preconditions.checkArgument(
         describedResult.containsResultSet(), "The statement result must be a result set");
-    long rows = 0;
-    ResultSet resultSet = describedResult.getStatementResult().getResultSet();
-    boolean hasData = describedResult.isHasMoreData();
-    while (hasData) {
-      new DataRowResponse(
-              this.outputStream, describedResult, this.connection.getServer().getOptions(), mode)
-          .send(false);
-      rows++;
-      hasData = resultSet.next();
-      if (rows == maxRows) {
-        break;
-      }
+    long rows;
+    StatementResult statementResult = describedResult.getStatementResult();
+    boolean hasData;
+    if (statementResult instanceof PartitionQueryResult) {
+      hasData = false;
+      PartitionQueryResult partitionQueryResult = (PartitionQueryResult) statementResult;
+      rows =
+          sendPartitionedQuery(
+              describedResult,
+              mode,
+              partitionQueryResult.getBatchTransactionId(),
+              partitionQueryResult.getPartitions());
+    } else {
+      hasData = describedResult.isHasMoreData();
+      ResultSet resultSet = describedResult.getStatementResult().getResultSet();
+      SendResultSetRunnable runnable =
+          SendResultSetRunnable.forResultSet(
+              describedResult, resultSet, maxRows, mode, SettableFuture.create(), hasData);
+      rows = runnable.call();
+      hasData = runnable.hasData;
     }
-    return new SendResultSetState(rows, hasData);
+
+    WireOutput suffix = describedResult.createResultSuffix();
+    if (suffix != null) {
+      suffix.send(false);
+    }
+    return new SendResultSetState(describedResult.getCommandTag(), rows, hasData);
+  }
+
+  long sendPartitionedQuery(
+      IntermediateStatement describedResult,
+      QueryMode mode,
+      BatchTransactionId batchTransactionId,
+      List<Partition> partitions) {
+    ListeningExecutorService executorService =
+        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(partitions.size()));
+    List<ListenableFuture<Long>> futures = new ArrayList<>(partitions.size());
+    SettableFuture<Boolean> prefixSent = SettableFuture.create();
+    Connection spannerConnection = connection.getSpannerConnection();
+    Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
+    BatchClient batchClient = spanner.getBatchClient(connection.getDatabaseId());
+    BatchReadOnlyTransaction batchReadOnlyTransaction =
+        batchClient.batchReadOnlyTransaction(batchTransactionId);
+    for (int i = 0; i < partitions.size(); i++) {
+      futures.add(
+          executorService.submit(
+              SendResultSetRunnable.forPartition(
+                  describedResult,
+                  batchReadOnlyTransaction,
+                  partitions.get(i),
+                  mode,
+                  i == 0,
+                  prefixSent)));
+    }
+    executorService.shutdown();
+    try {
+      @SuppressWarnings("UnstableApiUsage")
+      List<Long> rowCounts = Futures.allAsList(futures).get();
+      long rowCount = rowCounts.stream().reduce(Long::sum).orElse(0L);
+      logger.log(Level.INFO, String.format("Sent %d rows from partitioned query", rowCount));
+      return rowCount;
+    } catch (ExecutionException executionException) {
+      logger.log(
+          Level.WARNING, "Sending partitioned query result failed", executionException.getCause());
+      executorService.shutdownNow();
+      throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
+    } catch (InterruptedException interruptedException) {
+      logger.log(
+          Level.WARNING, "Sending partitioned query result interrupted", interruptedException);
+      executorService.shutdownNow();
+      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+    } finally {
+      batchReadOnlyTransaction.cleanup();
+    }
+  }
+
+  static final class SendResultSetRunnable implements Callable<Long> {
+    private final IntermediateStatement describedResult;
+    private ResultSet resultSet;
+    private final BatchReadOnlyTransaction batchReadOnlyTransaction;
+    private final Partition partition;
+    private final long maxRows;
+    private final QueryMode mode;
+    private final boolean includePrefix;
+    private final SettableFuture<Boolean> prefixSent;
+    private boolean hasData;
+
+    static SendResultSetRunnable forResultSet(
+        IntermediateStatement describedResult,
+        ResultSet resultSet,
+        long maxRows,
+        QueryMode mode,
+        SettableFuture<Boolean> prefixSent,
+        boolean hasData) {
+      return new SendResultSetRunnable(
+          describedResult, resultSet, maxRows, mode, true, prefixSent, hasData);
+    }
+
+    static SendResultSetRunnable forPartition(
+        IntermediateStatement describedResult,
+        BatchReadOnlyTransaction batchReadOnlyTransaction,
+        Partition partition,
+        QueryMode mode,
+        boolean includePrefix,
+        SettableFuture<Boolean> prefixSent) {
+      return new SendResultSetRunnable(
+          describedResult, batchReadOnlyTransaction, partition, mode, includePrefix, prefixSent);
+    }
+
+    private SendResultSetRunnable(
+        IntermediateStatement describedResult,
+        ResultSet resultSet,
+        long maxRows,
+        QueryMode mode,
+        boolean includePrefix,
+        SettableFuture<Boolean> prefixSent,
+        boolean hasData) {
+      this.describedResult = describedResult;
+      this.resultSet = resultSet;
+      this.batchReadOnlyTransaction = null;
+      this.partition = null;
+      this.maxRows = maxRows;
+      this.mode = mode;
+      this.includePrefix = includePrefix;
+      this.prefixSent = prefixSent;
+      this.hasData = hasData;
+    }
+
+    private SendResultSetRunnable(
+        IntermediateStatement describedResult,
+        BatchReadOnlyTransaction batchReadOnlyTransaction,
+        Partition partition,
+        QueryMode mode,
+        boolean includePrefix,
+        SettableFuture<Boolean> prefixSent) {
+      this.describedResult = describedResult;
+      this.resultSet = null;
+      this.batchReadOnlyTransaction = batchReadOnlyTransaction;
+      this.partition = partition;
+      this.maxRows = 0L;
+      this.mode = mode;
+      this.includePrefix = includePrefix;
+      this.prefixSent = prefixSent;
+      this.hasData = false;
+    }
+
+    @Override
+    public Long call() throws Exception {
+      if (resultSet == null && batchReadOnlyTransaction != null && partition != null) {
+        // Note: It is OK not to close this result set, as the underlying transaction and session
+        // will be cleaned up at a later moment.
+        try {
+          resultSet = batchReadOnlyTransaction.execute(partition);
+          hasData = resultSet.next();
+        } catch (Throwable t) {
+          if (includePrefix) {
+            synchronized (describedResult) {
+              prefixSent.setException(t);
+            }
+          }
+          throw t;
+        }
+      }
+      if (includePrefix) {
+        try {
+          WireOutput prefix = describedResult.createResultPrefix(resultSet);
+          if (prefix != null) {
+            prefix.send(false);
+          }
+          prefixSent.set(true);
+        } catch (Throwable t) {
+          prefixSent.setException(t);
+          throw t;
+        }
+      }
+      // Wait until the prefix (if any) has been sent.
+      prefixSent.get();
+      long rows = 0L;
+      while (hasData) {
+        WireOutput wireOutput = describedResult.createDataRowResponse(resultSet, mode);
+        synchronized (describedResult) {
+          wireOutput.send(false);
+        }
+        rows++;
+        hasData = resultSet.next();
+        if (rows % 1000 == 0) {
+          logger.log(Level.INFO, String.format("Sent %d rows", rows));
+        }
+        if (rows == maxRows) {
+          break;
+        }
+      }
+      return rows;
+    }
   }
 }

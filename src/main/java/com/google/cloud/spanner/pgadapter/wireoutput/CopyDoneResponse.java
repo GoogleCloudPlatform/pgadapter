@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-@InternalApi
-package com.google.cloud.spanner.pgadapter.parsers.copy;
+package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import com.google.api.core.InternalApi;
+import java.io.DataOutputStream;
+
+@InternalApi
+public class CopyDoneResponse extends WireOutput {
+
+  public CopyDoneResponse(DataOutputStream output) {
+    super(output, 4);
+  }
+
+  @Override
+  protected void sendPayload() throws Exception {}
+
+  @Override
+  public byte getIdentifier() {
+    return 'c';
+  }
+
+  @Override
+  protected String getMessageName() {
+    return "Copy Done";
+  }
+
+  @Override
+  protected String getPayloadString() {
+    return "Copy Done";
+  }
+}
