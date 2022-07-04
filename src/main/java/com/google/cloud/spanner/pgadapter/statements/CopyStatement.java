@@ -328,6 +328,7 @@ public class CopyStatement extends IntermediatePortalStatement {
               options.getTableName(),
               getTableColumns(),
               indexedColumnsCount,
+              this.options.getFormat(),
               getParserFormat(),
               hasHeader());
       setFutureStatementResult(

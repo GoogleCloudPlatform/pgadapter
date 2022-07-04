@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import static com.google.cloud.spanner.pgadapter.utils.CopyInParser.createDefaultTimestampUtils;
 import static com.google.cloud.spanner.pgadapter.utils.MutationWriter.calculateSize;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -35,6 +36,8 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
+import com.google.cloud.spanner.pgadapter.utils.CsvCopyParser.CsvCopyRecord;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -127,6 +130,7 @@ public class MutationWriterTest {
             "numbers",
             tableColumns,
             /* indexedColumnsCount = */ 1,
+            Format.TEXT,
             format,
             false);
 
@@ -168,6 +172,7 @@ public class MutationWriterTest {
               "numbers",
               tableColumns,
               /* indexedColumnsCount = */ 1,
+              Format.TEXT,
               format,
               false);
 
@@ -212,6 +217,7 @@ public class MutationWriterTest {
               "numbers",
               tableColumns,
               /* indexedColumnsCount = */ 1,
+              Format.TEXT,
               format,
               false);
 
@@ -249,6 +255,7 @@ public class MutationWriterTest {
               "numbers",
               tableColumns,
               /* indexedColumnsCount = */ 0,
+              Format.TEXT,
               format,
               false);
 
@@ -290,6 +297,7 @@ public class MutationWriterTest {
               "numbers",
               tableColumns,
               /* indexedColumnsCount = */ 1,
+              Format.TEXT,
               format,
               false);
 
@@ -335,6 +343,7 @@ public class MutationWriterTest {
             "numbers",
             tableColumns,
             /* indexedColumnsCount = */ 1,
+            Format.TEXT,
             format,
             false);
 
@@ -526,6 +535,7 @@ public class MutationWriterTest {
               "my_table",
               ImmutableMap.of("col", typeCode),
               0,
+              Format.TEXT,
               CSVFormat.POSTGRESQL_TEXT,
               false);
       CSVParser parser =
@@ -533,7 +543,8 @@ public class MutationWriterTest {
               new StringReader("col\n\\N\n"), CSVFormat.POSTGRESQL_TEXT.withFirstRecordAsHeader());
       CSVRecord record = parser.getRecords().get(0);
 
-      Mutation mutation = mutationWriter.buildMutation(record);
+      Mutation mutation =
+          mutationWriter.buildMutation(new CsvCopyRecord(createDefaultTimestampUtils(), record));
 
       assertEquals(String.format("Type code: %s", typeCode), 1, mutation.asMap().size());
     }
