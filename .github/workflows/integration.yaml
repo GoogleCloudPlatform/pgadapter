@@ -1,5 +1,14 @@
 on:
   pull_request:
+  schedule:
+    # Run at 04:52UTC every day
+    - cron: '52 4 * * *'
+  workflow_dispatch:
+    inputs:
+      staging:
+        description: "Run the integration tests on the staging environment?"
+        required: false
+        type: boolean
 name: integration
 env:
   GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
@@ -17,13 +26,20 @@ jobs:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         if: "${{ env.GCP_PROJECT_ID != '' }}"
         run: echo "::set-output name=defined::true"
-
   integration-test:
     needs: [check-env]
     if: needs.check-env.outputs.has-key == 'true'
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
+      - id: set-manual-endpoint
+        if: "${{ inputs.staging }}"
+        run: |
+          echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
+      - id: set-scheduled-endpoint
+        if: github.event.schedule=='52 4 * * *'
+        run: |
+          echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
       - uses: actions/checkout@v3
       - name: Setup Java
         uses: actions/setup-java@v3

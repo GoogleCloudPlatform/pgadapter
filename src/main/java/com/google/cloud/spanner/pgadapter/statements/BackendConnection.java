@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerBatchUpdateException;
@@ -29,6 +30,7 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
@@ -45,7 +47,10 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -156,6 +161,8 @@ public class BackendConnection {
           result.set(NO_RESULT);
         } else if (statement.getSql().isEmpty()) {
           result.set(NO_RESULT);
+        } else if (parsedStatement.isDdl()) {
+          result.set(ddlExecutor.execute(parsedStatement, statement));
         } else {
           result.set(spannerConnection.execute(statement));
         }
@@ -226,8 +233,10 @@ public class BackendConnection {
   private final ImmutableMap<String, LocalStatement> localStatements;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
+  private final String currentSchema = "public";
   private final LinkedList<BufferedStatement<?>> bufferedStatements = new LinkedList<>();
   private final Connection spannerConnection;
+  private final DdlExecutor ddlExecutor;
   private final DdlTransactionMode ddlTransactionMode;
 
   /**
@@ -235,10 +244,12 @@ public class BackendConnection {
    * DdlTransactionMode}.
    */
   BackendConnection(
+      DatabaseId databaseId,
       Connection spannerConnection,
       DdlTransactionMode ddlTransactionMode,
       ImmutableList<LocalStatement> localStatements) {
     this.spannerConnection = spannerConnection;
+    this.ddlExecutor = new DdlExecutor(databaseId, this);
     this.ddlTransactionMode = ddlTransactionMode;
     //noinspection UnstableApiUsage
     this.localStatements =
@@ -299,6 +310,14 @@ public class BackendConnection {
     } finally {
       endImplicitTransaction();
     }
+  }
+
+  Connection getSpannerConnection() {
+    return this.spannerConnection;
+  }
+
+  String getCurrentSchema() {
+    return this.currentSchema;
   }
 
   /**
@@ -569,11 +588,22 @@ public class BackendConnection {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, "Statement type is not supported for batching");
     }
+    List<StatementResult> statementResults = new ArrayList<>(getStatementCount());
     int index = fromIndex;
     while (index < getStatementCount()) {
       StatementType statementType = getStatementType(index);
       if (canBeBatchedTogether(batchType, statementType)) {
-        spannerConnection.execute(bufferedStatements.get(index).statement);
+        // Send DDL statements to the DdlExecutor instead of executing them directly on the
+        // connection, so we can support certain DDL constructs that are currently not supported by
+        // the backend, such as IF [NOT] EXISTS.
+        if (batchType == StatementType.DDL) {
+          statementResults.add(
+              ddlExecutor.execute(
+                  bufferedStatements.get(index).parsedStatement,
+                  bufferedStatements.get(index).statement));
+        } else {
+          spannerConnection.execute(bufferedStatements.get(index).statement);
+        }
         index++;
       } else {
         // End the batch here, as the statement type on this index can not be batched together with
@@ -583,15 +613,49 @@ public class BackendConnection {
     }
     try {
       long[] counts = spannerConnection.runBatch();
+      if (batchType == StatementType.DDL) {
+        counts = extractDdlUpdateCounts(statementResults, counts);
+      }
       updateBatchResultCount(fromIndex, counts);
     } catch (SpannerBatchUpdateException batchUpdateException) {
-      long[] counts = batchUpdateException.getUpdateCounts();
+      long[] counts;
+      if (batchType == StatementType.DDL) {
+        counts = extractDdlUpdateCounts(statementResults, batchUpdateException.getUpdateCounts());
+      } else {
+        counts = batchUpdateException.getUpdateCounts();
+      }
       updateBatchResultCount(fromIndex, counts);
       Execute failedExecute = (Execute) bufferedStatements.get(fromIndex + counts.length);
       failedExecute.result.setException(batchUpdateException);
       throw batchUpdateException;
     }
     return index - fromIndex;
+  }
+
+  /**
+   * Extracts the update count for a list of DDL statements. It could be that the DdlExecutor
+   * decided to skip some DDL statements. This is indicated by the executor returning a {@link
+   * NotExecuted} result for that statement. The result that we return to the client should still
+   * indicate that the statement was 'executed'.
+   */
+  static long[] extractDdlUpdateCounts(
+      List<StatementResult> statementResults, long[] returnedUpdateCounts) {
+    int index = 0;
+    int successfullyExecutedCount = 0;
+    while (index < returnedUpdateCounts.length
+        && successfullyExecutedCount < statementResults.size()) {
+      if (!(statementResults.get(successfullyExecutedCount) instanceof NotExecuted)) {
+        index++;
+      }
+      successfullyExecutedCount++;
+    }
+    while (successfullyExecutedCount < statementResults.size()
+        && statementResults.get(successfullyExecutedCount) instanceof NotExecuted) {
+      successfullyExecutedCount++;
+    }
+    long[] updateCounts = new long[successfullyExecutedCount];
+    Arrays.fill(updateCounts, 1L);
+    return updateCounts;
   }
 
   /** Updates the results of the buffered statements after finishing executing a batch. */
@@ -613,7 +677,7 @@ public class BackendConnection {
   public static final class NoResult implements StatementResult {
     private final String commandTag;
 
-    private NoResult() {
+    NoResult() {
       this.commandTag = null;
     }
 
