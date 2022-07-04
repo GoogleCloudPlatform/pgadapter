@@ -38,6 +38,7 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.spanner.v1.TypeCode;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -45,6 +46,7 @@ import java.io.OutputStreamWriter;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.Reader;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
@@ -388,6 +390,10 @@ public class MutationWriterTest {
   @Test
   public void testCalculateSize() {
     assertEquals(
+        1,
+        calculateSize(
+            Mutation.newInsertBuilder("my_table").set("my_col").to((String) null).build()));
+    assertEquals(
         8, calculateSize(Mutation.newInsertBuilder("my_table").set("my_col").to(1L).build()));
     assertEquals(
         1, calculateSize(Mutation.newInsertBuilder("my_table").set("my_col").to(true).build()));
@@ -498,5 +504,38 @@ public class MutationWriterTest {
                 .set("my_col")
                 .toJsonArray(ImmutableList.of("foo", "a"))
                 .build()));
+  }
+
+  @Test
+  public void testBuildMutationNulls() throws IOException {
+    // TODO(b/237831798): Add support for ARRAY in COPY operations.
+    ImmutableSet<TypeCode> unsupportedTypeCodes =
+        ImmutableSet.of(
+            TypeCode.TYPE_CODE_UNSPECIFIED, TypeCode.ARRAY, TypeCode.STRUCT, TypeCode.UNRECOGNIZED);
+
+    Connection connection = mock(Connection.class);
+    for (TypeCode typeCode : TypeCode.values()) {
+      if (unsupportedTypeCodes.contains(typeCode)) {
+        continue;
+      }
+
+      MutationWriter mutationWriter =
+          new MutationWriter(
+              CopyTransactionMode.ImplicitAtomic,
+              connection,
+              "my_table",
+              ImmutableMap.of("col", typeCode),
+              0,
+              CSVFormat.POSTGRESQL_TEXT,
+              false);
+      CSVParser parser =
+          CSVParser.parse(
+              new StringReader("col\n\\N\n"), CSVFormat.POSTGRESQL_TEXT.withFirstRecordAsHeader());
+      CSVRecord record = parser.getRecords().get(0);
+
+      Mutation mutation = mutationWriter.buildMutation(record);
+
+      assertEquals(String.format("Type code: %s", typeCode), 1, mutation.asMap().size());
+    }
   }
 }
