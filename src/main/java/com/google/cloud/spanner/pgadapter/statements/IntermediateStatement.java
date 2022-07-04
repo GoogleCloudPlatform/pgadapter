@@ -267,7 +267,7 @@ public class IntermediateStatement {
    *
    * @param exception The exception to store.
    */
-  protected void handleExecutionException(SpannerException exception) {
+  public void handleExecutionException(SpannerException exception) {
     setException(exception);
     this.hasMoreData = false;
   }
