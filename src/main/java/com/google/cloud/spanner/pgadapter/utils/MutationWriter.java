@@ -30,6 +30,7 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -42,7 +43,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.io.PrintWriter;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
@@ -130,7 +130,6 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final int pipeBufferSize;
   private final CSVFormat format;
   private final CSVParser parser;
-  private PrintWriter errorFileWriter;
   private final PipedOutputStream payload = new PipedOutputStream();
   private final AtomicBoolean commit = new AtomicBoolean(false);
   private final AtomicBoolean rollback = new AtomicBoolean(false);
@@ -187,6 +186,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                     "copy_in_pipe_buffer_size", String.valueOf(DEFAULT_PIPE_BUFFER_SIZE))),
             1024);
     this.format = format;
+    // TODO(b/237831799): Support binary format for COPY.
     this.parser = createParser();
   }
 
@@ -431,6 +431,11 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   static int calculateSize(Mutation mutation) {
     int size = 0;
     for (Value value : mutation.getValues()) {
+      if (value.isNull()) {
+        size++;
+        continue;
+      }
+
       switch (value.getType().getCode()) {
         case BOOL:
           size++;
@@ -503,7 +508,8 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     return size;
   }
 
-  private Mutation buildMutation(CSVRecord record) {
+  @VisibleForTesting
+  Mutation buildMutation(CSVRecord record) {
     TimestampUtils timestampUtils = new TimestampUtils(false, () -> null);
     WriteBuilder builder;
     // The default is to use Insert, but PGAdapter also supports InsertOrUpdate. This can be very
@@ -520,7 +526,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       TypeCode columnType = this.tableColumns.get(columnName);
       String recordValue = "";
       try {
-        recordValue = record.get(columnName).trim();
+        recordValue = record.get(columnName);
         switch (columnType) {
           case STRING:
             builder.set(columnName).to(recordValue);
@@ -529,30 +535,42 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
             builder.set(columnName).to(Value.json(recordValue));
             break;
           case BOOL:
-            builder.set(columnName).to(Boolean.parseBoolean(recordValue));
+            builder
+                .set(columnName)
+                .to(recordValue == null ? null : Boolean.parseBoolean(recordValue));
             break;
           case INT64:
-            builder.set(columnName).to(Long.parseLong(recordValue));
+            builder.set(columnName).to(recordValue == null ? null : Long.parseLong(recordValue));
             break;
           case FLOAT64:
-            builder.set(columnName).to(Double.parseDouble(recordValue));
+            builder
+                .set(columnName)
+                .to(recordValue == null ? null : Double.parseDouble(recordValue));
             break;
           case NUMERIC:
             builder.set(columnName).to(Value.pgNumeric(recordValue));
             break;
           case BYTES:
-            if (recordValue.startsWith("\\x")) {
+            if (recordValue == null) {
+              builder.set(columnName).to((ByteArray) null);
+            } else if (recordValue.startsWith("\\x")) {
               builder
                   .set(columnName)
                   .to(ByteArray.copyFrom(Hex.decodeHex(recordValue.substring(2))));
+            } else {
+              throw SpannerExceptionFactory.newSpannerException(
+                  ErrorCode.INVALID_ARGUMENT,
+                  "COPY only supports the Hex format for bytea columns");
             }
             break;
           case DATE:
-            builder.set(columnName).to(Date.parseDate(recordValue));
+            builder.set(columnName).to(recordValue == null ? null : Date.parseDate(recordValue));
             break;
           case TIMESTAMP:
             Timestamp timestamp = timestampUtils.toTimestamp(null, recordValue);
-            builder.set(columnName).to(com.google.cloud.Timestamp.of(timestamp));
+            builder
+                .set(columnName)
+                .to(timestamp == null ? null : com.google.cloud.Timestamp.of(timestamp));
             break;
         }
       } catch (NumberFormatException | DateTimeParseException e) {
