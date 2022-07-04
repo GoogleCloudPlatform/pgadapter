@@ -29,8 +29,8 @@
       com.google.cloud.spanner.pgadapter.python.PythonTest
     </excludedTests>
 
-    <spanner.version>6.25.6</spanner.version>
-    <junixsocket.version>2.5.0</junixsocket.version>
+    <spanner.version>6.25.7</spanner.version>
+    <junixsocket.version>2.5.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -120,14 +120,14 @@
     <dependency>
       <groupId>com.google.api</groupId>
       <artifactId>gax-grpc</artifactId>
-      <version>2.18.1</version>
+      <version>2.18.2</version>
       <classifier>testlib</classifier>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>net.java.dev.jna</groupId>
       <artifactId>jna</artifactId>
-      <version>5.12.0</version>
+      <version>5.12.1</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -411,6 +411,8 @@
         </executions>
         <configuration>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
+          <forkCount>8</forkCount>
+          <reuseForks>true</reuseForks>
           <argLine>${failsafe.jacoco.args}</argLine>
           <skipITs>${skipITs}</skipITs>
         </configuration>

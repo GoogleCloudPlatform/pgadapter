@@ -38,6 +38,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -134,6 +135,14 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   private String getConnectionUrl() {
+    if (useDomainSocket) {
+      return String.format(
+          "jdbc:postgresql://localhost/%s?"
+              + "preferQueryMode=%s"
+              + "&socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
+              + "&socketFactoryArg=/tmp/.s.PGSQL.%d",
+          database.getId().getDatabase(), preferQueryMode, testEnv.getPGAdapterPort());
+    }
     return String.format(
         "jdbc:postgresql://%s/%s?preferQueryMode=%s",
         testEnv.getPGAdapterHostAndPort(), database.getId().getDatabase(), preferQueryMode);
@@ -147,6 +156,31 @@ public class ITJdbcTest implements IntegrationTest {
         assertTrue(resultSet.next());
         assertEquals("Hello World!", resultSet.getString(1));
         assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testCreateTableIfNotExists() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // This table already exists, so it should be a no-op.
+        assertFalse(
+            statement.execute("create table if not exists all_types (id bigint primary key)"));
+        assertFalse(statement.getMoreResults());
+      }
+    }
+  }
+
+  @Test
+  public void testCreateTableIfNotExists_withSchemaPrefix() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // This table already exists, so it should be a no-op.
+        assertFalse(
+            statement.execute(
+                "create table if not exists public.all_types (id bigint primary key)"));
+        assertFalse(statement.getMoreResults());
       }
     }
   }
@@ -461,6 +495,34 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @Test
+  public void testCopyIn_Nulls() throws SQLException, IOException {
+    // Empty all data in the table.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
+
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      long copyCount =
+          copyManager.copyIn(
+              "copy all_types from stdin;",
+              new FileInputStream("./src/test/resources/all_types_data_nulls.txt"));
+      assertEquals(1L, copyCount);
+
+      // Verify that there is 1 row in the table, and that the values of all columns except the
+      // primary key are null.
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select * from all_types")) {
+        assertTrue(resultSet.next());
+        for (int col = 2; col <= resultSet.getMetaData().getColumnCount(); col++) {
+          assertNull(String.format("Col %d should be null", col), resultSet.getObject(col));
+        }
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testCopyIn_Large_FailsWhenAtomic() throws SQLException {
     // Empty all data in the table.
     String databaseId = database.getId().getDatabase();
@@ -476,11 +538,14 @@ public class ITJdbcTest implements IntegrationTest {
                   copyManager.copyIn(
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
-      assertEquals(
-          "ERROR: FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.\n\n"
-              + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n\n"
-              + "Execute `SET AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.\n\n",
-          exception.getMessage());
+      assertTrue(
+          exception.getMessage(),
+          exception
+                  .getMessage()
+                  .contains("FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.")
+              || exception
+                  .getMessage()
+                  .contains("Database connection failed when canceling copy operation"));
     }
 
     // Verify that the table is still empty.

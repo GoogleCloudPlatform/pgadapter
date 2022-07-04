@@ -41,6 +41,7 @@ public class ExtendedQueryProtocolHandler {
             : connectionHandler.getWellKnownClient().getLocalStatements(connectionHandler);
     this.backendConnection =
         new BackendConnection(
+            connectionHandler.getDatabaseId(),
             connectionHandler.getSpannerConnection(),
             connectionHandler.getServer().getOptions().getDdlTransactionMode(),
             localStatements);
