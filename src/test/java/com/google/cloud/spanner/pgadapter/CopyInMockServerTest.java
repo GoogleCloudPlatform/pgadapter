@@ -20,6 +20,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
+import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -30,6 +31,7 @@ import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.Mutation;
 import com.google.spanner.v1.Mutation.OperationCase;
 import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
@@ -276,14 +278,14 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                   copyManager.copyIn(
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
-      assertTrue(
-          exception.getMessage(),
-          exception
-                  .getMessage()
-                  .contains("FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.")
-              || exception
-                  .getMessage()
-                  .contains("Database connection failed when canceling copy operation"));
+
+      assertEquals(
+          "ERROR: FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.\n"
+              + "\n"
+              + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
+              + "\n"
+              + "Execute `SET AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.\n\n",
+          exception.getMessage());
     }
   }
 
@@ -352,8 +354,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       }
     }
 
-    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertTrue(commitRequests.isEmpty());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -504,6 +505,18 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar(0);
       stream.flush();
 
+      // Wait for the CopyInResponse.
+      boolean receivedCopyInResponse = false;
+      while (!receivedCopyInResponse) {
+        int command = stream.receiveChar();
+        if (command == 'G') {
+          receivedCopyInResponse = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
+
       // Send a CopyData message and then a 'Q', which is not allowed.
       stream.sendChar('d');
       stream.sendInteger4(payload.length + 4);
@@ -515,14 +528,23 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendInteger4(13);
       stream.send("SELECT 1".getBytes(StandardCharsets.UTF_8));
       stream.sendChar(0);
+
+      String error = "Error";
+      stream.sendChar('f');
+      stream.sendInteger4(4 + error.getBytes(StandardCharsets.UTF_8).length + 1);
+      stream.send(error.getBytes(StandardCharsets.UTF_8));
+      stream.sendChar(0);
       stream.flush();
 
-      boolean receivedErrorMessage = false;
+      boolean receivedReadyForQuery = false;
       StringBuilder errorMessage = new StringBuilder();
-      while (!receivedErrorMessage) {
+      while (!receivedReadyForQuery) {
         int command = stream.receiveChar();
-        if (command == 'E') {
-          receivedErrorMessage = true;
+        if (command == 'Z') {
+          receivedReadyForQuery = true;
+          // Skip the status flag.
+          stream.skip(1);
+        } else if (command == 'E') {
           // Read and ignore the length.
           stream.receiveInteger4();
           while (stream.receiveChar() > 0) {
@@ -537,11 +559,12 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       assertEquals(
           "ERROR\n"
               + "XX000\n"
-              + "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: 'Q'\n",
+              + "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: 'Q'\n"
+              + "ERROR\n"
+              + "P0001\n"
+              + "CANCELLED: Error\n",
           errorMessage.toString());
 
-      stream.sendChar('c');
-      stream.sendInteger4(4);
       stream.sendChar('x');
       stream.sendInteger4(4);
       stream.flush();
@@ -628,6 +651,49 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCopyInBatchPsqlWithError() throws Exception {
+    assumeTrue("This test requires psql to be installed", isPsqlAvailable());
+    setupCopyInformationSchemaResults();
+
+    String host = useDomainSocket ? "/tmp" : "localhost";
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand =
+        new String[] {"psql", "-h", host, "-p", String.valueOf(pgServer.getLocalPort())};
+    builder.command(psqlCommand);
+    Process process = builder.start();
+    String errors;
+    String output;
+
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      // The 'INSERT INTO FOO VALUES ('abc')' statement will return an error.
+      writer.write(
+          "SELECT 1\\;copy users from stdin\\;INSERT INTO FOO VALUES ('abc')\\;copy users from stdin\\;SELECT 2;\n"
+              + "1\t2\t3\n"
+              + "\\.\n"
+              + "\n"
+              + "\\q\n");
+      writer.flush();
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    assertEquals(
+        "ERROR:  INVALID_ARGUMENT: com.google.api.gax.rpc.InvalidArgumentException: io.grpc.StatusRuntimeException: INVALID_ARGUMENT: Statement is invalid.",
+        errors);
+    assertEquals("", output);
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    // The batch is executed as one implicit transaction. That transaction should be rolled back.
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
   public void testCopyInBatch() throws Exception {
     setupCopyInformationSchemaResults();
 
@@ -650,6 +716,18 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar(0);
       stream.flush();
 
+      // Wait for the first CopyInResponse.
+      boolean receivedCopyInResponse = false;
+      while (!receivedCopyInResponse) {
+        int command = stream.receiveChar();
+        if (command == 'G') {
+          receivedCopyInResponse = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
+
       // Send CopyData + CopyDone for the first copy operation.
       stream.sendChar('d');
       stream.sendInteger4(row1.length + 4);
@@ -657,6 +735,30 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar('c');
       stream.sendInteger4(4);
       stream.flush();
+
+      // Wait for CommandComplete
+      boolean receivedCommandComplete = false;
+      while (!receivedCommandComplete) {
+        int command = stream.receiveChar();
+        if (command == 'C') {
+          receivedCommandComplete = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
+
+      // Wait for the second CopyInResponse.
+      receivedCopyInResponse = false;
+      while (!receivedCopyInResponse) {
+        int command = stream.receiveChar();
+        if (command == 'G') {
+          receivedCopyInResponse = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
 
       // Send CopyData + CopyDone for the second copy operation.
       stream.sendChar('d');
@@ -671,11 +773,10 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         int command = stream.receiveChar();
         if (command == 'Z') {
           receivedReadyForQuery = true;
-        } else {
-          // Just skip everything in the message.
-          length = stream.receiveInteger4();
-          stream.skip(length - 4);
         }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
       }
     }
 
@@ -720,6 +821,18 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar(0);
       stream.flush();
 
+      // Wait for the CopyInResponse.
+      boolean receivedCopyInResponse = false;
+      while (!receivedCopyInResponse) {
+        int command = stream.receiveChar();
+        if (command == 'G') {
+          receivedCopyInResponse = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
+
       // Send CopyData + CopyDone for the first copy operation.
       stream.sendChar('d');
       stream.sendInteger4(row1.length + 4);
@@ -727,6 +840,30 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       stream.sendChar('c');
       stream.sendInteger4(4);
       stream.flush();
+
+      // Wait for CommandComplete
+      boolean receivedCommandComplete = false;
+      while (!receivedCommandComplete) {
+        int command = stream.receiveChar();
+        if (command == 'C') {
+          receivedCommandComplete = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
+
+      // Wait for the second CopyInResponse.
+      receivedCopyInResponse = false;
+      while (!receivedCopyInResponse) {
+        int command = stream.receiveChar();
+        if (command == 'G') {
+          receivedCopyInResponse = true;
+        }
+        // Just skip everything in the message.
+        length = stream.receiveInteger4();
+        stream.skip(length - 4);
+      }
 
       // Send CopyData + CopyFail for the second copy operation.
       stream.sendChar('d');
@@ -746,6 +883,8 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         int command = stream.receiveChar();
         if (command == 'Z') {
           receivedReadyForQuery = true;
+          // Skip the status flag.
+          stream.skip(1);
         } else if (command == 'E') {
           receivedErrorMessage = true;
           // Read and ignore the length.
@@ -760,14 +899,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         }
       }
       assertTrue(receivedErrorMessage);
-      assertEquals(
-          "ERROR\n"
-              + "P0001\n"
-              + "CANCELLED: Changed my mind\n"
-              + "ERROR\n"
-              + "P0001\n"
-              + "INVALID_ARGUMENT: current transaction is aborted, commands ignored until end of transaction block\n",
-          errorMessage.toString());
+      assertEquals("ERROR\n" + "P0001\n" + "CANCELLED: Changed my mind\n", errorMessage.toString());
     }
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
@@ -777,6 +909,11 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   private void setupCopyInformationSchemaResults(boolean tableFound) {
+    setupCopyInformationSchemaResults(mockSpanner, tableFound);
+  }
+
+  public static void setupCopyInformationSchemaResults(
+      MockSpannerServiceImpl mockSpanner, boolean tableFound) {
     ResultSetMetadata metadata =
         ResultSetMetadata.newBuilder()
             .setRowType(

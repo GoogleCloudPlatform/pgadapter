@@ -175,7 +175,13 @@ public class MutationWriterTest {
       mutationWriter.close();
 
       SpannerException exception = assertThrows(SpannerException.class, mutationWriter::call);
-      assertTrue(exception.getMessage().contains("Record count: 2 has exceeded the limit: 1"));
+      assertEquals(
+          "FAILED_PRECONDITION: Record count: 2 has exceeded the limit: 1.\n"
+              + "\n"
+              + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
+              + "\n"
+              + "Execute `SET AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.\n\n",
+          exception.getMessage());
 
       verify(connection, never()).write(anyIterable());
     } finally {

@@ -315,12 +315,6 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   @Override
-  public void handleExecutionException(SpannerException exception) {
-    executor.shutdownNow();
-    super.handleExecutionException(exception);
-  }
-
-  @Override
   public void executeAsync(BackendConnection backendConnection) {
     this.executed = true;
     try {
