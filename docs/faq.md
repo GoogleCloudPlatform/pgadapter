@@ -2,6 +2,29 @@
 
 ## Connection Options
 
+### How can I specify the credentials that should be used for a connection?
+PGAdapter supports two ways of setting the credentials that should be used for a connection:
+1. Use the same credentials for all connections. The credentials must be set when PGAdapter is started,
+   either using the `-c` command line argument or by letting PGAdapter use the default Google Cloud
+   credentials of the runtime environment.
+
+Example:
+```shell
+java -jar pgadapter.jar -p my-project -i my-instance -c /path/to/my-credentials.json
+psql -h /tmp -d my-database
+```
+
+2. Let each connection supply the credentials as a password message to PGAdapter. This mode is enabled
+   by starting PGAdapter with the `-a` command line argument.
+
+Example:
+```shell
+java -jar pgadapter.jar -a -p my-project -i my-instance
+PGPASSWORD=$(cat /path/to/my-credentials.json) psql -h /tmp -d my-database
+```
+
+See [authentication](authentication.md) for more information.
+
 ### How can I configure the number of sessions and/or number of gRPC channels that PGAdapter should use?
 You can use the `-r` command line argument when starting PGAdapter to specify additional connection
 properties that PGAdapter should use when it is connecting to Cloud Spanner. All connection properties
