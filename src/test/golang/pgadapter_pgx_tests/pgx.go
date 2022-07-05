@@ -538,3 +538,36 @@ func TestWrongDialect(connString string) *C.char {
 
 	return nil
 }
+
+//export TestCopyIn
+func TestCopyIn(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	numeric := pgtype.Numeric{}
+	numeric.Set("6.626")
+	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T12:39:10.123456000Z")
+	date := pgtype.Date{}
+	date.Set("2022-07-01")
+	rows := [][]interface{}{
+		{1, true, []byte{1, 2, 3}, 3.14, 10, numeric, timestamptz, date, "test"},
+	}
+	count, err := conn.CopyFrom(
+		ctx,
+		pgx.Identifier{"all_types"},
+		[]string{"col_bigint", "col_bool", "col_bytea", "col_float8", "col_int", "col_numeric", "col_timestamptz", "col_date", "col_varchar"},
+		pgx.CopyFromRows(rows),
+	)
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to execute COPY statement: %v", err))
+	}
+	if g, w := count, int64(1); g != w {
+		return C.CString(fmt.Sprintf("rows affected mismatch:\n Got: %v\nWant: %v", g, w))
+	}
+
+	return nil
+}

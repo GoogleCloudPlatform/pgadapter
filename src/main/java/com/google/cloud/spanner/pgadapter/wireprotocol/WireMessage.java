@@ -40,8 +40,8 @@ public abstract class WireMessage {
   public WireMessage(ConnectionHandler connection, int length) {
     Preconditions.checkArgument(length >= 4);
     this.connection = connection;
-    this.inputStream = connection.getConnectionMetadata().getInputStream();
-    this.outputStream = connection.getConnectionMetadata().getOutputStream();
+    this.inputStream = connection.getConnectionMetadata().peekInputStream();
+    this.outputStream = connection.getConnectionMetadata().peekOutputStream();
     this.length = length;
   }
 
