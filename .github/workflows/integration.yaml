@@ -41,6 +41,8 @@ jobs:
         # Set health checks to wait until postgres has started
         ports:
           - 5432:5432
+        volumes:
+          - /var/run/postgresql:/tmp
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -82,7 +84,7 @@ jobs:
           sudo apt-get install --yes --no-install-recommends postgresql-client
       - name: Create PostgreSQL test database
         run: |
-          psql -h postgres -U postgres -c "CREATE DATABASE pgadapter"
+          psql -h /tmp -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run unit tests
         run: mvn test -B -Ptest-all
       - name: Setup GCloud
