@@ -36,6 +36,7 @@ interface CopyInParser {
       case CSV:
         return new CsvCopyParser(csvFormat, payload, pipeBufferSize, hasHeader);
       case BINARY:
+        return new BinaryCopyParser(payload, pipeBufferSize);
       default:
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, "Unsupported COPY format: " + format);

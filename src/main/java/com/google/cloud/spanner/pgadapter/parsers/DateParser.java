@@ -24,7 +24,7 @@ import java.time.LocalDate;
 import org.postgresql.util.ByteConverter;
 
 /** Translate wire protocol dates to desired formats. */
-class DateParser extends Parser<Date> {
+public class DateParser extends Parser<Date> {
   // Valid format for date: 'yyyy-MM-dd [+-]HH[:mi]'.
   // Timezone information is optional. Timezone may also be specified using only hour value.
   // NOTE: Following algorithm might perform slowly due to exception handling; sadly, this seems
@@ -55,16 +55,20 @@ class DateParser extends Parser<Date> {
           this.item = Date.parseDate(stringValue.substring(0, 10));
           break;
         case BINARY:
-          long days = ByteConverter.int4(item, 0) + PG_EPOCH_DAYS;
-          LocalDate localDate = LocalDate.ofEpochDay(validateRange(days));
-          this.item =
-              Date.fromYearMonthDay(
-                  localDate.getYear(), localDate.getMonthValue(), localDate.getDayOfMonth());
+          this.item = toDate(item);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
+  }
+
+  /** Converts the binary data to a {@link Date}. */
+  public static Date toDate(byte[] data) {
+    long days = ByteConverter.int4(data, 0) + PG_EPOCH_DAYS;
+    LocalDate localDate = LocalDate.ofEpochDay(validateRange(days));
+    return Date.fromYearMonthDay(
+        localDate.getYear(), localDate.getMonthValue(), localDate.getDayOfMonth());
   }
 
   /**
@@ -109,7 +113,7 @@ class DateParser extends Parser<Date> {
    *
    * @param days Number of days to validate.
    */
-  private int validateRange(long days) {
+  static int validateRange(long days) {
     if (days > Integer.MAX_VALUE) {
       throw new IllegalArgumentException("Date is out of range, epoch day=" + days);
     }

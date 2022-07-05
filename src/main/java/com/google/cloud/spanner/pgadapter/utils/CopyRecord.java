@@ -21,6 +21,8 @@ interface CopyRecord {
 
   int numColumns();
 
+  boolean hasColumnNames();
+
   Value getValue(Type type, String columnName);
 
   Value getValue(Type type, int columnIndex);

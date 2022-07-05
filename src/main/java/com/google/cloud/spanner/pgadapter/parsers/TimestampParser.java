@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to timestamp. */
-class TimestampParser extends Parser<Timestamp> {
+public class TimestampParser extends Parser<Timestamp> {
 
   private static final int MICROSECONDS_IN_SECOND = 1000000;
   private static final long NANOSECONDS_IN_MICROSECONDS = 1000L;
@@ -76,16 +76,21 @@ class TimestampParser extends Parser<Timestamp> {
                   temporalAccessor.get(ChronoField.NANO_OF_SECOND));
           break;
         case BINARY:
-          long pgMicros = ByteConverter.int8(item, 0);
-          com.google.cloud.Timestamp ts = com.google.cloud.Timestamp.ofTimeMicroseconds(pgMicros);
-          long javaSeconds = ts.getSeconds() + PG_EPOCH_SECONDS;
-          int javaNanos = ts.getNanos();
-          this.item = Timestamp.ofTimeSecondsAndNanos(javaSeconds, javaNanos);
+          this.item = toTimestamp(item);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
+  }
+
+  /** Converts the binary data to a {@link Timestamp}. */
+  public static Timestamp toTimestamp(byte[] data) {
+    long pgMicros = ByteConverter.int8(data, 0);
+    com.google.cloud.Timestamp ts = com.google.cloud.Timestamp.ofTimeMicroseconds(pgMicros);
+    long javaSeconds = ts.getSeconds() + PG_EPOCH_SECONDS;
+    int javaNanos = ts.getNanos();
+    return Timestamp.ofTimeSecondsAndNanos(javaSeconds, javaNanos);
   }
 
   /**

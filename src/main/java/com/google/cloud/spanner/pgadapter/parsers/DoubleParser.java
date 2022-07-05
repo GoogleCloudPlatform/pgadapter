@@ -19,7 +19,7 @@ import com.google.cloud.spanner.Statement;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to double. */
-class DoubleParser extends Parser<Double> {
+public class DoubleParser extends Parser<Double> {
 
   DoubleParser(ResultSet item, int position) {
     this.item = item.getDouble(position);
@@ -36,12 +36,16 @@ class DoubleParser extends Parser<Double> {
           this.item = Double.valueOf(new String(item));
           break;
         case BINARY:
-          this.item = ByteConverter.float8(item, 0);
+          this.item = toDouble(item);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
+  }
+
+  public static double toDouble(byte[] data) {
+    return ByteConverter.float8(data, 0);
   }
 
   @Override

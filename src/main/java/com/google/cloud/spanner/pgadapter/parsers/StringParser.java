@@ -19,7 +19,7 @@ import com.google.cloud.spanner.Statement;
 import java.nio.charset.StandardCharsets;
 
 /** Translate from wire protocol to string. */
-class StringParser extends Parser<String> {
+public class StringParser extends Parser<String> {
 
   StringParser(ResultSet item, int position) {
     this.item = item.getString(position);
@@ -31,8 +31,13 @@ class StringParser extends Parser<String> {
 
   StringParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
-      this.item = new String(item, UTF8);
+      this.item = toString(item);
     }
+  }
+
+  /** Converts the binary data to an UTF8 string. */
+  public static String toString(byte[] data) {
+    return new String(data, UTF8);
   }
 
   @Override

@@ -25,6 +25,7 @@ import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Mutation.WriteBuilder;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
@@ -37,7 +38,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.google.spanner.v1.TypeCode;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.PipedOutputStream;
@@ -111,7 +111,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private long rowCount;
   private final Connection connection;
   private final String tableName;
-  private final Map<String, TypeCode> tableColumns;
+  private final Map<String, Type> tableColumns;
   private final int maxBatchSize;
   private final long commitSizeLimitForBatching;
   private final int maxParallelism;
@@ -132,7 +132,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       CopyTransactionMode transactionMode,
       Connection connection,
       String tableName,
-      Map<String, TypeCode> tableColumns,
+      Map<String, Type> tableColumns,
       int indexedColumnsCount,
       CopyOptions.Format copyFormat,
       CSVFormat format,
@@ -504,10 +504,15 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       builder = Mutation.newInsertBuilder(this.tableName);
     }
     // Iterate through all table column to copy into
+    int index = 0;
     for (String columnName : this.tableColumns.keySet()) {
-      TypeCode columnType = this.tableColumns.get(columnName);
-      Value value = record.getValue(columnType, columnName);
+      Type columnType = this.tableColumns.get(columnName);
+      Value value =
+          record.hasColumnNames()
+              ? record.getValue(columnType, columnName)
+              : record.getValue(columnType, index);
       builder.set(columnName).to(value);
+      index++;
     }
     return builder.build();
   }

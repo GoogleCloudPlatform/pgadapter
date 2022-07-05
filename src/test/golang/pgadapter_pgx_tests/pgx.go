@@ -555,6 +555,7 @@ func TestCopyIn(connString string) *C.char {
 	date.Set("2022-07-01")
 	rows := [][]interface{}{
 		{1, true, []byte{1, 2, 3}, 3.14, 10, numeric, timestamptz, date, "test"},
+		{2, nil, nil, nil, nil, nil, nil, nil, nil},
 	}
 	count, err := conn.CopyFrom(
 		ctx,
@@ -565,7 +566,7 @@ func TestCopyIn(connString string) *C.char {
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute COPY statement: %v", err))
 	}
-	if g, w := count, int64(1); g != w {
+	if g, w := count, int64(2); g != w {
 		return C.CString(fmt.Sprintf("rows affected mismatch:\n Got: %v\nWant: %v", g, w))
 	}
 

@@ -24,7 +24,7 @@ import java.nio.charset.StandardCharsets;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to {@link Number}. */
-class NumericParser extends Parser<String> {
+public class NumericParser extends Parser<String> {
   NumericParser(ResultSet item, int position) {
     this.item = item.isNull(position) ? null : item.getString(position);
   }
@@ -40,13 +40,20 @@ class NumericParser extends Parser<String> {
           this.item = new String(item);
           break;
         case BINARY:
-          Number number = ByteConverter.numeric(item, 0, item.length);
-          this.item = number == null ? null : number.toString();
+          this.item = toNumericString(item);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
+  }
+  /**
+   * Converts the binary data to a string representation of the numeric value. That is either a
+   * valid numeric string or 'NaN'.
+   */
+  public static String toNumericString(byte[] data) {
+    Number number = ByteConverter.numeric(data, 0, data.length);
+    return number == null ? null : number.toString();
   }
 
   @Override

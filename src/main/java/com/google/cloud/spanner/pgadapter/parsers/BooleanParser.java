@@ -25,7 +25,7 @@ import org.postgresql.util.ByteConverter;
  * Parse specified data to boolean. For most cases it is simply translating from chars 't'/'f' to
  * bit, or simply returning the bit representation.
  */
-class BooleanParser extends Parser<Boolean> {
+public class BooleanParser extends Parser<Boolean> {
   private static final String TRUE_VALUE = "t";
   private static final String FALSE_VALUE = "f";
   // See https://www.postgresql.org/docs/current/datatype-boolean.html
@@ -56,12 +56,17 @@ class BooleanParser extends Parser<Boolean> {
           }
           break;
         case BINARY:
-          this.item = ByteConverter.bool(item, 0);
+          this.item = toBoolean(item);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
+  }
+
+  /** Converts the given binary data to a boolean value. */
+  public static boolean toBoolean(byte[] data) {
+    return ByteConverter.bool(data, 0);
   }
 
   @Override
