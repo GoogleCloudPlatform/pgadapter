@@ -38,6 +38,8 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.Collections;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -355,9 +357,13 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setDouble(++index, 3.14d);
         statement.setInt(++index, 1);
         statement.setBigDecimal(++index, new BigDecimal("3.14"));
-        statement.setTimestamp(
-            ++index, Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00").toSqlTimestamp());
-        statement.setDate(++index, Date.valueOf("2022-04-29"));
+        // TODO(b/237989954)
+        statement.setObject(++index, ZonedDateTime.parse("2022-01-27T17:51:30+01:00"));
+        statement.setObject(++index, LocalDate.parse("2022-04-29"));
+        //        statement.setTimestamp(
+        //            ++index,
+        // Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00").toSqlTimestamp());
+        //        statement.setDate(++index, Date.valueOf("2022-04-29"));
         statement.setString(++index, "test");
 
         try (ResultSet resultSet = statement.executeQuery()) {
@@ -401,9 +407,13 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setDouble(++index, 10.1);
         statement.setInt(++index, 100);
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
-        statement.setTimestamp(
-            ++index, Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp());
-        statement.setDate(++index, Date.valueOf("2022-04-29"));
+        // TODO(b/237989954)
+        statement.setObject(++index, ZonedDateTime.parse("2022-02-11T13:45:00.123456+01:00"));
+        statement.setObject(++index, LocalDate.parse("2022-04-29"));
+        //        statement.setTimestamp(
+        //            ++index,
+        // Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp());
+        //        statement.setDate(++index, Date.valueOf("2022-04-29"));
         statement.setString(++index, "string_test");
 
         assertEquals(1, statement.executeUpdate());
@@ -460,10 +470,14 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setBigDecimal(++index, new BigDecimal("10.0"));
         // Note that PostgreSQL does not support nanosecond precision, so the JDBC driver therefore
         // truncates this value before it is sent to PG.
-        statement.setTimestamp(
-            ++index,
-            Timestamp.parseTimestamp("2022-02-11T14:04:59.123456789+01:00").toSqlTimestamp());
-        statement.setDate(++index, Date.valueOf("2000-02-29"));
+        // TODO(b/237989954)
+        statement.setObject(++index, ZonedDateTime.parse("2022-02-11T14:04:59.123456789+01:00"));
+        statement.setObject(++index, LocalDate.parse("2000-02-29"));
+        //        statement.setTimestamp(
+        //            ++index,
+        //
+        // Timestamp.parseTimestamp("2022-02-11T14:04:59.123456789+01:00").toSqlTimestamp());
+        //        statement.setDate(++index, Date.valueOf("2000-02-29"));
         statement.setString(++index, "updated");
         statement.setLong(++index, 1);
 
@@ -494,6 +508,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
     }
   }
 
+  @Ignore("b/237989954")
   @Test
   public void testNullValues() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
