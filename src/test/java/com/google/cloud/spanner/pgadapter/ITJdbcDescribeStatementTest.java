@@ -39,7 +39,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.time.LocalDate;
-import java.time.ZonedDateTime;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -360,7 +360,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         // TODO(b/237989954)
         statement.setObject(
             ++index,
-            ZonedDateTime.parse("2022-01-27T17:51:30+01:00"),
+            OffsetDateTime.parse("2022-01-27T17:51:30+01:00"),
             Types.TIMESTAMP_WITH_TIMEZONE);
         statement.setObject(++index, LocalDate.parse("2022-04-29"), Types.DATE);
         //        statement.setTimestamp(
@@ -413,7 +413,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         // TODO(b/237989954)
         statement.setObject(
             ++index,
-            ZonedDateTime.parse("2022-02-11T13:45:00.123456+01:00"),
+            OffsetDateTime.parse("2022-02-11T13:45:00.123456+01:00"),
             Types.TIMESTAMP_WITH_TIMEZONE);
         statement.setObject(++index, LocalDate.parse("2022-04-29"), Types.DATE);
         //        statement.setTimestamp(
@@ -479,7 +479,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         // TODO(b/237989954)
         statement.setObject(
             ++index,
-            ZonedDateTime.parse("2022-02-11T14:04:59.123456789+01:00"),
+            OffsetDateTime.parse("2022-02-11T14:04:59.123456789+01:00"),
             Types.TIMESTAMP_WITH_TIMEZONE);
         statement.setObject(++index, LocalDate.parse("2000-02-29"), Types.DATE);
         //        statement.setTimestamp(
