@@ -78,8 +78,8 @@ jobs:
       - run: pip install -r ./src/test/python/requirements.txt
       - name: Setup psql
         run: |
-          apt-get update
-          apt-get install --yes --no-install-recommends postgresql-client
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client
       - name: Create PostgreSQL test database
         run: |
           psql -h postgres -U postgres -c "CREATE DATABASE pgadapter"
