@@ -54,8 +54,10 @@ import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
@@ -70,6 +72,8 @@ import org.postgresql.core.Oid;
 @RunWith(Parameterized.class)
 public class PgxMockServerTest extends AbstractMockServerTest {
   private static PgxTest pgxTest;
+
+  @Rule public Timeout globalTimeout = Timeout.seconds(30);
 
   @Parameter public boolean useDomainSocket;
 
