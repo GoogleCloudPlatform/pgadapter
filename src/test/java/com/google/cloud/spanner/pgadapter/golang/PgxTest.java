@@ -49,6 +49,8 @@ public interface PgxTest extends Library {
 
   String TestWrongDialect(GoString connString);
 
+  String TestCopyIn(GoString connString);
+
   static PgxTest compile() throws IOException, InterruptedException {
     // Compile the Go code to ensure that we always have the most recent test code.
     ProcessBuilder builder = new ProcessBuilder();

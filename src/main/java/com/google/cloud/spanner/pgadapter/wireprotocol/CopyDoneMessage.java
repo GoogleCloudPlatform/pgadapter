@@ -39,14 +39,18 @@ public class CopyDoneMessage extends ControlMessage {
   @Override
   protected void sendPayload() throws Exception {
     // If backend error occurred during copy-in mode, drop any subsequent CopyDone messages.
-    if (this.statement != null) {
+    if (this.statement != null && !this.statement.hasException()) {
       statement.getMutationWriter().commit();
       statement.close();
     }
     // Clear the COPY_IN status to indicate that we finished successfully. This will cause the
     // inline handling of incoming (copy) messages to stop and the server to resume normal
-    // operation.
-    this.connection.setStatus(ConnectionStatus.COPY_DONE);
+    // operation. Only indicate that it is COPY_DONE if we did not receive an error.
+    if (this.statement != null && this.statement.hasException()) {
+      this.connection.setStatus(ConnectionStatus.COPY_FAILED);
+    } else {
+      this.connection.setStatus(ConnectionStatus.COPY_DONE);
+    }
   }
 
   @Override

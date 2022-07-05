@@ -92,7 +92,7 @@ public class ConnectionHandlerTest {
     when(socket.getInetAddress()).thenReturn(address);
     DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
     ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
-    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    when(connectionMetadata.peekOutputStream()).thenReturn(dataOutputStream);
     WireMessage message = mock(WireMessage.class);
     when(server.recordMessage(message)).thenReturn(message);
     doThrow(
@@ -122,7 +122,7 @@ public class ConnectionHandlerTest {
     when(socket.getInetAddress()).thenReturn(address);
     DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
     ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
-    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
+    when(connectionMetadata.peekOutputStream()).thenReturn(dataOutputStream);
     WireMessage message = mock(WireMessage.class);
     when(server.recordMessage(message)).thenReturn(message);
     doThrow(new EOFException("fatal test exception")).when(message).send();
