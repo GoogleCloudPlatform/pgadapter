@@ -358,8 +358,11 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setInt(++index, 1);
         statement.setBigDecimal(++index, new BigDecimal("3.14"));
         // TODO(b/237989954)
-        statement.setObject(++index, ZonedDateTime.parse("2022-01-27T17:51:30+01:00"));
-        statement.setObject(++index, LocalDate.parse("2022-04-29"));
+        statement.setObject(
+            ++index,
+            ZonedDateTime.parse("2022-01-27T17:51:30+01:00"),
+            Types.TIMESTAMP_WITH_TIMEZONE);
+        statement.setObject(++index, LocalDate.parse("2022-04-29"), Types.DATE);
         //        statement.setTimestamp(
         //            ++index,
         // Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00").toSqlTimestamp());
@@ -408,8 +411,11 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         statement.setInt(++index, 100);
         statement.setBigDecimal(++index, new BigDecimal("6.626"));
         // TODO(b/237989954)
-        statement.setObject(++index, ZonedDateTime.parse("2022-02-11T13:45:00.123456+01:00"));
-        statement.setObject(++index, LocalDate.parse("2022-04-29"));
+        statement.setObject(
+            ++index,
+            ZonedDateTime.parse("2022-02-11T13:45:00.123456+01:00"),
+            Types.TIMESTAMP_WITH_TIMEZONE);
+        statement.setObject(++index, LocalDate.parse("2022-04-29"), Types.DATE);
         //        statement.setTimestamp(
         //            ++index,
         // Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp());
@@ -471,8 +477,11 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         // Note that PostgreSQL does not support nanosecond precision, so the JDBC driver therefore
         // truncates this value before it is sent to PG.
         // TODO(b/237989954)
-        statement.setObject(++index, ZonedDateTime.parse("2022-02-11T14:04:59.123456789+01:00"));
-        statement.setObject(++index, LocalDate.parse("2000-02-29"));
+        statement.setObject(
+            ++index,
+            ZonedDateTime.parse("2022-02-11T14:04:59.123456789+01:00"),
+            Types.TIMESTAMP_WITH_TIMEZONE);
+        statement.setObject(++index, LocalDate.parse("2000-02-29"), Types.DATE);
         //        statement.setTimestamp(
         //            ++index,
         //
