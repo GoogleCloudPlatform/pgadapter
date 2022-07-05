@@ -31,6 +31,21 @@ jobs:
     if: needs.check-env.outputs.has-key == 'true'
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    # Add a PostgreSQL Docker container
+    services:
+      # Container label
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        # Set health checks to wait until postgres has started
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - id: set-manual-endpoint
         if: "${{ inputs.staging }}"
@@ -61,6 +76,13 @@ jobs:
         with:
           python-version: '3.9'
       - run: pip install -r ./src/test/python/requirements.txt
+      - name: Setup psql
+      - run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends postgresql-client
+      - name: Create PostgreSQL test database
+      - run: |
+          psql -h postgres -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run unit tests
         run: mvn test -B -Ptest-all
       - name: Setup GCloud
