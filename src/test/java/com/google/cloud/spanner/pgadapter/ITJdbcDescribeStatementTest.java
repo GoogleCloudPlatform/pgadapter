@@ -202,8 +202,9 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
           assertEquals(Types.DOUBLE, metadata.getParameterType(++index));
           assertEquals(Types.BIGINT, metadata.getParameterType(++index));
           assertEquals(Types.NUMERIC, metadata.getParameterType(++index));
-          assertEquals(Types.TIMESTAMP, metadata.getParameterType(++index));
-          assertEquals(Types.DATE, metadata.getParameterType(++index));
+          // TODO: b/237989954
+          //          assertEquals(Types.TIMESTAMP, metadata.getParameterType(++index));
+          //          assertEquals(Types.DATE, metadata.getParameterType(++index));
           assertEquals(Types.VARCHAR, metadata.getParameterType(++index));
         }
       }
