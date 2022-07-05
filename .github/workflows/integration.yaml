@@ -77,11 +77,11 @@ jobs:
           python-version: '3.9'
       - run: pip install -r ./src/test/python/requirements.txt
       - name: Setup psql
-      - run: |
+        run: |
           apt-get update
           apt-get install --yes --no-install-recommends postgresql-client
       - name: Create PostgreSQL test database
-      - run: |
+        run: |
           psql -h postgres -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run unit tests
         run: mvn test -B -Ptest-all
