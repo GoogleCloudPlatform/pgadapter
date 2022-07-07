@@ -7,9 +7,10 @@ on:
     inputs:
       endpoint:
         description: "The Spanner endpoint to use for the tests"
-        required: false
+        required: true
         type: choice
         options:
+          - spanner.googleapis.com
           - staging-wrenchworks.sandbox.googleapis.com
           - preprod-spanner.sandbox.googleapis.com
 name: integration
