@@ -83,6 +83,7 @@ public class CopyDataReceiver implements Callable<Void> {
           // respond with an ErrorResponse. That is why we do not check for COPY_FAILED here, and do
           // not return an ErrorResponse.
           if (connectionHandler.getStatus() == ConnectionStatus.COPY_DONE) {
+            this.copyStatement.close();
             new CommandCompleteResponse(
                     this.connectionHandler.getConnectionMetadata().peekOutputStream(),
                     "COPY " + copyStatement.getUpdateCount(ResultNotReadyBehavior.BLOCK))

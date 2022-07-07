@@ -40,14 +40,12 @@ import java.util.NoSuchElementException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.postgresql.core.Oid;
-import org.postgresql.jdbc.TimestampUtils;
 
 class BinaryCopyParser implements CopyInParser {
   private static final Logger logger = Logger.getLogger(BinaryCopyParser.class.getName());
   private static final byte[] EXPECTED_HEADER =
       new byte[] {'P', 'G', 'C', 'O', 'P', 'Y', '\n', -1, '\r', '\n', '\0'};
 
-  private final TimestampUtils timestampUtils = CopyInParser.createDefaultTimestampUtils();
   private final DataInputStream dataInputStream;
   private boolean containsOids;
   private boolean calledIterator = false;
