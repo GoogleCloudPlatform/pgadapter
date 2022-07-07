@@ -43,6 +43,7 @@ public class CopyFailMessage extends ControlMessage {
   public CopyFailMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     logger.log(Level.INFO, "received CopyFail");
+    System.out.println("Received CopyFail");
     this.errorMessage = this.readAll();
     IntermediateStatement activeStatement = connection.getActiveStatement();
     if (activeStatement instanceof CopyStatement) {

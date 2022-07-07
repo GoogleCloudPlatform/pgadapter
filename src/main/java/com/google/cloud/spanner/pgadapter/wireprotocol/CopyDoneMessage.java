@@ -37,6 +37,7 @@ public class CopyDoneMessage extends ControlMessage {
   public CopyDoneMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     logger.log(Level.INFO, "received CopyDone");
+    System.out.println("Received CopyDone");
     this.statement = (CopyStatement) connection.getActiveStatement();
   }
 

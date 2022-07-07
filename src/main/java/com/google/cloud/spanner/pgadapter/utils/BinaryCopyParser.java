@@ -64,6 +64,7 @@ class BinaryCopyParser implements CopyInParser {
 
     try {
       verifyBinaryHeader();
+      System.out.println("Binary header verified");
       int flags = this.dataInputStream.readInt();
       this.containsOids = ((flags & (1L << 16)) != 0);
       // This should according to the current spec always be zero.
