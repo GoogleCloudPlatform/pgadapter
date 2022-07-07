@@ -115,6 +115,7 @@ class BinaryCopyParser implements CopyInParser {
           short fieldCount = dataInputStream.readShort();
           if (fieldCount == -1) {
             logger.log(Level.INFO, "End of copy file: -1");
+            System.out.println("End of copy file: -1");
             hasNext = HasNext.NO;
           } else if (fieldCount > -1) {
             if (firstRowFieldCount == -1) {
@@ -139,6 +140,7 @@ class BinaryCopyParser implements CopyInParser {
         // The protocol specifies that the stream should contain a -1 as the trailer in the file,
         // but it seems that some clients do not include this.
         logger.log(Level.INFO, "EOF in BinaryCopyParser");
+        System.out.println("EOF in BinaryCopyParser");
         hasNext = HasNext.NO;
         return false;
       } catch (IOException ioException) {
