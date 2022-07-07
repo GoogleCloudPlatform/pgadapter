@@ -5,10 +5,14 @@ on:
     - cron: '52 4 * * *'
   workflow_dispatch:
     inputs:
-      staging:
-        description: "Run the integration tests on the staging environment?"
-        required: false
-        type: boolean
+      endpoint:
+        description: "The Spanner endpoint to use for the tests"
+        required: true
+        type: choice
+        options:
+          - spanner.googleapis.com
+          - staging-wrenchworks.sandbox.googleapis.com
+          - preprod-spanner.sandbox.googleapis.com
 name: integration
 env:
   GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
@@ -33,13 +37,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - id: set-manual-endpoint
-        if: "${{ inputs.staging }}"
+        if: "${{ inputs.endpoint }}"
         run: |
-          echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
+          echo "GOOGLE_CLOUD_ENDPOINT=${{ inputs.endpoint }}" >> $GITHUB_ENV
       - id: set-scheduled-endpoint
         if: github.event.schedule=='52 4 * * *'
         run: |
-          echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
+          echo "GOOGLE_CLOUD_ENDPOINT=preprod-spanner.sandbox.googleapis.com" >> $GITHUB_ENV
       - uses: actions/checkout@v3
       - name: Setup Java
         uses: actions/setup-java@v3
