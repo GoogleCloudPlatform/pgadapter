@@ -46,4 +46,6 @@ public interface PgxTest extends Library {
   String TestBatchExecutionError(GoString connString);
 
   String TestWrongDialect(GoString connString);
+
+  String TestCopyIn(GoString connString);
 }

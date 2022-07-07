@@ -29,6 +29,7 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
+import com.google.cloud.spanner.pgadapter.CopyInMockServerTest;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.AbstractMessage;
@@ -50,6 +51,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -974,5 +976,36 @@ public class PgxMockServerTest extends AbstractMockServerTest {
       mockSpanner.putStatementResult(StatementResult.detectDialectResult(Dialect.POSTGRESQL));
       closeSpannerPool();
     }
+  }
+
+  @Ignore("pgx uses copy from stdin binary")
+  @Test
+  public void testCopyIn() {
+    CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, true);
+
+    String sql =
+        "select \"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\" "
+            + "from \"all_types\"";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING)))
+                .build()));
+
+    String res = pgxTest.TestCopyIn(createConnString());
+
+    assertNull(res);
   }
 }
