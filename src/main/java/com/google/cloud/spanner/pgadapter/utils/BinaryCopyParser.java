@@ -112,6 +112,7 @@ class BinaryCopyParser implements CopyInParser {
     public boolean hasNext() {
       try {
         if (hasNext == HasNext.UNKNOWN) {
+          System.out.println("BinaryCopyParser: Checking for more input");
           short fieldCount = dataInputStream.readShort();
           if (fieldCount == -1) {
             logger.log(Level.INFO, "End of copy file: -1");

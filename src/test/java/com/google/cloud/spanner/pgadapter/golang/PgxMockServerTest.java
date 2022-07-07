@@ -74,7 +74,7 @@ import org.postgresql.core.Oid;
 public class PgxMockServerTest extends AbstractMockServerTest {
   private static PgxTest pgxTest;
 
-  @Rule public Timeout globalTimeout = Timeout.seconds(30);
+  @Rule public Timeout globalTimeout = Timeout.seconds(120L);
 
   @Parameter public boolean useDomainSocket;
 
