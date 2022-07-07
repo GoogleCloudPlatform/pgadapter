@@ -14,12 +14,16 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
-import com.google.spanner.v1.TypeCode;
 
 interface CopyRecord {
 
   int numColumns();
 
-  Value getValue(TypeCode typeCode, String columnName);
+  boolean hasColumnNames();
+
+  Value getValue(Type type, String columnName);
+
+  Value getValue(Type type, int columnIndex);
 }

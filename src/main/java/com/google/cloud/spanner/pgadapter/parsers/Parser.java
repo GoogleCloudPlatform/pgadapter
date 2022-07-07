@@ -250,7 +250,7 @@ public abstract class Parser<T> {
     }
   }
 
-  T getItem() {
+  public T getItem() {
     return this.item;
   }
 

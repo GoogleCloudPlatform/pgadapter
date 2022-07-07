@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.PipedOutputStream;
 import java.util.Iterator;
 import org.apache.commons.csv.CSVFormat;
+import org.postgresql.jdbc.TimestampUtils;
 
 interface CopyInParser {
   static CopyInParser create(
@@ -35,10 +36,15 @@ interface CopyInParser {
       case CSV:
         return new CsvCopyParser(csvFormat, payload, pipeBufferSize, hasHeader);
       case BINARY:
+        return new BinaryCopyParser(payload, pipeBufferSize);
       default:
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, "Unsupported COPY format: " + format);
     }
+  }
+
+  static TimestampUtils createDefaultTimestampUtils() {
+    return new TimestampUtils(false, () -> null);
   }
 
   /** Returns an iterator of COPY records. */

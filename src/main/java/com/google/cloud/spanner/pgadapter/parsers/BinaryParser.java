@@ -26,7 +26,7 @@ import org.postgresql.util.PGbytea;
  * Parse specified type to binary (generally this is the simplest parse class, as items are
  * generally represented in binary for wire format).
  */
-class BinaryParser extends Parser<ByteArray> {
+public class BinaryParser extends Parser<ByteArray> {
 
   BinaryParser(ResultSet item, int position) {
     this.item = item.getBytes(position);
@@ -48,12 +48,17 @@ class BinaryParser extends Parser<ByteArray> {
                 "Invalid binary value: " + new String(item, StandardCharsets.UTF_8), e);
           }
         case BINARY:
-          this.item = ByteArray.copyFrom(item);
+          this.item = toByteArray(item);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
+  }
+
+  /** Converts the binary data to a {@link ByteArray}. */
+  public static ByteArray toByteArray(byte[] data) {
+    return ByteArray.copyFrom(data);
   }
 
   @Override

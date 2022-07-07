@@ -19,9 +19,9 @@ import com.google.cloud.Date;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.common.collect.Iterators;
-import com.google.spanner.v1.TypeCode;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PipedInputStream;
@@ -42,17 +42,12 @@ import org.postgresql.jdbc.TimestampUtils;
 class CsvCopyParser implements CopyInParser {
   private static final Logger logger = Logger.getLogger(CsvCopyParser.class.getName());
 
-  private final TimestampUtils timestampUtils = createDefaultTimestampUtils();
+  private final TimestampUtils timestampUtils = CopyInParser.createDefaultTimestampUtils();
   private final CSVFormat format;
   private final PipedOutputStream payload;
   private final int pipeBufferSize;
-  private boolean hasHeader;
-  private boolean isHeaderParsed;
+  private final boolean hasHeader;
   private final CSVParser parser;
-
-  static TimestampUtils createDefaultTimestampUtils() {
-    return new TimestampUtils(false, () -> null);
-  }
 
   CsvCopyParser(
       CSVFormat csvFormat, PipedOutputStream payload, int pipeBufferSize, boolean hasHeader)
@@ -67,7 +62,8 @@ class CsvCopyParser implements CopyInParser {
   @Override
   public Iterator<CopyRecord> iterator() {
     return Iterators.transform(
-        parser.iterator(), record -> new CsvCopyRecord(this.timestampUtils, record));
+        parser.iterator(),
+        record -> new CsvCopyRecord(this.timestampUtils, record, this.hasHeader));
   }
 
   @Override
@@ -84,9 +80,8 @@ class CsvCopyParser implements CopyInParser {
         new InputStreamReader(
             new PipedInputStream(this.payload, this.pipeBufferSize), StandardCharsets.UTF_8);
     CSVParser parser;
-    if (this.hasHeader && !this.isHeaderParsed) {
+    if (this.hasHeader) {
       parser = CSVParser.parse(reader, this.format.withFirstRecordAsHeader());
-      this.isHeaderParsed = true;
     } else {
       parser = CSVParser.parse(reader, this.format);
     }
@@ -96,10 +91,12 @@ class CsvCopyParser implements CopyInParser {
   static class CsvCopyRecord implements CopyRecord {
     private final TimestampUtils timestampUtils;
     private final CSVRecord record;
+    private final boolean hasHeader;
 
-    CsvCopyRecord(TimestampUtils timestampUtils, CSVRecord record) {
+    CsvCopyRecord(TimestampUtils timestampUtils, CSVRecord record, boolean hasHeader) {
       this.timestampUtils = timestampUtils;
       this.record = record;
+      this.hasHeader = hasHeader;
     }
 
     @Override
@@ -108,11 +105,25 @@ class CsvCopyParser implements CopyInParser {
     }
 
     @Override
-    public Value getValue(TypeCode typeCode, String columnName) throws SpannerException {
-      String recordValue = "";
+    public boolean hasColumnNames() {
+      return this.hasHeader;
+    }
+
+    @Override
+    public Value getValue(Type type, String columnName) throws SpannerException {
+      String recordValue = record.get(columnName);
+      return getSpannerValue(type, recordValue);
+    }
+
+    @Override
+    public Value getValue(Type type, int columnIndex) throws SpannerException {
+      String recordValue = record.get(columnIndex);
+      return getSpannerValue(type, recordValue);
+    }
+
+    Value getSpannerValue(Type type, String recordValue) throws SpannerException {
       try {
-        recordValue = record.get(columnName);
-        switch (typeCode) {
+        switch (type.getCode()) {
           case STRING:
             return Value.string(recordValue);
           case JSON:
@@ -123,7 +134,7 @@ class CsvCopyParser implements CopyInParser {
             return Value.int64(recordValue == null ? null : Long.parseLong(recordValue));
           case FLOAT64:
             return Value.float64(recordValue == null ? null : Double.parseDouble(recordValue));
-          case NUMERIC:
+          case PG_NUMERIC:
             return Value.pgNumeric(recordValue);
           case BYTES:
             if (recordValue == null) {
@@ -144,7 +155,7 @@ class CsvCopyParser implements CopyInParser {
           default:
             SpannerException spannerException =
                 SpannerExceptionFactory.newSpannerException(
-                    ErrorCode.INVALID_ARGUMENT, "Unknown or unsupported type: " + typeCode);
+                    ErrorCode.INVALID_ARGUMENT, "Unknown or unsupported type: " + type);
             logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
             throw spannerException;
         }
@@ -152,21 +163,14 @@ class CsvCopyParser implements CopyInParser {
         SpannerException spannerException =
             SpannerExceptionFactory.newSpannerException(
                 ErrorCode.INVALID_ARGUMENT,
-                "Invalid input syntax for type "
-                    + typeCode.toString()
-                    + ":"
-                    + "\""
-                    + recordValue
-                    + "\"",
+                "Invalid input syntax for type " + type + ":" + "\"" + recordValue + "\"",
                 e);
         logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
         throw spannerException;
       } catch (IllegalArgumentException e) {
         SpannerException spannerException =
             SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INVALID_ARGUMENT,
-                "Invalid input syntax for column \"" + columnName + "\"",
-                e);
+                ErrorCode.INVALID_ARGUMENT, "Invalid input syntax", e);
         logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
         throw spannerException;
       } catch (Exception e) {

@@ -19,7 +19,7 @@ import com.google.cloud.spanner.Statement;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to long. */
-class LongParser extends Parser<Long> {
+public class LongParser extends Parser<Long> {
 
   LongParser(ResultSet item, int position) {
     this.item = item.getLong(position);
@@ -36,12 +36,17 @@ class LongParser extends Parser<Long> {
           this.item = Long.valueOf(new String(item));
           break;
         case BINARY:
-          this.item = ByteConverter.int8(item, 0);
+          this.item = toLong(item);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
+  }
+
+  /** Converts the binary data to a long value. */
+  public static long toLong(byte[] data) {
+    return ByteConverter.int8(data, 0);
   }
 
   @Override
