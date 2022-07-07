@@ -113,6 +113,7 @@ class BinaryCopyParser implements CopyInParser {
         if (hasNext == HasNext.UNKNOWN) {
           short fieldCount = dataInputStream.readShort();
           if (fieldCount == -1) {
+            logger.log(Level.INFO, "End of copy file: -1");
             hasNext = HasNext.NO;
           } else if (fieldCount > -1) {
             if (firstRowFieldCount == -1) {
@@ -136,6 +137,7 @@ class BinaryCopyParser implements CopyInParser {
       } catch (EOFException eofException) {
         // The protocol specifies that the stream should contain a -1 as the trailer in the file,
         // but it seems that some clients do not include this.
+        logger.log(Level.INFO, "EOF in BinaryCopyParser");
         hasNext = HasNext.NO;
         return false;
       } catch (IOException ioException) {
@@ -148,6 +150,8 @@ class BinaryCopyParser implements CopyInParser {
     public CopyRecord next() {
       try {
         if (!hasNext()) {
+          logger.log(
+              Level.WARNING, "tried to call next() on BinaryCopyParser with no more elements");
           throw new NoSuchElementException();
         }
         hasNext = HasNext.UNKNOWN;
