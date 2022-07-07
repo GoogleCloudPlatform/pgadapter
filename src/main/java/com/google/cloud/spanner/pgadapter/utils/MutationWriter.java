@@ -29,6 +29,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -537,7 +538,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
           case BOOL:
             builder
                 .set(columnName)
-                .to(recordValue == null ? null : Boolean.parseBoolean(recordValue));
+                .to(recordValue == null ? null : BooleanParser.toBoolean(recordValue));
             break;
           case INT64:
             builder.set(columnName).to(recordValue == null ? null : Long.parseLong(recordValue));

@@ -15,7 +15,10 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.PgAdapterTestEnv.DEFAULT_DATA_MODEL;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
@@ -26,6 +29,10 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Types;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -34,6 +41,12 @@ import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+/**
+ * This integration test assumes that a local PostgreSQL server is available, and uses that server
+ * to compare the behavior of PGAdapter with a real PostgreSQL server. It for example generates
+ * random data that is inserted into the local PostgreSQL database, copies this to Cloud Spanner,
+ * and then compares the data in the two databases afterwards.
+ */
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
 public class ITPsqlTest implements IntegrationTest {
@@ -44,17 +57,23 @@ public class ITPsqlTest implements IntegrationTest {
   private static final String POSTGRES_PORT = System.getenv("POSTGRES_PORT");
   private static final String POSTGRES_USER = System.getenv("POSTGRES_USER");
   private static final String POSTGRES_DATABASE = System.getenv("POSTGRES_DATABASE");
+  private static final String POSTGRES_PASSWORD = System.getenv("POSTGRES_PASSWORD");
 
   @BeforeClass
   public static void setup() throws Exception {
     assumeTrue("This test requires psql to be installed", isPsqlAvailable());
-    assumeFalse("This test the environment variable POSTGRES_HOST to point to a valid PostgreSQL host",
+    assumeTrue("This test requires bash to be installed", isBashAvailable());
+    assumeFalse(
+        "This test the environment variable POSTGRES_HOST to point to a valid PostgreSQL host",
         Strings.isNullOrEmpty(POSTGRES_HOST));
-    assumeFalse("This test the environment variable POSTGRES_PORT to point to a valid PostgreSQL port number",
+    assumeFalse(
+        "This test the environment variable POSTGRES_PORT to point to a valid PostgreSQL port number",
         Strings.isNullOrEmpty(POSTGRES_PORT));
-    assumeFalse("This test the environment variable POSTGRES_USER to point to a valid PostgreSQL user",
+    assumeFalse(
+        "This test the environment variable POSTGRES_USER to point to a valid PostgreSQL user",
         Strings.isNullOrEmpty(POSTGRES_USER));
-    assumeFalse("This test the environment variable POSTGRES_DATABASE to point to a valid PostgreSQL database",
+    assumeFalse(
+        "This test the environment variable POSTGRES_DATABASE to point to a valid PostgreSQL database",
         Strings.isNullOrEmpty(POSTGRES_PORT));
 
     // Make sure the PG JDBC driver is loaded.
@@ -63,16 +82,16 @@ public class ITPsqlTest implements IntegrationTest {
     dropDataModel();
     createDataModel();
 
-//     testEnv.setUp();
-//     database = testEnv.createDatabase(DEFAULT_DATA_MODEL);
-//     testEnv.startPGAdapterServer(Collections.emptyList());
+    testEnv.setUp();
+    database = testEnv.createDatabase(DEFAULT_DATA_MODEL);
+    testEnv.startPGAdapterServer(Collections.emptyList());
   }
 
   @AfterClass
   public static void teardown() throws Exception {
-//    testEnv.stopPGAdapterServer();
-//    testEnv.cleanUp();
-//    dropDataModel();
+    testEnv.stopPGAdapterServer();
+    testEnv.cleanUp();
+    dropDataModel();
   }
 
   private static boolean isPsqlAvailable() {
@@ -89,22 +108,37 @@ public class ITPsqlTest implements IntegrationTest {
     }
   }
 
+  private static boolean isBashAvailable() {
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand = new String[] {"bash", "--version"};
+    builder.command(psqlCommand);
+    try {
+      Process process = builder.start();
+      int res = process.waitFor();
+
+      return res == 0;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
   private static void createDataModel() throws Exception {
     String[] createTablesCommand =
         new String[] {
-            "psql",
-            "-h",
-            POSTGRES_HOST,
-            "-p",
-            POSTGRES_PORT,
-            "-U",
-            POSTGRES_USER,
-            "-d",
-            POSTGRES_DATABASE,
-            "-c",
-            String.join(";", DEFAULT_DATA_MODEL) + ";\n"
+          "psql",
+          "-h",
+          POSTGRES_HOST,
+          "-p",
+          POSTGRES_PORT,
+          "-U",
+          POSTGRES_USER,
+          "-d",
+          POSTGRES_DATABASE,
+          "-c",
+          String.join(";", DEFAULT_DATA_MODEL) + ";\n"
         };
     ProcessBuilder builder = new ProcessBuilder().command(createTablesCommand);
+    builder.environment().put("PGPASSWORD", POSTGRES_PASSWORD);
     Process process = builder.start();
 
     int res = process.waitFor();
@@ -114,19 +148,20 @@ public class ITPsqlTest implements IntegrationTest {
   private static void dropDataModel() throws Exception {
     String[] dropTablesCommand =
         new String[] {
-            "psql",
-            "-h",
-            POSTGRES_HOST,
-            "-p",
-            POSTGRES_PORT,
-            "-U",
-            POSTGRES_USER,
-            "-d",
-            POSTGRES_DATABASE,
-            "-c",
-            "drop table if exists all_types; drop table if exists numbers;"
+          "psql",
+          "-h",
+          POSTGRES_HOST,
+          "-p",
+          POSTGRES_PORT,
+          "-U",
+          POSTGRES_USER,
+          "-d",
+          POSTGRES_DATABASE,
+          "-c",
+          "drop table if exists all_types; drop table if exists numbers;"
         };
     ProcessBuilder builder = new ProcessBuilder().command(dropTablesCommand);
+    builder.environment().put("PGPASSWORD", POSTGRES_PASSWORD);
     Process process = builder.start();
 
     int res = process.waitFor();
@@ -138,18 +173,43 @@ public class ITPsqlTest implements IntegrationTest {
       return String.format(
           "jdbc:postgresql://localhost/%s?"
               + "socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
-              + "&socketFactoryArg=%s/.s.PGSQL.%d"
-              + "&preferQueryMode=simple",
-          pgServer.getLocalPort());
+              + "&socketFactoryArg=%s/.s.PGSQL.%s",
+          POSTGRES_DATABASE, POSTGRES_HOST, POSTGRES_PORT);
     }
-    return String.format("jdbc:postgresql://%s:%s/%s", POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DATABASE);
+    return String.format(
+        "jdbc:postgresql://%s:%s/%s", POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DATABASE);
+  }
+
+  private String createJdbcUrlForPGAdapter() {
+    if (POSTGRES_HOST.startsWith("/")) {
+      return String.format(
+          "jdbc:postgresql://localhost/%s?"
+              + "&socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
+              + "&socketFactoryArg=/tmp/.s.PGSQL.%d",
+          database.getId().getDatabase(), testEnv.getPGAdapterPort());
+    }
+    return String.format(
+        "jdbc:postgresql://%s/%s",
+        testEnv.getPGAdapterHostAndPort(), database.getId().getDatabase());
   }
 
   @Test
   public void testRealPostgreSQLHelloWorld() throws Exception {
     ProcessBuilder builder = new ProcessBuilder();
-    String[] psqlCommand = new String[] {"psql", "-h", POSTGRES_HOST, "-p", POSTGRES_PORT, "-U", POSTGRES_USER, "-d", POSTGRES_DATABASE};
+    String[] psqlCommand =
+        new String[] {
+          "psql",
+          "-h",
+          POSTGRES_HOST,
+          "-p",
+          POSTGRES_PORT,
+          "-U",
+          POSTGRES_USER,
+          "-d",
+          POSTGRES_DATABASE
+        };
     builder.command(psqlCommand);
+    builder.environment().put("PGPASSWORD", POSTGRES_PASSWORD);
     Process process = builder.start();
     String errors;
     String output;
@@ -174,34 +234,153 @@ public class ITPsqlTest implements IntegrationTest {
 
   @Test
   public void testCopyFromPostgreSQLToCloudSpanner() throws Exception {
-    // Generate 100 random rows and copy these into the all_types table in a local PostgreSQL database.
+    int numRows = 100;
+
+    // Generate 100 random rows.
+    copyRandomRowsToPostgreSQL(numRows);
+
+    // Verify that we have 100 rows in PostgreSQL.
+    try (Connection connection =
+        DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select count(*) from all_types")) {
+        assertTrue(resultSet.next());
+        assertEquals(numRows, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    // COPY the rows to Cloud Spanner.
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(
         "bash",
         "-c",
         "psql"
-            + " -h " + POSTGRES_HOST
-            + " -p " + POSTGRES_PORT
-            + " -U " + POSTGRES_USER
-            + " -d " + POSTGRES_DATABASE
-            + " -c \"copy (select (random()*9223372036854775807)::bigint, "
-            + "  random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, "
-            + "  (random()*999999)::int, (random()*999999999999)::numeric, now()-random()*interval '250 year', "
-            + "  (current_date-random()*interval '400 year')::date, md5(random()::text || clock_timestamp()::text)::varchar "
-            + "  from generate_series(1, 100) s(i)) to stdout\" "
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy all_types to stdout\" "
             + "  | psql "
-            + " -h " + POSTGRES_HOST
-            + " -p " + POSTGRES_PORT
-            + " -U " + POSTGRES_USER
-            + " -d " + POSTGRES_DATABASE
+            + " -h "
+            + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+            + " -p "
+            + testEnv.getPGAdapterPort()
+            + " -d "
+            + database.getId().getDatabase()
             + " -c \"copy all_types from stdin;\"\n");
+    builder.environment().put("PGPASSWORD", POSTGRES_PASSWORD);
     Process process = builder.start();
     int res = process.waitFor();
     assertEquals(0, res);
 
-    try (Connection connection = DriverManager.getConnection()) {
+    // Verify that we now also have 100 rows in Spanner.
+    try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select count(*) from all_types")) {
+        assertTrue(resultSet.next());
+        assertEquals(numRows, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
 
+    // Verify that the rows in both databases are equal.
+    try (Connection pgConnection =
+            DriverManager.getConnection(
+                createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD);
+        Connection spangresConnection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
+      try (ResultSet pgResultSet =
+              pgConnection
+                  .createStatement()
+                  .executeQuery("select * from all_types order by col_bigint");
+          ResultSet spangresResultSet =
+              spangresConnection
+                  .createStatement()
+                  .executeQuery("select * from all_types order by col_bigint")) {
+        assertEquals(
+            pgResultSet.getMetaData().getColumnCount(),
+            spangresResultSet.getMetaData().getColumnCount());
+        while (pgResultSet.next() && spangresResultSet.next()) {
+          for (int col = 1; col <= pgResultSet.getMetaData().getColumnCount(); col++) {
+            switch (pgResultSet.getMetaData().getColumnType(col)) {
+              case Types.BINARY:
+                // We can't use equals on byte arrays.
+                assertArrayEquals(
+                    String.format(
+                        "Column %s mismatch:\nPG: %s\nCS: %s",
+                        pgResultSet.getMetaData().getColumnName(col),
+                        Arrays.toString(pgResultSet.getBytes(col)),
+                        Arrays.toString(spangresResultSet.getBytes(col))),
+                    pgResultSet.getBytes(col),
+                    spangresResultSet.getBytes(col));
+                break;
+              case Types.INTEGER:
+                // Spangres accepts `int4` as a data type in DDL statements, but it is converted to
+                // `int8` by the backend. This means that there is a slight difference between these
+                // two in the local database and Cloud Spanner.
+                assertEquals(
+                    String.format(
+                        "Column %s mismatch:\nPG: %s\nCS: %s",
+                        pgResultSet.getMetaData().getColumnName(col),
+                        pgResultSet.getObject(col),
+                        spangresResultSet.getObject(col)),
+                    pgResultSet.getLong(col),
+                    spangresResultSet.getLong(col));
+                assertEquals(pgResultSet.wasNull(), spangresResultSet.wasNull());
+                break;
+              default:
+                assertEquals(
+                    String.format(
+                        "Column %s mismatch:\nPG: %s\nCS: %s",
+                        pgResultSet.getMetaData().getColumnName(col),
+                        pgResultSet.getObject(col),
+                        spangresResultSet.getObject(col)),
+                    pgResultSet.getObject(col),
+                    spangresResultSet.getObject(col));
+            }
+          }
+        }
+      }
     }
   }
 
+  private void copyRandomRowsToPostgreSQL(int numRows) throws Exception {
+    // Generate random rows and copy these into the all_types table in a local PostgreSQL database.
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy (select (random()*9223372036854775807)::bigint, "
+            + "  random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, "
+            + "  (random()*999999)::int, (random()*999999999999)::numeric, now()-random()*interval '250 year', "
+            + "  (current_date-random()*interval '400 year')::date, md5(random()::text || clock_timestamp()::text)::varchar "
+            + String.format("  from generate_series(1, %d) s(i)) to stdout\" ", numRows)
+            + "  | psql "
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy all_types from stdin;\"\n");
+    builder.environment().put("PGPASSWORD", POSTGRES_PASSWORD);
+    Process process = builder.start();
+    int res = process.waitFor();
+    assertEquals(0, res);
+  }
 }
