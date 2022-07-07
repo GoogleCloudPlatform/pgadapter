@@ -23,6 +23,10 @@ import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.InstanceAdminClient;
+import com.google.cloud.spanner.InstanceConfigId;
+import com.google.cloud.spanner.InstanceId;
+import com.google.cloud.spanner.InstanceNotFoundException;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerExceptionFactory;
@@ -302,6 +306,30 @@ public class PgAdapterTestEnv {
     }
     String databaseId = getDatabaseId();
     Spanner spanner = getSpanner();
+
+    InstanceAdminClient instanceAdminClient = spanner.getInstanceAdminClient();
+    try {
+      instanceAdminClient.getInstance(instanceId);
+    } catch (InstanceNotFoundException notFoundException) {
+      try {
+        InstanceConfigId instanceConfigId =
+            instanceAdminClient.listInstanceConfigs().iterateAll().iterator().next().getId();
+        instanceAdminClient
+            .createInstance(
+                instanceAdminClient
+                    .newInstanceBuilder(InstanceId.of(projectId, instanceId))
+                    .setInstanceConfigId(instanceConfigId)
+                    .setDisplayName("PGAdapter test instance")
+                    .setNodeCount(1)
+                    .build())
+            .get();
+      } catch (ExecutionException executionException) {
+        throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
+      } catch (InterruptedException interruptedException) {
+        throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+      }
+    }
+
     DatabaseAdminClient client = spanner.getDatabaseAdminClient();
     OperationFuture<Database, CreateDatabaseMetadata> op =
         client.createDatabase(
