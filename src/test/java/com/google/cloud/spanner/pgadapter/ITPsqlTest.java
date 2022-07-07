@@ -122,6 +122,13 @@ public class ITPsqlTest implements IntegrationTest {
     }
   }
 
+  private static ProcessBuilder setPgPassword(ProcessBuilder builder) {
+    if (POSTGRES_PASSWORD != null) {
+      builder.environment().put("PGPASSWORD", POSTGRES_PASSWORD);
+    }
+    return builder;
+  }
+
   private static void createDataModel() throws Exception {
     String[] createTablesCommand =
         new String[] {
@@ -138,7 +145,7 @@ public class ITPsqlTest implements IntegrationTest {
           String.join(";", DEFAULT_DATA_MODEL) + ";\n"
         };
     ProcessBuilder builder = new ProcessBuilder().command(createTablesCommand);
-    builder.environment().put("PGPASSWORD", POSTGRES_PASSWORD);
+    setPgPassword(builder);
     Process process = builder.start();
 
     int res = process.waitFor();
@@ -161,7 +168,7 @@ public class ITPsqlTest implements IntegrationTest {
           "drop table if exists all_types; drop table if exists numbers;"
         };
     ProcessBuilder builder = new ProcessBuilder().command(dropTablesCommand);
-    builder.environment().put("PGPASSWORD", POSTGRES_PASSWORD);
+    setPgPassword(builder);
     Process process = builder.start();
 
     int res = process.waitFor();
@@ -209,7 +216,7 @@ public class ITPsqlTest implements IntegrationTest {
           POSTGRES_DATABASE
         };
     builder.command(psqlCommand);
-    builder.environment().put("PGPASSWORD", POSTGRES_PASSWORD);
+    setPgPassword(builder);
     Process process = builder.start();
     String errors;
     String output;
@@ -273,7 +280,7 @@ public class ITPsqlTest implements IntegrationTest {
             + " -d "
             + database.getId().getDatabase()
             + " -c \"copy all_types from stdin;\"\n");
-    builder.environment().put("PGPASSWORD", POSTGRES_PASSWORD);
+    setPgPassword(builder);
     Process process = builder.start();
     int res = process.waitFor();
     assertEquals(0, res);
@@ -378,7 +385,7 @@ public class ITPsqlTest implements IntegrationTest {
             + " -d "
             + POSTGRES_DATABASE
             + " -c \"copy all_types from stdin;\"\n");
-    builder.environment().put("PGPASSWORD", POSTGRES_PASSWORD);
+    setPgPassword(builder);
     Process process = builder.start();
     int res = process.waitFor();
     assertEquals(0, res);
