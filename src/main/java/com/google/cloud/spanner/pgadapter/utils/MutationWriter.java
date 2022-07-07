@@ -297,10 +297,12 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
           }
         }
       } // end of iterator.hasNext()
+      System.out.println("End of CopyIterator");
 
       // There are no more CSVRecords in the pipeline.
       // Write any remaining mutations in the buffer.
       if (!rollback.get() && !mutations.isEmpty()) {
+        System.out.println("Writing remaining mutations");
         if (transactionMode == CopyTransactionMode.Explicit) {
           connection.write(mutations);
         } else {
@@ -336,12 +338,14 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
         throw this.exception;
       }
     } finally {
+      System.out.println("MmutationWriter finishing");
       this.executorService.shutdown();
       if (!this.executorService.awaitTermination(60L, TimeUnit.SECONDS)) {
         logger.log(Level.WARNING, "Timeout while waiting for MutationWriter executor to shutdown.");
       }
       this.payload.close();
       this.parser.close();
+      System.out.println("MmutationWriter finished");
     }
     return new UpdateCount(rowCount);
   }
