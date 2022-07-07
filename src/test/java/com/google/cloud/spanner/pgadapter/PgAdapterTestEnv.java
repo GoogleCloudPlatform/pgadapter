@@ -23,12 +23,14 @@ import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.InstanceAdminClient;
 import com.google.cloud.spanner.InstanceConfigId;
 import com.google.cloud.spanner.InstanceId;
 import com.google.cloud.spanner.InstanceNotFoundException;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Spanner;
+import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
@@ -324,7 +326,13 @@ public class PgAdapterTestEnv {
                     .build())
             .get();
       } catch (ExecutionException executionException) {
-        throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
+        SpannerException spannerException =
+            SpannerExceptionFactory.asSpannerException(executionException.getCause());
+        // Ignore if it ALREADY_EXISTS. This is caused by multiple test runs trying simultaneously
+        // to create an instance.
+        if (spannerException.getErrorCode() != ErrorCode.ALREADY_EXISTS) {
+          throw spannerException;
+        }
       } catch (InterruptedException interruptedException) {
         throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
       }
