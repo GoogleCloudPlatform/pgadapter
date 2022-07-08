@@ -19,8 +19,6 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import java.text.MessageFormat;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Normally used to signal a copy command is done. Spanner does not currently support copies, so
@@ -30,14 +28,11 @@ import java.util.logging.Logger;
  */
 @InternalApi
 public class CopyDoneMessage extends ControlMessage {
-  private static final Logger logger = Logger.getLogger(CopyDoneMessage.class.getName());
   protected static final char IDENTIFIER = 'c';
   private final CopyStatement statement;
 
   public CopyDoneMessage(ConnectionHandler connection) throws Exception {
     super(connection);
-    logger.log(Level.INFO, "received CopyDone");
-    System.out.println("Received CopyDone");
     this.statement = (CopyStatement) connection.getActiveStatement();
   }
 

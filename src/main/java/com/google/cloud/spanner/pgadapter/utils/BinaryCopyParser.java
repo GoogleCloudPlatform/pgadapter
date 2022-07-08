@@ -62,7 +62,6 @@ class BinaryCopyParser implements CopyInParser {
 
     try {
       verifyBinaryHeader();
-      System.out.println("Binary header verified");
       int flags = this.dataInputStream.readInt();
       this.containsOids = ((flags & (1L << 16)) != 0);
       // This should according to the current spec always be zero.
@@ -110,11 +109,9 @@ class BinaryCopyParser implements CopyInParser {
     public boolean hasNext() {
       try {
         if (hasNext == HasNext.UNKNOWN) {
-          System.out.println("BinaryCopyParser: Checking for more input");
           short fieldCount = dataInputStream.readShort();
           if (fieldCount == -1) {
-            logger.log(Level.INFO, "End of copy file: -1");
-            System.out.println("End of copy file: -1");
+            logger.log(Level.FINE, "End of copy file: -1");
             hasNext = HasNext.NO;
           } else if (fieldCount > -1) {
             if (firstRowFieldCount == -1) {
@@ -138,8 +135,7 @@ class BinaryCopyParser implements CopyInParser {
       } catch (EOFException eofException) {
         // The protocol specifies that the stream should contain a -1 as the trailer in the file,
         // but it seems that some clients do not include this.
-        logger.log(Level.INFO, "EOF in BinaryCopyParser");
-        System.out.println("EOF in BinaryCopyParser");
+        logger.log(Level.FINE, "EOF in BinaryCopyParser");
         hasNext = HasNext.NO;
         return false;
       } catch (IOException ioException) {

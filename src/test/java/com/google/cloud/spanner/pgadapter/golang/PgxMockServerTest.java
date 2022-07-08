@@ -74,7 +74,7 @@ import org.postgresql.core.Oid;
 public class PgxMockServerTest extends AbstractMockServerTest {
   private static PgxTest pgxTest;
 
-  @Rule public Timeout globalTimeout = Timeout.seconds(120L);
+  @Rule public Timeout globalTimeout = Timeout.seconds(30L);
 
   @Parameter public boolean useDomainSocket;
 
@@ -893,7 +893,6 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }
 
-  @Ignore("Skip wrong dialect test for now as it fails to clean up all resources")
   @Test
   public void testWrongDialect() {
     // Let the mock server respond with the Google SQL dialect instead of PostgreSQL. The
@@ -916,6 +915,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     }
   }
 
+  @Ignore(
+      "pgx copy implementation seems buggy (CopyDone message can be sent before all data has been sent)")
   @Test
   public void testCopyIn() {
     CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, true);

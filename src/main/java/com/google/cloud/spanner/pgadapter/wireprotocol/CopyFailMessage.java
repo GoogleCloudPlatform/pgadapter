@@ -23,8 +23,6 @@ import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import java.text.MessageFormat;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Normally used to signal a copy command failed. Spanner does not currently support copies, so send
@@ -34,7 +32,6 @@ import java.util.logging.Logger;
  */
 @InternalApi
 public class CopyFailMessage extends ControlMessage {
-  private static final Logger logger = Logger.getLogger(CopyFailMessage.class.getName());
   protected static final char IDENTIFIER = 'f';
 
   private final CopyStatement statement;
@@ -42,8 +39,6 @@ public class CopyFailMessage extends ControlMessage {
 
   public CopyFailMessage(ConnectionHandler connection) throws Exception {
     super(connection);
-    logger.log(Level.INFO, "received CopyFail");
-    System.out.println("Received CopyFail");
     this.errorMessage = this.readAll();
     IntermediateStatement activeStatement = connection.getActiveStatement();
     if (activeStatement instanceof CopyStatement) {
