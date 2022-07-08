@@ -100,7 +100,8 @@ public class RowDescriptionResponse extends WireOutput {
       this.outputStream.writeInt(oidType);
       this.outputStream.writeShort(getOidTypeSize(oidType));
       // The type modifier. The meaning of the modifier is type-specific.
-      this.outputStream.writeInt(DEFAULT_FLAG);
+      // No modifier is indicated by -1.
+      this.outputStream.writeInt(-1);
       short format =
           this.statement == null
               ? defaultFormat.getCode()
