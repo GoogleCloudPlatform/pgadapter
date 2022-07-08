@@ -559,7 +559,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "from all_types where col_bigint = 11 or col_bigint = 16";
 
     expectedOutput =
-        "(10, "
+        "(11, "
             + "True, "
             + "89.23, "
             + "34, "
@@ -568,7 +568,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "datetime.date(2022, 7, 1), "
             + "'hello world')"
             + "\n"
-            + "(15, "
+            + "(16, "
             + "False, "
             + "74.567, "
             + "69, "
@@ -639,7 +639,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "from all_types where col_bigint = 12 or col_bigint = 17";
 
     expectedOutput =
-        "(10, "
+        "(12, "
             + "True, "
             + "89.23, "
             + "34, "
@@ -648,7 +648,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "datetime.date(2022, 7, 1), "
             + "'hello world')"
             + "\n"
-            + "(15, "
+            + "(17, "
             + "False, "
             + "74.567, "
             + "69, "
