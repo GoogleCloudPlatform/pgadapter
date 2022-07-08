@@ -23,6 +23,8 @@ import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.KeySet;
+import com.google.cloud.spanner.Mutation;
 import com.google.common.base.Strings;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -242,7 +244,6 @@ public class ITPsqlTest implements IntegrationTest {
   @Test
   public void testCopyFromPostgreSQLToCloudSpanner() throws Exception {
     int numRows = 100;
-
     // Generate 100 random rows.
     copyRandomRowsToPostgreSQL(numRows);
 
@@ -257,97 +258,107 @@ public class ITPsqlTest implements IntegrationTest {
       }
     }
 
-    // COPY the rows to Cloud Spanner.
-    ProcessBuilder builder = new ProcessBuilder();
-    builder.command(
-        "bash",
-        "-c",
-        "psql"
-            + " -h "
-            + POSTGRES_HOST
-            + " -p "
-            + POSTGRES_PORT
-            + " -U "
-            + POSTGRES_USER
-            + " -d "
-            + POSTGRES_DATABASE
-            + " -c \"copy all_types to stdout\" "
-            + "  | psql "
-            + " -h "
-            + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
-            + " -p "
-            + testEnv.getPGAdapterPort()
-            + " -d "
-            + database.getId().getDatabase()
-            + " -c \"copy all_types from stdin;\"\n");
-    setPgPassword(builder);
-    Process process = builder.start();
-    int res = process.waitFor();
-    assertEquals(0, res);
+    for (boolean binary : new boolean[] {false, true}) {
+      // Make sure the all_types table on Cloud Spanner is empty.
+      String databaseId = database.getId().getDatabase();
+      testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
-    // Verify that we now also have 100 rows in Spanner.
-    try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
-      try (ResultSet resultSet =
-          connection.createStatement().executeQuery("select count(*) from all_types")) {
-        assertTrue(resultSet.next());
-        assertEquals(numRows, resultSet.getLong(1));
-        assertFalse(resultSet.next());
+      // COPY the rows to Cloud Spanner.
+      ProcessBuilder builder = new ProcessBuilder();
+      builder.command(
+          "bash",
+          "-c",
+          "psql"
+              + " -h "
+              + POSTGRES_HOST
+              + " -p "
+              + POSTGRES_PORT
+              + " -U "
+              + POSTGRES_USER
+              + " -d "
+              + POSTGRES_DATABASE
+              + " -c \"copy all_types to stdout"
+              + (binary ? " binary \" " : "\" ")
+              + "  | psql "
+              + " -h "
+              + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+              + " -p "
+              + testEnv.getPGAdapterPort()
+              + " -d "
+              + database.getId().getDatabase()
+              + " -c \"copy all_types from stdin "
+              + (binary ? "binary" : "")
+              + ";\"\n");
+      setPgPassword(builder);
+      Process process = builder.start();
+      int res = process.waitFor();
+      assertEquals(0, res);
+
+      // Verify that we now also have 100 rows in Spanner.
+      try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select count(*) from all_types")) {
+          assertTrue(resultSet.next());
+          assertEquals(numRows, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
       }
-    }
 
-    // Verify that the rows in both databases are equal.
-    try (Connection pgConnection =
-            DriverManager.getConnection(
-                createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD);
-        Connection spangresConnection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
-      try (ResultSet pgResultSet =
-              pgConnection
-                  .createStatement()
-                  .executeQuery("select * from all_types order by col_bigint");
-          ResultSet spangresResultSet =
-              spangresConnection
-                  .createStatement()
-                  .executeQuery("select * from all_types order by col_bigint")) {
-        assertEquals(
-            pgResultSet.getMetaData().getColumnCount(),
-            spangresResultSet.getMetaData().getColumnCount());
-        while (pgResultSet.next() && spangresResultSet.next()) {
-          for (int col = 1; col <= pgResultSet.getMetaData().getColumnCount(); col++) {
-            switch (pgResultSet.getMetaData().getColumnType(col)) {
-              case Types.BINARY:
-                // We can't use equals on byte arrays.
-                assertArrayEquals(
-                    String.format(
-                        "Column %s mismatch:\nPG: %s\nCS: %s",
-                        pgResultSet.getMetaData().getColumnName(col),
-                        Arrays.toString(pgResultSet.getBytes(col)),
-                        Arrays.toString(spangresResultSet.getBytes(col))),
-                    pgResultSet.getBytes(col),
-                    spangresResultSet.getBytes(col));
-                break;
-              case Types.INTEGER:
-                // Spangres accepts `int4` as a data type in DDL statements, but it is converted to
-                // `int8` by the backend. This means that there is a slight difference between these
-                // two in the local database and Cloud Spanner.
-                assertEquals(
-                    String.format(
-                        "Column %s mismatch:\nPG: %s\nCS: %s",
-                        pgResultSet.getMetaData().getColumnName(col),
-                        pgResultSet.getObject(col),
-                        spangresResultSet.getObject(col)),
-                    pgResultSet.getLong(col),
-                    spangresResultSet.getLong(col));
-                assertEquals(pgResultSet.wasNull(), spangresResultSet.wasNull());
-                break;
-              default:
-                assertEquals(
-                    String.format(
-                        "Column %s mismatch:\nPG: %s\nCS: %s",
-                        pgResultSet.getMetaData().getColumnName(col),
-                        pgResultSet.getObject(col),
-                        spangresResultSet.getObject(col)),
-                    pgResultSet.getObject(col),
-                    spangresResultSet.getObject(col));
+      // Verify that the rows in both databases are equal.
+      try (Connection pgConnection =
+              DriverManager.getConnection(
+                  createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD);
+          Connection spangresConnection =
+              DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
+        try (ResultSet pgResultSet =
+                pgConnection
+                    .createStatement()
+                    .executeQuery("select * from all_types order by col_bigint");
+            ResultSet spangresResultSet =
+                spangresConnection
+                    .createStatement()
+                    .executeQuery("select * from all_types order by col_bigint")) {
+          assertEquals(
+              pgResultSet.getMetaData().getColumnCount(),
+              spangresResultSet.getMetaData().getColumnCount());
+          while (pgResultSet.next() && spangresResultSet.next()) {
+            for (int col = 1; col <= pgResultSet.getMetaData().getColumnCount(); col++) {
+              switch (pgResultSet.getMetaData().getColumnType(col)) {
+                case Types.BINARY:
+                  // We can't use equals on byte arrays.
+                  assertArrayEquals(
+                      String.format(
+                          "Column %s mismatch:\nPG: %s\nCS: %s",
+                          pgResultSet.getMetaData().getColumnName(col),
+                          Arrays.toString(pgResultSet.getBytes(col)),
+                          Arrays.toString(spangresResultSet.getBytes(col))),
+                      pgResultSet.getBytes(col),
+                      spangresResultSet.getBytes(col));
+                  break;
+                case Types.INTEGER:
+                  // Spangres accepts `int4` as a data type in DDL statements, but it is converted
+                  // to `int8` by the backend. This means that there is a slight difference between
+                  // these two in the local database and Cloud Spanner.
+                  assertEquals(
+                      String.format(
+                          "Column %s mismatch:\nPG: %s\nCS: %s",
+                          pgResultSet.getMetaData().getColumnName(col),
+                          pgResultSet.getObject(col),
+                          spangresResultSet.getObject(col)),
+                      pgResultSet.getLong(col),
+                      spangresResultSet.getLong(col));
+                  assertEquals(pgResultSet.wasNull(), spangresResultSet.wasNull());
+                  break;
+                default:
+                  assertEquals(
+                      String.format(
+                          "Column %s mismatch:\nPG: %s\nCS: %s",
+                          pgResultSet.getMetaData().getColumnName(col),
+                          pgResultSet.getObject(col),
+                          spangresResultSet.getObject(col)),
+                      pgResultSet.getObject(col),
+                      spangresResultSet.getObject(col));
+              }
             }
           }
         }

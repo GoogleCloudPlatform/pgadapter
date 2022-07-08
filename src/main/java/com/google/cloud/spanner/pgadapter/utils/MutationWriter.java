@@ -321,19 +321,16 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       // 2. This will throw the underlying exception, so we can catch and register it.
       ApiFutures.allAsList(allCommitFutures).get();
     } catch (SpannerException e) {
-      e.printStackTrace();
       synchronized (lock) {
         this.exception = e;
         throw this.exception;
       }
     } catch (ExecutionException e) {
-      e.printStackTrace();
       synchronized (lock) {
         this.exception = SpannerExceptionFactory.asSpannerException(e.getCause());
         throw this.exception;
       }
     } catch (Exception e) {
-      e.printStackTrace();
       synchronized (lock) {
         this.exception = SpannerExceptionFactory.asSpannerException(e);
         throw this.exception;
