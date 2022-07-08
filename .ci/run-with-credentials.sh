@@ -36,7 +36,7 @@ lint)
   mvn -B com.coveo:fmt-maven-plugin:check
   ;;
 clirr)
-  mvn -B clirr:check
+  mvn -B clirr:check -Dclirr.skip=false
   ;;
 integration)
   mvn verify -B -Dclirr.skip=true -DskipITs=false -DPG_ADAPTER_HOST="https://${GOOGLE_CLOUD_ENDPOINT}" -DPG_ADAPTER_INSTANCE="${GOOGLE_CLOUD_INSTANCE}" -DPG_ADAPTER_DATABASE="${GOOGLE_CLOUD_DATABASE}"
