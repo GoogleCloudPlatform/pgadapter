@@ -370,7 +370,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
 
   @Test
   public void testInsertUsingExecuteMany() throws IOException, InterruptedException {
-    String sql =
+    String insertSql =
         "Insert into all_types("
             + "col_bigint, "
             + "col_bool , "
@@ -433,12 +433,12 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("69");
 
     String actualOutput =
-        executeInBatch(testEnv.getPGAdapterPort(), sql, "named_execute_many", parameters);
+        executeInBatch(testEnv.getPGAdapterPort(), insertSql, "named_execute_many", parameters);
     String expectedOutput = "2\n";
 
     assertEquals(expectedOutput, actualOutput);
 
-    String sql2 =
+    String selectSql =
         "Select "
             + "col_bigint, "
             + "col_bool , "
@@ -448,7 +448,9 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_timestamptz , "
             + "col_date , "
             + "col_varchar "
-            + "from all_types where col_bigint = 10 or col_bigint = 15";
+            + "from all_types "
+            + "where col_bigint = 10 or col_bigint = 15 "
+            + "order by col_bigint";
 
     expectedOutput =
         "(10, "
@@ -470,15 +472,13 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "'bye bye world')"
             + "\n";
 
-    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql2, "query");
+    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), selectSql, "query");
     assertEquals(expectedOutput, actualOutput);
-    // System.out.println(actualOutput);
-
   }
 
   @Test
   public void testInsertUsingExecuteBatch() throws IOException, InterruptedException {
-    String sql =
+    String insertSql =
         "Insert into all_types("
             + "col_bigint, "
             + "col_bool , "
@@ -541,12 +541,12 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("69");
 
     String actualOutput =
-        executeInBatch(testEnv.getPGAdapterPort(), sql, "named_execute_batch", parameters);
+        executeInBatch(testEnv.getPGAdapterPort(), insertSql, "named_execute_batch", parameters);
     String expectedOutput = "1\n";
 
     assertEquals(expectedOutput, actualOutput);
 
-    String sql2 =
+    String selectSql =
         "Select "
             + "col_bigint, "
             + "col_bool , "
@@ -556,7 +556,9 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_timestamptz , "
             + "col_date , "
             + "col_varchar "
-            + "from all_types where col_bigint = 11 or col_bigint = 16";
+            + "from all_types "
+            + "where col_bigint = 11 or col_bigint = 16 "
+            + "order by col_bigint";
 
     expectedOutput =
         "(11, "
@@ -578,13 +580,13 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "'bye bye world')"
             + "\n";
 
-    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql2, "query");
+    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), selectSql, "query");
     assertEquals(expectedOutput, actualOutput);
   }
 
   @Test
   public void testInsertUsingExecuteValues() throws IOException, InterruptedException {
-    String sql =
+    String insertSql =
         "Insert into all_types("
             + "col_bigint, "
             + "col_bool , "
@@ -621,12 +623,12 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("bye bye world");
 
     String actualOutput =
-        executeInBatch(testEnv.getPGAdapterPort(), sql, "execute_values", parameters);
+        executeInBatch(testEnv.getPGAdapterPort(), insertSql, "execute_values", parameters);
     String expectedOutput = "2\n";
 
     assertEquals(expectedOutput, actualOutput);
 
-    String sql2 =
+    String selectSql =
         "Select "
             + "col_bigint, "
             + "col_bool , "
@@ -636,7 +638,9 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_timestamptz , "
             + "col_date , "
             + "col_varchar "
-            + "from all_types where col_bigint = 12 or col_bigint = 17";
+            + "from all_types "
+            + "where col_bigint = 12 or col_bigint = 17 "
+            + "order by col_bigint";
 
     expectedOutput =
         "(12, "
@@ -658,7 +662,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "'bye bye world')"
             + "\n";
 
-    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql2, "query");
+    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), selectSql, "query");
     assertEquals(expectedOutput, actualOutput);
   }
 }
