@@ -29,7 +29,7 @@ import org.junit.runners.JUnit4;
 
 @Category(PythonTest.class)
 @RunWith(JUnit4.class)
-public class PythonBatchTests extends PythonTestSetup{
+public class PythonBatchTests extends PythonTestSetup {
 
   @Test
   public void testInsertUsingExecuteMany() throws IOException, InterruptedException {
@@ -77,11 +77,24 @@ public class PythonBatchTests extends PythonTestSetup{
     String expectedOutput = "27\n";
 
     assertEquals(expectedOutput, actualOutput);
-    
+
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
-    assertEquals(2, mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0).getStatementsCount());
-    assertEquals(sql1, mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0).getStatements(0).getSql());
-    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0).getStatements(1).getSql());
+    assertEquals(
+        2, mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0).getStatementsCount());
+    assertEquals(
+        sql1,
+        mockSpanner
+            .getRequestsOfType(ExecuteBatchDmlRequest.class)
+            .get(0)
+            .getStatements(0)
+            .getSql());
+    assertEquals(
+        sql2,
+        mockSpanner
+            .getRequestsOfType(ExecuteBatchDmlRequest.class)
+            .get(0)
+            .getStatements(1)
+            .getSql());
   }
 
   @Test
@@ -98,18 +111,19 @@ public class PythonBatchTests extends PythonTestSetup{
     String sql1 = "INSERT INTO SOME_TABLE VALUES(('hello','world'),('hello1','world1'))";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 57));
 
-    String actualOutput = executeInBatch(pgServer.getLocalPort(), sql, "execute_values", parameters);
+    String actualOutput =
+        executeInBatch(pgServer.getLocalPort(), sql, "execute_values", parameters);
     String expectedOutput = "57\n";
 
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     assertEquals(sql1, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
-
   }
 
   @Test
-  public void testInsertUsingExecuteManyWithNamedParameters() throws IOException, InterruptedException {
+  public void testInsertUsingExecuteManyWithNamedParameters()
+      throws IOException, InterruptedException {
     String sql = "INSERT INTO SOME_TABLE VALUES(%(VALUE1)s, %(VALUE2)s)";
     ArrayList<String> parameters = new ArrayList<>();
 
@@ -127,7 +141,8 @@ public class PythonBatchTests extends PythonTestSetup{
     String sql2 = "INSERT INTO SOME_TABLE VALUES('HELLO1', 'WORLD1')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 37));
 
-    String actualOutput = executeInBatch(pgServer.getLocalPort(), sql, "named_execute_many", parameters);
+    String actualOutput =
+        executeInBatch(pgServer.getLocalPort(), sql, "named_execute_many", parameters);
     String expectedOutput = "66\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -138,7 +153,8 @@ public class PythonBatchTests extends PythonTestSetup{
   }
 
   @Test
-  public void testInsertUsingExecuteBatchWithNamedParameters() throws IOException, InterruptedException {
+  public void testInsertUsingExecuteBatchWithNamedParameters()
+      throws IOException, InterruptedException {
     String sql = "INSERT INTO SOME_TABLE VALUES(%(VALUE1)s, %(VALUE2)s)";
     ArrayList<String> parameters = new ArrayList<>();
 
@@ -156,15 +172,28 @@ public class PythonBatchTests extends PythonTestSetup{
     String sql2 = "INSERT INTO SOME_TABLE VALUES('hello1', 'world1')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 27));
 
-    String actualOutput = executeInBatch(pgServer.getLocalPort(), sql, "named_execute_batch", parameters);
+    String actualOutput =
+        executeInBatch(pgServer.getLocalPort(), sql, "named_execute_batch", parameters);
     String expectedOutput = "27\n";
 
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
-    assertEquals(2, mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0).getStatementsCount());
-    assertEquals(sql1, mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0).getStatements(0).getSql());
-    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0).getStatements(1).getSql());
+    assertEquals(
+        2, mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0).getStatementsCount());
+    assertEquals(
+        sql1,
+        mockSpanner
+            .getRequestsOfType(ExecuteBatchDmlRequest.class)
+            .get(0)
+            .getStatements(0)
+            .getSql());
+    assertEquals(
+        sql2,
+        mockSpanner
+            .getRequestsOfType(ExecuteBatchDmlRequest.class)
+            .get(0)
+            .getStatements(1)
+            .getSql());
   }
-
 }

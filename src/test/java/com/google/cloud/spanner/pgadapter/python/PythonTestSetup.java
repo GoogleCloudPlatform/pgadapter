@@ -126,5 +126,4 @@ public class PythonTestSetup extends AbstractMockServerTest {
 
     return output.toString();
   }
-
 }
