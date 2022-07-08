@@ -90,7 +90,6 @@ public class StatementTest {
   @Mock private Connection connection;
   @Mock private ConnectionHandler connectionHandler;
   @Mock private ConnectionMetadata connectionMetadata;
-  @Mock private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   @Mock private BackendConnection backendConnection;
   @Mock private ProxyServer server;
   @Mock private OptionsMetadata options;
@@ -115,6 +114,7 @@ public class StatementTest {
   public void testBasicSelectStatement() throws Exception {
     String sql = "SELECT * FROM users";
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
@@ -138,6 +138,7 @@ public class StatementTest {
     String sql = "UPDATE users SET name = someName WHERE id = 10";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
@@ -166,6 +167,7 @@ public class StatementTest {
     String sql = "UPDATE users SET name = someName WHERE id = -1";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connection.execute(Statement.of(sql))).thenReturn(statementResult);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
@@ -202,6 +204,7 @@ public class StatementTest {
     String sql = "CREATE TABLE users (name varchar(100) primary key)";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
@@ -228,6 +231,7 @@ public class StatementTest {
 
   @Test
   public void testDescribeBasicStatementThrowsException() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sql = "SELECT * FROM users";
     IntermediateStatement intermediateStatement =
         new IntermediateStatement(options, parse(sql), Statement.of(sql), connectionHandler);
@@ -243,6 +247,7 @@ public class StatementTest {
 
     when(connection.execute(Statement.of(sql))).thenThrow(thrownException);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
@@ -263,6 +268,7 @@ public class StatementTest {
   @Test
   public void testPreparedStatement() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sqlStatement = "SELECT * FROM users WHERE age > $2 AND age < $3 AND name = $1";
     int[] parameterDataTypes = new int[] {Oid.VARCHAR, Oid.INT8, Oid.INT4};
 
@@ -306,6 +312,7 @@ public class StatementTest {
 
   @Test
   public void testPreparedStatementIllegalTypeThrowsException() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sqlStatement = "SELECT * FROM users WHERE metadata = $1";
     int[] parameterDataTypes = new int[] {Oid.JSON};
 
@@ -324,6 +331,7 @@ public class StatementTest {
   @Test
   public void testPreparedStatementDescribeDoesNotThrowException() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sqlStatement = "SELECT * FROM users WHERE name = $1 AND age > $2 AND age < $3";
     when(connection.analyzeQuery(Statement.of(sqlStatement), QueryAnalyzeMode.PLAN))
         .thenReturn(resultSet);
@@ -341,6 +349,7 @@ public class StatementTest {
   @Test
   public void testPortalStatement() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
 
     IntermediatePortalStatement intermediateStatement =
@@ -389,6 +398,7 @@ public class StatementTest {
   @Test
   public void testPortalStatementDescribePropagatesFailure() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
 
     IntermediatePortalStatement intermediateStatement =
@@ -442,6 +452,7 @@ public class StatementTest {
   @Test
   public void testCopyInvalidBuildMutation() throws Exception {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     setupQueryInformationSchemaResults();
 
     String sql = "COPY keyvalue FROM STDIN;";
@@ -475,6 +486,7 @@ public class StatementTest {
     String sql = "select * from foo";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediateStatement intermediateStatement =
         new IntermediateStatement(options, parse(sql), Statement.of(sql), connectionHandler);
 
@@ -488,6 +500,7 @@ public class StatementTest {
     String sql = "select * from foo";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediateStatement intermediateStatement =
         new IntermediateStatement(options, parse(sql), Statement.of(sql), connectionHandler);
 
@@ -501,6 +514,7 @@ public class StatementTest {
     String sql = "select * from foo";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
@@ -519,6 +533,7 @@ public class StatementTest {
   @Test
   public void testCopyBatchSizeLimit() throws Exception {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
@@ -559,6 +574,7 @@ public class StatementTest {
 
   @Test
   public void testCopyDataRowLengthMismatchLimit() throws Exception {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(

@@ -1297,6 +1297,7 @@ public class ProtocolTest {
   @Test
   public void testMultipleCopyDataMessages() throws Exception {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
 
     byte[] messageMetadata = {'d'};
@@ -1411,6 +1412,7 @@ public class ProtocolTest {
 
   @Test
   public void testCopyFromFilePipe() throws Exception {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     setupQueryInformationSchemaResults();
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));

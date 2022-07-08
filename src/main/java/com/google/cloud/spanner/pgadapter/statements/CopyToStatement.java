@@ -24,6 +24,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
@@ -32,8 +33,10 @@ import com.google.cloud.spanner.pgadapter.wireoutput.CopyDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyDoneResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyOutResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
+import com.google.common.util.concurrent.Futures;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.Future;
 
 /**
  * {@link CopyStatement} models a `COPY table TO STDOUT` statement. The same class is used both as
@@ -96,6 +99,13 @@ public class CopyToStatement extends IntermediatePortalStatement {
   public void executeAsync(BackendConnection backendConnection) {
     this.executed = true;
     setFutureStatementResult(backendConnection.executeCopyOut(parsedStatement, statement));
+  }
+
+  @Override
+  public Future<DescribePortalMetadata> describeAsync(BackendConnection backendConnection) {
+    // Return null to indicate that this COPY TO STDOUT statement does not return any
+    // RowDescriptionResponse.
+    return Futures.immediateFuture(null);
   }
 
   @Override

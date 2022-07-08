@@ -68,7 +68,6 @@ public class SimpleQueryStatement {
     // Finish with a Sync to close any implicit transaction and to return the results.
     for (Statement originalStatement : this.statements) {
       boolean isFirst = this.statements.get(0) == originalStatement;
-      boolean isLast = this.statements.get(this.statements.size() - 1) == originalStatement;
       try {
         ParsedStatement originalParsedStatement = PARSER.parse(originalStatement);
         ParsedStatement parsedStatement = originalParsedStatement;
@@ -99,16 +98,8 @@ public class SimpleQueryStatement {
         }
         new ParseMessage(connectionHandler, parsedStatement, originalStatement).send();
         new BindMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
-        if (!isCopy) {
-          new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
-              .send();
-        }
+        new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
         new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
-        // Only flush the pipeline if this is not the last command. Otherwise, we'll just rely on
-        // the sync at the end.
-        if (!isLast && isCopy) {
-          new FlushMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
-        }
       } catch (Exception ignore) {
         // Stop further processing if an exception occurs.
         break;
