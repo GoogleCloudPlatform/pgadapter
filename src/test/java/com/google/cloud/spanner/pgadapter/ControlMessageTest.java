@@ -66,8 +66,8 @@ public final class ControlMessageTest {
         new DataInputStream(
             new ByteArrayInputStream(new byte[] {(byte) QUERY_IDENTIFIER, 0, 0, 0, 5, 0}));
 
-    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
-    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionMetadata.peekInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.peekOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(intermediateStatement.getStatementType()).thenReturn(StatementType.UPDATE);
     when(intermediateStatement.getCommandTag()).thenReturn("INSERT");

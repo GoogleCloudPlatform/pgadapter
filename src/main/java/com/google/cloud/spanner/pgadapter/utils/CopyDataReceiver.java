@@ -21,6 +21,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.ResultNotReadyBehavior;
+import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyInResponse;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.concurrent.Callable;
@@ -60,32 +61,52 @@ public class CopyDataReceiver implements Callable<Void> {
     if (copyStatement.hasException()) {
       throw copyStatement.getException();
     } else {
-      this.connectionHandler.addActiveStatement(copyStatement);
-      new CopyInResponse(
-              this.connectionHandler.getConnectionMetadata().getOutputStream(),
-              copyStatement.getTableColumns().size(),
-              copyStatement.getFormatCode())
-          .send();
-      ConnectionStatus initialConnectionStatus = this.connectionHandler.getStatus();
       try {
-        this.connectionHandler.setStatus(ConnectionStatus.COPY_IN);
-        // Loop here until COPY_IN mode has finished.
-        while (this.connectionHandler.getStatus() == ConnectionStatus.COPY_IN) {
-          this.connectionHandler.handleMessages();
-        }
-        if (copyStatement.hasException(ResultNotReadyBehavior.BLOCK)
-            || this.connectionHandler.getStatus() == ConnectionStatus.COPY_FAILED) {
-          if (copyStatement.hasException(ResultNotReadyBehavior.BLOCK)) {
-            throw copyStatement.getException();
-          } else {
-            throw SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INTERNAL, "Copy failed with unknown reason");
+        // Push a new set of input/output streams for the connection. This ensures that the COPY
+        // process does not use the buffers of the normal protocol.
+        this.connectionHandler.getConnectionMetadata().pushNewStreams();
+        this.connectionHandler.addActiveStatement(copyStatement);
+        new CopyInResponse(
+                this.connectionHandler.getConnectionMetadata().peekOutputStream(),
+                copyStatement.getTableColumns().size(),
+                copyStatement.getFormatCode())
+            .send();
+        ConnectionStatus initialConnectionStatus = this.connectionHandler.getStatus();
+        try {
+          this.connectionHandler.setStatus(ConnectionStatus.COPY_IN);
+          // Loop here until COPY_IN mode has finished.
+          while (this.connectionHandler.getStatus() == ConnectionStatus.COPY_IN) {
+            this.connectionHandler.handleMessages();
           }
+          // Return CommandComplete if the COPY succeeded. This should not be cached until a flush.
+          // Note that if an error occurred during the COPY, the message handler will automatically
+          // respond with an ErrorResponse. That is why we do not check for COPY_FAILED here, and do
+          // not return an ErrorResponse.
+          if (connectionHandler.getStatus() == ConnectionStatus.COPY_DONE) {
+            new CommandCompleteResponse(
+                    this.connectionHandler.getConnectionMetadata().peekOutputStream(),
+                    "COPY " + copyStatement.getUpdateCount(ResultNotReadyBehavior.BLOCK))
+                .send();
+          }
+          // Throw an exception if the COPY failed. This ensures that the BackendConnection receives
+          // an error and marks the current (implicit) transaction as aborted.
+          if (copyStatement.hasException(ResultNotReadyBehavior.BLOCK)
+              || this.connectionHandler.getStatus() == ConnectionStatus.COPY_FAILED) {
+            if (copyStatement.hasException(ResultNotReadyBehavior.BLOCK)) {
+              throw copyStatement.getException();
+            } else {
+              throw SpannerExceptionFactory.newSpannerException(
+                  ErrorCode.INTERNAL, "Copy failed with unknown reason");
+            }
+          }
+        } finally {
+          this.connectionHandler.removeActiveStatement(copyStatement);
+          this.copyStatement.close();
+          this.connectionHandler.setStatus(initialConnectionStatus);
         }
       } finally {
-        this.connectionHandler.removeActiveStatement(copyStatement);
-        this.copyStatement.close();
-        this.connectionHandler.setStatus(initialConnectionStatus);
+        // Pop the COPY input/output streams to return to the normal protocol and streams.
+        this.connectionHandler.getConnectionMetadata().popStreams();
       }
     }
   }

@@ -114,7 +114,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
             .getSpannerConnection()
             .executeQuery(Statement.of("select * from " + copyOptions.getTableName()))) {
       new CopyOutResponse(
-              this.connectionHandler.getConnectionMetadata().getOutputStream(),
+              this.connectionHandler.getConnectionMetadata().peekOutputStream(),
               resultSet.getColumnCount(),
               0)
           .send();
@@ -123,10 +123,10 @@ public class CopyToStatement extends IntermediatePortalStatement {
         createDataResponse(resultSet).send(false);
         rowCount++;
       }
-      new CopyDoneResponse(this.connectionHandler.getConnectionMetadata().getOutputStream())
+      new CopyDoneResponse(this.connectionHandler.getConnectionMetadata().peekOutputStream())
           .send(false);
       new CommandCompleteResponse(
-              this.connectionHandler.getConnectionMetadata().getOutputStream(), "COPY " + rowCount)
+              this.connectionHandler.getConnectionMetadata().peekOutputStream(), "COPY " + rowCount)
           .send();
     } catch (SpannerException spannerException) {
       handleExecutionException(spannerException);

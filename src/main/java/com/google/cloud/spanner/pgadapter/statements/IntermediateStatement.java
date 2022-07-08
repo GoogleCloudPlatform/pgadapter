@@ -106,7 +106,7 @@ public class IntermediateStatement {
     this.connection = connectionHandler.getSpannerConnection();
     this.command = StatementParser.parseCommand(this.parsedStatement.getSqlWithoutComments());
     this.commandTag = this.command;
-    this.outputStream = connectionHandler.getConnectionMetadata().getOutputStream();
+    this.outputStream = connectionHandler.getConnectionMetadata().peekOutputStream();
   }
 
   /**
@@ -275,7 +275,7 @@ public class IntermediateStatement {
    *
    * @param exception The exception to store.
    */
-  protected void handleExecutionException(SpannerException exception) {
+  public void handleExecutionException(SpannerException exception) {
     setException(exception);
     this.hasMoreData = false;
   }

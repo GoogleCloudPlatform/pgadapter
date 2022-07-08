@@ -62,6 +62,9 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -421,8 +424,8 @@ public class StatementTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
-    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
-    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionMetadata.peekInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.peekOutputStream()).thenReturn(outputStream);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
@@ -450,11 +453,12 @@ public class StatementTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"), connection, DdlTransactionMode.Batch, ImmutableList.of());
     statement.executeAsync(backendConnection);
-    backendConnection.flush();
 
     byte[] payload = "2 3\n".getBytes();
     MutationWriter mutationWriter = statement.getMutationWriter();
     mutationWriter.addCopyData(payload);
+
+    backendConnection.flush();
 
     SpannerException thrown = assertThrows(SpannerException.class, statement::getUpdateCount);
     assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
@@ -514,6 +518,7 @@ public class StatementTest {
 
   @Test
   public void testCopyBatchSizeLimit() throws Exception {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
@@ -530,21 +535,24 @@ public class StatementTest {
     copyStatement.executeAsync(backendConnection);
     assertTrue(copyStatement.isExecuted());
 
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    Future<MutationWriter> future =
+        executor.submit(
+            () -> {
+              MutationWriter mw = copyStatement.getMutationWriter();
+              mw.addCopyData(payload);
+              mw.close();
+              return mw;
+            });
+    executor.shutdown();
+
     backendConnection.flush();
-    MutationWriter mw = copyStatement.getMutationWriter();
-    //    // Inject a mock DatabaseClient for now.
-    //    // TODO: Fix this once we can use the Connection API.
-    //    Field databaseClientField = MutationWriter.class.getDeclaredField("databaseClient");
-    //    databaseClientField.setAccessible(true);
-    //    databaseClientField.set(mw, mock(DatabaseClient.class));
-    mw.addCopyData(payload);
-    mw.close();
 
     assertEquals("TEXT", copyStatement.getFormatType());
     assertEquals('\t', copyStatement.getDelimiterChar());
     assertFalse(copyStatement.hasException());
     assertEquals(12L, copyStatement.getUpdateCount());
-    assertEquals(12L, mw.getRowCount());
+    assertEquals(12L, future.get().getRowCount());
 
     copyStatement.close();
   }
@@ -567,10 +575,19 @@ public class StatementTest {
     copyStatement.executeAsync(backendConnection);
     assertTrue(copyStatement.isExecuted());
 
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    Future<MutationWriter> future =
+        executor.submit(
+            () -> {
+              MutationWriter mw = copyStatement.getMutationWriter();
+              mw.addCopyData(payload);
+              mw.close();
+              return mw;
+            });
+    executor.shutdown();
+    ;
+
     backendConnection.flush();
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(payload);
-    mw.close();
 
     SpannerException thrown = assertThrows(SpannerException.class, copyStatement::getUpdateCount);
     assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());

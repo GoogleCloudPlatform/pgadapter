@@ -83,7 +83,7 @@ public abstract class ControlMessage extends WireMessage {
   private final ManuallyCreatedToken manuallyCreatedToken;
 
   public ControlMessage(ConnectionHandler connection) throws IOException {
-    super(connection, connection.getConnectionMetadata().getInputStream().readInt());
+    super(connection, connection.getConnectionMetadata().peekInputStream().readInt());
     this.manuallyCreatedToken = null;
   }
 
@@ -106,7 +106,7 @@ public abstract class ControlMessage extends WireMessage {
    */
   public static ControlMessage create(ConnectionHandler connection) throws Exception {
     boolean validMessage = true;
-    char nextMsg = (char) connection.getConnectionMetadata().getInputStream().readUnsignedByte();
+    char nextMsg = (char) connection.getConnectionMetadata().peekInputStream().readUnsignedByte();
     try {
       if (connection.getStatus() == ConnectionStatus.COPY_IN) {
         switch (nextMsg) {
@@ -174,7 +174,7 @@ public abstract class ControlMessage extends WireMessage {
         connection.increaseInvalidMessageCount();
         if (connection.getInvalidMessageCount() > MAX_INVALID_MESSAGE_COUNT) {
           new ErrorResponse(
-                  connection.getConnectionMetadata().getOutputStream(),
+                  connection.getConnectionMetadata().peekOutputStream(),
                   new IllegalStateException(
                       String.format(
                           "Received %d invalid/unexpected messages. Last received message: '%c'",

@@ -495,6 +495,34 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @Test
+  public void testCopyIn_Nulls() throws SQLException, IOException {
+    // Empty all data in the table.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
+
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      long copyCount =
+          copyManager.copyIn(
+              "copy all_types from stdin;",
+              new FileInputStream("./src/test/resources/all_types_data_nulls.txt"));
+      assertEquals(1L, copyCount);
+
+      // Verify that there is 1 row in the table, and that the values of all columns except the
+      // primary key are null.
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select * from all_types")) {
+        assertTrue(resultSet.next());
+        for (int col = 2; col <= resultSet.getMetaData().getColumnCount(); col++) {
+          assertNull(String.format("Col %d should be null", col), resultSet.getObject(col));
+        }
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testCopyIn_Large_FailsWhenAtomic() throws SQLException {
     // Empty all data in the table.
     String databaseId = database.getId().getDatabase();
@@ -510,14 +538,13 @@ public class ITJdbcTest implements IntegrationTest {
                   copyManager.copyIn(
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
-      assertTrue(
-          exception.getMessage(),
-          exception
-                  .getMessage()
-                  .contains("FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.")
-              || exception
-                  .getMessage()
-                  .contains("Database connection failed when canceling copy operation"));
+      assertEquals(
+          "ERROR: FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.\n"
+              + "\n"
+              + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
+              + "\n"
+              + "Execute `SET AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.\n\n",
+          exception.getMessage());
     }
 
     // Verify that the table is still empty.
