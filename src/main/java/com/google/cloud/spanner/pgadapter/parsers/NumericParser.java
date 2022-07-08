@@ -52,6 +52,10 @@ public class NumericParser extends Parser<String> {
    * valid numeric string or 'NaN'.
    */
   public static String toNumericString(byte[] data) {
+    if (data.length < 8) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Invalid length for numeric: " + data.length);
+    }
     Number number = ByteConverter.numeric(data, 0, data.length);
     return number == null ? null : number.toString();
   }

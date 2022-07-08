@@ -14,7 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import org.postgresql.util.ByteConverter;
 
@@ -45,6 +47,10 @@ public class DoubleParser extends Parser<Double> {
   }
 
   public static double toDouble(byte[] data) {
+    if (data.length < 8) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Invalid length for float8: " + data.length);
+    }
     return ByteConverter.float8(data, 0);
   }
 

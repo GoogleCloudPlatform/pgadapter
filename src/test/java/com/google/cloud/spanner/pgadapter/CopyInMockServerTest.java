@@ -52,6 +52,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Base64;
 import java.util.List;
+import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -972,6 +973,121 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     assertEquals("2", row3.getValues(0).getStringValue());
     assertEquals("40", row3.getValues(1).getStringValue());
     assertEquals("Two", row3.getValues(2).getStringValue());
+  }
+
+  @Test
+  public void testCopyBinaryPsql_wrongTypeWithValidLength() throws Exception {
+    assumeTrue("This test requires psql", isPsqlAvailable());
+    assumeTrue("This test requires bash", isBashAvailable());
+
+    setupCopyInformationSchemaResults();
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -d knut-test-db"
+            + " -c \"copy (\n"
+            // Note: float8 has the same length as bigint, so the receiving part will not notice
+            // that the type is invalid. Instead, we will get a wrong value in the column.
+            + "    select 1::float8 as id, 30::bigint as age, 'One'::varchar as name\n"
+            + "  ) to stdout binary\" "
+            + "  | psql "
+            + " -h "
+            + (useDomainSocket ? "/tmp" : "localhost")
+            + " -p "
+            + pgServer.getLocalPort()
+            + " -c \"copy users from stdin binary;\"\n");
+    Process process = builder.start();
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    ListValue row1 = mutation.getInsert().getValues(0);
+    // The float8 is interpreted as a bigint.
+    assertEquals("4607182418800017408", row1.getValues(0).getStringValue());
+    assertEquals("30", row1.getValues(1).getStringValue());
+    assertEquals("One", row1.getValues(2).getStringValue());
+  }
+
+  @Test
+  public void testCopyBinaryPsql_wrongTypeWithInvalidLength() throws Exception {
+    assumeTrue("This test requires psql", isPsqlAvailable());
+    assumeTrue("This test requires bash", isBashAvailable());
+
+    setupCopyInformationSchemaResults();
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -d knut-test-db"
+            + " -c \"copy (\n"
+            // Note: int2 has an invalid length for a bigint column.
+            + "    select 1::int2 as id, 30::bigint as age, 'One'::varchar as name\n"
+            + "  ) to stdout binary\" "
+            + "  | psql "
+            + " -h "
+            + (useDomainSocket ? "/tmp" : "localhost")
+            + " -p "
+            + pgServer.getLocalPort()
+            + " -c \"copy users from stdin binary;\"\n");
+    Process process = builder.start();
+    int res = process.waitFor();
+    assertEquals(1, res);
+    StringBuilder error = new StringBuilder();
+    Scanner scanner = new Scanner(new InputStreamReader(process.getErrorStream()));
+    while (scanner.hasNextLine()) {
+      error.append(scanner.nextLine()).append('\n');
+    }
+    assertEquals("ERROR:  INVALID_ARGUMENT: Invalid length for int8: 2\n", error.toString());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testCopyBinaryPsql_Int4ToInt8() throws Exception {
+    assumeTrue("This test requires psql", isPsqlAvailable());
+    assumeTrue("This test requires bash", isBashAvailable());
+
+    setupCopyInformationSchemaResults();
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -d knut-test-db"
+            + " -c \"copy (\n"
+            // Note: int4 has an invalid length for a bigint column, but PGAdapter specifically
+            // allows this conversion.
+            + "    select 1::int4 as id, 30::bigint as age, 'One'::varchar as name\n"
+            + "  ) to stdout binary\" "
+            + "  | psql "
+            + " -h "
+            + (useDomainSocket ? "/tmp" : "localhost")
+            + " -p "
+            + pgServer.getLocalPort()
+            + " -c \"copy users from stdin binary;\"\n");
+    Process process = builder.start();
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(1, mutation.getInsert().getValuesCount());
+    ListValue row = mutation.getInsert().getValues(0);
+    assertEquals("1", row.getValues(0).getStringValue());
+    assertEquals("30", row.getValues(1).getStringValue());
+    assertEquals("One", row.getValues(2).getStringValue());
   }
 
   @Test

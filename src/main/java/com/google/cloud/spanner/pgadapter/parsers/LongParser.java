@@ -14,7 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import org.postgresql.util.ByteConverter;
 
@@ -46,7 +48,18 @@ public class LongParser extends Parser<Long> {
 
   /** Converts the binary data to a long value. */
   public static long toLong(byte[] data) {
-    return ByteConverter.int8(data, 0);
+    if (data.length >= 8) {
+      return ByteConverter.int8(data, 0);
+    } else if (data.length == 4) {
+      // We allow 4-byte values for bigint as well, because Spangres allows the use of the int type
+      // in create table statements. This is automatically converted to a bigint column, but it
+      // could be that someone uses the same DDL statement to create a table in both real
+      // PostgresSQL and Spangres, and this keeps copying data between them possible.
+      return ByteConverter.int4(data, 0);
+    } else {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Invalid length for int8: " + data.length);
+    }
   }
 
   @Override

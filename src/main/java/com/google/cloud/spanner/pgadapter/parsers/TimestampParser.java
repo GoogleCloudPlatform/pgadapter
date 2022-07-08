@@ -15,7 +15,9 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
@@ -86,6 +88,10 @@ public class TimestampParser extends Parser<Timestamp> {
 
   /** Converts the binary data to a {@link Timestamp}. */
   public static Timestamp toTimestamp(byte[] data) {
+    if (data.length < 8) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Invalid length for timestamptz: " + data.length);
+    }
     long pgMicros = ByteConverter.int8(data, 0);
     com.google.cloud.Timestamp ts = com.google.cloud.Timestamp.ofTimeMicroseconds(pgMicros);
     long javaSeconds = ts.getSeconds() + PG_EPOCH_SECONDS;

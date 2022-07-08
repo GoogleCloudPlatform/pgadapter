@@ -15,7 +15,9 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.Date;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.common.base.Preconditions;
 import java.text.ParseException;
@@ -65,6 +67,10 @@ public class DateParser extends Parser<Date> {
 
   /** Converts the binary data to a {@link Date}. */
   public static Date toDate(byte[] data) {
+    if (data.length < 4) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Invalid length for date: " + data.length);
+    }
     long days = ByteConverter.int4(data, 0) + PG_EPOCH_DAYS;
     LocalDate localDate = LocalDate.ofEpochDay(validateRange(days));
     return Date.fromYearMonthDay(
