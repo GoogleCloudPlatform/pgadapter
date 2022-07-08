@@ -432,7 +432,8 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("int");
     parameters.add("69");
 
-    String actualOutput = executeInBatch(testEnv.getPGAdapterPort(), sql, "named_execute_many", parameters);
+    String actualOutput =
+        executeInBatch(testEnv.getPGAdapterPort(), sql, "named_execute_many", parameters);
     String expectedOutput = "2\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -449,28 +450,29 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_varchar "
             + "from all_types where col_bigint = 10 or col_bigint = 15";
 
-    expectedOutput = "(10, "
-        + "True, "
-        + "89.23, "
-        + "34, "
-        + "Decimal('33.546'), "
-        + "datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
-        + "datetime.date(2022, 7, 1), "
-        + "'hello world')"
-        + "\n"
-        + "(15, "
-        + "False, "
-        + "74.567, "
-        + "69, "
-        + "Decimal('99.9999'), "
-        + "datetime.datetime(2021, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
-        + "datetime.date(2021, 7, 1), "
-        + "'bye bye world')"
-        + "\n";
+    expectedOutput =
+        "(10, "
+            + "True, "
+            + "89.23, "
+            + "34, "
+            + "Decimal('33.546'), "
+            + "datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
+            + "datetime.date(2022, 7, 1), "
+            + "'hello world')"
+            + "\n"
+            + "(15, "
+            + "False, "
+            + "74.567, "
+            + "69, "
+            + "Decimal('99.9999'), "
+            + "datetime.datetime(2021, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
+            + "datetime.date(2021, 7, 1), "
+            + "'bye bye world')"
+            + "\n";
 
     actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql2, "query");
     assertEquals(expectedOutput, actualOutput);
-    //System.out.println(actualOutput);
+    // System.out.println(actualOutput);
 
   }
 
@@ -538,7 +540,8 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("int");
     parameters.add("69");
 
-    String actualOutput = executeInBatch(testEnv.getPGAdapterPort(), sql, "named_execute_batch", parameters);
+    String actualOutput =
+        executeInBatch(testEnv.getPGAdapterPort(), sql, "named_execute_batch", parameters);
     String expectedOutput = "1\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -555,28 +558,28 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_varchar "
             + "from all_types where col_bigint = 11 or col_bigint = 16";
 
-    expectedOutput = "(10, "
-        + "True, "
-        + "89.23, "
-        + "34, "
-        + "Decimal('33.546'), "
-        + "datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
-        + "datetime.date(2022, 7, 1), "
-        + "'hello world')"
-        + "\n"
-        + "(15, "
-        + "False, "
-        + "74.567, "
-        + "69, "
-        + "Decimal('99.9999'), "
-        + "datetime.datetime(2021, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
-        + "datetime.date(2021, 7, 1), "
-        + "'bye bye world')"
-        + "\n";
+    expectedOutput =
+        "(10, "
+            + "True, "
+            + "89.23, "
+            + "34, "
+            + "Decimal('33.546'), "
+            + "datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
+            + "datetime.date(2022, 7, 1), "
+            + "'hello world')"
+            + "\n"
+            + "(15, "
+            + "False, "
+            + "74.567, "
+            + "69, "
+            + "Decimal('99.9999'), "
+            + "datetime.datetime(2021, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
+            + "datetime.date(2021, 7, 1), "
+            + "'bye bye world')"
+            + "\n";
 
     actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql2, "query");
     assertEquals(expectedOutput, actualOutput);
-
   }
 
   @Test
@@ -617,7 +620,8 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("2021-7-1");
     parameters.add("bye bye world");
 
-    String actualOutput = executeInBatch(testEnv.getPGAdapterPort(), sql, "execute_values", parameters);
+    String actualOutput =
+        executeInBatch(testEnv.getPGAdapterPort(), sql, "execute_values", parameters);
     String expectedOutput = "2\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -634,28 +638,27 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_varchar "
             + "from all_types where col_bigint = 12 or col_bigint = 17";
 
-    expectedOutput = "(10, "
-        + "True, "
-        + "89.23, "
-        + "34, "
-        + "Decimal('33.546'), "
-        + "datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
-        + "datetime.date(2022, 7, 1), "
-        + "'hello world')"
-        + "\n"
-        + "(15, "
-        + "False, "
-        + "74.567, "
-        + "69, "
-        + "Decimal('99.9999'), "
-        + "datetime.datetime(2021, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
-        + "datetime.date(2021, 7, 1), "
-        + "'bye bye world')"
-        + "\n";
+    expectedOutput =
+        "(10, "
+            + "True, "
+            + "89.23, "
+            + "34, "
+            + "Decimal('33.546'), "
+            + "datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
+            + "datetime.date(2022, 7, 1), "
+            + "'hello world')"
+            + "\n"
+            + "(15, "
+            + "False, "
+            + "74.567, "
+            + "69, "
+            + "Decimal('99.9999'), "
+            + "datetime.datetime(2021, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
+            + "datetime.date(2021, 7, 1), "
+            + "'bye bye world')"
+            + "\n";
 
     actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql2, "query");
     assertEquals(expectedOutput, actualOutput);
-
   }
-
 }
