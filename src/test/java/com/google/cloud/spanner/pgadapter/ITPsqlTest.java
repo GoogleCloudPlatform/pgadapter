@@ -30,6 +30,7 @@ import java.io.OutputStreamWriter;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.Collections;
@@ -258,8 +259,8 @@ public class ITPsqlTest implements IntegrationTest {
     }
 
     // COPY the rows to Cloud Spanner.
-    ProcessBuilder builder = new ProcessBuilder();
-    builder.command(
+    ProcessBuilder copyToCloudSpannerBuilder = new ProcessBuilder();
+    copyToCloudSpannerBuilder.command(
         "bash",
         "-c",
         "psql"
@@ -280,10 +281,10 @@ public class ITPsqlTest implements IntegrationTest {
             + " -d "
             + database.getId().getDatabase()
             + " -c \"copy all_types from stdin;\"\n");
-    setPgPassword(builder);
-    Process process = builder.start();
-    int res = process.waitFor();
-    assertEquals(0, res);
+    setPgPassword(copyToCloudSpannerBuilder);
+    Process copyToCloudSpannerProcess = copyToCloudSpannerBuilder.start();
+    int copyToCloudSpannerResult = copyToCloudSpannerProcess.waitFor();
+    assertEquals(0, copyToCloudSpannerResult);
 
     // Verify that we now also have 100 rows in Spanner.
     try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
@@ -296,6 +297,47 @@ public class ITPsqlTest implements IntegrationTest {
     }
 
     // Verify that the rows in both databases are equal.
+    compareTableContents();
+
+    // Remove all rows in the table in the local PostgreSQL database and then copy everything from
+    // Cloud Spanner to PostgreSQL.
+    try (Connection connection = DriverManager.getConnection(createJdbcUrlForLocalPg())) {
+      assertEquals(numRows, connection.createStatement().executeUpdate("delete from all_types"));
+    }
+
+    // COPY the rows to Cloud Spanner.
+    ProcessBuilder copyToPostgresBuilder = new ProcessBuilder();
+    copyToPostgresBuilder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -c \"copy all_types to stdout\" "
+            + " -h "
+            + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+            + " -p "
+            + testEnv.getPGAdapterPort()
+            + " -d "
+            + database.getId().getDatabase()
+            + "  | psql "
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy all_types from stdin;\"\n");
+    setPgPassword(copyToPostgresBuilder);
+    Process copyToPostgresProcess = copyToPostgresBuilder.start();
+    int copyToPostgresResult = copyToPostgresProcess.waitFor();
+    assertEquals(0, copyToPostgresResult);
+
+    // Compare table contents again.
+    compareTableContents();
+  }
+
+  private void compareTableContents() throws SQLException {
     try (Connection pgConnection =
             DriverManager.getConnection(
                 createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD);
