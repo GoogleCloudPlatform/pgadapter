@@ -367,4 +367,295 @@ public class ITPsycopg2Test extends PythonTestSetup {
     expectedOutput = "(0,)\n";
     assertEquals(expectedOutput, actualOutput);
   }
+
+  @Test
+  public void testInsertUsingExecuteMany() throws IOException, InterruptedException {
+    String sql =
+        "Insert into all_types("
+            + "col_bigint, "
+            + "col_bool , "
+            + "col_bytea , "
+            + "col_float8 , "
+            + "col_int , "
+            + "col_numeric , "
+            + "col_timestamptz , "
+            + "col_date , "
+            + "col_varchar )"
+            + " values("
+            + "%(bigint)s, "
+            + "%(bool)s, "
+            + "%(bytea)s, "
+            + "%(float)s, "
+            + "%(int)s, "
+            + "%(numeric)s, "
+            + "%(tstz)s, "
+            + "%(date)s, "
+            + "%(varchar)s)";
+
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("9");
+    parameters.add("bool");
+    parameters.add("True");
+    parameters.add("float");
+    parameters.add("89.23");
+    parameters.add("numeric");
+    parameters.add("33.546");
+    parameters.add("tstz");
+    parameters.add("2022-02-16T14:18:02+01:00");
+    parameters.add("varchar");
+    parameters.add("hello world");
+    parameters.add("date");
+    parameters.add("2022-7-1");
+    parameters.add("bigint");
+    parameters.add("10");
+    parameters.add("bytea");
+    parameters.add("alpha beta");
+    parameters.add("int");
+    parameters.add("34");
+
+    parameters.add("bool");
+    parameters.add("False");
+    parameters.add("float");
+    parameters.add("74.567");
+    parameters.add("numeric");
+    parameters.add("99.9999");
+    parameters.add("tstz");
+    parameters.add("2021-02-16T14:18:02+01:00");
+    parameters.add("varchar");
+    parameters.add("bye bye world");
+    parameters.add("date");
+    parameters.add("2021-7-1");
+    parameters.add("bigint");
+    parameters.add("15");
+    parameters.add("bytea");
+    parameters.add("gamma theta");
+    parameters.add("int");
+    parameters.add("69");
+
+    String actualOutput = executeInBatch(testEnv.getPGAdapterPort(), sql, "named_execute_many", parameters);
+    String expectedOutput = "2\n";
+
+    assertEquals(expectedOutput, actualOutput);
+
+    String sql2 =
+        "Select "
+            + "col_bigint, "
+            + "col_bool , "
+            + "col_float8 , "
+            + "col_int , "
+            + "col_numeric , "
+            + "col_timestamptz , "
+            + "col_date , "
+            + "col_varchar "
+            + "from all_types where col_bigint = 10 or col_bigint = 15";
+
+    expectedOutput = "(10, "
+        + "True, "
+        + "89.23, "
+        + "34, "
+        + "Decimal('33.546'), "
+        + "datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
+        + "datetime.date(2022, 7, 1), "
+        + "'hello world')"
+        + "\n"
+        + "(15, "
+        + "False, "
+        + "74.567, "
+        + "69, "
+        + "Decimal('99.9999'), "
+        + "datetime.datetime(2021, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
+        + "datetime.date(2021, 7, 1), "
+        + "'bye bye world')"
+        + "\n";
+
+    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql2, "query");
+    assertEquals(expectedOutput, actualOutput);
+    //System.out.println(actualOutput);
+
+  }
+
+  @Test
+  public void testInsertUsingExecuteBatch() throws IOException, InterruptedException {
+    String sql =
+        "Insert into all_types("
+            + "col_bigint, "
+            + "col_bool , "
+            + "col_bytea , "
+            + "col_float8 , "
+            + "col_int , "
+            + "col_numeric , "
+            + "col_timestamptz , "
+            + "col_date , "
+            + "col_varchar )"
+            + " values("
+            + "%(bigint)s, "
+            + "%(bool)s, "
+            + "%(bytea)s, "
+            + "%(float)s, "
+            + "%(int)s, "
+            + "%(numeric)s, "
+            + "%(tstz)s, "
+            + "%(date)s, "
+            + "%(varchar)s)";
+
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("9");
+    parameters.add("bool");
+    parameters.add("True");
+    parameters.add("float");
+    parameters.add("89.23");
+    parameters.add("numeric");
+    parameters.add("33.546");
+    parameters.add("tstz");
+    parameters.add("2022-02-16T14:18:02+01:00");
+    parameters.add("varchar");
+    parameters.add("hello world");
+    parameters.add("date");
+    parameters.add("2022-7-1");
+    parameters.add("bigint");
+    parameters.add("11");
+    parameters.add("bytea");
+    parameters.add("alpha beta");
+    parameters.add("int");
+    parameters.add("34");
+
+    parameters.add("bool");
+    parameters.add("False");
+    parameters.add("float");
+    parameters.add("74.567");
+    parameters.add("numeric");
+    parameters.add("99.9999");
+    parameters.add("tstz");
+    parameters.add("2021-02-16T14:18:02+01:00");
+    parameters.add("varchar");
+    parameters.add("bye bye world");
+    parameters.add("date");
+    parameters.add("2021-7-1");
+    parameters.add("bigint");
+    parameters.add("16");
+    parameters.add("bytea");
+    parameters.add("gamma theta");
+    parameters.add("int");
+    parameters.add("69");
+
+    String actualOutput = executeInBatch(testEnv.getPGAdapterPort(), sql, "named_execute_batch", parameters);
+    String expectedOutput = "1\n";
+
+    assertEquals(expectedOutput, actualOutput);
+
+    String sql2 =
+        "Select "
+            + "col_bigint, "
+            + "col_bool , "
+            + "col_float8 , "
+            + "col_int , "
+            + "col_numeric , "
+            + "col_timestamptz , "
+            + "col_date , "
+            + "col_varchar "
+            + "from all_types where col_bigint = 11 or col_bigint = 16";
+
+    expectedOutput = "(10, "
+        + "True, "
+        + "89.23, "
+        + "34, "
+        + "Decimal('33.546'), "
+        + "datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
+        + "datetime.date(2022, 7, 1), "
+        + "'hello world')"
+        + "\n"
+        + "(15, "
+        + "False, "
+        + "74.567, "
+        + "69, "
+        + "Decimal('99.9999'), "
+        + "datetime.datetime(2021, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
+        + "datetime.date(2021, 7, 1), "
+        + "'bye bye world')"
+        + "\n";
+
+    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql2, "query");
+    assertEquals(expectedOutput, actualOutput);
+
+  }
+
+  @Test
+  public void testInsertUsingExecuteValues() throws IOException, InterruptedException {
+    String sql =
+        "Insert into all_types("
+            + "col_bigint, "
+            + "col_bool , "
+            + "col_bytea , "
+            + "col_float8 , "
+            + "col_int , "
+            + "col_numeric , "
+            + "col_timestamptz , "
+            + "col_date , "
+            + "col_varchar )"
+            + " values %s";
+
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("9");
+
+    parameters.add("12");
+    parameters.add("True");
+    parameters.add("alpha beta");
+    parameters.add("89.23");
+    parameters.add("34");
+    parameters.add("33.546");
+    parameters.add("2022-02-16T14:18:02+01:00");
+    parameters.add("2022-7-1");
+    parameters.add("hello world");
+
+    parameters.add("17");
+    parameters.add("False");
+    parameters.add("gamma theta");
+    parameters.add("74.567");
+    parameters.add("69");
+    parameters.add("99.9999");
+    parameters.add("2021-02-16T14:18:02+01:00");
+    parameters.add("2021-7-1");
+    parameters.add("bye bye world");
+
+    String actualOutput = executeInBatch(testEnv.getPGAdapterPort(), sql, "execute_values", parameters);
+    String expectedOutput = "2\n";
+
+    assertEquals(expectedOutput, actualOutput);
+
+    String sql2 =
+        "Select "
+            + "col_bigint, "
+            + "col_bool , "
+            + "col_float8 , "
+            + "col_int , "
+            + "col_numeric , "
+            + "col_timestamptz , "
+            + "col_date , "
+            + "col_varchar "
+            + "from all_types where col_bigint = 12 or col_bigint = 17";
+
+    expectedOutput = "(10, "
+        + "True, "
+        + "89.23, "
+        + "34, "
+        + "Decimal('33.546'), "
+        + "datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
+        + "datetime.date(2022, 7, 1), "
+        + "'hello world')"
+        + "\n"
+        + "(15, "
+        + "False, "
+        + "74.567, "
+        + "69, "
+        + "Decimal('99.9999'), "
+        + "datetime.datetime(2021, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), "
+        + "datetime.date(2021, 7, 1), "
+        + "'bye bye world')"
+        + "\n";
+
+    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql2, "query");
+    assertEquals(expectedOutput, actualOutput);
+
+  }
+
 }
