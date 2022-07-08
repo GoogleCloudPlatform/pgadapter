@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
@@ -27,6 +28,7 @@ import org.postgresql.util.ByteConverter;
  * Parse specified data to boolean. For most cases it is simply translating from chars 't'/'f' to
  * bit, or simply returning the bit representation.
  */
+@InternalApi
 public class BooleanParser extends Parser<Boolean> {
   private static final String TRUE_VALUE = "t";
   private static final String FALSE_VALUE = "f";
@@ -49,13 +51,7 @@ public class BooleanParser extends Parser<Boolean> {
       switch (formatCode) {
         case TEXT:
           String stringValue = new String(item, UTF8).toLowerCase(Locale.ENGLISH);
-          if (TRUE_VALUES.contains(stringValue)) {
-            this.item = true;
-          } else if (FALSE_VALUES.contains(stringValue)) {
-            this.item = false;
-          } else {
-            throw new IllegalArgumentException(stringValue + " is not a valid boolean value");
-          }
+          this.item = toBoolean(stringValue);
           break;
         case BINARY:
           this.item = toBoolean(item);
@@ -73,6 +69,17 @@ public class BooleanParser extends Parser<Boolean> {
           ErrorCode.INVALID_ARGUMENT, "Invalid length for bool: " + data.length);
     }
     return ByteConverter.bool(data, 0);
+  }
+
+  /** Converts the string to a boolean value according to the PostgreSQL specs. */
+  public static boolean toBoolean(String value) {
+    if (TRUE_VALUES.contains(value)) {
+      return true;
+    } else if (FALSE_VALUES.contains(value)) {
+      return false;
+    } else {
+      throw new IllegalArgumentException(value + " is not a valid boolean value");
+    }
   }
 
   @Override

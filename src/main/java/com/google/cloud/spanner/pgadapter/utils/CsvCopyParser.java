@@ -21,6 +21,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.common.collect.Iterators;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -129,7 +130,7 @@ class CsvCopyParser implements CopyInParser {
           case JSON:
             return Value.json(recordValue);
           case BOOL:
-            return Value.bool(recordValue == null ? null : Boolean.parseBoolean(recordValue));
+            return Value.bool(recordValue == null ? null : BooleanParser.toBoolean(recordValue));
           case INT64:
             return Value.int64(recordValue == null ? null : Long.parseLong(recordValue));
           case FLOAT64:

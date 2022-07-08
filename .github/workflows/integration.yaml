@@ -35,6 +35,23 @@ jobs:
     if: needs.check-env.outputs.has-key == 'true'
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    # Add a PostgreSQL Docker container
+    services:
+      # Container label
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        # Set health checks to wait until postgres has started
+        ports:
+          - 5432:5432
+        volumes:
+          - /pg:/var/run/postgresql
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - id: set-manual-endpoint
         if: "${{ inputs.endpoint }}"
@@ -65,6 +82,13 @@ jobs:
         with:
           python-version: '3.9'
       - run: pip install -r ./src/test/python/requirements.txt
+      - name: Setup psql
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client
+      - name: Create PostgreSQL test database
+        run: |
+          psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run unit tests
         run: mvn test -B -Ptest-all
       - name: Setup GCloud
@@ -75,6 +99,11 @@ jobs:
           export_default_credentials: true
       - name: Run integration tests
         run: mvn verify -B -Dclirr.skip=true -DskipITs=false -DPG_ADAPTER_HOST="https://$GOOGLE_CLOUD_ENDPOINT" -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
+        env:
+          POSTGRES_HOST: /pg
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_DATABASE: pgadapter
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:

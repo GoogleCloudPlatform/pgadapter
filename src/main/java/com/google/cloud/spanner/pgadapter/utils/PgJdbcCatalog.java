@@ -229,7 +229,7 @@ public class PgJdbcCatalog {
           + "           WHEN DATA_TYPE = 'timestamp with time zone' THEN 1184\n"
           + "           WHEN DATA_TYPE = 'timestamp with time zone[]' THEN 1185\n"
           + "           END AS atttypid,\n"
-          + "       DATA_TYPE AS atttypid, 0 as atttypmod,\n"
+          + "       DATA_TYPE AS atttypid, -1 as atttypmod,\n"
           + "       CASE\n"
           + "           WHEN DATA_TYPE LIKE 'ARRAY' THEN 0\n"
           + "           WHEN DATA_TYPE = 'boolean' THEN NULL\n"
@@ -453,7 +453,7 @@ public class PgJdbcCatalog {
   public static final String PG_JDBC_GET_BEST_ROW_IDENTIFIER_PREFIX =
       "SELECT a.attname, a.atttypid, atttypmod FROM pg_catalog.pg_class ct   JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)   JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)   JOIN (SELECT i.indexrelid, i.indrelid, i.indisprimary,              information_schema._pg_expandarray(i.indkey) AS keys         FROM pg_catalog.pg_index i) i     ON (a.attnum = (i.keys).x AND a.attrelid = i.indrelid) WHERE true";
   public static final String PG_JDBC_GET_BEST_ROW_IDENTIFIER_REPLACEMENT =
-      "select '' as attname, 0 as atttypid, 0 as atttypmod from (select 1) t where false";
+      "select '' as attname, 0 as atttypid, -1 as atttypmod from (select 1) t where false";
 
   private static final String PG_JDBC_PK_QUERY_INNER_PREFIX_42_3 =
       "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, "

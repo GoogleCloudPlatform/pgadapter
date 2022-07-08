@@ -14,17 +14,23 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_DATABASE;
+import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_HOST;
+import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_PORT;
+import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_USER;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.base.Strings;
 import com.google.common.hash.Hashing;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
@@ -922,8 +928,24 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     }
   }
 
+  private static void assumeLocalPostgreSQLSetup() {
+    assumeFalse(
+        "This test the environment variable POSTGRES_HOST to point to a valid PostgreSQL host",
+        Strings.isNullOrEmpty(POSTGRES_HOST));
+    assumeFalse(
+        "This test the environment variable POSTGRES_PORT to point to a valid PostgreSQL port number",
+        Strings.isNullOrEmpty(POSTGRES_PORT));
+    assumeFalse(
+        "This test the environment variable POSTGRES_USER to point to a valid PostgreSQL user",
+        Strings.isNullOrEmpty(POSTGRES_USER));
+    assumeFalse(
+        "This test the environment variable POSTGRES_DATABASE to point to a valid PostgreSQL database",
+        Strings.isNullOrEmpty(POSTGRES_DATABASE));
+  }
+
   @Test
   public void testCopyBinaryPsql() throws Exception {
+    assumeLocalPostgreSQLSetup();
     assumeTrue("This test requires psql", isPsqlAvailable());
     assumeTrue("This test requires bash", isBashAvailable());
 
@@ -934,7 +956,14 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         "bash",
         "-c",
         "psql"
-            + " -d knut-test-db"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
             + " -c \"copy (\n"
             + "    select 1::bigint as id, 30::bigint as age, 'One'::varchar as name\n"
             + "    union all\n"
@@ -977,6 +1006,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCopyBinaryPsql_wrongTypeWithValidLength() throws Exception {
+    assumeLocalPostgreSQLSetup();
     assumeTrue("This test requires psql", isPsqlAvailable());
     assumeTrue("This test requires bash", isBashAvailable());
 
@@ -987,7 +1017,14 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         "bash",
         "-c",
         "psql"
-            + " -d knut-test-db"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
             + " -c \"copy (\n"
             // Note: float8 has the same length as bigint, so the receiving part will not notice
             // that the type is invalid. Instead, we will get a wrong value in the column.
@@ -1017,6 +1054,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCopyBinaryPsql_wrongTypeWithInvalidLength() throws Exception {
+    assumeLocalPostgreSQLSetup();
     assumeTrue("This test requires psql", isPsqlAvailable());
     assumeTrue("This test requires bash", isBashAvailable());
 
@@ -1027,7 +1065,14 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         "bash",
         "-c",
         "psql"
-            + " -d knut-test-db"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
             + " -c \"copy (\n"
             // Note: int2 has an invalid length for a bigint column.
             + "    select 1::int2 as id, 30::bigint as age, 'One'::varchar as name\n"
@@ -1052,6 +1097,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCopyBinaryPsql_Int4ToInt8() throws Exception {
+    assumeLocalPostgreSQLSetup();
     assumeTrue("This test requires psql", isPsqlAvailable());
     assumeTrue("This test requires bash", isBashAvailable());
 
@@ -1062,7 +1108,14 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         "bash",
         "-c",
         "psql"
-            + " -d knut-test-db"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
             + " -c \"copy (\n"
             // Note: int4 has an invalid length for a bigint column, but PGAdapter specifically
             // allows this conversion.
@@ -1092,6 +1145,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCopyAllTypesBinaryPsql() throws Exception {
+    assumeLocalPostgreSQLSetup();
     assumeTrue("This test requires psql", isPsqlAvailable());
     assumeTrue("This test requires bash", isBashAvailable());
 
@@ -1102,7 +1156,14 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         "bash",
         "-c",
         "psql"
-            + " -d knut-test-db"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
             + " -c \"copy (\n"
             + "    select 1::bigint as col_bigint, true::bool as col_bool,\n"
             + "           sha256('hello world')::bytea as col_bytea,\n"
