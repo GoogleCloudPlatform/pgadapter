@@ -55,7 +55,7 @@ public class DoubleParser extends Parser<Double> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item == null ? null : Double.toString(this.item);
   }
 

@@ -83,7 +83,7 @@ public class BooleanParser extends Parser<Boolean> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     if (this.item == null) {
       return null;
     }

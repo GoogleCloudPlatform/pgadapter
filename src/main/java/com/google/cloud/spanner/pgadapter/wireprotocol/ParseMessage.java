@@ -14,16 +14,24 @@
 
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
+import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
+import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
+import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.FromTo;
+import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
+import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
@@ -77,12 +85,21 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
       Statement originalStatement,
       int[] parameterDataTypes) {
     if (StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments())) {
-      return new CopyStatement(
-          connectionHandler,
-          connectionHandler.getServer().getOptions(),
-          name,
-          parsedStatement,
-          originalStatement);
+      CopyOptions copyOptions = parseCopyStatement(parsedStatement);
+      if (copyOptions.getFromTo() == FromTo.FROM) {
+        return new CopyStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (copyOptions.getFromTo() == FromTo.TO) {
+        return new CopyToStatement(
+            connectionHandler, connectionHandler.getServer().getOptions(), name, copyOptions);
+      } else {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT, "Unsupported COPY direction: " + copyOptions.getFromTo());
+      }
     } else {
       IntermediatePreparedStatement statement =
           new IntermediatePreparedStatement(
@@ -93,6 +110,17 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
               originalStatement);
       statement.setParameterDataTypes(parameterDataTypes);
       return statement;
+    }
+  }
+
+  static CopyOptions parseCopyStatement(ParsedStatement parsedStatement) {
+    CopyTreeParser.CopyOptions copyOptions = new CopyOptions();
+    try {
+      parse(parsedStatement.getSqlWithoutComments(), copyOptions);
+      return copyOptions;
+    } catch (Exception | TokenMgrError e) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Invalid COPY statement syntax: " + e);
     }
   }
 

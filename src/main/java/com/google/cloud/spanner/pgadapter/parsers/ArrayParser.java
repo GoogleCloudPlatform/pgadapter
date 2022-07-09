@@ -126,7 +126,7 @@ class ArrayParser extends Parser<List<?>> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     if (this.item == null) {
       return null;
     }

@@ -38,6 +38,7 @@ import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import org.junit.Rule;
@@ -53,6 +54,8 @@ public class IntermediateStatementTest {
   @Rule public MockitoRule rule = MockitoJUnit.rule();
 
   @Mock private ConnectionHandler connectionHandler;
+
+  @Mock private ConnectionMetadata connectionMetadata;
 
   private static final PostgreSQLStatementParser PARSER =
       (PostgreSQLStatementParser) AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
@@ -93,6 +96,7 @@ public class IntermediateStatementTest {
   @Test
   public void testUpdateResultCount_ResultSet() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
 
     String sql = "select foo from bar";
     IntermediateStatement statement =
@@ -114,6 +118,8 @@ public class IntermediateStatementTest {
   @Test
   public void testUpdateResultCount_UpdateCount() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+
     String sql = "update bar set foo=1";
     IntermediateStatement statement =
         new IntermediateStatement(
@@ -133,6 +139,8 @@ public class IntermediateStatementTest {
   @Test
   public void testUpdateResultCount_NoResult() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+
     String sql = "create table bar (foo bigint primary key)";
     IntermediateStatement statement =
         new IntermediateStatement(

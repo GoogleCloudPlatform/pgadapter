@@ -48,6 +48,14 @@ public class CopyTreeParser implements CopyVisitor {
       return this.direction;
     }
 
+    public void setFilename(String filename) {
+      this.filename = filename;
+    }
+
+    public String getFilename() {
+      return this.filename;
+    }
+
     public void setHeader(boolean header) {
       this.header = header;
     }
@@ -92,6 +100,7 @@ public class CopyTreeParser implements CopyVisitor {
     private String tableName = "";
     private Format format = Format.TEXT;
     private FromTo direction;
+    private String filename;
     private boolean header;
     private char delimiter;
     private char escape;
@@ -131,6 +140,7 @@ public class CopyTreeParser implements CopyVisitor {
   }
 
   public Object visit(ASTFilename node, Object data) {
+    options.setFilename(node.getName());
     data = node.childrenAccept(this, data);
     return data;
   }

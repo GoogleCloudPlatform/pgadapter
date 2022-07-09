@@ -111,7 +111,7 @@ public class TimestampParser extends Parser<Timestamp> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item == null ? null : toPGString(this.item.toString());
   }
 
