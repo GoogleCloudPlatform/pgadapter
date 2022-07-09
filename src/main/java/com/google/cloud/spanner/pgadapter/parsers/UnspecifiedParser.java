@@ -36,7 +36,7 @@ class UnspecifiedParser extends Parser<Value> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item == null || this.item.isNull() ? null : this.item.getString();
   }
 

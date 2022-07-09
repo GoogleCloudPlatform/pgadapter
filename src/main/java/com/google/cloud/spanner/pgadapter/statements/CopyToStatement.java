@@ -16,27 +16,24 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.SpannerException;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
-import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
-import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyDoneResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyOutResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import com.google.common.util.concurrent.Futures;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.Future;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.QuoteMode;
 
 /**
  * {@link CopyStatement} models a `COPY table TO STDOUT` statement. The same class is used both as
@@ -45,11 +42,7 @@ import java.util.concurrent.Future;
  */
 @InternalApi
 public class CopyToStatement extends IntermediatePortalStatement {
-  private final CopyOptions copyOptions;
-  private final DataFormat format;
-  private final char delimiter;
-  private final char rowTerminator;
-  private final byte[] nullString;
+  private final CSVFormat csvFormat;
 
   public CopyToStatement(
       ConnectionHandler connectionHandler,
@@ -62,14 +55,30 @@ public class CopyToStatement extends IntermediatePortalStatement {
         name,
         createParsedStatement(copyOptions),
         createSelectStatement(copyOptions));
-    this.copyOptions = copyOptions;
-    this.format = DataFormat.POSTGRESQL_TEXT;
-    this.delimiter = copyOptions.getDelimiter() == 0 ? '\t' : copyOptions.getDelimiter();
-    this.rowTerminator = '\n';
-    this.nullString =
-        copyOptions.getNullString() == null
-            ? "\\N".getBytes(StandardCharsets.UTF_8)
-            : copyOptions.getNullString().getBytes(StandardCharsets.UTF_8);
+    CSVFormat.Builder formatBuilder =
+        CSVFormat.Builder.create(CSVFormat.POSTGRESQL_TEXT)
+            .setNullString(
+                copyOptions.getNullString() == null
+                    ? CSVFormat.POSTGRESQL_TEXT.getNullString()
+                    : copyOptions.getNullString())
+            .setRecordSeparator('\n')
+            .setDelimiter(
+                copyOptions.getDelimiter() == 0
+                    ? CSVFormat.POSTGRESQL_TEXT.getDelimiterString().charAt(0)
+                    : copyOptions.getDelimiter())
+            .setQuote(
+                copyOptions.getQuote() == 0
+                    ? CSVFormat.POSTGRESQL_TEXT.getQuoteCharacter()
+                    : copyOptions.getQuote())
+            .setEscape(
+                copyOptions.getEscape() == 0
+                    ? CSVFormat.POSTGRESQL_TEXT.getEscapeCharacter()
+                    : copyOptions.getEscape())
+            .setQuoteMode(QuoteMode.NONE);
+    if (copyOptions.hasHeader()) {
+      formatBuilder.setHeader(copyOptions.getColumnNames().toArray(new String[0]));
+    }
+    this.csvFormat = formatBuilder.build();
   }
 
   static ParsedStatement createParsedStatement(CopyOptions copyOptions) {
@@ -118,33 +127,6 @@ public class CopyToStatement extends IntermediatePortalStatement {
     return this;
   }
 
-  void sendSpannerResult(BackendConnection backendConnection) {
-    try (ResultSet resultSet =
-        backendConnection
-            .getSpannerConnection()
-            .executeQuery(Statement.of("select * from " + copyOptions.getTableName()))) {
-      new CopyOutResponse(
-              this.connectionHandler.getConnectionMetadata().peekOutputStream(),
-              resultSet.getColumnCount(),
-              0)
-          .send();
-      long rowCount = 0L;
-      while (resultSet.next()) {
-        createDataResponse(resultSet).send(false);
-        rowCount++;
-      }
-      new CopyDoneResponse(this.connectionHandler.getConnectionMetadata().peekOutputStream())
-          .send(false);
-      new CommandCompleteResponse(
-              this.connectionHandler.getConnectionMetadata().peekOutputStream(), "COPY " + rowCount)
-          .send();
-    } catch (SpannerException spannerException) {
-      handleExecutionException(spannerException);
-    } catch (Exception exception) {
-      handleExecutionException(SpannerExceptionFactory.asSpannerException(exception));
-    }
-  }
-
   @Override
   public CopyOutResponse createResultPrefix(ResultSet resultSet) {
     return new CopyOutResponse(this.outputStream, resultSet.getColumnCount(), 0);
@@ -161,15 +143,16 @@ public class CopyToStatement extends IntermediatePortalStatement {
   }
 
   CopyDataResponse createDataResponse(ResultSet resultSet) {
-    byte[][] data = new byte[resultSet.getColumnCount()][];
+    String[] data = new String[resultSet.getColumnCount()];
     for (int col = 0; col < resultSet.getColumnCount(); col++) {
       if (resultSet.isNull(col)) {
-        data[col] = nullString;
+        data[col] = null;
       } else {
         Parser<?> parser = Parser.create(resultSet, resultSet.getColumnType(col), col);
-        data[col] = parser.parse(format);
+        data[col] = parser.stringParse();
       }
     }
-    return new CopyDataResponse(this.outputStream, data, this.delimiter, this.rowTerminator);
+    String row = csvFormat.format((Object[]) data);
+    return new CopyDataResponse(this.outputStream, row, csvFormat.getRecordSeparator().charAt(0));
   }
 }

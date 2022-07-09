@@ -36,7 +36,7 @@ class ShortParser extends Parser<Short> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item == null ? null : Short.toString(this.item);
   }
 

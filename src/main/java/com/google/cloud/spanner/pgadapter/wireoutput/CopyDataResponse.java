@@ -15,38 +15,22 @@
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import java.io.DataOutputStream;
+import java.nio.charset.StandardCharsets;
 
 public class CopyDataResponse extends WireOutput {
 
-  private final byte[][] data;
-  private final char delimiter;
+  private final String stringData;
   private final char rowTerminator;
 
-  public CopyDataResponse(
-      DataOutputStream output, byte[][] data, char delimiter, char rowTerminator) {
-    super(output, calculateLength(data) + 4);
-    this.data = data;
-    this.delimiter = delimiter;
+  public CopyDataResponse(DataOutputStream output, String data, char rowTerminator) {
+    super(output, data.length() + 5);
+    this.stringData = data;
     this.rowTerminator = rowTerminator;
-  }
-
-  static int calculateLength(byte[][] data) {
-    int length = 0;
-    for (int i = 0; i < data.length; i++) {
-      // +1 for the delimiter / row terminator
-      length += data[i].length + 1;
-    }
-    return length;
   }
 
   @Override
   protected void sendPayload() throws Exception {
-    for (int i = 0; i < data.length; i++) {
-      this.outputStream.write(data[i]);
-      if (i < (data.length - 1)) {
-        this.outputStream.write(this.delimiter);
-      }
-    }
+    this.outputStream.write(this.stringData.getBytes(StandardCharsets.UTF_8));
     this.outputStream.write(this.rowTerminator);
   }
 

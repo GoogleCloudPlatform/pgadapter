@@ -36,7 +36,7 @@ public class FloatParser extends Parser<Float> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item == null ? null : Float.toString(this.item);
   }
 
