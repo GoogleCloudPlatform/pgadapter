@@ -24,7 +24,6 @@ import com.google.cloud.spanner.pgadapter.parsers.DateParser;
 import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
 import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
-import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
 import com.google.common.base.Preconditions;
@@ -39,11 +38,10 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.postgresql.core.Oid;
 
 class BinaryCopyParser implements CopyInParser {
   private static final Logger logger = Logger.getLogger(BinaryCopyParser.class.getName());
-  private static final byte[] EXPECTED_HEADER =
+  static final byte[] EXPECTED_HEADER =
       new byte[] {'P', 'G', 'C', 'O', 'P', 'Y', '\n', -1, '\r', '\n', '\0'};
 
   private final DataInputStream dataInputStream;
@@ -153,23 +151,23 @@ class BinaryCopyParser implements CopyInParser {
           throw new NoSuchElementException();
         }
         hasNext = HasNext.UNKNOWN;
-        int oid = Oid.UNSPECIFIED;
         if (containsOids) {
           int length = dataInputStream.readInt();
           if (length != 4) {
             throw SpannerExceptionFactory.newSpannerException(
                 ErrorCode.FAILED_PRECONDITION, "Invalid length for OID: " + length);
           }
-          oid = dataInputStream.readInt();
+          // Read and ignore the oid.
+          dataInputStream.readInt();
         }
         for (int field = 0; field < firstRowFieldCount; field++) {
           int length = dataInputStream.readInt();
           if (length == -1) {
-            currentRow[field] = new BinaryField(null, oid);
+            currentRow[field] = new BinaryField(null);
           } else if (length > -1) {
             byte[] data = new byte[length];
             dataInputStream.readFully(data);
-            currentRow[field] = new BinaryField(data, oid);
+            currentRow[field] = new BinaryField(data);
           } else {
             throw SpannerExceptionFactory.newSpannerException(
                 ErrorCode.FAILED_PRECONDITION, "Invalid field length: " + length);
@@ -186,11 +184,9 @@ class BinaryCopyParser implements CopyInParser {
 
   static class BinaryField {
     private final byte[] data;
-    private final int oid;
 
-    BinaryField(byte[] data, int oid) {
+    BinaryField(byte[] data) {
       this.data = data;
-      this.oid = oid;
     }
   }
 
@@ -222,17 +218,6 @@ class BinaryCopyParser implements CopyInParser {
           columnIndex >= 0 && columnIndex < numColumns(),
           "columnIndex must be >= 0 && < numColumns");
       BinaryField field = fields[columnIndex];
-      if (field.oid != Oid.UNSPECIFIED) {
-        int columnOid = Parser.toOid(type);
-        if (columnOid != field.oid) {
-          String message =
-              String.format(
-                  "Conversion of binary values from %d to %d is not supported",
-                  field.oid, columnOid);
-          logger.log(Level.WARNING, message);
-          throw SpannerExceptionFactory.newSpannerException(ErrorCode.FAILED_PRECONDITION, message);
-        }
-      }
       switch (type.getCode()) {
         case BOOL:
           return Value.bool(field.data == null ? null : BooleanParser.toBoolean(field.data));
