@@ -62,7 +62,7 @@ public class BinaryParser extends Parser<ByteArray> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item == null ? null : "\\x" + Utils.toHexString(this.item.toByteArray());
   }
 

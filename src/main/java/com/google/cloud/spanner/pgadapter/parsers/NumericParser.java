@@ -61,7 +61,7 @@ public class NumericParser extends Parser<String> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item;
   }
 

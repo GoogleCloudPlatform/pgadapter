@@ -13,6 +13,12 @@
     <className>com/google/cloud/spanner/pgadapter/ConnectionHandler$ConnectionStatus</className>
     <field>IDLE</field>
   </difference>
+  <!-- Changed to copyDirection. This is only for internal use. -->
+  <difference>
+    <differenceType>7002</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/parsers/copy/Copy</className>
+    <method>void copyFrom()</method>
+  </difference>
 
   <!-- Add ignores for all sub packages, as these are considered internal. -->
   <difference>

@@ -116,7 +116,7 @@ void Stmt() : {}
 /** Copy Statement. */
 void CopyStmt() #CopyStatement : {}
 {
-  <K_COPY> qualifiedName() optColumnList() copyFrom() copyFileName() optWith() copyOptions()
+  <K_COPY> qualifiedName() optColumnList() copyDirection() copyFileName() optWith() copyOptions()
 }
 
 /** Qualified Name. Zero or more namespaces qualifiers can prefix the name. */
@@ -159,13 +159,10 @@ void columnElem() #ColumnElement : {}
 }
 
 /** Copy From */
-void copyFrom() #CopyDirection : {}
+void copyDirection() #CopyDirection : {}
 {
   <K_FROM> { jjtThis.setDirection("FROM"); }
-  | <K_TO>	{
-    jjtThis.setDirection("TO");
-    throw new ParseException("COPY TO is not supported.");
-  }
+  | <K_TO>	{ jjtThis.setDirection("TO"); }
 }
 
 void copyFileName() #Filename :

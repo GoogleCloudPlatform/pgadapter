@@ -17,16 +17,29 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.ByteArray;
+import com.google.cloud.spanner.BatchClient;
+import com.google.cloud.spanner.BatchReadOnlyTransaction;
+import com.google.cloud.spanner.BatchTransactionId;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.Partition;
+import com.google.cloud.spanner.PartitionOptions;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.ResultSets;
+import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerBatchUpdateException;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Struct;
+import com.google.cloud.spanner.TimestampBound;
+import com.google.cloud.spanner.Type;
+import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
@@ -46,6 +59,9 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -173,6 +189,51 @@ public class BackendConnection {
     }
   }
 
+  private static final int MAX_PARTITIONS =
+      Math.max(16, 2 * Runtime.getRuntime().availableProcessors());
+
+  private final class CopyOut extends BufferedStatement<StatementResult> {
+
+    CopyOut(ParsedStatement parsedStatement, Statement statement) {
+      super(parsedStatement, statement);
+    }
+
+    @Override
+    void execute() {
+      checkConnectionState();
+      try {
+        if (transactionMode != TransactionMode.IMPLICIT) {
+          result.set(spannerConnection.execute(statement));
+        } else {
+          Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
+          BatchClient batchClient = spanner.getBatchClient(databaseId);
+          BatchReadOnlyTransaction batchReadOnlyTransaction =
+              batchClient.batchReadOnlyTransaction(TimestampBound.strong());
+          try {
+            List<Partition> partitions =
+                batchReadOnlyTransaction.partitionQuery(
+                    PartitionOptions.newBuilder().setMaxPartitions(MAX_PARTITIONS).build(),
+                    statement);
+            if (partitions.size() < 2) {
+              // No need for the extra complexity of a partitioned query.
+              result.set(spannerConnection.execute(statement));
+            } else {
+              result.set(
+                  new PartitionQueryResult(
+                      batchReadOnlyTransaction.getBatchTransactionId(), partitions));
+            }
+          } catch (SpannerException spannerException) {
+            // The query might not be suitable for partitioning. Just try with a normal query.
+            result.set(spannerConnection.execute(statement));
+          }
+        }
+      } catch (Exception exception) {
+        result.setException(exception);
+        throw exception;
+      }
+    }
+  }
+
   /**
    * This statement represents a COPY table FROM STDIN statement. This has no one-on-one mapping
    * with a Cloud Spanner SQL statement and is therefore executed using a custom {@link
@@ -242,6 +303,7 @@ public class BackendConnection {
   private final String currentSchema = "public";
   private final LinkedList<BufferedStatement<?>> bufferedStatements = new LinkedList<>();
   private final Connection spannerConnection;
+  private final DatabaseId databaseId;
   private final DdlExecutor ddlExecutor;
   private final DdlTransactionMode ddlTransactionMode;
 
@@ -255,6 +317,7 @@ public class BackendConnection {
       DdlTransactionMode ddlTransactionMode,
       ImmutableList<LocalStatement> localStatements) {
     this.spannerConnection = spannerConnection;
+    this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
     this.ddlTransactionMode = ddlTransactionMode;
     //noinspection UnstableApiUsage
@@ -299,6 +362,13 @@ public class BackendConnection {
     Copy copy = new Copy(parsedStatement, statement, copyDataReceiver, mutationWriter, executor);
     bufferedStatements.add(copy);
     return copy.result;
+  }
+
+  public Future<StatementResult> executeCopyOut(
+      ParsedStatement parsedStatement, Statement statement) {
+    CopyOut copyOut = new CopyOut(parsedStatement, statement);
+    bufferedStatements.add(copyOut);
+    return copyOut.result;
   }
 
   /** Flushes the buffered statements to Spanner. */
@@ -774,6 +844,63 @@ public class BackendConnection {
     @Override
     public ResultSet getResultSet() {
       return resultSet;
+    }
+
+    @Override
+    public Long getUpdateCount() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  @InternalApi
+  public static final class PartitionQueryResult implements StatementResult {
+    private final BatchTransactionId batchTransactionId;
+    private final List<Partition> partitions;
+
+    public PartitionQueryResult(BatchTransactionId batchTransactionId, List<Partition> partitions) {
+      this.batchTransactionId = batchTransactionId;
+      this.partitions = partitions;
+    }
+
+    public BatchTransactionId getBatchTransactionId() {
+      return batchTransactionId;
+    }
+
+    public List<Partition> getPartitions() {
+      return partitions;
+    }
+
+    @Override
+    public ResultType getResultType() {
+      return ResultType.RESULT_SET;
+    }
+
+    @Override
+    public ClientSideStatementType getClientSideStatementType() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ResultSet getResultSet() {
+      return ResultSets.forRows(
+          Type.struct(StructField.of("partition", Type.bytes())),
+          partitions.stream()
+              .map(
+                  partition -> {
+                    try {
+                      ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                      ObjectOutputStream objectOutputStream =
+                          new ObjectOutputStream(byteArrayOutputStream);
+                      objectOutputStream.writeObject(partition);
+                      return Struct.newBuilder()
+                          .set("partition")
+                          .to(ByteArray.copyFrom(byteArrayOutputStream.toByteArray()))
+                          .build();
+                    } catch (IOException ioException) {
+                      return Struct.newBuilder().set("partition").to((ByteArray) null).build();
+                    }
+                  })
+              .collect(Collectors.toList()));
     }
 
     @Override

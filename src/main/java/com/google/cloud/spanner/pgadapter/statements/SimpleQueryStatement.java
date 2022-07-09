@@ -67,6 +67,7 @@ public class SimpleQueryStatement {
     // Do a Parse-Describe-Bind-Execute round-trip for each statement in the query string.
     // Finish with a Sync to close any implicit transaction and to return the results.
     for (Statement originalStatement : this.statements) {
+      boolean isFirst = this.statements.get(0) == originalStatement;
       try {
         ParsedStatement originalParsedStatement = PARSER.parse(originalStatement);
         ParsedStatement parsedStatement = originalParsedStatement;
@@ -85,7 +86,7 @@ public class SimpleQueryStatement {
         // require additional messages to be sent back and forth, and this ensures that we get
         // everything in the correct order.
         boolean isCopy = StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments());
-        if (isCopy) {
+        if (!isFirst && isCopy) {
           new FlushMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
           if (connectionHandler
                   .getExtendedQueryProtocolHandler()

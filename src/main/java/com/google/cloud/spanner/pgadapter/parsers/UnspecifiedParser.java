@@ -25,6 +25,10 @@ import java.sql.Types;
  */
 class UnspecifiedParser extends Parser<Value> {
 
+  UnspecifiedParser(Object item) {
+    this.item = (Value) item;
+  }
+
   UnspecifiedParser(byte[] item, FormatCode formatCode) {
     this.item =
         item == null
@@ -36,7 +40,7 @@ class UnspecifiedParser extends Parser<Value> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item == null || this.item.isNull() ? null : this.item.getString();
   }
 
