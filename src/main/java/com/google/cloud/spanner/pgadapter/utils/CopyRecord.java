@@ -14,10 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 
-interface CopyRecord {
+@InternalApi
+public interface CopyRecord {
 
   int numColumns();
 

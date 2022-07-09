@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
@@ -23,7 +24,8 @@ import java.util.Iterator;
 import org.apache.commons.csv.CSVFormat;
 import org.postgresql.jdbc.TimestampUtils;
 
-interface CopyInParser {
+@InternalApi
+public interface CopyInParser {
   static CopyInParser create(
       CopyOptions.Format format,
       CSVFormat csvFormat,
