@@ -45,7 +45,7 @@ class IntegerParser extends Parser<Integer> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item == null ? null : Integer.toString(this.item);
   }
 

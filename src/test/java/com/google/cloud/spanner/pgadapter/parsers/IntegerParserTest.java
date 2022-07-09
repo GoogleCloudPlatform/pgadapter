@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-@InternalApi
-package com.google.cloud.spanner.pgadapter.parsers.copy;
+package com.google.cloud.spanner.pgadapter.parsers;
 
-import com.google.api.core.InternalApi;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+
+@RunWith(JUnit4.class)
+public class IntegerParserTest {
+
+  @Test
+  public void testStringParse() {
+    assertEquals("100", new IntegerParser(100).stringParse());
+    assertNull(new IntegerParser(null).stringParse());
+  }
+}

@@ -45,7 +45,7 @@ class LongParser extends Parser<Long> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item == null ? null : Long.toString(this.item);
   }
 

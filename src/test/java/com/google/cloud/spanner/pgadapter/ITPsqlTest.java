@@ -25,14 +25,19 @@ import static org.junit.Assume.assumeTrue;
 import com.google.cloud.spanner.Database;
 import com.google.common.base.Strings;
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Random;
+import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -243,8 +248,17 @@ public class ITPsqlTest implements IntegrationTest {
   public void testCopyFromPostgreSQLToCloudSpanner() throws Exception {
     int numRows = 100;
 
-    // Generate 100 random rows.
-    copyRandomRowsToPostgreSQL(numRows);
+    // Generate 99 random rows.
+    copyRandomRowsToPostgreSQL(numRows - 1);
+    // Also add one row with all nulls to ensure that nulls are also copied correctly.
+    try (Connection connection =
+        DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("insert into all_types (col_bigint) values (?)")) {
+        preparedStatement.setLong(1, new Random().nextLong());
+        assertEquals(1, preparedStatement.executeUpdate());
+      }
+    }
 
     // Verify that we have 100 rows in PostgreSQL.
     try (Connection connection =
@@ -258,8 +272,8 @@ public class ITPsqlTest implements IntegrationTest {
     }
 
     // COPY the rows to Cloud Spanner.
-    ProcessBuilder builder = new ProcessBuilder();
-    builder.command(
+    ProcessBuilder copyToCloudSpannerBuilder = new ProcessBuilder();
+    copyToCloudSpannerBuilder.command(
         "bash",
         "-c",
         "psql"
@@ -280,10 +294,10 @@ public class ITPsqlTest implements IntegrationTest {
             + " -d "
             + database.getId().getDatabase()
             + " -c \"copy all_types from stdin;\"\n");
-    setPgPassword(builder);
-    Process process = builder.start();
-    int res = process.waitFor();
-    assertEquals(0, res);
+    setPgPassword(copyToCloudSpannerBuilder);
+    Process copyToCloudSpannerProcess = copyToCloudSpannerBuilder.start();
+    int copyToCloudSpannerResult = copyToCloudSpannerProcess.waitFor();
+    assertEquals(0, copyToCloudSpannerResult);
 
     // Verify that we now also have 100 rows in Spanner.
     try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
@@ -296,6 +310,56 @@ public class ITPsqlTest implements IntegrationTest {
     }
 
     // Verify that the rows in both databases are equal.
+    compareTableContents();
+
+    // Remove all rows in the table in the local PostgreSQL database and then copy everything from
+    // Cloud Spanner to PostgreSQL.
+    try (Connection connection =
+        DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+      assertEquals(numRows, connection.createStatement().executeUpdate("delete from all_types"));
+    }
+
+    // COPY the rows to Cloud Spanner.
+    ProcessBuilder copyToPostgresBuilder = new ProcessBuilder();
+    copyToPostgresBuilder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -c \"copy all_types to stdout\" "
+            + " -h "
+            + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+            + " -p "
+            + testEnv.getPGAdapterPort()
+            + " -d "
+            + database.getId().getDatabase()
+            + "  | psql "
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy all_types from stdin;\"\n");
+    setPgPassword(copyToPostgresBuilder);
+    Process copyToPostgresProcess = copyToPostgresBuilder.start();
+    InputStream errorStream = copyToPostgresProcess.getErrorStream();
+    int copyToPostgresResult = copyToPostgresProcess.waitFor();
+    StringBuilder errors = new StringBuilder();
+    try (Scanner scanner = new Scanner(new InputStreamReader(errorStream))) {
+      while (scanner.hasNextLine()) {
+        errors.append(errors).append(scanner.nextLine()).append("\n");
+      }
+    }
+    assertEquals("", errors.toString());
+    assertEquals(0, copyToPostgresResult);
+
+    // Compare table contents again.
+    compareTableContents();
+  }
+
+  private void compareTableContents() throws SQLException {
     try (Connection pgConnection =
             DriverManager.getConnection(
                 createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD);

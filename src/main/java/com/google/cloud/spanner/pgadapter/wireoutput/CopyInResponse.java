@@ -73,7 +73,7 @@ public class CopyInResponse extends WireOutput {
             });
   }
 
-  private static int calculateLength(int columnCount) {
+  static int calculateLength(int columnCount) {
     return HEADER_LENGTH
         + FORMAT_FLAG_LENGTH
         + COLUMN_NUM_LENGTH

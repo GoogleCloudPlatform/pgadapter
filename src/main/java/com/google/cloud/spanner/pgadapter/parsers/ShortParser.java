@@ -20,6 +20,10 @@ import org.postgresql.util.ByteConverter;
 /** Translate from wire protocol to short. */
 class ShortParser extends Parser<Short> {
 
+  ShortParser(Object item) {
+    this.item = (Short) item;
+  }
+
   ShortParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
       switch (formatCode) {
@@ -36,7 +40,7 @@ class ShortParser extends Parser<Short> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item == null ? null : Short.toString(this.item);
   }
 

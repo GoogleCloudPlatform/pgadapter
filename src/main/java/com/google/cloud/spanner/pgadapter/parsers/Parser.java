@@ -278,7 +278,7 @@ public abstract class Parser<T> {
    *
    * @return String representation of data.
    */
-  protected abstract String stringParse();
+  public abstract String stringParse();
 
   /** @return Binary representation of string data. */
   protected byte[] stringBinaryParse() {
