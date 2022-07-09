@@ -16,16 +16,14 @@ package com.google.cloud.spanner.pgadapter.golang;
 
 import com.sun.jna.Library;
 
-/** Interface for the pgx tests. Each method in this class represents a test method in pgx.go. */
-public interface PgxTest extends Library {
+/** Interface for the gorm tests. Each method in this class represents a test method in gorm.go. */
+public interface GormTest extends Library {
 
-  String TestHelloWorld(GoString connString);
+  String TestFirst(GoString connString);
 
-  String TestSelect1(GoString connString);
+  String TestQueryAllDataTypes(GoString connString);
 
-  String TestQueryWithParameter(GoString connString);
-
-  String TestQueryAllDataTypes(GoString connString, int oid, int format);
+  String TestQueryNullsAllDataTypes(GoString connString);
 
   String TestInsertAllDataTypes(GoString connString);
 
@@ -33,19 +31,13 @@ public interface PgxTest extends Library {
 
   String TestUpdateAllDataTypes(GoString connString);
 
-  String TestPrepareStatement(GoString connString);
+  String TestDelete(GoString connString);
 
-  String TestPrepareSelectStatement(GoString connString);
+  String TestCreateInBatches(GoString connString);
 
-  String TestInsertBatch(GoString connString);
+  String TestTransaction(GoString connString);
 
-  String TestMixedBatch(GoString connString);
+  String TestNestedTransaction(GoString connString);
 
-  String TestBatchError(GoString connString);
-
-  String TestBatchExecutionError(GoString connString);
-
-  String TestWrongDialect(GoString connString);
-
-  String TestCopyIn(GoString connString);
+  String TestReadOnlyTransaction(GoString connString);
 }

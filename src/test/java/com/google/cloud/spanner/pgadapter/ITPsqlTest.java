@@ -244,6 +244,7 @@ public class ITPsqlTest implements IntegrationTest {
   @Test
   public void testCopyFromPostgreSQLToCloudSpanner() throws Exception {
     int numRows = 100;
+
     // Generate 100 random rows.
     copyRandomRowsToPostgreSQL(numRows);
 
