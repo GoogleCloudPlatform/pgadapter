@@ -15,7 +15,9 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.common.collect.ImmutableSet;
 import java.util.Locale;
@@ -52,12 +54,21 @@ public class BooleanParser extends Parser<Boolean> {
           this.item = toBoolean(stringValue);
           break;
         case BINARY:
-          this.item = ByteConverter.bool(item, 0);
+          this.item = toBoolean(item);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
+  }
+
+  /** Converts the given binary data to a boolean value. */
+  public static boolean toBoolean(byte[] data) {
+    if (data.length == 0) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Invalid length for bool: " + data.length);
+    }
+    return ByteConverter.bool(data, 0);
   }
 
   /** Converts the string to a boolean value according to the PostgreSQL specs. */

@@ -14,16 +14,24 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_DATABASE;
+import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_HOST;
+import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_PORT;
+import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_USER;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.base.Strings;
+import com.google.common.hash.Hashing;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
@@ -48,7 +56,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Base64;
 import java.util.List;
+import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -902,6 +912,315 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       assertEquals("ERROR\n" + "P0001\n" + "CANCELLED: Changed my mind\n", errorMessage.toString());
     }
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  private static boolean isBashAvailable() {
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand = new String[] {"bash", "--version"};
+    builder.command(psqlCommand);
+    try {
+      Process process = builder.start();
+      int res = process.waitFor();
+
+      return res == 0;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  private static void assumeLocalPostgreSQLSetup() {
+    assumeFalse(
+        "This test the environment variable POSTGRES_HOST to point to a valid PostgreSQL host",
+        Strings.isNullOrEmpty(POSTGRES_HOST));
+    assumeFalse(
+        "This test the environment variable POSTGRES_PORT to point to a valid PostgreSQL port number",
+        Strings.isNullOrEmpty(POSTGRES_PORT));
+    assumeFalse(
+        "This test the environment variable POSTGRES_USER to point to a valid PostgreSQL user",
+        Strings.isNullOrEmpty(POSTGRES_USER));
+    assumeFalse(
+        "This test the environment variable POSTGRES_DATABASE to point to a valid PostgreSQL database",
+        Strings.isNullOrEmpty(POSTGRES_DATABASE));
+  }
+
+  @Test
+  public void testCopyBinaryPsql() throws Exception {
+    assumeLocalPostgreSQLSetup();
+    assumeTrue("This test requires psql", isPsqlAvailable());
+    assumeTrue("This test requires bash", isBashAvailable());
+
+    setupCopyInformationSchemaResults();
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy (\n"
+            + "    select 1::bigint as id, 30::bigint as age, 'One'::varchar as name\n"
+            + "    union all\n"
+            + "    select null::bigint as id, null::bigint as age, null::varchar as name\n"
+            + "    union all\n"
+            + "    select 2::bigint as id, 40::bigint as age, 'Two'::varchar as name\n"
+            + "  ) to stdout binary\" "
+            + "  | psql "
+            + " -h "
+            + (useDomainSocket ? "/tmp" : "localhost")
+            + " -p "
+            + pgServer.getLocalPort()
+            + " -c \"copy users from stdin binary;\"\n");
+    Process process = builder.start();
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsert().getValuesCount());
+    assertEquals("id", mutation.getInsert().getColumns(0));
+    assertEquals("age", mutation.getInsert().getColumns(1));
+    assertEquals("name", mutation.getInsert().getColumns(2));
+    ListValue row1 = mutation.getInsert().getValues(0);
+    assertEquals("1", row1.getValues(0).getStringValue());
+    assertEquals("30", row1.getValues(1).getStringValue());
+    assertEquals("One", row1.getValues(2).getStringValue());
+    ListValue row2 = mutation.getInsert().getValues(1);
+    assertTrue(row2.getValues(0).hasNullValue());
+    assertTrue(row2.getValues(1).hasNullValue());
+    assertTrue(row2.getValues(2).hasNullValue());
+    ListValue row3 = mutation.getInsert().getValues(2);
+    assertEquals("2", row3.getValues(0).getStringValue());
+    assertEquals("40", row3.getValues(1).getStringValue());
+    assertEquals("Two", row3.getValues(2).getStringValue());
+  }
+
+  @Test
+  public void testCopyBinaryPsql_wrongTypeWithValidLength() throws Exception {
+    assumeLocalPostgreSQLSetup();
+    assumeTrue("This test requires psql", isPsqlAvailable());
+    assumeTrue("This test requires bash", isBashAvailable());
+
+    setupCopyInformationSchemaResults();
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy (\n"
+            // Note: float8 has the same length as bigint, so the receiving part will not notice
+            // that the type is invalid. Instead, we will get a wrong value in the column.
+            + "    select 1::float8 as id, 30::bigint as age, 'One'::varchar as name\n"
+            + "  ) to stdout binary\" "
+            + "  | psql "
+            + " -h "
+            + (useDomainSocket ? "/tmp" : "localhost")
+            + " -p "
+            + pgServer.getLocalPort()
+            + " -c \"copy users from stdin binary;\"\n");
+    Process process = builder.start();
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    ListValue row1 = mutation.getInsert().getValues(0);
+    // The float8 is interpreted as a bigint.
+    assertEquals("4607182418800017408", row1.getValues(0).getStringValue());
+    assertEquals("30", row1.getValues(1).getStringValue());
+    assertEquals("One", row1.getValues(2).getStringValue());
+  }
+
+  @Test
+  public void testCopyBinaryPsql_wrongTypeWithInvalidLength() throws Exception {
+    assumeLocalPostgreSQLSetup();
+    assumeTrue("This test requires psql", isPsqlAvailable());
+    assumeTrue("This test requires bash", isBashAvailable());
+
+    setupCopyInformationSchemaResults();
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy (\n"
+            // Note: int2 has an invalid length for a bigint column.
+            + "    select 1::int2 as id, 30::bigint as age, 'One'::varchar as name\n"
+            + "  ) to stdout binary\" "
+            + "  | psql "
+            + " -h "
+            + (useDomainSocket ? "/tmp" : "localhost")
+            + " -p "
+            + pgServer.getLocalPort()
+            + " -c \"copy users from stdin binary;\"\n");
+    Process process = builder.start();
+    int res = process.waitFor();
+    assertEquals(1, res);
+    StringBuilder error = new StringBuilder();
+    Scanner scanner = new Scanner(new InputStreamReader(process.getErrorStream()));
+    while (scanner.hasNextLine()) {
+      error.append(scanner.nextLine()).append('\n');
+    }
+    assertEquals("ERROR:  INVALID_ARGUMENT: Invalid length for int8: 2\n", error.toString());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testCopyBinaryPsql_Int4ToInt8() throws Exception {
+    assumeLocalPostgreSQLSetup();
+    assumeTrue("This test requires psql", isPsqlAvailable());
+    assumeTrue("This test requires bash", isBashAvailable());
+
+    setupCopyInformationSchemaResults();
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy (\n"
+            // Note: int4 has an invalid length for a bigint column, but PGAdapter specifically
+            // allows this conversion.
+            + "    select 1::int4 as id, 30::bigint as age, 'One'::varchar as name\n"
+            + "  ) to stdout binary\" "
+            + "  | psql "
+            + " -h "
+            + (useDomainSocket ? "/tmp" : "localhost")
+            + " -p "
+            + pgServer.getLocalPort()
+            + " -c \"copy users from stdin binary;\"\n");
+    Process process = builder.start();
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(1, mutation.getInsert().getValuesCount());
+    ListValue row = mutation.getInsert().getValues(0);
+    assertEquals("1", row.getValues(0).getStringValue());
+    assertEquals("30", row.getValues(1).getStringValue());
+    assertEquals("One", row.getValues(2).getStringValue());
+  }
+
+  @Test
+  public void testCopyAllTypesBinaryPsql() throws Exception {
+    assumeLocalPostgreSQLSetup();
+    assumeTrue("This test requires psql", isPsqlAvailable());
+    assumeTrue("This test requires bash", isBashAvailable());
+
+    setupCopyInformationSchemaResults();
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy (\n"
+            + "    select 1::bigint as col_bigint, true::bool as col_bool,\n"
+            + "           sha256('hello world')::bytea as col_bytea,\n"
+            + "           3.14::float8 as col_float8, 100::bigint as col_int,\n"
+            + "           6.626::numeric as col_numeric,\n"
+            + "           '2022-07-07 08:16:48.123456+02:00'::timestamptz as col_timestamptz,\n"
+            + "           '2022-07-07'::date as col_date, 'hello world'::varchar as col_varchar\n"
+            + "    union all\n"
+            + "    select null::bigint as col_bigint, null::bool as col_bool,\n"
+            + "           null::bytea as col_bytea, null::float8 as col_float8,\n"
+            + "           null::bigint as col_int, null::numeric as col_numeric,"
+            + "           null::timestamptz as col_timestamptz, null::date as col_date,"
+            + "           null::varchar as col_varchar\n"
+            + "  ) to stdout binary\" "
+            + "  | psql "
+            + " -h "
+            + (useDomainSocket ? "/tmp" : "localhost")
+            + " -p "
+            + pgServer.getLocalPort()
+            + " -c \"copy all_types from stdin binary;\"\n");
+    Process process = builder.start();
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(2, mutation.getInsert().getValuesCount());
+    assertEquals("col_bigint", mutation.getInsert().getColumns(0));
+    assertEquals("col_bool", mutation.getInsert().getColumns(1));
+    assertEquals("col_bytea", mutation.getInsert().getColumns(2));
+    assertEquals("col_float8", mutation.getInsert().getColumns(3));
+    assertEquals("col_int", mutation.getInsert().getColumns(4));
+    assertEquals("col_numeric", mutation.getInsert().getColumns(5));
+    assertEquals("col_timestamptz", mutation.getInsert().getColumns(6));
+    assertEquals("col_date", mutation.getInsert().getColumns(7));
+    assertEquals("col_varchar", mutation.getInsert().getColumns(8));
+
+    ListValue row1 = mutation.getInsert().getValues(0);
+    assertEquals("1", row1.getValues(0).getStringValue());
+    assertTrue(row1.getValues(1).getBoolValue());
+    assertArrayEquals(
+        Hashing.sha256().hashString("hello world", StandardCharsets.UTF_8).asBytes(),
+        Base64.getDecoder().decode(row1.getValues(2).getStringValue()));
+    assertEquals(3.14, row1.getValues(3).getNumberValue(), 0.0);
+    assertEquals("100", row1.getValues(4).getStringValue());
+    assertEquals("6.626", row1.getValues(5).getStringValue());
+    assertEquals("2022-07-07T06:16:48.123456000Z", row1.getValues(6).getStringValue());
+    assertEquals("2022-07-07", row1.getValues(7).getStringValue());
+    assertEquals("hello world", row1.getValues(8).getStringValue());
+
+    ListValue row2 = mutation.getInsert().getValues(1);
+    for (int i = 0; i < row2.getValuesCount(); i++) {
+      assertTrue(row2.getValues(i).hasNullValue());
+    }
   }
 
   private void setupCopyInformationSchemaResults() {
