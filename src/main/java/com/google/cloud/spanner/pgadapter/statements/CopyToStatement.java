@@ -29,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.CopyDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyDoneResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyOutResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Futures;
 import java.util.List;
 import java.util.concurrent.Future;
@@ -87,6 +88,11 @@ public class CopyToStatement extends IntermediatePortalStatement {
 
   static Statement createSelectStatement(CopyOptions copyOptions) {
     return Statement.of("select * from " + copyOptions.getTableName());
+  }
+
+  @VisibleForTesting
+  CSVFormat getCsvFormat() {
+    return csvFormat;
   }
 
   @Override

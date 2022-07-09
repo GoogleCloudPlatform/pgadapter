@@ -14,7 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -39,5 +41,12 @@ public class BooleanParserTest {
     assertFalse(BooleanParser.toBoolean("f"));
 
     assertThrows(IllegalArgumentException.class, () -> BooleanParser.toBoolean("foo"));
+  }
+
+  @Test
+  public void testStringParse() {
+    assertEquals("t", new BooleanParser(Boolean.TRUE).stringParse());
+    assertEquals("f", new BooleanParser(Boolean.FALSE).stringParse());
+    assertNull(new BooleanParser(null).stringParse());
   }
 }

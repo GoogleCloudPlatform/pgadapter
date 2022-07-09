@@ -25,6 +25,10 @@ import java.sql.Types;
  */
 class UnspecifiedParser extends Parser<Value> {
 
+  UnspecifiedParser(Object item) {
+    this.item = (Value) item;
+  }
+
   UnspecifiedParser(byte[] item, FormatCode formatCode) {
     this.item =
         item == null
