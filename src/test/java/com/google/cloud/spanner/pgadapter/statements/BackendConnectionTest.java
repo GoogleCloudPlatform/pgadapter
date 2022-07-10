@@ -270,8 +270,10 @@ public class BackendConnectionTest {
     StatementResult listDatabasesResult = mock(StatementResult.class);
     when(listDatabasesResult.getResultType()).thenReturn(ResultType.RESULT_SET);
     ListDatabasesStatement listDatabasesStatement = mock(ListDatabasesStatement.class);
-    when(listDatabasesStatement.getSql()).thenReturn(ListDatabasesStatement.LIST_DATABASES_SQL);
-    when(listDatabasesStatement.execute(connection)).thenReturn(listDatabasesResult);
+    when(listDatabasesStatement.getSql())
+        .thenReturn(new String[] {ListDatabasesStatement.LIST_DATABASES_SQL});
+    when(listDatabasesStatement.execute(any(BackendConnection.class)))
+        .thenReturn(listDatabasesResult);
     ImmutableList<LocalStatement> localStatements = ImmutableList.of(listDatabasesStatement);
     ParsedStatement parsedListDatabasesStatement = mock(ParsedStatement.class);
     when(parsedListDatabasesStatement.getSqlWithoutComments())
@@ -285,7 +287,7 @@ public class BackendConnectionTest {
             parsedListDatabasesStatement, Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL));
     backendConnection.flush();
 
-    verify(listDatabasesStatement).execute(connection);
+    verify(listDatabasesStatement).execute(backendConnection);
     assertTrue(resultFuture.isDone());
     assertEquals(listDatabasesResult, resultFuture.get());
   }
@@ -295,7 +297,8 @@ public class BackendConnectionTest {
       throws ExecutionException, InterruptedException {
     Connection connection = mock(Connection.class);
     ListDatabasesStatement listDatabasesStatement = mock(ListDatabasesStatement.class);
-    when(listDatabasesStatement.getSql()).thenReturn(ListDatabasesStatement.LIST_DATABASES_SQL);
+    when(listDatabasesStatement.getSql())
+        .thenReturn(new String[] {ListDatabasesStatement.LIST_DATABASES_SQL});
     ImmutableList<LocalStatement> localStatements = ImmutableList.of(listDatabasesStatement);
 
     StatementResult statementResult = mock(StatementResult.class);
@@ -312,7 +315,7 @@ public class BackendConnectionTest {
     Future<StatementResult> resultFuture = backendConnection.execute(parsedStatement, statement);
     backendConnection.flush();
 
-    verify(listDatabasesStatement, never()).execute(connection);
+    verify(listDatabasesStatement, never()).execute(backendConnection);
     assertTrue(resultFuture.isDone());
     assertEquals(statementResult, resultFuture.get());
   }

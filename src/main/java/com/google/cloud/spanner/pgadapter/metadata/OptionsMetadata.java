@@ -77,6 +77,8 @@ public class OptionsMetadata {
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
+  private static final String OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS =
+      "disable_default_local_statements";
   private static final String OPTION_PSQL_MODE = "q";
   private static final String OPTION_DDL_TRANSACTION_MODE = "ddl";
   private static final String OPTION_JDBC_MODE = "jdbc";
@@ -107,6 +109,7 @@ public class OptionsMetadata {
   private final boolean binaryFormat;
   private final boolean authenticate;
   private final boolean disableAutoDetectClient;
+  private final boolean disableDefaultLocalStatements;
   private final boolean requiresMatcher;
   private final DdlTransactionMode ddlTransactionMode;
   private final boolean replaceJdbcMetadataQueries;
@@ -157,6 +160,8 @@ public class OptionsMetadata {
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
     this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
+    this.disableDefaultLocalStatements =
+        commandLine.hasOption(OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS);
     this.requiresMatcher =
         commandLine.hasOption(OPTION_PSQL_MODE)
             || commandLine.hasOption(OPTION_COMMAND_METADATA_FILE);
@@ -212,6 +217,7 @@ public class OptionsMetadata {
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
     this.disableAutoDetectClient = false;
+    this.disableDefaultLocalStatements = false;
     this.requiresMatcher = requiresMatcher;
     this.ddlTransactionMode = DdlTransactionMode.AutocommitImplicitTransaction;
     this.replaceJdbcMetadataQueries = replaceJdbcMetadataQueries;
@@ -503,6 +509,14 @@ public class OptionsMetadata {
             + "Use this option if you do not want PGAdapter to automatically apply query "
             + "replacements based on the client that is connected to PGAdapter.");
     options.addOption(
+        null,
+        OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS,
+        false,
+        "This option turns off translations for commonly used statements that are "
+            + "currently not supported by Cloud Spanner (e.g. `select current_schema`). "
+            + "Use this option if you do not want PGAdapter to automatically apply query "
+            + "replacements for these statements.");
+    options.addOption(
         OPTION_PSQL_MODE,
         "psql-mode",
         false,
@@ -724,6 +738,10 @@ public class OptionsMetadata {
 
   public boolean shouldAutoDetectClient() {
     return !this.disableAutoDetectClient;
+  }
+
+  public boolean useDefaultLocalStatements() {
+    return !this.disableDefaultLocalStatements;
   }
 
   public boolean requiresMatcher() {

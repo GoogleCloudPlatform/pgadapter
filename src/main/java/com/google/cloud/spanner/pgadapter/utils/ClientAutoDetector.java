@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,8 @@ import java.util.Map;
 @InternalApi
 public class ClientAutoDetector {
   public static final ImmutableList<LocalStatement> EMPTY_LOCAL_STATEMENTS = ImmutableList.of();
+  public static final ImmutableList<LocalStatement> DEFAULT_LOCAL_STATEMENTS =
+      ImmutableList.of(SelectCurrentSchemaStatement.INSTANCE);
 
   public enum WellKnownClient {
     PSQL {
@@ -42,6 +45,12 @@ public class ClientAutoDetector {
 
       @Override
       public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+          return ImmutableList.<LocalStatement>builder()
+              .addAll(DEFAULT_LOCAL_STATEMENTS)
+              .add(new ListDatabasesStatement(connectionHandler))
+              .build();
+        }
         return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
       }
     },
@@ -90,6 +99,9 @@ public class ClientAutoDetector {
     abstract boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters);
 
     public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+      if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+        return DEFAULT_LOCAL_STATEMENTS;
+      }
       return EMPTY_LOCAL_STATEMENTS;
     }
   }

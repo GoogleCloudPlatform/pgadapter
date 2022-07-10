@@ -14,8 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements.local;
 
-import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 
 /**
  * Interface for statements that are handled locally in PGAdapter instead of being sent to
@@ -23,8 +23,8 @@ import com.google.cloud.spanner.connection.StatementResult;
  */
 public interface LocalStatement {
   /** Returns the static SQL string associated with this local statement. */
-  String getSql();
+  String[] getSql();
 
   /** Executes the local statement and returns the result. */
-  StatementResult execute(Connection connection);
+  StatementResult execute(BackendConnection backendConnection);
 }

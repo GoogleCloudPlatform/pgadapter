@@ -123,6 +123,22 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSelectCurrentSchema() throws SQLException {
+    String sql = "SELECT current_schema";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals("public", resultSet.getString("current_schema"));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
   public void testQueryHint() throws SQLException {
     String sql = "/* @OPTIMIZER_VERSION=1 */ SELECT 1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));

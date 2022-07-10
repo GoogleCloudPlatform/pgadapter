@@ -54,6 +54,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -161,7 +162,7 @@ public class BackendConnection {
         if (!localStatements.isEmpty() && localStatements.containsKey(statement.getSql())) {
           result.set(
               Objects.requireNonNull(localStatements.get(statement.getSql()))
-                  .execute(spannerConnection));
+                  .execute(BackendConnection.this));
         } else if (connectionState == ConnectionState.ABORTED
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
@@ -320,16 +321,17 @@ public class BackendConnection {
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
     this.ddlTransactionMode = ddlTransactionMode;
-    //noinspection UnstableApiUsage
-    this.localStatements =
-        localStatements.isEmpty()
-            ? EMPTY_LOCAL_STATEMENTS
-            : ImmutableMap.copyOf(
-                localStatements.stream()
-                    .map(
-                        localStatement ->
-                            new SimpleImmutableEntry<>(localStatement.getSql(), localStatement))
-                    .collect(Collectors.toList()));
+    if (localStatements.isEmpty()) {
+      this.localStatements = EMPTY_LOCAL_STATEMENTS;
+    } else {
+      Builder<String, LocalStatement> builder = ImmutableMap.builder();
+      for (LocalStatement localStatement : localStatements) {
+        for (String sql : localStatement.getSql()) {
+          builder.put(new SimpleImmutableEntry<>(sql, localStatement));
+        }
+      }
+      this.localStatements = builder.build();
+    }
   }
 
   /** Returns the current connection state. */
@@ -388,11 +390,13 @@ public class BackendConnection {
     }
   }
 
-  Connection getSpannerConnection() {
+  /** Returns the Spanner connection used by this {@link BackendConnection}. */
+  public Connection getSpannerConnection() {
     return this.spannerConnection;
   }
 
-  String getCurrentSchema() {
+  /** Returns the current schema that is used by this {@link BackendConnection}. */
+  public String getCurrentSchema() {
     return this.currentSchema;
   }
 
