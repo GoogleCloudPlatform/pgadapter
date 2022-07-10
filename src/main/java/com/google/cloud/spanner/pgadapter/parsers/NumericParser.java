@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
@@ -21,9 +22,11 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to {@link Number}. */
+@InternalApi
 public class NumericParser extends Parser<String> {
   NumericParser(ResultSet item, int position) {
     this.item = item.isNull(position) ? null : item.getString(position);
@@ -51,7 +54,7 @@ public class NumericParser extends Parser<String> {
    * Converts the binary data to a string representation of the numeric value. That is either a
    * valid numeric string or 'NaN'.
    */
-  public static String toNumericString(byte[] data) {
+  public static String toNumericString(@Nonnull byte[] data) {
     if (data.length < 8) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT, "Invalid length for numeric: " + data.length);

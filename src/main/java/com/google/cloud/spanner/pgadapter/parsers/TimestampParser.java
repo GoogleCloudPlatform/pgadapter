@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
@@ -26,9 +27,11 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
 import java.util.regex.Pattern;
+import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to timestamp. */
+@InternalApi
 public class TimestampParser extends Parser<Timestamp> {
 
   private static final int MICROSECONDS_IN_SECOND = 1000000;
@@ -87,7 +90,7 @@ public class TimestampParser extends Parser<Timestamp> {
   }
 
   /** Converts the binary data to a {@link Timestamp}. */
-  public static Timestamp toTimestamp(byte[] data) {
+  public static Timestamp toTimestamp(@Nonnull byte[] data) {
     if (data.length < 8) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT, "Invalid length for timestamptz: " + data.length);

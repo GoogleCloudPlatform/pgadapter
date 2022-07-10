@@ -20,13 +20,19 @@ import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOption
 import java.io.IOException;
 import java.io.PipedOutputStream;
 import java.util.Iterator;
+import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVFormat;
 import org.postgresql.jdbc.TimestampUtils;
 
+/** Common interface for parsers that implement one or more of the PostgreSQL COPY formats. */
 interface CopyInParser {
+  /**
+   * Creates a {@link CopyInParser} for the given format. The csvFormat argument is only required
+   * for non-binary formats.
+   */
   static CopyInParser create(
       CopyOptions.Format format,
-      CSVFormat csvFormat,
+      @Nullable CSVFormat csvFormat,
       PipedOutputStream payload,
       int pipeBufferSize,
       boolean hasHeader)

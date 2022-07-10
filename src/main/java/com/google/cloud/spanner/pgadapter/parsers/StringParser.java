@@ -14,11 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import java.nio.charset.StandardCharsets;
+import javax.annotation.Nonnull;
 
 /** Translate from wire protocol to string. */
+@InternalApi
 public class StringParser extends Parser<String> {
 
   StringParser(ResultSet item, int position) {
@@ -36,7 +39,7 @@ public class StringParser extends Parser<String> {
   }
 
   /** Converts the binary data to an UTF8 string. */
-  public static String toString(byte[] data) {
+  public static String toString(@Nonnull byte[] data) {
     return new String(data, UTF8);
   }
 

@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.Date;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
@@ -23,9 +24,11 @@ import com.google.common.base.Preconditions;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
 /** Translate wire protocol dates to desired formats. */
+@InternalApi
 public class DateParser extends Parser<Date> {
   // Valid format for date: 'yyyy-MM-dd [+-]HH[:mi]'.
   // Timezone information is optional. Timezone may also be specified using only hour value.
@@ -66,7 +69,7 @@ public class DateParser extends Parser<Date> {
   }
 
   /** Converts the binary data to a {@link Date}. */
-  public static Date toDate(byte[] data) {
+  public static Date toDate(@Nonnull byte[] data) {
     if (data.length < 4) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT, "Invalid length for date: " + data.length);

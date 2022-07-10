@@ -14,13 +14,16 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to long. */
+@InternalApi
 public class LongParser extends Parser<Long> {
 
   LongParser(ResultSet item, int position) {
@@ -47,7 +50,7 @@ public class LongParser extends Parser<Long> {
   }
 
   /** Converts the binary data to a long value. */
-  public static long toLong(byte[] data) {
+  public static long toLong(@Nonnull byte[] data) {
     if (data.length >= 8) {
       return ByteConverter.int8(data, 0);
     } else if (data.length == 4) {
