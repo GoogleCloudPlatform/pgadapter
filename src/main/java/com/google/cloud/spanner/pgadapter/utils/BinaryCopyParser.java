@@ -27,6 +27,7 @@ import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
 import com.google.common.base.Preconditions;
+import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -55,7 +56,8 @@ class BinaryCopyParser implements CopyInParser {
   private short firstRowFieldCount = -1;
 
   BinaryCopyParser(PipedOutputStream payload, int pipeBufferSize) throws IOException {
-    this.dataInputStream = new DataInputStream(new PipedInputStream(payload, pipeBufferSize));
+    this.dataInputStream =
+        new DataInputStream(new BufferedInputStream(new PipedInputStream(payload, pipeBufferSize)));
   }
 
   @Override
