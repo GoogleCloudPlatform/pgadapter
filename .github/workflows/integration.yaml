@@ -4,8 +4,10 @@ on:
       - postgresql-dialect
   pull_request:
   schedule:
-    # Run at 04:52UTC every day
+    # Run at 04:52UTC every day. This run will use preprod-spanner.sandbox.googleapis.com
     - cron: '52 4 * * *'
+    # Run at 03:14UTC every day. This run will use staging-wrenchworks.sandbox.googleapis.com
+    - cron: '14 3 * * *'
   workflow_dispatch:
     inputs:
       endpoint:
@@ -60,10 +62,14 @@ jobs:
         if: "${{ inputs.endpoint }}"
         run: |
           echo "GOOGLE_CLOUD_ENDPOINT=${{ inputs.endpoint }}" >> $GITHUB_ENV
-      - id: set-scheduled-endpoint
+      - id: set-preprod-scheduled-endpoint
         if: github.event.schedule=='52 4 * * *'
         run: |
           echo "GOOGLE_CLOUD_ENDPOINT=preprod-spanner.sandbox.googleapis.com" >> $GITHUB_ENV
+      - id: set-staging-scheduled-endpoint
+        if: github.event.schedule=='14 3 * * *'
+        run: |
+          echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
       - uses: actions/checkout@v3
       - name: Setup Java
         uses: actions/setup-java@v3
