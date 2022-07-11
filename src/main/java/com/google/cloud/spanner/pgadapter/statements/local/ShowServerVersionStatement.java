@@ -26,36 +26,25 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResu
 import com.google.common.collect.ImmutableList;
 
 @InternalApi
-public class SelectCurrentSchemaStatement implements LocalStatement {
-  public static final SelectCurrentSchemaStatement INSTANCE = new SelectCurrentSchemaStatement();
+public class ShowServerVersionStatement implements LocalStatement {
+  public static final ShowServerVersionStatement INSTANCE = new ShowServerVersionStatement();
 
-  private SelectCurrentSchemaStatement() {}
+  private ShowServerVersionStatement() {}
 
   @Override
   public String[] getSql() {
-    return new String[] {
-      "select current_schema()",
-      "SELECT current_schema()",
-      "Select current_schema()",
-      "select current_schema",
-      "SELECT current_schema",
-      "Select current_schema",
-      "select * from current_schema()",
-      "SELECT * FROM current_schema()",
-      "select * from current_schema",
-      "SELECT * FROM current_schema"
-    };
+    return new String[] {"show server_version", "SHOW server_version", "SHOW SERVER_VERSION"};
   }
 
   @Override
   public StatementResult execute(BackendConnection backendConnection) {
     ResultSet resultSet =
         ResultSets.forRows(
-            Type.struct(StructField.of("current_schema", Type.string())),
+            Type.struct(StructField.of("server_version", Type.string())),
             ImmutableList.of(
                 Struct.newBuilder()
-                    .set("current_schema")
-                    .to(backendConnection.getCurrentSchema())
+                    .set("server_version")
+                    .to(backendConnection.getOptionsMetadata().getServerVersion())
                     .build()));
     return new QueryResult(resultSet);
   }
