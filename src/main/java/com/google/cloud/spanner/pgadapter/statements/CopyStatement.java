@@ -23,6 +23,7 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
@@ -34,7 +35,6 @@ import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.common.base.Strings;
-import com.google.spanner.v1.TypeCode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,7 +59,7 @@ public class CopyStatement extends IntermediatePortalStatement {
   private CSVFormat format;
 
   // Table columns read from information schema.
-  private Map<String, TypeCode> tableColumns;
+  private Map<String, Type> tableColumns;
   private int indexedColumnsCount;
   private MutationWriter mutationWriter;
   // We need two threads to execute a CopyStatement:
@@ -114,7 +114,7 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   /** @return Mapping of table column names to column type. */
-  public Map<String, TypeCode> getTableColumns() {
+  public Map<String, Type> getTableColumns() {
     return this.tableColumns;
   }
 
@@ -200,7 +200,7 @@ public class CopyStatement extends IntermediatePortalStatement {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT, "Number of copy columns provided exceed table column count");
     }
-    LinkedHashMap<String, TypeCode> tempTableColumns = new LinkedHashMap<>();
+    LinkedHashMap<String, Type> tempTableColumns = new LinkedHashMap<>();
     // Verify that every copy column given is a valid table column name
     for (String copyColumn : options.getColumnNames()) {
       if (!this.tableColumns.containsKey(copyColumn)) {
@@ -214,31 +214,31 @@ public class CopyStatement extends IntermediatePortalStatement {
     this.tableColumns = tempTableColumns;
   }
 
-  private static TypeCode parsePostgreSQLDataType(String columnType) {
+  private static Type parsePostgreSQLDataType(String columnType) {
     // Eliminate size modifiers in column type (e.g. character varying(100), etc.)
     int index = columnType.indexOf("(");
     columnType = (index > 0) ? columnType.substring(0, index) : columnType;
     switch (columnType) {
       case "boolean":
-        return TypeCode.BOOL;
+        return Type.bool();
       case "bigint":
-        return TypeCode.INT64;
+        return Type.int64();
       case "float8":
       case "double precision":
-        return TypeCode.FLOAT64;
+        return Type.float64();
       case "numeric":
-        return TypeCode.NUMERIC;
+        return Type.pgNumeric();
       case "bytea":
-        return TypeCode.BYTES;
+        return Type.bytes();
       case "character varying":
       case "text":
-        return TypeCode.STRING;
+        return Type.string();
       case "date":
-        return TypeCode.DATE;
+        return Type.date();
       case "timestamp with time zone":
-        return TypeCode.TIMESTAMP;
+        return Type.timestamp();
       case "jsonb":
-        return TypeCode.JSON;
+        return Type.json();
       default:
         throw new IllegalArgumentException(
             "Unrecognized or unsupported column data type: " + columnType);
@@ -246,7 +246,7 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   private void queryInformationSchema() {
-    Map<String, TypeCode> tableColumns = new LinkedHashMap<>();
+    Map<String, Type> tableColumns = new LinkedHashMap<>();
     Statement statement =
         Statement.newBuilder(
                 "SELECT "
@@ -260,7 +260,7 @@ public class CopyStatement extends IntermediatePortalStatement {
     try (ResultSet result = connection.getDatabaseClient().singleUse().executeQuery(statement)) {
       while (result.next()) {
         String columnName = result.getString(COLUMN_NAME);
-        TypeCode type = parsePostgreSQLDataType(result.getString(DATA_TYPE));
+        Type type = parsePostgreSQLDataType(result.getString(DATA_TYPE));
         tableColumns.put(columnName, type);
       }
     }
@@ -328,6 +328,7 @@ public class CopyStatement extends IntermediatePortalStatement {
               options.getTableName(),
               getTableColumns(),
               indexedColumnsCount,
+              this.options.getFormat(),
               getParserFormat(),
               hasHeader());
       setFutureStatementResult(

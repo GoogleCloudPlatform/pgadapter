@@ -16,13 +16,38 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerException;
+import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.util.ByteConverter;
 
 @RunWith(JUnit4.class)
 public class LongParserTest {
+
+  @Test
+  public void testToLong() {
+    long l = new Random().nextLong();
+    byte[] data = new byte[8];
+    ByteConverter.int8(data, 0, l);
+    assertEquals(l, LongParser.toLong(data));
+
+    // We allow 4 byte values to be parsed as a long as well, as Cloud Spanner allows int4 as a
+    // valid data type for a column in a DDL statement, but it is converted to an int8 on the
+    // backend.
+    int i = new Random().nextInt();
+    data = new byte[4];
+    ByteConverter.int4(data, 0, i);
+    assertEquals(i, LongParser.toLong(data));
+
+    SpannerException spannerException =
+        assertThrows(SpannerException.class, () -> LongParser.toLong(new byte[2]));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
+  }
 
   @Test
   public void testStringParse() {

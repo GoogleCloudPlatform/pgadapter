@@ -23,6 +23,8 @@ import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.KeySet;
+import com.google.cloud.spanner.Mutation;
 import com.google.common.base.Strings;
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -58,11 +60,11 @@ public class ITPsqlTest implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
 
-  private static final String POSTGRES_HOST = System.getenv("POSTGRES_HOST");
-  private static final String POSTGRES_PORT = System.getenv("POSTGRES_PORT");
-  private static final String POSTGRES_USER = System.getenv("POSTGRES_USER");
-  private static final String POSTGRES_DATABASE = System.getenv("POSTGRES_DATABASE");
-  private static final String POSTGRES_PASSWORD = System.getenv("POSTGRES_PASSWORD");
+  public static final String POSTGRES_HOST = System.getenv("POSTGRES_HOST");
+  public static final String POSTGRES_PORT = System.getenv("POSTGRES_PORT");
+  public static final String POSTGRES_USER = System.getenv("POSTGRES_USER");
+  public static final String POSTGRES_DATABASE = System.getenv("POSTGRES_DATABASE");
+  public static final String POSTGRES_PASSWORD = System.getenv("POSTGRES_PASSWORD");
 
   @BeforeClass
   public static void setup() throws Exception {
@@ -79,7 +81,7 @@ public class ITPsqlTest implements IntegrationTest {
         Strings.isNullOrEmpty(POSTGRES_USER));
     assumeFalse(
         "This test the environment variable POSTGRES_DATABASE to point to a valid PostgreSQL database",
-        Strings.isNullOrEmpty(POSTGRES_PORT));
+        Strings.isNullOrEmpty(POSTGRES_DATABASE));
 
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
@@ -271,92 +273,103 @@ public class ITPsqlTest implements IntegrationTest {
       }
     }
 
-    // COPY the rows to Cloud Spanner.
-    ProcessBuilder copyToCloudSpannerBuilder = new ProcessBuilder();
-    copyToCloudSpannerBuilder.command(
-        "bash",
-        "-c",
-        "psql"
-            + " -h "
-            + POSTGRES_HOST
-            + " -p "
-            + POSTGRES_PORT
-            + " -U "
-            + POSTGRES_USER
-            + " -d "
-            + POSTGRES_DATABASE
-            + " -c \"copy all_types to stdout\" "
-            + "  | psql "
-            + " -h "
-            + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
-            + " -p "
-            + testEnv.getPGAdapterPort()
-            + " -d "
-            + database.getId().getDatabase()
-            + " -c \"copy all_types from stdin;\"\n");
-    setPgPassword(copyToCloudSpannerBuilder);
-    Process copyToCloudSpannerProcess = copyToCloudSpannerBuilder.start();
-    int copyToCloudSpannerResult = copyToCloudSpannerProcess.waitFor();
-    assertEquals(0, copyToCloudSpannerResult);
+    // Execute the COPY tests in both binary and text mode.
+    for (boolean binary : new boolean[] {false, true}) {
+      // Make sure the all_types table on Cloud Spanner is empty.
+      String databaseId = database.getId().getDatabase();
+      testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
-    // Verify that we now also have 100 rows in Spanner.
-    try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
-      try (ResultSet resultSet =
-          connection.createStatement().executeQuery("select count(*) from all_types")) {
-        assertTrue(resultSet.next());
-        assertEquals(numRows, resultSet.getLong(1));
-        assertFalse(resultSet.next());
+      // COPY the rows to Cloud Spanner.
+      ProcessBuilder builder = new ProcessBuilder();
+      builder.command(
+          "bash",
+          "-c",
+          "psql"
+              + " -h "
+              + POSTGRES_HOST
+              + " -p "
+              + POSTGRES_PORT
+              + " -U "
+              + POSTGRES_USER
+              + " -d "
+              + POSTGRES_DATABASE
+              + " -c \"copy all_types to stdout"
+              + (binary ? " binary \" " : "\" ")
+              + "  | psql "
+              + " -h "
+              + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+              + " -p "
+              + testEnv.getPGAdapterPort()
+              + " -d "
+              + database.getId().getDatabase()
+              + " -c \"copy all_types from stdin "
+              + (binary ? "binary" : "")
+              + ";\"\n");
+      setPgPassword(builder);
+      Process process = builder.start();
+      int res = process.waitFor();
+      assertEquals(0, res);
+
+      // Verify that we now also have 100 rows in Spanner.
+      try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select count(*) from all_types")) {
+          assertTrue(resultSet.next());
+          assertEquals(numRows, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
       }
-    }
 
-    // Verify that the rows in both databases are equal.
-    compareTableContents();
+      // Verify that the rows in both databases are equal.
+      compareTableContents();
 
-    // Remove all rows in the table in the local PostgreSQL database and then copy everything from
-    // Cloud Spanner to PostgreSQL.
-    try (Connection connection =
-        DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
-      assertEquals(numRows, connection.createStatement().executeUpdate("delete from all_types"));
-    }
-
-    // COPY the rows to Cloud Spanner.
-    ProcessBuilder copyToPostgresBuilder = new ProcessBuilder();
-    copyToPostgresBuilder.command(
-        "bash",
-        "-c",
-        "psql"
-            + " -c \"copy all_types to stdout\" "
-            + " -h "
-            + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
-            + " -p "
-            + testEnv.getPGAdapterPort()
-            + " -d "
-            + database.getId().getDatabase()
-            + "  | psql "
-            + " -h "
-            + POSTGRES_HOST
-            + " -p "
-            + POSTGRES_PORT
-            + " -U "
-            + POSTGRES_USER
-            + " -d "
-            + POSTGRES_DATABASE
-            + " -c \"copy all_types from stdin;\"\n");
-    setPgPassword(copyToPostgresBuilder);
-    Process copyToPostgresProcess = copyToPostgresBuilder.start();
-    InputStream errorStream = copyToPostgresProcess.getErrorStream();
-    int copyToPostgresResult = copyToPostgresProcess.waitFor();
-    StringBuilder errors = new StringBuilder();
-    try (Scanner scanner = new Scanner(new InputStreamReader(errorStream))) {
-      while (scanner.hasNextLine()) {
-        errors.append(errors).append(scanner.nextLine()).append("\n");
+      // Remove all rows in the table in the local PostgreSQL database and then copy everything from
+      // Cloud Spanner to PostgreSQL.
+      try (Connection connection =
+          DriverManager.getConnection(
+              createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+        assertEquals(numRows, connection.createStatement().executeUpdate("delete from all_types"));
       }
-    }
-    assertEquals("", errors.toString());
-    assertEquals(0, copyToPostgresResult);
 
-    // Compare table contents again.
-    compareTableContents();
+      // COPY the rows to Cloud Spanner.
+      ProcessBuilder copyToPostgresBuilder = new ProcessBuilder();
+      copyToPostgresBuilder.command(
+          "bash",
+          "-c",
+          "psql"
+              + " -c \"copy all_types to stdout\" "
+              + " -h "
+              + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+              + " -p "
+              + testEnv.getPGAdapterPort()
+              + " -d "
+              + database.getId().getDatabase()
+              + "  | psql "
+              + " -h "
+              + POSTGRES_HOST
+              + " -p "
+              + POSTGRES_PORT
+              + " -U "
+              + POSTGRES_USER
+              + " -d "
+              + POSTGRES_DATABASE
+              + " -c \"copy all_types from stdin;\"\n");
+      setPgPassword(copyToPostgresBuilder);
+      Process copyToPostgresProcess = copyToPostgresBuilder.start();
+      InputStream errorStream = copyToPostgresProcess.getErrorStream();
+      int copyToPostgresResult = copyToPostgresProcess.waitFor();
+      StringBuilder errors = new StringBuilder();
+      try (Scanner scanner = new Scanner(new InputStreamReader(errorStream))) {
+        while (scanner.hasNextLine()) {
+          errors.append(errors).append(scanner.nextLine()).append("\n");
+        }
+      }
+      assertEquals("", errors.toString());
+      assertEquals(0, copyToPostgresResult);
+
+      // Compare table contents again.
+      compareTableContents();
+    }
   }
 
   private void compareTableContents() throws SQLException {
