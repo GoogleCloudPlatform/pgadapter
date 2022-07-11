@@ -26,10 +26,10 @@ import com.google.cloud.spanner.pgadapter.parsers.DateParser;
 import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
 import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
-import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
 import com.google.common.base.Preconditions;
+import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -41,8 +41,12 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.postgresql.core.Oid;
 
+/**
+ * This class parses a stream of copy data in the PostgreSQL binary format
+ * (https://www.postgresql.org/docs/current/sql-copy.html) and converts them to a stream of {@link
+ * CopyRecord}s.
+ */
 class BinaryCopyParser implements CopyInParser {
   private static final Logger logger = Logger.getLogger(BinaryCopyParser.class.getName());
 
@@ -52,7 +56,8 @@ class BinaryCopyParser implements CopyInParser {
   private short firstRowFieldCount = -1;
 
   BinaryCopyParser(PipedOutputStream payload, int pipeBufferSize) throws IOException {
-    this.dataInputStream = new DataInputStream(new PipedInputStream(payload, pipeBufferSize));
+    this.dataInputStream =
+        new DataInputStream(new BufferedInputStream(new PipedInputStream(payload, pipeBufferSize)));
   }
 
   @Override
@@ -61,7 +66,14 @@ class BinaryCopyParser implements CopyInParser {
     this.calledIterator = true;
 
     try {
+      // The PostgreSQL binary copy format uses a fixed header to indicate that it is a file/stream
+      // in binary format.
       verifyBinaryHeader();
+      // The fixed header is followed by two ints:
+      // 1. flags: Contains specific flags for the binary copy format.
+      // 2. header extension length: Currently zero, but if anything else is encountered, this
+      // parser just skips it. This is according to spec, as a reader should skip any extension it
+      // does not know.
       int flags = this.dataInputStream.readInt();
       this.containsOids = ((flags & (1L << 16)) != 0);
       // This should according to the current spec always be zero.
@@ -95,6 +107,7 @@ class BinaryCopyParser implements CopyInParser {
     }
   }
 
+  /** Tri-value enum for the hasNext() call. */
   enum HasNext {
     UNKNOWN,
     YES,
@@ -108,7 +121,12 @@ class BinaryCopyParser implements CopyInParser {
     @Override
     public boolean hasNext() {
       try {
+        // The hasNext status is UNKNOWN if a call to next() has been executed since the last time
+        // hasNext() was called, or if this is the first time hasNext() is called.
         if (hasNext == HasNext.UNKNOWN) {
+          // The first value in a row is the number of fields in that row. The value will be -1 for
+          // the last tuple (this is the file trailer). The value should be the same for all other
+          // rows.
           short fieldCount = dataInputStream.readShort();
           if (fieldCount == -1) {
             logger.log(Level.FINE, "End of copy file: -1");
@@ -147,29 +165,38 @@ class BinaryCopyParser implements CopyInParser {
     @Override
     public CopyRecord next() {
       try {
+        // Verify that there is actually a next record.
         if (!hasNext()) {
           logger.log(
               Level.WARNING, "tried to call next() on BinaryCopyParser with no more elements");
           throw new NoSuchElementException();
         }
+        // Reset the hasNext status.
         hasNext = HasNext.UNKNOWN;
-        int oid = Oid.UNSPECIFIED;
+        // The header flags could indicate that the file contains oids. If so, we just read and
+        // ignore them.
         if (containsOids) {
           int length = dataInputStream.readInt();
           if (length != 4) {
             throw SpannerExceptionFactory.newSpannerException(
                 ErrorCode.FAILED_PRECONDITION, "Invalid length for OID: " + length);
           }
-          oid = dataInputStream.readInt();
+          // Read and ignore the oid.
+          dataInputStream.readInt();
         }
+        // Each row consists of:
+        // 1. The number of fields (this should be the same for all rows)
+        // 2. For each field:
+        // 2.1. The length of the field.
+        // 2.2. The actual data of that field.
         for (int field = 0; field < firstRowFieldCount; field++) {
           int length = dataInputStream.readInt();
           if (length == -1) {
-            currentRow[field] = new BinaryField(null, oid);
+            currentRow[field] = new BinaryField(null);
           } else if (length > -1) {
             byte[] data = new byte[length];
             dataInputStream.readFully(data);
-            currentRow[field] = new BinaryField(data, oid);
+            currentRow[field] = new BinaryField(data);
           } else {
             throw SpannerExceptionFactory.newSpannerException(
                 ErrorCode.FAILED_PRECONDITION, "Invalid field length: " + length);
@@ -186,11 +213,9 @@ class BinaryCopyParser implements CopyInParser {
 
   static class BinaryField {
     private final byte[] data;
-    private final int oid;
 
-    BinaryField(byte[] data, int oid) {
+    BinaryField(byte[] data) {
       this.data = data;
-      this.oid = oid;
     }
   }
 
@@ -213,6 +238,7 @@ class BinaryCopyParser implements CopyInParser {
 
     @Override
     public Value getValue(Type type, String columnName) {
+      // The binary copy format does not include any column name headers or any type information.
       throw new UnsupportedOperationException();
     }
 
@@ -222,17 +248,6 @@ class BinaryCopyParser implements CopyInParser {
           columnIndex >= 0 && columnIndex < numColumns(),
           "columnIndex must be >= 0 && < numColumns");
       BinaryField field = fields[columnIndex];
-      if (field.oid != Oid.UNSPECIFIED) {
-        int columnOid = Parser.toOid(type);
-        if (columnOid != field.oid) {
-          String message =
-              String.format(
-                  "Conversion of binary values from %d to %d is not supported",
-                  field.oid, columnOid);
-          logger.log(Level.WARNING, message);
-          throw SpannerExceptionFactory.newSpannerException(ErrorCode.FAILED_PRECONDITION, message);
-        }
-      }
       switch (type.getCode()) {
         case BOOL:
           return Value.bool(field.data == null ? null : BooleanParser.toBoolean(field.data));

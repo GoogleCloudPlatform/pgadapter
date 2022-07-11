@@ -278,6 +278,7 @@ public class ITPsqlTest implements IntegrationTest {
       }
     }
 
+    // Execute the COPY tests in both binary and text mode.
     for (boolean binary : new boolean[] {false, true}) {
       // Make sure the all_types table on Cloud Spanner is empty.
       String databaseId = database.getId().getDatabase();

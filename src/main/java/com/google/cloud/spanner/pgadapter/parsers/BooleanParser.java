@@ -22,6 +22,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.common.collect.ImmutableSet;
 import java.util.Locale;
 import java.util.Set;
+import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
 /**
@@ -63,7 +64,7 @@ public class BooleanParser extends Parser<Boolean> {
   }
 
   /** Converts the given binary data to a boolean value. */
-  public static boolean toBoolean(byte[] data) {
+  public static boolean toBoolean(@Nonnull byte[] data) {
     if (data.length == 0) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT, "Invalid length for bool: " + data.length);

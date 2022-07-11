@@ -14,13 +14,16 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to double. */
+@InternalApi
 public class DoubleParser extends Parser<Double> {
 
   DoubleParser(ResultSet item, int position) {
@@ -46,7 +49,8 @@ public class DoubleParser extends Parser<Double> {
     }
   }
 
-  public static double toDouble(byte[] data) {
+  /** Converts the binary data to a double value. */
+  public static double toDouble(@Nonnull byte[] data) {
     if (data.length < 8) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT, "Invalid length for float8: " + data.length);

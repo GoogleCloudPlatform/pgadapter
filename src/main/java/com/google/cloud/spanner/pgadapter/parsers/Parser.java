@@ -250,6 +250,7 @@ public abstract class Parser<T> {
     }
   }
 
+  /** Returns the item helder by this parser. */
   public T getItem() {
     return this.item;
   }

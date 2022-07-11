@@ -40,6 +40,7 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.postgresql.jdbc.TimestampUtils;
 
+/** Implementation of {@link CopyInParser} for the TEXT and CSV formats. */
 class CsvCopyParser implements CopyInParser {
   private static final Logger logger = Logger.getLogger(CsvCopyParser.class.getName());
 
@@ -113,16 +114,17 @@ class CsvCopyParser implements CopyInParser {
     @Override
     public Value getValue(Type type, String columnName) throws SpannerException {
       String recordValue = record.get(columnName);
-      return getSpannerValue(type, recordValue);
+      return getSpannerValue(type, recordValue, this.timestampUtils);
     }
 
     @Override
     public Value getValue(Type type, int columnIndex) throws SpannerException {
       String recordValue = record.get(columnIndex);
-      return getSpannerValue(type, recordValue);
+      return getSpannerValue(type, recordValue, this.timestampUtils);
     }
 
-    Value getSpannerValue(Type type, String recordValue) throws SpannerException {
+    static Value getSpannerValue(Type type, String recordValue, TimestampUtils timestampUtils)
+        throws SpannerException {
       try {
         switch (type.getCode()) {
           case STRING:

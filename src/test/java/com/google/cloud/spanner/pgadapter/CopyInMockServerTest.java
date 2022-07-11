@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_DATABASE;
 import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_HOST;
+import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_PASSWORD;
 import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_PORT;
 import static com.google.cloud.spanner.pgadapter.ITPsqlTest.POSTGRES_USER;
 import static org.junit.Assert.assertArrayEquals;
@@ -79,7 +80,7 @@ import org.postgresql.jdbc.PgConnection;
 
 @RunWith(Parameterized.class)
 public class CopyInMockServerTest extends AbstractMockServerTest {
-  @Rule public Timeout globalTimeout = Timeout.seconds(10);
+  @Rule public Timeout globalTimeout = Timeout.seconds(30);
 
   @Parameter public boolean useDomainSocket;
 
@@ -140,6 +141,50 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     Mutation mutation = commitRequest.getMutations(0);
     assertEquals(OperationCase.INSERT, mutation.getOperationCase());
     assertEquals(3, mutation.getInsert().getValuesCount());
+    assertEquals(3, mutation.getInsert().getColumnsCount());
+  }
+
+  @Test
+  public void testCopyInWithColumnNames() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn(
+          "COPY users (id, name) FROM STDIN;", new StringReader("5\t5\n6\t6\n7\t7\n"));
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsert().getValuesCount());
+    assertEquals(2, mutation.getInsert().getColumnsCount());
+    assertEquals("id", mutation.getInsert().getColumns(0));
+    assertEquals("name", mutation.getInsert().getColumns(1));
+  }
+
+  @Test
+  public void testCopyInWithInvalidColumnNames() throws SQLException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      SQLException sqlException =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  copyManager.copyIn(
+                      "COPY users (id, foo) FROM STDIN;", new StringReader("5\t5\n6\t6\n7\t7\n")));
+      assertEquals(
+          "ERROR: INVALID_ARGUMENT: Column \"foo\" of relation \"users\" does not exist",
+          sqlException.getMessage());
+    }
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -943,6 +988,13 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         Strings.isNullOrEmpty(POSTGRES_DATABASE));
   }
 
+  private static ProcessBuilder setPgPassword(ProcessBuilder builder) {
+    if (POSTGRES_PASSWORD != null) {
+      builder.environment().put("PGPASSWORD", POSTGRES_PASSWORD);
+    }
+    return builder;
+  }
+
   @Test
   public void testCopyBinaryPsql() throws Exception {
     assumeLocalPostgreSQLSetup();
@@ -977,6 +1029,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             + " -p "
             + pgServer.getLocalPort()
             + " -c \"copy users from stdin binary;\"\n");
+    setPgPassword(builder);
     Process process = builder.start();
     int res = process.waitFor();
     assertEquals(0, res);
@@ -1036,6 +1089,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             + " -p "
             + pgServer.getLocalPort()
             + " -c \"copy users from stdin binary;\"\n");
+    setPgPassword(builder);
     Process process = builder.start();
     int res = process.waitFor();
     assertEquals(0, res);
@@ -1083,6 +1137,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             + " -p "
             + pgServer.getLocalPort()
             + " -c \"copy users from stdin binary;\"\n");
+    setPgPassword(builder);
     Process process = builder.start();
     int res = process.waitFor();
     assertEquals(1, res);
@@ -1127,6 +1182,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             + " -p "
             + pgServer.getLocalPort()
             + " -c \"copy users from stdin binary;\"\n");
+    setPgPassword(builder);
     Process process = builder.start();
     int res = process.waitFor();
     assertEquals(0, res);
@@ -1184,6 +1240,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             + " -p "
             + pgServer.getLocalPort()
             + " -c \"copy all_types from stdin binary;\"\n");
+    setPgPassword(builder);
     Process process = builder.start();
     int res = process.waitFor();
     assertEquals(0, res);
@@ -1221,6 +1278,65 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     for (int i = 0; i < row2.getValuesCount(); i++) {
       assertTrue(row2.getValues(i).hasNullValue());
     }
+  }
+
+  @Test
+  public void testCopyBinaryWithColumnNamesPsql() throws Exception {
+    assumeLocalPostgreSQLSetup();
+    assumeTrue("This test requires psql", isPsqlAvailable());
+    assumeTrue("This test requires bash", isBashAvailable());
+
+    setupCopyInformationSchemaResults();
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "bash",
+        "-c",
+        "psql"
+            + " -h "
+            + POSTGRES_HOST
+            + " -p "
+            + POSTGRES_PORT
+            + " -U "
+            + POSTGRES_USER
+            + " -d "
+            + POSTGRES_DATABASE
+            + " -c \"copy (\n"
+            + "    select 1::bigint as id, 'One'::varchar as name\n"
+            + "    union all\n"
+            + "    select null::bigint as id, null::varchar as name\n"
+            + "    union all\n"
+            + "    select 2::bigint as id, 'Two'::varchar as name\n"
+            + "  ) to stdout binary\" "
+            + "  | psql "
+            + " -h "
+            + (useDomainSocket ? "/tmp" : "localhost")
+            + " -p "
+            + pgServer.getLocalPort()
+            + " -c \"copy users (id, name) from stdin binary;\"\n");
+    setPgPassword(builder);
+    Process process = builder.start();
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsert().getValuesCount());
+    assertEquals(2, mutation.getInsert().getColumnsCount());
+    assertEquals("id", mutation.getInsert().getColumns(0));
+    assertEquals("name", mutation.getInsert().getColumns(1));
+    ListValue row1 = mutation.getInsert().getValues(0);
+    assertEquals("1", row1.getValues(0).getStringValue());
+    assertEquals("One", row1.getValues(1).getStringValue());
+    ListValue row2 = mutation.getInsert().getValues(1);
+    assertTrue(row2.getValues(0).hasNullValue());
+    assertTrue(row2.getValues(1).hasNullValue());
+    ListValue row3 = mutation.getInsert().getValues(2);
+    assertEquals("2", row3.getValues(0).getStringValue());
+    assertEquals("Two", row3.getValues(1).getStringValue());
   }
 
   private void setupCopyInformationSchemaResults() {
