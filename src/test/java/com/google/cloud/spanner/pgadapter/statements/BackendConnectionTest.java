@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.extractDdlUpdateCounts;
+import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.EMPTY_LOCAL_STATEMENTS;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -326,5 +327,27 @@ public class BackendConnectionTest {
     assertEquals(resultSet, queryResult.getResultSet());
     assertThrows(UnsupportedOperationException.class, queryResult::getClientSideStatementType);
     assertThrows(UnsupportedOperationException.class, queryResult::getUpdateCount);
+  }
+
+  @Test
+  public void testGeneralException() {
+    Connection connection = mock(Connection.class);
+    ParsedStatement parsedStatement = mock(ParsedStatement.class);
+    Statement statement = Statement.of("select foo from bar");
+    RuntimeException error = new RuntimeException("test error");
+    when(connection.execute(statement)).thenThrow(error);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            DdlTransactionMode.Batch,
+            EMPTY_LOCAL_STATEMENTS);
+    Future<StatementResult> resultFuture = backendConnection.execute(parsedStatement, statement);
+    backendConnection.flush();
+
+    ExecutionException executionException =
+        assertThrows(ExecutionException.class, resultFuture::get);
+    assertSame(executionException.getCause(), error);
   }
 }
