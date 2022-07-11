@@ -149,7 +149,12 @@ public class ITPsqlTest implements IntegrationTest {
           "-d",
           POSTGRES_DATABASE,
           "-c",
-          String.join(";", DEFAULT_DATA_MODEL) + ";\n"
+          // We need to change the `col_int int` column definition into `col_int bigint` to make the
+          // local PostgreSQL database match the actual data model of the Cloud Spanner database.
+          DEFAULT_DATA_MODEL.stream()
+                  .map(s -> s.replace("col_int int", "col_int bigint"))
+                  .collect(Collectors.joining(";"))
+              + ";\n"
         };
     ProcessBuilder builder = new ProcessBuilder().command(createTablesCommand);
     setPgPassword(builder);
@@ -337,7 +342,8 @@ public class ITPsqlTest implements IntegrationTest {
           "bash",
           "-c",
           "psql"
-              + " -c \"copy all_types to stdout\" "
+              + " -c \"copy all_types to stdout"
+              + (binary ? " binary \" " : "\" ")
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
               + " -p "
@@ -353,7 +359,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types from stdin;\"\n");
+              + " -c \"copy all_types from stdin "
+              + (binary ? "binary" : "")
+              + ";\"\n");
       setPgPassword(copyToPostgresBuilder);
       Process copyToPostgresProcess = copyToPostgresBuilder.start();
       InputStream errorStream = copyToPostgresProcess.getErrorStream();

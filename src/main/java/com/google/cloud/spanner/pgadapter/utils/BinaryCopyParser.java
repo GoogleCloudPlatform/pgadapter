@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import static com.google.cloud.spanner.pgadapter.statements.CopyToStatement.COPY_BINARY_HEADER;
+
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Type;
@@ -47,8 +49,6 @@ import java.util.logging.Logger;
  */
 class BinaryCopyParser implements CopyInParser {
   private static final Logger logger = Logger.getLogger(BinaryCopyParser.class.getName());
-  static final byte[] EXPECTED_HEADER =
-      new byte[] {'P', 'G', 'C', 'O', 'P', 'Y', '\n', -1, '\r', '\n', '\0'};
 
   private final DataInputStream dataInputStream;
   private boolean containsOids;
@@ -98,12 +98,12 @@ class BinaryCopyParser implements CopyInParser {
     // PGCOPY\n\377\r\n\0
     byte[] header = new byte[11];
     this.dataInputStream.readFully(header);
-    if (!Arrays.equals(EXPECTED_HEADER, header)) {
+    if (!Arrays.equals(COPY_BINARY_HEADER, header)) {
       throw new IOException(
           String.format(
               "Invalid COPY header encountered.\nGot:  %s\nWant: %s",
               new String(header, StandardCharsets.UTF_8),
-              new String(EXPECTED_HEADER, StandardCharsets.UTF_8)));
+              new String(COPY_BINARY_HEADER, StandardCharsets.UTF_8)));
     }
   }
 

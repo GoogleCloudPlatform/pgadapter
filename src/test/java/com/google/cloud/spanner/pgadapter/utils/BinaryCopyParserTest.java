@@ -14,7 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
-import static com.google.cloud.spanner.pgadapter.utils.BinaryCopyParser.EXPECTED_HEADER;
+import static com.google.cloud.spanner.pgadapter.statements.CopyToStatement.COPY_BINARY_HEADER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -46,7 +46,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
 
     parser.verifyBinaryHeader();
   }
@@ -69,7 +69,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(0); // flags
     data.writeInt(0); // header extensions length
 
@@ -82,7 +82,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     pipedOutputStream.close();
 
     assertThrows(SpannerException.class, parser::iterator);
@@ -94,7 +94,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(0);
     data.writeInt(0);
 
@@ -111,7 +111,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(0);
     data.writeInt(0);
 
@@ -136,7 +136,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(0);
     data.writeInt(0);
 
@@ -156,7 +156,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(0);
     data.writeInt(0);
 
@@ -182,7 +182,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(0);
     data.writeInt(0);
 
@@ -200,7 +200,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(0);
     data.writeInt(0);
 
@@ -218,7 +218,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(0);
     data.writeInt(0);
 
@@ -242,7 +242,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(0);
     data.writeInt(0);
 
@@ -267,7 +267,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(0);
     data.writeInt(0);
 
@@ -286,7 +286,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(0);
     data.writeInt(0);
 
@@ -306,7 +306,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(1 << 16);
     data.writeInt(0);
 
@@ -336,7 +336,7 @@ public class BinaryCopyParserTest {
     BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
-    data.write(EXPECTED_HEADER);
+    data.write(COPY_BINARY_HEADER);
     data.writeInt(1 << 16);
     data.writeInt(0);
 

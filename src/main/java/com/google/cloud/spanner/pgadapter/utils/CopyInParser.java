@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
@@ -25,7 +26,8 @@ import org.apache.commons.csv.CSVFormat;
 import org.postgresql.jdbc.TimestampUtils;
 
 /** Common interface for parsers that implement one or more of the PostgreSQL COPY formats. */
-interface CopyInParser {
+@InternalApi
+public interface CopyInParser {
   /**
    * Creates a {@link CopyInParser} for the given format. The csvFormat argument is only required
    * for non-binary formats.

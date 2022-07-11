@@ -40,7 +40,6 @@ public class DateParserTest {
 
   @Test
   public void testStringParse() {
-
     assertEquals("2022-07-08", new DateParser(Date.fromYearMonthDay(2022, 7, 8)).stringParse());
     assertNull(new DateParser(null).stringParse());
   }
