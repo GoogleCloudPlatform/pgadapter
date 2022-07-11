@@ -16,11 +16,14 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import static com.google.cloud.spanner.pgadapter.statements.CopyToStatement.COPY_BINARY_HEADER;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import java.io.DataOutputStream;
 import java.nio.charset.StandardCharsets;
 
+@InternalApi
 public class CopyDataResponse extends WireOutput {
+  @InternalApi
   public enum ResponseType {
     HEADER,
     ROW,
@@ -33,10 +36,14 @@ public class CopyDataResponse extends WireOutput {
   private final String stringData;
   private final char rowTerminator;
 
+  /** Creates a {@link CopyDataResponse} message containing the fixed binary COPY header. */
+  @InternalApi
   public static CopyDataResponse createBinaryHeader(DataOutputStream output) {
     return new CopyDataResponse(output, COPY_BINARY_HEADER.length + 8, ResponseType.HEADER);
   }
 
+  /** Creates a {@link CopyDataResponse} message containing the fixed binary COPY trailer. */
+  @InternalApi
   public static CopyDataResponse createBinaryTrailer(DataOutputStream output) {
     return new CopyDataResponse(output, 2, ResponseType.TRAILER);
   }

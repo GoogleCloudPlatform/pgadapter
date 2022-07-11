@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 
@@ -21,6 +22,7 @@ import com.google.cloud.spanner.Value;
  * {@link CopyRecord} is a common interface for COPY data records that are produced by a parser for
  * a specific COPY format.
  */
+@InternalApi
 public interface CopyRecord {
 
   /** Returns the number of columns in the record. */
