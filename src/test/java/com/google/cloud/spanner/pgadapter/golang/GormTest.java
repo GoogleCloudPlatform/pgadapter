@@ -40,4 +40,7 @@ public interface GormTest extends Library {
   String TestNestedTransaction(GoString connString);
 
   String TestReadOnlyTransaction(GoString connString);
+
+  // Migration tests.
+  String TestMigrateUser(GoString connString);
 }

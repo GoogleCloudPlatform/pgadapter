@@ -39,7 +39,8 @@ func main() {
 }
 
 type User struct {
-	ID           uint
+	// Cloud Spanner currently does not support auto-incremented integers.
+	ID           uint `gorm:"primaryKey;autoIncrement:false"`
 	Name         string
 	Email        *string
 	Age          uint8
@@ -482,6 +483,25 @@ func TestReadOnlyTransaction(connString string) *C.char {
 	}, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute read-only transaction: %v", err))
+	}
+
+	return nil
+}
+
+//export TestMigrateUser
+func TestMigrateUser(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+
+	if err := db.AutoMigrate(&User{}); err != nil {
+		return C.CString(err.Error())
 	}
 
 	return nil
