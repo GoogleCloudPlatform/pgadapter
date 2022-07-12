@@ -36,6 +36,7 @@ import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -1133,5 +1134,47 @@ public class PgxMockServerTest extends AbstractMockServerTest {
       }
     }
     assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testReadOnlyTransaction() {
+    String res = pgxTest.TestReadOnlyTransaction(createConnString());
+
+    assertNull(res);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+    BeginTransactionRequest beginTransactionRequest =
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class).get(0);
+    assertTrue(beginTransactionRequest.getOptions().hasReadOnly());
+    List<ByteString> transactionsStarted = mockSpanner.getTransactionsStarted();
+    assertFalse(transactionsStarted.isEmpty());
+    ByteString transactionId = transactionsStarted.get(transactionsStarted.size() - 1);
+
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    for (ExecuteSqlRequest request : requests) {
+      assertEquals(transactionId, request.getTransaction().getId());
+    }
+    // Read-only transactions are not really committed.
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testReadWriteTransactionIsolationLevelSerializable() {
+    String res = pgxTest.TestReadWriteTransactionIsolationLevelSerializable(createConnString());
+
+    assertNull(res);
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest describeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+    assertTrue(executeRequest.getTransaction().hasId());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 }

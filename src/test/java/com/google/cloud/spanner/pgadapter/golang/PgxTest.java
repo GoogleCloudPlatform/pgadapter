@@ -50,4 +50,8 @@ public interface PgxTest extends Library {
   String TestCopyIn(GoString connString);
 
   String TestReadWriteTransaction(GoString connString);
+
+  String TestReadOnlyTransaction(GoString connString);
+
+  String TestReadWriteTransactionIsolationLevelSerializable(GoString connString);
 }
