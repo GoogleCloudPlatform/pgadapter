@@ -48,4 +48,6 @@ public interface PgxTest extends Library {
   String TestWrongDialect(GoString connString);
 
   String TestCopyIn(GoString connString);
+
+  String TestReadWriteTransaction(GoString connString);
 }

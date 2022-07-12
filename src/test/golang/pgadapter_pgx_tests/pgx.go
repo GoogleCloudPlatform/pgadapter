@@ -608,3 +608,49 @@ func TestCopyIn(connString string) *C.char {
 
 	return nil
 }
+
+//export TestReadWriteTransaction
+func TestReadWriteTransaction(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to begin transaction: %v", err.Error()))
+	}
+
+	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+	numeric := pgtype.Numeric{}
+	_ = numeric.Set("6.626")
+	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T07:39:10.123456789+01:00")
+	var tag pgconn.CommandTag
+	date := pgtype.Date{}
+	_ = date.Set("2022-04-02")
+	for _, id := range []int64{10, 20} {
+		if strings.Contains(connString, "prefer_simple_protocol=true") {
+			// Simple mode will format the date as '2022-04-02 00:00:00Z', which is not supported by the
+			// backend yet.
+			tag, err = tx.Exec(ctx, sql, id, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string")
+		} else {
+			tag, err = tx.Exec(ctx, sql, id, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string")
+		}
+		if err != nil {
+			return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
+		}
+		if !tag.Insert() {
+			return C.CString("statement was not recognized as an insert")
+		}
+		if g, w := tag.RowsAffected(), int64(1); g != w {
+			return C.CString(fmt.Sprintf("rows affected mismatch:\n Got: %v\nWant: %v", g, w))
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return C.CString(fmt.Sprintf("failed to commit transaction: %v", err))
+	}
+
+	return nil
+}
