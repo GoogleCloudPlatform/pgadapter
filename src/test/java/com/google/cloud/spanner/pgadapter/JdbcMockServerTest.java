@@ -140,13 +140,39 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testSelectCurrentDatabase() throws SQLException {
-    String sql = "SELECT current_database";
+    for (String sql :
+        new String[] {
+          "SELECT current_database()",
+          "select current_database()",
+          "select * from CURRENT_DATABASE()"
+        }) {
 
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
-        assertTrue(resultSet.next());
-        assertEquals("d", resultSet.getString("current_database"));
-        assertFalse(resultSet.next());
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("d", resultSet.getString("current_database"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testSelectCurrentCatalog() throws SQLException {
+    for (String sql :
+        new String[] {
+          "SELECT current_catalog", "select current_catalog", "select * from CURRENT_CATALOG"
+        }) {
+
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("d", resultSet.getString("current_catalog"));
+          assertFalse(resultSet.next());
+        }
       }
     }
 
