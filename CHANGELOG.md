@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.6.0...v0.6.1) (2022-07-13)
+
+
+### Bug Fixes
+
+* prepared statement could return error 'This ResultSet is closed' ([#279](https://github.com/GoogleCloudPlatform/pgadapter/issues/279)) ([3383738](https://github.com/GoogleCloudPlatform/pgadapter/commit/33837384b2c926e268934a082406056070f1f21b)), closes [#278](https://github.com/GoogleCloudPlatform/pgadapter/issues/278)
+
 ## [0.6.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.5.1...v0.6.0) (2022-07-11)
 
 
