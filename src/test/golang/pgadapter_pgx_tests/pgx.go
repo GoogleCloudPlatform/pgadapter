@@ -623,6 +623,16 @@ func TestReadWriteTransaction(connString string) *C.char {
 		return C.CString(fmt.Sprintf("failed to begin transaction: %v", err.Error()))
 	}
 
+	// Execute a query in a read/write transaction.
+	var value int64
+	err = conn.QueryRow(ctx, "SELECT 1").Scan(&value)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	if g, w := value, int64(1); g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+
 	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
 	numeric := pgtype.Numeric{}
 	_ = numeric.Set("6.626")
