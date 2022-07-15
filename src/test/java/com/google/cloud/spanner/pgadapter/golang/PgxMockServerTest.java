@@ -1100,26 +1100,35 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that the first request is sent
-    // three times to the backend:
+    // pgx by default always uses prepared statements. That means that the first time a SQL
+    // statement is executed, it will be sent three times to the backend (twice for statements
+    // without any query parameters):
     // 1. DescribeStatement (parameters)
     // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
     // 3. Execute
     // The second time the same statement is executed, it is only sent once.
-    assertEquals(4, requests.size());
-    ExecuteSqlRequest describeParamsRequest = requests.get(0);
+
+    assertEquals(6, requests.size());
+    ExecuteSqlRequest describeSelect1Request = requests.get(0);
+    // The first statement should begin the transaction.
+    assertTrue(describeSelect1Request.getTransaction().hasBegin());
+    assertEquals(QueryMode.PLAN, describeSelect1Request.getQueryMode());
+    ExecuteSqlRequest executeSelect1Request = requests.get(1);
+    // All following requests should use the transaction that was started.
+    assertTrue(executeSelect1Request.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeSelect1Request.getQueryMode());
+
+    ExecuteSqlRequest describeParamsRequest = requests.get(2);
     assertEquals(describeSql, describeParamsRequest.getSql());
     assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    // The first statement should begin the transaction.
-    assertTrue(describeParamsRequest.getTransaction().hasBegin());
+    assertTrue(describeParamsRequest.getTransaction().hasId());
 
-    ExecuteSqlRequest describeRequest = requests.get(1);
+    ExecuteSqlRequest describeRequest = requests.get(3);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    // All following requests should use the transaction that was started.
     assertTrue(describeRequest.getTransaction().hasId());
 
-    ExecuteSqlRequest executeRequest = requests.get(2);
+    ExecuteSqlRequest executeRequest = requests.get(4);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
     assertTrue(executeRequest.getTransaction().hasId());
