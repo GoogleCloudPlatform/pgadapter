@@ -724,3 +724,53 @@ func TestReadWriteTransactionIsolationLevelSerializable(connString string) *C.ch
 
 	return nil
 }
+
+//export TestReadWriteTransactionIsolationLevelRepeatableRead
+func TestReadWriteTransactionIsolationLevelRepeatableRead(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	_, err = conn.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	if err == nil {
+		return C.CString("missing expected error for BeginTx with isolation level RepeatableRead")
+	}
+	if g, w := err.Error(), "ERROR: INVALID_ARGUMENT: Unknown statement: begin isolation level repeatable read (SQLSTATE P0001)"; g != w {
+		return C.CString(fmt.Sprintf("error mismatch\nGot:  %v\n Want: %v", g, w))
+	}
+
+	return nil
+}
+
+//export TestReadOnlySerializableTransaction
+func TestReadOnlySerializableTransaction(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly, IsoLevel: pgx.Serializable})
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to begin read-only transaction with isolation level serializable: %v", err.Error()))
+	}
+	for _, i := range []int{1, 2} {
+		var value int64
+		err = tx.QueryRow(ctx, fmt.Sprintf("SELECT %d", i)).Scan(&value)
+		if err != nil {
+			return C.CString(err.Error())
+		}
+		if g, w := value, int64(i); g != w {
+			return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return C.CString(fmt.Sprintf("failed to commit read-only transaction: %v", err.Error()))
+	}
+
+	return nil
+}

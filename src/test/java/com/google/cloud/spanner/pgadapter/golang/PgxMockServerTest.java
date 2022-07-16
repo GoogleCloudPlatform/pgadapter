@@ -1186,4 +1186,37 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
+
+  @Test
+  public void testReadWriteTransactionIsolationLevelRepeatableRead() {
+    String res = pgxTest.TestReadWriteTransactionIsolationLevelRepeatableRead(createConnString());
+
+    assertNull(res);
+
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Ignore("Requires Spanner client library 6.26.0")
+  @Test
+  public void testReadOnlySerializableTransaction() {
+    String res = pgxTest.TestReadOnlySerializableTransaction(createConnString());
+
+    assertNull(res);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+    BeginTransactionRequest beginTransactionRequest =
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class).get(0);
+    assertTrue(beginTransactionRequest.getOptions().hasReadOnly());
+    List<ByteString> transactionsStarted = mockSpanner.getTransactionsStarted();
+    assertFalse(transactionsStarted.isEmpty());
+    ByteString transactionId = transactionsStarted.get(transactionsStarted.size() - 1);
+
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    for (ExecuteSqlRequest request : requests) {
+      assertEquals(transactionId, request.getTransaction().getId());
+    }
+    // Read-only transactions are not really committed.
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
 }
