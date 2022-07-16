@@ -26,6 +26,7 @@ import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.commands.Command;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.ConnectionState;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
@@ -66,32 +67,42 @@ public class SimpleQueryStatement {
     // Do a Parse-Describe-Bind-Execute round-trip for each statement in the query string.
     // Finish with a Sync to close any implicit transaction and to return the results.
     for (Statement originalStatement : this.statements) {
-      ParsedStatement originalParsedStatement = PARSER.parse(originalStatement);
-      ParsedStatement parsedStatement = originalParsedStatement;
-      if (options.requiresMatcher()
-          || connectionHandler.getWellKnownClient() == WellKnownClient.PSQL) {
-        parsedStatement = translatePotentialMetadataCommand(parsedStatement, connectionHandler);
-      }
-      parsedStatement =
-          replaceKnownUnsupportedQueries(
-              this.connectionHandler.getWellKnownClient(), this.options, parsedStatement);
-      if (parsedStatement != originalParsedStatement) {
-        // The original statement was replaced.
-        originalStatement = Statement.of(parsedStatement.getSqlWithoutComments());
-      }
-      // We need to flush the entire pipeline if we encounter a COPY statement, as COPY statements
-      // require additional messages to be sent back and forth, and this ensures that we get
-      // everything in the correct order.
-      boolean isCopy = StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments());
-      if (isCopy) {
-        new FlushMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
-      }
-      new ParseMessage(connectionHandler, parsedStatement, originalStatement).send();
-      new BindMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
-      new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
-      new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
-      if (isCopy) {
-        new FlushMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
+      boolean isFirst = this.statements.get(0) == originalStatement;
+      try {
+        ParsedStatement originalParsedStatement = PARSER.parse(originalStatement);
+        ParsedStatement parsedStatement = originalParsedStatement;
+        if (options.requiresMatcher()
+            || connectionHandler.getWellKnownClient() == WellKnownClient.PSQL) {
+          parsedStatement = translatePotentialMetadataCommand(parsedStatement, connectionHandler);
+        }
+        parsedStatement =
+            replaceKnownUnsupportedQueries(
+                this.connectionHandler.getWellKnownClient(), this.options, parsedStatement);
+        if (parsedStatement != originalParsedStatement) {
+          // The original statement was replaced.
+          originalStatement = Statement.of(parsedStatement.getSqlWithoutComments());
+        }
+        // We need to flush the entire pipeline if we encounter a COPY statement, as COPY statements
+        // require additional messages to be sent back and forth, and this ensures that we get
+        // everything in the correct order.
+        boolean isCopy = StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments());
+        if (!isFirst && isCopy) {
+          new FlushMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
+          if (connectionHandler
+                  .getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getConnectionState()
+              == ConnectionState.ABORTED) {
+            break;
+          }
+        }
+        new ParseMessage(connectionHandler, parsedStatement, originalStatement).send();
+        new BindMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
+        new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
+        new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
+      } catch (Exception ignore) {
+        // Stop further processing if an exception occurs.
+        break;
       }
     }
     new SyncMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();

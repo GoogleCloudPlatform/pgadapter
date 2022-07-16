@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
@@ -27,10 +28,14 @@ import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
+import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
+import java.io.DataOutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -41,6 +46,8 @@ import java.util.concurrent.Future;
  */
 @InternalApi
 public class IntermediateStatement {
+  private static final WireOutput[] EMPTY_WIRE_OUTPUT_ARRAY = new WireOutput[0];
+
   /**
    * Indicates whether an attempt to get the result of a statement should block or fail if the
    * result is not yet available. Normal SQL commands that can be executed directly on Cloud Spanner
@@ -69,6 +76,7 @@ public class IntermediateStatement {
   protected boolean executed;
   protected final Connection connection;
   protected final ConnectionHandler connectionHandler;
+  protected final DataOutputStream outputStream;
 
   public IntermediateStatement(
       OptionsMetadata options,
@@ -99,6 +107,7 @@ public class IntermediateStatement {
     this.connection = connectionHandler.getSpannerConnection();
     this.command = StatementParser.parseCommand(this.parsedStatement.getSqlWithoutComments());
     this.commandTag = this.command;
+    this.outputStream = connectionHandler.getConnectionMetadata().peekOutputStream();
   }
 
   /**
@@ -267,7 +276,7 @@ public class IntermediateStatement {
    *
    * @param exception The exception to store.
    */
-  protected void handleExecutionException(SpannerException exception) {
+  public void handleExecutionException(SpannerException exception) {
     setException(exception);
     this.hasMoreData = false;
   }
@@ -305,5 +314,21 @@ public class IntermediateStatement {
   /** @return the extracted command (first word) from the really executed SQL statement. */
   public String getCommandTag() {
     return this.commandTag;
+  }
+
+  public WireOutput[] createResultPrefix(ResultSet resultSet) {
+    // This is a no-op for a normal query. COPY uses this to send a CopyOutResponse.
+    // COPY table_name TO STDOUT BINARY also uses this to add the binary copy header.
+    return EMPTY_WIRE_OUTPUT_ARRAY;
+  }
+
+  public WireOutput createDataRowResponse(ResultSet resultSet, QueryMode mode) {
+    return new DataRowResponse(this.outputStream, this, resultSet, this.options, mode);
+  }
+
+  public WireOutput[] createResultSuffix() {
+    // This is a no-op for a normal query. COPY uses this to send a CopyDoneResponse.
+    // COPY table_name TO STDOUT BINARY also uses this to add the binary copy trailer.
+    return EMPTY_WIRE_OUTPUT_ARRAY;
   }
 }

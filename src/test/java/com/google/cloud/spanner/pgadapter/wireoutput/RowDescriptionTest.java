@@ -155,7 +155,7 @@ public final class RowDescriptionTest {
     // type size
     assertEquals(8, outputReader.readShort());
     // type modifier
-    assertEquals(DEFAULT_FLAG, outputReader.readInt());
+    assertEquals(-1, outputReader.readInt());
     // format code
     assertEquals(0, outputReader.readShort());
   }
@@ -208,7 +208,7 @@ public final class RowDescriptionTest {
     // type size
     assertEquals(-1, outputReader.readShort());
     // type modifier
-    assertEquals(DEFAULT_FLAG, outputReader.readInt());
+    assertEquals(-1, outputReader.readInt());
     // format code
     assertEquals(0, outputReader.readShort());
 
@@ -228,7 +228,7 @@ public final class RowDescriptionTest {
     // type size
     assertEquals(-1, outputReader.readShort());
     // type modifier
-    assertEquals(DEFAULT_FLAG, outputReader.readInt());
+    assertEquals(-1, outputReader.readInt());
     // format code
     assertEquals(1, outputReader.readShort());
   }
@@ -279,7 +279,7 @@ public final class RowDescriptionTest {
     // type size
     assertEquals(8, outputReader.readShort());
     // type modifier
-    assertEquals(DEFAULT_FLAG, outputReader.readInt());
+    assertEquals(-1, outputReader.readInt());
     // format code
     assertEquals(1, outputReader.readShort());
   }
@@ -335,7 +335,7 @@ public final class RowDescriptionTest {
       // type size
       assertEquals(8, outputReader.readShort());
       // type modifier
-      assertEquals(DEFAULT_FLAG, outputReader.readInt());
+      assertEquals(-1, outputReader.readInt());
       // format code
       assertEquals(i, outputReader.readShort());
     }

@@ -47,9 +47,6 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -82,7 +79,6 @@ import javax.annotation.Nullable;
 @InternalApi
 public class ConnectionHandler extends Thread {
   private static final Logger logger = Logger.getLogger(ConnectionHandler.class.getName());
-  private static final int SOCKET_BUFFER_SIZE = 1 << 16;
   private static final AtomicLong CONNECTION_HANDLER_ID_GENERATOR = new AtomicLong(0L);
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
 
@@ -233,25 +229,19 @@ public class ConnectionHandler extends Thread {
             String.format(
                 "Connection handler with ID %s starting for client %s", getName(), remoteClient));
 
-    try (DataInputStream input =
-            new DataInputStream(
-                new BufferedInputStream(
-                    Channels.newInputStream(socketChannel), SOCKET_BUFFER_SIZE));
-        DataOutputStream output =
-            new DataOutputStream(
-                new BufferedOutputStream(
-                    Channels.newOutputStream(socketChannel), SOCKET_BUFFER_SIZE))) {
+    try (ConnectionMetadata connectionMetadata =
+        new ConnectionMetadata(
+            Channels.newInputStream(socketChannel), Channels.newOutputStream(socketChannel))) {
+      this.connectionMetadata = connectionMetadata;
       if (!server.getOptions().disableLocalhostCheck()
           && this.remoteAddress != null
           && !this.remoteAddress.getAddress().isAnyLocalAddress()
           && !this.remoteAddress.getAddress().isLoopbackAddress()) {
-        handleError(
-            output, new IllegalAccessException("This proxy may only be accessed from localhost."));
+        handleError(new IllegalAccessException("This proxy may only be accessed from localhost."));
         return;
       }
 
       try {
-        this.connectionMetadata = new ConnectionMetadata(input, output);
         this.message = this.server.recordMessage(BootstrapMessage.create(this));
         this.message.send();
         while (this.status == ConnectionStatus.UNAUTHENTICATED) {
@@ -270,7 +260,7 @@ public class ConnectionHandler extends Thread {
           handleMessages();
         }
       } catch (Exception e) {
-        this.handleError(output, e);
+        this.handleError(e);
       }
     } catch (Exception e) {
       logger.log(
@@ -311,14 +301,14 @@ public class ConnectionHandler extends Thread {
       message.nextHandler();
       message.send();
     } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
-      this.handleError(getConnectionMetadata().getOutputStream(), fatalException);
-      if (this.status == ConnectionStatus.COPY_IN) {
-        this.status = ConnectionStatus.COPY_FAILED;
-      } else {
+      this.handleError(fatalException);
+      // Only terminate the connection if we are not in COPY_IN mode. In COPY_IN mode the mode will
+      // switch to normal mode in these cases.
+      if (this.status != ConnectionStatus.COPY_IN) {
         terminate();
       }
     } catch (Exception e) {
-      this.handleError(getConnectionMetadata().getOutputStream(), e);
+      this.handleError(e);
     }
   }
 
@@ -355,12 +345,13 @@ public class ConnectionHandler extends Thread {
    * @param exception The exception to be related.
    * @throws IOException if there is some issue in the sending of the error messages.
    */
-  private void handleError(DataOutputStream output, Exception exception) throws Exception {
+  private void handleError(Exception exception) throws Exception {
     logger.log(
         Level.WARNING,
         exception,
         () ->
             String.format("Exception on connection handler with ID %s: %s", getName(), exception));
+    DataOutputStream output = getConnectionMetadata().peekOutputStream();
     if (this.status == ConnectionStatus.TERMINATED) {
       new ErrorResponse(output, exception, ErrorResponse.State.InternalError, Severity.FATAL)
           .send();

@@ -18,7 +18,11 @@ import com.google.cloud.spanner.Statement;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to float. */
-public class FloatParser extends Parser<Float> {
+class FloatParser extends Parser<Float> {
+
+  FloatParser(Object item) {
+    this.item = (Float) item;
+  }
 
   FloatParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
@@ -36,7 +40,7 @@ public class FloatParser extends Parser<Float> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item == null ? null : Float.toString(this.item);
   }
 

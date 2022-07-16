@@ -19,6 +19,7 @@
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
     <skipITs>true</skipITs>
+    <clirr.skip>true</clirr.skip>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
@@ -35,7 +36,7 @@
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.5.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.6.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -47,7 +48,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.5.0</version>
+    <version>1.5.1</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -332,6 +333,20 @@
       </testResource>
     </testResources>
     <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>clirr-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <!-- Disable this plugin for now as it regularly times out when being downloaded -->
+            <phase>none</phase>
+          </execution>
+        </executions>
+        <configuration>
+          <skip>${clirr.skip}</skip>
+        </configuration>
+      </plugin>
+
       <plugin>
         <groupId>com.coveo</groupId>
         <artifactId>fmt-maven-plugin</artifactId>

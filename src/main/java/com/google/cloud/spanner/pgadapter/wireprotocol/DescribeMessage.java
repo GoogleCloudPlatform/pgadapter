@@ -122,16 +122,19 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
       throw this.statement.getException();
     } else {
       if (this.statement.containsResultSet()) {
-        try {
-          new RowDescriptionResponse(
-                  this.outputStream,
-                  this.statement,
-                  getPortalMetadata().getMetadata(),
-                  this.connection.getServer().getOptions(),
-                  this.queryMode)
-              .send(false);
-        } catch (SpannerException exception) {
-          this.handleError(exception);
+        // COPY TO STDOUT statements do not contain any metadata.
+        if (getPortalMetadata() != null) {
+          try {
+            new RowDescriptionResponse(
+                    this.outputStream,
+                    this.statement,
+                    getPortalMetadata().getMetadata(),
+                    this.connection.getServer().getOptions(),
+                    this.queryMode)
+                .send(false);
+          } catch (SpannerException exception) {
+            this.handleError(exception);
+          }
         }
       } else {
         // The simple query protocol does not expect a NoData response in case of a non-query
@@ -163,8 +166,8 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
    * @throws Exception if sending the message back to the client causes an error.
    */
   public void handleDescribeStatement() throws Exception {
-    try {
-      DescribeStatementMetadata metadata = (DescribeStatementMetadata) this.statement.describe();
+    try (DescribeStatementMetadata metadata =
+        (DescribeStatementMetadata) this.statement.describe()) {
       new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send(false);
       if (metadata.getResultSet() != null) {
         new RowDescriptionResponse(

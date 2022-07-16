@@ -19,16 +19,17 @@ import com.google.api.core.ApiFutures;
 import com.google.api.core.InternalApi;
 import com.google.api.core.SettableApiFuture;
 import com.google.cloud.ByteArray;
-import com.google.cloud.Date;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Mutation.WriteBuilder;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -37,16 +38,9 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.google.spanner.v1.TypeCode;
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.io.Reader;
-import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -62,11 +56,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.GuardedBy;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
-import org.postgresql.jdbc.TimestampUtils;
 
 @InternalApi
 public class MutationWriter implements Callable<StatementResult>, Closeable {
@@ -118,18 +108,14 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       Integer.parseInt(
           System.getProperty("copy_in_commit_limit", String.valueOf(DEFAULT_COMMIT_LIMIT)));
   private final CopyTransactionMode transactionMode;
-  private final boolean hasHeader;
-  private boolean isHeaderParsed;
   private long rowCount;
   private final Connection connection;
   private final String tableName;
-  private final Map<String, TypeCode> tableColumns;
+  private final Map<String, Type> tableColumns;
   private final int maxBatchSize;
   private final long commitSizeLimitForBatching;
   private final int maxParallelism;
-  private final int pipeBufferSize;
-  private final CSVFormat format;
-  private final CSVParser parser;
+  private final CopyInParser parser;
   private final PipedOutputStream payload = new PipedOutputStream();
   private final AtomicBoolean commit = new AtomicBoolean(false);
   private final AtomicBoolean rollback = new AtomicBoolean(false);
@@ -146,15 +132,14 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       CopyTransactionMode transactionMode,
       Connection connection,
       String tableName,
-      Map<String, TypeCode> tableColumns,
+      Map<String, Type> tableColumns,
       int indexedColumnsCount,
+      CopyOptions.Format copyFormat,
       CSVFormat format,
       boolean hasHeader)
       throws IOException {
     this.transactionMode = transactionMode;
     this.connection = connection;
-    this.hasHeader = hasHeader;
-    this.isHeaderParsed = false;
     this.tableName = tableName;
     this.tableColumns = tableColumns;
     int mutationLimit =
@@ -179,15 +164,13 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                 System.getProperty(
                     "copy_in_max_parallelism", String.valueOf(DEFAULT_MAX_PARALLELISM))),
             1);
-    this.pipeBufferSize =
+    int pipeBufferSize =
         Math.max(
             Integer.parseInt(
                 System.getProperty(
                     "copy_in_pipe_buffer_size", String.valueOf(DEFAULT_PIPE_BUFFER_SIZE))),
             1024);
-    this.format = format;
-    // TODO(b/237831799): Support binary format for COPY.
-    this.parser = createParser();
+    this.parser = CopyInParser.create(copyFormat, format, payload, pipeBufferSize, hasHeader);
   }
 
   /** @return number of rows copied into Spanner */
@@ -253,21 +236,21 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     // before finishing, to ensure that all data has been written before we signal that we are done.
     List<ApiFuture<Void>> allCommitFutures = new ArrayList<>();
     try {
-      Iterator<CSVRecord> iterator = this.parser.iterator();
+      Iterator<CopyRecord> iterator = this.parser.iterator();
       List<Mutation> mutations = new ArrayList<>();
       long currentBufferByteSize = 0L;
       // Note: iterator.hasNext() blocks if there is not enough data in the pipeline to construct a
       // complete record. It returns false if the stream has been closed and all records have been
       // returned.
       while (!rollback.get() && iterator.hasNext()) {
-        CSVRecord record = iterator.next();
-        if (record.size() != this.tableColumns.keySet().size()) {
+        CopyRecord record = iterator.next();
+        if (record.numColumns() != this.tableColumns.keySet().size()) {
           throw SpannerExceptionFactory.newSpannerException(
               ErrorCode.INVALID_ARGUMENT,
               "Invalid COPY data: Row length mismatched. Expected "
                   + this.tableColumns.keySet().size()
                   + " columns, but only found "
-                  + record.size());
+                  + record.numColumns());
         }
 
         Mutation mutation = buildMutation(record);
@@ -509,8 +492,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   }
 
   @VisibleForTesting
-  Mutation buildMutation(CSVRecord record) {
-    TimestampUtils timestampUtils = new TimestampUtils(false, () -> null);
+  Mutation buildMutation(CopyRecord record) {
     WriteBuilder builder;
     // The default is to use Insert, but PGAdapter also supports InsertOrUpdate. This can be very
     // useful for importing large datasets using PartitionedNonAtomic mode. If an import attempt
@@ -522,102 +504,16 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       builder = Mutation.newInsertBuilder(this.tableName);
     }
     // Iterate through all table column to copy into
+    int index = 0;
     for (String columnName : this.tableColumns.keySet()) {
-      TypeCode columnType = this.tableColumns.get(columnName);
-      String recordValue = "";
-      try {
-        recordValue = record.get(columnName);
-        switch (columnType) {
-          case STRING:
-            builder.set(columnName).to(recordValue);
-            break;
-          case JSON:
-            builder.set(columnName).to(Value.json(recordValue));
-            break;
-          case BOOL:
-            builder
-                .set(columnName)
-                .to(recordValue == null ? null : Boolean.parseBoolean(recordValue));
-            break;
-          case INT64:
-            builder.set(columnName).to(recordValue == null ? null : Long.parseLong(recordValue));
-            break;
-          case FLOAT64:
-            builder
-                .set(columnName)
-                .to(recordValue == null ? null : Double.parseDouble(recordValue));
-            break;
-          case NUMERIC:
-            builder.set(columnName).to(Value.pgNumeric(recordValue));
-            break;
-          case BYTES:
-            if (recordValue == null) {
-              builder.set(columnName).to((ByteArray) null);
-            } else if (recordValue.startsWith("\\x")) {
-              builder
-                  .set(columnName)
-                  .to(ByteArray.copyFrom(Hex.decodeHex(recordValue.substring(2))));
-            } else {
-              throw SpannerExceptionFactory.newSpannerException(
-                  ErrorCode.INVALID_ARGUMENT,
-                  "COPY only supports the Hex format for bytea columns");
-            }
-            break;
-          case DATE:
-            builder.set(columnName).to(recordValue == null ? null : Date.parseDate(recordValue));
-            break;
-          case TIMESTAMP:
-            Timestamp timestamp = timestampUtils.toTimestamp(null, recordValue);
-            builder
-                .set(columnName)
-                .to(timestamp == null ? null : com.google.cloud.Timestamp.of(timestamp));
-            break;
-        }
-      } catch (NumberFormatException | DateTimeParseException e) {
-        SpannerException spannerException =
-            SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INVALID_ARGUMENT,
-                "Invalid input syntax for type "
-                    + columnType.toString()
-                    + ":"
-                    + "\""
-                    + recordValue
-                    + "\"",
-                e);
-        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
-        throw spannerException;
-      } catch (IllegalArgumentException e) {
-        SpannerException spannerException =
-            SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INVALID_ARGUMENT,
-                "Invalid input syntax for column \"" + columnName + "\"",
-                e);
-        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
-        throw spannerException;
-      } catch (Exception e) {
-        SpannerException spannerException = SpannerExceptionFactory.asSpannerException(e);
-        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
-        throw spannerException;
-      }
+      Type columnType = this.tableColumns.get(columnName);
+      Value value =
+          record.hasColumnNames()
+              ? record.getValue(columnType, columnName)
+              : record.getValue(columnType, index);
+      builder.set(columnName).to(value);
+      index++;
     }
     return builder.build();
-  }
-
-  private CSVParser createParser() throws IOException {
-    // Construct the CSVParser directly on the stream of incoming CopyData messages, so we don't
-    // store more data in memory than necessary. Loading all data into memory first before starting
-    // to parse and write the CSVRecords could otherwise cause an out-of-memory exception for large
-    // files.
-    Reader reader =
-        new InputStreamReader(
-            new PipedInputStream(this.payload, this.pipeBufferSize), StandardCharsets.UTF_8);
-    CSVParser parser;
-    if (this.hasHeader && !this.isHeaderParsed) {
-      parser = CSVParser.parse(reader, this.format.withFirstRecordAsHeader());
-      this.isHeaderParsed = true;
-    } else {
-      parser = CSVParser.parse(reader, this.format);
-    }
-    return parser;
   }
 }

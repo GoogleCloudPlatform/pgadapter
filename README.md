@@ -51,9 +51,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.5.1` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.6.1` with the version you want to download):
 ```shell
-VERSION=v0.5.1
+VERSION=v0.6.1
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 ```
@@ -86,7 +86,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.5.1</version>
+  <version>0.6.1</version>
 </dependency>
 ```
 <!--- {x-version-update-end} -->
@@ -277,7 +277,7 @@ out of the box, the following items are not supported:
 * COPY <table_name> TO ...
 * COPY <table_name> FROM <filename | PROGRAM program>
 
-See [COPY <table-name> FROM STDIN](#copy-support) for more information on COPY.
+See [COPY <table-name> FROM STDIN](docs/copy.md) for more information on COPY.
 
 Only the following `psql` meta-commands are supported:
   * `\d <table>` 
@@ -287,69 +287,6 @@ Only the following `psql` meta-commands are supported:
   * `\l`
 
 Other `psql` meta-commands are __not__ supported.
-
-## COPY support
-`COPY <table-name> FROM STDIN` is supported. This option can be used to insert bulk data to a Cloud
-Spanner database. `COPY` operations are atomic by default, but the standard transaction limits of
-Cloud Spanner apply to these transactions. That means that at most 20,000 mutations can be included
-in one `COPY` operation. `COPY` can also be executed in non-atomic mode by executing the statement
-`SET SPANNER.AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing the copy operation.
-
-Although only `STDIN` is supported, export files can still be imported using `COPY` by piping files
-into `psql`. See the examples below.
-
-### Atomic COPY example
-```sql
-create table numbers (number bigint not null primary key, name varchar);
-```
-
-```shell
-cat numbers.txt | psql -h localhost -d test-db -c "copy numbers from stdin;"
-```
-
-The above operation will fail if the `numbers.txt` file contains more than 20,000 mutations.
-
-### Non-atomic COPY example
-```sql
-create table numbers (number bigint not null primary key, name varchar);
-```
-
-```shell
-cat numbers.txt | psql -h localhost -d test-db -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; copy numbers from stdin;"
-```
-
-The above operation will automatically split the data over multiple transactions if the file
-contains more than 20,000 mutations.
-
-Note that this also means that if an error is encountered
-during the `COPY` operation, some rows may already have been persisted to the database. This will
-not be rolled back after the error was encountered. The transactions are executed in parallel,
-which means that data after the row that caused the error in the import file can still have been
-imported to the database before the `COPY` operation was halted.
-
-### Streaming data from PostgreSQL
-`COPY` can also be used to stream data directly from a real PostgreSQL database to Cloud Spanner.
-This makes it easy to quickly copy an entire table from PostgreSQL to Cloud Spanner, or to generate
-test data for Cloud Spanner using PostgreSQL queries.
-
-The following examples assume that a real PostgreSQL server is running on `localhost:5432` and
-PGAdapter is running on `localhost:5433`.
-
-```shell
-psql -h localhost -p 5432 -d my-local-db \
-  -c "copy (select i, to_char(i, 'fm000') from generate_series(1, 10) s(i)) to stdout" \
-  | psql -h localhost -p 5433 -d my-spanner-db \
-  -c "copy numbers from stdin;"
-```
-
-Larger datasets require that the Cloud Spanner database is set to `PARTITIONED_NON_ATOMIC` mode:
-
-```shell
-psql -h localhost -p 5432 -d my-local-db \
-  -c "copy (select i, to_char(i, 'fm000') from generate_series(1, 1000000) s(i)) to stdout" \
-  | psql -h localhost -p 5433 -d my-spanner-db \
-  -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; copy numbers from stdin;"
-```
 
 ## Limitations
 

@@ -433,7 +433,18 @@ public class ParserTest {
       assertEquals(Format.TEXT, options.getFormat());
       assertTrue(options.getColumnNames().isEmpty());
     }
+    {
+      CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+      String sql = "COPY users TO STDOUT;";
+      parse(sql, options);
 
+      assertEquals(StatementParser.parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", options.getTableName());
+      assertEquals(FromTo.TO, options.getFromTo());
+      assertEquals("STDOUT", options.getFilename());
+      assertEquals(Format.TEXT, options.getFormat());
+      assertTrue(options.getColumnNames().isEmpty());
+    }
     {
       CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
       String sql = "COPY Users FROM STDIN;";

@@ -79,7 +79,7 @@ public class ITPgxTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() throws Exception {
-    pgxTest = PgxTest.compile();
+    pgxTest = GolangTest.compile("pgadapter_pgx_tests/pgx.go", PgxTest.class);
 
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());

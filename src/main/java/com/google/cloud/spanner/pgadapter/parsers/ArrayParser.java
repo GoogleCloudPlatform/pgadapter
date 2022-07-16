@@ -88,7 +88,7 @@ class ArrayParser extends Parser<List<?>> {
   }
 
   @Override
-  List<?> getItem() {
+  public List<?> getItem() {
     return this.item;
   }
 
@@ -126,7 +126,7 @@ class ArrayParser extends Parser<List<?>> {
   }
 
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     if (this.item == null) {
       return null;
     }

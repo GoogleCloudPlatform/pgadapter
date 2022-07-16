@@ -250,7 +250,8 @@ public abstract class Parser<T> {
     }
   }
 
-  T getItem() {
+  /** Returns the item helder by this parser. */
+  public T getItem() {
     return this.item;
   }
 
@@ -278,7 +279,7 @@ public abstract class Parser<T> {
    *
    * @return String representation of data.
    */
-  protected abstract String stringParse();
+  public abstract String stringParse();
 
   /** @return Binary representation of string data. */
   protected byte[] stringBinaryParse() {

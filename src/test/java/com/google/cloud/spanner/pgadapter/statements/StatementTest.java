@@ -62,6 +62,9 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.AfterClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -87,7 +90,6 @@ public class StatementTest {
   @Mock private Connection connection;
   @Mock private ConnectionHandler connectionHandler;
   @Mock private ConnectionMetadata connectionMetadata;
-  @Mock private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   @Mock private BackendConnection backendConnection;
   @Mock private ProxyServer server;
   @Mock private OptionsMetadata options;
@@ -112,6 +114,7 @@ public class StatementTest {
   public void testBasicSelectStatement() throws Exception {
     String sql = "SELECT * FROM users";
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
@@ -135,6 +138,7 @@ public class StatementTest {
     String sql = "UPDATE users SET name = someName WHERE id = 10";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
@@ -163,6 +167,7 @@ public class StatementTest {
     String sql = "UPDATE users SET name = someName WHERE id = -1";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connection.execute(Statement.of(sql))).thenReturn(statementResult);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
@@ -199,6 +204,7 @@ public class StatementTest {
     String sql = "CREATE TABLE users (name varchar(100) primary key)";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
@@ -225,6 +231,7 @@ public class StatementTest {
 
   @Test
   public void testDescribeBasicStatementThrowsException() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sql = "SELECT * FROM users";
     IntermediateStatement intermediateStatement =
         new IntermediateStatement(options, parse(sql), Statement.of(sql), connectionHandler);
@@ -240,6 +247,7 @@ public class StatementTest {
 
     when(connection.execute(Statement.of(sql))).thenThrow(thrownException);
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
@@ -260,6 +268,7 @@ public class StatementTest {
   @Test
   public void testPreparedStatement() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sqlStatement = "SELECT * FROM users WHERE age > $2 AND age < $3 AND name = $1";
     int[] parameterDataTypes = new int[] {Oid.VARCHAR, Oid.INT8, Oid.INT4};
 
@@ -303,6 +312,7 @@ public class StatementTest {
 
   @Test
   public void testPreparedStatementIllegalTypeThrowsException() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sqlStatement = "SELECT * FROM users WHERE metadata = $1";
     int[] parameterDataTypes = new int[] {Oid.JSON};
 
@@ -321,6 +331,7 @@ public class StatementTest {
   @Test
   public void testPreparedStatementDescribeDoesNotThrowException() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sqlStatement = "SELECT * FROM users WHERE name = $1 AND age > $2 AND age < $3";
     when(connection.analyzeQuery(Statement.of(sqlStatement), QueryAnalyzeMode.PLAN))
         .thenReturn(resultSet);
@@ -338,6 +349,7 @@ public class StatementTest {
   @Test
   public void testPortalStatement() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
 
     IntermediatePortalStatement intermediateStatement =
@@ -386,6 +398,7 @@ public class StatementTest {
   @Test
   public void testPortalStatementDescribePropagatesFailure() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
 
     IntermediatePortalStatement intermediateStatement =
@@ -421,8 +434,8 @@ public class StatementTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
-    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
-    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionMetadata.peekInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.peekOutputStream()).thenReturn(outputStream);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
@@ -439,6 +452,7 @@ public class StatementTest {
   @Test
   public void testCopyInvalidBuildMutation() throws Exception {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     setupQueryInformationSchemaResults();
 
     String sql = "COPY keyvalue FROM STDIN;";
@@ -450,11 +464,12 @@ public class StatementTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"), connection, DdlTransactionMode.Batch, ImmutableList.of());
     statement.executeAsync(backendConnection);
-    backendConnection.flush();
 
     byte[] payload = "2 3\n".getBytes();
     MutationWriter mutationWriter = statement.getMutationWriter();
     mutationWriter.addCopyData(payload);
+
+    backendConnection.flush();
 
     SpannerException thrown = assertThrows(SpannerException.class, statement::getUpdateCount);
     assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
@@ -471,6 +486,7 @@ public class StatementTest {
     String sql = "select * from foo";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediateStatement intermediateStatement =
         new IntermediateStatement(options, parse(sql), Statement.of(sql), connectionHandler);
 
@@ -484,6 +500,7 @@ public class StatementTest {
     String sql = "select * from foo";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediateStatement intermediateStatement =
         new IntermediateStatement(options, parse(sql), Statement.of(sql), connectionHandler);
 
@@ -497,6 +514,7 @@ public class StatementTest {
     String sql = "select * from foo";
 
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
             connectionHandler, options, "", parse(sql), Statement.of(sql));
@@ -514,6 +532,8 @@ public class StatementTest {
 
   @Test
   public void testCopyBatchSizeLimit() throws Exception {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
@@ -530,27 +550,31 @@ public class StatementTest {
     copyStatement.executeAsync(backendConnection);
     assertTrue(copyStatement.isExecuted());
 
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    Future<MutationWriter> future =
+        executor.submit(
+            () -> {
+              MutationWriter mw = copyStatement.getMutationWriter();
+              mw.addCopyData(payload);
+              mw.close();
+              return mw;
+            });
+    executor.shutdown();
+
     backendConnection.flush();
-    MutationWriter mw = copyStatement.getMutationWriter();
-    //    // Inject a mock DatabaseClient for now.
-    //    // TODO: Fix this once we can use the Connection API.
-    //    Field databaseClientField = MutationWriter.class.getDeclaredField("databaseClient");
-    //    databaseClientField.setAccessible(true);
-    //    databaseClientField.set(mw, mock(DatabaseClient.class));
-    mw.addCopyData(payload);
-    mw.close();
 
     assertEquals("TEXT", copyStatement.getFormatType());
     assertEquals('\t', copyStatement.getDelimiterChar());
     assertFalse(copyStatement.hasException());
     assertEquals(12L, copyStatement.getUpdateCount());
-    assertEquals(12L, mw.getRowCount());
+    assertEquals(12L, future.get().getRowCount());
 
     copyStatement.close();
   }
 
   @Test
   public void testCopyDataRowLengthMismatchLimit() throws Exception {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
@@ -567,10 +591,19 @@ public class StatementTest {
     copyStatement.executeAsync(backendConnection);
     assertTrue(copyStatement.isExecuted());
 
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    Future<MutationWriter> future =
+        executor.submit(
+            () -> {
+              MutationWriter mw = copyStatement.getMutationWriter();
+              mw.addCopyData(payload);
+              mw.close();
+              return mw;
+            });
+    executor.shutdown();
+    ;
+
     backendConnection.flush();
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(payload);
-    mw.close();
 
     SpannerException thrown = assertThrows(SpannerException.class, copyStatement::getUpdateCount);
     assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());

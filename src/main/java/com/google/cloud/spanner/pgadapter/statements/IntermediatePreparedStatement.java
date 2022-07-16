@@ -136,60 +136,53 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     Set<String> parameters = extractParameters(this.parsedStatement.getSqlWithoutComments());
 
     ResultSet columnsResultSet = null;
-    try {
-      if (this.parsedStatement.isQuery()) {
-        Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
-        columnsResultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
-      }
+    if (this.parsedStatement.isQuery()) {
+      Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
+      columnsResultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
+    }
 
-      boolean describeFailed = false;
-      if (parameters.isEmpty()) {
-        ensureParameterLength(0);
-      } else if (parameters.size() != this.parameterDataTypes.length
-          || Arrays.stream(this.parameterDataTypes).anyMatch(p -> p == 0)) {
-        // Note: We are only asking the backend to parse the types if there is at least one
-        // parameter with unspecified type. Otherwise, we will rely on the types given in PARSE.
+    boolean describeFailed = false;
+    if (parameters.isEmpty()) {
+      ensureParameterLength(0);
+    } else if (parameters.size() != this.parameterDataTypes.length
+        || Arrays.stream(this.parameterDataTypes).anyMatch(p -> p == 0)) {
+      // Note: We are only asking the backend to parse the types if there is at least one
+      // parameter with unspecified type. Otherwise, we will rely on the types given in PARSE.
 
-        // Transform the statement into a select statement that selects the parameters, and then
-        // extract the types from the result set metadata.
-        Statement selectParamsStatement = transformToSelectParams(parameters);
-        if (selectParamsStatement == null) {
-          // The transformation failed. Just rely on the types given in the PARSE message. If the
-          // transformation failed because the statement was malformed, the backend will catch that
-          // at a later stage.
+      // Transform the statement into a select statement that selects the parameters, and then
+      // extract the types from the result set metadata.
+      Statement selectParamsStatement = transformToSelectParams(parameters);
+      if (selectParamsStatement == null) {
+        // The transformation failed. Just rely on the types given in the PARSE message. If the
+        // transformation failed because the statement was malformed, the backend will catch that
+        // at a later stage.
+        describeFailed = true;
+        ensureParameterLength(parameters.size());
+      } else {
+        try (ResultSet paramsResultSet =
+            connection.analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)) {
+          extractParameterTypes(paramsResultSet);
+        } catch (SpannerException exception) {
+          // Ignore here and rely on the types given in PARSE.
           describeFailed = true;
           ensureParameterLength(parameters.size());
-        } else {
-          try (ResultSet paramsResultSet =
-              connection.analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)) {
-            extractParameterTypes(paramsResultSet);
-          } catch (SpannerException exception) {
-            // Ignore here and rely on the types given in PARSE.
-            describeFailed = true;
-            ensureParameterLength(parameters.size());
-          }
         }
       }
-      if (columnsResultSet != null) {
-        return new DescribeStatementMetadata(this.parameterDataTypes, columnsResultSet);
-      }
-
-      if (this.parsedStatement.isUpdate()
-          && (describeFailed || !Strings.isNullOrEmpty(this.name))) {
-        // Let the backend analyze the statement if it is a named prepared statement or if the query
-        // that was used to determine the parameter types failed, so we can return a reasonable
-        // error message if the statement is invalid. If it is the unnamed statement or getting the
-        // param types succeeded, we will let the following EXECUTE message handle that, instead of
-        // sending the statement twice to the backend.
-        connection.analyzeUpdate(
-            Statement.of(this.parsedStatement.getSqlWithoutComments()), QueryAnalyzeMode.PLAN);
-      }
-      return new DescribeStatementMetadata(this.parameterDataTypes, null);
-    } finally {
-      if (columnsResultSet != null) {
-        columnsResultSet.close();
-      }
     }
+    if (columnsResultSet != null) {
+      return new DescribeStatementMetadata(this.parameterDataTypes, columnsResultSet);
+    }
+
+    if (this.parsedStatement.isUpdate() && (describeFailed || !Strings.isNullOrEmpty(this.name))) {
+      // Let the backend analyze the statement if it is a named prepared statement or if the query
+      // that was used to determine the parameter types failed, so we can return a reasonable
+      // error message if the statement is invalid. If it is the unnamed statement or getting the
+      // param types succeeded, we will let the following EXECUTE message handle that, instead of
+      // sending the statement twice to the backend.
+      connection.analyzeUpdate(
+          Statement.of(this.parsedStatement.getSqlWithoutComments()), QueryAnalyzeMode.PLAN);
+    }
+    return new DescribeStatementMetadata(this.parameterDataTypes, null);
   }
 
   /**

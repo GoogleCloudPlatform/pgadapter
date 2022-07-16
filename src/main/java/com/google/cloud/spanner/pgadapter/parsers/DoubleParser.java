@@ -14,12 +14,17 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to double. */
-class DoubleParser extends Parser<Double> {
+@InternalApi
+public class DoubleParser extends Parser<Double> {
 
   DoubleParser(ResultSet item, int position) {
     this.item = item.getDouble(position);
@@ -36,7 +41,7 @@ class DoubleParser extends Parser<Double> {
           this.item = Double.valueOf(new String(item));
           break;
         case BINARY:
-          this.item = ByteConverter.float8(item, 0);
+          this.item = toDouble(item);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
@@ -44,8 +49,17 @@ class DoubleParser extends Parser<Double> {
     }
   }
 
+  /** Converts the binary data to a double value. */
+  public static double toDouble(@Nonnull byte[] data) {
+    if (data.length < 8) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, "Invalid length for float8: " + data.length);
+    }
+    return ByteConverter.float8(data, 0);
+  }
+
   @Override
-  protected String stringParse() {
+  public String stringParse() {
     return this.item == null ? null : Double.toString(this.item);
   }
 

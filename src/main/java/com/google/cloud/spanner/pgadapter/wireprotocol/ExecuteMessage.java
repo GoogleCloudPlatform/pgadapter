@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import java.text.MessageFormat;
 
@@ -89,13 +90,20 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
    * @throws Exception if sending the message back to the client causes an error.
    */
   private void handleExecute() throws Exception {
-    if (this.statement.hasException()) {
-      this.handleError(this.statement.getException());
+    // Copy response is handled directly in the COPY protocol.
+    if (this.statement instanceof CopyStatement) {
+      if (this.statement.hasException()) {
+        throw this.statement.getException();
+      }
     } else {
-      try {
-        this.sendSpannerResult(this.statement, this.queryMode, this.maxRows);
-      } catch (Exception exception) {
-        handleError(exception);
+      if (this.statement.hasException()) {
+        this.handleError(this.statement.getException());
+      } else {
+        try {
+          this.sendSpannerResult(this.statement, this.queryMode, this.maxRows);
+        } catch (Exception exception) {
+          handleError(exception);
+        }
       }
     }
     this.connection.cleanUp(this.statement);

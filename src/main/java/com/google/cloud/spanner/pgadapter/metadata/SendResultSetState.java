@@ -20,12 +20,22 @@ import com.google.api.core.InternalApi;
 @InternalApi
 public class SendResultSetState {
 
+  private final String commandTag;
   private final long numRowsSent;
   private final boolean moreRows;
 
-  public SendResultSetState(long numRowsSent, boolean hasMoreRows) {
+  public SendResultSetState(String commandTag, long numRowsSent, boolean hasMoreRows) {
+    this.commandTag = commandTag;
     this.numRowsSent = numRowsSent;
     this.moreRows = hasMoreRows;
+  }
+
+  public String getCommandAndNumRows() {
+    return getCommandTag() + " " + getNumberOfRowsSent();
+  }
+
+  public String getCommandTag() {
+    return commandTag;
   }
 
   public boolean hasMoreRows() {

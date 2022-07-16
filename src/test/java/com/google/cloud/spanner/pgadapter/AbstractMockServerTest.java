@@ -298,12 +298,22 @@ public abstract class AbstractMockServerTest {
 
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
-    doStartMockSpannerAndPgAdapterServers("d", Collections.emptyList());
+    doStartMockSpannerAndPgAdapterServers(
+        new MockSpannerServiceImpl(), "d", Collections.emptyList());
   }
 
   protected static void doStartMockSpannerAndPgAdapterServers(
       String defaultDatabase, Iterable<String> extraPGAdapterOptions) throws Exception {
-    mockSpanner = new MockSpannerServiceImpl();
+    doStartMockSpannerAndPgAdapterServers(
+        new MockSpannerServiceImpl(), defaultDatabase, extraPGAdapterOptions);
+  }
+
+  protected static void doStartMockSpannerAndPgAdapterServers(
+      MockSpannerServiceImpl mockSpannerService,
+      String defaultDatabase,
+      Iterable<String> extraPGAdapterOptions)
+      throws Exception {
+    mockSpanner = mockSpannerService;
     mockSpanner.setAbortProbability(0.0D); // We don't want any unpredictable aborted transactions.
     mockSpanner.putStatementResult(StatementResult.query(SELECT1, SELECT1_RESULTSET));
     mockSpanner.putStatementResult(StatementResult.query(SELECT2, SELECT2_RESULTSET));

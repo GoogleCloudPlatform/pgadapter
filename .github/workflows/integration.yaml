@@ -1,14 +1,23 @@
 on:
+  push:
+    branches:
+      - postgresql-dialect
   pull_request:
   schedule:
-    # Run at 04:52UTC every day
+    # Run at 04:52UTC every day. This run will use preprod-spanner.sandbox.googleapis.com
     - cron: '52 4 * * *'
+    # Run at 03:14UTC every day. This run will use staging-wrenchworks.sandbox.googleapis.com
+    - cron: '14 3 * * *'
   workflow_dispatch:
     inputs:
-      staging:
-        description: "Run the integration tests on the staging environment?"
-        required: false
-        type: boolean
+      endpoint:
+        description: "The Spanner endpoint to use for the tests"
+        required: true
+        type: choice
+        options:
+          - spanner.googleapis.com
+          - staging-wrenchworks.sandbox.googleapis.com
+          - preprod-spanner.sandbox.googleapis.com
 name: integration
 env:
   GOOGLE_CLOUD_PROJECT: "span-cloud-testing"
@@ -31,13 +40,34 @@ jobs:
     if: needs.check-env.outputs.has-key == 'true'
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    # Add a PostgreSQL Docker container
+    services:
+      # Container label
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        # Set health checks to wait until postgres has started
+        ports:
+          - 5432:5432
+        volumes:
+          - /pg:/var/run/postgresql
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - id: set-manual-endpoint
-        if: "${{ inputs.staging }}"
+        if: "${{ inputs.endpoint }}"
         run: |
-          echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
-      - id: set-scheduled-endpoint
+          echo "GOOGLE_CLOUD_ENDPOINT=${{ inputs.endpoint }}" >> $GITHUB_ENV
+      - id: set-preprod-scheduled-endpoint
         if: github.event.schedule=='52 4 * * *'
+        run: |
+          echo "GOOGLE_CLOUD_ENDPOINT=preprod-spanner.sandbox.googleapis.com" >> $GITHUB_ENV
+      - id: set-staging-scheduled-endpoint
+        if: github.event.schedule=='14 3 * * *'
         run: |
           echo "GOOGLE_CLOUD_ENDPOINT=staging-wrenchworks.sandbox.googleapis.com" >> $GITHUB_ENV
       - uses: actions/checkout@v3
@@ -61,6 +91,13 @@ jobs:
         with:
           python-version: '3.9'
       - run: pip install -r ./src/test/python/requirements.txt
+      - name: Setup psql
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client
+      - name: Create PostgreSQL test database
+        run: |
+          psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run unit tests
         run: mvn test -B -Ptest-all
       - name: Run unit tests for native image
@@ -73,6 +110,11 @@ jobs:
           export_default_credentials: true
       - name: Run integration tests
         run: mvn verify -B -Dclirr.skip=true -DskipITs=false -DPG_ADAPTER_HOST="https://$GOOGLE_CLOUD_ENDPOINT" -DPG_ADAPTER_INSTANCE="$GOOGLE_CLOUD_INSTANCE" -DPG_ADAPTER_DATABASE="$GOOGLE_CLOUD_DATABASE"
+        env:
+          POSTGRES_HOST: /pg
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+          POSTGRES_DATABASE: pgadapter
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
