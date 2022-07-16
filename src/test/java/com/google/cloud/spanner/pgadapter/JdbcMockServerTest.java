@@ -139,6 +139,65 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSelectCurrentDatabase() throws SQLException {
+    for (String sql :
+        new String[] {
+          "SELECT current_database()",
+          "select current_database()",
+          "select * from CURRENT_DATABASE()"
+        }) {
+
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("d", resultSet.getString("current_database"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testSelectCurrentCatalog() throws SQLException {
+    for (String sql :
+        new String[] {
+          "SELECT current_catalog", "select current_catalog", "select * from CURRENT_CATALOG"
+        }) {
+
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("d", resultSet.getString("current_catalog"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testShowServerVersion() throws SQLException {
+    String sql = "show server_version";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(
+            pgServer.getOptions().getServerVersion(), resultSet.getString("server_version"));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
   public void testQueryHint() throws SQLException {
     String sql = "/* @OPTIMIZER_VERSION=1 */ SELECT 1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));

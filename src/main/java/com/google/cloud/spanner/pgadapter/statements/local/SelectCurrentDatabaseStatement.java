@@ -26,24 +26,27 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResu
 import com.google.common.collect.ImmutableList;
 
 @InternalApi
-public class SelectCurrentSchemaStatement implements LocalStatement {
-  public static final SelectCurrentSchemaStatement INSTANCE = new SelectCurrentSchemaStatement();
+public class SelectCurrentDatabaseStatement implements LocalStatement {
+  public static final SelectCurrentDatabaseStatement INSTANCE =
+      new SelectCurrentDatabaseStatement();
 
-  private SelectCurrentSchemaStatement() {}
+  private SelectCurrentDatabaseStatement() {}
 
   @Override
   public String[] getSql() {
     return new String[] {
-      "select current_schema()",
-      "SELECT current_schema()",
-      "Select current_schema()",
-      "select current_schema",
-      "SELECT current_schema",
-      "Select current_schema",
-      "select * from current_schema()",
-      "SELECT * FROM current_schema()",
-      "select * from current_schema",
-      "SELECT * FROM current_schema"
+      "select current_database()",
+      "SELECT current_database()",
+      "Select current_database()",
+      "select CURRENT_DATABASE()",
+      "SELECT CURRENT_DATABASE()",
+      "Select CURRENT_DATABASE()",
+      "select * from current_database()",
+      "SELECT * FROM current_database()",
+      "Select * FROM current_database()",
+      "select * from CURRENT_DATABASE()",
+      "SELECT * FROM CURRENT_DATABASE()",
+      "Select * FROM CURRENT_DATABASE()",
     };
   }
 
@@ -51,11 +54,11 @@ public class SelectCurrentSchemaStatement implements LocalStatement {
   public StatementResult execute(BackendConnection backendConnection) {
     ResultSet resultSet =
         ResultSets.forRows(
-            Type.struct(StructField.of("current_schema", Type.string())),
+            Type.struct(StructField.of("current_database", Type.string())),
             ImmutableList.of(
                 Struct.newBuilder()
-                    .set("current_schema")
-                    .to(backendConnection.getCurrentSchema())
+                    .set("current_database")
+                    .to(backendConnection.getCurrentDatabase())
                     .build()));
     return new QueryResult(resultSet);
   }

@@ -26,24 +26,26 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResu
 import com.google.common.collect.ImmutableList;
 
 @InternalApi
-public class SelectCurrentSchemaStatement implements LocalStatement {
-  public static final SelectCurrentSchemaStatement INSTANCE = new SelectCurrentSchemaStatement();
+public class SelectCurrentCatalogStatement implements LocalStatement {
+  public static final SelectCurrentCatalogStatement INSTANCE = new SelectCurrentCatalogStatement();
 
-  private SelectCurrentSchemaStatement() {}
+  private SelectCurrentCatalogStatement() {}
 
   @Override
   public String[] getSql() {
     return new String[] {
-      "select current_schema()",
-      "SELECT current_schema()",
-      "Select current_schema()",
-      "select current_schema",
-      "SELECT current_schema",
-      "Select current_schema",
-      "select * from current_schema()",
-      "SELECT * FROM current_schema()",
-      "select * from current_schema",
-      "SELECT * FROM current_schema"
+      "select current_catalog",
+      "SELECT current_catalog",
+      "Select current_catalog",
+      "select CURRENT_CATALOG",
+      "SELECT CURRENT_CATALOG",
+      "Select CURRENT_CATALOG",
+      "select * from current_catalog",
+      "SELECT * FROM current_catalog",
+      "Select * from current_catalog",
+      "select * from CURRENT_CATALOG",
+      "SELECT * FROM CURRENT_CATALOG",
+      "Select * from CURRENT_CATALOG"
     };
   }
 
@@ -51,11 +53,11 @@ public class SelectCurrentSchemaStatement implements LocalStatement {
   public StatementResult execute(BackendConnection backendConnection) {
     ResultSet resultSet =
         ResultSets.forRows(
-            Type.struct(StructField.of("current_schema", Type.string())),
+            Type.struct(StructField.of("current_catalog", Type.string())),
             ImmutableList.of(
                 Struct.newBuilder()
-                    .set("current_schema")
-                    .to(backendConnection.getCurrentSchema())
+                    .set("current_catalog")
+                    .to(backendConnection.getCurrentDatabase())
                     .build()));
     return new QueryResult(resultSet);
   }
