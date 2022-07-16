@@ -14,8 +14,10 @@
 
 package com.google.cloud.spanner.connection;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 
+@InternalApi
 public class ResultSetHelper {
 
   /**
