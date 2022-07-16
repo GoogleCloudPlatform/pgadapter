@@ -344,7 +344,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             connection,
-            DdlTransactionMode.Batch,
+            mock(OptionsMetadata.class),
             EMPTY_LOCAL_STATEMENTS);
     Future<StatementResult> resultFuture = backendConnection.execute(parsedStatement, statement);
     backendConnection.flush();
