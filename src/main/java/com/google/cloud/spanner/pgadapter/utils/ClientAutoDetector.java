@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ShowServerVersionStatement;
@@ -37,6 +38,7 @@ public class ClientAutoDetector {
       ImmutableList.of(
           SelectCurrentSchemaStatement.INSTANCE,
           SelectCurrentDatabaseStatement.INSTANCE,
+          SelectCurrentCatalogStatement.INSTANCE,
           ShowServerVersionStatement.INSTANCE);
 
   public enum WellKnownClient {
@@ -132,6 +134,7 @@ public class ClientAutoDetector {
         return client;
       }
     }
+    // The following line should never be reached.
     throw new IllegalStateException("UNSPECIFIED.isClient() should have returned true");
   }
 }

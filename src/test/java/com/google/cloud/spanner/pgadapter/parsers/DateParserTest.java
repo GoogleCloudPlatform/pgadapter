@@ -16,14 +16,27 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.Date;
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class DateParserTest {
+
+  @Test
+  public void testToDate() {
+    assertEquals(Date.fromYearMonthDay(2000, 1, 1), DateParser.toDate(new byte[] {0, 0, 0, 0}));
+    assertEquals(Date.fromYearMonthDay(2000, 1, 2), DateParser.toDate(new byte[] {0, 0, 0, 1}));
+
+    SpannerException spannerException =
+        assertThrows(SpannerException.class, () -> DateParser.toDate(new byte[] {}));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
+  }
 
   @Test
   public void testStringParse() {
