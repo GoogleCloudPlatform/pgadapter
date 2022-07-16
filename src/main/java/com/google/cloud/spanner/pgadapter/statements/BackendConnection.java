@@ -43,6 +43,7 @@ import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.ResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
@@ -55,6 +56,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -162,7 +164,7 @@ public class BackendConnection {
         if (!localStatements.isEmpty() && localStatements.containsKey(statement.getSql())) {
           result.set(
               Objects.requireNonNull(localStatements.get(statement.getSql()))
-                  .execute(spannerConnection));
+                  .execute(BackendConnection.this));
         } else if (connectionState == ConnectionState.ABORTED
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
@@ -338,7 +340,7 @@ public class BackendConnection {
   private final Connection spannerConnection;
   private final DatabaseId databaseId;
   private final DdlExecutor ddlExecutor;
-  private final DdlTransactionMode ddlTransactionMode;
+  private final OptionsMetadata optionsMetadata;
 
   /**
    * Creates a PG backend connection that uses the given Spanner {@link Connection} and {@link
@@ -347,22 +349,23 @@ public class BackendConnection {
   BackendConnection(
       DatabaseId databaseId,
       Connection spannerConnection,
-      DdlTransactionMode ddlTransactionMode,
+      OptionsMetadata optionsMetadata,
       ImmutableList<LocalStatement> localStatements) {
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
-    this.ddlTransactionMode = ddlTransactionMode;
-    //noinspection UnstableApiUsage
-    this.localStatements =
-        localStatements.isEmpty()
-            ? EMPTY_LOCAL_STATEMENTS
-            : ImmutableMap.copyOf(
-                localStatements.stream()
-                    .map(
-                        localStatement ->
-                            new SimpleImmutableEntry<>(localStatement.getSql(), localStatement))
-                    .collect(Collectors.toList()));
+    this.optionsMetadata = optionsMetadata;
+    if (localStatements.isEmpty()) {
+      this.localStatements = EMPTY_LOCAL_STATEMENTS;
+    } else {
+      Builder<String, LocalStatement> builder = ImmutableMap.builder();
+      for (LocalStatement localStatement : localStatements) {
+        for (String sql : localStatement.getSql()) {
+          builder.put(new SimpleImmutableEntry<>(sql, localStatement));
+        }
+      }
+      this.localStatements = builder.build();
+    }
   }
 
   /** Returns the current connection state. */
@@ -421,12 +424,24 @@ public class BackendConnection {
     }
   }
 
-  Connection getSpannerConnection() {
+  /** Returns the Spanner connection used by this {@link BackendConnection}. */
+  public Connection getSpannerConnection() {
     return this.spannerConnection;
   }
 
-  String getCurrentSchema() {
+  /** Returns the current schema that is used by this {@link BackendConnection}. */
+  public String getCurrentSchema() {
     return this.currentSchema;
+  }
+
+  /** Returns the id of the database that this connection uses. */
+  public String getCurrentDatabase() {
+    return this.databaseId.getDatabase();
+  }
+
+  /** Returns the options that are used for this connection. */
+  public OptionsMetadata getOptionsMetadata() {
+    return this.optionsMetadata;
   }
 
   /**
@@ -545,6 +560,7 @@ public class BackendConnection {
    * allowed.
    */
   private void prepareExecuteDdl(BufferedStatement<?> bufferedStatement) {
+    DdlTransactionMode ddlTransactionMode = this.optionsMetadata.getDdlTransactionMode();
     try {
       // Single statements are simpler to check, so we do that in a separate check.
       if (bufferedStatements.size() == 1) {

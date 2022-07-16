@@ -50,15 +50,17 @@ public class StartupMessage extends BootstrapMessage {
     if (connection.getServer().getOptions().shouldAutoDetectClient()) {
       WellKnownClient wellKnownClient =
           ClientAutoDetector.detectClient(this.parseParameterKeys(rawParameters), this.parameters);
-      if (wellKnownClient != null) {
+      connection.setWellKnownClient(wellKnownClient);
+      if (wellKnownClient != WellKnownClient.UNSPECIFIED) {
         logger.log(
             Level.INFO,
             () ->
                 String.format(
                     "Well-known client %s detected for connection %d.",
                     wellKnownClient, connection.getConnectionId()));
-        connection.setWellKnownClient(wellKnownClient);
       }
+    } else {
+      connection.setWellKnownClient(WellKnownClient.UNSPECIFIED);
     }
   }
 

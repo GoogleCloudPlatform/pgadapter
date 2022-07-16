@@ -14,12 +14,16 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.DEFAULT_LOCAL_STATEMENTS;
 import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.EMPTY_LOCAL_STATEMENTS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ProxyServer;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableList;
@@ -148,9 +152,21 @@ public class ClientAutoDetectorTest {
                   "TimeZone", "some-time-zone")));
     }
 
-    assertEquals(
-        EMPTY_LOCAL_STATEMENTS,
-        WellKnownClient.JDBC.getLocalStatements(mock(ConnectionHandler.class)));
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ProxyServer server = mock(ProxyServer.class);
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
+    for (boolean useDefaultLocalStatements : new boolean[] {true, false}) {
+      when(options.useDefaultLocalStatements()).thenReturn(useDefaultLocalStatements);
+      if (useDefaultLocalStatements) {
+        assertEquals(
+            DEFAULT_LOCAL_STATEMENTS, WellKnownClient.JDBC.getLocalStatements(connectionHandler));
+      } else {
+        assertEquals(
+            EMPTY_LOCAL_STATEMENTS, WellKnownClient.JDBC.getLocalStatements(connectionHandler));
+      }
+    }
   }
 
   @Test
@@ -192,6 +208,10 @@ public class ClientAutoDetectorTest {
             ImmutableList.of("application_name"), ImmutableMap.of("application_name", "PSQL")));
 
     ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ProxyServer server = mock(ProxyServer.class);
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
     assertEquals(
         ImmutableList.of(new ListDatabasesStatement(connectionHandler)),
         WellKnownClient.PSQL.getLocalStatements(connectionHandler));
@@ -207,8 +227,20 @@ public class ClientAutoDetectorTest {
         ClientAutoDetector.detectClient(
             ImmutableList.of("some-param"), ImmutableMap.of("some-param", "some-value")));
 
-    assertEquals(
-        EMPTY_LOCAL_STATEMENTS,
-        WellKnownClient.PGX.getLocalStatements(mock(ConnectionHandler.class)));
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ProxyServer server = mock(ProxyServer.class);
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
+    for (boolean useDefaultLocalStatements : new boolean[] {true, false}) {
+      when(options.useDefaultLocalStatements()).thenReturn(useDefaultLocalStatements);
+      if (useDefaultLocalStatements) {
+        assertEquals(
+            DEFAULT_LOCAL_STATEMENTS, WellKnownClient.PGX.getLocalStatements(connectionHandler));
+      } else {
+        assertEquals(
+            EMPTY_LOCAL_STATEMENTS, WellKnownClient.PGX.getLocalStatements(connectionHandler));
+      }
+    }
   }
 }
