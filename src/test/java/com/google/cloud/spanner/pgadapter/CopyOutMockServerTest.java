@@ -18,13 +18,22 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
+import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Type;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
+import com.google.cloud.spanner.pgadapter.utils.CopyInParser;
+import com.google.cloud.spanner.pgadapter.utils.CopyRecord;
 import com.google.protobuf.ByteString;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -38,6 +47,8 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PipedOutputStream;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -45,6 +56,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.CountDownLatch;
@@ -229,6 +241,117 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       copyManager.copyOut("COPY all_types TO STDOUT", writer);
 
       assertEquals("\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n", writer.toString());
+    }
+  }
+
+  private static boolean isPsqlAvailable() {
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand = new String[] {"psql", "--version"};
+    builder.command(psqlCommand);
+    try {
+      Process process = builder.start();
+      int res = process.waitFor();
+
+      return res == 0;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  @Test
+  public void testCopyOutBinaryPsql() throws Exception {
+    assumeTrue("This test requires psql", isPsqlAvailable());
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "psql",
+        "-h",
+        (useDomainSocket ? "/tmp" : "localhost"),
+        "-p",
+        String.valueOf(pgServer.getLocalPort()),
+        "-c",
+        "copy all_types to stdout binary");
+    Process process = builder.start();
+    StringBuilder errorBuilder = new StringBuilder();
+    try (Scanner scanner = new Scanner(new InputStreamReader(process.getErrorStream()))) {
+      while (scanner.hasNextLine()) {
+        errorBuilder.append(scanner.nextLine()).append('\n');
+      }
+    }
+    PipedOutputStream pipedOutputStream = new PipedOutputStream();
+    CopyInParser copyParser =
+        CopyInParser.create(Format.BINARY, null, pipedOutputStream, 1 << 16, false);
+    int b;
+    while ((b = process.getInputStream().read()) != -1) {
+      pipedOutputStream.write(b);
+    }
+    int res = process.waitFor();
+    assertEquals("", errorBuilder.toString());
+    assertEquals(0, res);
+
+    Iterator<CopyRecord> iterator = copyParser.iterator();
+    assertTrue(iterator.hasNext());
+    CopyRecord record = iterator.next();
+    assertFalse(iterator.hasNext());
+
+    assertEquals(Value.int64(1L), record.getValue(Type.int64(), 0));
+    assertEquals(Value.bool(true), record.getValue(Type.bool(), 1));
+    assertEquals(Value.bytes(ByteArray.copyFrom("test")), record.getValue(Type.bytes(), 2));
+    assertEquals(Value.float64(3.14), record.getValue(Type.float64(), 3));
+    assertEquals(Value.int64(100L), record.getValue(Type.int64(), 4));
+    assertEquals(Value.pgNumeric("6.626"), record.getValue(Type.pgNumeric(), 5));
+    // Note: The binary format truncates timestamptz value to microsecond precision.
+    assertEquals(
+        Value.timestamp(Timestamp.parseTimestamp("2022-02-16T13:18:02.123456000Z")),
+        record.getValue(Type.timestamp(), 6));
+    assertEquals(Value.date(Date.parseDate("2022-03-29")), record.getValue(Type.date(), 7));
+    assertEquals(Value.string("test"), record.getValue(Type.string(), 8));
+  }
+
+  @Test
+  public void testCopyOutNullsBinaryPsql() throws Exception {
+    assumeTrue("This test requires psql", isPsqlAvailable());
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_NULLS_RESULTSET));
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "psql",
+        "-h",
+        (useDomainSocket ? "/tmp" : "localhost"),
+        "-p",
+        String.valueOf(pgServer.getLocalPort()),
+        "-c",
+        "copy all_types to stdout binary");
+    Process process = builder.start();
+    StringBuilder errorBuilder = new StringBuilder();
+    try (Scanner scanner = new Scanner(new InputStreamReader(process.getErrorStream()))) {
+      while (scanner.hasNextLine()) {
+        errorBuilder.append(scanner.nextLine()).append('\n');
+      }
+    }
+    PipedOutputStream pipedOutputStream = new PipedOutputStream();
+    CopyInParser copyParser =
+        CopyInParser.create(Format.BINARY, null, pipedOutputStream, 1 << 16, false);
+    int b;
+    while ((b = process.getInputStream().read()) != -1) {
+      pipedOutputStream.write(b);
+    }
+    int res = process.waitFor();
+    assertEquals("", errorBuilder.toString());
+    assertEquals(0, res);
+
+    Iterator<CopyRecord> iterator = copyParser.iterator();
+    assertTrue(iterator.hasNext());
+    CopyRecord record = iterator.next();
+    assertFalse(iterator.hasNext());
+
+    for (int col = 0; col < record.numColumns(); col++) {
+      // Note: Null values in a COPY BINARY stream are untyped, so it does not matter what type we
+      // specify when getting the value.
+      assertTrue(record.getValue(Type.string(), col).isNull());
     }
   }
 

@@ -88,7 +88,7 @@ class ArrayParser extends Parser<List<?>> {
   }
 
   @Override
-  List<?> getItem() {
+  public List<?> getItem() {
     return this.item;
   }
 

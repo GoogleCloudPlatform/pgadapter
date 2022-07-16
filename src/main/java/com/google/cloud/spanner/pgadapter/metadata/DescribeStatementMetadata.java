@@ -20,7 +20,8 @@ import com.google.cloud.spanner.ResultSet;
 
 /** Simple POJO to hold describe metadata specific to prepared statements. */
 @InternalApi
-public class DescribeStatementMetadata extends DescribeMetadata<Tuple<int[], ResultSet>> {
+public class DescribeStatementMetadata extends DescribeMetadata<Tuple<int[], ResultSet>>
+    implements AutoCloseable {
 
   public DescribeStatementMetadata(int[] parameters, ResultSet resultMetaData) {
     this.metadata = Tuple.of(parameters, resultMetaData);
@@ -32,5 +33,12 @@ public class DescribeStatementMetadata extends DescribeMetadata<Tuple<int[], Res
 
   public ResultSet getResultSet() {
     return metadata.y();
+  }
+
+  @Override
+  public void close() {
+    if (getResultSet() != null) {
+      getResultSet().close();
+    }
   }
 }

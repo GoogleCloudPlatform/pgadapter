@@ -21,10 +21,12 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
+import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyDoneResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyOutResponse;
@@ -43,6 +45,10 @@ import org.apache.commons.csv.QuoteMode;
  */
 @InternalApi
 public class CopyToStatement extends IntermediatePortalStatement {
+  public static final byte[] COPY_BINARY_HEADER =
+      new byte[] {'P', 'G', 'C', 'O', 'P', 'Y', '\n', -1, '\r', '\n', '\0'};
+
+  private final CopyOptions copyOptions;
   private final CSVFormat csvFormat;
 
   public CopyToStatement(
@@ -56,30 +62,35 @@ public class CopyToStatement extends IntermediatePortalStatement {
         name,
         createParsedStatement(copyOptions),
         createSelectStatement(copyOptions));
-    CSVFormat.Builder formatBuilder =
-        CSVFormat.Builder.create(CSVFormat.POSTGRESQL_TEXT)
-            .setNullString(
-                copyOptions.getNullString() == null
-                    ? CSVFormat.POSTGRESQL_TEXT.getNullString()
-                    : copyOptions.getNullString())
-            .setRecordSeparator('\n')
-            .setDelimiter(
-                copyOptions.getDelimiter() == 0
-                    ? CSVFormat.POSTGRESQL_TEXT.getDelimiterString().charAt(0)
-                    : copyOptions.getDelimiter())
-            .setQuote(
-                copyOptions.getQuote() == 0
-                    ? CSVFormat.POSTGRESQL_TEXT.getQuoteCharacter()
-                    : copyOptions.getQuote())
-            .setEscape(
-                copyOptions.getEscape() == 0
-                    ? CSVFormat.POSTGRESQL_TEXT.getEscapeCharacter()
-                    : copyOptions.getEscape())
-            .setQuoteMode(QuoteMode.NONE);
-    if (copyOptions.hasHeader()) {
-      formatBuilder.setHeader(copyOptions.getColumnNames().toArray(new String[0]));
+    this.copyOptions = copyOptions;
+    if (copyOptions.getFormat() == Format.BINARY) {
+      this.csvFormat = null;
+    } else {
+      CSVFormat.Builder formatBuilder =
+          CSVFormat.Builder.create(CSVFormat.POSTGRESQL_TEXT)
+              .setNullString(
+                  copyOptions.getNullString() == null
+                      ? CSVFormat.POSTGRESQL_TEXT.getNullString()
+                      : copyOptions.getNullString())
+              .setRecordSeparator('\n')
+              .setDelimiter(
+                  copyOptions.getDelimiter() == 0
+                      ? CSVFormat.POSTGRESQL_TEXT.getDelimiterString().charAt(0)
+                      : copyOptions.getDelimiter())
+              .setQuote(
+                  copyOptions.getQuote() == 0
+                      ? CSVFormat.POSTGRESQL_TEXT.getQuoteCharacter()
+                      : copyOptions.getQuote())
+              .setEscape(
+                  copyOptions.getEscape() == 0
+                      ? CSVFormat.POSTGRESQL_TEXT.getEscapeCharacter()
+                      : copyOptions.getEscape())
+              .setQuoteMode(QuoteMode.NONE);
+      if (copyOptions.hasHeader()) {
+        formatBuilder.setHeader(copyOptions.getColumnNames().toArray(new String[0]));
+      }
+      this.csvFormat = formatBuilder.build();
     }
-    this.csvFormat = formatBuilder.build();
   }
 
   static ParsedStatement createParsedStatement(CopyOptions copyOptions) {
@@ -134,18 +145,36 @@ public class CopyToStatement extends IntermediatePortalStatement {
   }
 
   @Override
-  public CopyOutResponse createResultPrefix(ResultSet resultSet) {
-    return new CopyOutResponse(this.outputStream, resultSet.getColumnCount(), 0);
+  public WireOutput[] createResultPrefix(ResultSet resultSet) {
+    return this.copyOptions.getFormat() == Format.BINARY
+        ? new WireOutput[] {
+          new CopyOutResponse(
+              this.outputStream,
+              resultSet.getColumnCount(),
+              DataFormat.POSTGRESQL_BINARY.getCode()),
+          CopyDataResponse.createBinaryHeader(this.outputStream)
+        }
+        : new WireOutput[] {
+          new CopyOutResponse(
+              this.outputStream, resultSet.getColumnCount(), DataFormat.POSTGRESQL_TEXT.getCode())
+        };
   }
 
   @Override
-  public WireOutput createDataRowResponse(ResultSet resultSet, QueryMode mode) {
-    return createDataResponse(resultSet);
+  public CopyDataResponse createDataRowResponse(ResultSet resultSet, QueryMode mode) {
+    return copyOptions.getFormat() == Format.BINARY
+        ? createBinaryDataResponse(resultSet)
+        : createDataResponse(resultSet);
   }
 
   @Override
-  public CopyDoneResponse createResultSuffix() {
-    return new CopyDoneResponse(this.outputStream);
+  public WireOutput[] createResultSuffix() {
+    return this.copyOptions.getFormat() == Format.BINARY
+        ? new WireOutput[] {
+          CopyDataResponse.createBinaryTrailer(this.outputStream),
+          new CopyDoneResponse(this.outputStream)
+        }
+        : new WireOutput[] {new CopyDoneResponse(this.outputStream)};
   }
 
   CopyDataResponse createDataResponse(ResultSet resultSet) {
@@ -160,5 +189,22 @@ public class CopyToStatement extends IntermediatePortalStatement {
     }
     String row = csvFormat.format((Object[]) data);
     return new CopyDataResponse(this.outputStream, row, csvFormat.getRecordSeparator().charAt(0));
+  }
+
+  CopyDataResponse createBinaryDataResponse(ResultSet resultSet) {
+    // Multiply number of columns by 4, as each column has as 4-byte length value.
+    // In addition, each row has a 2-byte number of columns value.s
+    int length = 2 + resultSet.getColumnCount() * 4;
+    byte[][] data = new byte[resultSet.getColumnCount()][];
+    for (int col = 0; col < resultSet.getColumnCount(); col++) {
+      if (!resultSet.isNull(col)) {
+        Parser<?> parser = Parser.create(resultSet, resultSet.getColumnType(col), col);
+        data[col] = parser.parse(DataFormat.POSTGRESQL_BINARY);
+        if (data[col] != null) {
+          length += data[col].length;
+        }
+      }
+    }
+    return new CopyDataResponse(this.outputStream, length, data);
   }
 }
