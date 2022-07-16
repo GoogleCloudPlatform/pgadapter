@@ -14,11 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
+import javax.annotation.Nonnull;
 import org.postgresql.core.Utils;
 import org.postgresql.util.PGbytea;
 
@@ -26,7 +28,8 @@ import org.postgresql.util.PGbytea;
  * Parse specified type to binary (generally this is the simplest parse class, as items are
  * generally represented in binary for wire format).
  */
-class BinaryParser extends Parser<ByteArray> {
+@InternalApi
+public class BinaryParser extends Parser<ByteArray> {
 
   BinaryParser(ResultSet item, int position) {
     this.item = item.getBytes(position);
@@ -48,12 +51,17 @@ class BinaryParser extends Parser<ByteArray> {
                 "Invalid binary value: " + new String(item, StandardCharsets.UTF_8), e);
           }
         case BINARY:
-          this.item = ByteArray.copyFrom(item);
+          this.item = toByteArray(item);
           break;
         default:
           throw new IllegalArgumentException("Unsupported format: " + formatCode);
       }
     }
+  }
+
+  /** Converts the binary data to a {@link ByteArray}. */
+  public static ByteArray toByteArray(@Nonnull byte[] data) {
+    return ByteArray.copyFrom(data);
   }
 
   @Override

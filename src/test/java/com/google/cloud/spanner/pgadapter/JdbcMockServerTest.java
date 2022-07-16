@@ -65,6 +65,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.jdbc.PgStatement;
 
@@ -348,6 +349,27 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals("test", params.get("p9").getStringValue());
 
       mockSpanner.clearRequests();
+    }
+  }
+
+  @Test
+  public void testMultipleQueriesInTransaction() throws SQLException {
+    String sql = "SELECT 1";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Use a read/write transaction to execute two queries.
+      connection.setAutoCommit(false);
+      // Force the use of prepared statements.
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      for (int i = 0; i < 2; i++) {
+        // https://github.com/GoogleCloudPlatform/pgadapter/issues/278
+        // This would return `ERROR: FAILED_PRECONDITION: This ResultSet is closed`
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
     }
   }
 

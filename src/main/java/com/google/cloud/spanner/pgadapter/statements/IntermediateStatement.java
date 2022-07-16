@@ -38,7 +38,6 @@ import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import java.io.DataOutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import javax.annotation.Nullable;
 
 /**
  * Data type to store simple SQL statement with designated metadata. Allows manipulation of
@@ -47,6 +46,8 @@ import javax.annotation.Nullable;
  */
 @InternalApi
 public class IntermediateStatement {
+  private static final WireOutput[] EMPTY_WIRE_OUTPUT_ARRAY = new WireOutput[0];
+
   /**
    * Indicates whether an attempt to get the result of a statement should block or fail if the
    * result is not yet available. Normal SQL commands that can be executed directly on Cloud Spanner
@@ -315,17 +316,19 @@ public class IntermediateStatement {
     return this.commandTag;
   }
 
-  public @Nullable WireOutput createResultPrefix(ResultSet resultSet) {
+  public WireOutput[] createResultPrefix(ResultSet resultSet) {
     // This is a no-op for a normal query. COPY uses this to send a CopyOutResponse.
-    return null;
+    // COPY table_name TO STDOUT BINARY also uses this to add the binary copy header.
+    return EMPTY_WIRE_OUTPUT_ARRAY;
   }
 
   public WireOutput createDataRowResponse(ResultSet resultSet, QueryMode mode) {
     return new DataRowResponse(this.outputStream, this, resultSet, this.options, mode);
   }
 
-  public @Nullable WireOutput createResultSuffix() {
+  public WireOutput[] createResultSuffix() {
     // This is a no-op for a normal query. COPY uses this to send a CopyDoneResponse.
-    return null;
+    // COPY table_name TO STDOUT BINARY also uses this to add the binary copy trailer.
+    return EMPTY_WIRE_OUTPUT_ARRAY;
   }
 }

@@ -40,6 +40,8 @@ import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
+import com.google.spanner.v1.Mutation;
+import com.google.spanner.v1.Mutation.OperationCase;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.StructType;
@@ -48,12 +50,15 @@ import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
 import java.io.IOException;
+import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
@@ -68,6 +73,8 @@ import org.postgresql.core.Oid;
 @RunWith(Parameterized.class)
 public class PgxMockServerTest extends AbstractMockServerTest {
   private static PgxTest pgxTest;
+
+  @Rule public Timeout globalTimeout = Timeout.seconds(30L);
 
   @Parameter public boolean useDomainSocket;
 
@@ -978,7 +985,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     }
   }
 
-  @Ignore("pgx uses copy from stdin binary")
+  @Ignore(
+      "pgx copy implementation seems buggy (CopyDone message can be sent before all data has been sent)")
   @Test
   public void testCopyIn() {
     CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, true);
@@ -1005,7 +1013,32 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .build()));
 
     String res = pgxTest.TestCopyIn(createConnString());
-
     assertNull(res);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest request = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(1, request.getMutationsCount());
+    Mutation mutation = request.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(2, mutation.getInsert().getValuesCount());
+    assertEquals(9, mutation.getInsert().getColumnsCount());
+    ListValue insert = mutation.getInsert().getValues(0);
+    assertEquals("1", insert.getValues(0).getStringValue());
+    assertTrue(insert.getValues(1).getBoolValue());
+    assertEquals(
+        Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}),
+        insert.getValues(2).getStringValue());
+    assertEquals(3.14, insert.getValues(3).getNumberValue(), 0.0);
+    assertEquals("10", insert.getValues(4).getStringValue());
+    assertEquals("6.626", insert.getValues(5).getStringValue());
+    assertEquals("2022-03-24T12:39:10.123456000Z", insert.getValues(6).getStringValue());
+    assertEquals("2022-07-01", insert.getValues(7).getStringValue());
+    assertEquals("test", insert.getValues(8).getStringValue());
+
+    insert = mutation.getInsert().getValues(1);
+    assertEquals("2", insert.getValues(0).getStringValue());
+    for (int i = 1; i < insert.getValuesCount(); i++) {
+      assertTrue(insert.getValues(i).hasNullValue());
+    }
   }
 }

@@ -16,13 +16,30 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerException;
+import java.math.BigDecimal;
+import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.util.ByteConverter;
 
 @RunWith(JUnit4.class)
 public class NumericParserTest {
+
+  @Test
+  public void testToNumeric() {
+    BigDecimal bd = BigDecimal.valueOf(new Random().nextDouble());
+    byte[] data = ByteConverter.numeric(bd);
+    assertEquals(bd.toString(), NumericParser.toNumericString(data));
+
+    SpannerException spannerException =
+        assertThrows(SpannerException.class, () -> NumericParser.toNumericString(new byte[4]));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
+  }
 
   @Test
   public void testStringParse() {

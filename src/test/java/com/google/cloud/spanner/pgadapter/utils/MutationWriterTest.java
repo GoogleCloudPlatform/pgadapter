@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import static com.google.cloud.spanner.pgadapter.utils.CopyInParser.createDefaultTimestampUtils;
 import static com.google.cloud.spanner.pgadapter.utils.MutationWriter.calculateSize;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -32,14 +33,15 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
+import com.google.cloud.spanner.pgadapter.utils.CsvCopyParser.CsvCopyRecord;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.spanner.v1.TypeCode;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -110,8 +112,7 @@ public class MutationWriterTest {
 
   @Test
   public void testWriteMutations() throws Exception {
-    Map<String, TypeCode> tableColumns =
-        ImmutableMap.of("number", TypeCode.INT64, "name", TypeCode.STRING);
+    Map<String, Type> tableColumns = ImmutableMap.of("number", Type.int64(), "name", Type.string());
     CSVFormat format =
         CSVFormat.POSTGRESQL_TEXT
             .builder()
@@ -127,6 +128,7 @@ public class MutationWriterTest {
             "numbers",
             tableColumns,
             /* indexedColumnsCount = */ 1,
+            Format.TEXT,
             format,
             false);
 
@@ -153,8 +155,8 @@ public class MutationWriterTest {
   public void testWriteMutations_FailsForLargeBatch() throws Exception {
     System.setProperty("copy_in_mutation_limit", "1");
     try {
-      Map<String, TypeCode> tableColumns =
-          ImmutableMap.of("number", TypeCode.INT64, "name", TypeCode.STRING);
+      Map<String, Type> tableColumns =
+          ImmutableMap.of("number", Type.int64(), "name", Type.string());
       CSVFormat format =
           CSVFormat.POSTGRESQL_TEXT
               .builder()
@@ -168,6 +170,7 @@ public class MutationWriterTest {
               "numbers",
               tableColumns,
               /* indexedColumnsCount = */ 1,
+              Format.TEXT,
               format,
               false);
 
@@ -194,8 +197,8 @@ public class MutationWriterTest {
     // 6 == 2 mutations per batch, as we have 2 columns + 1 indexed column.
     System.setProperty("copy_in_mutation_limit", "6");
     try {
-      Map<String, TypeCode> tableColumns =
-          ImmutableMap.of("number", TypeCode.INT64, "name", TypeCode.STRING);
+      Map<String, Type> tableColumns =
+          ImmutableMap.of("number", Type.int64(), "name", Type.string());
       CSVFormat format =
           CSVFormat.POSTGRESQL_TEXT
               .builder()
@@ -212,6 +215,7 @@ public class MutationWriterTest {
               "numbers",
               tableColumns,
               /* indexedColumnsCount = */ 1,
+              Format.TEXT,
               format,
               false);
 
@@ -234,8 +238,8 @@ public class MutationWriterTest {
   public void testWriteMutations_FailsForLargeCommit() throws Exception {
     System.setProperty("copy_in_commit_limit", "30");
     try {
-      Map<String, TypeCode> tableColumns =
-          ImmutableMap.of("number", TypeCode.INT64, "name", TypeCode.STRING);
+      Map<String, Type> tableColumns =
+          ImmutableMap.of("number", Type.int64(), "name", Type.string());
       CSVFormat format =
           CSVFormat.POSTGRESQL_TEXT
               .builder()
@@ -249,6 +253,7 @@ public class MutationWriterTest {
               "numbers",
               tableColumns,
               /* indexedColumnsCount = */ 0,
+              Format.TEXT,
               format,
               false);
 
@@ -272,8 +277,8 @@ public class MutationWriterTest {
   public void testWriteMutations_NonAtomic_SucceedsForLargeCommit() throws Exception {
     System.setProperty("copy_in_commit_limit", "80");
     try {
-      Map<String, TypeCode> tableColumns =
-          ImmutableMap.of("number", TypeCode.INT64, "name", TypeCode.STRING);
+      Map<String, Type> tableColumns =
+          ImmutableMap.of("number", Type.int64(), "name", Type.string());
       CSVFormat format =
           CSVFormat.POSTGRESQL_TEXT
               .builder()
@@ -290,6 +295,7 @@ public class MutationWriterTest {
               "numbers",
               tableColumns,
               /* indexedColumnsCount = */ 1,
+              Format.TEXT,
               format,
               false);
 
@@ -317,8 +323,7 @@ public class MutationWriterTest {
 
   @Test
   public void testWritePartials() throws Exception {
-    Map<String, TypeCode> tableColumns =
-        ImmutableMap.of("number", TypeCode.INT64, "name", TypeCode.STRING);
+    Map<String, Type> tableColumns = ImmutableMap.of("number", Type.int64(), "name", Type.string());
     CSVFormat format =
         CSVFormat.POSTGRESQL_TEXT
             .builder()
@@ -335,14 +340,9 @@ public class MutationWriterTest {
             "numbers",
             tableColumns,
             /* indexedColumnsCount = */ 1,
+            Format.TEXT,
             format,
             false);
-
-    mutationWriter.addCopyData(
-        "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
-            .getBytes(StandardCharsets.UTF_8));
-    mutationWriter.commit();
-    mutationWriter.close();
 
     ExecutorService executor = Executors.newFixedThreadPool(2);
     executor.submit(
@@ -354,6 +354,7 @@ public class MutationWriterTest {
           mutationWriter.addCopyData(
               "\"Three\"\n4\t\"Four\"\n5\t".getBytes(StandardCharsets.UTF_8));
           mutationWriter.addCopyData("\"Five\"\n".getBytes(StandardCharsets.UTF_8));
+          mutationWriter.commit();
           mutationWriter.close();
           return null;
         });
@@ -509,23 +510,27 @@ public class MutationWriterTest {
   @Test
   public void testBuildMutationNulls() throws IOException {
     // TODO(b/237831798): Add support for ARRAY in COPY operations.
-    ImmutableSet<TypeCode> unsupportedTypeCodes =
-        ImmutableSet.of(
-            TypeCode.TYPE_CODE_UNSPECIFIED, TypeCode.ARRAY, TypeCode.STRUCT, TypeCode.UNRECOGNIZED);
-
     Connection connection = mock(Connection.class);
-    for (TypeCode typeCode : TypeCode.values()) {
-      if (unsupportedTypeCodes.contains(typeCode)) {
-        continue;
-      }
-
+    for (Type type :
+        new Type[] {
+          Type.bool(),
+          Type.bytes(),
+          Type.date(),
+          Type.float64(),
+          Type.int64(),
+          Type.json(),
+          Type.pgNumeric(),
+          Type.string(),
+          Type.timestamp()
+        }) {
       MutationWriter mutationWriter =
           new MutationWriter(
               CopyTransactionMode.ImplicitAtomic,
               connection,
               "my_table",
-              ImmutableMap.of("col", typeCode),
+              ImmutableMap.of("col", type),
               0,
+              Format.TEXT,
               CSVFormat.POSTGRESQL_TEXT,
               false);
       CSVParser parser =
@@ -533,9 +538,11 @@ public class MutationWriterTest {
               new StringReader("col\n\\N\n"), CSVFormat.POSTGRESQL_TEXT.withFirstRecordAsHeader());
       CSVRecord record = parser.getRecords().get(0);
 
-      Mutation mutation = mutationWriter.buildMutation(record);
+      Mutation mutation =
+          mutationWriter.buildMutation(
+              new CsvCopyRecord(createDefaultTimestampUtils(), record, true));
 
-      assertEquals(String.format("Type code: %s", typeCode), 1, mutation.asMap().size());
+      assertEquals(String.format("Type: %s", type), 1, mutation.asMap().size());
     }
   }
 }

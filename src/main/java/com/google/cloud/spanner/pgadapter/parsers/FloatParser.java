@@ -18,7 +18,7 @@ import com.google.cloud.spanner.Statement;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to float. */
-public class FloatParser extends Parser<Float> {
+class FloatParser extends Parser<Float> {
 
   FloatParser(Object item) {
     this.item = (Float) item;
