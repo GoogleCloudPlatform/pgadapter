@@ -37,7 +37,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
 import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
@@ -128,7 +128,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
-            DdlTransactionMode.Batch,
+            mock(OptionsMetadata.class),
             ImmutableList.of());
     Future<StatementResult> result =
         backendConnection.executeCopy(parsedStatement, statement, receiver, writer, executor);
@@ -165,7 +165,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
-            DdlTransactionMode.Batch,
+            mock(OptionsMetadata.class),
             ImmutableList.of());
     onlyDmlStatements.execute(parsedUpdateStatement, updateStatement);
     onlyDmlStatements.execute(parsedUpdateStatement, updateStatement);
@@ -176,7 +176,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
-            DdlTransactionMode.Batch,
+            mock(OptionsMetadata.class),
             ImmutableList.of());
     onlyCopyStatements.executeCopy(parsedCopyStatement, copyStatement, receiver, writer, executor);
     onlyCopyStatements.executeCopy(parsedCopyStatement, copyStatement, receiver, writer, executor);
@@ -187,7 +187,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
-            DdlTransactionMode.Batch,
+            mock(OptionsMetadata.class),
             ImmutableList.of());
     dmlAndCopyStatements.execute(parsedUpdateStatement, updateStatement);
     dmlAndCopyStatements.executeCopy(
@@ -199,7 +199,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
-            DdlTransactionMode.Batch,
+            mock(OptionsMetadata.class),
             ImmutableList.of());
     onlySelectStatements.execute(parsedSelectStatement, selectStatement);
     onlySelectStatements.execute(parsedSelectStatement, selectStatement);
@@ -210,7 +210,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
-            DdlTransactionMode.Batch,
+            mock(OptionsMetadata.class),
             ImmutableList.of());
     onlyClientSideStatements.execute(parsedClientSideStatement, clientSideStatement);
     onlyClientSideStatements.execute(parsedClientSideStatement, clientSideStatement);
@@ -221,7 +221,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
-            DdlTransactionMode.Batch,
+            mock(OptionsMetadata.class),
             ImmutableList.of());
     onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement);
     onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement);
@@ -232,7 +232,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
-            DdlTransactionMode.Batch,
+            mock(OptionsMetadata.class),
             ImmutableList.of());
     dmlAndSelectStatements.execute(parsedUpdateStatement, updateStatement);
     dmlAndSelectStatements.execute(parsedSelectStatement, selectStatement);
@@ -243,7 +243,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
-            DdlTransactionMode.Batch,
+            mock(OptionsMetadata.class),
             ImmutableList.of());
     copyAndSelectStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
@@ -255,7 +255,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
-            DdlTransactionMode.Batch,
+            mock(OptionsMetadata.class),
             ImmutableList.of());
     copyAndUnknownStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
@@ -270,8 +270,10 @@ public class BackendConnectionTest {
     StatementResult listDatabasesResult = mock(StatementResult.class);
     when(listDatabasesResult.getResultType()).thenReturn(ResultType.RESULT_SET);
     ListDatabasesStatement listDatabasesStatement = mock(ListDatabasesStatement.class);
-    when(listDatabasesStatement.getSql()).thenReturn(ListDatabasesStatement.LIST_DATABASES_SQL);
-    when(listDatabasesStatement.execute(connection)).thenReturn(listDatabasesResult);
+    when(listDatabasesStatement.getSql())
+        .thenReturn(new String[] {ListDatabasesStatement.LIST_DATABASES_SQL});
+    when(listDatabasesStatement.execute(any(BackendConnection.class)))
+        .thenReturn(listDatabasesResult);
     ImmutableList<LocalStatement> localStatements = ImmutableList.of(listDatabasesStatement);
     ParsedStatement parsedListDatabasesStatement = mock(ParsedStatement.class);
     when(parsedListDatabasesStatement.getSqlWithoutComments())
@@ -279,13 +281,13 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
-            DatabaseId.of("p", "i", "d"), connection, DdlTransactionMode.Batch, localStatements);
+            DatabaseId.of("p", "i", "d"), connection, mock(OptionsMetadata.class), localStatements);
     Future<StatementResult> resultFuture =
         backendConnection.execute(
             parsedListDatabasesStatement, Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL));
     backendConnection.flush();
 
-    verify(listDatabasesStatement).execute(connection);
+    verify(listDatabasesStatement).execute(backendConnection);
     assertTrue(resultFuture.isDone());
     assertEquals(listDatabasesResult, resultFuture.get());
   }
@@ -295,7 +297,8 @@ public class BackendConnectionTest {
       throws ExecutionException, InterruptedException {
     Connection connection = mock(Connection.class);
     ListDatabasesStatement listDatabasesStatement = mock(ListDatabasesStatement.class);
-    when(listDatabasesStatement.getSql()).thenReturn(ListDatabasesStatement.LIST_DATABASES_SQL);
+    when(listDatabasesStatement.getSql())
+        .thenReturn(new String[] {ListDatabasesStatement.LIST_DATABASES_SQL});
     ImmutableList<LocalStatement> localStatements = ImmutableList.of(listDatabasesStatement);
 
     StatementResult statementResult = mock(StatementResult.class);
@@ -308,11 +311,11 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
-            DatabaseId.of("p", "i", "d"), connection, DdlTransactionMode.Batch, localStatements);
+            DatabaseId.of("p", "i", "d"), connection, mock(OptionsMetadata.class), localStatements);
     Future<StatementResult> resultFuture = backendConnection.execute(parsedStatement, statement);
     backendConnection.flush();
 
-    verify(listDatabasesStatement, never()).execute(connection);
+    verify(listDatabasesStatement, never()).execute(backendConnection);
     assertTrue(resultFuture.isDone());
     assertEquals(statementResult, resultFuture.get());
   }
