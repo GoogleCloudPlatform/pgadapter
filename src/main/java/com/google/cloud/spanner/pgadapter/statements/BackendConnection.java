@@ -40,6 +40,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
+import com.google.cloud.spanner.connection.ResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -184,10 +185,42 @@ public class BackendConnection {
         } else {
           result.set(spannerConnection.execute(statement));
         }
+      } catch (SpannerException spannerException) {
+        // Executing queries against the information schema in a transaction is unsupported.
+        // This ensures that those queries are retried using a separate single-use transaction.
+        if (isUnsupportedConcurrencyModeException(spannerException)) {
+          try {
+            result.set(
+                new QueryResult(
+                    ResultSetHelper.toDirectExecuteResultSet(
+                        spannerConnection
+                            .getDatabaseClient()
+                            .singleUse()
+                            .executeQuery(statement))));
+            return;
+          } catch (Exception exception) {
+            result.setException(exception);
+            throw exception;
+          }
+        }
+        result.setException(spannerException);
+        throw spannerException;
       } catch (Exception exception) {
         result.setException(exception);
         throw exception;
       }
+    }
+
+    /**
+     * Returns true if the given exception is the error that is returned by Cloud Spanner when an
+     * INFORMATION_SCHEMA query is not executed in a single-use read-only transaction.
+     */
+    boolean isUnsupportedConcurrencyModeException(SpannerException spannerException) {
+      return spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
+          && spannerException
+              .getMessage()
+              .startsWith(
+                  "INVALID_ARGUMENT: io.grpc.StatusRuntimeException: INVALID_ARGUMENT: Unsupported concurrency mode in query using INFORMATION_SCHEMA.");
     }
   }
 
