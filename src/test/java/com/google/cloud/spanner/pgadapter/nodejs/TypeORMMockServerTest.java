@@ -37,6 +37,7 @@ import java.io.InputStreamReader;
 import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -45,6 +46,19 @@ import org.junit.runners.JUnit4;
 @Category(NodeJSTest.class)
 @RunWith(JUnit4.class)
 public class TypeORMMockServerTest extends AbstractMockServerTest {
+
+  @BeforeClass
+  public static void installDependencies() throws IOException, InterruptedException {
+    String currentPath = new java.io.File(".").getCanonicalPath();
+    String testFilePath = String.format("%s/src/test/nodejs/typeorm/data-test", currentPath);
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command("npm", "install");
+    builder.directory(new File(testFilePath));
+
+    Process process = builder.start();
+    int res = process.waitFor();
+    assertEquals(0, res);
+  }
 
   @Test
   public void testFindOneUser() throws IOException, InterruptedException {

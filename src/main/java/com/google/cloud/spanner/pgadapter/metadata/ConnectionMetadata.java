@@ -84,13 +84,19 @@ public class ConnectionMetadata implements AutoCloseable {
     return outputStream.peek();
   }
 
-  /** Returns the next byte in the input stream without removing it. */
+  /**
+   * Returns the next byte in the input stream without removing it. Returns zero if no bytes are
+   * available.
+   */
   public char peekNextByte() throws IOException {
     DataInputStream dataInputStream = inputStream.peek();
-    dataInputStream.mark(1);
-    char result = (char) dataInputStream.readUnsignedByte();
-    dataInputStream.reset();
+    if (dataInputStream.available() > 0) {
+      dataInputStream.mark(1);
+      char result = (char) dataInputStream.readUnsignedByte();
+      dataInputStream.reset();
 
-    return result;
+      return result;
+    }
+    return 0;
   }
 }

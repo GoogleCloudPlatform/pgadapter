@@ -26,26 +26,22 @@ import java.text.MessageFormat;
 public class FlushMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'H';
-  private final char nextMessage;
 
   public FlushMessage(ConnectionHandler connection) throws Exception {
     super(connection);
-    this.nextMessage = connection.getConnectionMetadata().peekNextByte();
   }
 
   public FlushMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
     super(connection, 4, manuallyCreatedToken);
-    this.nextMessage = 0;
-  }
-
-  boolean isNextMessageSync() {
-    return this.nextMessage == SyncMessage.IDENTIFIER;
   }
 
   @Override
   protected void sendPayload() throws Exception {
-    // Just pretend that this message is a sync if it is followed directly by a sync message.
-    if (isNextMessageSync()) {
+    // Pretend that this message is a sync if it is followed directly by a sync message.
+    // This allows us to use a more efficient transaction type for single queries, as we know that
+    // no other query will be following after the flush.
+    char nextMessage = connection.getConnectionMetadata().peekNextByte();
+    if (nextMessage == SyncMessage.IDENTIFIER) {
       connection.getExtendedQueryProtocolHandler().sync();
     } else {
       connection.getExtendedQueryProtocolHandler().flush();
