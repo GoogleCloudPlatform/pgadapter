@@ -15,14 +15,19 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.StartupMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.ExecuteSqlRequest;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -123,6 +128,109 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
           assertEquals(-1, inputStream.read());
         } catch (IOException ignore) {
         }
+      }
+    }
+  }
+
+  @Test
+  public void testFlushAndSync() throws IOException {
+    // This test verifies that PGAdapter will treat a Flush directly followed by a Sync messages as
+    // if it was just a Sync message. Sending Flush and then Sync directly after each other is not
+    // very useful, as Sync means 'flush and commit' (i.e. it already entails Flush).
+
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        // Request startup.
+        outputStream.writeInt(17);
+        outputStream.writeInt(StartupMessage.IDENTIFIER);
+        outputStream.writeBytes("user");
+        outputStream.writeByte(0);
+        outputStream.writeBytes("foo");
+        outputStream.writeByte(0);
+        outputStream.flush();
+
+        // Verify that the server responds with auth OK.
+        assertEquals('R', inputStream.readByte());
+        assertEquals(8, inputStream.readInt());
+        assertEquals(0, inputStream.readInt()); // 0 == success
+
+        // Receive key data.
+        assertEquals('K', inputStream.readByte());
+        assertEquals(12, inputStream.readInt());
+        inputStream.readInt();
+        inputStream.readInt();
+
+        // Just skip parameter data and wait for 'Z' (ready for query)
+        while (true) {
+          byte message = inputStream.readByte();
+          int length = inputStream.readInt();
+          inputStream.readFully(new byte[length - 4]);
+          if (message == 'Z') {
+            break;
+          }
+        }
+
+        // Do an extended query round-trip.
+        // PARSE
+        outputStream.writeByte('P');
+        outputStream.writeInt(4 + 1 + "SELECT 1".getBytes(StandardCharsets.UTF_8).length + 1 + 2);
+        outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+        outputStream.write("SELECT 1".getBytes(StandardCharsets.UTF_8));
+        outputStream.writeByte(0);
+        outputStream.writeShort(0);
+        // BIND
+        outputStream.writeByte('B');
+        outputStream.writeInt(4 + 1 + 1 + 2 + 2 + 2);
+        outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+        outputStream.writeByte(0); // Empty string terminator for the unnamed prepared statement
+        outputStream.writeShort(0); // Zero parameter format codes
+        outputStream.writeShort(0); // Zero parameter values
+        outputStream.writeShort(0); // Zero result format codes
+        // DESCRIBE
+        outputStream.writeByte('D');
+        outputStream.writeInt(4 + 1 + 1);
+        outputStream.writeByte('P');
+        outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+        // EXECUTE
+        outputStream.writeByte('E');
+        outputStream.writeInt(4 + 1 + 4);
+        outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+        outputStream.writeInt(0); // Return all rows
+        // FLUSH
+        outputStream.writeByte('H');
+        outputStream.writeInt(4);
+        // SYNC
+        outputStream.writeByte('S');
+        outputStream.writeInt(4);
+
+        outputStream.flush();
+
+        // Wait for 'Z' (ready for query)
+        while (true) {
+          byte message = inputStream.readByte();
+          int length = inputStream.readInt();
+          inputStream.readFully(new byte[length - 4]);
+          if (message == 'Z') {
+            break;
+          }
+        }
+
+        // Verify that we received the messages that we sent.
+        List<WireMessage> messages = getWireMessages();
+        // Startup-Parse-Bind-Describe-Execute-Flush-Sync.
+        assertEquals(7, messages.size());
+
+        // Verify that PGAdapter executed the single query using a single-use read-only transaction.
+        // This is achieved because we do a look-ahead in the flush message to check whether the
+        // next message is a sync. Otherwise, the flush would cause the backend connection to start
+        // an implicit read/write transaction, as we do not know what type of statement might follow
+        // after the flush.
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+        ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+        assertTrue(request.getTransaction().hasSingleUse());
+        assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
       }
     }
   }

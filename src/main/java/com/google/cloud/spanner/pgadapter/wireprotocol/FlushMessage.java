@@ -37,7 +37,19 @@ public class FlushMessage extends ControlMessage {
 
   @Override
   protected void sendPayload() throws Exception {
-    connection.getExtendedQueryProtocolHandler().flush();
+    // Pretend that this message is a sync if it is followed directly by a sync message.
+    // This allows us to use a more efficient transaction type for single queries, as we know that
+    // no other query will be following after the flush.
+    if (isExtendedProtocol()) {
+      char nextMessage = connection.getConnectionMetadata().peekNextByte();
+      if (nextMessage == SyncMessage.IDENTIFIER) {
+        connection.getExtendedQueryProtocolHandler().sync();
+      } else {
+        connection.getExtendedQueryProtocolHandler().flush();
+      }
+    } else {
+      connection.getExtendedQueryProtocolHandler().flush();
+    }
   }
 
   @Override

@@ -21,6 +21,7 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Stack;
@@ -81,5 +82,20 @@ public class ConnectionMetadata implements AutoCloseable {
   /** Returns the current {@link DataOutputStream} for the connection. */
   public DataOutputStream peekOutputStream() {
     return outputStream.peek();
+  }
+  /**
+   * Returns the next byte in the input stream without removing it. Returns zero if no bytes are
+   * available.
+   */
+  public char peekNextByte() throws IOException {
+    DataInputStream dataInputStream = inputStream.peek();
+    if (dataInputStream.available() > 0) {
+      dataInputStream.mark(1);
+      char result = (char) dataInputStream.readUnsignedByte();
+      dataInputStream.reset();
+
+      return result;
+    }
+    return 0;
   }
 }

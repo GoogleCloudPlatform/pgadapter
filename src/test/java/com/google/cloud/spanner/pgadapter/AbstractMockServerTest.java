@@ -58,6 +58,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
@@ -247,6 +248,10 @@ public abstract class AbstractMockServerTest {
   protected static MockInstanceAdminImpl mockInstanceAdmin;
   private static Server spannerServer;
   protected static ProxyServer pgServer;
+
+  protected List<WireMessage> getWireMessages() {
+    return new ArrayList<>(pgServer.getDebugMessages());
+  }
 
   protected <T extends WireMessage> List<T> getWireMessagesOfType(Class<T> type) {
     return pgServer.getDebugMessages().stream()
