@@ -1,7 +1,7 @@
 {
-   "name": "MyProject",
+   "name": "data-test",
    "version": "0.0.1",
-   "description": "Awesome project developed with TypeORM.",
+   "description": "TypeORM Data operations tests",
    "type": "commonjs",
    "devDependencies": {
       "ts-node": "10.7.0",
@@ -11,7 +11,8 @@
    "dependencies": {
       "typeorm": "0.3.7",
       "reflect-metadata": "^0.1.13",
-      "pg": "^8.4.0"
+      "pg": "^8.4.0",
+      "yargs": "^17.5.1"
    },
    "scripts": {
       "start": "ts-node src/index.ts",

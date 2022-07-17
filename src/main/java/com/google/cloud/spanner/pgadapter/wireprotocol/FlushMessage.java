@@ -26,18 +26,30 @@ import java.text.MessageFormat;
 public class FlushMessage extends ControlMessage {
 
   protected static final char IDENTIFIER = 'H';
+  private final char nextMessage;
 
   public FlushMessage(ConnectionHandler connection) throws Exception {
     super(connection);
+    this.nextMessage = connection.getConnectionMetadata().peekNextByte();
   }
 
   public FlushMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
     super(connection, 4, manuallyCreatedToken);
+    this.nextMessage = 0;
+  }
+
+  boolean isNextMessageSync() {
+    return this.nextMessage == SyncMessage.IDENTIFIER;
   }
 
   @Override
   protected void sendPayload() throws Exception {
-    connection.getExtendedQueryProtocolHandler().flush();
+    // Just pretend that this message is a sync if it is followed directly by a sync message.
+    if (isNextMessageSync()) {
+      connection.getExtendedQueryProtocolHandler().sync();
+    } else {
+      connection.getExtendedQueryProtocolHandler().flush();
+    }
   }
 
   @Override

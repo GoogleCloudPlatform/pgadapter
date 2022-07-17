@@ -145,14 +145,14 @@ public abstract class ControlMessage extends WireMessage {
             return new ExecuteMessage(connection);
           case CloseMessage.IDENTIFIER:
             return new CloseMessage(connection);
-          case SyncMessage.IDENTIFIER:
-            return new SyncMessage(connection);
           case TerminateMessage.IDENTIFIER:
             return new TerminateMessage(connection);
           case FunctionCallMessage.IDENTIFIER:
             return new FunctionCallMessage(connection);
           case FlushMessage.IDENTIFIER:
             return new FlushMessage(connection);
+          case SyncMessage.IDENTIFIER:
+            return new SyncMessage(connection);
           case CopyDoneMessage.IDENTIFIER:
           case CopyDataMessage.IDENTIFIER:
           case CopyFailMessage.IDENTIFIER:

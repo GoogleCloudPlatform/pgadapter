@@ -18,12 +18,14 @@ import com.google.cloud.spanner.AbstractLazyInitializer;
 import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
@@ -197,7 +199,11 @@ class DdlExecutor {
 
   Statement translateCreate(SimpleParser parser, Statement statement) {
     if (parser.eat("table")) {
-      return translateCreateTable(parser, statement);
+      Statement createTableStatement = translateCreateTable(parser, statement);
+      if (createTableStatement == null) {
+        return null;
+      }
+      return maybeRemovePrimaryKeyConstraintName(createTableStatement);
     }
     boolean unique = parser.eat("unique");
     if (parser.eat("index")) {
@@ -336,5 +342,44 @@ class DdlExecutor {
     } catch (Exception exception) {
       throw SpannerExceptionFactory.asSpannerException(exception);
     }
+  }
+
+  Statement maybeRemovePrimaryKeyConstraintName(Statement createTableStatement) {
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(createTableStatement);
+    SimpleParser parser = new SimpleParser(parsedStatement.getSqlWithoutComments());
+    parser.eat("create", "table", "if", "not", "exists");
+    TableOrIndexName tableName = parser.readTableOrIndexName();
+    if (tableName == null) {
+      return createTableStatement;
+    }
+    if (!parser.eat("(")) {
+      return createTableStatement;
+    }
+    while (true) {
+      if (parser.eat(")")) {
+        break;
+      } else if (parser.eat(",")) {
+        continue;
+      } else if (parser.peek("constraint")) {
+        int positionBeforeConstraintDefinition = parser.getPos();
+        parser.eat("constraint");
+        String constraintName = unquoteIdentifier(parser.readIdentifierPart());
+        int positionAfterConstraintName = parser.getPos();
+        if (parser.eat("primary", "key")) {
+          if (!constraintName.equalsIgnoreCase("pk_" + unquoteIdentifier(tableName.name))) {
+            return createTableStatement;
+          }
+          return Statement.of(
+              parser.getSql().substring(0, positionBeforeConstraintDefinition)
+                  + parser.getSql().substring(positionAfterConstraintName));
+        } else {
+          parser.parseExpression();
+        }
+      } else {
+        parser.parseExpression();
+      }
+    }
+    return createTableStatement;
   }
 }
