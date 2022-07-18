@@ -234,4 +234,268 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
       }
     }
   }
+
+  @Test
+  public void testFlushFollowedByQuery() throws IOException {
+    // This test verifies that PGAdapter will treat a Flush directly followed by another query as
+    // a flush message (i.e. it does not treat it as a Sync).
+
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        // Request startup.
+        outputStream.writeInt(17);
+        outputStream.writeInt(StartupMessage.IDENTIFIER);
+        outputStream.writeBytes("user");
+        outputStream.writeByte(0);
+        outputStream.writeBytes("foo");
+        outputStream.writeByte(0);
+        outputStream.flush();
+
+        // Verify that the server responds with auth OK.
+        assertEquals('R', inputStream.readByte());
+        assertEquals(8, inputStream.readInt());
+        assertEquals(0, inputStream.readInt()); // 0 == success
+
+        // Receive key data.
+        assertEquals('K', inputStream.readByte());
+        assertEquals(12, inputStream.readInt());
+        inputStream.readInt();
+        inputStream.readInt();
+
+        // Just skip parameter data and wait for 'Z' (ready for query)
+        while (true) {
+          byte message = inputStream.readByte();
+          int length = inputStream.readInt();
+          inputStream.readFully(new byte[length - 4]);
+          if (message == 'Z') {
+            break;
+          }
+        }
+
+        for (int i = 0; i < 2; i++) {
+          // Do an extended query round-trip.
+          // PARSE
+          outputStream.writeByte('P');
+          outputStream.writeInt(4 + 1 + "SELECT 1".getBytes(StandardCharsets.UTF_8).length + 1 + 2);
+          outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+          outputStream.write("SELECT 1".getBytes(StandardCharsets.UTF_8));
+          outputStream.writeByte(0);
+          outputStream.writeShort(0);
+          // BIND
+          outputStream.writeByte('B');
+          outputStream.writeInt(4 + 1 + 1 + 2 + 2 + 2);
+          outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+          outputStream.writeByte(0); // Empty string terminator for the unnamed prepared statement
+          outputStream.writeShort(0); // Zero parameter format codes
+          outputStream.writeShort(0); // Zero parameter values
+          outputStream.writeShort(0); // Zero result format codes
+          // DESCRIBE
+          outputStream.writeByte('D');
+          outputStream.writeInt(4 + 1 + 1);
+          outputStream.writeByte('P');
+          outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+          // EXECUTE
+          outputStream.writeByte('E');
+          outputStream.writeInt(4 + 1 + 4);
+          outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+          outputStream.writeInt(0); // Return all rows
+
+          // Do a flush, but not a sync, after the first query.
+          if (i == 0) {
+            // FLUSH
+            outputStream.writeByte('H');
+            outputStream.writeInt(4);
+
+            outputStream.flush();
+
+            // Wait until we have received a CommandComplete message.
+            while (true) {
+              byte message = inputStream.readByte();
+              int length = inputStream.readInt();
+              inputStream.readFully(new byte[length - 4]);
+              if (message == 'C') {
+                break;
+              }
+            }
+
+            // Verify that we received the messages that we sent.
+            List<WireMessage> messages = getWireMessages();
+            // Startup-Parse-Bind-Describe-Execute-Flush.
+            assertEquals(6, messages.size());
+
+            assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+            assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+            ExecuteSqlRequest request =
+                mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+            // PGAdapter will start an implicit read/write transaction, because we have sent a
+            // flush and more statements may follow, and we have not specified that this transaction
+            // will only read.
+            assertTrue(request.getTransaction().hasBegin());
+            assertTrue(request.getTransaction().getBegin().hasReadWrite());
+          }
+        }
+        // SYNC
+        outputStream.writeByte('S');
+        outputStream.writeInt(4);
+
+        outputStream.flush();
+
+        // Wait for 'Z' (ready for query)
+        while (true) {
+          byte message = inputStream.readByte();
+          int length = inputStream.readInt();
+          inputStream.readFully(new byte[length - 4]);
+          if (message == 'Z') {
+            break;
+          }
+        }
+
+        // Verify that we received the messages that we sent.
+        List<WireMessage> messages = getWireMessages();
+        // Startup-Parse-Bind-Describe-Execute-Flush.
+        // Parse-Bind-Describe-Execute-Sync.
+        assertEquals(11, messages.size());
+
+        // Verify that PGAdapter executed the two queries using a read/write transaction.
+        assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+        ExecuteSqlRequest firstRequest =
+            mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+        assertTrue(firstRequest.getTransaction().hasBegin());
+        assertTrue(firstRequest.getTransaction().getBegin().hasReadWrite());
+        ExecuteSqlRequest secondRequest =
+            mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+        assertTrue(secondRequest.getTransaction().hasId());
+      }
+    }
+  }
+
+  @Test
+  public void testFlushFollowedByEmptyBuffer() throws IOException {
+    // This test verifies that PGAdapter will treat a Flush without a message that is sent directly
+    // after as a Flush. PGAdapter should not block to try to peek at the next message if there is
+    // nothing in the buffer. This means that a Flush followed by a Sync could lead to the use of a
+    // read/write transaction if there is a pause between the two.
+
+    try (Socket socket = new Socket("localhost", pgServer.getLocalPort())) {
+      try (DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+          DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream())) {
+        // Request startup.
+        outputStream.writeInt(17);
+        outputStream.writeInt(StartupMessage.IDENTIFIER);
+        outputStream.writeBytes("user");
+        outputStream.writeByte(0);
+        outputStream.writeBytes("foo");
+        outputStream.writeByte(0);
+        outputStream.flush();
+
+        // Verify that the server responds with auth OK.
+        assertEquals('R', inputStream.readByte());
+        assertEquals(8, inputStream.readInt());
+        assertEquals(0, inputStream.readInt()); // 0 == success
+
+        // Receive key data.
+        assertEquals('K', inputStream.readByte());
+        assertEquals(12, inputStream.readInt());
+        inputStream.readInt();
+        inputStream.readInt();
+
+        // Just skip parameter data and wait for 'Z' (ready for query)
+        while (true) {
+          byte message = inputStream.readByte();
+          int length = inputStream.readInt();
+          inputStream.readFully(new byte[length - 4]);
+          if (message == 'Z') {
+            break;
+          }
+        }
+
+        // Do an extended query round-trip.
+        // PARSE
+        outputStream.writeByte('P');
+        outputStream.writeInt(4 + 1 + "SELECT 1".getBytes(StandardCharsets.UTF_8).length + 1 + 2);
+        outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+        outputStream.write("SELECT 1".getBytes(StandardCharsets.UTF_8));
+        outputStream.writeByte(0);
+        outputStream.writeShort(0);
+        // BIND
+        outputStream.writeByte('B');
+        outputStream.writeInt(4 + 1 + 1 + 2 + 2 + 2);
+        outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+        outputStream.writeByte(0); // Empty string terminator for the unnamed prepared statement
+        outputStream.writeShort(0); // Zero parameter format codes
+        outputStream.writeShort(0); // Zero parameter values
+        outputStream.writeShort(0); // Zero result format codes
+        // DESCRIBE
+        outputStream.writeByte('D');
+        outputStream.writeInt(4 + 1 + 1);
+        outputStream.writeByte('P');
+        outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+        // EXECUTE
+        outputStream.writeByte('E');
+        outputStream.writeInt(4 + 1 + 4);
+        outputStream.writeByte(0); // Empty string terminator for the unnamed portal
+        outputStream.writeInt(0); // Return all rows
+
+        // Do a flush, but not a sync, after the query.
+        // FLUSH
+        outputStream.writeByte('H');
+        outputStream.writeInt(4);
+
+        outputStream.flush();
+
+        // Wait until we have received a CommandComplete message.
+        while (true) {
+          byte message = inputStream.readByte();
+          int length = inputStream.readInt();
+          inputStream.readFully(new byte[length - 4]);
+          if (message == 'C') {
+            break;
+          }
+        }
+
+        // Verify that we received the messages that we sent.
+        List<WireMessage> messages = getWireMessages();
+        // Startup-Parse-Bind-Describe-Execute-Flush.
+        assertEquals(6, messages.size());
+
+        assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+        ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+        // PGAdapter will start an implicit read/write transaction, because we have sent a
+        // flush and more statements may follow, and we have not specified that this transaction
+        // will only read.
+        assertTrue(request.getTransaction().hasBegin());
+        assertTrue(request.getTransaction().getBegin().hasReadWrite());
+        // The transaction should not yet have committed.
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+
+        // Now send a sync. This will commit the implicit read/write transaction.
+        // SYNC
+        outputStream.writeByte('S');
+        outputStream.writeInt(4);
+
+        outputStream.flush();
+
+        // Wait for 'Z' (ready for query)
+        while (true) {
+          byte message = inputStream.readByte();
+          int length = inputStream.readInt();
+          inputStream.readFully(new byte[length - 4]);
+          if (message == 'Z') {
+            break;
+          }
+        }
+
+        // Verify that we received the messages that we sent.
+        messages = getWireMessages();
+        // Startup-Parse-Bind-Describe-Execute-Flush-(pause)-Sync.
+        assertEquals(7, messages.size());
+
+        // Verify that PGAdapter committed the implicit transaction.
+        assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+      }
+    }
+  }
 }

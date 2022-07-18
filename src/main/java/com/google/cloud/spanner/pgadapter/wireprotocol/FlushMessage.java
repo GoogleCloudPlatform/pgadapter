@@ -50,6 +50,7 @@ public class FlushMessage extends ControlMessage {
     } else {
       connection.getExtendedQueryProtocolHandler().flush();
     }
+    connection.getConnectionMetadata().peekOutputStream().flush();
   }
 
   @Override
