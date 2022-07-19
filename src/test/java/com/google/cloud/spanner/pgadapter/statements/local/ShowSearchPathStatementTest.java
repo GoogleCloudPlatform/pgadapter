@@ -39,7 +39,7 @@ public class ShowSearchPathStatementTest {
           ShowSearchPathStatement.INSTANCE.execute(backendConnection).getResultSet()) {
         assertTrue(resultSet.next());
         assertEquals(1, resultSet.getColumnCount());
-        assertEquals("\"$user\", " + schema, resultSet.getString("search_path"));
+        assertEquals(schema, resultSet.getString("search_path"));
         assertFalse(resultSet.next());
       }
     }

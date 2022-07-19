@@ -190,7 +190,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         assertTrue(resultSet.next());
-        assertEquals("\"$user\", public", resultSet.getString("search_path"));
+        assertEquals("public", resultSet.getString("search_path"));
         assertFalse(resultSet.next());
       }
     }

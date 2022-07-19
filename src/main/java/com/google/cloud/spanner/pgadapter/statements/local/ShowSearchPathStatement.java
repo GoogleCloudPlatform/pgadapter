@@ -46,7 +46,7 @@ public class ShowSearchPathStatement implements LocalStatement {
             ImmutableList.of(
                 Struct.newBuilder()
                     .set("search_path")
-                    .to("\"$user\", " + backendConnection.getCurrentSchema())
+                    .to(backendConnection.getCurrentSchema())
                     .build()));
     return new QueryResult(resultSet);
   }
