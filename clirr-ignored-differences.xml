@@ -19,6 +19,36 @@
     <className>com/google/cloud/spanner/pgadapter/parsers/copy/Copy</className>
     <method>void copyFrom()</method>
   </difference>
+  <!-- Changed to BackendConnection. This is only for internal use. -->
+  <difference>
+    <differenceType>7005</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/statements/local/LocalStatement</className>
+    <method>com.google.cloud.spanner.connection.StatementResult execute(com.google.cloud.spanner.connection.Connection)</method>
+    <to>com.google.cloud.spanner.connection.StatementResult execute(com.google.cloud.spanner.pgadapter.statements.BackendConnection)</to>
+  </difference>
+  <!-- Return type changed to String[]. This is only for internal use. -->
+  <difference>
+    <differenceType>7006</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/statements/local/LocalStatement</className>
+    <method>java.lang.String getSql()</method>
+    <from>java.lang.String</from>
+    <to>java.lang.String[]</to>
+  </difference>
+  <!-- Changed to BackendConnection. This is only for internal use. -->
+  <difference>
+    <differenceType>7005</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/statements/local/ListDatabasesStatement</className>
+    <method>com.google.cloud.spanner.connection.StatementResult execute(com.google.cloud.spanner.connection.Connection)</method>
+    <to>com.google.cloud.spanner.connection.StatementResult execute(com.google.cloud.spanner.pgadapter.statements.BackendConnection)</to>
+  </difference>
+  <!-- Return type changed to String[]. This is only for internal use. -->
+  <difference>
+    <differenceType>7006</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/statements/local/ListDatabasesStatement</className>
+    <method>java.lang.String getSql()</method>
+    <from>java.lang.String</from>
+    <to>java.lang.String[]</to>
+  </difference>
 
   <!-- Add ignores for all sub packages, as these are considered internal. -->
   <difference>

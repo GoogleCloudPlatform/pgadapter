@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements.local;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -36,6 +37,7 @@ import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -49,7 +51,7 @@ public class ListDatabasesStatementTest {
     ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
     ListDatabasesStatement statement = new ListDatabasesStatement(connectionHandler);
 
-    assertEquals(ListDatabasesStatement.LIST_DATABASES_SQL, statement.getSql());
+    assertArrayEquals(new String[] {ListDatabasesStatement.LIST_DATABASES_SQL}, statement.getSql());
   }
 
   @Test
@@ -102,9 +104,11 @@ public class ListDatabasesStatementTest {
         createMockPage(ImmutableList.of(otherPgDatabase, otherGsqlDatabase, currentDatabase));
     when(databaseAdminClient.listDatabases(currentDatabaseId.getInstanceId().getInstance()))
         .thenReturn(page);
+    BackendConnection backendConnection = mock(BackendConnection.class);
+    when(backendConnection.getSpannerConnection()).thenReturn(connection);
 
     ListDatabasesStatement statement = new ListDatabasesStatement(connectionHandler);
-    StatementResult result = statement.execute(connection);
+    StatementResult result = statement.execute(backendConnection);
 
     assertEquals(ResultType.RESULT_SET, result.getResultType());
     ResultSet resultSet = result.getResultSet();
@@ -143,9 +147,11 @@ public class ListDatabasesStatementTest {
         createMockPage(ImmutableList.of(otherPgDatabase, otherGsqlDatabase, currentDatabase));
     when(databaseAdminClient.listDatabases(currentDatabaseId.getInstanceId().getInstance()))
         .thenReturn(page);
+    BackendConnection backendConnection = mock(BackendConnection.class);
+    when(backendConnection.getSpannerConnection()).thenReturn(connection);
 
     ListDatabasesStatement statement = new ListDatabasesStatement(connectionHandler);
-    StatementResult result = statement.execute(connection);
+    StatementResult result = statement.execute(backendConnection);
 
     assertEquals(ResultType.RESULT_SET, result.getResultType());
     ResultSet resultSet = result.getResultSet();
@@ -185,9 +191,11 @@ public class ListDatabasesStatementTest {
         createMockPage(ImmutableList.of(otherPgDatabase, otherGsqlDatabase, currentDatabase));
     when(databaseAdminClient.listDatabases(currentDatabaseId.getInstanceId().getInstance()))
         .thenReturn(page);
+    BackendConnection backendConnection = mock(BackendConnection.class);
+    when(backendConnection.getSpannerConnection()).thenReturn(connection);
 
     ListDatabasesStatement statement = new ListDatabasesStatement(connectionHandler);
-    StatementResult result = statement.execute(connection);
+    StatementResult result = statement.execute(backendConnection);
 
     assertEquals(ResultType.RESULT_SET, result.getResultType());
     ResultSet resultSet = result.getResultSet();
@@ -221,8 +229,11 @@ public class ListDatabasesStatementTest {
     when(databaseBuilder.build()).thenReturn(currentDatabase);
     when(databaseAdminClient.newDatabaseBuilder(currentDatabaseId)).thenReturn(databaseBuilder);
 
+    BackendConnection backendConnection = mock(BackendConnection.class);
+    when(backendConnection.getSpannerConnection()).thenReturn(connection);
+
     ListDatabasesStatement statement = new ListDatabasesStatement(connectionHandler);
-    StatementResult result = statement.execute(connection);
+    StatementResult result = statement.execute(backendConnection);
 
     assertEquals(ResultType.RESULT_SET, result.getResultType());
     ResultSet resultSet = result.getResultSet();
