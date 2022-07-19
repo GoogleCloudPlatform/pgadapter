@@ -806,7 +806,7 @@ public class BackendConnection {
       this.commandTag = null;
     }
 
-    private NoResult(String commandTag) {
+    public NoResult(String commandTag) {
       this.commandTag = commandTag;
     }
 
