@@ -181,6 +181,24 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   }
 
   @Test
+  public void testSelectEdbRedwoodDateSetting() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            try (ResultSet resultSet =
+                connection
+                    .createStatement()
+                    .executeQuery(
+                        "select setting from pg_settings where name = 'edb_redwood_date'")) {
+              assertFalse(resultSet.next());
+            }
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
+  }
+
+  @Test
   public void testDatabaseMetaDataTables() throws Exception {
     runForAllVersions(
         connection -> {

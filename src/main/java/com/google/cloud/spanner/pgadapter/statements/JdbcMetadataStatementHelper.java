@@ -34,8 +34,9 @@ class JdbcMetadataStatementHelper {
    * @return true if the query could be a JDBC metadata query, and false if it definitely not.
    */
   static boolean isPotentialJdbcMetadataStatement(String sql) {
-    // All JDBC metadata queries that need any replacements reference the pg_catalog schema.
-    return sql.contains("pg_catalog.");
+    // All JDBC metadata queries that need any replacements reference the pg_catalog schema or the
+    // pg_settings table.
+    return sql.contains("pg_catalog.") || sql.contains("pg_settings");
   }
 
   static String replaceJdbcMetadataStatement(String sql) {
@@ -47,6 +48,9 @@ class JdbcMetadataStatementHelper {
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_SCHEMAS_PREFIX)) {
       return replaceGetSchemasQuery(sql);
+    }
+    if (sql.equals(PgJdbcCatalog.PG_JDBC_GET_EDB_REDWOOD_DATE_QUERY)) {
+      return PgJdbcCatalog.PG_JDBC_GET_EDB_REDWOOD_DATE_REPLACEMENT;
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_1)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLES_PREFIX_2)
