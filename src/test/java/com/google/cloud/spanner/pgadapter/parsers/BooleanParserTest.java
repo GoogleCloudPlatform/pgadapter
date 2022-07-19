@@ -20,12 +20,30 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class BooleanParserTest {
+
+  @Test
+  public void testBinaryToBoolean() {
+    assertTrue(BooleanParser.toBoolean(new byte[] {1}));
+    assertTrue(BooleanParser.toBoolean(new byte[] {1, 0}));
+
+    assertFalse(BooleanParser.toBoolean(new byte[] {0}));
+    assertFalse(BooleanParser.toBoolean(new byte[] {0, 1}));
+    assertFalse(BooleanParser.toBoolean(new byte[] {0, 0}));
+    assertFalse(BooleanParser.toBoolean(new byte[] {2}));
+    assertFalse(BooleanParser.toBoolean(new byte[] {-1}));
+
+    SpannerException spannerException =
+        assertThrows(SpannerException.class, () -> BooleanParser.toBoolean(new byte[] {}));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
+  }
 
   @Test
   public void testToBoolean() {
