@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -105,19 +104,35 @@ public final class ControlMessageTest {
   }
 
   @Test
-  public void testUnknownStatementTypeThrowsError() {
+  public void testUnknownStatementTypeDoesNotThrowError() throws Exception {
+    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(buffer);
+    DataInputStream inputStream =
+        new DataInputStream(
+            new ByteArrayInputStream(new byte[] {(byte) QUERY_IDENTIFIER, 0, 0, 0, 5, 0}));
+
+    when(connectionMetadata.peekInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.peekOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     ExecuteMessage executeMessage =
         new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
     IntermediateStatement intermediateStatement = mock(IntermediateStatement.class);
-    when(intermediateStatement.getCommandTag()).thenReturn("PARSE");
+    when(intermediateStatement.getCommandTag()).thenReturn("parse");
     when(intermediateStatement.getStatementType()).thenReturn(StatementType.UNKNOWN);
     when(intermediateStatement.getStatement()).thenReturn("parse foo from bar");
 
-    IllegalStateException exception =
-        assertThrows(
-            IllegalStateException.class,
-            () -> executeMessage.sendSpannerResult(intermediateStatement, QueryMode.SIMPLE, 0L));
-    assertEquals("Unknown statement type: parse foo from bar", exception.getMessage());
+    executeMessage.sendSpannerResult(intermediateStatement, QueryMode.SIMPLE, 0L);
+
+    DataInputStream outputReader =
+        new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));
+    // identifier
+    outputReader.readByte();
+    // length
+    outputReader.readInt();
+    final String resultMessage = "parse";
+    int numOfBytes = resultMessage.getBytes(UTF8).length;
+    byte[] bytes = new byte[numOfBytes];
+    assertEquals(numOfBytes, outputReader.read(bytes, 0, numOfBytes));
+    assertEquals(resultMessage, new String(bytes, UTF8));
   }
 }

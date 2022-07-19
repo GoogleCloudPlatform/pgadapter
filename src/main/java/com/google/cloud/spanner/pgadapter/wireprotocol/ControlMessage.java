@@ -271,6 +271,11 @@ public abstract class ControlMessage extends WireMessage {
         new CommandCompleteResponse(this.outputStream, command).send(false);
         break;
       case UNKNOWN:
+        if (!Strings.isNullOrEmpty(command)) {
+          new CommandCompleteResponse(this.outputStream, command).send(false);
+          break;
+        }
+        // fallthrough
       default:
         throw new IllegalStateException("Unknown statement type: " + statement.getStatement());
     }
