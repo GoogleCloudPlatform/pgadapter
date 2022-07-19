@@ -200,6 +200,22 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSetSearchPath() throws SQLException {
+    String sql = "set search_path to public";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
   public void testShowServerVersion() throws SQLException {
     String sql = "show server_version";
 
