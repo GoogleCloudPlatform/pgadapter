@@ -18,9 +18,14 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.ShowServerVersionStatement;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nonnull;
 
 /**
  * Utility class that tries to automatically detect well-known clients and drivers that are
@@ -29,6 +34,12 @@ import java.util.Map;
 @InternalApi
 public class ClientAutoDetector {
   public static final ImmutableList<LocalStatement> EMPTY_LOCAL_STATEMENTS = ImmutableList.of();
+  public static final ImmutableList<LocalStatement> DEFAULT_LOCAL_STATEMENTS =
+      ImmutableList.of(
+          SelectCurrentSchemaStatement.INSTANCE,
+          SelectCurrentDatabaseStatement.INSTANCE,
+          SelectCurrentCatalogStatement.INSTANCE,
+          ShowServerVersionStatement.INSTANCE);
 
   public enum WellKnownClient {
     PSQL {
@@ -42,6 +53,12 @@ public class ClientAutoDetector {
 
       @Override
       public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+          return ImmutableList.<LocalStatement>builder()
+              .addAll(DEFAULT_LOCAL_STATEMENTS)
+              .add(new ListDatabasesStatement(connectionHandler))
+              .build();
+        }
         return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
       }
     },
@@ -85,26 +102,39 @@ public class ClientAutoDetector {
         // pgx does not send enough unique parameters for it to be auto-detected.
         return false;
       }
+    },
+    UNSPECIFIED {
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
+        // defaults defined in this enum.
+        return true;
+      }
     };
 
     abstract boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters);
 
     public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+      if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+        return DEFAULT_LOCAL_STATEMENTS;
+      }
       return EMPTY_LOCAL_STATEMENTS;
     }
   }
 
   /**
    * Returns the {@link WellKnownClient} that the detector thinks is connecting to PGAdapter based
-   * purely on the list of parameters.
+   * purely on the list of parameters. It will return UNSPECIFIED if no specific client could be
+   * determined.
    */
-  public static WellKnownClient detectClient(
+  public static @Nonnull WellKnownClient detectClient(
       List<String> orderParameterKeys, Map<String, String> parameters) {
     for (WellKnownClient client : WellKnownClient.values()) {
       if (client.isClient(orderParameterKeys, parameters)) {
         return client;
       }
     }
-    return null;
+    // The following line should never be reached.
+    throw new IllegalStateException("UNSPECIFIED.isClient() should have returned true");
   }
 }

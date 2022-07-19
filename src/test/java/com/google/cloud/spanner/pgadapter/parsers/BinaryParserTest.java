@@ -18,12 +18,21 @@ import static junit.framework.TestCase.assertNull;
 import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.ByteArray;
+import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class BinaryParserTest {
+
+  @Test
+  public void testToByteArray() {
+    assertEquals(
+        ByteArray.copyFrom("test"),
+        BinaryParser.toByteArray("test".getBytes(StandardCharsets.UTF_8)));
+    assertEquals(ByteArray.copyFrom(new byte[] {}), BinaryParser.toByteArray(new byte[] {}));
+  }
 
   @Test
   public void testStringParse() {

@@ -17,12 +17,19 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class StringParserTest {
+
+  @Test
+  public void testToString() {
+    assertEquals("", StringParser.toString(new byte[] {}));
+    assertEquals("test", StringParser.toString("test".getBytes(StandardCharsets.UTF_8)));
+  }
 
   @Test
   public void testStringParse() {

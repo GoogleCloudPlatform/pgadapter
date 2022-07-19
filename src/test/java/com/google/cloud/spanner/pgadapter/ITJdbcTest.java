@@ -161,6 +161,18 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @Test
+  public void testSelectCurrentSchema() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select current_schema()")) {
+        assertTrue(resultSet.next());
+        assertEquals("public", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testCreateTableIfNotExists() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (Statement statement = connection.createStatement()) {

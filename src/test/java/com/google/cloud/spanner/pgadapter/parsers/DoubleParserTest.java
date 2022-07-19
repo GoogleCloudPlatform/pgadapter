@@ -16,13 +16,30 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerException;
+import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.util.ByteConverter;
 
 @RunWith(JUnit4.class)
 public class DoubleParserTest {
+
+  @Test
+  public void testToDouble() {
+    double d = new Random().nextDouble();
+    byte[] data = new byte[8];
+    ByteConverter.float8(data, 0, d);
+    assertEquals(d, DoubleParser.toDouble(data), 0.0);
+
+    SpannerException spannerException =
+        assertThrows(SpannerException.class, () -> DoubleParser.toDouble(new byte[4]));
+    assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
+  }
 
   @Test
   public void testStringParse() {
