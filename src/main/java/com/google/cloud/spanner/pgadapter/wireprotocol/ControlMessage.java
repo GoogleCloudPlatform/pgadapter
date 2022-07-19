@@ -93,7 +93,7 @@ public abstract class ControlMessage extends WireMessage {
     this.manuallyCreatedToken = token;
   }
 
-  protected boolean isExtendedProtocol() {
+  public boolean isExtendedProtocol() {
     return manuallyCreatedToken == null;
   }
 
