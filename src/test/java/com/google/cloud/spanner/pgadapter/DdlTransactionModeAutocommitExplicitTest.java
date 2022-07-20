@@ -178,7 +178,7 @@ public class DdlTransactionModeAutocommitExplicitTest
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
-        statement.execute("begin");
+        statement.execute("begin;");
         assertFalse(statement.execute(sql));
         statement.execute("commit");
       }
@@ -199,7 +199,7 @@ public class DdlTransactionModeAutocommitExplicitTest
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
         // PGAdapter will automatically convert this transaction into a DDL batch.
-        statement.execute("begin");
+        statement.execute("begin;");
         assertFalse(statement.execute("CREATE TABLE foo (id bigint primary key)"));
         assertFalse(statement.execute("CREATE TABLE bar (id bigint primary key)"));
         statement.execute("commit");
@@ -222,12 +222,12 @@ public class DdlTransactionModeAutocommitExplicitTest
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
         // PGAdapter will automatically convert this transaction into a DDL batch.
-        statement.execute("begin");
+        statement.execute("begin;");
         assertFalse(statement.execute("CREATE TABLE foo (id bigint primary key)"));
         assertFalse(statement.execute("CREATE TABLE bar (id bigint primary key)"));
-        // This will
+        // The following DML statement will auto-commit the DDL batch above.
         assertEquals(1, statement.executeUpdate(INSERT_STATEMENT.getSql()));
-        statement.execute("commit");
+        statement.execute("commit;");
       }
     }
 
@@ -236,7 +236,137 @@ public class DdlTransactionModeAutocommitExplicitTest
             .filter(request -> request instanceof UpdateDatabaseDdlRequest)
             .map(UpdateDatabaseDdlRequest.class::cast)
             .collect(Collectors.toList());
+    // The DDL statements should be batched together.
     assertEquals(1, updateDatabaseDdlRequests.size());
     assertEquals(2, updateDatabaseDdlRequests.get(0).getStatementsCount());
+  }
+
+  @Test
+  public void testMultipleDdlStatementsInExplicitTransactionWithRollback() throws SQLException {
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // PGAdapter will automatically convert this transaction into a DDL batch.
+        statement.execute("begin;");
+        assertFalse(statement.execute("CREATE TABLE foo (id bigint primary key)"));
+        assertFalse(statement.execute("CREATE TABLE bar (id bigint primary key)"));
+        statement.execute("rollback;");
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    // There should be no DDL requests.
+    assertEquals(0, updateDatabaseDdlRequests.size());
+  }
+
+  @Test
+  public void testMultipleDdlAndDmlStatementsInExplicitTransactionWithRollback()
+      throws SQLException {
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // PGAdapter will automatically convert this transaction into a DDL batch.
+        statement.execute("begin;");
+        assertFalse(statement.execute("CREATE TABLE foo (id bigint primary key)"));
+        assertFalse(statement.execute("CREATE TABLE bar (id bigint primary key)"));
+        // The following DML statement will auto-commit the DDL batch above. This means that the
+        // rollback will have no effect on the DDL statements.
+        assertEquals(1, statement.executeUpdate(INSERT_STATEMENT.getSql()));
+        statement.execute("rollback;");
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    // The DDL statements should be batched together.
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(2, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    // The DML statement should not be committed.
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testInvalidDdlStatementInExplicitTransaction() throws SQLException {
+    addDdlExceptionToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // PGAdapter will automatically convert this transaction into a DDL batch.
+        statement.execute("begin;");
+        // This statement would normally fail, but as it is batched, the error will be deferred to
+        // the commit statement.
+        assertFalse(statement.execute("CREATE TABLE foo (id bigint)"));
+        SQLException exception =
+            assertThrows(SQLException.class, () -> statement.execute("commit"));
+        assertTrue(exception.getMessage(), exception.getMessage().contains("Statement is invalid"));
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    // NOTE: The DDL request is actually sent to Cloud Spanner, but it is not executed because it
+    // returns an error. The mock Admin server does not register requests that fail directly, which
+    // is why this count is zero.
+    assertEquals(0, updateDatabaseDdlRequests.size());
+  }
+
+  @Test
+  public void testInvalidDdlStatementHalfwayInExplicitTransaction() throws SQLException {
+    // Add a success and a failure for DDL statements to the mock server. This means that the first
+    // DDL statement/batch will succeed, while the second will fail.
+    addDdlResponseToSpannerAdmin();
+    addDdlExceptionToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // PGAdapter will automatically convert this transaction into a DDL batch.
+        statement.execute("begin;");
+        assertFalse(statement.execute("CREATE TABLE foo (id bigint primary key)"));
+        // This auto-commits the above DDL statement. The statement itself is also automatically
+        // committed when the next DDL batch starts.
+        assertEquals(1, statement.executeUpdate(INSERT_STATEMENT.getSql()));
+
+        // This starts a new DDL batch. This batch will fail, but the error is only surfaced when
+        // the batch is committed, which is at the next non-DDL statement.
+        assertFalse(statement.execute("CREATE TABLE bar (id bigint primary key)"));
+        assertFalse(statement.execute("CREATE TABLE baz (id bigint)"));
+        SQLException exception =
+            assertThrows(SQLException.class, () -> statement.execute(INSERT_STATEMENT.getSql()));
+        assertTrue(exception.getMessage(), exception.getMessage().contains("Statement is invalid"));
+        // Trying to execute further statements should return an aborted transaction error.
+        SQLException abortedException =
+            assertThrows(SQLException.class, () -> statement.execute(SELECT1.getSql()));
+        assertTrue(
+            abortedException.getMessage(),
+            abortedException.getMessage().contains(TRANSACTION_ABORTED_ERROR));
+
+        // Committing the transaction is accepted, but is silently converted to a rollback.
+        assertFalse(statement.execute("commit;"));
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    // NOTE: The DDL request is actually sent to Cloud Spanner, but it is not executed because it
+    // returns an error. The mock Admin server does not register requests that fail directly, which
+    // is why this count is one (the first batch of DDL statements did succeed).
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    // The DML statement between the two DDL batches is automatically committed.
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 }

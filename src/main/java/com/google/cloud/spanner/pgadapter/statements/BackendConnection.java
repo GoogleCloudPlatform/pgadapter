@@ -473,8 +473,16 @@ public class BackendConnection {
           prepareExecuteDdl(bufferedStatement);
         } else if (transactionMode == TransactionMode.DDL_BATCH && !isTransactionStatement(index)) {
           // End the automatically created DDL batch and revert to an explicit transaction.
-          spannerConnection.runBatch();
-          transactionMode = TransactionMode.EXPLICIT;
+          try {
+            spannerConnection.runBatch();
+          } catch (Exception exception) {
+            // Register the exception on the current statement, even though it was caused by a
+            // previous one.
+            bufferedStatements.get(index).result.setException(exception);
+            throw exception;
+          } finally {
+            transactionMode = TransactionMode.EXPLICIT;
+          }
           spannerConnection.beginTransaction();
         }
         boolean canUseBatch = false;
