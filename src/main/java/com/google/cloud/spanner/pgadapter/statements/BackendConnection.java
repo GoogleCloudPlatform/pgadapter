@@ -755,26 +755,36 @@ public class BackendConnection {
     }
     List<StatementResult> statementResults = new ArrayList<>(getStatementCount());
     int index = fromIndex;
-    while (index < getStatementCount()) {
-      StatementType statementType = getStatementType(index);
-      if (canBeBatchedTogether(batchType, statementType)) {
-        // Send DDL statements to the DdlExecutor instead of executing them directly on the
-        // connection, so we can support certain DDL constructs that are currently not supported by
-        // the backend, such as IF [NOT] EXISTS.
-        if (batchType == StatementType.DDL) {
-          statementResults.add(
-              ddlExecutor.execute(
-                  bufferedStatements.get(index).parsedStatement,
-                  bufferedStatements.get(index).statement));
+    try {
+      while (index < getStatementCount()) {
+        StatementType statementType = getStatementType(index);
+        if (canBeBatchedTogether(batchType, statementType)) {
+          // Send DDL statements to the DdlExecutor instead of executing them directly on the
+          // connection, so we can support certain DDL constructs that are currently not supported
+          // by
+          // the backend, such as IF [NOT] EXISTS.
+          if (batchType == StatementType.DDL) {
+            statementResults.add(
+                ddlExecutor.execute(
+                    bufferedStatements.get(index).parsedStatement,
+                    bufferedStatements.get(index).statement));
+          } else {
+            spannerConnection.execute(bufferedStatements.get(index).statement);
+          }
+          index++;
         } else {
-          spannerConnection.execute(bufferedStatements.get(index).statement);
+          // End the batch here, as the statement type on this index can not be batched together
+          // with
+          // the other statements in the batch.
+          break;
         }
-        index++;
-      } else {
-        // End the batch here, as the statement type on this index can not be batched together with
-        // the other statements in the batch.
-        break;
       }
+    } catch (Exception exception) {
+      // This should normally not happen, as we are not sending any statements to Cloud Spanner yet,
+      // but is done as safety precaution to ensure that there is always at least one result.
+      // Register the exception on the first statement in the batch.
+      bufferedStatements.get(fromIndex).result.setException(exception);
+      throw exception;
     }
     try {
       long[] counts = spannerConnection.runBatch();
