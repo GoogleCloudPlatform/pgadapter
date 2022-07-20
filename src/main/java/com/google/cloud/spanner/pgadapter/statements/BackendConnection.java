@@ -118,6 +118,7 @@ public class BackendConnection {
   enum TransactionMode {
     IMPLICIT,
     EXPLICIT,
+    DDL_BATCH,
   }
 
   /**
@@ -175,6 +176,18 @@ public class BackendConnection {
           result.set(NO_RESULT);
         } else if ((isCommit(parsedStatement) || isRollback(parsedStatement))
             && !spannerConnection.isInTransaction()) {
+          // Check if we are in a DDL batch that was created from an explicit transaction.
+          if (transactionMode == TransactionMode.DDL_BATCH) {
+            try {
+              if (isCommit(parsedStatement)) {
+                spannerConnection.runBatch();
+              } else {
+                spannerConnection.abortBatch();
+              }
+            } finally {
+              transactionMode = TransactionMode.IMPLICIT;
+            }
+          }
           // Ignore the statement as it is a no-op to execute COMMIT/ROLLBACK when we are not in a
           // transaction. TODO: Return a warning.
           result.set(NO_RESULT);
@@ -458,6 +471,11 @@ public class BackendConnection {
         // current transaction, depending on the settings for execute DDL in transactions.
         if (bufferedStatement.parsedStatement.isDdl()) {
           prepareExecuteDdl(bufferedStatement);
+        } else if (transactionMode == TransactionMode.DDL_BATCH && !isTransactionStatement(index)) {
+          // End the automatically created DDL batch and revert to an explicit transaction.
+          spannerConnection.runBatch();
+          transactionMode = TransactionMode.EXPLICIT;
+          spannerConnection.beginTransaction();
         }
         boolean canUseBatch = false;
         if (index < (getStatementCount() - 1)) {
@@ -486,6 +504,8 @@ public class BackendConnection {
       if (spannerConnection.isInTransaction()) {
         spannerConnection.setStatementTag(null);
         spannerConnection.execute(ROLLBACK);
+      } else if (spannerConnection.isDdlBatchActive()) {
+        spannerConnection.abortBatch();
       }
     } finally {
       bufferedStatements.clear();
@@ -581,7 +601,13 @@ public class BackendConnection {
             // might be active.
             if (spannerConnection.isInTransaction()) {
               spannerConnection.commit();
-              transactionMode = TransactionMode.IMPLICIT;
+              if (transactionMode == TransactionMode.EXPLICIT) {
+                // Convert the explicit transaction to a DDL batch.
+                transactionMode = TransactionMode.DDL_BATCH;
+                spannerConnection.startBatchDdl();
+              } else {
+                transactionMode = TransactionMode.IMPLICIT;
+              }
             }
         }
         return;
@@ -614,7 +640,13 @@ public class BackendConnection {
           // Switch the execution state to implicit transaction.
           if (spannerConnection.isInTransaction()) {
             spannerConnection.commit();
-            transactionMode = TransactionMode.IMPLICIT;
+            if (transactionMode == TransactionMode.EXPLICIT) {
+              // Convert the explicit transaction to a DDL batch.
+              transactionMode = TransactionMode.DDL_BATCH;
+              spannerConnection.startBatchDdl();
+            } else {
+              transactionMode = TransactionMode.IMPLICIT;
+            }
           }
       }
     } catch (SpannerException exception) {

@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -141,8 +142,13 @@ public class DdlTransactionModeAutocommitExplicitTest
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
         assertTrue(exception.getMessage(), exception.getMessage().contains(EXCEPTION.getMessage()));
 
-        // The connection should not be in the aborted transaction state.
-        assertTrue(statement.execute("show transaction isolation level"));
+        // The connection should now be in the aborted transaction state.
+        SQLException abortedException =
+            assertThrows(
+                SQLException.class, () -> statement.execute("show transaction isolation level"));
+        assertTrue(
+            abortedException.getMessage(),
+            abortedException.getMessage().contains(TRANSACTION_ABORTED_ERROR));
       }
     }
 
@@ -174,6 +180,7 @@ public class DdlTransactionModeAutocommitExplicitTest
       try (Statement statement = connection.createStatement()) {
         statement.execute("begin");
         assertFalse(statement.execute(sql));
+        statement.execute("commit");
       }
     }
 
@@ -183,5 +190,53 @@ public class DdlTransactionModeAutocommitExplicitTest
             .map(UpdateDatabaseDdlRequest.class::cast)
             .collect(Collectors.toList());
     assertEquals(1, updateDatabaseDdlRequests.size());
+  }
+
+  @Test
+  public void testMultipleDdlStatementsInExplicitTransaction() throws SQLException {
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // PGAdapter will automatically convert this transaction into a DDL batch.
+        statement.execute("begin");
+        assertFalse(statement.execute("CREATE TABLE foo (id bigint primary key)"));
+        assertFalse(statement.execute("CREATE TABLE bar (id bigint primary key)"));
+        statement.execute("commit");
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(2, updateDatabaseDdlRequests.get(0).getStatementsCount());
+  }
+
+  @Test
+  public void testMultipleDdlAndDmlStatementsInExplicitTransaction() throws SQLException {
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        // PGAdapter will automatically convert this transaction into a DDL batch.
+        statement.execute("begin");
+        assertFalse(statement.execute("CREATE TABLE foo (id bigint primary key)"));
+        assertFalse(statement.execute("CREATE TABLE bar (id bigint primary key)"));
+        // This will
+        assertEquals(1, statement.executeUpdate(INSERT_STATEMENT.getSql()));
+        statement.execute("commit");
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    assertEquals(1, updateDatabaseDdlRequests.size());
+    assertEquals(2, updateDatabaseDdlRequests.get(0).getStatementsCount());
   }
 }
