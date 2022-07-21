@@ -168,6 +168,11 @@ public class PgJdbcCatalog {
           + ") f\n"
           + "where false";
 
+  public static final String PG_JDBC_GET_EDB_REDWOOD_DATE_QUERY =
+      "select setting from pg_settings where name = 'edb_redwood_date'";
+  public static final String PG_JDBC_GET_EDB_REDWOOD_DATE_REPLACEMENT =
+      "select * from (select ''::varchar as setting) s where false";
+
   public static final String PG_JDBC_GET_SCHEMAS_PREFIX =
       "SELECT nspname AS TABLE_SCHEM, NULL AS TABLE_CATALOG FROM pg_catalog.pg_namespace "
           + " WHERE nspname <> 'pg_toast' AND (nspname !~ '^pg_temp_' "
