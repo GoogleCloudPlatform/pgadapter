@@ -23,6 +23,7 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
  * A no-op SET search_path implementation. This should be removed once support has been added to the
  * Connection API.
  */
+// TODO: Remove this once search_path support has been added to the Connection API.
 @InternalApi
 public class SetSearchPathStatement implements LocalStatement {
   public static final SetSearchPathStatement INSTANCE = new SetSearchPathStatement();
