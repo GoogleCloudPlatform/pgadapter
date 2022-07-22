@@ -88,7 +88,7 @@ import org.junit.BeforeClass;
  * server received the requests that the test expected.
  */
 public abstract class AbstractMockServerTest {
-  protected static final Logger logger = Logger.getLogger(AbstractMockServerTest.class.getName());
+  private static final Logger logger = Logger.getLogger(AbstractMockServerTest.class.getName());
 
   protected static final Statement SELECT1 = Statement.of("SELECT 1");
   protected static final Statement SELECT2 = Statement.of("SELECT 2");

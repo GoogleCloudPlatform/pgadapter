@@ -14,12 +14,18 @@
 
 package com.google.cloud.spanner.pgadapter.python;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
 import com.google.protobuf.AbstractMessage;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.v1.BatchCreateSessionsRequest;
+import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
@@ -32,9 +38,8 @@ import com.google.spanner.v1.TypeCode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import org.junit.Assert;
+import java.util.stream.Collectors;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -119,63 +124,54 @@ public class PythonTransactionTests extends PythonTestSetup {
     String expectedOutput =
         "(1, 'abcd')\n" + "1\n" + "(2, 'pqrs')\n" + "(3, '1234')\n" + "2\n" + "(4, '6789')\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    List<String> sql = new ArrayList<>();
 
-    for (ExecuteSqlRequest request : requests) {
-      sql.add(request.getSql());
-    }
+    assertTrue(requests.get(0).getSql().equals(sql1));
+    assertTrue(requests.get(1).getSql().equals(sql2));
+    assertTrue(requests.get(2).getSql().equals(sql3));
+    assertTrue(requests.get(3).getSql().equals(sql4));
+    assertTrue(requests.get(4).getSql().equals(sql5));
+    assertTrue(requests.get(5).getSql().equals(sql6));
 
-    Assert.assertEquals(true, sql.contains(sql1));
-    Assert.assertEquals(true, sql.contains(sql2));
-    Assert.assertEquals(true, sql.contains(sql3));
-    Assert.assertEquals(true, sql.contains(sql4));
-    Assert.assertEquals(true, sql.contains(sql5));
-    Assert.assertEquals(true, sql.contains(sql6));
-
-    String transactionIdForSql2 =
+    ByteString transactionIdForSql2 =
         requests.stream()
             .filter(req -> req.getSql().equals(sql2))
             .findAny()
             .get()
             .getTransaction()
-            .getId()
-            .toStringUtf8();
-    String transactionIdForSql3 =
+            .getId();
+    ByteString transactionIdForSql3 =
         requests.stream()
             .filter(req -> req.getSql().equals(sql3))
             .findAny()
             .get()
             .getTransaction()
-            .getId()
-            .toStringUtf8();
+            .getId();
 
-    Assert.assertEquals(true, transactionIdForSql2.equals(transactionIdForSql3));
+    assertTrue(transactionIdForSql2.equals(transactionIdForSql3));
 
-    String transactionIdForSql5 =
+    ByteString transactionIdForSql5 =
         requests.stream()
             .filter(req -> req.getSql().equals(sql5))
             .findAny()
             .get()
             .getTransaction()
-            .getId()
-            .toStringUtf8();
-    String transactionIdForSql6 =
+            .getId();
+    ByteString transactionIdForSql6 =
         requests.stream()
             .filter(req -> req.getSql().equals(sql6))
             .findAny()
             .get()
             .getTransaction()
-            .getId()
-            .toStringUtf8();
+            .getId();
 
-    Assert.assertEquals(true, transactionIdForSql5.equals(transactionIdForSql6));
+    assertTrue(transactionIdForSql5.equals(transactionIdForSql6));
   }
 
   @Test
@@ -227,24 +223,47 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n" + "1\n" + "2\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    for (AbstractMessage request : mockSpanner.getRequests())
-      System.out.println(request.getClass());
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
-    List<String> sql = new ArrayList<>();
+    List<AbstractMessage> requests = mockSpanner.getRequests();
 
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
+    requests =
+        requests.stream()
+            .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+            .collect(Collectors.toList());
 
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(2, Collections.frequency(sql, sql2));
-    Assert.assertEquals(1, Collections.frequency(sql, sql3));
-    Assert.assertEquals(2, Collections.frequency(sql, sql4));
+    assertEquals(9, requests.size());
+
+    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(0))).getSql().equals(sql1));
+
+    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(1))).getSql().equals(sql2));
+
+    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(2))).getSql().equals(sql4));
+
+    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+
+    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(4))).getSql().equals(sql3));
+    assertTrue(((ExecuteSqlRequest) (requests.get(4))).getTransaction().hasSingleUse());
+    assertTrue(
+        ((ExecuteSqlRequest) (requests.get(4))).getTransaction().getSingleUse().hasReadOnly());
+
+    assertTrue(requests.get(5).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(5))).getSql().equals(sql2));
+
+    assertTrue(requests.get(6).getClass().equals(CommitRequest.class));
+
+    assertTrue(requests.get(7).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(7))).getSql().equals(sql4));
+
+    assertTrue(requests.get(8).getClass().equals(CommitRequest.class));
   }
 
   @Test
@@ -296,22 +315,47 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n" + "1\n" + "2\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
-    List<String> sql = new ArrayList<>();
+    List<AbstractMessage> requests = mockSpanner.getRequests();
 
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
+    requests =
+        requests.stream()
+            .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+            .collect(Collectors.toList());
 
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(2, Collections.frequency(sql, sql2));
-    Assert.assertEquals(1, Collections.frequency(sql, sql3));
-    Assert.assertEquals(2, Collections.frequency(sql, sql4));
+    assertEquals(9, requests.size());
+
+    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(0))).getSql().equals(sql1));
+
+    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(1))).getSql().equals(sql2));
+
+    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(2))).getSql().equals(sql4));
+
+    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+
+    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(4))).getSql().equals(sql3));
+    assertTrue(((ExecuteSqlRequest) (requests.get(4))).getTransaction().hasSingleUse());
+    assertTrue(
+        ((ExecuteSqlRequest) (requests.get(4))).getTransaction().getSingleUse().hasReadOnly());
+
+    assertTrue(requests.get(5).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(5))).getSql().equals(sql2));
+
+    assertTrue(requests.get(6).getClass().equals(CommitRequest.class));
+
+    assertTrue(requests.get(7).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(7))).getSql().equals(sql4));
+
+    assertTrue(requests.get(8).getClass().equals(CommitRequest.class));
   }
 
   @Test
@@ -333,11 +377,11 @@ public class PythonTransactionTests extends PythonTestSetup {
     String expectedOutput = "the 'deferrable' setting is only available from PostgreSQL 9.1\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
 
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test
@@ -359,11 +403,11 @@ public class PythonTransactionTests extends PythonTestSetup {
     String expectedOutput = "the 'deferrable' setting is only available from PostgreSQL 9.1\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
 
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test
@@ -396,7 +440,17 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     // query will be executed as expected
     statements.add("query");
+    statements.add(sql1);
+
+    // query will be executed as expected
+    statements.add("query");
     statements.add(sql3);
+
+    // commit request will not be sent to the Cloud Spanner
+    // because Cloud Spanner does not require read-only transactions
+    // to be committed or rolled back
+    statements.add("transaction");
+    statements.add("commit");
 
     // update will throw an error because the readonly is activated
     statements.add("update");
@@ -413,25 +467,50 @@ public class PythonTransactionTests extends PythonTestSetup {
         "(1, 'abcd')\n"
             + "1\n"
             + "2\n"
+            + "(1, 'abcd')\n"
             + "(2, 'pqrs')\n"
             + "FAILED_PRECONDITION: Update statements are not allowed for read-only transactions\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(5, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
-    List<String> sql = new ArrayList<>();
+    List<AbstractMessage> requests = mockSpanner.getRequests();
 
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
+    requests =
+        requests.stream()
+            .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+            .collect(Collectors.toList());
 
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(1, Collections.frequency(sql, sql2));
-    Assert.assertEquals(1, Collections.frequency(sql, sql3));
-    Assert.assertEquals(1, Collections.frequency(sql, sql4));
+    assertEquals(7, requests.size());
+
+    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(0))).getSql().equals(sql1));
+
+    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(1))).getSql().equals(sql2));
+
+    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(2))).getSql().equals(sql4));
+
+    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+
+    assertTrue(requests.get(4).getClass().equals(BeginTransactionRequest.class));
+    assertTrue(((BeginTransactionRequest) (requests.get(4))).getOptions().hasReadOnly());
+
+    assertTrue(requests.get(5).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(5))).getSql().equals(sql1));
+    ByteString transactionIdForRequest5 =
+        ((ExecuteSqlRequest) (requests.get(5))).getTransaction().getId();
+
+    assertTrue(requests.get(6).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(6))).getSql().equals(sql3));
+    ByteString transactionIdForRequest6 =
+        ((ExecuteSqlRequest) (requests.get(6))).getTransaction().getId();
+
+    assertTrue(transactionIdForRequest6.equals(transactionIdForRequest5));
   }
 
   @Test
@@ -464,7 +543,17 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     // query will be executed as expected
     statements.add("query");
+    statements.add(sql1);
+
+    // query will be executed as expected
+    statements.add("query");
     statements.add(sql3);
+
+    // commit request will not be sent to the Cloud Spanner
+    // because Cloud Spanner does not require read-only transactions
+    // to be committed or rolled back
+    statements.add("transaction");
+    statements.add("commit");
 
     // update will throw an error because the readonly is activated
     statements.add("update");
@@ -481,25 +570,51 @@ public class PythonTransactionTests extends PythonTestSetup {
         "(1, 'abcd')\n"
             + "1\n"
             + "2\n"
+            + "(1, 'abcd')\n"
             + "(2, 'pqrs')\n"
             + "FAILED_PRECONDITION: Update statements are not allowed for read-only transactions\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(5, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
-    List<String> sql = new ArrayList<>();
+    List<AbstractMessage> requests = mockSpanner.getRequests();
 
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
+    requests =
+        requests.stream()
+            .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+            .collect(Collectors.toList());
 
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(1, Collections.frequency(sql, sql2));
-    Assert.assertEquals(1, Collections.frequency(sql, sql3));
-    Assert.assertEquals(1, Collections.frequency(sql, sql4));
+    assertEquals(7, requests.size());
+
+    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(0))).getSql().equals(sql1));
+
+    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(1))).getSql().equals(sql2));
+
+    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(2))).getSql().equals(sql4));
+
+    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+
+    // Read Only Transaction is Started
+    assertTrue(requests.get(4).getClass().equals(BeginTransactionRequest.class));
+    assertTrue(((BeginTransactionRequest) (requests.get(4))).getOptions().hasReadOnly());
+
+    assertTrue(requests.get(5).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(5))).getSql().equals(sql1));
+    ByteString transactionIdForRequest5 =
+        ((ExecuteSqlRequest) (requests.get(5))).getTransaction().getId();
+
+    assertTrue(requests.get(6).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(6))).getSql().equals(sql3));
+    ByteString transactionIdForRequest6 =
+        ((ExecuteSqlRequest) (requests.get(6))).getTransaction().getId();
+
+    assertTrue(transactionIdForRequest6.equals(transactionIdForRequest5));
   }
 
   // Isolation Levels
@@ -509,127 +624,16 @@ public class PythonTransactionTests extends PythonTestSetup {
   // ISOLATION_LEVEL_SERIALIZABLE -> 3
   // ISOLATION_LEVEL_READ_UNCOMMITTED -> 4
   @Test
-  public void testIsolationLevelErrorInTransactions() throws IOException, InterruptedException {
-    // tests isolation_level settings using connection.isolation_level variable
-    List<String> statements = new ArrayList<>();
-    String sql1 = "Select * from some_table";
-    String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
-    String sql3 = "Select * from some_table3";
-    String sql4 = "insert into some_table3(col1, col2) values(value1, value2)";
-
-    // query will be executed as expected
-    statements.add("query");
-    statements.add(sql1);
-
-    // update will be executed as expected
-    statements.add("update");
-    statements.add(sql2);
-
-    // update will be executed as expected
-    statements.add("update");
-    statements.add(sql4);
-
-    // 1 commit request will be sent
-    statements.add("transaction");
-    statements.add("commit");
-
-    statements.add("transaction");
-    statements.add("set isolation_level 1");
-
-    // query won't be executed because the previous setting would've thrown error
-    statements.add("query");
-    statements.add(sql3);
-
-    mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql1), createResultSet(1, "abcd")));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 1));
-    mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql3), createResultSet(2, "pqrs")));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
-
-    String expectedOutput =
-        "(1, 'abcd')\n"
-            + "1\n"
-            + "2\n"
-            + "INVALID_ARGUMENT: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
-
-    Assert.assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-
-    List<String> sql = new ArrayList<>();
-
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
-
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(1, Collections.frequency(sql, sql2));
-    Assert.assertEquals(0, Collections.frequency(sql, sql3));
-    Assert.assertEquals(1, Collections.frequency(sql, sql4));
-
-    mockSpanner.clearRequests();
-    statements.set(9, "set isolation_level 4");
-
-    actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
-
-    Assert.assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-
-    sql.clear();
-
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
-
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(1, Collections.frequency(sql, sql2));
-    Assert.assertEquals(0, Collections.frequency(sql, sql3));
-    Assert.assertEquals(1, Collections.frequency(sql, sql4));
-
-    Assert.assertEquals(
-        2,
-        getWireMessagesOfType(QueryMessage.class).stream()
-            .filter(qm -> qm.toString().contains("READ COMMITTED"))
-            .count());
-  }
-
-  @Test
-  public void testIsolationLevelSessionErrorInTransactions()
+  public void testUnsupportedIsolationLevelsInTransactions()
       throws IOException, InterruptedException {
-    // tests isolation_level settings using set_session() function
-    List<String> statements = new ArrayList<>();
+    // tests isolation_level settings for unsupported isolation levels using
+    // connection.isolation_level variable
+    List<String> unsupportedIsolationLevels = Arrays.asList("1", "4");
+
     String sql1 = "Select * from some_table";
     String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
     String sql3 = "Select * from some_table3";
     String sql4 = "insert into some_table3(col1, col2) values(value1, value2)";
-
-    // query will be executed as expected
-    statements.add("query");
-    statements.add(sql1);
-
-    // update will be executed as expected
-    statements.add("update");
-    statements.add(sql2);
-
-    // update will be executed as expected
-    statements.add("update");
-    statements.add(sql4);
-
-    // 1 commit request will be sent
-    statements.add("transaction");
-    statements.add("commit");
-
-    statements.add("transaction");
-    statements.add("set session isolation_level 1");
-
-    // query won't be executed because the previous setting would've thrown error
-    statements.add("query");
-    statements.add(sql3);
 
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql1), createResultSet(1, "abcd")));
@@ -641,66 +645,311 @@ public class PythonTransactionTests extends PythonTestSetup {
     String expectedOutput =
         "(1, 'abcd')\n"
             + "1\n"
-            + "2\n"
             + "INVALID_ARGUMENT: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    for (String unsupportedIsolationLevel : unsupportedIsolationLevels) {
+      List<String> statements = new ArrayList<>();
 
-    List<String> sql = new ArrayList<>();
+      // query will be executed as expected
+      statements.add("query");
+      statements.add(sql1);
 
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
+      // update will be executed as expected
+      statements.add("update");
+      statements.add(sql2);
+
+      // 1 commit request will be sent
+      statements.add("transaction");
+      statements.add("commit");
+
+      statements.add("transaction");
+      statements.add("set isolation_level " + unsupportedIsolationLevel);
+
+      // query won't be executed because the previous setting would've thrown error
+      statements.add("query");
+      statements.add(sql3);
+
+      String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+      assertEquals(expectedOutput, actualOutput);
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+      assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+      assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+
+      List<AbstractMessage> requests = mockSpanner.getRequests();
+
+      requests =
+          requests.stream()
+              .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+              .collect(Collectors.toList());
+
+      assertEquals(3, requests.size());
+
+      assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+      assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+
+      assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+      assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+
+      assertTrue(requests.get(2).getClass().equals(CommitRequest.class));
+
+      mockSpanner.clearRequests();
     }
 
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(1, Collections.frequency(sql, sql2));
-    Assert.assertEquals(0, Collections.frequency(sql, sql3));
-    Assert.assertEquals(1, Collections.frequency(sql, sql4));
-
-    mockSpanner.clearRequests();
-    statements.set(9, "set session isolation_level 4");
-
-    actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
-
-    for (AbstractMessage request : mockSpanner.getRequests())
-      System.out.println(request.getClass());
-
-    Assert.assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-
-    sql.clear();
-
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
-
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(1, Collections.frequency(sql, sql2));
-    Assert.assertEquals(0, Collections.frequency(sql, sql3));
-    Assert.assertEquals(1, Collections.frequency(sql, sql4));
-
-    Assert.assertEquals(
+    assertEquals(
         2,
         getWireMessagesOfType(QueryMessage.class).stream()
             .filter(qm -> qm.toString().contains("READ COMMITTED"))
             .count());
   }
 
-  private void restartServerWithDifferentVersion(String version) throws Exception {
-    stopMockSpannerAndPgAdapterServers();
-    doStartMockSpannerAndPgAdapterServers("d", Arrays.asList("-v", version));
-    Assert.assertEquals(version, pgServer.getOptions().getServerVersion());
+  @Test
+  public void testUnsupportedIsolationLevelsSessionInTransactions()
+      throws IOException, InterruptedException {
+    // tests isolation_level settings for unsupported isolation levels using set_session function
+    List<String> unsupportedIsolationLevels = Arrays.asList("1", "4");
+
+    String sql1 = "Select * from some_table";
+    String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
+    String sql3 = "Select * from some_table3";
+    String sql4 = "insert into some_table3(col1, col2) values(value1, value2)";
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql1), createResultSet(1, "abcd")));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 1));
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql3), createResultSet(2, "pqrs")));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
+
+    String expectedOutput =
+        "(1, 'abcd')\n"
+            + "1\n"
+            + "INVALID_ARGUMENT: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED\n";
+
+    for (String unsupportedIsolationLevel : unsupportedIsolationLevels) {
+      List<String> statements = new ArrayList<>();
+
+      // query will be executed as expected
+      statements.add("query");
+      statements.add(sql1);
+
+      // update will be executed as expected
+      statements.add("update");
+      statements.add(sql2);
+
+      // 1 commit request will be sent
+      statements.add("transaction");
+      statements.add("commit");
+
+      statements.add("transaction");
+      statements.add("set session isolation_level " + unsupportedIsolationLevel);
+
+      // query won't be executed because the previous setting would've thrown error
+      statements.add("query");
+      statements.add(sql3);
+
+      String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+      assertEquals(expectedOutput, actualOutput);
+
+      assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+      assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+      assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+
+      List<AbstractMessage> requests = mockSpanner.getRequests();
+      requests =
+          requests.stream()
+              .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+              .collect(Collectors.toList());
+
+      assertEquals(3, requests.size());
+
+      assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+      assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+
+      assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+      assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+
+      assertTrue(requests.get(2).getClass().equals(CommitRequest.class));
+
+      mockSpanner.clearRequests();
+    }
+
+    assertEquals(
+        2,
+        getWireMessagesOfType(QueryMessage.class).stream()
+            .filter(qm -> qm.toString().contains("READ COMMITTED"))
+            .count());
   }
 
   @Test
-  public void testIsolationLevelInTransactions() throws IOException, InterruptedException {
-    // tests isolation_level settings using connection.isolation_level variable
+  public void testSupportedIsolationLevelInTransactions() throws IOException, InterruptedException {
+    // tests supported isolation_level settings using connection.isolation_level variable
+    List<String> statements = new ArrayList<>();
+    String sql1 = "Select * from some_table";
+    String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
+    String sql3 = "Select * from some_table3";
+    String sql4 = "insert into some_table3(col1, col2) values(value1, value2)";
+
+    statements.add("query");
+    statements.add(sql1);
+
+    statements.add("update");
+    statements.add(sql2);
+
+    statements.add("update");
+    statements.add(sql4);
+
+    statements.add("transaction");
+    statements.add("commit");
+
+    // This will work fine because SERIALIZABLE is supported by the Cloud Spanner
+    statements.add("transaction");
+    statements.add("set isolation_level 3");
+
+    statements.add("query");
+    statements.add(sql3);
+
+    statements.add("transaction");
+    statements.add("commit");
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql1), createResultSet(1, "abcd")));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 1));
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql3), createResultSet(2, "pqrs")));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
+
+    String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n";
+    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+
+    List<AbstractMessage> requests = mockSpanner.getRequests();
+    requests =
+        requests.stream()
+            .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+            .collect(Collectors.toList());
+
+    assertEquals(6, requests.size());
+
+    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+
+    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+
+    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(2)).getSql().equals(sql4));
+
+    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+
+    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(4)).getSql().equals(sql3));
+
+    assertTrue(requests.get(5).getClass().equals(CommitRequest.class));
+
+    assertEquals(
+        1,
+        getWireMessagesOfType(QueryMessage.class).stream()
+            .filter(qm -> qm.toString().contains("SERIALIZABLE"))
+            .count());
+  }
+
+  @Test
+  public void testSupportedIsolationLevelSessionInTransactions()
+      throws IOException, InterruptedException {
+    // tests supported isolation_level settings using set_session function
+    List<String> statements = new ArrayList<>();
+    String sql1 = "Select * from some_table";
+    String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
+    String sql3 = "Select * from some_table3";
+    String sql4 = "insert into some_table3(col1, col2) values(value1, value2)";
+
+    statements.add("query");
+    statements.add(sql1);
+
+    statements.add("update");
+    statements.add(sql2);
+
+    statements.add("update");
+    statements.add(sql4);
+
+    statements.add("transaction");
+    statements.add("commit");
+
+    // This will work fine because SERIALIZABLE is supported by the Cloud Spanner
+    statements.add("transaction");
+    statements.add("set session isolation_level 3");
+
+    statements.add("query");
+    statements.add(sql3);
+
+    statements.add("transaction");
+    statements.add("commit");
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql1), createResultSet(1, "abcd")));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 1));
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql3), createResultSet(2, "pqrs")));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
+
+    String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n";
+    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+
+    List<AbstractMessage> requests = mockSpanner.getRequests();
+    requests =
+        requests.stream()
+            .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+            .collect(Collectors.toList());
+
+    assertEquals(6, requests.size());
+
+    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+
+    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+
+    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(2)).getSql().equals(sql4));
+
+    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+
+    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(4)).getSql().equals(sql3));
+
+    assertTrue(requests.get(5).getClass().equals(CommitRequest.class));
+
+    assertEquals(
+        1,
+        getWireMessagesOfType(QueryMessage.class).stream()
+            .filter(qm -> qm.toString().contains("SERIALIZABLE"))
+            .count());
+  }
+
+  // The default version returned by PG Adapter is 1.0.
+  // Psycopg2 doesn't support Repeatable Read with the versions of Postgres lower than 9.1
+  // So, if the version of the Postgres (or PG Adapter in or case) is lower than 9.1,
+  // it converts Repeatable Read to Serializable.
+  // Hence, instead of sending SET TRANSACTION ISOLATION LEVEL REPEATABLE READ,
+  // it sends SET TRANSACTION ISOLATION LEVEL SERIALIZABLE.
+  // This is the reason why setting isolation_level to REPEATABLE_READ in the versions lower than
+  // 9.1
+  // will not lead to any error, even though we don't support REPEATABLE_READ
+  @Test
+  public void testRepeatableReadIsolationLevelWithLowerVersions()
+      throws IOException, InterruptedException {
+    // tests repeatable read isolation_level settings with default version 1.0 using
+    // connection.isolation_level variable
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
     String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
@@ -739,54 +988,52 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
-    List<String> sql = new ArrayList<>();
+    List<AbstractMessage> requests = mockSpanner.getRequests();
+    requests =
+        requests.stream()
+            .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+            .collect(Collectors.toList());
 
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
+    assertEquals(6, requests.size());
 
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(1, Collections.frequency(sql, sql2));
-    Assert.assertEquals(1, Collections.frequency(sql, sql3));
-    Assert.assertEquals(1, Collections.frequency(sql, sql4));
+    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
 
-    mockSpanner.clearRequests();
-    statements.set(9, "set isolation_level 3");
+    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
 
-    actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(2)).getSql().equals(sql4));
 
-    Assert.assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
 
-    sql.clear();
+    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(4)).getSql().equals(sql3));
 
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
+    assertTrue(requests.get(5).getClass().equals(CommitRequest.class));
 
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(1, Collections.frequency(sql, sql2));
-    Assert.assertEquals(1, Collections.frequency(sql, sql3));
-    Assert.assertEquals(1, Collections.frequency(sql, sql4));
-
-    Assert.assertEquals(
-        2,
+    // PG Adapter should've received a call to set isolation level to SERIALIZABLE not REPEATABLE
+    // READ
+    // because the default version is 1.0 which is lower than 9.1
+    // So, Psycopg2 will convert REPEATABLE_READ to SERIALIZABLE
+    assertEquals(
+        1,
         getWireMessagesOfType(QueryMessage.class).stream()
             .filter(qm -> qm.toString().contains("SERIALIZABLE"))
             .count());
   }
 
   @Test
-  public void testIsolationLevelSessionInTransactions() throws IOException, InterruptedException {
-    // tests isolation_level settings using set_session() function
+  public void testRepeatableReadIsolationLevelSessionWithLowerVersions()
+      throws IOException, InterruptedException {
+    // tests repeatable read with default version 1.0 isolation_level settings using set_session
+    // function
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
     String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
@@ -825,49 +1072,224 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
-    List<String> sql = new ArrayList<>();
+    List<AbstractMessage> requests = mockSpanner.getRequests();
+    requests =
+        requests.stream()
+            .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+            .collect(Collectors.toList());
 
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
+    assertEquals(6, requests.size());
 
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(1, Collections.frequency(sql, sql2));
-    Assert.assertEquals(1, Collections.frequency(sql, sql3));
-    Assert.assertEquals(1, Collections.frequency(sql, sql4));
+    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
 
-    mockSpanner.clearRequests();
-    statements.set(9, "set session isolation_level 3");
+    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
 
-    actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(2)).getSql().equals(sql4));
 
-    Assert.assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
 
-    sql.clear();
+    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(4)).getSql().equals(sql3));
 
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
+    assertTrue(requests.get(5).getClass().equals(CommitRequest.class));
 
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(1, Collections.frequency(sql, sql2));
-    Assert.assertEquals(1, Collections.frequency(sql, sql3));
-    Assert.assertEquals(1, Collections.frequency(sql, sql4));
-
-    Assert.assertEquals(
-        2,
+    // PG Adapter should've received a call to set isolation level to SERIALIZABLE not REPEATABLE
+    // READ
+    // because the default version is 1.0 which is lower than 9.1
+    // So, Psycopg2 will convert REPEATABLE_READ to SERIALIZABLE
+    assertEquals(
+        1,
         getWireMessagesOfType(QueryMessage.class).stream()
             .filter(qm -> qm.toString().contains("SERIALIZABLE"))
             .count());
+  }
+
+  private void restartServerWithDifferentVersion(String version) throws Exception {
+    stopMockSpannerAndPgAdapterServers();
+    doStartMockSpannerAndPgAdapterServers("d", Arrays.asList("-v", version));
+    assertEquals(version, pgServer.getOptions().getServerVersion());
+  }
+
+  @Test
+  public void testRepeatableReadIsolationLevelWithHigherVersions() throws Exception {
+    // tests repeatable read isolation_level settings with version 9.1 using
+    // connection.isolation_level variable
+
+    restartServerWithDifferentVersion("9.1");
+
+    List<String> statements = new ArrayList<>();
+    String sql1 = "Select * from some_table";
+    String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
+    String sql3 = "Select * from some_table3";
+    String sql4 = "insert into some_table3(col1, col2) values(value1, value2)";
+
+    statements.add("query");
+    statements.add(sql1);
+
+    statements.add("update");
+    statements.add(sql2);
+
+    statements.add("update");
+    statements.add(sql4);
+
+    statements.add("transaction");
+    statements.add("commit");
+
+    // This will cause error because the server version is 9.1 now,
+    // so the psycopg2 will send REPEATABLE READ as the isolation level
+    statements.add("transaction");
+    statements.add("set isolation_level 2");
+
+    statements.add("query");
+    statements.add(sql3);
+
+    statements.add("transaction");
+    statements.add("commit");
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql1), createResultSet(1, "abcd")));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 1));
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql3), createResultSet(2, "pqrs")));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
+
+    String expectedOutput =
+        "(1, 'abcd')\n"
+            + "1\n"
+            + "2\n"
+            + "INVALID_ARGUMENT: Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n";
+    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+
+    List<AbstractMessage> requests = mockSpanner.getRequests();
+    requests =
+        requests.stream()
+            .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+            .collect(Collectors.toList());
+
+    assertEquals(4, requests.size());
+
+    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+
+    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+
+    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(2)).getSql().equals(sql4));
+
+    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+
+    // PG Adapter should've received a call to set the isolation level to REPEATABLE READ not
+    // SERIALIZABLE
+    // because we've set the version to 9.1
+    // So, Psycopg2 will not convert REPEATABLE_READ to SERIALIZABLE
+    assertEquals(
+        1,
+        getWireMessagesOfType(QueryMessage.class).stream()
+            .filter(qm -> qm.toString().contains("REPEATABLE READ"))
+            .count());
+
+    restartServerWithDifferentVersion("1.0");
+  }
+
+  @Test
+  public void testRepeatableReadIsolationLevelSessionWithHigherVersions() throws Exception {
+    // tests repeatable read isolation_level settings with version 9.1 using set_session function
+
+    restartServerWithDifferentVersion("9.1");
+
+    List<String> statements = new ArrayList<>();
+    String sql1 = "Select * from some_table";
+    String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
+    String sql3 = "Select * from some_table3";
+    String sql4 = "insert into some_table3(col1, col2) values(value1, value2)";
+
+    statements.add("query");
+    statements.add(sql1);
+
+    statements.add("update");
+    statements.add(sql2);
+
+    statements.add("update");
+    statements.add(sql4);
+
+    statements.add("transaction");
+    statements.add("commit");
+
+    // This will cause error because the server version is 9.1 now,
+    // so the psycopg2 will send REPEATABLE READ as the isolation level
+    statements.add("transaction");
+    statements.add("set session isolation_level 2");
+
+    statements.add("query");
+    statements.add(sql3);
+
+    statements.add("transaction");
+    statements.add("commit");
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql1), createResultSet(1, "abcd")));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 1));
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql3), createResultSet(2, "pqrs")));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
+
+    String expectedOutput =
+        "(1, 'abcd')\n"
+            + "1\n"
+            + "2\n"
+            + "INVALID_ARGUMENT: Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n";
+    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+
+    List<AbstractMessage> requests = mockSpanner.getRequests();
+    requests =
+        requests.stream()
+            .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+            .collect(Collectors.toList());
+
+    assertEquals(4, requests.size());
+
+    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+
+    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+
+    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) requests.get(2)).getSql().equals(sql4));
+
+    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+
+    // PG Adapter should've received a call to set the isolation level to REPEATABLE READ not
+    // SERIALIZABLE
+    // because we've set the version to 9.1
+    // So, Psycopg2 will not convert REPEATABLE_READ to SERIALIZABLE
+    assertEquals(
+        1,
+        getWireMessagesOfType(QueryMessage.class).stream()
+            .filter(qm -> qm.toString().contains("REPEATABLE READ"))
+            .count());
+
+    restartServerWithDifferentVersion("1.0");
   }
 
   @Test
@@ -920,97 +1342,50 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n" + "1\n" + "2\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
-    List<String> sql = new ArrayList<>();
+    List<AbstractMessage> requests = mockSpanner.getRequests();
 
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
+    requests =
+        requests.stream()
+            .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+            .collect(Collectors.toList());
 
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(2, Collections.frequency(sql, sql2));
-    Assert.assertEquals(1, Collections.frequency(sql, sql3));
-    Assert.assertEquals(2, Collections.frequency(sql, sql4));
+    assertEquals(9, requests.size());
+
+    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(0))).getSql().equals(sql1));
+
+    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(1))).getSql().equals(sql2));
+
+    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(2))).getSql().equals(sql4));
+
+    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+
+    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(4))).getSql().equals(sql3));
+    assertTrue(((ExecuteSqlRequest) (requests.get(4))).getTransaction().hasSingleUse());
+    assertTrue(
+        ((ExecuteSqlRequest) (requests.get(4))).getTransaction().getSingleUse().hasReadOnly());
+
+    assertTrue(requests.get(5).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(5))).getSql().equals(sql2));
+
+    assertTrue(requests.get(6).getClass().equals(CommitRequest.class));
+
+    assertTrue(requests.get(7).getClass().equals(ExecuteSqlRequest.class));
+    assertTrue(((ExecuteSqlRequest) (requests.get(7))).getSql().equals(sql4));
+
+    assertTrue(requests.get(8).getClass().equals(CommitRequest.class));
   }
 
-  @Test
-  public void testIsolationLevelWithDifferentVersion() throws Exception {
-    restartServerWithDifferentVersion("9.1");
-
-    List<String> statements = new ArrayList<>();
-    String sql1 = "Select * from some_table";
-    String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
-    String sql3 = "Select * from some_table3";
-    String sql4 = "insert into some_table3(col1, col2) values(value1, value2)";
-
-    statements.add("query");
-    statements.add(sql1);
-
-    statements.add("update");
-    statements.add(sql2);
-
-    statements.add("update");
-    statements.add(sql4);
-
-    statements.add("transaction");
-    statements.add("commit");
-
-    // This will not cause error because the server version is 9.1 now,
-    // so the psycopg2 will send REPEATABLE READ as the isolation level
-    statements.add("transaction");
-    statements.add("set isolation_level 2");
-
-    statements.add("query");
-    statements.add(sql3);
-
-    statements.add("transaction");
-    statements.add("commit");
-
-    mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql1), createResultSet(1, "abcd")));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 1));
-    mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql3), createResultSet(2, "pqrs")));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
-
-    String expectedOutput =
-        "(1, 'abcd')\n"
-            + "1\n"
-            + "2\n"
-            + "INVALID_ARGUMENT: Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-    Assert.assertEquals(expectedOutput, actualOutput);
-
-    Assert.assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    Assert.assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-
-    List<String> sql = new ArrayList<>();
-
-    for (ExecuteSqlRequest request : mockSpanner.getRequestsOfType(ExecuteSqlRequest.class)) {
-      sql.add(request.getSql());
-    }
-
-    Assert.assertEquals(1, Collections.frequency(sql, sql1));
-    Assert.assertEquals(1, Collections.frequency(sql, sql2));
-    Assert.assertEquals(0, Collections.frequency(sql, sql3));
-    Assert.assertEquals(1, Collections.frequency(sql, sql4));
-
-    Assert.assertEquals(
-        1,
-        getWireMessagesOfType(QueryMessage.class).stream()
-            .filter(qm -> qm.toString().contains("REPEATABLE READ"))
-            .count());
-
-    restartServerWithDifferentVersion("1.0");
-  }
-
-  @Ignore("To be Removed when changes in Client Library are live")
+  @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
   @Test
   public void testSetAllPropertiesUsingSetSession() throws Exception {
     List<String> statements = new ArrayList<>();
@@ -1027,11 +1402,10 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     String expectedOutput = "10\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(expectedOutput, actualOutput);
-
-    Assert.assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
     statements.set(1, "set session isolation_level 3 readonly True autocommit False");
 
@@ -1041,10 +1415,10 @@ public class PythonTransactionTests extends PythonTestSetup {
         "FAILED_PRECONDITION: Update statements are not allowed for read-only transactions\n";
     actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
 
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
     statements.set(
         1, "set session isolation_level 2 readonly True autocommit False deferrable True");
@@ -1055,10 +1429,10 @@ public class PythonTransactionTests extends PythonTestSetup {
     expectedOutput = "Some Error\n";
     actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
 
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
     statements.set(
         1, "set session isolation_level 1 readonly True autocommit False deferrable False");
@@ -1069,10 +1443,10 @@ public class PythonTransactionTests extends PythonTestSetup {
     expectedOutput = "Some Error\n";
     actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
 
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
     restartServerWithDifferentVersion("9.1");
 
@@ -1085,10 +1459,10 @@ public class PythonTransactionTests extends PythonTestSetup {
     expectedOutput = "Some Error\n";
     actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
 
-    Assert.assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput);
 
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
-    Assert.assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
     restartServerWithDifferentVersion("1.0");
   }
