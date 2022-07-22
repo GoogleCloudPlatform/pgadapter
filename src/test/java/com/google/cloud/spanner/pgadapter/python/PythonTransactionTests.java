@@ -1387,10 +1387,10 @@ public class PythonTransactionTests extends PythonTestSetup {
 
   @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
   @Test
-  public void testSetAllPropertiesUsingSetSession() throws Exception {
+  public void testSetAllPropertiesUsingSetSessionWithoutDeferrable() throws Exception {
     List<String> statements = new ArrayList<>();
 
-    String sql = "insert into some_table values(value1, cvalue2)";
+    String sql = "insert into some_table values(value1, value2)";
 
     statements.add("transaction");
     statements.add("set session isolation_level 2 readonly False autocommit True");
@@ -1406,58 +1406,103 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
 
-    statements.set(1, "set session isolation_level 3 readonly True autocommit False");
+  @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
+  @Test
+  public void testSetAllPropertiesUsingSetSessionWithoutDeferrableError() throws IOException, InterruptedException {
+    List<String> statements = new ArrayList<>();
 
-    mockSpanner.clearRequests();
+    String sql = "insert into some_table values(value1, value2)";
 
-    expectedOutput =
+    statements.add("transaction");
+    statements.add("set session isolation_level 3 readonly True autocommit False");
+
+    statements.add("update");
+    statements.add(sql);
+
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10));
+
+    String expectedOutput =
         "FAILED_PRECONDITION: Update statements are not allowed for read-only transactions\n";
-    actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
 
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
-    statements.set(
-        1, "set session isolation_level 2 readonly True autocommit False deferrable True");
 
-    mockSpanner.clearRequests();
+  }
 
-    // TODO
-    expectedOutput = "Some Error\n";
-    actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+  @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
+  @Test
+  public void testSetAllPropertiesUsingSetSessionWithDeferrableTrue() throws IOException, InterruptedException {
+    List<String> statements = new ArrayList<>();
+
+    String sql = "insert into some_table values(value1, value2)";
+
+    statements.add("transaction");
+    statements.add("set session isolation_level 2 readonly True autocommit False deferrable True");
+
+    statements.add("update");
+    statements.add(sql);
+
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10));
+
+    // TODO: Update the Error Message according to the changes in the Java Client Library PR
+    String expectedOutput = "Some Error\n";
+    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
+  @Test
+  public void testSetAllPropertiesUsingSetSessionWithDeferrableFalse() throws IOException, InterruptedException {
+    List<String> statements = new ArrayList<>();
+
+    String sql = "insert into some_table values(value1, value2)";
+
+    statements.add("transaction");
+    statements.add("set session isolation_level 1 readonly True autocommit False deferrable False");
+
+    statements.add("update");
+    statements.add(sql);
+
+    // TODO: Update the Error Message according to the changes in the Java Client Library PR
+    String expectedOutput = "Some Error\n";
+    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
 
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
 
-    statements.set(
-        1, "set session isolation_level 1 readonly True autocommit False deferrable False");
 
-    mockSpanner.clearRequests();
+  }
 
-    // TODO
-    expectedOutput = "Some Error\n";
-    actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
-
-    assertEquals(expectedOutput, actualOutput);
-
-    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
-    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-
+  @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
+  @Test
+  public void testSetAllPropertiesUsingSetSessionWithDeferrableTrueWithHigherVersions() throws Exception {
     restartServerWithDifferentVersion("9.1");
 
-    statements.set(
-        1, "set session isolation_level 2 readonly True autocommit False deferrable False");
+    List<String> statements = new ArrayList<>();
 
-    mockSpanner.clearRequests();
+    String sql = "insert into some_table values(value1, value2)";
 
-    // TODO
-    expectedOutput = "Some Error\n";
-    actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    statements.add("transaction");
+    statements.add("set session isolation_level 2 readonly True autocommit False deferrable False");
+
+    statements.add("update");
+    statements.add(sql);
+
+    // TODO: Update the Error Message according to the changes in the Java Client Library PR
+    String expectedOutput = "Some Error\n";
+    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
 
     assertEquals(expectedOutput, actualOutput);
 
@@ -1466,4 +1511,5 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     restartServerWithDifferentVersion("1.0");
   }
+
 }
