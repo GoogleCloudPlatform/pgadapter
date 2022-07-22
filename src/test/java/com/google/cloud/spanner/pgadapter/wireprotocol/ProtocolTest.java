@@ -1185,7 +1185,7 @@ public class ProtocolTest {
     when(connectionMetadata.peekOutputStream()).thenReturn(outputStream);
 
     ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
-        new ExtendedQueryProtocolHandler(backendConnection);
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
 
