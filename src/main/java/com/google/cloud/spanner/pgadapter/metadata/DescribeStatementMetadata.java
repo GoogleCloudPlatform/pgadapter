@@ -15,24 +15,19 @@
 package com.google.cloud.spanner.pgadapter.metadata;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.Tuple;
 import com.google.cloud.spanner.ResultSet;
 
 /** Simple POJO to hold describe metadata specific to prepared statements. */
 @InternalApi
-public class DescribeStatementMetadata extends DescribeMetadata<Tuple<int[], ResultSet>>
+public class DescribeStatementMetadata extends DescribeMetadata<ResultSet>
     implements AutoCloseable {
 
-  public DescribeStatementMetadata(int[] parameters, ResultSet resultMetaData) {
-    this.metadata = Tuple.of(parameters, resultMetaData);
-  }
-
-  public int[] getParameters() {
-    return metadata.x();
+  public DescribeStatementMetadata(ResultSet resultSet) {
+    this.metadata = resultSet;
   }
 
   public ResultSet getResultSet() {
-    return metadata.y();
+    return metadata;
   }
 
   @Override

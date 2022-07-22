@@ -24,7 +24,6 @@ import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import java.io.DataOutputStream;
 import java.text.MessageFormat;
-import org.postgresql.core.Oid;
 
 /** Sends back qualifier for a row. */
 @InternalApi
@@ -98,7 +97,7 @@ public class RowDescriptionResponse extends WireOutput {
       this.outputStream.writeShort(DEFAULT_FLAG);
       int oidType = getOidType(column_index);
       this.outputStream.writeInt(oidType);
-      this.outputStream.writeShort(getOidTypeSize(oidType));
+      this.outputStream.writeShort(Parser.getOidTypeSize(oidType));
       // The type modifier. The meaning of the modifier is type-specific.
       // No modifier is indicated by -1.
       this.outputStream.writeInt(-1);
@@ -132,40 +131,5 @@ public class RowDescriptionResponse extends WireOutput {
   int getOidType(int column_index) {
     Type type = this.resultSet.getColumnType(column_index);
     return Parser.toOid(type);
-  }
-
-  int getOidTypeSize(int oid_type) {
-    switch (oid_type) {
-      case Oid.INT2:
-        return 2;
-      case Oid.INT4:
-        return 4;
-      case Oid.INT8:
-        return 8;
-      case Oid.NUMERIC:
-        return -1;
-      case Oid.FLOAT4:
-        return 4;
-      case Oid.FLOAT8:
-        return 8;
-      case Oid.CHAR:
-        return 1;
-      case Oid.TEXT:
-        return -1;
-      case Oid.VARCHAR:
-        return -1;
-      case Oid.BYTEA:
-        return -1;
-      case Oid.BOOL:
-        return 1;
-      case Oid.DATE:
-        return 8;
-      case Oid.TIME:
-        return 8;
-      case Oid.TIMESTAMPTZ:
-        return 12;
-      default:
-        return -1;
-    }
   }
 }

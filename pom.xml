@@ -30,7 +30,8 @@
       com.google.cloud.spanner.pgadapter.python.PythonTest
     </excludedTests>
 
-    <spanner.version>6.25.7</spanner.version>
+    <!-- Will update post the Spanner client code is pushed -->
+    <spanner.version>6.27.1-SNAPSHOT</spanner.version>
     <junixsocket.version>2.5.1</junixsocket.version>
   </properties>
 

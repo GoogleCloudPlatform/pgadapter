@@ -250,6 +250,41 @@ public abstract class Parser<T> {
     }
   }
 
+  public static int getOidTypeSize(int oid_type) {
+    switch (oid_type) {
+      case Oid.INT2:
+        return 2;
+      case Oid.INT4:
+        return 4;
+      case Oid.INT8:
+        return 8;
+      case Oid.NUMERIC:
+        return -1;
+      case Oid.FLOAT4:
+        return 4;
+      case Oid.FLOAT8:
+        return 8;
+      case Oid.CHAR:
+        return 1;
+      case Oid.TEXT:
+        return -1;
+      case Oid.VARCHAR:
+        return -1;
+      case Oid.BYTEA:
+        return -1;
+      case Oid.BOOL:
+        return 1;
+      case Oid.DATE:
+        return 8;
+      case Oid.TIME:
+        return 8;
+      case Oid.TIMESTAMPTZ:
+        return 12;
+      default:
+        return -1;
+    }
+  }
+
   /** Returns the item helder by this parser. */
   public T getItem() {
     return this.item;
