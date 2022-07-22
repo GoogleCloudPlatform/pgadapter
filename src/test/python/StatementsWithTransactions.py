@@ -45,14 +45,14 @@ def set_property(connection, property, value):
 def set_session_property(connection, sql):
   properties = sql.split()
   i = 0
-  arguements_string = '('
+  arguments_string = '('
   while i < len(properties):
-    arguements_string += properties[i] + ' = ' + properties[i+1]
+    arguments_string += properties[i] + ' = ' + properties[i+1]
     i += 2
     if i < len(properties):
-      arguements_string += ' , '
-  arguements_string += ')'
-  eval('connection.set_session'+arguements_string)
+      arguments_string += ' , '
+  arguments_string += ')'
+  eval('connection.set_session'+arguments_string)
 
 def execute_statement(connection, cursor, statement_type, sql):
   try:
