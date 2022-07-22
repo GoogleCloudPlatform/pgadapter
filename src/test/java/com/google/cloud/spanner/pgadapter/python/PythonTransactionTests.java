@@ -1410,7 +1410,8 @@ public class PythonTransactionTests extends PythonTestSetup {
 
   @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
   @Test
-  public void testSetAllPropertiesUsingSetSessionWithoutDeferrableError() throws IOException, InterruptedException {
+  public void testSetAllPropertiesUsingSetSessionWithoutDeferrableError()
+      throws IOException, InterruptedException {
     List<String> statements = new ArrayList<>();
 
     String sql = "insert into some_table values(value1, value2)";
@@ -1431,13 +1432,12 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-
-
   }
 
   @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
   @Test
-  public void testSetAllPropertiesUsingSetSessionWithDeferrableTrue() throws IOException, InterruptedException {
+  public void testSetAllPropertiesUsingSetSessionWithDeferrableTrue()
+      throws IOException, InterruptedException {
     List<String> statements = new ArrayList<>();
 
     String sql = "insert into some_table values(value1, value2)";
@@ -1462,7 +1462,8 @@ public class PythonTransactionTests extends PythonTestSetup {
 
   @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
   @Test
-  public void testSetAllPropertiesUsingSetSessionWithDeferrableFalse() throws IOException, InterruptedException {
+  public void testSetAllPropertiesUsingSetSessionWithDeferrableFalse()
+      throws IOException, InterruptedException {
     List<String> statements = new ArrayList<>();
 
     String sql = "insert into some_table values(value1, value2)";
@@ -1481,13 +1482,12 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-
-
   }
 
   @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
   @Test
-  public void testSetAllPropertiesUsingSetSessionWithDeferrableTrueWithHigherVersions() throws Exception {
+  public void testSetAllPropertiesUsingSetSessionWithDeferrableTrueWithHigherVersions()
+      throws Exception {
     restartServerWithDifferentVersion("9.1");
 
     List<String> statements = new ArrayList<>();
@@ -1511,5 +1511,4 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     restartServerWithDifferentVersion("1.0");
   }
-
 }
