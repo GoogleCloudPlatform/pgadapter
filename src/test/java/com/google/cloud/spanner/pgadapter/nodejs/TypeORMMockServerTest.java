@@ -46,6 +46,32 @@ import org.junit.runners.JUnit4;
 @Category(NodeJSTest.class)
 @RunWith(JUnit4.class)
 public class TypeORMMockServerTest extends AbstractMockServerTest {
+  private static final ResultSetMetadata USERS_METADATA =
+      ResultSetMetadata.newBuilder()
+          .setRowType(
+              StructType.newBuilder()
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("User_id")
+                          .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                          .build())
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("User_firstName")
+                          .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                          .build())
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("User_lastName")
+                          .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                          .build())
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("User_age")
+                          .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                          .build())
+                  .build())
+          .build();
 
   @BeforeClass
   public static void installDependencies() throws IOException, InterruptedException {
@@ -73,32 +99,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.of(sql),
             ResultSet.newBuilder()
-                .setMetadata(
-                    ResultSetMetadata.newBuilder()
-                        .setRowType(
-                            StructType.newBuilder()
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("User_id")
-                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
-                                        .build())
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("User_firstName")
-                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                                        .build())
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("User_lastName")
-                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                                        .build())
-                                .addFields(
-                                    Field.newBuilder()
-                                        .setName("User_age")
-                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
-                                        .build())
-                                .build())
-                        .build())
+                .setMetadata(USERS_METADATA)
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(Value.newBuilder().setStringValue("1").build())
@@ -127,6 +128,77 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
+  @Test
+  public void testCreateUser() throws IOException, InterruptedException {
+    String existsSql =
+        "SELECT \"User\".\"id\" AS \"User_id\", \"User\".\"firstName\" AS \"User_firstName\", "
+            + "\"User\".\"lastName\" AS \"User_lastName\", \"User\".\"age\" AS \"User_age\" "
+            + "FROM \"user\" \"User\" WHERE \"User\".\"id\" IN ($1)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(existsSql), ResultSet.newBuilder().setMetadata(USERS_METADATA).build()));
+    String insertSql =
+        "INSERT INTO \"user\"(\"id\", \"firstName\", \"lastName\", \"age\") VALUES ($1, $2, $3, $4)";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 1L));
+
+    String sql =
+        "SELECT \"User\".\"id\" AS \"User_id\", \"User\".\"firstName\" AS \"User_firstName\", "
+            + "\"User\".\"lastName\" AS \"User_lastName\", \"User\".\"age\" AS \"User_age\" "
+            + "FROM \"user\" \"User\" WHERE (\"User\".\"firstName\" = $1 AND \"User\".\"lastName\" = $2) "
+            + "LIMIT 1";
+    // The parameter is sent as an untyped parameter, and therefore not included in the statement
+    // lookup on the mock server, hence the Statement.of(sql) instead of building a statement that
+    // does include the parameter value.
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(USERS_METADATA)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("Timber").build())
+                        .addValues(Value.newBuilder().setStringValue("Saw").build())
+                        .addValues(Value.newBuilder().setStringValue("25").build())
+                        .build())
+                .build()));
+
+    String output = runTest("createUser");
+
+    assertEquals("\n\nFound user 1 with name Timber Saw\n", output);
+
+    // Creating the user will use a read/write transaction. The query that checks whether the record
+    // already exists will however not use that transaction, as each statement is executed in
+    // auto-commit mode.
+    List<ExecuteSqlRequest> checkExistsRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(existsSql))
+            .collect(Collectors.toList());
+    assertEquals(1, checkExistsRequests.size());
+    ExecuteSqlRequest checkExistsRequest = checkExistsRequests.get(0);
+    assertTrue(checkExistsRequest.getTransaction().hasSingleUse());
+    assertTrue(checkExistsRequest.getTransaction().getSingleUse().hasReadOnly());
+    List<ExecuteSqlRequest> insertRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(insertSql))
+            .collect(Collectors.toList());
+    assertEquals(1, insertRequests.size());
+    ExecuteSqlRequest insertRequest = insertRequests.get(0);
+    assertTrue(insertRequest.getTransaction().hasBegin());
+    assertTrue(insertRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+
+    // Loading the user after having saved it will be done in a single-use read-only transaction.
+    List<ExecuteSqlRequest> loadRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, loadRequests.size());
+    ExecuteSqlRequest loadRequest = loadRequests.get(0);
+    assertTrue(loadRequest.getTransaction().hasSingleUse());
+    assertTrue(loadRequest.getTransaction().getSingleUse().hasReadOnly());
+  }
+
   static String runTest(String testName) throws IOException, InterruptedException {
     String currentPath = new java.io.File(".").getCanonicalPath();
     String testFilePath = String.format("%s/src/test/nodejs/typeorm/data-test", currentPath);
@@ -138,11 +210,11 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     InputStream inputStream = process.getInputStream();
     InputStream errorStream = process.getErrorStream();
     int res = process.waitFor();
-    assertEquals(0, res);
 
     String output = readAll(inputStream);
     String errors = readAll(errorStream);
     assertEquals("", errors);
+    assertEquals(0, res);
 
     return output;
   }

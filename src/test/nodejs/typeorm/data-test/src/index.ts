@@ -43,6 +43,25 @@ async function testFindOneUser(dataSource: DataSource) {
     }
 }
 
+async function testCreateUser(dataSource: DataSource) {
+    const repository = dataSource.getRepository(User)
+
+    const user = new User()
+    user.id = 1
+    user.firstName = 'Timber'
+    user.lastName = 'Saw'
+    user.age = 25
+
+    await repository.save(user)
+
+    const foundUser = await repository.findOneBy({firstName: 'Timber', lastName: 'Saw'})
+    if (foundUser) {
+        console.log(`Found user ${foundUser.id} with name ${foundUser.firstName} ${foundUser.lastName}`)
+    } else {
+        console.log('User not found')
+    }
+}
+
 require('yargs')
     .demand(2)
     .command(
@@ -52,6 +71,13 @@ require('yargs')
         opts => runTest(opts.port, testFindOneUser)
     )
     .example('node $0 findOneUser 5432')
+    .command(
+        'createUser <port>',
+        'Creates one user',
+        {},
+        opts => runTest(opts.port, testCreateUser)
+    )
+    .example('node $0 createUser 5432')
     .wrap(120)
     .recommendCommands()
     .strict()
