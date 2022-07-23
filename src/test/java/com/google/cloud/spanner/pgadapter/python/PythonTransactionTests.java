@@ -938,7 +938,7 @@ public class PythonTransactionTests extends PythonTestSetup {
 
   // The default version returned by PG Adapter is 1.0.
   // Psycopg2 doesn't support Repeatable Read with the versions of Postgres lower than 9.1
-  // So, if the version of the Postgres (or PG Adapter in or case) is lower than 9.1,
+  // So, if the version of the Postgres (or PGAdapter in our case) is lower than 9.1,
   // it converts Repeatable Read to Serializable.
   // Hence, instead of sending SET TRANSACTION ISOLATION LEVEL REPEATABLE READ,
   // it sends SET TRANSACTION ISOLATION LEVEL SERIALIZABLE.
