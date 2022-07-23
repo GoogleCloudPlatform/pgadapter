@@ -20,6 +20,7 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
@@ -132,12 +133,12 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
 
-    assertTrue(requests.get(0).getSql().equals(sql1));
-    assertTrue(requests.get(1).getSql().equals(sql2));
-    assertTrue(requests.get(2).getSql().equals(sql3));
-    assertTrue(requests.get(3).getSql().equals(sql4));
-    assertTrue(requests.get(4).getSql().equals(sql5));
-    assertTrue(requests.get(5).getSql().equals(sql6));
+    assertEquals(sql1, requests.get(0).getSql());
+    assertEquals(sql2, requests.get(1).getSql());
+    assertEquals(sql3, requests.get(2).getSql());
+    assertEquals(sql4, requests.get(3).getSql());
+    assertEquals(sql5, requests.get(4).getSql());
+    assertEquals(sql6, requests.get(5).getSql());
 
     ByteString transactionIdForSql2 =
         requests.stream()
@@ -154,7 +155,7 @@ public class PythonTransactionTests extends PythonTestSetup {
             .getTransaction()
             .getId();
 
-    assertTrue(transactionIdForSql2.equals(transactionIdForSql3));
+    assertEquals(transactionIdForSql2, transactionIdForSql3);
 
     ByteString transactionIdForSql5 =
         requests.stream()
@@ -171,7 +172,7 @@ public class PythonTransactionTests extends PythonTestSetup {
             .getTransaction()
             .getId();
 
-    assertTrue(transactionIdForSql5.equals(transactionIdForSql6));
+    assertEquals(transactionIdForSql6, transactionIdForSql5);
   }
 
   @Test
@@ -238,32 +239,32 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(9, requests.size());
 
-    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(0))).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) (requests.get(0))).getSql());
 
-    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(1))).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) (requests.get(1))).getSql());
 
-    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(2))).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(2).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) (requests.get(2))).getSql());
 
-    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(3).getClass());
 
-    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(4))).getSql().equals(sql3));
+    assertEquals(ExecuteSqlRequest.class, requests.get(4).getClass());
+    assertEquals(sql3, ((ExecuteSqlRequest) (requests.get(4))).getSql());
     assertTrue(((ExecuteSqlRequest) (requests.get(4))).getTransaction().hasSingleUse());
     assertTrue(
         ((ExecuteSqlRequest) (requests.get(4))).getTransaction().getSingleUse().hasReadOnly());
 
-    assertTrue(requests.get(5).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(5))).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(5).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) (requests.get(5))).getSql());
 
-    assertTrue(requests.get(6).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(6).getClass());
 
-    assertTrue(requests.get(7).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(7))).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(7).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) (requests.get(7))).getSql());
 
-    assertTrue(requests.get(8).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(8).getClass());
   }
 
   @Test
@@ -330,32 +331,32 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(9, requests.size());
 
-    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(0))).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) (requests.get(0))).getSql());
 
-    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(1))).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) (requests.get(1))).getSql());
 
-    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(2))).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(2).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) (requests.get(2))).getSql());
 
-    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(3).getClass());
 
-    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(4))).getSql().equals(sql3));
+    assertEquals(ExecuteSqlRequest.class, requests.get(4).getClass());
+    assertEquals(sql3, ((ExecuteSqlRequest) (requests.get(4))).getSql());
     assertTrue(((ExecuteSqlRequest) (requests.get(4))).getTransaction().hasSingleUse());
     assertTrue(
         ((ExecuteSqlRequest) (requests.get(4))).getTransaction().getSingleUse().hasReadOnly());
 
-    assertTrue(requests.get(5).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(5))).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(5).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) (requests.get(5))).getSql());
 
-    assertTrue(requests.get(6).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(6).getClass());
 
-    assertTrue(requests.get(7).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(7))).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(7).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) (requests.get(7))).getSql());
 
-    assertTrue(requests.get(8).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(8).getClass());
   }
 
   @Test
@@ -486,31 +487,35 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(7, requests.size());
 
-    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(0))).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) (requests.get(0))).getSql());
 
-    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(1))).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) (requests.get(1))).getSql());
 
-    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(2))).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(2).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) (requests.get(2))).getSql());
 
-    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(3).getClass());
 
-    assertTrue(requests.get(4).getClass().equals(BeginTransactionRequest.class));
+    assertEquals(BeginTransactionRequest.class, requests.get(4).getClass());
     assertTrue(((BeginTransactionRequest) (requests.get(4))).getOptions().hasReadOnly());
 
-    assertTrue(requests.get(5).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(5))).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(5).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) (requests.get(5))).getSql());
     ByteString transactionIdForRequest5 =
         ((ExecuteSqlRequest) (requests.get(5))).getTransaction().getId();
 
-    assertTrue(requests.get(6).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(6))).getSql().equals(sql3));
+    assertEquals(ExecuteSqlRequest.class, requests.get(6).getClass());
+    assertEquals(sql3, ((ExecuteSqlRequest) (requests.get(6))).getSql());
     ByteString transactionIdForRequest6 =
         ((ExecuteSqlRequest) (requests.get(6))).getTransaction().getId();
 
-    assertTrue(transactionIdForRequest6.equals(transactionIdForRequest5));
+    assertEquals(transactionIdForRequest6, transactionIdForRequest5);
+
+    for (WireMessage wm : getWireMessagesOfType(QueryMessage.class)) {
+      System.out.println(wm);
+    }
   }
 
   @Test
@@ -589,32 +594,32 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(7, requests.size());
 
-    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(0))).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) (requests.get(0))).getSql());
 
-    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(1))).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) (requests.get(1))).getSql());
 
-    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(2))).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(2).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) (requests.get(2))).getSql());
 
-    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(3).getClass());
 
     // Read Only Transaction is Started
-    assertTrue(requests.get(4).getClass().equals(BeginTransactionRequest.class));
+    assertEquals(BeginTransactionRequest.class, requests.get(4).getClass());
     assertTrue(((BeginTransactionRequest) (requests.get(4))).getOptions().hasReadOnly());
 
-    assertTrue(requests.get(5).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(5))).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(5).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) (requests.get(5))).getSql());
     ByteString transactionIdForRequest5 =
         ((ExecuteSqlRequest) (requests.get(5))).getTransaction().getId();
 
-    assertTrue(requests.get(6).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(6))).getSql().equals(sql3));
+    assertEquals(ExecuteSqlRequest.class, requests.get(6).getClass());
+    assertEquals(sql3, ((ExecuteSqlRequest) (requests.get(6))).getSql());
     ByteString transactionIdForRequest6 =
         ((ExecuteSqlRequest) (requests.get(6))).getTransaction().getId();
 
-    assertTrue(transactionIdForRequest6.equals(transactionIdForRequest5));
+    assertEquals(transactionIdForRequest6, transactionIdForRequest5);
   }
 
   // Isolation Levels
@@ -685,13 +690,13 @@ public class PythonTransactionTests extends PythonTestSetup {
 
       assertEquals(3, requests.size());
 
-      assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-      assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+      assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+      assertEquals(sql1, ((ExecuteSqlRequest) requests.get(0)).getSql());
 
-      assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-      assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+      assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+      assertEquals(sql2, ((ExecuteSqlRequest) requests.get(1)).getSql());
 
-      assertTrue(requests.get(2).getClass().equals(CommitRequest.class));
+      assertEquals(CommitRequest.class, requests.get(2).getClass());
 
       mockSpanner.clearRequests();
     }
@@ -763,13 +768,13 @@ public class PythonTransactionTests extends PythonTestSetup {
 
       assertEquals(3, requests.size());
 
-      assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-      assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+      assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+      assertEquals(sql1, ((ExecuteSqlRequest) requests.get(0)).getSql());
 
-      assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-      assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+      assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+      assertEquals(sql2, ((ExecuteSqlRequest) requests.get(1)).getSql());
 
-      assertTrue(requests.get(2).getClass().equals(CommitRequest.class));
+      assertEquals(CommitRequest.class, requests.get(2).getClass());
 
       mockSpanner.clearRequests();
     }
@@ -835,21 +840,21 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(6, requests.size());
 
-    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) requests.get(0)).getSql());
 
-    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) requests.get(1)).getSql());
 
-    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(2)).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(2).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) requests.get(2)).getSql());
 
-    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(3).getClass());
 
-    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(4)).getSql().equals(sql3));
+    assertEquals(ExecuteSqlRequest.class, requests.get(4).getClass());
+    assertEquals(sql3, ((ExecuteSqlRequest) requests.get(4)).getSql());
 
-    assertTrue(requests.get(5).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(5).getClass());
 
     assertEquals(
         1,
@@ -913,21 +918,21 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(6, requests.size());
 
-    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) requests.get(0)).getSql());
 
-    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) requests.get(1)).getSql());
 
-    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(2)).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(2).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) requests.get(2)).getSql());
 
-    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(3).getClass());
 
-    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(4)).getSql().equals(sql3));
+    assertEquals(ExecuteSqlRequest.class, requests.get(4).getClass());
+    assertEquals(sql3, ((ExecuteSqlRequest) requests.get(4)).getSql());
 
-    assertTrue(requests.get(5).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(5).getClass());
 
     assertEquals(
         1,
@@ -1002,21 +1007,21 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(6, requests.size());
 
-    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) requests.get(0)).getSql());
 
-    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) requests.get(1)).getSql());
 
-    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(2)).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(2).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) requests.get(2)).getSql());
 
-    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(3).getClass());
 
-    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(4)).getSql().equals(sql3));
+    assertEquals(ExecuteSqlRequest.class, requests.get(4).getClass());
+    assertEquals(sql3, ((ExecuteSqlRequest) requests.get(4)).getSql());
 
-    assertTrue(requests.get(5).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(5).getClass());
 
     // PG Adapter should've received a call to set isolation level to SERIALIZABLE not REPEATABLE
     // READ
@@ -1086,21 +1091,21 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(6, requests.size());
 
-    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) requests.get(0)).getSql());
 
-    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) requests.get(1)).getSql());
 
-    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(2)).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(2).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) requests.get(2)).getSql());
 
-    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(3).getClass());
 
-    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(4)).getSql().equals(sql3));
+    assertEquals(ExecuteSqlRequest.class, requests.get(4).getClass());
+    assertEquals(sql3, ((ExecuteSqlRequest) requests.get(4)).getSql());
 
-    assertTrue(requests.get(5).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(5).getClass());
 
     // PG Adapter should've received a call to set isolation level to SERIALIZABLE not REPEATABLE
     // READ
@@ -1182,16 +1187,16 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(4, requests.size());
 
-    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) requests.get(0)).getSql());
 
-    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) requests.get(1)).getSql());
 
-    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(2)).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(2).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) requests.get(2)).getSql());
 
-    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(3).getClass());
 
     // PG Adapter should've received a call to set the isolation level to REPEATABLE READ not
     // SERIALIZABLE
@@ -1268,16 +1273,16 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(4, requests.size());
 
-    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(0)).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) requests.get(0)).getSql());
 
-    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(1)).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) requests.get(1)).getSql());
 
-    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) requests.get(2)).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(2).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) requests.get(2)).getSql());
 
-    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(3).getClass());
 
     // PG Adapter should've received a call to set the isolation level to REPEATABLE READ not
     // SERIALIZABLE
@@ -1357,32 +1362,32 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     assertEquals(9, requests.size());
 
-    assertTrue(requests.get(0).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(0))).getSql().equals(sql1));
+    assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+    assertEquals(sql1, ((ExecuteSqlRequest) (requests.get(0))).getSql());
 
-    assertTrue(requests.get(1).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(1))).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(1).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) (requests.get(1))).getSql());
 
-    assertTrue(requests.get(2).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(2))).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(2).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) (requests.get(2))).getSql());
 
-    assertTrue(requests.get(3).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(3).getClass());
 
-    assertTrue(requests.get(4).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(4))).getSql().equals(sql3));
+    assertEquals(ExecuteSqlRequest.class, requests.get(4).getClass());
+    assertEquals(sql3, ((ExecuteSqlRequest) (requests.get(4))).getSql());
     assertTrue(((ExecuteSqlRequest) (requests.get(4))).getTransaction().hasSingleUse());
     assertTrue(
         ((ExecuteSqlRequest) (requests.get(4))).getTransaction().getSingleUse().hasReadOnly());
 
-    assertTrue(requests.get(5).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(5))).getSql().equals(sql2));
+    assertEquals(ExecuteSqlRequest.class, requests.get(5).getClass());
+    assertEquals(sql2, ((ExecuteSqlRequest) (requests.get(5))).getSql());
 
-    assertTrue(requests.get(6).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(6).getClass());
 
-    assertTrue(requests.get(7).getClass().equals(ExecuteSqlRequest.class));
-    assertTrue(((ExecuteSqlRequest) (requests.get(7))).getSql().equals(sql4));
+    assertEquals(ExecuteSqlRequest.class, requests.get(7).getClass());
+    assertEquals(sql4, ((ExecuteSqlRequest) (requests.get(7))).getSql());
 
-    assertTrue(requests.get(8).getClass().equals(CommitRequest.class));
+    assertEquals(CommitRequest.class, requests.get(8).getClass());
   }
 
   @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
