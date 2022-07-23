@@ -34,7 +34,8 @@ docker run \
   -x
 ```
 
-See [Running in Docker](docs/docker.md) for more information.
+The `-x` argument turns off the requirement that all TCP connections must come from localhost.
+This is required when running PGAdapter in a Docker container.
 
 See [Options](#Options) for an explanation of all further options.
 
@@ -43,7 +44,8 @@ See [Options](#Options) for an explanation of all further options.
 A pre-built jar and all dependencies can be downloaded from https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz
 
 ```shell
-wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz && tar -xzvf pgadapter.tar.gz
+wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz \
+  && tar -xzvf pgadapter.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 ```
 
@@ -54,7 +56,8 @@ PostgreSQL running on your local system.
 You can also download a specific version of the jar. Example (replace `v0.6.1` with the version you want to download):
 ```shell
 VERSION=v0.6.1
-wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz && tar -xzvf pgadapter-${VERSION}.tar.gz
+wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
+  && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
 ```
 <!--- {x-version-update-end} -->
@@ -97,35 +100,29 @@ This option is only available for Java/JVM-based applications.
 ```java
 class PGProxyRunner {
     public static void main() {
-        ProxyServer server = new ProxyServer(
-          new OptionsMetadata(
-                "jdbc:cloudspanner:/projects/my-project"
-                + "/instances/my-instance"
-                + "/databases/my-database"
-                + ";credentials=/home/user/service-account-credentials.json",
-                portNumber,
-                textFormat,
-                forceBinary,
-                authenticate,
-                requiresMatcher,
-                commandMetadataJSON)
-        );
-        server.startServer();
+      String[] arguments =
+              new String[] {
+                      "-p",
+                      "my-project",
+                      "-i",
+                      "my-instance",
+                      "-d",
+                      "my-database",
+                      "-c",
+                      "/path/to/credentials.json"
+              };
+      ProxyServer server = new ProxyServer(new OptionsMetadata(arguments));
+      server.startServer();
+      server.awaitRunning();
     }
 }
 ```
 
-Wherein the first item is the JDBC connection string containing pertinent
-information regarding project id, instance id, database name, credentials file
-path; All other items map directly to previously mentioned CLI options.
-
 ### Options
 
-#### Connection Options
+The following list contains the most frequently used startup options for PGAdapter.
 
-See [connection options](docs/connection_options.md) for more details.
-
-```    
+```
 -p <projectname>
   * The project name where the Spanner database(s) is/are running. If omitted, all connection
     requests must use a fully qualified database name in the format
@@ -153,15 +150,7 @@ See [connection options](docs/connection_options.md) for more details.
   * The full path for the file containing the service account credentials in JSON format.
   * Do remember to grant the service account sufficient credentials to access the database. See
     https://cloud.google.com/docs/authentication/production for more information.
-```
 
-#### Optional
-
-See [DDL Options](docs/ddl.md) for more details for the `-ddl` command line argument.
-
-The following options are optional:
-
-```    
 -s <port>
   * The inbound port for the proxy. Defaults to 5432. Choose a different port if you already have
     PostgreSQL running on your local system.
@@ -187,71 +176,50 @@ The following options are optional:
     PGAdapter. The proxy should therefore only be used within a private network.
     The connection between PGAdapter and Cloud Spanner is always secured with SSL.
 
--b
-  * Force the server to send data back in binary PostgreSQL format when no
-    specific format has been requested. The PostgreSQL wire protocol specifies 
-    that the server should send data in text format in those cases. This 
-    setting overrides this default and should be used with caution, for example
-    for testing purposes, as clients might not accept this behavior. This 
-    setting only affects query results in extended query mode. Queries in 
-    simple query mode will always return results in text format. If you do not 
-    know what extended query mode and simple query mode is, then you should 
-    probably not be using this setting.
-
--j <commandmetadatapath>
-  * The full path for a file containing a JSON object to do SQL translation
-    based on RegEx replacement. Any item matching the input_pattern will be
-    replaced by the output_pattern string, wherein capture groups are allowed and
-    their order is specified via the matcher_array item. Match replacement must be
-    defined via %s in the output_pattern string. Set matcher_array to [] if no
-    matches exist. Alternatively, you may place the matching group names 
-    directly within the output_pattern string using matcher.replaceAll() rules
-    (that is to say, placing the item within braces, preceeded by a dollar sign);
-    For this specific case, matcher_array must be left empty. User-specified 
-    patterns will precede internal matches. Escaped and general regex syntax 
-    matches Java RegEx syntax; more information on the Java RegEx syntax found 
-    here: 
-    https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html
-    * Example:
-        { 
-          "commands": 
-            [ 
-              {
-                "input_pattern": "^SELECT * FROM users;$", 
-                "output_pattern": "SELECT 1;",
-                "matcher_array": []
-              }, 
-              {
-                "input_pattern": "^ab(?<firstgroup>\\d)(?<secondgroup>\\d)$",
-                "output_pattern": "second number: %s, first number: %s",
-                "matcher_array": ["secondgroup", "firstgroup"] 
-              },
-              {
-                "input_pattern": "^cd(?<firstgroup>\\d)(?<secondgroup>\\d)$",
-                "output_pattern": "second number: ${secondgroup}, first number: ${firstgroup}",
-                "matcher_array": [] 
-              }
-            ]
-        }
-        
-        
-        Input queries:
-        "SELECT * FROM users;"
-        "ab12"
-        "cd34"
-
-        Output queries:
-        "SELECT 1;"
-        "second number: 2, first number: 1"
-        "second number: 4, first number: 3"
+-x
+  * PGAdapter by default only allows TCP connections from localhost or Unix Domain Socket connections.
+    Use the -x switch to turn off the localhost check. This is required when running PGAdapter in a
+    Docker container, as the connections from the host machine will not be seen as a connection from
+    localhost in the container.
 ```
-An example of a simple run string:
+
+* See [command line arguments](docs/command_line_arguments.md) for a list of all supported arguments.
+* See [connection options](docs/connection_options.md) for all connection options.
+* See [Authentication Options](docs/authentication.md) for more details on the `-a` command line
+  argument and other authentication options.
+* See [DDL Options](docs/ddl.md) for more details for the `-ddl` command line argument.
+
+#### Example - Connect to a Single Database
+
+This example starts PGAdapter and instructs it to always connect to the same database using a fixed
+set of credentials:
 
 ```shell
 java -jar pgadapter.jar \
      -p <project-id> -i <instance-id> -d <database-id> \
      -c <path to credentials file> -s 5432
+psql -h localhost
 ```
+
+The psql `-d` command line argument will be ignored. The psql `\c` meta-command will have no effect.
+
+#### Example - Require Authentication and Fully Qualified Database Name
+
+This example starts PGAdapter and requires the client to supply both credentials and a fully
+qualified database name. This allows a single instance of PGAdapter to serve connections to any
+Cloud Spanner database.
+
+```shell
+java -jar pgadapter.jar -a
+
+# The credentials file must be a valid Google Cloud credentials file, such as a
+# service account key file or a user credentials file.
+# Note that you must enclose the database name in quotes as it contains slashes.
+PGPASSWORD=$(cat /path/to/credentials.json) psql -h /tmp \
+  -d "projects/my-project/instances/my-instance/databases/my-database"
+```
+
+The psql `\c` meta-command can be used to switch to a different database.
 
 ## Details
 Google Cloud Spanner PGAdapter is a simple, MITM, forward, non-transparent proxy, which translates
@@ -274,10 +242,10 @@ PostgreSQL dialect do not support all `pg_catalog` tables.
 Though the majority of functionality inherent in most PostgreSQL clients are included
 out of the box, the following items are not supported:
 * SSL
-* COPY <table_name> TO ...
 * COPY <table_name> FROM <filename | PROGRAM program>
 
-See [COPY <table-name> FROM STDIN](docs/copy.md) for more information on COPY.
+See [COPY <table-name> FROM STDIN](docs/copy.md) for more information on the COPY operations  that
+are supported.
 
 Only the following `psql` meta-commands are supported:
   * `\d <table>` 
@@ -294,7 +262,8 @@ PGAdapter has the following known limitations at this moment:
 - SSL connections are not supported.
 - Only [password authentication](https://www.postgresql.org/docs/current/auth-password.html) using
   the `password` method is supported. All other authentication methods are not supported.
-- The COPY protocol only supports COPY FROM STDIN.
+- The COPY protocol only supports COPY TO/FROM STDIN [BINARY]. COPY TO/FROM <FILE|PROGRAM> is not supported.
+  See [COPY](docs/copy.md) for more information.
 - DDL transactions are not supported. PGAdapter allows DDL statements in implicit transactions,
   and executes SQL strings that contain multiple DDL statements as a single DDL batch on Cloud
   Spanner. See [DDL transaction options](docs/ddl.md) for more information.
