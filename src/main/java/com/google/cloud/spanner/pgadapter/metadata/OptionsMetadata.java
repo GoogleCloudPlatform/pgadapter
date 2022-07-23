@@ -633,9 +633,10 @@ public class OptionsMetadata {
 
   static void printDeprecatedWarnings(CommandLine commandLine) {
     if (commandLine.hasOption(OPTION_BINARY_FORMAT)) {
-      System.out.println("Forcing the server to return results using the binary format is a violation "
-          + "of the PostgreSQL wire-protocol. Using this option can cause unexpected errors.\nIt is "
-          + "recommended not to use the -b option.");
+      System.out.println(
+          "Forcing the server to return results using the binary format is a violation "
+              + "of the PostgreSQL wire-protocol. Using this option can cause unexpected errors.\nIt is "
+              + "recommended not to use the -b option.");
     }
     if (!commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT)) {
       if (commandLine.hasOption(OPTION_PSQL_MODE)) {
