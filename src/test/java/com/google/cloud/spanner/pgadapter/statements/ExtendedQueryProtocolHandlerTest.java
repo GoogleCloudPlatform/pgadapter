@@ -18,12 +18,16 @@ import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
+import java.io.DataOutputStream;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -36,6 +40,7 @@ import org.mockito.junit.MockitoRule;
 public class ExtendedQueryProtocolHandlerTest {
   @Rule public MockitoRule rule = MockitoJUnit.rule();
 
+  @Mock private ConnectionHandler connectionHandler;
   @Mock private BackendConnection backendConnection;
 
   @Test
@@ -45,7 +50,8 @@ public class ExtendedQueryProtocolHandlerTest {
     DescribeMessage describeMessage = mock(DescribeMessage.class);
     ExecuteMessage executeMessage = mock(ExecuteMessage.class);
 
-    ExtendedQueryProtocolHandler handler = new ExtendedQueryProtocolHandler(backendConnection);
+    ExtendedQueryProtocolHandler handler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     handler.buffer(parseMessage);
     handler.buffer(bindMessage);
     handler.buffer(describeMessage);
@@ -58,12 +64,16 @@ public class ExtendedQueryProtocolHandlerTest {
 
   @Test
   public void testFlush() throws Exception {
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.peekOutputStream()).thenReturn(mock(DataOutputStream.class));
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     ParseMessage parseMessage = mock(ParseMessage.class);
     BindMessage bindMessage = mock(BindMessage.class);
     DescribeMessage describeMessage = mock(DescribeMessage.class);
     ExecuteMessage executeMessage = mock(ExecuteMessage.class);
 
-    ExtendedQueryProtocolHandler handler = new ExtendedQueryProtocolHandler(backendConnection);
+    ExtendedQueryProtocolHandler handler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     handler.buffer(parseMessage);
     handler.buffer(bindMessage);
     handler.buffer(describeMessage);
@@ -85,12 +95,16 @@ public class ExtendedQueryProtocolHandlerTest {
 
   @Test
   public void testSync() throws Exception {
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.peekOutputStream()).thenReturn(mock(DataOutputStream.class));
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     ParseMessage parseMessage = mock(ParseMessage.class);
     BindMessage bindMessage = mock(BindMessage.class);
     DescribeMessage describeMessage = mock(DescribeMessage.class);
     ExecuteMessage executeMessage = mock(ExecuteMessage.class);
 
-    ExtendedQueryProtocolHandler handler = new ExtendedQueryProtocolHandler(backendConnection);
+    ExtendedQueryProtocolHandler handler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
     handler.buffer(parseMessage);
     handler.buffer(bindMessage);
     handler.buffer(describeMessage);

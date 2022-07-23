@@ -26,7 +26,7 @@ import java.text.MessageFormat;
 @InternalApi
 public class SyncMessage extends ControlMessage {
 
-  protected static final char IDENTIFIER = 'S';
+  public static final char IDENTIFIER = 'S';
 
   public SyncMessage(ConnectionHandler connection) throws Exception {
     super(connection);
