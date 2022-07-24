@@ -24,6 +24,12 @@ import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaSt
 import com.google.cloud.spanner.pgadapter.statements.local.SetSearchPathStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ShowSearchPathStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ShowServerVersionStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.pgdump.NoOpSetStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.pgdump.SelectExtensionsStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.pgdump.SelectNamespacesStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.pgdump.SelectPgIsInRecoveryStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.pgdump.SelectSetConfigStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.pgdump.SelectTablesStatement;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +67,31 @@ public class ClientAutoDetector {
           return ImmutableList.<LocalStatement>builder()
               .addAll(DEFAULT_LOCAL_STATEMENTS)
               .add(new ListDatabasesStatement(connectionHandler))
+              .build();
+        }
+        return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
+      }
+    },
+    PG_DUMP {
+
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // pg_dump makes it easy for us, as it sends its own name in the application_name parameter.
+        return parameters.containsKey("application_name")
+            && parameters.get("application_name").equals("pg_dump");
+      }
+
+      @Override
+      public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
+        if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
+          return ImmutableList.<LocalStatement>builder()
+              .addAll(DEFAULT_LOCAL_STATEMENTS)
+              .add(new SelectSetConfigStatement())
+              .add(new SelectPgIsInRecoveryStatement())
+              .add(new NoOpSetStatement())
+              .add(new SelectExtensionsStatement())
+              .add(new SelectNamespacesStatement())
+              .add(new SelectTablesStatement())
               .build();
         }
         return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
