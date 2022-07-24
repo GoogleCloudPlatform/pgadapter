@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.nodejs;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
@@ -124,9 +125,18 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     // a look-ahead to determine if the next message is a Sync, and if it is, executes a Sync on the
     // backend connection. This is a lot more efficient, as it means that we can use single-use
     // read-only transactions for single queries.
-    assertTrue(request.getTransaction().hasSingleUse());
-    assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
-    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    // There is however no guarantee that the server will see the Sync message in time to do this
+    // optimization, so in some cases the single query will be using a read/write transaction.
+    int commitRequestCount = mockSpanner.countRequestsOfType(CommitRequest.class);
+    if (commitRequestCount == 0) {
+      assertTrue(request.getTransaction().hasSingleUse());
+      assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+    } else if (commitRequestCount == 1) {
+      assertTrue(request.getTransaction().hasBegin());
+      assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    } else {
+      fail("Invalid commit count: " + commitRequestCount);
+    }
   }
 
   @Test
@@ -171,14 +181,22 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     // Creating the user will use a read/write transaction. The query that checks whether the record
     // already exists will however not use that transaction, as each statement is executed in
     // auto-commit mode.
+    int expectedCommitCount = 0;
     List<ExecuteSqlRequest> checkExistsRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(existsSql))
             .collect(Collectors.toList());
     assertEquals(1, checkExistsRequests.size());
     ExecuteSqlRequest checkExistsRequest = checkExistsRequests.get(0);
-    assertTrue(checkExistsRequest.getTransaction().hasSingleUse());
-    assertTrue(checkExistsRequest.getTransaction().getSingleUse().hasReadOnly());
+    if (checkExistsRequest.getTransaction().hasSingleUse()) {
+      assertTrue(checkExistsRequest.getTransaction().getSingleUse().hasReadOnly());
+    } else if (checkExistsRequest.getTransaction().hasBegin()) {
+      assertTrue(checkExistsRequest.getTransaction().getBegin().hasReadWrite());
+      expectedCommitCount++;
+    } else {
+      fail("missing or invalid transaction option: " + checkExistsRequest.getTransaction());
+    }
+
     List<ExecuteSqlRequest> insertRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(insertSql))
@@ -187,7 +205,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest insertRequest = insertRequests.get(0);
     assertTrue(insertRequest.getTransaction().hasBegin());
     assertTrue(insertRequest.getTransaction().getBegin().hasReadWrite());
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    expectedCommitCount++;
 
     // Loading the user after having saved it will be done in a single-use read-only transaction.
     List<ExecuteSqlRequest> loadRequests =
@@ -196,8 +214,15 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             .collect(Collectors.toList());
     assertEquals(1, loadRequests.size());
     ExecuteSqlRequest loadRequest = loadRequests.get(0);
-    assertTrue(loadRequest.getTransaction().hasSingleUse());
-    assertTrue(loadRequest.getTransaction().getSingleUse().hasReadOnly());
+    if (loadRequest.getTransaction().hasSingleUse()) {
+      assertTrue(loadRequest.getTransaction().getSingleUse().hasReadOnly());
+    } else if (loadRequest.getTransaction().hasBegin()) {
+      assertTrue(loadRequest.getTransaction().getBegin().hasReadWrite());
+      expectedCommitCount++;
+    } else {
+      fail("missing or invalid transaction option: " + loadRequest.getTransaction());
+    }
+    assertEquals(expectedCommitCount, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -248,14 +273,37 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     // Updating the user will use a read/write transaction. The query that checks whether the record
     // already exists will however not use that transaction, as each statement is executed in
     // auto-commit mode.
+    int expectedCommitCount = 0;
+    List<ExecuteSqlRequest> loadRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(loadSql))
+            .collect(Collectors.toList());
+    assertEquals(1, loadRequests.size());
+    ExecuteSqlRequest loadRequest = loadRequests.get(0);
+    if (loadRequest.getTransaction().hasSingleUse()) {
+      assertTrue(loadRequest.getTransaction().getSingleUse().hasReadOnly());
+    } else if (loadRequest.getTransaction().hasBegin()) {
+      assertTrue(loadRequest.getTransaction().getBegin().hasReadWrite());
+      expectedCommitCount++;
+    } else {
+      fail("missing or invalid transaction option: " + loadRequest.getTransaction());
+    }
+
     List<ExecuteSqlRequest> checkExistsRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(existsSql))
             .collect(Collectors.toList());
     assertEquals(1, checkExistsRequests.size());
     ExecuteSqlRequest checkExistsRequest = checkExistsRequests.get(0);
-    assertTrue(checkExistsRequest.getTransaction().hasSingleUse());
-    assertTrue(checkExistsRequest.getTransaction().getSingleUse().hasReadOnly());
+    if (checkExistsRequest.getTransaction().hasSingleUse()) {
+      assertTrue(checkExistsRequest.getTransaction().getSingleUse().hasReadOnly());
+    } else if (checkExistsRequest.getTransaction().hasBegin()) {
+      assertTrue(checkExistsRequest.getTransaction().getBegin().hasReadWrite());
+      expectedCommitCount++;
+    } else {
+      fail("missing or invalid transaction option: " + checkExistsRequest.getTransaction());
+    }
+
     List<ExecuteSqlRequest> updateRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(updateSql))
@@ -264,7 +312,9 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest updateRequest = updateRequests.get(0);
     assertTrue(updateRequest.getTransaction().hasBegin());
     assertTrue(updateRequest.getTransaction().getBegin().hasReadWrite());
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    expectedCommitCount++;
+
+    assertEquals(expectedCommitCount, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -314,14 +364,37 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     // Deleting the user will use a read/write transaction. The query that checks whether the record
     // already exists will however not use that transaction, as each statement is executed in
     // auto-commit mode.
+    int expectedCommitCount = 0;
+    List<ExecuteSqlRequest> loadRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(loadSql))
+            .collect(Collectors.toList());
+    assertEquals(1, loadRequests.size());
+    ExecuteSqlRequest loadRequest = loadRequests.get(0);
+    if (loadRequest.getTransaction().hasSingleUse()) {
+      assertTrue(loadRequest.getTransaction().getSingleUse().hasReadOnly());
+    } else if (loadRequest.getTransaction().hasBegin()) {
+      assertTrue(loadRequest.getTransaction().getBegin().hasReadWrite());
+      expectedCommitCount++;
+    } else {
+      fail("missing or invalid transaction option: " + loadRequest.getTransaction());
+    }
+
     List<ExecuteSqlRequest> checkExistsRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(existsSql))
             .collect(Collectors.toList());
     assertEquals(1, checkExistsRequests.size());
     ExecuteSqlRequest checkExistsRequest = checkExistsRequests.get(0);
-    assertTrue(checkExistsRequest.getTransaction().hasSingleUse());
-    assertTrue(checkExistsRequest.getTransaction().getSingleUse().hasReadOnly());
+    if (checkExistsRequest.getTransaction().hasSingleUse()) {
+      assertTrue(checkExistsRequest.getTransaction().getSingleUse().hasReadOnly());
+    } else if (checkExistsRequest.getTransaction().hasBegin()) {
+      assertTrue(checkExistsRequest.getTransaction().getBegin().hasReadWrite());
+      expectedCommitCount++;
+    } else {
+      fail("missing or invalid transaction option: " + checkExistsRequest.getTransaction());
+    }
+
     List<ExecuteSqlRequest> deleteRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(deleteSql))
@@ -330,7 +403,9 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest deleteRequest = deleteRequests.get(0);
     assertTrue(deleteRequest.getTransaction().hasBegin());
     assertTrue(deleteRequest.getTransaction().getBegin().hasReadWrite());
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    expectedCommitCount++;
+
+    assertEquals(expectedCommitCount, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -363,15 +438,22 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "}\n",
         output);
 
+    int expectedCommitCount = 0;
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(sql))
             .collect(Collectors.toList());
     assertEquals(1, executeSqlRequests.size());
     ExecuteSqlRequest request = executeSqlRequests.get(0);
-    assertTrue(request.getTransaction().hasSingleUse());
-    assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
-    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    if (request.getTransaction().hasSingleUse()) {
+      assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+    } else if (request.getTransaction().hasBegin()) {
+      assertTrue(request.getTransaction().getBegin().hasReadWrite());
+      expectedCommitCount++;
+    } else {
+      fail("missing or invalid transaction option: " + request.getTransaction());
+    }
+    assertEquals(expectedCommitCount, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -407,15 +489,6 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     assertEquals("\n\nCreated one record\n", output);
 
-    List<ExecuteSqlRequest> existsRequests =
-        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(request -> request.getSql().equals(existsSql))
-            .collect(Collectors.toList());
-    assertEquals(1, existsRequests.size());
-    ExecuteSqlRequest existsRequest = existsRequests.get(0);
-    assertTrue(existsRequest.getTransaction().hasSingleUse());
-    assertTrue(existsRequest.getTransaction().getSingleUse().hasReadOnly());
-
     List<ExecuteSqlRequest> insertRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(insertSql))
@@ -424,8 +497,6 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest insertRequest = insertRequests.get(0);
     assertTrue(insertRequest.getTransaction().hasBegin());
     assertTrue(insertRequest.getTransaction().getBegin().hasReadWrite());
-
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
 
     // The NodeJS PostgreSQL driver sends parameters without any type information to the backend.
     // This means that all parameters are sent as untyped string values.
