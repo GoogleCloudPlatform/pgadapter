@@ -21,8 +21,10 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -208,5 +210,24 @@ public class OptionsMetadataTest {
 
     options = new OptionsMetadata(new String[] {"-p p", "-i i", "-disable_auto_detect_client"});
     assertFalse(options.shouldAutoDetectClient());
+  }
+
+  @Test
+  public void testDeprecatedBinaryFormat() {
+    PrintStream originalOut = System.out;
+    try {
+      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+      System.setOut(new PrintStream(outputStream));
+      OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i", "-b"});
+      assertTrue(options.isBinaryFormat());
+
+      assertEquals(
+          "Forcing the server to return results using the binary format is a violation "
+              + "of the PostgreSQL wire-protocol. Using this option can cause unexpected errors.\nIt is "
+              + "recommended not to use the -b option.\n",
+          outputStream.toString());
+    } finally {
+      System.setOut(originalOut);
+    }
   }
 }
