@@ -166,9 +166,9 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
    * @throws Exception if sending the message back to the client causes an error.
    */
   public void handleDescribeStatement() throws Exception {
-    try (DescribeStatementMetadata metadata =
-        (DescribeStatementMetadata) this.statement.describe()) {
-      new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send(false);
+    try {
+      DescribeStatementMetadata metadata = (DescribeStatementMetadata) this.statement.describe();
+      new ParameterDescriptionResponse(this.outputStream, metadata.getResultSet()).send(false);
       if (metadata.getResultSet() != null) {
         new RowDescriptionResponse(
                 this.outputStream,

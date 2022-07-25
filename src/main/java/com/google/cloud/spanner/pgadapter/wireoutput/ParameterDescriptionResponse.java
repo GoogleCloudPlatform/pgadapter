@@ -15,6 +15,10 @@
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Type;
+import com.google.cloud.spanner.Type.Code;
+import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -28,15 +32,17 @@ public class ParameterDescriptionResponse extends WireOutput {
   private static final int PARAMETER_NUMBER_LENGTH = 2;
   private static final int PARAMETER_LENGTH = 4;
 
-  private final int[] parameters;
+  private final Type undeclaredParameters;
+  private int[] parameters;
 
-  public ParameterDescriptionResponse(DataOutputStream output, int[] parameters) {
-    super(output, calculateLength(parameters));
-    this.parameters = parameters;
+  public ParameterDescriptionResponse(DataOutputStream output, ResultSet resultSet) {
+    super(output, calculateLength(resultSet.getUndeclaredParameters()));
+    this.undeclaredParameters = resultSet.getUndeclaredParameters();
   }
 
   @Override
   protected void sendPayload() throws IOException {
+    this.parameters = convertUndeclaredParametersToOIO(undeclaredParameters);
     this.outputStream.writeShort(this.parameters.length);
     for (int parameter : this.parameters) {
       this.outputStream.writeInt(parameter);
@@ -55,11 +61,34 @@ public class ParameterDescriptionResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
+    this.parameters = convertUndeclaredParametersToOIO(undeclaredParameters);
     return new MessageFormat("Length: {0}, " + "Parameters: {1}")
         .format(new Object[] {this.length, Arrays.toString(this.parameters)});
   }
 
-  private static int calculateLength(int[] parameters) {
-    return HEADER_LENGTH + PARAMETER_NUMBER_LENGTH + (parameters.length * PARAMETER_LENGTH);
+  private static int[] convertUndeclaredParametersToOIO(Type undeclaredParameters) {
+    if (undeclaredParameters.getCode() != Code.STRUCT) {
+      return new int[0];
+    }
+
+    int[] oids = new int[getCountOfParameters(undeclaredParameters)];
+    for (int parameterIndex = 0; parameterIndex < oids.length; parameterIndex++) {
+      oids[parameterIndex] =
+          Parser.toOid(undeclaredParameters.getStructFields().get(parameterIndex).getType());
+    }
+    return oids;
+  }
+
+  private static int calculateLength(Type undeclaredParameters) {
+    return HEADER_LENGTH
+        + PARAMETER_NUMBER_LENGTH
+        + (getCountOfParameters(undeclaredParameters) * PARAMETER_LENGTH);
+  }
+
+  private static int getCountOfParameters(Type undeclaredParameters) {
+    if (undeclaredParameters.getCode() != Code.STRUCT) {
+      return 0;
+    }
+    return undeclaredParameters.getStructFields().size();
   }
 }

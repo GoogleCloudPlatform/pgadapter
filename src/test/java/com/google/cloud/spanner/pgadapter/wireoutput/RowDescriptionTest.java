@@ -23,6 +23,7 @@ import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
+import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -85,28 +86,28 @@ public final class RowDescriptionTest {
 
     // Types.BIGINT
     assertEquals(Oid.INT8, response.getOidType(0));
-    assertEquals(8, response.getOidTypeSize(Oid.INT8));
+    assertEquals(8, Parser.getOidTypeSize(Oid.INT8));
     // Types.NUMERIC
     assertEquals(Oid.NUMERIC, response.getOidType(1));
-    assertEquals(-1, response.getOidTypeSize(Oid.NUMERIC));
+    assertEquals(-1, Parser.getOidTypeSize(Oid.NUMERIC));
     // Types.DOUBLE
     assertEquals(Oid.FLOAT8, response.getOidType(2));
-    assertEquals(8, response.getOidTypeSize(Oid.FLOAT8));
+    assertEquals(8, Parser.getOidTypeSize(Oid.FLOAT8));
     // Types.VARCHAR
     assertEquals(Oid.VARCHAR, response.getOidType(3));
-    assertEquals(-1, response.getOidTypeSize(Oid.VARCHAR));
+    assertEquals(-1, Parser.getOidTypeSize(Oid.VARCHAR));
     // Types.BINARY
     assertEquals(Oid.BYTEA, response.getOidType(4));
-    assertEquals(-1, response.getOidTypeSize(Oid.BYTEA));
+    assertEquals(-1, Parser.getOidTypeSize(Oid.BYTEA));
     // Types.BIT
     assertEquals(Oid.BOOL, response.getOidType(5));
-    assertEquals(1, response.getOidTypeSize(Oid.BOOL));
+    assertEquals(1, Parser.getOidTypeSize(Oid.BOOL));
     // Types.DATE
     assertEquals(Oid.DATE, response.getOidType(6));
-    assertEquals(8, response.getOidTypeSize(Oid.DATE));
+    assertEquals(8, Parser.getOidTypeSize(Oid.DATE));
     // Types.TIMESTAMP
     assertEquals(Oid.TIMESTAMPTZ, response.getOidType(7));
-    assertEquals(12, response.getOidTypeSize(Oid.TIMESTAMPTZ));
+    assertEquals(12, Parser.getOidTypeSize(Oid.TIMESTAMPTZ));
   }
 
   @Test
