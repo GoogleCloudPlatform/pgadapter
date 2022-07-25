@@ -296,6 +296,54 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   }
 
   @Test
+  public void testDatabaseMetaDataTables_AllTypes() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            try (ResultSet tables =
+                metadata.getTables(
+                    null,
+                    "public",
+                    "%a%",
+                    new String[] {
+                      "TABLE",
+                      "PARTITIONED TABLE",
+                      "INDEX",
+                      "PARTITIONED INDEX",
+                      "SEQUENCE",
+                      "TYPE",
+                      "SYSTEM TABLE",
+                      "SYSTEM TOAST TABLE",
+                      "SYSTEM TOAST INDEX",
+                      "SYSTEM VIEW",
+                      "SYSTEM INDEX",
+                      "TEMPORARY TABLE",
+                      "TEMPORARY INDEX",
+                      "TEMPORARY VIEW",
+                      "TEMPORARY SEQUENCE",
+                      "FOREIGN TABLE",
+                      "MATERIALIZED VIEW",
+                      "VIEW"
+                    })) {
+              assertTrue(tables.next());
+              assertEquals("albums", tables.getString("TABLE_NAME"));
+              assertTrue(tables.next());
+              assertEquals("all_types", tables.getString("TABLE_NAME"));
+              assertTrue(tables.next());
+              assertEquals("recording_attempt", tables.getString("TABLE_NAME"));
+              assertTrue(tables.next());
+              assertEquals("tracks", tables.getString("TABLE_NAME"));
+
+              assertFalse(tables.next());
+            }
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
+  }
+
+  @Test
   public void testDatabaseMetaDataColumns() throws Exception {
     runForAllVersions(
         connection -> {
