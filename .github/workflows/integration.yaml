@@ -91,6 +91,9 @@ jobs:
         with:
           python-version: '3.9'
       - run: pip install -r ./src/test/python/requirements.txt
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
       - name: Setup psql
         run: |
           sudo apt-get update
