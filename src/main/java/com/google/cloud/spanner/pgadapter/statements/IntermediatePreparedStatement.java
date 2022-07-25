@@ -125,17 +125,11 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   @Override
   public DescribeMetadata<?> describe() {
     ResultSet planResultSet = null;
-    try {
-      if (this.parsedStatement.isQuery()) {
-        Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
-        planResultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
-      }
-      return new DescribeStatementMetadata(planResultSet);
-    } finally {
-      if (planResultSet != null) {
-        planResultSet.close();
-      }
+    if (this.parsedStatement.isQuery()) {
+      Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
+      planResultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
     }
+    return new DescribeStatementMetadata(planResultSet);
   }
 
   /**
