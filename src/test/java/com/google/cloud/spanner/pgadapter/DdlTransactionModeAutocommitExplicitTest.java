@@ -21,7 +21,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.protobuf.AbstractMessage;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
+import com.google.spanner.v1.BatchCreateSessionsRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -368,5 +370,81 @@ public class DdlTransactionModeAutocommitExplicitTest
     assertEquals(1, updateDatabaseDdlRequests.size());
     // The DML statement between the two DDL batches is automatically committed.
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testMultipleDdlBatchesInExplicitTransaction() throws SQLException {
+    // We need two responses, as we will be sending two batches.
+    addDdlResponseToSpannerAdmin();
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        statement.execute("begin;");
+
+        assertEquals(1, statement.executeUpdate(INSERT_STATEMENT.getSql()));
+
+        // This will auto-commit the transaction and start a DDL batch.
+        assertFalse(statement.execute("CREATE TABLE foo1 (id bigint primary key)"));
+        assertFalse(statement.execute("CREATE TABLE bar1 (id bigint primary key)"));
+
+        // The following DML statement will auto-commit the DDL batch above.
+        assertEquals(1, statement.executeUpdate(INSERT_STATEMENT.getSql()));
+
+        // This will start another DDL batch.
+        assertFalse(statement.execute("CREATE TABLE foo2 (id bigint primary key)"));
+        assertFalse(statement.execute("CREATE TABLE bar2 (id bigint primary key)"));
+
+        // This will once again auto-commit the DDL batch.
+        assertEquals(1, statement.executeUpdate(INSERT_STATEMENT.getSql()));
+
+        // Only the last DML statement will be rolled back.
+        statement.execute("rollback;");
+      }
+    }
+
+    List<UpdateDatabaseDdlRequest> updateDatabaseDdlRequests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(UpdateDatabaseDdlRequest.class::cast)
+            .collect(Collectors.toList());
+    // There should be two separate DDL batches.
+    assertEquals(2, updateDatabaseDdlRequests.size());
+
+    assertEquals(2, updateDatabaseDdlRequests.get(0).getStatementsCount());
+    assertEquals(
+        "CREATE TABLE foo1 (id bigint primary key)",
+        updateDatabaseDdlRequests.get(0).getStatements(0));
+    assertEquals(
+        "CREATE TABLE bar1 (id bigint primary key)",
+        updateDatabaseDdlRequests.get(0).getStatements(1));
+
+    assertEquals(2, updateDatabaseDdlRequests.get(1).getStatementsCount());
+    assertEquals(
+        "CREATE TABLE foo2 (id bigint primary key)",
+        updateDatabaseDdlRequests.get(1).getStatements(0));
+    assertEquals(
+        "CREATE TABLE bar2 (id bigint primary key)",
+        updateDatabaseDdlRequests.get(1).getStatements(1));
+
+    // Get all requests (except BatchCreateSession).
+    List<AbstractMessage> requests =
+        mockSpanner.getRequests().stream()
+            .filter(message -> !(message instanceof BatchCreateSessionsRequest))
+            .collect(Collectors.toList());
+    // The order of requests should be:
+    // 1. DML (with begin)
+    // 2. Commit
+    // 3. DML (with begin)
+    // 4. Commit
+    // 5. DML (with begin)
+    // 6. Rollback
+    assertEquals(6, requests.size());
+    assertEquals(ExecuteSqlRequest.class, requests.get(0).getClass());
+    assertEquals(CommitRequest.class, requests.get(1).getClass());
+    assertEquals(ExecuteSqlRequest.class, requests.get(2).getClass());
+    assertEquals(CommitRequest.class, requests.get(3).getClass());
+    assertEquals(ExecuteSqlRequest.class, requests.get(4).getClass());
+    assertEquals(RollbackRequest.class, requests.get(5).getClass());
   }
 }
