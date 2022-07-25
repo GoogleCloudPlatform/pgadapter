@@ -142,12 +142,12 @@ class SimpleParser {
   }
 
   TableOrIndexName readTableOrIndexName() {
-    String nameOrSchema = readTableOrIndexNamePart();
+    String nameOrSchema = readIdentifierPart();
     if (nameOrSchema == null) {
       return null;
     }
     if (eat(".")) {
-      String name = readTableOrIndexNamePart();
+      String name = readIdentifierPart();
       if (name == null) {
         name = "";
       }
@@ -156,8 +156,11 @@ class SimpleParser {
     return new TableOrIndexName(nameOrSchema);
   }
 
-  String readTableOrIndexNamePart() {
+  String readIdentifierPart() {
     skipWhitespaces();
+    if (pos >= sql.length()) {
+      return null;
+    }
     boolean quoted = sql.charAt(pos) == '"';
     int start = pos;
     if (quoted) {
