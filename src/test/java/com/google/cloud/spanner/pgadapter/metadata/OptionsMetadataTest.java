@@ -224,7 +224,8 @@ public class OptionsMetadataTest {
       assertEquals(
           "Forcing the server to return results using the binary format is a violation "
               + "of the PostgreSQL wire-protocol. Using this option can cause unexpected errors.\nIt is "
-              + "recommended not to use the -b option.\n",
+              + "recommended not to use the -b option."
+              + System.lineSeparator(),
           outputStream.toString());
     } finally {
       System.setOut(originalOut);
