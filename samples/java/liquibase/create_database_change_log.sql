@@ -1,3 +1,5 @@
+BEGIN;
+
 CREATE TABLE databasechangeloglock (
     ID INTEGER NOT NULL,
     LOCKED BOOLEAN NOT NULL,
@@ -23,3 +25,4 @@ CREATE TABLE databasechangelog (
     DEPLOYMENT_ID VARCHAR(10)
 );
 
+COMMIT;

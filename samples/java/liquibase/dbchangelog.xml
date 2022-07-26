@@ -11,7 +11,11 @@
   <changeSet  id="1"  author="bob">
     <createTable  tableName="department">
       <column  name="id"  type="int">
-        <constraints  primaryKey="true"  nullable="false"/>
+        <!-- Setting the primary key name to 'pk_<table_name>' is required. -->
+        <constraints
+          primaryKey="true"
+          primaryKeyName="pk_department"
+          nullable="false"/>
       </column>
       <column  name="name"  type="varchar(50)">
         <constraints  nullable="false"/>
