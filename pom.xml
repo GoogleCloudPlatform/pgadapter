@@ -48,7 +48,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.5.1</version>
+    <version>1.5.2</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
