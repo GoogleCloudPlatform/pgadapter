@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.7.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.6.1...v0.7.0) (2022-07-26)
+
+
+### Features
+
+* execute INFORMATION_SCHEMA in single-use transaction ([#276](https://github.com/GoogleCloudPlatform/pgadapter/issues/276)) ([fa7fe13](https://github.com/GoogleCloudPlatform/pgadapter/commit/fa7fe135161399dc599d9ef5991ab1eb42e5f120))
+* ignore named primary keys with correct name ([#286](https://github.com/GoogleCloudPlatform/pgadapter/issues/286)) ([6d90366](https://github.com/GoogleCloudPlatform/pgadapter/commit/6d903666025b43c328ffd3aad31e9cea35a215cb))
+* select current_schema ([#273](https://github.com/GoogleCloudPlatform/pgadapter/issues/273)) ([b80069d](https://github.com/GoogleCloudPlatform/pgadapter/commit/b80069d555c593730aa31a36b4c77e037f9c52b1))
+* support (ignore) show and set search_path ([#288](https://github.com/GoogleCloudPlatform/pgadapter/issues/288)) ([93d8c14](https://github.com/GoogleCloudPlatform/pgadapter/commit/93d8c140bfbcdc17daaaece4a66b649d701f7777))
+
+
+### Performance Improvements
+
+* treat 'flush and sync' as 'sync' ([#285](https://github.com/GoogleCloudPlatform/pgadapter/issues/285)) ([7fc5d51](https://github.com/GoogleCloudPlatform/pgadapter/commit/7fc5d51805722aadf968cb520f789f4f98ac70b8))
+
 ## [0.6.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.6.0...v0.6.1) (2022-07-13)
 
 
