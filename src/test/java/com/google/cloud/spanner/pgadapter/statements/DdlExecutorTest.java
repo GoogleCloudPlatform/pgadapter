@@ -66,6 +66,8 @@ public class DdlExecutorTest {
         Statement.of("create table foo (id int)"),
         translate("create table foo (id int)", executor));
     assertEquals(
+        Statement.of("create table foo(id int)"), translate("create table foo(id int)", executor));
+    assertEquals(
         Statement.of("create table \"Foo\" (id int)"),
         translate("create table \"Foo\" (id int)", executor));
     assertEquals(
