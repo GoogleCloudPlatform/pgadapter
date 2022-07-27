@@ -35,6 +35,7 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
@@ -351,6 +352,44 @@ public class BackendConnectionTest {
 
     ExecutionException executionException =
         assertThrows(ExecutionException.class, resultFuture::get);
+    assertSame(executionException.getCause(), error);
+  }
+
+  @Test
+  public void testDdlExceptionInBatch() {
+    String sql1 = "create table foo (id bigint primary key)";
+    String sql2 = "create table bar (id bigint primary key)";
+
+    Connection connection = mock(Connection.class);
+    ParsedStatement parsedStatement1 = mock(ParsedStatement.class);
+    when(parsedStatement1.getType()).thenReturn(StatementType.DDL);
+    when(parsedStatement1.getSqlWithoutComments()).thenReturn(sql1);
+
+    ParsedStatement parsedStatement2 = mock(ParsedStatement.class);
+    when(parsedStatement2.getType()).thenReturn(StatementType.DDL);
+    when(parsedStatement2.getSqlWithoutComments()).thenReturn(sql2);
+
+    Statement statement1 = Statement.of(sql1);
+    Statement statement2 = Statement.of(sql2);
+    when(connection.execute(statement1)).thenReturn(NO_RESULT);
+    RuntimeException error = new RuntimeException("test error");
+    when(connection.execute(statement2)).thenThrow(error);
+    when(connection.isDdlBatchActive()).thenReturn(true);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            mock(OptionsMetadata.class),
+            EMPTY_LOCAL_STATEMENTS);
+    Future<StatementResult> resultFuture1 = backendConnection.execute(parsedStatement1, statement1);
+    backendConnection.execute(parsedStatement2, statement2);
+    backendConnection.flush();
+
+    // The error will be set on the first statement in the batch, as the error occurs before
+    // anything is actually executed on Cloud Spanner.
+    ExecutionException executionException =
+        assertThrows(ExecutionException.class, resultFuture1::get);
     assertSame(executionException.getCause(), error);
   }
 }

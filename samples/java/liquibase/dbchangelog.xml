@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+  xmlns:pro="http://www.liquibase.org/xml/ns/pro"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+		http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+		http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd
+		http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd">
+  <changeSet  id="1"  author="bob">
+    <createTable  tableName="singers">
+      <column  name="singer_id"  type="varchar(36)">
+        <!-- Setting the primary key name to 'pk_<table_name>' is required! -->
+        <constraints
+          primaryKey="true"
+          primaryKeyName="pk_singers"
+          nullable="false"/>
+      </column>
+      <column  name="first_name"  type="varchar(200)" />
+      <column  name="last_name"  type="varchar(200)">
+        <constraints nullable="false" />
+      </column>
+      <column
+          name="full_name"
+          type="varchar(400)"
+          generationType="ALWAYS"
+          defaultValueComputed="GENERATED ALWAYS AS (coalesce(first_name || ' ', '') || last_name) STORED">
+        <constraints nullable="true" />
+      </column>
+      <column name="active" type="boolean" defaultValueBoolean="true"/>
+    </createTable>
+  </changeSet>
+</databaseChangeLog>
