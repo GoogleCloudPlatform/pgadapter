@@ -9,18 +9,26 @@
 		http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd
 		http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd">
   <changeSet  id="1"  author="bob">
-    <createTable  tableName="department">
-      <column  name="id"  type="int">
-        <!-- Setting the primary key name to 'pk_<table_name>' is required. -->
+    <createTable  tableName="singers">
+      <column  name="singer_id"  type="varchar(36)">
+        <!-- Setting the primary key name to 'pk_<table_name>' is required! -->
         <constraints
           primaryKey="true"
-          primaryKeyName="pk_department"
+          primaryKeyName="pk_singers"
           nullable="false"/>
       </column>
-      <column  name="name"  type="varchar(50)">
-        <constraints  nullable="false"/>
+      <column  name="first_name"  type="varchar(200)" />
+      <column  name="last_name"  type="varchar(200)">
+        <constraints nullable="false" />
       </column>
-      <column  name="active"  type="boolean"  defaultValueBoolean="true"/>
+      <column
+          name="full_name"
+          type="varchar(400)"
+          generationType="ALWAYS"
+          defaultValueComputed="GENERATED ALWAYS AS (coalesce(first_name || ' ', '') || last_name) STORED">
+        <constraints nullable="true" />
+      </column>
+      <column name="active" type="boolean" defaultValueBoolean="true"/>
     </createTable>
   </changeSet>
 </databaseChangeLog>

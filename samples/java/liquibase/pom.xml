@@ -106,6 +106,7 @@
           <version>4.12.0</version>
           <configuration>
             <propertyFile>liquibase.properties</propertyFile>
+            <outputChangeLogFile>changelog-master.xml</outputChangeLogFile>
           </configuration>
           <dependencies>
             <dependency>

@@ -24,6 +24,7 @@ import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaSt
 import com.google.cloud.spanner.pgadapter.statements.local.SetSearchPathStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ShowSearchPathStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ShowServerVersionStatement;
+import com.google.cloud.spanner.pgadapter.statements.local.liquibase.SetExtraFloatDigitsStatement;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +44,8 @@ public class ClientAutoDetector {
           SelectCurrentCatalogStatement.INSTANCE,
           ShowSearchPathStatement.INSTANCE,
           ShowServerVersionStatement.INSTANCE,
-          SetSearchPathStatement.INSTANCE);
+          SetSearchPathStatement.INSTANCE,
+          SetExtraFloatDigitsStatement.INSTANCE);
 
   public enum WellKnownClient {
     PSQL {
