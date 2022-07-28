@@ -50,7 +50,10 @@ import com.google.spanner.v1.DatabaseName;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
-import java.net.Socket;
+import java.net.InetSocketAddress;
+import java.nio.channels.ByteChannel;
+import java.nio.channels.Channels;
+import java.nio.channels.SocketChannel;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.util.HashMap;
@@ -80,7 +83,9 @@ public class ConnectionHandler extends Thread {
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
 
   private final ProxyServer server;
-  private final Socket socket;
+  private final ByteChannel socketChannel;
+  private final InetSocketAddress remoteAddress;
+  private final String remoteClient;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
   private static final Map<Integer, IntermediateStatement> activeStatementsMap =
@@ -100,18 +105,26 @@ public class ConnectionHandler extends Thread {
   private WellKnownClient wellKnownClient;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
 
-  ConnectionHandler(ProxyServer server, Socket socket) {
+  ConnectionHandler(ProxyServer server, ByteChannel byteChannel) throws IOException {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
-    this.socket = socket;
+    this.socketChannel = byteChannel;
+    if (byteChannel instanceof SocketChannel
+        && ((SocketChannel) byteChannel).getRemoteAddress() instanceof InetSocketAddress) {
+      SocketChannel socketChannel = (SocketChannel) byteChannel;
+      this.remoteAddress = (InetSocketAddress) socketChannel.getRemoteAddress();
+      this.remoteClient = remoteAddress.getAddress().getHostAddress();
+    } else {
+      this.remoteAddress = null;
+      this.remoteClient = "(local)";
+    }
     this.secret = new SecureRandom().nextInt();
     setDaemon(true);
     logger.log(
         Level.INFO,
         () ->
             String.format(
-                "Connection handler with ID %s created for client %s",
-                getName(), socket.getInetAddress().getHostAddress()));
+                "Connection handler with ID %s created for client %s", getName(), remoteClient));
   }
 
   @InternalApi
@@ -214,15 +227,16 @@ public class ConnectionHandler extends Thread {
         Level.INFO,
         () ->
             String.format(
-                "Connection handler with ID %s starting for client %s",
-                getName(), socket.getInetAddress().getHostAddress()));
+                "Connection handler with ID %s starting for client %s", getName(), remoteClient));
 
     try (ConnectionMetadata connectionMetadata =
-        new ConnectionMetadata(this.socket.getInputStream(), this.socket.getOutputStream())) {
+        new ConnectionMetadata(
+            Channels.newInputStream(socketChannel), Channels.newOutputStream(socketChannel))) {
       this.connectionMetadata = connectionMetadata;
       if (!server.getOptions().disableLocalhostCheck()
-          && !this.socket.getInetAddress().isAnyLocalAddress()
-          && !this.socket.getInetAddress().isLoopbackAddress()) {
+          && this.remoteAddress != null
+          && !this.remoteAddress.getAddress().isAnyLocalAddress()
+          && !this.remoteAddress.getAddress().isLoopbackAddress()) {
         handleError(new IllegalAccessException("This proxy may only be accessed from localhost."));
         return;
       }
@@ -255,7 +269,7 @@ public class ConnectionHandler extends Thread {
           () ->
               String.format(
                   "Exception on connection handler with ID %s for client %s: %s",
-                  getName(), socket.getInetAddress().getHostAddress(), e));
+                  getName(), remoteClient, e));
     } finally {
       logger.log(
           Level.INFO, () -> String.format("Closing connection handler with ID %s", getName()));
@@ -263,7 +277,7 @@ public class ConnectionHandler extends Thread {
         if (this.spannerConnection != null) {
           this.spannerConnection.close();
         }
-        this.socket.close();
+        this.socketChannel.close();
       } catch (SpannerException | IOException e) {
         logger.log(
             Level.WARNING,
@@ -314,9 +328,7 @@ public class ConnectionHandler extends Thread {
   void terminate() {
     handleTerminate();
     try {
-      if (!socket.isClosed()) {
-        socket.close();
-      }
+      socketChannel.close();
     } catch (IOException exception) {
       logger.log(
           Level.WARNING,

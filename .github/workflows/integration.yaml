@@ -75,7 +75,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: zulu
-          java-version: 8
+          java-version: 17
       - run: java -version
       - name: Setup Go
         uses: actions/setup-go@v3
@@ -100,6 +100,8 @@ jobs:
           psql -h /pg -U postgres -c "CREATE DATABASE pgadapter"
       - name: Run unit tests
         run: mvn test -B -Ptest-all
+      - name: Run unit tests for native image
+        run: mvn test -B -Pnative-image
       - name: Setup GCloud
         uses: google-github-actions/setup-gcloud@v0
         with:

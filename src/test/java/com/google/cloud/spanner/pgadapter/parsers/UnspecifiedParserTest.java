@@ -14,17 +14,42 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.protobuf.NullValue;
+import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.core.Oid;
 
 @RunWith(JUnit4.class)
 public class UnspecifiedParserTest {
+
+  @Test
+  public void testCreateUnspecifiedParser() {
+    Parser<?> parser = Parser.create(new byte[] {}, Oid.UNSPECIFIED, FormatCode.TEXT);
+
+    assertEquals(UnspecifiedParser.class, parser.getClass());
+  }
+
+  @Test
+  public void testParseNonNull() {
+    Parser<?> parser =
+        Parser.create(
+            "unspecified value".getBytes(StandardCharsets.UTF_8), Oid.UNSPECIFIED, FormatCode.TEXT);
+
+    assertEquals(
+        Value.untyped(
+            com.google.protobuf.Value.newBuilder().setStringValue("unspecified value").build()),
+        parser.getItem());
+    assertEquals("unspecified value", parser.stringParse());
+    assertArrayEquals("unspecified value".getBytes(StandardCharsets.UTF_8), parser.binaryParse());
+  }
 
   @Test
   public void testStringParse() {
