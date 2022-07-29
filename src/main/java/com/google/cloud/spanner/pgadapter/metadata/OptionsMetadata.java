@@ -64,7 +64,7 @@ public class OptionsMetadata {
   }
 
   private static final Logger logger = Logger.getLogger(OptionsMetadata.class.getName());
-  private static final String DEFAULT_SERVER_VERSION = "1.0.0";
+  private static final String DEFAULT_SERVER_VERSION = "14.1";
   private static final String DEFAULT_USER_AGENT = "pg-adapter";
 
   private static final String OPTION_SERVER_PORT = "s";
@@ -599,9 +599,12 @@ public class OptionsMetadata {
         OPTION_SERVER_VERSION,
         "server-version",
         true,
-        "This option specifies what server_version PG Adapter should claim to be. If not specified "
-            + " it will default to version "
-            + DEFAULT_SERVER_VERSION);
+        String.format(
+            "This option specifies what server_version PG Adapter should claim to be. If not specified "
+                + " it will default to version %s. Changing the server version can cause tools and drivers to change "
+                + "behavior, and could cause unexpected errors if the client tries to execute a statement or use "
+                + "a feature that is not supported by PGAdapter or Cloud Spanner.",
+            DEFAULT_SERVER_VERSION));
     options.addOption(
         OPTION_DEBUG_MODE,
         "debug-mode",
