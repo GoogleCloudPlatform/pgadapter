@@ -698,7 +698,7 @@ public class GormMockServerTest extends AbstractMockServerTest {
     // Nested transactions are not supported, as we don't support savepoints.
     String res = gormTest.TestNestedTransaction(createConnString());
     assertEquals(
-        "failed to execute nested transaction: ERROR: INVALID_ARGUMENT: current transaction is aborted, commands ignored until end of transaction block (SQLSTATE P0001)",
+        "failed to execute nested transaction: ERROR: current transaction is aborted, commands ignored until end of transaction block (SQLSTATE P0001)",
         res);
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
