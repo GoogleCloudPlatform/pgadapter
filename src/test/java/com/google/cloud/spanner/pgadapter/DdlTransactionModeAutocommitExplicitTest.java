@@ -139,7 +139,7 @@ public class DdlTransactionModeAutocommitExplicitTest
         // commits the explicit transaction, which means that we continue with an implicit
         // transaction after that. That transaction is therefore rolled back when the batch fails.
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
-        assertTrue(exception.getMessage(), exception.getMessage().contains(EXCEPTION.getMessage()));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
 
         // The connection should not be in the aborted transaction state.
         assertTrue(statement.execute("show transaction isolation level"));

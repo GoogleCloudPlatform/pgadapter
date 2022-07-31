@@ -419,9 +419,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         SQLException exception = assertThrows(SQLException.class, preparedStatement::executeQuery);
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("Table non_existing_table not found"));
+        assertEquals(
+            "ERROR: Table non_existing_table not found - Statement: 'select * from non_existing_table where id=$1'",
+            exception.getMessage());
       }
     }
 
@@ -445,9 +445,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         SQLException exception = assertThrows(SQLException.class, preparedStatement::executeUpdate);
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("Table non_existing_table not found"));
+        assertEquals("ERROR: Table non_existing_table not found", exception.getMessage());
       }
     }
 
@@ -555,9 +553,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         SQLException exception =
             assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("Table non_existing_table not found"));
+        assertEquals(
+            "ERROR: Table non_existing_table not found - Statement: 'select * from non_existing_table where id=$1'",
+            exception.getMessage());
       }
     }
 
@@ -591,9 +589,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         SQLException exception =
             assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("Table non_existing_table not found"));
+        assertEquals("ERROR: Table non_existing_table not found", exception.getMessage());
       }
     }
 
@@ -1616,7 +1612,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       SQLException sqlException =
           assertThrows(SQLException.class, () -> connection.createStatement().executeQuery(sql));
       assertEquals(
-          "ERROR: INTERNAL: io.grpc.StatusRuntimeException: INTERNAL: test error - Statement: 'SELECT * FROM INFORMATION_SCHEMA.TABLES'",
+          "ERROR: test error - Statement: 'SELECT * FROM INFORMATION_SCHEMA.TABLES'",
           sqlException.getMessage());
 
       // Make sure that the connection is now in the aborted state.
@@ -1625,7 +1621,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               SQLException.class,
               () -> connection.createStatement().executeQuery(SELECT2.getSql()));
       assertEquals(
-          "ERROR: INVALID_ARGUMENT: current transaction is aborted, commands ignored until end of transaction block",
+          "ERROR: current transaction is aborted, commands ignored until end of transaction block",
           abortedException.getMessage());
     }
 
