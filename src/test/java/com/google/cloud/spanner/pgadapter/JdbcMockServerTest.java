@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -1637,5 +1638,340 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     //    aborted state.
     assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testShowValidSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show application_name ")) {
+        assertTrue(resultSet.next());
+        assertNull(resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testShowInvalidSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().executeQuery("show random_setting"));
+      assertEquals(
+          "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"random_setting\"",
+          exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testSetValidSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set application_name to 'my-application'");
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show application_name ")) {
+        assertTrue(resultSet.next());
+        assertEquals("my-application", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSetInvalidSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  connection.createStatement().executeQuery("set random_setting to 'some-value'"));
+      assertEquals(
+          "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"random_setting\"",
+          exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testResetValidSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set application_name to 'my-application'");
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show application_name ")) {
+        assertTrue(resultSet.next());
+        assertEquals("my-application", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+
+      connection.createStatement().execute("reset application_name");
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show application_name ")) {
+        assertTrue(resultSet.next());
+        assertNull(resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testResetInvalidSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().executeQuery("reset random_setting"));
+      assertEquals(
+          "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"random_setting\"",
+          exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testShowUndefinedExtensionSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().executeQuery("show spanner.some_setting"));
+      assertEquals(
+          "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"spanner.some_setting\"",
+          exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testSetExtensionSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set spanner.some_setting to 'some-value'");
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.some_setting ")) {
+        assertTrue(resultSet.next());
+        assertEquals("some-value", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testResetValidExtensionSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set spanner.some_setting to 'some-value'");
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.some_setting")) {
+        assertTrue(resultSet.next());
+        assertEquals("some-value", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+
+      connection.createStatement().execute("reset spanner.some_setting");
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.some_setting")) {
+        assertTrue(resultSet.next());
+        assertNull(resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testResetUndefinedExtensionSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Resetting an undefined extension setting is allowed by PostgreSQL, and will effectively set
+      // the extension setting to null.
+      connection.createStatement().execute("reset spanner.some_setting");
+
+      verifySettingIsNull(connection, "spanner.some_setting");
+    }
+  }
+
+  @Test
+  public void testCommitSet() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      // Verify that the initial value is null.
+      verifySettingIsNull(connection, "application_name");
+      connection.createStatement().execute("set application_name to \"my-application\"");
+      verifySettingValue(connection, "application_name", "my-application");
+      // Committing the transaction should persist the value.
+      connection.commit();
+      verifySettingValue(connection, "application_name", "my-application");
+    }
+  }
+
+  @Test
+  public void testRollbackSet() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      // Verify that the initial value is null.
+      verifySettingIsNull(connection, "application_name");
+      connection.createStatement().execute("set application_name to \"my-application\"");
+      verifySettingValue(connection, "application_name", "my-application");
+      // Rolling back the transaction should reset the value to what it was before the transaction.
+      connection.rollback();
+      verifySettingIsNull(connection, "application_name");
+    }
+  }
+
+  @Test
+  public void testCommitSetExtension() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().execute("set spanner.random_setting to \"42\"");
+      verifySettingValue(connection, "spanner.random_setting", "42");
+      // Committing the transaction should persist the value.
+      connection.commit();
+      verifySettingValue(connection, "spanner.random_setting", "42");
+    }
+  }
+
+  @Test
+  public void testRollbackSetExtension() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().execute("set spanner.random_setting to \"42\"");
+      verifySettingValue(connection, "spanner.random_setting", "42");
+      // Rolling back the transaction should reset the value to what it was before the transaction.
+      // In this case, that means that it should be undefined.
+      connection.rollback();
+      verifySettingIsUnrecognized(connection, "spanner.random_setting");
+    }
+  }
+
+  @Test
+  public void testRollbackDefinedExtension() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // First define the extension setting.
+      connection.createStatement().execute("set spanner.random_setting to '100'");
+
+      connection.setAutoCommit(false);
+
+      connection.createStatement().execute("set spanner.random_setting to \"42\"");
+      verifySettingValue(connection, "spanner.random_setting", "42");
+      // Rolling back the transaction should reset the value to what it was before the transaction.
+      // In this case, that means back to '100'.
+      connection.rollback();
+      verifySettingValue(connection, "spanner.random_setting", "100");
+    }
+  }
+
+  @Test
+  public void testCommitSetLocal() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      // Verify that the initial value is null.
+      verifySettingIsNull(connection, "application_name");
+      connection.createStatement().execute("set local application_name to \"my-application\"");
+      verifySettingValue(connection, "application_name", "my-application");
+      // Committing the transaction should not persist the value as it was only set for the current
+      // transaction.
+      connection.commit();
+      verifySettingIsNull(connection, "application_name");
+    }
+  }
+
+  @Test
+  public void testCommitSetLocalAndSession() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      // Verify that the initial value is null.
+      verifySettingIsNull(connection, "application_name");
+      // Set both a session and a local value. The session value will be 'hidden' by the local
+      // value, but the session value will be committed.
+      connection
+          .createStatement()
+          .execute("set session application_name to \"my-session-application\"");
+      verifySettingValue(connection, "application_name", "my-session-application");
+      connection
+          .createStatement()
+          .execute("set local application_name to \"my-local-application\"");
+      verifySettingValue(connection, "application_name", "my-local-application");
+      // Committing the transaction should persist the session value.
+      connection.commit();
+      verifySettingValue(connection, "application_name", "my-session-application");
+    }
+  }
+
+  @Test
+  public void testCommitSetLocalAndSessionExtension() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Verify that the initial value is undefined.
+      verifySettingIsUnrecognized(connection, "spanner.custom_setting");
+
+      connection.setAutoCommit(false);
+
+      // Set both a session and a local value. The session value will be 'hidden' by the local
+      // value, but the session value will be committed.
+      connection.createStatement().execute("set spanner.custom_setting to 'session-value'");
+      verifySettingValue(connection, "spanner.custom_setting", "session-value");
+      connection.createStatement().execute("set local spanner.custom_setting to 'local-value'");
+      verifySettingValue(connection, "spanner.custom_setting", "local-value");
+      // Committing the transaction should persist the session value.
+      connection.commit();
+      verifySettingValue(connection, "spanner.custom_setting", "session-value");
+    }
+  }
+
+  @Test
+  public void testInvalidShowAbortsTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      // Verify that executing an invalid show statement will abort the transaction.
+      assertThrows(
+          SQLException.class,
+          () -> connection.createStatement().execute("show spanner.non_existing_param"));
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().execute("show application_name "));
+      assertEquals("ERROR: INVALID_ARGUMENT: " + TRANSACTION_ABORTED_ERROR, exception.getMessage());
+
+      connection.rollback();
+
+      // Verify that the connection is usable again.
+      verifySettingIsNull(connection, "application_name");
+    }
+  }
+
+  private void verifySettingIsNull(Connection connection, String setting) throws SQLException {
+    try (ResultSet resultSet =
+        connection.createStatement().executeQuery(String.format("show %s", setting))) {
+      assertTrue(resultSet.next());
+      assertNull(resultSet.getString(1));
+      assertFalse(resultSet.next());
+    }
+  }
+
+  private void verifySettingValue(Connection connection, String setting, String value)
+      throws SQLException {
+    try (ResultSet resultSet =
+        connection.createStatement().executeQuery(String.format("show %s", setting))) {
+      assertTrue(resultSet.next());
+      assertEquals(value, resultSet.getString(1));
+      assertFalse(resultSet.next());
+    }
+  }
+
+  private void verifySettingIsUnrecognized(Connection connection, String setting) {
+    SQLException exception =
+        assertThrows(
+            SQLException.class,
+            () -> connection.createStatement().execute(String.format("show %s", setting)));
+    assertEquals(
+        String.format(
+            "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"%s\"", setting),
+        exception.getMessage());
   }
 }

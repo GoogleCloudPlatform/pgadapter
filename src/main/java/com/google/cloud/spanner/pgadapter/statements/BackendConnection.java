@@ -47,6 +47,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
+import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
@@ -76,6 +77,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 
 /**
  * This class emulates a backend PostgreSQL connection. Statements are buffered in memory until a
@@ -162,10 +164,13 @@ public class BackendConnection {
         //  SELECT statements, then we should create a read-only transaction. Also, if a transaction
         //  block always ends with a ROLLBACK, PGAdapter should skip the entire execution of that
         //  block.
+        SessionStatement sessionStatement = getSessionManagementStatement(parsedStatement);
         if (!localStatements.isEmpty() && localStatements.containsKey(statement.getSql())) {
           result.set(
               Objects.requireNonNull(localStatements.get(statement.getSql()))
                   .execute(BackendConnection.this));
+        } else if (sessionStatement != null) {
+          result.set(sessionStatement.execute(sessionState));
         } else if (connectionState == ConnectionState.ABORTED
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
@@ -222,6 +227,20 @@ public class BackendConnection {
               .getMessage()
               .startsWith(
                   "INVALID_ARGUMENT: io.grpc.StatusRuntimeException: INVALID_ARGUMENT: Unsupported concurrency mode in query using INFORMATION_SCHEMA.");
+    }
+
+    @Nullable
+    SessionStatement getSessionManagementStatement(ParsedStatement parsedStatement) {
+      if (parsedStatement.getType() == StatementType.UNKNOWN
+          || (parsedStatement.getType() == StatementType.QUERY
+              && parsedStatement.getSqlWithoutComments().length() >= 4
+              && parsedStatement
+                  .getSqlWithoutComments()
+                  .substring(0, 4)
+                  .equalsIgnoreCase("show"))) {
+        return SessionStatementParser.parse(parsedStatement);
+      }
+      return null;
     }
   }
 
@@ -333,7 +352,7 @@ public class BackendConnection {
   private static final StatementResult ROLLBACK_RESULT = new NoResult("ROLLBACK");
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
-  private final SessionState sessionState = new SessionState();
+  private final SessionState sessionState;
   private final ImmutableMap<String, LocalStatement> localStatements;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
@@ -353,6 +372,7 @@ public class BackendConnection {
       Connection spannerConnection,
       OptionsMetadata optionsMetadata,
       ImmutableList<LocalStatement> localStatements) {
+    this.sessionState = new SessionState(optionsMetadata);
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
@@ -477,6 +497,11 @@ public class BackendConnection {
             transactionMode = TransactionMode.EXPLICIT;
             connectionState = ConnectionState.TRANSACTION;
           } else if (isCommit(index) || isRollback(index)) {
+            if (isCommit(index)) {
+              sessionState.commit();
+            } else {
+              sessionState.rollback();
+            }
             transactionMode = TransactionMode.IMPLICIT;
             connectionState = ConnectionState.IDLE;
           }
@@ -485,6 +510,7 @@ public class BackendConnection {
       }
     } catch (Exception exception) {
       connectionState = ConnectionState.ABORTED;
+      sessionState.rollback();
       if (spannerConnection.isInTransaction()) {
         spannerConnection.setStatementTag(null);
         spannerConnection.execute(ROLLBACK);
@@ -538,6 +564,9 @@ public class BackendConnection {
     }
 
     try {
+      if (connectionState != ConnectionState.ABORTED) {
+        sessionState.commit();
+      }
       if (spannerConnection.isInTransaction()) {
         spannerConnection.setStatementTag(null);
         if (connectionState == ConnectionState.ABORTED) {
@@ -583,6 +612,7 @@ public class BackendConnection {
             // might be active.
             if (spannerConnection.isInTransaction()) {
               spannerConnection.commit();
+              sessionState.commit();
               transactionMode = TransactionMode.IMPLICIT;
             }
         }
@@ -616,6 +646,7 @@ public class BackendConnection {
           // Switch the execution state to implicit transaction.
           if (spannerConnection.isInTransaction()) {
             spannerConnection.commit();
+            sessionState.commit();
             transactionMode = TransactionMode.IMPLICIT;
           }
       }

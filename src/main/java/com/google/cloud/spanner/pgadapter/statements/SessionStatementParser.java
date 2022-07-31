@@ -14,21 +14,58 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.api.client.util.Strings;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ResultSets;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Struct;
+import com.google.cloud.spanner.Type;
+import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
+import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.session.PGSetting;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SetStatement.Builder;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
+/** Simple parser for session management commands (SET/SHOW variable_name) */
 public class SessionStatementParser {
-  interface SessionStatement {
-    void execute(SessionState sessionState);
+  abstract static class SessionStatement {
+    protected final String extension;
+    protected final String name;
+
+    SessionStatement(TableOrIndexName name) {
+      if (name == null) {
+        this.extension = null;
+        this.name = null;
+      } else {
+        this.extension = toParameterExtension(name);
+        this.name = toParameterName(name);
+      }
+    }
+
+    String getKey() {
+      if (extension != null && name != null) {
+        return extension + "." + name;
+      } else if (extension == null && name != null) {
+        return name;
+      }
+      return "all";
+    }
+
+    abstract StatementResult execute(SessionState sessionState);
   }
 
-  static class SetStatement implements SessionStatement {
+  static class SetStatement extends SessionStatement {
     static class Builder {
       private boolean local;
       private TableOrIndexName name;
@@ -54,54 +91,146 @@ public class SessionStatementParser {
       }
     }
 
+    private static final NoResult SET_RESULT = new NoResult("SET");
     final boolean local;
-    final TableOrIndexName name;
     final String value;
 
-    private SetStatement(boolean local, TableOrIndexName name, String value) {
+    SetStatement(boolean local, TableOrIndexName name, String value) {
+      super(Preconditions.checkNotNull(name));
       this.local = local;
-      this.name = name;
-      this.value = value;
+      this.value = unquote(value);
     }
 
     @Override
-    public void execute(SessionState sessionState) {
+    public StatementResult execute(SessionState sessionState) {
       if (local) {
-        sessionState.setLocal(name.toString(), value);
+        sessionState.setLocal(extension, name, value);
       } else {
-        sessionState.set(name.toString(), value);
+        sessionState.set(extension, name, value);
       }
+      return SET_RESULT;
     }
-  }
 
-  static class ResetStatement implements SessionStatement {
-    final TableOrIndexName name;
-
-    private ResetStatement(TableOrIndexName name) {
-      this.name = name;
+    public boolean equals(Object o) {
+      if (!(o instanceof SetStatement)) {
+        return false;
+      }
+      SetStatement other = (SetStatement) o;
+      return Objects.equals(this.name, other.name)
+          && Objects.equals(this.local, other.local)
+          && Objects.equals(this.value, other.value);
     }
 
     @Override
-    public void execute(SessionState sessionState) {}
+    public String toString() {
+      return "set " + (local ? "local " : "") + name + " to " + value;
+    }
   }
 
-  static class ShowStatement implements SessionStatement {
-    final TableOrIndexName name;
+  static class ResetStatement extends SessionStatement {
+    private static final NoResult RESET_RESULT = new NoResult("RESET");
+
+    ResetStatement(TableOrIndexName name) {
+      super(name);
+    }
+
+    @Override
+    public StatementResult execute(SessionState sessionState) {
+      if (extension == null) {
+        PGSetting setting = sessionState.get(null, name);
+        sessionState.set(null, name, setting.getResetVal());
+      } else {
+        sessionState.set(extension, name, null);
+      }
+      return RESET_RESULT;
+    }
+
+    public boolean equals(Object o) {
+      if (!(o instanceof ResetStatement)) {
+        return false;
+      }
+      ResetStatement other = (ResetStatement) o;
+      return Objects.equals(this.name, other.name);
+    }
+
+    @Override
+    public String toString() {
+      return "reset " + (name == null ? "all" : name);
+    }
+  }
+
+  static class ShowStatement extends SessionStatement {
 
     static ShowStatement createShowAll() {
       return new ShowStatement(null);
     }
 
-    private ShowStatement(TableOrIndexName name) {
-      this.name = name;
+    ShowStatement(TableOrIndexName name) {
+      super(name);
     }
 
     @Override
-    public void execute(SessionState sessionState) {}
+    public StatementResult execute(SessionState sessionState) {
+      if (name != null) {
+        return new QueryResult(
+            ResultSets.forRows(
+                Type.struct(StructField.of(getKey(), Type.string())),
+                ImmutableList.of(
+                    Struct.newBuilder()
+                        .set(getKey())
+                        .to(sessionState.get(extension, name).getSetting())
+                        .build())));
+      }
+      return new QueryResult(
+          ResultSets.forRows(
+              Type.struct(StructField.of(getKey(), Type.string())),
+              sessionState.getAll().stream()
+                  .map(
+                      setting -> Struct.newBuilder().set(getKey()).to(setting.getSetting()).build())
+                  .collect(Collectors.toList())));
+    }
+
+    public boolean equals(Object o) {
+      if (!(o instanceof ShowStatement)) {
+        return false;
+      }
+      ShowStatement other = (ShowStatement) o;
+      return Objects.equals(this.name, other.name);
+    }
+
+    @Override
+    public String toString() {
+      return "show " + (name == null ? "all" : getKey());
+    }
+  }
+
+  private static String toParameterExtension(TableOrIndexName name) {
+    return name.schema == null ? null : unquote(name.schema).toLowerCase(Locale.ROOT);
+  }
+
+  private static String toParameterName(TableOrIndexName name) {
+    return unquote(name.name).toLowerCase(Locale.ROOT);
+  }
+
+  private static String unquote(String value) {
+    if (value == null) {
+      return null;
+    }
+    if (value.length() < 2) {
+      return value;
+    }
+    if (value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"') {
+      return value.substring(1, value.length() - 1);
+    }
+    if (value.charAt(0) == '\'' && value.charAt(value.length() - 1) == '\'') {
+      return value.substring(1, value.length() - 1);
+    }
+    return value;
   }
 
   public static @Nullable SessionStatement parse(ParsedStatement parsedStatement) {
-    if (parsedStatement.getType() != StatementType.UNKNOWN) {
+    if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+      // This statement is handled by the Connection API.
       return null;
     }
     SimpleParser parser = new SimpleParser(parsedStatement.getSqlWithoutComments());
@@ -160,6 +289,15 @@ public class SessionStatementParser {
               + parser.getSql()
               + ". Expected configuration parameter name.");
     }
+    String remaining = parser.parseExpression();
+    if (!Strings.isNullOrEmpty(remaining)) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          "Invalid RESET statement: "
+              + parser.getSql()
+              + ". Expected end of statement after "
+              + name);
+    }
     return new ResetStatement(name);
   }
 
@@ -174,6 +312,15 @@ public class SessionStatementParser {
           "Invalid SHOW statement: "
               + parser.getSql()
               + ". Expected configuration parameter name or ALL.");
+    }
+    String remaining = parser.parseExpression();
+    if (!Strings.isNullOrEmpty(remaining)) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          "Invalid SHOW statement: "
+              + parser.getSql()
+              + ". Expected end of statement after "
+              + name);
     }
     return new ShowStatement(name);
   }

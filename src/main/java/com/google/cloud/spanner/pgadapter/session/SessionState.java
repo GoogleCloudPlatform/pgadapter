@@ -14,61 +14,127 @@
 
 package com.google.cloud.spanner.pgadapter.session;
 
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.collect.Sets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class SessionState {
-  private final Map<String, PGSetting> settings = new HashMap<>();
+  private static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
+
+  static {
+    for (PGSetting setting : PGSetting.read()) {
+      SERVER_SETTINGS.put(setting.getName(), setting);
+    }
+  }
+
+  private final Map<String, PGSetting> settings;
 
   /** transactionSettings are the modified session settings during a transaction. */
   private Map<String, PGSetting> transactionSettings;
   /** localSettings are the modified local settings during a transaction. */
   private Map<String, PGSetting> localSettings;
 
-  private boolean inTransaction;
-
-  public SessionState() {
-    for (PGSetting setting : PGSetting.read()) {
-      settings.put(setting.getName(), setting);
-    }
+  public SessionState(OptionsMetadata options) {
+    this.settings = new HashMap<>(SERVER_SETTINGS);
+    this.settings.get("server_version").setSetting(options.getServerVersion());
+    this.settings.get("search_path").setSetting("public");
   }
 
-  public void set(String name, String setting) {
+  private static String toKey(String extension, String name) {
+    return extension == null ? name : extension + "." + name;
+  }
+
+  public void set(String extension, String name, String setting) {
     if (transactionSettings == null) {
       transactionSettings = new HashMap<>();
     }
-    internalSet(name, setting, transactionSettings);
-    localSettings.remove(name);
+    internalSet(extension, name, setting, transactionSettings);
+    // Remove the setting from the local settings if it's there, as the new transaction setting is
+    // the one that should be used.
+    if (localSettings != null) {
+      localSettings.remove(toKey(extension, name));
+    }
   }
 
-  public void setLocal(String name, String setting) {
+  public void setLocal(String extension, String name, String setting) {
     if (localSettings == null) {
       localSettings = new HashMap<>();
     }
-    internalSet(name, setting, localSettings);
+    // Note that setting a local setting does not remove it from the transaction settings. This
+    // means that a commit will persist the setting in transactionSettings.
+    internalSet(extension, name, setting, localSettings);
   }
 
-  private void internalSet(String name, String setting, Map<String, PGSetting> currentSettings) {
-    PGSetting newSetting = currentSettings.get(name);
+  private void internalSet(
+      String extension, String name, String setting, Map<String, PGSetting> currentSettings) {
+    String key = toKey(extension, name);
+    PGSetting newSetting = currentSettings.get(key);
     if (newSetting == null) {
-      PGSetting existingSetting = settings.get(name);
+      PGSetting existingSetting = settings.get(key);
       if (existingSetting == null) {
-        // TODO: Check if it is an extension setting, otherwise return error.
-        newSetting = new PGSetting(name);
+        if (extension == null) {
+          throw unknownParamError(key);
+        }
+        newSetting = new PGSetting(extension, name);
       } else {
         newSetting = existingSetting.copy();
       }
     }
     newSetting.setSetting(setting);
-    currentSettings.put(name, newSetting);
+    currentSettings.put(key, newSetting);
   }
 
-  /**
-   * Begin a transaction. Any changes to the session state during this transaction will be persisted
-   * if the transaction is committed, or abandoned if the transaction is rolled back.
-   */
-  public void begin() {
-    this.inTransaction = true;
+  public PGSetting get(String extension, String name) {
+    return internalGet(toKey(extension, name));
+  }
+
+  private PGSetting internalGet(String key) {
+    if (localSettings != null && localSettings.containsKey(key)) {
+      return localSettings.get(key);
+    }
+    if (transactionSettings != null && transactionSettings.containsKey(key)) {
+      return transactionSettings.get(key);
+    }
+    if (settings.containsKey(key)) {
+      return settings.get(key);
+    }
+    throw unknownParamError(key);
+  }
+
+  public List<PGSetting> getAll() {
+    List<PGSetting> result =
+        new ArrayList<>(
+            (localSettings == null ? 0 : localSettings.size())
+                + (transactionSettings == null ? 0 : transactionSettings.size())
+                + settings.size());
+    Set<String> keys =
+        Sets.union(
+            settings.keySet(),
+            Sets.union(
+                localSettings == null ? Collections.emptySet() : localSettings.keySet(),
+                transactionSettings == null
+                    ? Collections.emptySet()
+                    : transactionSettings.keySet()));
+    for (String key : keys) {
+      result.add(internalGet(key));
+    }
+    result.sort(Comparator.comparing(PGSetting::getKey));
+    return result;
+  }
+
+  static SpannerException unknownParamError(String key) {
+    return SpannerExceptionFactory.newSpannerException(
+        ErrorCode.INVALID_ARGUMENT,
+        String.format("unrecognized configuration parameter \"%s\"", key));
   }
 
   /**
@@ -76,11 +142,18 @@ public class SessionState {
    * changes).
    */
   public void commit() {
-    this.inTransaction = false;
+    if (transactionSettings != null) {
+      for (PGSetting setting : transactionSettings.values()) {
+        settings.put(toKey(setting.getExtension(), setting.getName()), setting);
+      }
+    }
+    this.localSettings = null;
+    this.transactionSettings = null;
   }
 
   /** Rolls back the current transaction and abandons any pending changes to the settings. */
   public void rollback() {
-    this.inTransaction = false;
+    this.localSettings = null;
+    this.transactionSettings = null;
   }
 }

@@ -1,5 +1,5 @@
 allow_system_table_mods	off	\N	Developer Options	Allows modifications of the structure of system tables.	\N	superuser	bool	default	\N	\N	\N	off	off	\N	\N	f
-application_name	psql	\N	Reporting and Logging / What to Log	Sets the application name to be reported in statistics and logs.	\N	user	string	client	\N	\N	\N		psql	\N	\N	f
+application_name	\N	\N	Reporting and Logging / What to Log	Sets the application name to be reported in statistics and logs.	\N	user	string	client	\N	\N	\N		\N	\N	\N	f
 archive_cleanup_command		\N	Write-Ahead Log / Archive Recovery	Sets the shell command that will be executed at every restart point.	\N	sighup	string	default	\N	\N	\N			\N	\N	f
 archive_command	(disabled)	\N	Write-Ahead Log / Archiving	Sets the shell command that will be called to archive a WAL file.	\N	sighup	string	default	\N	\N	\N			\N	\N	f
 archive_mode	off	\N	Write-Ahead Log / Archiving	Allows archiving of WAL files using archive_command.	\N	postmaster	enum	default	\N	\N	{always,on,off}	off	off	\N	\N	f

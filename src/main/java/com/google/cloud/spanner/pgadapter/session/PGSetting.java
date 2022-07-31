@@ -14,8 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter.session;
 
+import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Scanner;
 import javax.annotation.Nonnull;
@@ -39,6 +45,7 @@ public class PGSetting {
   private static final int SOURCELINE_INDEX = 15;
   private static final int PENDING_RESTART_INDEX = 16;
 
+  private final String extension;
   private final String name;
   private final String category;
   private final String shortDesc;
@@ -67,30 +74,38 @@ public class PGSetting {
         builder.add(parse(scanner.nextLine()));
       }
     }
-    return ImmutableList.of();
+    return builder.build();
   }
 
   static @Nonnull PGSetting parse(String line) {
     String[] values = line.split("\t");
     Preconditions.checkArgument(values.length == 17);
     return new PGSetting(
-        values[NAME_INDEX],
-        values[CATEGORY_INDEX],
-        values[SHORT_DESC_INDEX],
-        values[EXTRA_DESC_INDEX],
-        values[CONTEXT_INDEX],
-        values[VARTYPE_INDEX],
-        values[MIN_VAL_INDEX],
-        values[MAX_VAL_INDEX],
+        /* extension = */ null,
+        parseString(values[NAME_INDEX]),
+        parseString(values[CATEGORY_INDEX]),
+        parseString(values[SHORT_DESC_INDEX]),
+        parseString(values[EXTRA_DESC_INDEX]),
+        parseString(values[CONTEXT_INDEX]),
+        parseString(values[VARTYPE_INDEX]),
+        parseString(values[MIN_VAL_INDEX]),
+        parseString(values[MAX_VAL_INDEX]),
         parseStringArray(values[ENUM_VALS_INDEX]),
-        values[SETTING_INDEX],
-        values[UNIT_INDEX],
-        values[SOURCE_INDEX],
-        values[BOOT_VAL_INDEX],
-        values[RESET_VAL_INDEX],
-        values[SOURCEFILE_INDEX],
+        parseString(values[SETTING_INDEX]),
+        parseString(values[UNIT_INDEX]),
+        parseString(values[SOURCE_INDEX]),
+        parseString(values[BOOT_VAL_INDEX]),
+        parseString(values[RESET_VAL_INDEX]),
+        parseString(values[SOURCEFILE_INDEX]),
         parseInteger(values[SOURCELINE_INDEX]),
         values[PENDING_RESTART_INDEX].equals("t"));
+  }
+
+  static String parseString(String value) {
+    if ("\\N".equals(value)) {
+      return null;
+    }
+    return value;
   }
 
   static String[] parseStringArray(String value) {
@@ -108,7 +123,8 @@ public class PGSetting {
     return Integer.valueOf(value);
   }
 
-  PGSetting(String name) {
+  PGSetting(String extension, String name) {
+    this.extension = extension;
     this.name = name;
     this.category = null;
     this.shortDesc = null;
@@ -121,6 +137,7 @@ public class PGSetting {
   }
 
   private PGSetting(
+      String extension,
       String name,
       String category,
       String shortDesc,
@@ -138,6 +155,7 @@ public class PGSetting {
       String sourcefile,
       Integer sourceline,
       boolean pendingRestart) {
+    this.extension = extension;
     this.name = name;
     this.category = category;
     this.shortDesc = shortDesc;
@@ -159,6 +177,7 @@ public class PGSetting {
 
   PGSetting copy() {
     return new PGSetting(
+        extension,
         name,
         category,
         shortDesc,
@@ -178,6 +197,17 @@ public class PGSetting {
         pendingRestart);
   }
 
+  public String getKey() {
+    if (extension == null) {
+      return name;
+    }
+    return extension + "." + name;
+  }
+
+  public String getExtension() {
+    return extension;
+  }
+
   public String getName() {
     return name;
   }
@@ -186,8 +216,46 @@ public class PGSetting {
     return setting;
   }
 
-  public void setSetting(String setting) {
+  void setSetting(String setting) {
+    if (this.vartype != null) {
+      // Check validity of the value.
+      if ("bool".equals(this.vartype)) {
+        // Just verify that it is a valid boolean. This will throw an IllegalArgumentException if
+        // setting is not a valid boolean value.
+        try {
+          BooleanParser.toBoolean(setting);
+        } catch (IllegalArgumentException exception) {
+          throw invalidBoolError(getKey());
+        }
+      } else if ("integer".equals(this.vartype)) {
+        try {
+          Integer.parseInt(setting);
+        } catch (NumberFormatException exception) {
+          throw invalidValueError(getKey(), setting);
+        }
+      } else if ("real".equals(this.vartype)) {
+        try {
+          Double.parseDouble(setting);
+        } catch (NumberFormatException exception) {
+          throw invalidValueError(getKey(), setting);
+        }
+      } else if (enumVals != null && !Iterables.contains(Arrays.asList(this.enumVals), setting)) {
+        throw invalidValueError(getKey(), setting);
+      }
+    }
     this.setting = setting;
+  }
+
+  static SpannerException invalidBoolError(String key) {
+    return SpannerExceptionFactory.newSpannerException(
+        ErrorCode.INVALID_ARGUMENT,
+        String.format("parameter \"%s\" requires a Boolean value", key));
+  }
+
+  static SpannerException invalidValueError(String key, String value) {
+    return SpannerExceptionFactory.newSpannerException(
+        ErrorCode.INVALID_ARGUMENT,
+        String.format("invalid value for parameter \"%s\": \"%s\"", key, value));
   }
 
   public String getCategory() {
@@ -220,5 +288,9 @@ public class PGSetting {
 
   public String[] getEnumVals() {
     return enumVals;
+  }
+
+  public String getResetVal() {
+    return resetVal;
   }
 }
