@@ -1945,6 +1945,65 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
+  @Test
+  public void testShowAll() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show all")) {
+        assertEquals(3, resultSet.getMetaData().getColumnCount());
+        assertEquals("name", resultSet.getMetaData().getColumnName(1));
+        assertEquals("setting", resultSet.getMetaData().getColumnName(2));
+        assertEquals("description", resultSet.getMetaData().getColumnName(3));
+        int count = 0;
+        while (resultSet.next()) {
+          if ("client_encoding".equals(resultSet.getString("name"))) {
+            assertEquals("UTF8", resultSet.getString("setting"));
+          }
+          count++;
+        }
+        assertEquals(308, count);
+      }
+    }
+  }
+
+  @Test
+  public void testResetAll() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set application_name to 'my-app'");
+      connection.createStatement().execute("set search_path to 'my_schema'");
+      verifySettingValue(connection, "application_name", "my-app");
+      verifySettingValue(connection, "search_path", "my_schema");
+
+      connection.createStatement().execute("reset all");
+
+      verifySettingIsNull(connection, "application_name");
+      verifySettingValue(connection, "search_path", "public");
+    }
+  }
+
+  @Test
+  public void testSetToDefault() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set application_name to 'my-app'");
+      connection.createStatement().execute("set search_path to 'my_schema'");
+      verifySettingValue(connection, "application_name", "my-app");
+      verifySettingValue(connection, "search_path", "my_schema");
+
+      connection.createStatement().execute("set application_name to default");
+      connection.createStatement().execute("set search_path to default");
+
+      verifySettingIsNull(connection, "application_name");
+      verifySettingValue(connection, "search_path", "public");
+    }
+  }
+
+  @Test
+  public void testSetToEmpty() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set application_name to ''");
+      verifySettingValue(connection, "application_name", "");
+    }
+  }
+
   private void verifySettingIsNull(Connection connection, String setting) throws SQLException {
     try (ResultSet resultSet =
         connection.createStatement().executeQuery(String.format("show %s", setting))) {

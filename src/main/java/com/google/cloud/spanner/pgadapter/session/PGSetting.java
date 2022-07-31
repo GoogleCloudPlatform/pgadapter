@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.session;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
@@ -26,6 +27,8 @@ import java.util.Objects;
 import java.util.Scanner;
 import javax.annotation.Nonnull;
 
+/** Represents a row in the pg_settings table. */
+@InternalApi
 public class PGSetting {
   private static final int NAME_INDEX = 0;
   private static final int SETTING_INDEX = 1;
@@ -212,38 +215,85 @@ public class PGSetting {
     return name;
   }
 
+  /** Returns the value of this setting. */
   public String getSetting() {
     return setting;
   }
 
-  void setSetting(String setting) {
+  /** Initializes the value of the setting without checking for validity. */
+  void initSettingValue(String value) {
+    this.setting = value;
+  }
+
+  /**
+   * Sets the value for this setting. Throws {@link SpannerException} if the value is not valid, or
+   * if the setting is not settable.
+   */
+  void setSetting(String value) {
+    if (this.context != null) {
+      checkValidContext();
+    }
     if (this.vartype != null) {
       // Check validity of the value.
-      if ("bool".equals(this.vartype)) {
-        // Just verify that it is a valid boolean. This will throw an IllegalArgumentException if
-        // setting is not a valid boolean value.
-        try {
-          BooleanParser.toBoolean(setting);
-        } catch (IllegalArgumentException exception) {
-          throw invalidBoolError(getKey());
-        }
-      } else if ("integer".equals(this.vartype)) {
-        try {
-          Integer.parseInt(setting);
-        } catch (NumberFormatException exception) {
-          throw invalidValueError(getKey(), setting);
-        }
-      } else if ("real".equals(this.vartype)) {
-        try {
-          Double.parseDouble(setting);
-        } catch (NumberFormatException exception) {
-          throw invalidValueError(getKey(), setting);
-        }
-      } else if (enumVals != null && !Iterables.contains(Arrays.asList(this.enumVals), setting)) {
-        throw invalidValueError(getKey(), setting);
-      }
+      checkValidValue(value);
     }
-    this.setting = setting;
+    this.setting = value;
+  }
+
+  boolean isSettable() {
+    // Consider all users as superuser.
+    return "user".equals(this.context) || "superuser".equals(this.context);
+  }
+
+  private void checkValidContext() {
+    if (!isSettable()) {
+      throw invalidContextError(getKey(), this.context);
+    }
+  }
+
+  static SpannerException invalidContextError(String key, String context) {
+    if ("internal".equals(context)) {
+      return SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, String.format("parameter \"%s\" cannot be changed", key));
+    }
+    if ("postmaster".equals(context)) {
+      return SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          String.format("parameter \"%s\" cannot be changed without restarting the server", key));
+    }
+    if ("sighup".equals(context)) {
+      return SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT, String.format("parameter \"%s\" cannot be changed now", key));
+    }
+    return SpannerExceptionFactory.newSpannerException(
+        ErrorCode.INVALID_ARGUMENT,
+        String.format("parameter \"%s\" cannot be set after connection start", key));
+  }
+
+  private void checkValidValue(String value) {
+    if ("bool".equals(this.vartype)) {
+      // Just verify that it is a valid boolean. This will throw an IllegalArgumentException if
+      // setting is not a valid boolean value.
+      try {
+        BooleanParser.toBoolean(value);
+      } catch (IllegalArgumentException exception) {
+        throw invalidBoolError(getKey());
+      }
+    } else if ("integer".equals(this.vartype)) {
+      try {
+        Integer.parseInt(value);
+      } catch (NumberFormatException exception) {
+        throw invalidValueError(getKey(), value);
+      }
+    } else if ("real".equals(this.vartype)) {
+      try {
+        Double.parseDouble(value);
+      } catch (NumberFormatException exception) {
+        throw invalidValueError(getKey(), value);
+      }
+    } else if (enumVals != null && !Iterables.contains(Arrays.asList(this.enumVals), value)) {
+      throw invalidValueError(getKey(), value);
+    }
   }
 
   static SpannerException invalidBoolError(String key) {

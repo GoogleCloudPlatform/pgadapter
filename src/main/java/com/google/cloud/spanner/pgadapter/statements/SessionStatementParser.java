@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.client.util.Strings;
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSets;
 import com.google.cloud.spanner.SpannerExceptionFactory;
@@ -37,7 +38,8 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
-/** Simple parser for session management commands (SET/SHOW variable_name) */
+/** Simple parser for session management commands (SET/SHOW/RESET variable_name) */
+@InternalApi
 public class SessionStatementParser {
   abstract static class SessionStatement {
     protected final String extension;
@@ -116,19 +118,28 @@ public class SessionStatementParser {
         return false;
       }
       SetStatement other = (SetStatement) o;
-      return Objects.equals(this.name, other.name)
+      return Objects.equals(this.extension, other.extension)
+          && Objects.equals(this.name, other.name)
           && Objects.equals(this.local, other.local)
           && Objects.equals(this.value, other.value);
     }
 
     @Override
     public String toString() {
-      return "set " + (local ? "local " : "") + name + " to " + value;
+      return "set "
+          + (local ? "local " : "")
+          + getKey()
+          + " to "
+          + (value == null ? "default" : value);
     }
   }
 
   static class ResetStatement extends SessionStatement {
     private static final NoResult RESET_RESULT = new NoResult("RESET");
+
+    static ResetStatement createResetAll() {
+      return new ResetStatement(null);
+    }
 
     ResetStatement(TableOrIndexName name) {
       super(name);
@@ -136,11 +147,13 @@ public class SessionStatementParser {
 
     @Override
     public StatementResult execute(SessionState sessionState) {
-      if (extension == null) {
+      if (extension == null && name != null) {
         PGSetting setting = sessionState.get(null, name);
         sessionState.set(null, name, setting.getResetVal());
-      } else {
+      } else if (extension != null && name != null) {
         sessionState.set(extension, name, null);
+      } else {
+        sessionState.resetAll();
       }
       return RESET_RESULT;
     }
@@ -155,7 +168,7 @@ public class SessionStatementParser {
 
     @Override
     public String toString() {
-      return "reset " + (name == null ? "all" : name);
+      return "reset " + (name == null ? "all" : getKey());
     }
   }
 
@@ -183,10 +196,21 @@ public class SessionStatementParser {
       }
       return new QueryResult(
           ResultSets.forRows(
-              Type.struct(StructField.of(getKey(), Type.string())),
+              Type.struct(
+                  StructField.of("name", Type.string()),
+                  StructField.of("setting", Type.string()),
+                  StructField.of("description", Type.string())),
               sessionState.getAll().stream()
                   .map(
-                      setting -> Struct.newBuilder().set(getKey()).to(setting.getSetting()).build())
+                      setting ->
+                          Struct.newBuilder()
+                              .set("name")
+                              .to(setting.getKey())
+                              .set("setting")
+                              .to(setting.getSetting())
+                              .set("description")
+                              .to(setting.getShortDesc())
+                              .build())
                   .collect(Collectors.toList())));
     }
 
@@ -275,12 +299,36 @@ public class SessionStatementParser {
           ErrorCode.INVALID_ARGUMENT,
           "Invalid SET statement: " + parser.getSql() + ". Expected value.");
     }
-    builder.setValue(value);
+    if ("default".equalsIgnoreCase(value)) {
+      builder.setValue(null);
+    } else {
+      builder.setValue(value);
+    }
+    String remaining = parser.parseExpression();
+    if (!Strings.isNullOrEmpty(remaining)) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          "Invalid SET statement: "
+              + parser.getSql()
+              + ". Expected end of statement after "
+              + value);
+    }
 
     return builder.build();
   }
 
   static ResetStatement parseResetStatement(SimpleParser parser) {
+    if (parser.eat("all")) {
+      String remaining = parser.parseExpression();
+      if (!Strings.isNullOrEmpty(remaining)) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "Invalid SHOW statement: "
+                + parser.getSql()
+                + ". Expected end of statement after \"all\"");
+      }
+      return ResetStatement.createResetAll();
+    }
     TableOrIndexName name = parser.readTableOrIndexName();
     if (name == null) {
       throw SpannerExceptionFactory.newSpannerException(
@@ -303,6 +351,14 @@ public class SessionStatementParser {
 
   static ShowStatement parseShowStatement(SimpleParser parser) {
     if (parser.eat("all")) {
+      String remaining = parser.parseExpression();
+      if (!Strings.isNullOrEmpty(remaining)) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "Invalid SHOW statement: "
+                + parser.getSql()
+                + ". Expected end of statement after \"all\"");
+      }
       return ShowStatement.createShowAll();
     }
     TableOrIndexName name = parser.readTableOrIndexName();

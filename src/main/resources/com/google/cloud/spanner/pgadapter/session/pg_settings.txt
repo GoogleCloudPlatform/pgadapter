@@ -220,7 +220,7 @@ recovery_target_xid		\N	Write-Ahead Log / Recovery Target	Sets the transaction I
 restart_after_crash	on	\N	Error Handling	Reinitialize server after backend crash.	\N	sighup	bool	default	\N	\N	\N	on	on	\N	\N	f
 restore_command		\N	Write-Ahead Log / Archive Recovery	Sets the shell command that will be called to retrieve an archived WAL file.	\N	postmaster	string	default	\N	\N	\N			\N	\N	f
 row_security	on	\N	Client Connection Defaults / Statement Behavior	Enable row security.	When enabled, row security will be applied to all users.	user	bool	default	\N	\N	\N	on	on	\N	\N	f
-search_path	"$user", public	\N	Client Connection Defaults / Statement Behavior	Sets the schema search order for names that are not schema-qualified.	\N	user	string	default	\N	\N	\N	"$user", public	"$user", public	\N	\N	f
+search_path	public	\N	Client Connection Defaults / Statement Behavior	Sets the schema search order for names that are not schema-qualified.	\N	user	string	default	\N	\N	\N	public	public	\N	\N	f
 segment_size	131072	8kB	Preset Options	Shows the number of pages per disk file.	\N	internal	integer	default	131072	131072	\N	131072	131072	\N	\N	f
 seq_page_cost	1	\N	Query Tuning / Planner Cost Constants	Sets the planner's estimate of the cost of a sequentially fetched disk page.	\N	user	real	default	0	1.79769e+308	\N	1	1	\N	\N	f
 server_encoding	UTF8	\N	Client Connection Defaults / Locale and Formatting	Sets the server (database) character set encoding.	\N	internal	string	override	\N	\N	\N	SQL_ASCII	UTF8	\N	\N	f

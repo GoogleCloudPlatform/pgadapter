@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.session;
 
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
@@ -25,8 +26,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
+/** {@link SessionState} contains all session variables for a connection. */
+@InternalApi
 public class SessionState {
   private static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
 
@@ -45,14 +49,17 @@ public class SessionState {
 
   public SessionState(OptionsMetadata options) {
     this.settings = new HashMap<>(SERVER_SETTINGS);
-    this.settings.get("server_version").setSetting(options.getServerVersion());
-    this.settings.get("search_path").setSetting("public");
+    this.settings.get("server_version").initSettingValue(options.getServerVersion());
   }
 
   private static String toKey(String extension, String name) {
     return extension == null ? name : extension + "." + name;
   }
 
+  /**
+   * Sets the value of the specified setting. The new value will be persisted if the current
+   * transaction is committed. The value will be lost if the transaction is rolled back.
+   */
   public void set(String extension, String name, String setting) {
     if (transactionSettings == null) {
       transactionSettings = new HashMap<>();
@@ -65,6 +72,10 @@ public class SessionState {
     }
   }
 
+  /**
+   * Sets the value of the specified setting for the current transaction. This value is lost when
+   * the transaction is committed or rolled back.
+   */
   public void setLocal(String extension, String name, String setting) {
     if (localSettings == null) {
       localSettings = new HashMap<>();
@@ -89,10 +100,14 @@ public class SessionState {
         newSetting = existingSetting.copy();
       }
     }
+    if (setting == null) {
+      setting = newSetting.getResetVal();
+    }
     newSetting.setSetting(setting);
     currentSettings.put(key, newSetting);
   }
 
+  /** Returns the current value of the specified setting. */
   public PGSetting get(String extension, String name) {
     return internalGet(toKey(extension, name));
   }
@@ -110,6 +125,7 @@ public class SessionState {
     throw unknownParamError(key);
   }
 
+  /** Returns all settings and their current values. */
   public List<PGSetting> getAll() {
     List<PGSetting> result =
         new ArrayList<>(
@@ -129,6 +145,15 @@ public class SessionState {
     }
     result.sort(Comparator.comparing(PGSetting::getKey));
     return result;
+  }
+
+  /** Resets all values to their 'reset' value. */
+  public void resetAll() {
+    for (PGSetting setting : getAll()) {
+      if (setting.isSettable() && !Objects.equals(setting.getSetting(), setting.getResetVal())) {
+        set(setting.getExtension(), setting.getName(), setting.getResetVal());
+      }
+    }
   }
 
   static SpannerException unknownParamError(String key) {

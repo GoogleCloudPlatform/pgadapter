@@ -120,6 +120,13 @@ public class SessionStatementParserTest {
   }
 
   @Test
+  public void testParseResetAll() {
+    assertEquals(
+        ResetStatement.createResetAll(),
+        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("reset all"))));
+  }
+
+  @Test
   public void testParseSetTo() {
     assertEquals(
         new SetStatement(false, new TableOrIndexName("foo"), "bar"),
@@ -136,6 +143,9 @@ public class SessionStatementParserTest {
     assertEquals(
         new SetStatement(false, new TableOrIndexName("foo"), "bar"),
         SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set \"foo\" to \"bar\""))));
+    assertEquals(
+        new SetStatement(false, new TableOrIndexName("foo"), null),
+        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set foo to default"))));
   }
 
   @Test
@@ -155,5 +165,8 @@ public class SessionStatementParserTest {
     assertEquals(
         new SetStatement(false, new TableOrIndexName("foo"), "bar"),
         SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set \"foo\" = \"bar\""))));
+    assertEquals(
+        new SetStatement(false, new TableOrIndexName("foo"), null),
+        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set foo = default"))));
   }
 }

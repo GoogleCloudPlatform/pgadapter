@@ -21,6 +21,7 @@ import static org.mockito.Mockito.mock;
 
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -109,6 +110,106 @@ public class SessionStateTest {
 
     state.rollback();
     assertNull(state.get(null, "application_name").getSetting());
+  }
+
+  @Test
+  public void testOverwriteLocalSettingWithNewLocalSetting() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    assertNull(state.get(null, "application_name").getSetting());
+
+    state.setLocal(null, "application_name", "local-app1");
+    assertEquals("local-app1", state.get(null, "application_name").getSetting());
+
+    state.setLocal(null, "application_name", "local-app2");
+    assertEquals("local-app2", state.get(null, "application_name").getSetting());
+
+    state.commit();
+    assertNull(state.get(null, "application_name").getSetting());
+  }
+
+  @Test
+  public void testOverwriteLocalSettingWithSessionSetting() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    assertNull(state.get(null, "application_name").getSetting());
+
+    state.setLocal(null, "application_name", "local-app");
+    assertEquals("local-app", state.get(null, "application_name").getSetting());
+
+    state.set(null, "application_name", "my-app");
+    assertEquals("my-app", state.get(null, "application_name").getSetting());
+
+    state.commit();
+    assertEquals("my-app", state.get(null, "application_name").getSetting());
+  }
+
+  @Test
+  public void testGetAll() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    List<PGSetting> allSettings = state.getAll();
+    assertEquals(308, allSettings.size());
+  }
+
+  @Test
+  public void testResetAll() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+
+    state.set(null, "application_name", "my-app");
+    state.commit();
+    assertEquals("my-app", state.get(null, "application_name").getSetting());
+
+    state.resetAll();
+    assertNull(state.get(null, "application_name").getSetting());
+  }
+
+  @Test
+  public void testSetDefault() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+
+    state.set(null, "search_path", "my_schema");
+    state.commit();
+    assertEquals("my_schema", state.get(null, "search_path").getSetting());
+
+    state.set(null, "search_path", null);
+    assertEquals("public", state.get(null, "search_path").getSetting());
+  }
+
+  @Test
+  public void testGetAllWithLocalAndSessionChanges() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+
+    state.set(null, "application_name", "my-app");
+    state.setLocal(null, "client_encoding", "my-encoding");
+
+    state.set("spanner", "custom_session_setting", "value1");
+    state.setLocal("spanner", "custom_local_setting", "value2");
+
+    List<PGSetting> allSettings = state.getAll();
+    assertEquals(310, allSettings.size());
+
+    PGSetting applicationName =
+        allSettings.stream()
+            .filter(pgSetting -> pgSetting.getName().equals("application_name"))
+            .findAny()
+            .orElse(mock(PGSetting.class));
+    assertEquals("my-app", applicationName.getSetting());
+    PGSetting clientEncoding =
+        allSettings.stream()
+            .filter(pgSetting -> pgSetting.getName().equals("client_encoding"))
+            .findAny()
+            .orElse(mock(PGSetting.class));
+    assertEquals("my-encoding", clientEncoding.getSetting());
+    PGSetting customSessionSetting =
+        allSettings.stream()
+            .filter(pgSetting -> pgSetting.getName().equals("custom_session_setting"))
+            .findAny()
+            .orElse(mock(PGSetting.class));
+    assertEquals("value1", customSessionSetting.getSetting());
+    PGSetting customLocalSetting =
+        allSettings.stream()
+            .filter(pgSetting -> pgSetting.getName().equals("custom_local_setting"))
+            .findAny()
+            .orElse(mock(PGSetting.class));
+    assertEquals("value2", customLocalSetting.getSetting());
   }
 
   @Test
@@ -235,6 +336,54 @@ public class SessionStateTest {
         assertThrows(SpannerException.class, () -> state.set(null, "bytea_output", "random_value"));
     assertEquals(
         "INVALID_ARGUMENT: invalid value for parameter \"bytea_output\": \"random_value\"",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testSetInternalParam() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    SpannerException exception =
+        assertThrows(SpannerException.class, () -> state.set(null, "segment_size", "100"));
+    assertEquals(
+        "INVALID_ARGUMENT: parameter \"segment_size\" cannot be changed", exception.getMessage());
+  }
+
+  @Test
+  public void testSetPostmasterParam() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    SpannerException exception =
+        assertThrows(SpannerException.class, () -> state.set(null, "shared_buffers", "100"));
+    assertEquals(
+        "INVALID_ARGUMENT: parameter \"shared_buffers\" cannot be changed without restarting the server",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testSetSighupParam() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    SpannerException exception =
+        assertThrows(SpannerException.class, () -> state.set(null, "ssl", "off"));
+    assertEquals(
+        "INVALID_ARGUMENT: parameter \"ssl\" cannot be changed now", exception.getMessage());
+  }
+
+  @Test
+  public void testSetsuperuserBackendParam() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    SpannerException exception =
+        assertThrows(SpannerException.class, () -> state.set(null, "jit_debugging_support", "off"));
+    assertEquals(
+        "INVALID_ARGUMENT: parameter \"jit_debugging_support\" cannot be set after connection start",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testSetBackendParam() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    SpannerException exception =
+        assertThrows(SpannerException.class, () -> state.set(null, "post_auth_delay", "100"));
+    assertEquals(
+        "INVALID_ARGUMENT: parameter \"post_auth_delay\" cannot be set after connection start",
         exception.getMessage());
   }
 }
