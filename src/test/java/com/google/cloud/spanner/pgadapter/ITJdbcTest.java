@@ -735,6 +735,20 @@ public class ITJdbcTest implements IntegrationTest {
     }
   }
 
+  @Test
+  public void testPGSettings() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select setting from pg_settings where name='DateStyle'")) {
+        assertTrue(resultSet.next());
+        assertEquals("ISO, MDY", resultSet.getString("setting"));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
   private void writeExtraTestRows() {
     testEnv.write(
         database.getId().getDatabase(),

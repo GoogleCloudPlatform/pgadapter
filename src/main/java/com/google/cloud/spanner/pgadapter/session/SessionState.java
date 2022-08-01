@@ -18,7 +18,11 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,12 +30,31 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /** {@link SessionState} contains all session variables for a connection. */
 @InternalApi
 public class SessionState {
+  private static final ImmutableSet<String> SUPPORTED_PG_SETTINGS_KEYS =
+      ImmutableSet.of(
+          "application_name",
+          "bytea_output",
+          "DateStyle",
+          "default_transaction_isolation",
+          "default_transaction_read_only",
+          "extra_float_digits",
+          "max_connections",
+          "max_index_keys",
+          "port",
+          "search_path",
+          "server_version",
+          "server_version_num",
+          "TimeZone",
+          "transaction_isolation",
+          "transaction_read_only");
   private static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
 
   static {
@@ -50,6 +73,51 @@ public class SessionState {
   public SessionState(OptionsMetadata options) {
     this.settings = new HashMap<>(SERVER_SETTINGS);
     this.settings.get("server_version").initSettingValue(options.getServerVersion());
+  }
+
+  public Statement addSessionState(ParsedStatement parsedStatement, Statement statement) {
+    if (parsedStatement.isQuery()
+        && parsedStatement.getSqlWithoutComments().contains("pg_settings")) {
+      String pgSettingsCte = generatePGSettingsCte();
+      // Check whether we can safely use the original SQL statement.
+      String sql =
+          startsWithIgnoreCase(statement.getSql(), "select")
+                  || startsWithIgnoreCase(statement.getSql(), "with")
+              ? statement.getSql()
+              : parsedStatement.getSqlWithoutComments();
+      Statement.Builder builder = null;
+      if (startsWithIgnoreCase(sql, "select")) {
+        builder = Statement.newBuilder("with ").append(pgSettingsCte).append(" ").append(sql);
+      } else if (startsWithIgnoreCase(sql, "with")) {
+        builder =
+            Statement.newBuilder("with ")
+                .append(pgSettingsCte)
+                .append(", ")
+                .append(sql.substring("with".length()));
+      }
+      if (builder != null) {
+        Map<String, Value> parameters = statement.getParameters();
+        for (Entry<String, Value> param : parameters.entrySet()) {
+          builder.bind(param.getKey()).to(param.getValue());
+        }
+        statement = builder.build();
+      }
+    }
+    return statement;
+  }
+
+  static boolean startsWithIgnoreCase(String string, String prefix) {
+    return string.substring(0, prefix.length()).equalsIgnoreCase(prefix);
+  }
+
+  /** Generates a Common Table Expression that represents the pg_settings table. */
+  String generatePGSettingsCte() {
+    return "pg_settings as (\n"
+        + getAll().stream()
+            .filter(setting -> SUPPORTED_PG_SETTINGS_KEYS.contains(setting.getKey()))
+            .map(PGSetting::getSelectStatement)
+            .collect(Collectors.joining("\nunion all\n"))
+        + "\n)\n";
   }
 
   private static String toKey(String extension, String name) {

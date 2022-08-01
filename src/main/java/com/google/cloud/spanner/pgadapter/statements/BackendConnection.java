@@ -189,7 +189,10 @@ public class BackendConnection {
         } else if (parsedStatement.isDdl()) {
           result.set(ddlExecutor.execute(parsedStatement, statement));
         } else {
-          result.set(spannerConnection.execute(statement));
+          // Potentially add session state in the form of CTE(s) to the statement.
+          Statement statementWithSessionState =
+              sessionState.addSessionState(parsedStatement, statement);
+          result.set(spannerConnection.execute(statementWithSessionState));
         }
       } catch (SpannerException spannerException) {
         // Executing queries against the information schema in a transaction is unsupported.

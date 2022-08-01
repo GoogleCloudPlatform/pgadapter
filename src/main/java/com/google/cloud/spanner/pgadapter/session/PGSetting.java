@@ -25,6 +25,7 @@ import com.google.common.collect.Iterables;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 
 /** Represents a row in the pg_settings table. */
@@ -198,6 +199,61 @@ public class PGSetting {
         sourcefile,
         sourceline,
         pendingRestart);
+  }
+
+  /** Returns this setting as a SELECT statement that can be used in a query or CTE. */
+  String getSelectStatement() {
+    return "select "
+        + toSelectExpression(getKey())
+        + " as name, "
+        + toSelectExpression(setting)
+        + " as setting, "
+        + toSelectExpression(unit)
+        + " as unit, "
+        + toSelectExpression(category)
+        + " as category, "
+        + toSelectExpression((String) null)
+        + " as short_desc, "
+        + toSelectExpression((String) null)
+        + " as extra_desc, "
+        + toSelectExpression(minVal)
+        + " as min_val, "
+        + toSelectExpression(maxVal)
+        + " as max_val, "
+        + toSelectExpression(enumVals)
+        + "::varchar[] as enumvals, "
+        + toSelectExpression(bootVal)
+        + " as boot_val, "
+        + toSelectExpression(resetVal)
+        + " as reset_val, "
+        + toSelectExpression((String) null)
+        + " as sourcefile, "
+        + toSelectExpression((Integer) null)
+        + "::bigint as sourceline, "
+        + toSelectExpression(pendingRestart)
+        + "::boolean as pending_restart";
+  }
+
+  String toSelectExpression(String value) {
+    return value == null ? "null" : "'" + value + "'";
+  }
+
+  String toSelectExpression(String[] value) {
+    return value == null
+        ? "null"
+        : "'{"
+            + Arrays.stream(value)
+                .map(s -> s.startsWith("\"") ? s : "\"" + s + "\"")
+                .collect(Collectors.joining(", "))
+            + "}'";
+  }
+
+  String toSelectExpression(Integer value) {
+    return value == null ? "null" : value.toString();
+  }
+
+  String toSelectExpression(Boolean value) {
+    return value == null ? "null" : (value ? "'t'" : "'f'");
   }
 
   public String getKey() {
