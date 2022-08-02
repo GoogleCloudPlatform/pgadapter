@@ -738,12 +738,47 @@ public class ITJdbcTest implements IntegrationTest {
   @Test
   public void testPGSettings() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      // First verify the default value.
+      // TODO: JDBC actually sets the DateStyle to 'ISO' for every connection at startup. This is
+      //       currently not respected by PGAdapter.
       try (ResultSet resultSet =
           connection
               .createStatement()
               .executeQuery("select setting from pg_settings where name='DateStyle'")) {
         assertTrue(resultSet.next());
         assertEquals("ISO, MDY", resultSet.getString("setting"));
+        assertFalse(resultSet.next());
+      }
+      // Change the date style and verify that it is also reflected in  pg_settings.
+      connection.createStatement().execute("set datestyle to 'iso, ymd'");
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select setting from pg_settings where name='DateStyle'")) {
+        assertTrue(resultSet.next());
+        assertEquals("iso, ymd", resultSet.getString("setting"));
+        assertFalse(resultSet.next());
+      }
+
+      // Verify that pg_settings also respects transactions.
+      connection.setAutoCommit(false);
+      connection.createStatement().execute("set datestyle to 'iso'");
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select setting from pg_settings where name='DateStyle'")) {
+        assertTrue(resultSet.next());
+        assertEquals("iso", resultSet.getString("setting"));
+        assertFalse(resultSet.next());
+      }
+      // This should also roll back the changes to pg_settings.
+      connection.rollback();
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select setting from pg_settings where name='DateStyle'")) {
+        assertTrue(resultSet.next());
+        assertEquals("iso, ymd", resultSet.getString("setting"));
         assertFalse(resultSet.next());
       }
     }
