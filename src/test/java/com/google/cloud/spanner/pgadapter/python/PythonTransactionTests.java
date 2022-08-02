@@ -470,7 +470,7 @@ public class PythonTransactionTests extends PythonTestSetup {
             + "2\n"
             + "(1, 'abcd')\n"
             + "(2, 'pqrs')\n"
-            + "FAILED_PRECONDITION: Update statements are not allowed for read-only transactions\n";
+            + "Update statements are not allowed for read-only transactions\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
@@ -577,7 +577,7 @@ public class PythonTransactionTests extends PythonTestSetup {
             + "2\n"
             + "(1, 'abcd')\n"
             + "(2, 'pqrs')\n"
-            + "FAILED_PRECONDITION: Update statements are not allowed for read-only transactions\n";
+            + "Update statements are not allowed for read-only transactions\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
