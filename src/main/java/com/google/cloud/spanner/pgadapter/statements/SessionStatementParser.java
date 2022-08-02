@@ -205,7 +205,7 @@ public class SessionStatementParser {
                       setting ->
                           Struct.newBuilder()
                               .set("name")
-                              .to(setting.getKey())
+                              .to(setting.getCasePreservingKey())
                               .set("setting")
                               .to(setting.getSetting())
                               .set("description")

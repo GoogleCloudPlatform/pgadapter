@@ -76,6 +76,10 @@ public class SessionState {
     this.settings.get("server_version").initSettingValue(options.getServerVersion());
   }
 
+  /**
+   * Potentially add any session state to the given statement if that is needed. This can for
+   * example include a CTE for pg_settings, if the statement references that table.
+   */
   public Statement addSessionState(ParsedStatement parsedStatement, Statement statement) {
     if (parsedStatement.isQuery()
         && parsedStatement.getSqlWithoutComments().contains("pg_settings")) {
@@ -115,7 +119,7 @@ public class SessionState {
   String generatePGSettingsCte() {
     return "pg_settings as (\n"
         + getAll().stream()
-            .filter(setting -> SUPPORTED_PG_SETTINGS_KEYS.contains(setting.getKey()))
+            .filter(setting -> SUPPORTED_PG_SETTINGS_KEYS.contains(setting.getCasePreservingKey()))
             .map(PGSetting::getSelectStatement)
             .collect(Collectors.joining("\nunion all\n"))
         + "\n)\n";
@@ -214,7 +218,7 @@ public class SessionState {
     for (String key : keys) {
       result.add(internalGet(key));
     }
-    result.sort(Comparator.comparing(PGSetting::getKey));
+    result.sort(Comparator.comparing(PGSetting::getCasePreservingKey));
     return result;
   }
 

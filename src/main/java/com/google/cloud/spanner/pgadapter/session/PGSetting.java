@@ -204,7 +204,7 @@ public class PGSetting {
   /** Returns this setting as a SELECT statement that can be used in a query or CTE. */
   String getSelectStatement() {
     return "select "
-        + toSelectExpression(getKey())
+        + toSelectExpression(getCasePreservingKey())
         + " as name, "
         + toSelectExpression(setting)
         + " as setting, "
@@ -256,7 +256,13 @@ public class PGSetting {
     return value == null ? "null" : (value ? "'t'" : "'f'");
   }
 
-  public String getKey() {
+  /**
+   * Returns the case-preserving key of this setting. Some settings have a key that is written in
+   * camel case (e.g. 'DateStyle') instead of snake case (e.g. 'server_version'). This key should
+   * not be used to look up a setting in the session state map, but should be used in for example
+   * the pg_settings table.
+   */
+  public String getCasePreservingKey() {
     if (extension == null) {
       return name;
     }
@@ -303,7 +309,7 @@ public class PGSetting {
 
   private void checkValidContext() {
     if (!isSettable()) {
-      throw invalidContextError(getKey(), this.context);
+      throw invalidContextError(getCasePreservingKey(), this.context);
     }
   }
 
@@ -333,22 +339,22 @@ public class PGSetting {
       try {
         BooleanParser.toBoolean(value);
       } catch (IllegalArgumentException exception) {
-        throw invalidBoolError(getKey());
+        throw invalidBoolError(getCasePreservingKey());
       }
     } else if ("integer".equals(this.vartype)) {
       try {
         Integer.parseInt(value);
       } catch (NumberFormatException exception) {
-        throw invalidValueError(getKey(), value);
+        throw invalidValueError(getCasePreservingKey(), value);
       }
     } else if ("real".equals(this.vartype)) {
       try {
         Double.parseDouble(value);
       } catch (NumberFormatException exception) {
-        throw invalidValueError(getKey(), value);
+        throw invalidValueError(getCasePreservingKey(), value);
       }
     } else if (enumVals != null && !Iterables.contains(Arrays.asList(this.enumVals), value)) {
-      throw invalidValueError(getKey(), value);
+      throw invalidValueError(getCasePreservingKey(), value);
     }
   }
 
