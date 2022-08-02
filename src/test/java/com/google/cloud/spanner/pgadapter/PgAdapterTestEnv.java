@@ -18,6 +18,7 @@ import static org.junit.Assert.assertEquals;
 
 import com.google.api.gax.longrunning.OperationFuture;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.NoCredentials;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
@@ -34,6 +35,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.ConnectionOptions.ExternalChannelProvider;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -44,6 +46,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -61,6 +64,7 @@ public class PgAdapterTestEnv {
   private static final int PROTOCOL_MESSAGE_SIZE = 8;
   private static final int INIT_PROTOCOL = 80877103;
   private static final int OPTIONS_PROTOCOL = 196608;
+  private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
 
   // GCP credentials file should be set through the 'GOOGLE_APPLICATION_CREDENTIALS' environment
   // variable.
@@ -153,6 +157,7 @@ public class PgAdapterTestEnv {
 
   public void setUp() {
     spannerHost = getSpannerUrl();
+    logger.info("Using Spanner host: " + spannerHost);
     options = createSpannerOptions();
   }
 
@@ -421,10 +426,34 @@ public class PgAdapterTestEnv {
       }
     }
     SpannerOptions.Builder builder = SpannerOptions.newBuilder().setProjectId(projectId);
-    if (spannerHost != null) {
+    // Use a custom channel provider if that has been configured.
+    // This also forces the connection to use no credentials.
+    if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) != null) {
+      if (spannerHost == null) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "ChannelProvider can only be used in combination with a specific host");
+      }
+      String channelProvider = System.getProperty(CHANNEL_PROVIDER_PROPERTY);
+      logger.info("Using custom channel provider: " + channelProvider);
+      try {
+        URL url = new URL(spannerHost);
+        ExternalChannelProvider provider =
+            (ExternalChannelProvider)
+                Class.forName(channelProvider).getDeclaredConstructor().newInstance();
+        builder.setChannelProvider(provider.getChannelProvider(url.getHost(), url.getPort()));
+        builder.setCredentials(NoCredentials.getInstance());
+      } catch (Exception e) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            String.format(
+                "%s : Failed to create channel with external provider: %s", e, channelProvider));
+      }
+    } else if (spannerHost != null) {
       builder.setHost(spannerHost);
     }
-    if (credentials != null) {
+
+    if (System.getProperty(CHANNEL_PROVIDER_PROPERTY) == null && credentials != null) {
       builder.setCredentials(credentials);
     }
     return builder.build();
