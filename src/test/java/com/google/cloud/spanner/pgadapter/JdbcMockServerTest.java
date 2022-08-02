@@ -1680,6 +1680,20 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSetCaseInsensitiveSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // The setting is called 'DateStyle' in the pg_settings table.
+      connection.createStatement().execute("set datestyle to 'iso'");
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show DATESTYLE")) {
+        assertTrue(resultSet.next());
+        assertEquals("iso", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testSetInvalidSetting() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       SQLException exception =

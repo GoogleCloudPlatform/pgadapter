@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -59,7 +60,7 @@ public class SessionState {
 
   static {
     for (PGSetting setting : PGSetting.read()) {
-      SERVER_SETTINGS.put(setting.getName(), setting);
+      SERVER_SETTINGS.put(toKey(null, setting.getName()), setting);
     }
   }
 
@@ -121,7 +122,9 @@ public class SessionState {
   }
 
   private static String toKey(String extension, String name) {
-    return extension == null ? name : extension + "." + name;
+    return extension == null
+        ? name.toLowerCase(Locale.ROOT)
+        : extension.toLowerCase(Locale.ROOT) + "." + name.toLowerCase(Locale.ROOT);
   }
 
   /**
