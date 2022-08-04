@@ -48,21 +48,21 @@ public class SimpleParserTest {
 
   @Test
   public void testReadTableOrIndexNamePart() {
-    assertEquals("foo", new SimpleParser("foo bar").readTableOrIndexNamePart());
-    assertEquals("foo", new SimpleParser("foo").readTableOrIndexNamePart());
-    assertEquals("\"foo\"", new SimpleParser("\"foo\" bar").readTableOrIndexNamePart());
-    assertEquals("\"foo\"", new SimpleParser("\"foo\"").readTableOrIndexNamePart());
-    assertEquals("foo", new SimpleParser(" foo bar").readTableOrIndexNamePart());
-    assertEquals("foo", new SimpleParser("\tfoo").readTableOrIndexNamePart());
-    assertEquals("\"foo\"", new SimpleParser("\n\"foo\" bar").readTableOrIndexNamePart());
-    assertEquals("\"foo\"", new SimpleParser("    \"foo\"").readTableOrIndexNamePart());
-    assertEquals("\"foo\"\"bar\"", new SimpleParser("\"foo\"\"bar\"").readTableOrIndexNamePart());
-    assertEquals("foo", new SimpleParser("foo\"bar\"").readTableOrIndexNamePart());
-    assertEquals("foo", new SimpleParser("foo.bar").readTableOrIndexNamePart());
-    assertEquals("foo", new SimpleParser("foo").readTableOrIndexNamePart());
-    assertEquals("\"foo\"", new SimpleParser("\"foo\".bar").readTableOrIndexNamePart());
-    assertEquals("\"foo\"", new SimpleParser("\"foo\"").readTableOrIndexNamePart());
-    assertNull(new SimpleParser("\"foo").readTableOrIndexNamePart());
+    assertEquals("foo", new SimpleParser("foo bar").readIdentifierPart());
+    assertEquals("foo", new SimpleParser("foo").readIdentifierPart());
+    assertEquals("\"foo\"", new SimpleParser("\"foo\" bar").readIdentifierPart());
+    assertEquals("\"foo\"", new SimpleParser("\"foo\"").readIdentifierPart());
+    assertEquals("foo", new SimpleParser(" foo bar").readIdentifierPart());
+    assertEquals("foo", new SimpleParser("\tfoo").readIdentifierPart());
+    assertEquals("\"foo\"", new SimpleParser("\n\"foo\" bar").readIdentifierPart());
+    assertEquals("\"foo\"", new SimpleParser("    \"foo\"").readIdentifierPart());
+    assertEquals("\"foo\"\"bar\"", new SimpleParser("\"foo\"\"bar\"").readIdentifierPart());
+    assertEquals("foo", new SimpleParser("foo\"bar\"").readIdentifierPart());
+    assertEquals("foo", new SimpleParser("foo.bar").readIdentifierPart());
+    assertEquals("foo", new SimpleParser("foo").readIdentifierPart());
+    assertEquals("\"foo\"", new SimpleParser("\"foo\".bar").readIdentifierPart());
+    assertEquals("\"foo\"", new SimpleParser("\"foo\"").readIdentifierPart());
+    assertNull(new SimpleParser("\"foo").readIdentifierPart());
   }
 
   @Test
