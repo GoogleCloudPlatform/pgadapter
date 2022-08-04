@@ -1142,7 +1142,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     while (scanner.hasNextLine()) {
       error.append(scanner.nextLine()).append('\n');
     }
-    assertEquals("ERROR:  INVALID_ARGUMENT: Invalid length for int8: 2\n", error.toString());
+    assertEquals("ERROR:  Invalid length for int8: 2\n", error.toString());
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
