@@ -63,6 +63,18 @@ public class SimpleParserTest {
     assertEquals("\"foo\"", new SimpleParser("\"foo\".bar").readIdentifierPart());
     assertEquals("\"foo\"", new SimpleParser("\"foo\"").readIdentifierPart());
     assertNull(new SimpleParser("\"foo").readIdentifierPart());
+
+    assertEquals("foo", new SimpleParser("foo) bar").readIdentifierPart());
+    assertEquals("foo", new SimpleParser("foo- bar").readIdentifierPart());
+    assertEquals("foo", new SimpleParser("foo/ bar").readIdentifierPart());
+    assertEquals("foo$", new SimpleParser("foo$ bar").readIdentifierPart());
+    assertEquals("f$oo", new SimpleParser("f$oo bar").readIdentifierPart());
+    assertEquals("_foo", new SimpleParser("_foo bar").readIdentifierPart());
+    assertEquals("øfoo", new SimpleParser("øfoo bar").readIdentifierPart());
+    assertNull(new SimpleParser("\\foo").readIdentifierPart());
+    assertNull(new SimpleParser("1foo").readIdentifierPart());
+    assertNull(new SimpleParser("-foo").readIdentifierPart());
+    assertNull(new SimpleParser("$foo").readIdentifierPart());
   }
 
   @Test
