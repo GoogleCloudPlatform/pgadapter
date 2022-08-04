@@ -14,6 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.error;
 
+import com.google.api.core.InternalApi;
+
+/** PG Error severity constants. */
+@InternalApi
 public enum Severity {
   ERROR,
   FATAL,
