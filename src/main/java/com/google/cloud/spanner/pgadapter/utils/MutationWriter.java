@@ -289,7 +289,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                     + "plus the number of indexed columns in the record. The maximum number of mutations "
                     + "in one transaction is "
                     + DEFAULT_MUTATION_LIMIT
-                    + ".\n\nExecute `SET AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation "
+                    + ".\n\nExecute `SET SPANNER.AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation "
                     + "to instruct PGAdapter to automatically break large transactions into multiple smaller. "
                     + "This will make the COPY operation non-atomic.\n\n");
           }
@@ -300,7 +300,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                     + currentBufferByteSize
                     + " has exceeded the limit: "
                     + commitSizeLimit
-                    + ".\n\nExecute `SET AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation "
+                    + ".\n\nExecute `SET SPANNER.AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation "
                     + "to instruct PGAdapter to automatically break large transactions into multiple smaller. "
                     + "This will make the COPY operation non-atomic.\n\n");
           }
