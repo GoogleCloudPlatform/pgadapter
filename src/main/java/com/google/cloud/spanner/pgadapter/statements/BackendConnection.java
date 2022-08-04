@@ -118,6 +118,7 @@ public class BackendConnection {
   enum TransactionMode {
     IMPLICIT,
     EXPLICIT,
+    DDL_BATCH,
   }
 
   /**
@@ -175,6 +176,18 @@ public class BackendConnection {
           result.set(NO_RESULT);
         } else if ((isCommit(parsedStatement) || isRollback(parsedStatement))
             && !spannerConnection.isInTransaction()) {
+          // Check if we are in a DDL batch that was created from an explicit transaction.
+          if (transactionMode == TransactionMode.DDL_BATCH) {
+            try {
+              if (isCommit(parsedStatement)) {
+                spannerConnection.runBatch();
+              } else {
+                spannerConnection.abortBatch();
+              }
+            } finally {
+              transactionMode = TransactionMode.IMPLICIT;
+            }
+          }
           // Ignore the statement as it is a no-op to execute COMMIT/ROLLBACK when we are not in a
           // transaction. TODO: Return a warning.
           result.set(NO_RESULT);
@@ -458,6 +471,19 @@ public class BackendConnection {
         // current transaction, depending on the settings for execute DDL in transactions.
         if (bufferedStatement.parsedStatement.isDdl()) {
           prepareExecuteDdl(bufferedStatement);
+        } else if (transactionMode == TransactionMode.DDL_BATCH && !isTransactionStatement(index)) {
+          // End the automatically created DDL batch and revert to an explicit transaction.
+          try {
+            spannerConnection.runBatch();
+          } catch (Exception exception) {
+            // Register the exception on the current statement, even though it was caused by a
+            // previous one.
+            bufferedStatements.get(index).result.setException(exception);
+            throw exception;
+          } finally {
+            transactionMode = TransactionMode.EXPLICIT;
+          }
+          spannerConnection.beginTransaction();
         }
         boolean canUseBatch = false;
         if (index < (getStatementCount() - 1)) {
@@ -486,6 +512,8 @@ public class BackendConnection {
       if (spannerConnection.isInTransaction()) {
         spannerConnection.setStatementTag(null);
         spannerConnection.execute(ROLLBACK);
+      } else if (spannerConnection.isDdlBatchActive()) {
+        spannerConnection.abortBatch();
       }
     } finally {
       bufferedStatements.clear();
@@ -581,7 +609,13 @@ public class BackendConnection {
             // might be active.
             if (spannerConnection.isInTransaction()) {
               spannerConnection.commit();
-              transactionMode = TransactionMode.IMPLICIT;
+              if (transactionMode == TransactionMode.EXPLICIT) {
+                // Convert the explicit transaction to a DDL batch.
+                transactionMode = TransactionMode.DDL_BATCH;
+                spannerConnection.startBatchDdl();
+              } else {
+                transactionMode = TransactionMode.IMPLICIT;
+              }
             }
         }
         return;
@@ -614,7 +648,13 @@ public class BackendConnection {
           // Switch the execution state to implicit transaction.
           if (spannerConnection.isInTransaction()) {
             spannerConnection.commit();
-            transactionMode = TransactionMode.IMPLICIT;
+            if (transactionMode == TransactionMode.EXPLICIT) {
+              // Convert the explicit transaction to a DDL batch.
+              transactionMode = TransactionMode.DDL_BATCH;
+              spannerConnection.startBatchDdl();
+            } else {
+              transactionMode = TransactionMode.IMPLICIT;
+            }
           }
       }
     } catch (SpannerException exception) {
@@ -715,26 +755,36 @@ public class BackendConnection {
     }
     List<StatementResult> statementResults = new ArrayList<>(getStatementCount());
     int index = fromIndex;
-    while (index < getStatementCount()) {
-      StatementType statementType = getStatementType(index);
-      if (canBeBatchedTogether(batchType, statementType)) {
-        // Send DDL statements to the DdlExecutor instead of executing them directly on the
-        // connection, so we can support certain DDL constructs that are currently not supported by
-        // the backend, such as IF [NOT] EXISTS.
-        if (batchType == StatementType.DDL) {
-          statementResults.add(
-              ddlExecutor.execute(
-                  bufferedStatements.get(index).parsedStatement,
-                  bufferedStatements.get(index).statement));
+    try {
+      while (index < getStatementCount()) {
+        StatementType statementType = getStatementType(index);
+        if (canBeBatchedTogether(batchType, statementType)) {
+          // Send DDL statements to the DdlExecutor instead of executing them directly on the
+          // connection, so we can support certain DDL constructs that are currently not supported
+          // by
+          // the backend, such as IF [NOT] EXISTS.
+          if (batchType == StatementType.DDL) {
+            statementResults.add(
+                ddlExecutor.execute(
+                    bufferedStatements.get(index).parsedStatement,
+                    bufferedStatements.get(index).statement));
+          } else {
+            spannerConnection.execute(bufferedStatements.get(index).statement);
+          }
+          index++;
         } else {
-          spannerConnection.execute(bufferedStatements.get(index).statement);
+          // End the batch here, as the statement type on this index can not be batched together
+          // with
+          // the other statements in the batch.
+          break;
         }
-        index++;
-      } else {
-        // End the batch here, as the statement type on this index can not be batched together with
-        // the other statements in the batch.
-        break;
       }
+    } catch (Exception exception) {
+      // This should normally not happen, as we are not sending any statements to Cloud Spanner yet,
+      // but is done as safety precaution to ensure that there is always at least one result.
+      // Register the exception on the first statement in the batch.
+      bufferedStatements.get(fromIndex).result.setException(exception);
+      throw exception;
     }
     try {
       long[] counts = spannerConnection.runBatch();
@@ -806,7 +856,7 @@ public class BackendConnection {
       this.commandTag = null;
     }
 
-    private NoResult(String commandTag) {
+    public NoResult(String commandTag) {
       this.commandTag = commandTag;
     }
 

@@ -126,4 +126,28 @@ public class PythonTestSetup extends AbstractMockServerTest {
 
     return output.toString();
   }
+
+  static String executeTransactions(int port, List<String> statements)
+      throws IOException, InterruptedException {
+    List<String> runCommand = new ArrayList<>();
+    runCommand.add("python3");
+    runCommand.add("StatementsWithTransactions.py");
+    runCommand.add(Integer.toString(port));
+    runCommand.addAll(statements);
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(runCommand);
+    builder.directory(new File("./src/test/python"));
+    Process process = builder.start();
+
+    Scanner scanner = new Scanner(process.getInputStream());
+    StringBuilder output = new StringBuilder();
+    while (scanner.hasNextLine()) {
+      output.append(scanner.nextLine()).append("\n");
+    }
+    int result = process.waitFor();
+    assertEquals(output.toString(), 0, result);
+
+    return output.toString();
+  }
 }
