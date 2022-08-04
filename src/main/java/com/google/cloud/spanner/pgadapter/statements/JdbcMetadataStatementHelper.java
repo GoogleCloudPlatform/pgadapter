@@ -250,8 +250,62 @@ class JdbcMetadataStatementHelper {
             "c.relkind IN ('r','p') AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'",
             "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TABLE'")
         .replace(
+            "c.relkind = 'p' AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TABLE'")
+        .replace(
             "c.relkind = 'v' AND n.nspname <> 'pg_catalog' AND n.nspname <> 'information_schema'",
             "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'VIEW'")
+        .replace(
+            "c.relkind = 'i' AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'INDEX'")
+        .replace(
+            "c.relkind = 'I' AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'INDEX'")
+        .replace(
+            "c.relkind = 'S' AND n.nspname ~ '^pg_temp_'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TEMP SEQUENCE'")
+        .replace(
+            "c.relkind = 'S'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'SEQUENCE'")
+        .replace(
+            "c.relkind = 'c' AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TYPE'")
+        .replace(
+            "c.relkind = 'r' AND (n.nspname = 'pg_catalog' OR n.nspname = 'information_schema')",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'SYSTEM TABLE'")
+        .replace(
+            "c.relkind = 'r' AND n.nspname = 'pg_toast'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'SYSTEM TOAST TABLE'")
+        .replace(
+            "c.relkind = 'i' AND n.nspname = 'pg_toast'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'SYSTEM TOAST INDEX'")
+        .replace(
+            "c.relkind = 'v' AND (n.nspname = 'pg_catalog' OR n.nspname = 'information_schema')",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'SYSTEM VIEW'")
+        .replace(
+            "c.relkind = 'i' AND (n.nspname = 'pg_catalog' OR n.nspname = 'information_schema')",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'SYSTEM INDEX'")
+        .replace(
+            "c.relkind IN ('r','p') AND n.nspname ~ '^pg_temp_'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TEMP TABLE'")
+        .replace(
+            "c.relkind = 'r' AND n.nspname ~ '^pg_temp_'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TEMP TABLE'")
+        .replace(
+            "c.relkind = 'i' AND n.nspname ~ '^pg_temp_'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TEMP INDEX'")
+        .replace(
+            "c.relkind = 'v' AND n.nspname ~ '^pg_temp_'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TEMP VIEW'")
+        .replace(
+            "c.relkind = 'S' AND n.nspname ~ '^pg_temp_'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TEMP SEQUENCE'")
+        .replace(
+            "c.relkind = 'f'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'FOREIGN TABLE'")
+        .replace(
+            "c.relkind = 'm'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'MATERIALIZED VIEW'")
         .replace(
             "ORDER BY TABLE_TYPE,TABLE_SCHEM,TABLE_NAME",
             "ORDER BY TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME");
