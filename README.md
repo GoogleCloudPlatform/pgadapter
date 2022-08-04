@@ -244,7 +244,7 @@ out of the box, the following items are not supported:
 * SSL
 * COPY <table_name> FROM <filename | PROGRAM program>
 
-See [COPY <table-name> FROM STDIN](docs/copy.md) for more information on the COPY operations  that
+See [COPY <table-name> FROM STDIN](docs/copy.md) for more information on the COPY operations that
 are supported.
 
 Only the following `psql` meta-commands are supported:
@@ -262,7 +262,7 @@ PGAdapter has the following known limitations at this moment:
 - SSL connections are not supported.
 - Only [password authentication](https://www.postgresql.org/docs/current/auth-password.html) using
   the `password` method is supported. All other authentication methods are not supported.
-- The COPY protocol only supports COPY TO/FROM STDIN [BINARY]. COPY TO/FROM <FILE|PROGRAM> is not supported.
+- The COPY protocol only supports COPY TO|FROM STDOUT|STDIN [BINARY]. COPY TO|FROM <FILE|PROGRAM> is not supported.
   See [COPY](docs/copy.md) for more information.
 - DDL transactions are not supported. PGAdapter allows DDL statements in implicit transactions,
   and executes SQL strings that contain multiple DDL statements as a single DDL batch on Cloud
