@@ -14,13 +14,11 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.EMPTY_LOCAL_STATEMENTS;
-
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.AbstractQueryProtocolMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -31,26 +29,26 @@ import java.util.List;
  */
 public class ExtendedQueryProtocolHandler {
   private final LinkedList<AbstractQueryProtocolMessage> messages = new LinkedList<>();
+  private final ConnectionHandler connectionHandler;
   private final BackendConnection backendConnection;
 
   /** Creates an {@link ExtendedQueryProtocolHandler} for the given connection. */
   public ExtendedQueryProtocolHandler(ConnectionHandler connectionHandler) {
-    ImmutableList<LocalStatement> localStatements =
-        connectionHandler.getWellKnownClient() == null
-            ? EMPTY_LOCAL_STATEMENTS
-            : connectionHandler.getWellKnownClient().getLocalStatements(connectionHandler);
+    this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
     this.backendConnection =
         new BackendConnection(
             connectionHandler.getDatabaseId(),
             connectionHandler.getSpannerConnection(),
-            connectionHandler.getServer().getOptions().getDdlTransactionMode(),
-            localStatements);
+            connectionHandler.getServer().getOptions(),
+            connectionHandler.getWellKnownClient().getLocalStatements(connectionHandler));
   }
 
   /** Constructor only intended for testing. */
   @VisibleForTesting
-  public ExtendedQueryProtocolHandler(BackendConnection backendConnection) {
-    this.backendConnection = backendConnection;
+  public ExtendedQueryProtocolHandler(
+      ConnectionHandler connectionHandler, BackendConnection backendConnection) {
+    this.connectionHandler = Preconditions.checkNotNull(connectionHandler);
+    this.backendConnection = Preconditions.checkNotNull(backendConnection);
   }
 
   /** Returns the backend PG connection for this query handler. */
@@ -65,6 +63,15 @@ public class ExtendedQueryProtocolHandler {
   }
 
   /**
+   * Returns true if the last message in the buffer uses the extended query protocol. That is; it is
+   * not a message that has been manually created by a {@link SimpleQueryStatement}.
+   */
+  boolean isExtendedProtocol() {
+    return !this.messages.isEmpty()
+        && this.messages.get(this.messages.size() - 1).isExtendedProtocol();
+  }
+
+  /**
    * Buffer an extended query protocol message for execution when the next flush/sync message is
    * received.
    */
@@ -76,8 +83,29 @@ public class ExtendedQueryProtocolHandler {
    * Flushes the current queue of messages. Any pending database statements are first executed,
    * before sending the wire-protocol responses to the frontend. A flush does not commit the
    * implicit transaction (if any).
+   *
+   * <p>This method will execute a {@link #sync()} if it determines that the next message in the
+   * buffer is a Sync message.
    */
   public void flush() throws Exception {
+    if (isExtendedProtocol()) {
+      // Wait at most 5 milliseconds for the next message to arrive. The method will just return 0
+      // if no message could be found in the buffer within this timeframe.
+      char nextMessage = connectionHandler.getConnectionMetadata().peekNextByte(5L);
+      if (nextMessage == SyncMessage.IDENTIFIER) {
+        // Do a sync instead of a flush, as the next message is a sync. This tells the backend
+        // connection that it is safe to for example use a read-only transaction if the buffer only
+        // contains queries.
+        sync();
+      } else {
+        internalFlush();
+      }
+    } else {
+      internalFlush();
+    }
+  }
+
+  private void internalFlush() throws Exception {
     backendConnection.flush();
     flushMessages();
   }
@@ -102,6 +130,7 @@ public class ExtendedQueryProtocolHandler {
         }
       }
     } finally {
+      connectionHandler.getConnectionMetadata().peekOutputStream().flush();
       messages.clear();
     }
   }

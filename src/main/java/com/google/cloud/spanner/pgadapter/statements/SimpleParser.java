@@ -142,12 +142,12 @@ class SimpleParser {
   }
 
   TableOrIndexName readTableOrIndexName() {
-    String nameOrSchema = readTableOrIndexNamePart();
+    String nameOrSchema = readIdentifierPart();
     if (nameOrSchema == null) {
       return null;
     }
     if (eat(".")) {
-      String name = readTableOrIndexNamePart();
+      String name = readIdentifierPart();
       if (name == null) {
         name = "";
       }
@@ -156,13 +156,17 @@ class SimpleParser {
     return new TableOrIndexName(nameOrSchema);
   }
 
-  String readTableOrIndexNamePart() {
+  String readIdentifierPart() {
     skipWhitespaces();
+    if (pos >= sql.length()) {
+      return null;
+    }
     boolean quoted = sql.charAt(pos) == '"';
     int start = pos;
     if (quoted) {
       pos++;
     }
+    boolean first = true;
     while (pos < sql.length()) {
       if (quoted) {
         if (sql.charAt(pos) == '"') {
@@ -173,11 +177,15 @@ class SimpleParser {
           }
         }
       } else {
-        if (Character.isWhitespace(sql.charAt(pos))
-            || sql.charAt(pos) == '.'
-            || sql.charAt(pos) == ','
-            || sql.charAt(pos) == '"') {
-          return sql.substring(start, pos);
+        if (first) {
+          if (!isValidIdentifierFirstChar(sql.charAt(pos))) {
+            return null;
+          }
+          first = false;
+        } else {
+          if (!isValidIdentifierChar(sql.charAt(pos))) {
+            return sql.substring(start, pos);
+          }
         }
       }
       pos++;
@@ -186,6 +194,14 @@ class SimpleParser {
       return null;
     }
     return sql.substring(start);
+  }
+
+  private boolean isValidIdentifierFirstChar(char c) {
+    return Character.isLetter(c) || c == '_';
+  }
+
+  private boolean isValidIdentifierChar(char c) {
+    return isValidIdentifierFirstChar(c) || Character.isDigit(c) || c == '$';
   }
 
   boolean peek(String keyword) {

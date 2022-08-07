@@ -30,13 +30,13 @@
       com.google.cloud.spanner.pgadapter.python.PythonTest
     </excludedTests>
 
-    <spanner.version>6.25.7</spanner.version>
+    <spanner.version>6.27.0</spanner.version>
     <junixsocket.version>2.5.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.5.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.6.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -48,7 +48,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.5.1</version>
+    <version>1.5.3</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -76,7 +76,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.4.0</version>
+      <version>42.4.1</version>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>

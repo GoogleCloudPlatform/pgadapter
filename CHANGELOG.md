@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.6.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.6.0...v0.6.1) (2022-07-13)
+
+
+### Bug Fixes
+
+* prepared statement could return error 'This ResultSet is closed' ([#279](https://github.com/GoogleCloudPlatform/pgadapter/issues/279)) ([3383738](https://github.com/GoogleCloudPlatform/pgadapter/commit/33837384b2c926e268934a082406056070f1f21b)), closes [#278](https://github.com/GoogleCloudPlatform/pgadapter/issues/278)
+
+## [0.6.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.5.1...v0.6.0) (2022-07-11)
+
+
+### Features
+
+* COPY my_table FROM STDIN BINARY ([#261](https://github.com/GoogleCloudPlatform/pgadapter/issues/261)) ([7155783](https://github.com/GoogleCloudPlatform/pgadapter/commit/7155783f69f1250f1310ab0a4108f9b65e7bc757))
+* COPY my_table TO STDOUT ([#269](https://github.com/GoogleCloudPlatform/pgadapter/issues/269)) ([393b520](https://github.com/GoogleCloudPlatform/pgadapter/commit/393b52061df760ebfccd911f56ed0b29e539c9d5))
+* COPY my_table TO STDOUT BINARY  ([#271](https://github.com/GoogleCloudPlatform/pgadapter/issues/271)) ([d8c4c77](https://github.com/GoogleCloudPlatform/pgadapter/commit/d8c4c77c1a60efdf2132b63f7b06ebda273b61f0))
+* support \l meta command ([#215](https://github.com/GoogleCloudPlatform/pgadapter/issues/215)) ([b9d0363](https://github.com/GoogleCloudPlatform/pgadapter/commit/b9d03630b4b6e1d659b5498cd05acc70b798fbb8))
+* support COPY statement in a batch of sql statements ([#217](https://github.com/GoogleCloudPlatform/pgadapter/issues/217)) ([d39cec8](https://github.com/GoogleCloudPlatform/pgadapter/commit/d39cec800d7738b8d0708fd7f3a0f99497854846))
+* support IF [NOT] EXISTS for DDL statements ([#224](https://github.com/GoogleCloudPlatform/pgadapter/issues/224)) ([703a25d](https://github.com/GoogleCloudPlatform/pgadapter/commit/703a25dc62312b6143dd7cbf87f54ca86cb51352))
+
+
+### Bug Fixes
+
+* copy could return wrong error message ([#252](https://github.com/GoogleCloudPlatform/pgadapter/issues/252)) ([6ad4aa2](https://github.com/GoogleCloudPlatform/pgadapter/commit/6ad4aa26b950026fbd9e8d1cf0f93d4d11dbf990))
+* COPY null values caused NullPointerException ([#254](https://github.com/GoogleCloudPlatform/pgadapter/issues/254)) ([cd34476](https://github.com/GoogleCloudPlatform/pgadapter/commit/cd3447683e055fe37eefbaf732b3662f8884707c))
+* order parameters by index and not textual value ([#239](https://github.com/GoogleCloudPlatform/pgadapter/issues/239)) ([d472639](https://github.com/GoogleCloudPlatform/pgadapter/commit/d472639625e3ae2ee4e6ba71bd75a2dc56becb39))
+* parse table names with schema prefix ([#232](https://github.com/GoogleCloudPlatform/pgadapter/issues/232)) ([cbdf28d](https://github.com/GoogleCloudPlatform/pgadapter/commit/cbdf28dcd3ae0299f49b335c2effe398a55e9c87))
+* respect result format code from Bind msg ([#238](https://github.com/GoogleCloudPlatform/pgadapter/issues/238)) ([708fa42](https://github.com/GoogleCloudPlatform/pgadapter/commit/708fa42137966a580b0309e751b326da30f107f2))
+* skip bytes in an invalid stream defensively ([#241](https://github.com/GoogleCloudPlatform/pgadapter/issues/241)) ([1c60253](https://github.com/GoogleCloudPlatform/pgadapter/commit/1c60253d4879d8fe3f07756a9c05aa319d817e24))
+
+
+### Documentation
+
+* add authentication faq entry ([#244](https://github.com/GoogleCloudPlatform/pgadapter/issues/244)) ([d5cc7e3](https://github.com/GoogleCloudPlatform/pgadapter/commit/d5cc7e306ef51f67ca411785585bd7592e89f686))
+* add connection tips for pgx ([#234](https://github.com/GoogleCloudPlatform/pgadapter/issues/234)) ([1ac2a70](https://github.com/GoogleCloudPlatform/pgadapter/commit/1ac2a706db012f6b3244e2fcb7d9649ddad0ad61))
+* add connection tips for pgx ([#234](https://github.com/GoogleCloudPlatform/pgadapter/issues/234)) ([684a068](https://github.com/GoogleCloudPlatform/pgadapter/commit/684a0680bdbf03881c14bcb45dea9240f94f416a))
+* document JDBC connection tips and performance considerations ([#233](https://github.com/GoogleCloudPlatform/pgadapter/issues/233)) ([5a09690](https://github.com/GoogleCloudPlatform/pgadapter/commit/5a096901b47acbb86d5087f9564745d871569a90))
+* move COPY documentation to separate file ([#246](https://github.com/GoogleCloudPlatform/pgadapter/issues/246)) ([54251aa](https://github.com/GoogleCloudPlatform/pgadapter/commit/54251aaee78f8c7b789be57d5606a8ffac8d5c7d))
+* update readme to reflect latest version ([#229](https://github.com/GoogleCloudPlatform/pgadapter/issues/229)) ([ea998bf](https://github.com/GoogleCloudPlatform/pgadapter/commit/ea998bf03f0a14be5127851432655cc23f09b767))
+
 ## [0.5.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.5.0...v0.5.1) (2022-06-22)
 
 

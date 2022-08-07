@@ -17,13 +17,16 @@ package com.google.cloud.spanner.pgadapter.metadata;
 import com.google.api.core.InternalApi;
 import com.google.cloud.Tuple;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Stack;
+import java.util.concurrent.TimeUnit;
 
 @InternalApi
 public class ConnectionMetadata implements AutoCloseable {
@@ -81,5 +84,27 @@ public class ConnectionMetadata implements AutoCloseable {
   /** Returns the current {@link DataOutputStream} for the connection. */
   public DataOutputStream peekOutputStream() {
     return outputStream.peek();
+  }
+
+  /**
+   * Returns the next byte in the input stream without removing it. Returns zero if no bytes are
+   * available. This method will wait for up to maxWaitMillis milliseconds to allow pending data to
+   * become available in the buffer.
+   */
+  public char peekNextByte(long maxWaitMillis) throws IOException {
+    DataInputStream dataInputStream = inputStream.peek();
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    while (dataInputStream.available() == 0
+        && stopwatch.elapsed(TimeUnit.MILLISECONDS) < maxWaitMillis) {
+      Thread.yield();
+    }
+    if (dataInputStream.available() > 0) {
+      dataInputStream.mark(1);
+      char result = (char) dataInputStream.readUnsignedByte();
+      dataInputStream.reset();
+
+      return result;
+    }
+    return 0;
   }
 }

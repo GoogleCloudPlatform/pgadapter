@@ -93,7 +93,7 @@ public abstract class ControlMessage extends WireMessage {
     this.manuallyCreatedToken = token;
   }
 
-  protected boolean isExtendedProtocol() {
+  public boolean isExtendedProtocol() {
     return manuallyCreatedToken == null;
   }
 
@@ -250,6 +250,7 @@ public abstract class ControlMessage extends WireMessage {
     switch (statement.getStatementType()) {
       case DDL:
       case CLIENT_SIDE:
+      case UNKNOWN:
         new CommandCompleteResponse(this.outputStream, command).send(false);
         break;
       case QUERY:
@@ -270,7 +271,6 @@ public abstract class ControlMessage extends WireMessage {
         command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
         new CommandCompleteResponse(this.outputStream, command).send(false);
         break;
-      case UNKNOWN:
       default:
         throw new IllegalStateException("Unknown statement type: " + statement.getStatement());
     }
@@ -312,8 +312,7 @@ public abstract class ControlMessage extends WireMessage {
       hasData = runnable.hasData;
     }
 
-    WireOutput suffix = describedResult.createResultSuffix();
-    if (suffix != null) {
+    for (WireOutput suffix : describedResult.createResultSuffix()) {
       suffix.send(false);
     }
     return new SendResultSetState(describedResult.getCommandTag(), rows, hasData);
@@ -469,8 +468,7 @@ public abstract class ControlMessage extends WireMessage {
       }
       if (includePrefix) {
         try {
-          WireOutput prefix = describedResult.createResultPrefix(resultSet);
-          if (prefix != null) {
+          for (WireOutput prefix : describedResult.createResultPrefix(resultSet)) {
             prefix.send(false);
           }
           prefixSent.set(true);

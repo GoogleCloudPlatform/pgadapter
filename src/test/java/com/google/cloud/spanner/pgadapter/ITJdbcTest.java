@@ -161,6 +161,18 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @Test
+  public void testSelectCurrentSchema() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select current_schema()")) {
+        assertTrue(resultSet.next());
+        assertEquals("public", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testCreateTableIfNotExists() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (Statement statement = connection.createStatement()) {
@@ -543,7 +555,7 @@ public class ITJdbcTest implements IntegrationTest {
               + "\n"
               + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
               + "\n"
-              + "Execute `SET AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.\n\n",
+              + "Execute `SET SPANNER.AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.\n\n",
           exception.getMessage());
     }
 

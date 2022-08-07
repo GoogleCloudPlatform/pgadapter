@@ -29,6 +29,7 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -62,12 +63,13 @@ public class ListDatabasesStatement implements LocalStatement {
   }
 
   @Override
-  public String getSql() {
-    return LIST_DATABASES_SQL;
+  public String[] getSql() {
+    return new String[] {LIST_DATABASES_SQL};
   }
 
   @Override
-  public StatementResult execute(Connection connection) {
+  public StatementResult execute(BackendConnection backendConnection) {
+    Connection connection = backendConnection.getSpannerConnection();
     Spanner spanner = ConnectionOptionsHelper.getSpanner(connection);
     InstanceId defaultInstanceId =
         connectionHandler.getServer().getOptions().getDefaultInstanceId();
