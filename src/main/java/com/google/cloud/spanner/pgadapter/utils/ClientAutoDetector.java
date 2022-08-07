@@ -24,6 +24,9 @@ import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaSt
 import com.google.cloud.spanner.pgadapter.statements.local.SetSearchPathStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ShowSearchPathStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ShowServerVersionStatement;
+import com.google.cloud.spanner.pgadapter.utils.HintGenerator.Hint;
+import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse.NoticeSeverity;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +67,24 @@ public class ClientAutoDetector {
               .build();
         }
         return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
+      }
+
+      @Override
+      public Iterable<NoticeResponse> createStartupNoticeResponses(ConnectionHandler connection) {
+        if (connection.getServer().getOptions().hasPsqlCommandLineOptions()) {
+          return ImmutableList.of(
+              new NoticeResponse(
+                  connection.getConnectionMetadata().peekOutputStream(),
+                  NoticeSeverity.INFO,
+                  "The 'psql mode' (-q) command line argument for PGAdapter is deprecated.",
+                  "PGAdapter automatically recognizes connections from psql.\n       PGAdapter can safely be started without the -q argument."));
+        }
+        Hint hint = HintGenerator.getRandomHint(connection);
+        if (hint != null) {
+          return ImmutableList.of(
+              new NoticeResponse(connection.getConnectionMetadata().peekOutputStream(), hint));
+        }
+        return super.createStartupNoticeResponses(connection);
       }
     },
     JDBC {
@@ -123,6 +144,11 @@ public class ClientAutoDetector {
         return DEFAULT_LOCAL_STATEMENTS;
       }
       return EMPTY_LOCAL_STATEMENTS;
+    }
+
+    /** Creates specific notice messages for a client after startup. */
+    public Iterable<NoticeResponse> createStartupNoticeResponses(ConnectionHandler connection) {
+      return ImmutableList.of();
     }
   }
 

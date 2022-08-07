@@ -203,7 +203,7 @@ public class ProxyServer extends AbstractApiService {
     this.serverSockets.add(tcpSocket);
     this.localPort = tcpSocket.getLocalPort();
     tcpStartedLatch.countDown();
-    runServer(tcpSocket, startupLatch, stoppedLatch);
+    runServer(tcpSocket, startupLatch, stoppedLatch, true);
   }
 
   void runDomainSocketServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch)
@@ -222,7 +222,7 @@ public class ProxyServer extends AbstractApiService {
       AFUNIXServerSocket domainSocket = AFUNIXServerSocket.newInstance();
       domainSocket.bind(AFUNIXSocketAddress.of(tempDir), this.options.getMaxBacklog());
       this.serverSockets.add(domainSocket);
-      runServer(domainSocket, startupLatch, stoppedLatch);
+      runServer(domainSocket, startupLatch, stoppedLatch, false);
     } catch (SocketException socketException) {
       logger.log(
           Level.SEVERE,
@@ -235,13 +235,16 @@ public class ProxyServer extends AbstractApiService {
   }
 
   void runServer(
-      ServerSocket serverSocket, CountDownLatch startupLatch, CountDownLatch stoppedLatch)
+      ServerSocket serverSocket,
+      CountDownLatch startupLatch,
+      CountDownLatch stoppedLatch,
+      boolean isTcpSocket)
       throws IOException {
     startupLatch.countDown();
     awaitRunning();
     try {
       while (isRunning()) {
-        createConnectionHandler(serverSocket.accept());
+        createConnectionHandler(serverSocket.accept(), isTcpSocket);
       }
     } catch (SocketException e) {
       // This is a normal exception, as this will occur when Server#stopServer() is called.
@@ -264,8 +267,8 @@ public class ProxyServer extends AbstractApiService {
    * @throws SpannerException if the {@link ConnectionHandler} is unable to connect to Cloud Spanner
    *     or if the dialect of the database is not PostgreSQL.
    */
-  void createConnectionHandler(Socket socket) {
-    ConnectionHandler handler = new ConnectionHandler(this, socket);
+  void createConnectionHandler(Socket socket, boolean isTcpSocket) {
+    ConnectionHandler handler = new ConnectionHandler(this, socket, isTcpSocket);
     register(handler);
     handler.start();
   }

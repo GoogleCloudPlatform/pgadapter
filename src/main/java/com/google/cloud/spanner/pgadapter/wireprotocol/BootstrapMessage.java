@@ -19,6 +19,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationOkResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.KeyDataResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterStatusResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
@@ -106,30 +107,41 @@ public abstract class BootstrapMessage extends WireMessage {
    * @throws Exception
    */
   public static void sendStartupMessage(
-      DataOutputStream output, int connectionId, int secret, OptionsMetadata options)
+      DataOutputStream output,
+      int connectionId,
+      int secret,
+      OptionsMetadata options,
+      Iterable<NoticeResponse> startupNotices)
       throws Exception {
-    new AuthenticationOkResponse(output).send();
-    new KeyDataResponse(output, connectionId, secret).send();
+    new AuthenticationOkResponse(output).send(false);
+    new KeyDataResponse(output, connectionId, secret).send(false);
     new ParameterStatusResponse(
             output, "server_version".getBytes(), options.getServerVersion().getBytes())
-        .send();
+        .send(false);
     new ParameterStatusResponse(output, "application_name".getBytes(), "PGAdapter".getBytes())
-        .send();
-    new ParameterStatusResponse(output, "is_superuser".getBytes(), "false".getBytes()).send();
+        .send(false);
+    new ParameterStatusResponse(output, "is_superuser".getBytes(), "false".getBytes()).send(false);
     new ParameterStatusResponse(output, "session_authorization".getBytes(), "PGAdapter".getBytes())
-        .send();
-    new ParameterStatusResponse(output, "integer_datetimes".getBytes(), "on".getBytes()).send();
-    new ParameterStatusResponse(output, "server_encoding".getBytes(), "UTF8".getBytes()).send();
-    new ParameterStatusResponse(output, "client_encoding".getBytes(), "UTF8".getBytes()).send();
-    new ParameterStatusResponse(output, "DateStyle".getBytes(), "ISO,YMD".getBytes()).send();
-    new ParameterStatusResponse(output, "IntervalStyle".getBytes(), "iso_8601".getBytes()).send();
+        .send(false);
+    new ParameterStatusResponse(output, "integer_datetimes".getBytes(), "on".getBytes())
+        .send(false);
+    new ParameterStatusResponse(output, "server_encoding".getBytes(), "UTF8".getBytes())
+        .send(false);
+    new ParameterStatusResponse(output, "client_encoding".getBytes(), "UTF8".getBytes())
+        .send(false);
+    new ParameterStatusResponse(output, "DateStyle".getBytes(), "ISO,YMD".getBytes()).send(false);
+    new ParameterStatusResponse(output, "IntervalStyle".getBytes(), "iso_8601".getBytes())
+        .send(false);
     new ParameterStatusResponse(output, "standard_conforming_strings".getBytes(), "on".getBytes())
-        .send();
+        .send(false);
     new ParameterStatusResponse(
             output,
             "TimeZone".getBytes(),
             TimeZone.getDefault().getDisplayName(false, TimeZone.SHORT).getBytes())
-        .send();
+        .send(false);
+    for (NoticeResponse noticeResponse : startupNotices) {
+      noticeResponse.send(false);
+    }
     new ReadyResponse(output, Status.IDLE).send();
   }
 }
