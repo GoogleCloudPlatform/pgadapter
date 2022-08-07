@@ -73,7 +73,6 @@ You can solve this problem by either:
 2. Remove the `-ddl=Single` command line argument when starting PGAdapter.
 
 ## COPY Statement
-PGAdapter supports `COPY table_name FROM STDIN`. See [copy support](copy.md) for more information.
-
-Other `COPY` variants, such as `COPY table_name FROM file_name` or `COPY table_name FROM PROGRAM`,
-are not supported. `COPY table_name TO ...` is also not supported.
+PGAdapter supports `COPY table_name FROM STDIN [BINARY]` and `COPY table_name TO STDOUT [BINARY]`.
+These commands can be used to copy data between different Cloud Spanner databases, or between a
+Cloud Spanner database and a PostgreSQL database. See [copy support](copy.md) for more information.
