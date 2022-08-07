@@ -92,7 +92,7 @@ public class ITPsqlTest implements IntegrationTest {
 
     testEnv.setUp();
     database = testEnv.createDatabase(DEFAULT_DATA_MODEL);
-    testEnv.startPGAdapterServer(ImmutableList.of("skip_psql_hints"));
+    testEnv.startPGAdapterServer(ImmutableList.of("-disable_psql_hints"));
   }
 
   @AfterClass

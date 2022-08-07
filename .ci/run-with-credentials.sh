@@ -62,7 +62,7 @@ e2e-psql)
   echo "Starting PGAdapter"
   ls -lh target
   UBER_JAR="pgadapter.jar"
-  (java -jar target/"${UBER_JAR}" -p "${GOOGLE_CLOUD_PROJECT}" -i "${GOOGLE_CLOUD_INSTANCE}" -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -e "${GOOGLE_CLOUD_ENDPOINT}" -s 4242 -ddl AutocommitImplicitTransaction -skip_psql_hints > /dev/null 2>&1) &
+  (java -jar target/"${UBER_JAR}" -p "${GOOGLE_CLOUD_PROJECT}" -i "${GOOGLE_CLOUD_INSTANCE}" -d "${GOOGLE_CLOUD_DATABASE_WITH_VERSION}" -e "${GOOGLE_CLOUD_ENDPOINT}" -s 4242 -ddl AutocommitImplicitTransaction -disable_psql_hints > /dev/null 2>&1) &
   BACK_PID=$!
   sleep 1
 #  execute psql and evaluate result
