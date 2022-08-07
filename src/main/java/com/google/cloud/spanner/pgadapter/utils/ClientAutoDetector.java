@@ -21,9 +21,6 @@ import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
-import com.google.cloud.spanner.pgadapter.statements.local.SetSearchPathStatement;
-import com.google.cloud.spanner.pgadapter.statements.local.ShowSearchPathStatement;
-import com.google.cloud.spanner.pgadapter.statements.local.ShowServerVersionStatement;
 import com.google.cloud.spanner.pgadapter.utils.HintGenerator.Hint;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse.NoticeSeverity;
@@ -43,10 +40,7 @@ public class ClientAutoDetector {
       ImmutableList.of(
           SelectCurrentSchemaStatement.INSTANCE,
           SelectCurrentDatabaseStatement.INSTANCE,
-          SelectCurrentCatalogStatement.INSTANCE,
-          ShowSearchPathStatement.INSTANCE,
-          ShowServerVersionStatement.INSTANCE,
-          SetSearchPathStatement.INSTANCE);
+          SelectCurrentCatalogStatement.INSTANCE);
 
   public enum WellKnownClient {
     PSQL {

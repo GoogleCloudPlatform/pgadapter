@@ -26,6 +26,7 @@ import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -91,7 +92,7 @@ public class ITPsqlTest implements IntegrationTest {
 
     testEnv.setUp();
     database = testEnv.createDatabase(DEFAULT_DATA_MODEL);
-    testEnv.startPGAdapterServer(Collections.emptyList());
+    testEnv.startPGAdapterServer(ImmutableList.of("skip_psql_hints"));
   }
 
   @AfterClass
