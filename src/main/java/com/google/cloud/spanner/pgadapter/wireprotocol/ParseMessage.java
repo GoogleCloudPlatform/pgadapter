@@ -159,6 +159,11 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
     return String.valueOf(IDENTIFIER);
   }
 
+  @Override
+  public String getSql() {
+    return this.statement.getSql();
+  }
+
   public IntermediatePreparedStatement getStatement() {
     return this.statement;
   }
