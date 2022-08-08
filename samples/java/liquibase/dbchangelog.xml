@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+  xmlns:pro="http://www.liquibase.org/xml/ns/pro"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+		http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+		http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd
+		http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd">
+
+  <changeSet  id="1 - create singers and albums"  author="loite">
+    <createTable  tableName="singers">
+      <column  name="singer_id"  type="varchar(36)">
+        <!-- Setting the primary key name to 'pk_<table_name>' is required! -->
+        <constraints
+          primaryKey="true"
+          primaryKeyName="pk_singers"
+          nullable="false"/>
+      </column>
+      <column  name="first_name"  type="varchar(200)" />
+      <column  name="last_name"  type="varchar(200)">
+        <constraints nullable="false" />
+      </column>
+      <column
+          name="full_name"
+          type="varchar(400)"
+          generationType="ALWAYS"
+          defaultValueComputed="GENERATED ALWAYS AS (coalesce(first_name || ' ', '') || last_name) STORED">
+        <constraints nullable="true" />
+      </column>
+      <column name="active" type="boolean" defaultValueBoolean="true"/>
+    </createTable>
+    <createTable  tableName="albums">
+      <column  name="album_id"  type="varchar(36)">
+        <!-- Setting the primary key name to 'pk_<table_name>' is required! -->
+        <constraints
+          primaryKey="true"
+          primaryKeyName="pk_albums"
+          nullable="false"/>
+      </column>
+      <column  name="title"  type="varchar(200)">
+        <constraints nullable="false" />
+      </column>
+      <column name="singer_id" type="varchar(36)">
+        <constraints
+          nullable="false"
+          foreignKeyName="fk_albums_singers"
+          references="singers (singer_id)" />
+      </column>
+    </createTable>
+  </changeSet>
+
+  <changeSet id="2 - create tracks"  author="loite">
+    <createTable  tableName="tracks">
+      <!-- Cloud Spanner does not allow adding a primary key after the table has been created, so
+       you must add the primary key definition to all columns when creating the table. -->
+      <column  name="album_id"  type="varchar(36)">
+        <constraints
+          primaryKey="true"
+          primaryKeyName="pk_tracks"
+          nullable="false"/>
+      </column>
+      <column  name="track_number"  type="bigint">
+        <constraints
+          primaryKey="true"
+          primaryKeyName="pk_tracks"
+          nullable="false"/>
+      </column>
+      <column  name="title"  type="varchar(200)">
+        <constraints nullable="false" />
+      </column>
+    </createTable>
+    <!-- Append custom sql to the previous CREATE TABLE statement to interleave it in albums. -->
+    <modifySql dbms="postgresql">
+      <append value=" interleave in parent albums on delete cascade"/>
+    </modifySql>
+  </changeSet>
+  <changeSet id="3 - load singers" author="loite">
+    <loadData
+      encoding="UTF-8"
+      file="data/singers.csv"
+      quotchar='"'
+      relativeToChangelogFile="true"
+      separator=";"
+      tableName="singers"
+      usePreparedStatements="true">
+      <column
+        name="singer_id"
+        type="string"/>
+      <column
+        name="first_name"
+        type="string"/>
+      <column
+        name="last_name"
+        type="string"/>
+      <column
+        name="active"
+        type="boolean"/>
+    </loadData>
+  </changeSet>
+  <changeSet id="4 - load albums" author="loite">
+    <loadData
+      encoding="UTF-8"
+      file="data/albums.csv"
+      quotchar='"'
+      relativeToChangelogFile="true"
+      separator=";"
+      tableName="albums"
+      usePreparedStatements="true">
+      <column
+        name="album_id"
+        type="string"/>
+      <column
+        name="singer_id"
+        type="string"/>
+      <column
+        name="title"
+        type="string"/>
+    </loadData>
+  </changeSet>
+  <changeSet id="5 - load tracks" author="loite">
+    <loadData
+      encoding="UTF-8"
+      file="data/tracks.csv"
+      quotchar='"'
+      relativeToChangelogFile="true"
+      separator=";"
+      tableName="tracks"
+      usePreparedStatements="true">
+      <column
+        name="album_id"
+        type="string"/>
+      <column
+        name="track_number"
+        type="numeric"/>
+      <column
+        name="title"
+        type="string"/>
+    </loadData>
+  </changeSet>
+
+<!--  <changeSet id="4 - add duration column to tracks">-->
+<!--    <addColumn>-->
+<!--      &lt;!&ndash; Add a non-null column &ndash;&gt;-->
+<!--      <column name="duration" type="numeric" defaultValueNumeric="0">-->
+<!--        <constraints nullable="false" />-->
+<!--      </column>-->
+<!--    </addColumn>-->
+<!--  </changeSet>-->
+</databaseChangeLog>
