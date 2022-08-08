@@ -1656,8 +1656,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               SQLException.class,
               () -> connection.createStatement().executeQuery("show random_setting"));
       assertEquals(
-          "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"random_setting\"",
-          exception.getMessage());
+          "ERROR: unrecognized configuration parameter \"random_setting\"", exception.getMessage());
     }
   }
 
@@ -1698,8 +1697,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               () ->
                   connection.createStatement().executeQuery("set random_setting to 'some-value'"));
       assertEquals(
-          "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"random_setting\"",
-          exception.getMessage());
+          "ERROR: unrecognized configuration parameter \"random_setting\"", exception.getMessage());
     }
   }
 
@@ -1734,8 +1732,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               SQLException.class,
               () -> connection.createStatement().executeQuery("reset random_setting"));
       assertEquals(
-          "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"random_setting\"",
-          exception.getMessage());
+          "ERROR: unrecognized configuration parameter \"random_setting\"", exception.getMessage());
     }
   }
 
@@ -1747,7 +1744,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               SQLException.class,
               () -> connection.createStatement().executeQuery("show spanner.some_setting"));
       assertEquals(
-          "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"spanner.some_setting\"",
+          "ERROR: unrecognized configuration parameter \"spanner.some_setting\"",
           exception.getMessage());
     }
   }
@@ -1946,7 +1943,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           assertThrows(
               SQLException.class,
               () -> connection.createStatement().execute("show application_name "));
-      assertEquals("ERROR: INVALID_ARGUMENT: " + TRANSACTION_ABORTED_ERROR, exception.getMessage());
+      assertEquals("ERROR: " + TRANSACTION_ABORTED_ERROR, exception.getMessage());
 
       connection.rollback();
 
@@ -2039,8 +2036,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             SQLException.class,
             () -> connection.createStatement().execute(String.format("show %s", setting)));
     assertEquals(
-        String.format(
-            "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"%s\"", setting),
+        String.format("ERROR: unrecognized configuration parameter \"%s\"", setting),
         exception.getMessage());
   }
 }
