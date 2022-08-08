@@ -48,7 +48,7 @@
   <parent>
     <groupId>com.google.cloud</groupId>
     <artifactId>google-cloud-shared-config</artifactId>
-    <version>1.5.2</version>
+    <version>1.5.3</version>
   </parent>
   <scm>
     <connection>scm:git:git@github.com:GoogleCloudPlatform/pgadapter.git</connection>
@@ -76,7 +76,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.4.0</version>
+      <version>42.4.1</version>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>
