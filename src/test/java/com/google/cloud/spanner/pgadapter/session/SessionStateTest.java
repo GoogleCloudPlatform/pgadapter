@@ -151,7 +151,7 @@ public class SessionStateTest {
   public void testGetAll() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(308, allSettings.size());
+    assertEquals(345, allSettings.size());
   }
 
   @Test
@@ -189,7 +189,7 @@ public class SessionStateTest {
     state.setLocal("spanner", "custom_local_setting", "value2");
 
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(310, allSettings.size());
+    assertEquals(347, allSettings.size());
 
     PGSetting applicationName =
         allSettings.stream()
@@ -410,15 +410,15 @@ public class SessionStateTest {
         + "union all\n"
         + "select 'max_connections' as name, '100' as setting, null as unit, 'Connections and Authentication / Connection Settings' as category, null as short_desc, null as extra_desc, '1' as min_val, '262143' as max_val, null::varchar[] as enumvals, '100' as boot_val, '100' as reset_val, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
-        + "select 'max_index_keys' as name, '32' as setting, null as unit, 'Preset Options' as category, null as short_desc, null as extra_desc, '32' as min_val, '32' as max_val, null::varchar[] as enumvals, '32' as boot_val, '32' as reset_val, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
+        + "select 'max_index_keys' as name, '16' as setting, null as unit, 'Preset Options' as category, null as short_desc, null as extra_desc, '16' as min_val, '16' as max_val, null::varchar[] as enumvals, '16' as boot_val, '16' as reset_val, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
         + "select 'port' as name, '5432' as setting, null as unit, 'Connections and Authentication / Connection Settings' as category, null as short_desc, null as extra_desc, '1' as min_val, '65535' as max_val, null::varchar[] as enumvals, '5432' as boot_val, '5432' as reset_val, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
         + "select 'search_path' as name, 'public' as setting, null as unit, 'Client Connection Defaults / Statement Behavior' as category, null as short_desc, null as extra_desc, null as min_val, null as max_val, null::varchar[] as enumvals, 'public' as boot_val, 'public' as reset_val, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
-        + "select 'server_version' as name, null as setting, null as unit, 'Preset Options' as category, null as short_desc, null as extra_desc, null as min_val, null as max_val, null::varchar[] as enumvals, '13.4' as boot_val, '13.4' as reset_val, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
+        + "select 'server_version' as name, null as setting, null as unit, 'Preset Options' as category, null as short_desc, null as extra_desc, null as min_val, null as max_val, null::varchar[] as enumvals, '14.1 (Debian 14.1-1.pgdg110+1)' as boot_val, '14.1 (Debian 14.1-1.pgdg110+1)' as reset_val, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
-        + "select 'server_version_num' as name, '130004' as setting, null as unit, 'Preset Options' as category, null as short_desc, null as extra_desc, '130004' as min_val, '130004' as max_val, null::varchar[] as enumvals, '130004' as boot_val, '130004' as reset_val, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
+        + "select 'server_version_num' as name, '140001' as setting, null as unit, 'Preset Options' as category, null as short_desc, null as extra_desc, '140001' as min_val, '140001' as max_val, null::varchar[] as enumvals, '140001' as boot_val, '140001' as reset_val, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
         + "select 'transaction_isolation' as name, 'serializable' as setting, null as unit, 'Client Connection Defaults / Statement Behavior' as category, null as short_desc, null as extra_desc, null as min_val, null as max_val, '{\"serializable\", \"repeatable read\", \"read committed\", \"read uncommitted\"}'::varchar[] as enumvals, 'serializable' as boot_val, 'serializable' as reset_val, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
