@@ -749,6 +749,16 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals("ISO, MDY", resultSet.getString("setting"));
         assertFalse(resultSet.next());
       }
+      // Verify that we can also use a statement parameter to query the pg_settings table.
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("select setting from pg_settings where name=?")) {
+        preparedStatement.setString(1, "DateStyle");
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          assertTrue(resultSet.next());
+          assertEquals("ISO, MDY", resultSet.getString("setting"));
+          assertFalse(resultSet.next());
+        }
+      }
       // Change the date style and verify that it is also reflected in  pg_settings.
       connection.createStatement().execute("set datestyle to 'iso, ymd'");
       try (ResultSet resultSet =

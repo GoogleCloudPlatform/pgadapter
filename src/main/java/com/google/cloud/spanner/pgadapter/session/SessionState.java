@@ -39,6 +39,11 @@ import java.util.stream.Collectors;
 /** {@link SessionState} contains all session variables for a connection. */
 @InternalApi
 public class SessionState {
+  /**
+   * This set contains the settings that show up in the pg_settings CTE. Not all settings are
+   * included in the CTE because Cloud Spanner has a limit of max 60 union all clauses in a
+   * sub-select.
+   */
   private static final ImmutableSet<String> SUPPORTED_PG_SETTINGS_KEYS =
       ImmutableSet.of(
           "application_name",
@@ -56,6 +61,7 @@ public class SessionState {
           "TimeZone",
           "transaction_isolation",
           "transaction_read_only");
+
   private static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
 
   static {
