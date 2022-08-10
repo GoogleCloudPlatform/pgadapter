@@ -163,6 +163,18 @@ public class IntermediateStatementTest {
         transformInsert("insert into foo (col1, col2) values ($1, $2)").getSql());
     assertEquals(
         "select $1, $2 from (select col1=$1, col2=$2 from foo) p",
+        transformInsert("insert into foo(col1, col2) values ($1, $2)").getSql());
+    assertEquals(
+        "select $1, $2 from (select col1=$1, col2=$2 from foo) p",
+        transformInsert("insert into foo (col1, col2) values($1, $2)").getSql());
+    assertEquals(
+        "select $1, $2 from (select col1=$1, col2=$2 from foo) p",
+        transformInsert("insert into foo(col1, col2) values($1, $2)").getSql());
+    assertEquals(
+        "select $1, $2 from (select col1=$1, col2=$2 from foo) p",
+        transformInsert("insert foo(col1, col2) values($1, $2)").getSql());
+    assertEquals(
+        "select $1, $2 from (select col1=$1, col2=$2 from foo) p",
         transformInsert("insert foo (col1, col2) values ($1, $2)").getSql());
     assertEquals(
         "select $1, $2, $3, $4 from (select col1=$1, col2=$2, col1=$3, col2=$4 from foo) p",
@@ -197,6 +209,13 @@ public class IntermediateStatementTest {
     assertEquals(
         "select $1 from (select * from bar where some_col=$1) p",
         transformInsert("insert into foo select * from bar where some_col=$1").getSql());
+    assertEquals(
+        "select $1 from ((select * from bar where some_col=$1)) p",
+        transformInsert("insert into foo (select * from bar where some_col=$1)").getSql());
+    assertEquals(
+        "select $1 from ((select * from(select col1, col2 from bar) where col2=$1)) p",
+        transformInsert("insert into foo (select * from(select col1, col2 from bar) where col2=$1)")
+            .getSql());
     assertEquals(
         "select $1 from (select * from bar where some_col=$1) p",
         transformInsert("insert foo select * from bar where some_col=$1").getSql());
