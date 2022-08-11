@@ -24,6 +24,20 @@ import java.util.List;
 import java.util.Scanner;
 
 public class PythonTestSetup extends AbstractMockServerTest {
+  static boolean isPythonAvailable() {
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] pythonCommand = new String[] {"python3", "--version"};
+    builder.command(pythonCommand);
+    try {
+      Process process = builder.start();
+      int res = process.waitFor();
+
+      return res == 0;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
   static String executeWithoutParameters(int port, String sql, String statementType)
       throws IOException, InterruptedException {
     String[] runCommand =

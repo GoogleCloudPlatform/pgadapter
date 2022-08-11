@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.python;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -58,6 +59,8 @@ public class ITPsycopg2Test extends PythonTestSetup {
 
   @BeforeClass
   public static void setup() throws Exception {
+    assumeTrue("This test requires python3", isPythonAvailable());
+
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
@@ -93,8 +96,10 @@ public class ITPsycopg2Test extends PythonTestSetup {
 
   @AfterClass
   public static void teardown() {
-    testEnv.stopPGAdapterServer();
-    testEnv.cleanUp();
+    if (isPythonAvailable()) {
+      testEnv.stopPGAdapterServer();
+      testEnv.cleanUp();
+    }
   }
 
   @Test

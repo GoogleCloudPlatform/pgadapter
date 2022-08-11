@@ -136,6 +136,13 @@ public class ITJdbcMetadataTest implements IntegrationTest {
                 },
                 defaultClassLoader.getParent());
         Thread.currentThread().setContextClassLoader(classLoader);
+        // Verify that we can load the PG JDBC driver from this class loader.
+        try {
+          classLoader.loadClass("org.postgresql.Driver");
+        } catch (Throwable t) {
+          throw new Exception(
+              "Could not load PostgreSQL driver using URLClassLoader: " + t.getMessage(), t);
+        }
         Class<?> runnerClass = classLoader.loadClass(TestRunner.class.getName());
         Constructor<?> constructor = runnerClass.getDeclaredConstructor();
         Object runner = constructor.newInstance();
