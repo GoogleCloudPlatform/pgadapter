@@ -212,6 +212,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         }
       }
     }
+    LOGGER.info("Finished test");
   }
 
   @Test
@@ -231,6 +232,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertEquals(Types.VARCHAR, metadata.getParameterType(6));
       }
     }
+    LOGGER.info("Finished test");
   }
 
   @Test
@@ -297,6 +299,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         }
       }
     }
+    LOGGER.info("Finished test");
   }
 
   @Test
@@ -350,6 +353,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         }
       }
     }
+    LOGGER.info("Finished test");
   }
 
   @Test
@@ -406,6 +410,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         }
       }
     }
+    LOGGER.info("Finished test");
   }
 
   @Test
@@ -457,6 +462,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertFalse(resultSet.next());
       }
     }
+    LOGGER.info("Finished test");
   }
 
   @Test
@@ -520,6 +526,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertFalse(resultSet.next());
       }
     }
+    LOGGER.info("Finished test");
   }
 
   @Test
@@ -578,5 +585,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertFalse(resultSet.next());
       }
     }
+    LOGGER.info("Finished test");
   }
 }
