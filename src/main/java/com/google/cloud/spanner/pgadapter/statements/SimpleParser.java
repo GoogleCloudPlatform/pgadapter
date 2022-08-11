@@ -268,7 +268,7 @@ class SimpleParser {
       return false;
     }
     if (sql.substring(pos, pos + keyword.length()).equalsIgnoreCase(keyword)
-        && (!requireWhitespaceAfter || isWhitespaceOrParensOrEnd(pos + keyword.length()))) {
+        && (!requireWhitespaceAfter || isValidEndOfKeyword(pos + keyword.length()))) {
       if (updatePos) {
         pos = pos + keyword.length();
       }
@@ -277,13 +277,11 @@ class SimpleParser {
     return false;
   }
 
-  private boolean isWhitespaceOrParensOrEnd(int index) {
+  private boolean isValidEndOfKeyword(int index) {
     if (sql.length() == index) {
       return true;
     }
-    return Character.isWhitespace(sql.charAt(index))
-        || sql.charAt(index) == '('
-        || sql.charAt(index) == ')';
+    return !isValidIdentifierChar(sql.charAt(index));
   }
 
   void skipWhitespaces() {

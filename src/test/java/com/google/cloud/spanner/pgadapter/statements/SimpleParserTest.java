@@ -53,6 +53,10 @@ public class SimpleParserTest {
     assertTrue(new SimpleParser("values (1, 2)").eatKeyword("values"));
     assertTrue(new SimpleParser("values(1, 2)").eatKeyword("values"));
     assertTrue(new SimpleParser("null)").eatKeyword("null"));
+
+    assertTrue(new SimpleParser("select\"id\"from\"foo\"").eatKeyword("select"));
+    assertTrue(new SimpleParser("select/*comment*/id from foo").eatKeyword("select"));
+    assertFalse(new SimpleParser("select$$foo$$").eatKeyword("select"));
   }
 
   @Test
@@ -81,6 +85,8 @@ public class SimpleParserTest {
 
   @Test
   public void testReadTableOrIndexNamePart() {
+    assertEquals("\"foo\"", new SimpleParser("\"foo\"(id)").readIdentifierPart());
+
     assertEquals("foo", new SimpleParser("foo bar").readIdentifierPart());
     assertEquals("foo", new SimpleParser("foo").readIdentifierPart());
     assertEquals("\"foo\"", new SimpleParser("\"foo\" bar").readIdentifierPart());

@@ -202,6 +202,9 @@ public class IntermediateStatementTest {
                 "insert into foo (col1, col2, col3, col4, col5, col6, col7, col8, col9, col10) "
                     + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)")
             .getSql());
+    assertEquals(
+        "select $1, $2 from (select col1=$1, col2=$2 from \"foo\") p",
+        transformInsert("insert\"foo\"(col1, col2)values($1, $2)").getSql());
   }
 
   @Test
