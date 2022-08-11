@@ -59,7 +59,11 @@ public class ITPsycopg2Test extends PythonTestSetup {
 
   @BeforeClass
   public static void setup() throws Exception {
-    assumeTrue("This test requires python3", isPythonAvailable());
+    assumeTrue(
+        "Skipping ecosystem test because of missing dependency",
+        isPythonAvailable()
+            || System.getProperty("allowSkipUnsupportedEcosystemTest", "false")
+                .equalsIgnoreCase("true"));
 
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
@@ -96,10 +100,8 @@ public class ITPsycopg2Test extends PythonTestSetup {
 
   @AfterClass
   public static void teardown() {
-    if (isPythonAvailable()) {
-      testEnv.stopPGAdapterServer();
-      testEnv.cleanUp();
-    }
+    testEnv.stopPGAdapterServer();
+    testEnv.cleanUp();
   }
 
   @Test
