@@ -21,12 +21,21 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.api.gax.core.NoCredentialsProvider;
 import com.google.cloud.ByteArray;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
+import com.google.cloud.spanner.pgadapter.channels.TestChannelWithCertificatesProvider;
+import com.google.cloud.spanner.v1.SpannerClient;
+import com.google.cloud.spanner.v1.SpannerSettings;
 import com.google.common.collect.ImmutableList;
+import com.google.spanner.v1.CreateSessionRequest;
+import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
+import com.google.spanner.v1.Session;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -251,6 +260,30 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
       }
     }
     LOGGER.info("Finished test");
+  }
+
+  @Test
+  public void testManualDescribe() throws IOException {
+    System.out.println("Creating client");
+    SpannerClient client = SpannerClient.create(
+        SpannerSettings.newBuilder()
+            .setCredentialsProvider(NoCredentialsProvider.create())
+            .setTransportChannelProvider(new TestChannelWithCertificatesProvider().getChannelProvider("localhost", 8790))
+            .build()
+    );
+    System.out.println("Created client");
+    Session session = client.createSession(CreateSessionRequest.newBuilder()
+            .setDatabase("projects/test-project/instances/test-instance/databases/test-database")
+        .build());
+    System.out.println("Created session");
+    System.out.println("Analyzing query");
+    com.google.spanner.v1.ResultSet resultSet = client.executeSql(ExecuteSqlRequest.newBuilder()
+            .setSql("select 1  from all_types where col_bigint=$1 and col_bool=$2 and col_float8=$3")
+            .setQueryMode(QueryMode.PLAN)
+            .setSession(session.getName())
+        .build());
+    System.out.println("Received result");
+    System.out.println(resultSet);
   }
 
   @Test
