@@ -48,6 +48,25 @@ public class PGSetting {
   private static final int SOURCEFILE_INDEX = 14;
   private static final int SOURCELINE_INDEX = 15;
   private static final int PENDING_RESTART_INDEX = 16;
+  private static final ImmutableList<String> COLUMN_NAMES =
+      ImmutableList.of(
+          "name",
+          "setting",
+          "unit",
+          "category",
+          "short_desc",
+          "extra_desc",
+          "context",
+          "vartype",
+          "source",
+          "min_val",
+          "max_val",
+          "enumvals",
+          "boot_val",
+          "reset_val",
+          "sourcefile",
+          "sourceline",
+          "pending_restart");
 
   private final String extension;
   private final String name;
@@ -216,16 +235,22 @@ public class PGSetting {
         + " as short_desc, "
         + toSelectExpression((String) null)
         + " as extra_desc, "
+        + toSelectExpression(context)
+        + " as context, "
+        + toSelectExpression(vartype)
+        + " as vartype, "
         + toSelectExpression(minVal)
         + " as min_val, "
         + toSelectExpression(maxVal)
         + " as max_val, "
         + toSelectExpression(enumVals)
-        + "::varchar[] as enumvals, "
+        + " as enumvals, "
         + toSelectExpression(bootVal)
         + " as boot_val, "
         + toSelectExpression(resetVal)
         + " as reset_val, "
+        + toSelectExpression(source)
+        + " as source, "
         + toSelectExpression((String) null)
         + " as sourcefile, "
         + toSelectExpression((Integer) null)
@@ -234,18 +259,22 @@ public class PGSetting {
         + "::boolean as pending_restart";
   }
 
+  static ImmutableList<String> getColumnNames() {
+    return COLUMN_NAMES;
+  }
+
   String toSelectExpression(String value) {
     return value == null ? "null" : "'" + value + "'";
   }
 
   String toSelectExpression(String[] value) {
     return value == null
-        ? "null"
+        ? "null::text[]"
         : "'{"
             + Arrays.stream(value)
                 .map(s -> s.startsWith("\"") ? s : "\"" + s + "\"")
                 .collect(Collectors.joining(", "))
-            + "}'";
+            + "}'::text[]";
   }
 
   String toSelectExpression(Integer value) {

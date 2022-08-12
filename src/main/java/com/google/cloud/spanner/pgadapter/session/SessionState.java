@@ -123,12 +123,33 @@ public class SessionState {
 
   /** Generates a Common Table Expression that represents the pg_settings table. */
   String generatePGSettingsCte() {
-    return "pg_settings as (\n"
+    return "pg_settings_inmem as (\n"
         + getAll().stream()
             .filter(setting -> SUPPORTED_PG_SETTINGS_KEYS.contains(setting.getCasePreservingKey()))
             .map(PGSetting::getSelectStatement)
             .collect(Collectors.joining("\nunion all\n"))
-        + "\n)\n";
+        + "\n),\n"
+        + "pg_settings_names as (\n"
+        + "select name from pg_settings_inmem\n"
+        + "union\n"
+        + "select name from pg_catalog.pg_settings\n"
+        + "),\n"
+        + "pg_settings as (\n"
+        + "select n.name, "
+        + generateValueExpressions()
+        + "\n"
+        + "from pg_settings_names n\n"
+        + "left join pg_settings_inmem s1 using (name)\n"
+        + "left join pg_catalog.pg_settings s2 using (name)\n"
+        + "order by name\n"
+        + ")\n";
+  }
+
+  private static String generateValueExpressions() {
+    return PGSetting.getColumnNames().stream()
+        .skip(1)
+        .map(column -> "coalesce(s1." + column + ", s2." + column + ") as " + column)
+        .collect(Collectors.joining(","));
   }
 
   private static String toKey(String extension, String name) {
