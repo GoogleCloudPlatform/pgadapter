@@ -226,10 +226,6 @@ class SimpleParser {
     return internalEat(keyword, skipWhitespaceBefore, requireWhitespaceAfter, false);
   }
 
-  String eatAnyKeyword() {
-    return null;
-  }
-
   boolean eatKeyword(String... keywords) {
     return eat(true, true, keywords);
   }

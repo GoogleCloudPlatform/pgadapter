@@ -124,6 +124,8 @@ public class SimpleParserTest {
     assertEquals(
         new TableOrIndexName("foo", ""), new SimpleParser("foo. bar").readTableOrIndexName());
     assertNull(new SimpleParser(".bar").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("foo", ""), new SimpleParser("foo.\"bar").readTableOrIndexName());
 
     assertEquals(new TableOrIndexName("foo"), new SimpleParser("foo bar").readTableOrIndexName());
     assertEquals(new TableOrIndexName("foo"), new SimpleParser("foo").readTableOrIndexName());

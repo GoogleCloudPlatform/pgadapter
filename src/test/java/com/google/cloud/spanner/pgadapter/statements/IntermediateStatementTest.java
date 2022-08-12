@@ -235,6 +235,7 @@ public class IntermediateStatementTest {
         transformInsert(
                 "insert foo (col1, col2, col3) select * from bar where some_col=$1 limit $2")
             .getSql());
+    assertNull(transformInsert("insert into foo (col1 values ('test')"));
   }
 
   @Test
