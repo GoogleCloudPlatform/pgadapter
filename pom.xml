@@ -18,6 +18,7 @@
     <java.version>1.8</java.version>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
+    <skipUnits>false</skipUnits>
     <skipITs>true</skipITs>
     <clirr.skip>true</clirr.skip>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -322,6 +323,7 @@
           <argLine>${surefire.jacoco.args}</argLine>
           <excludedGroups>${excludedTests}</excludedGroups>
           <reportNameSuffix>sponge_log</reportNameSuffix>
+          <skipTests>${skipUnits}</skipTests>
           <systemProperties>
             <property>
               <name>java.util.logging.config.file</name>
@@ -430,6 +432,12 @@
           <reuseForks>true</reuseForks>
           <argLine>${failsafe.jacoco.args}</argLine>
           <skipITs>${skipITs}</skipITs>
+          <systemProperties>
+            <property>
+              <name>java.util.logging.config.file</name>
+              <value>src/test/resources/logging.properties</value>
+            </property>
+          </systemProperties>
         </configuration>
       </plugin>
       <plugin>
