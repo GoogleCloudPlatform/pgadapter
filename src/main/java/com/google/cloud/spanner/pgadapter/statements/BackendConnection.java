@@ -462,6 +462,14 @@ public class BackendConnection {
     }
   }
 
+  /**
+   * Sets the initial value of a pg_settings setting for this connection. This method should only be
+   * called during startup with values that come from the connection request.
+   */
+  public void initSessionSetting(String name, String value) {
+    this.sessionState.setConnectionStartupValue(name, value);
+  }
+
   /** Returns the Spanner connection used by this {@link BackendConnection}. */
   public Connection getSpannerConnection() {
     return this.spannerConnection;

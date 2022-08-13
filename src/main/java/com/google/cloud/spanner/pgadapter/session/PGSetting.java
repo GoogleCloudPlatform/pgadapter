@@ -48,6 +48,7 @@ public class PGSetting {
   private static final int SOURCEFILE_INDEX = 14;
   private static final int SOURCELINE_INDEX = 15;
   private static final int PENDING_RESTART_INDEX = 16;
+  /** The column names of the pg_settings table. */
   private static final ImmutableList<String> COLUMN_NAMES =
       ImmutableList.of(
           "name",
@@ -198,6 +199,7 @@ public class PGSetting {
     this.pendingRestart = pendingRestart;
   }
 
+  /** Returns a copy of this {@link PGSetting}. */
   PGSetting copy() {
     return new PGSetting(
         extension,
@@ -259,14 +261,20 @@ public class PGSetting {
         + "::boolean as pending_restart";
   }
 
+  /** Returns the column names of the pg_settings table. */
   static ImmutableList<String> getColumnNames() {
     return COLUMN_NAMES;
   }
 
+  /** Converts a string to a SQL literal expression that can be used in a select statement. */
   String toSelectExpression(String value) {
     return value == null ? "null" : "'" + value + "'";
   }
 
+  /**
+   * Converts a string array to a SQL literal expression that can be used in a select statement. The
+   * expression is cast to text[].
+   */
   String toSelectExpression(String[] value) {
     return value == null
         ? "null::text[]"
@@ -277,10 +285,12 @@ public class PGSetting {
             + "}'::text[]";
   }
 
+  /** Converts an Integer to a SQL literal expression that can be used in a select statement. */
   String toSelectExpression(Integer value) {
     return value == null ? "null" : value.toString();
   }
 
+  /** Converts a Boolean to a SQL literal expression that can be used in a select statement. */
   String toSelectExpression(Boolean value) {
     return value == null ? "null" : (value ? "'t'" : "'f'");
   }
@@ -314,6 +324,12 @@ public class PGSetting {
   /** Initializes the value of the setting without checking for validity. */
   void initSettingValue(String value) {
     this.setting = value;
+  }
+
+  /** Initializes the value of the setting at connection startup. */
+  void initConnectionValue(String value) {
+    setSetting(value);
+    this.resetVal = value;
   }
 
   /**

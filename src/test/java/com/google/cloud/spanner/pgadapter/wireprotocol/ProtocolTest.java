@@ -1518,6 +1518,9 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getConnectionId()).thenReturn(1);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
     when(server.getOptions()).thenReturn(options);
     when(options.getServerVersion()).thenReturn("13.4");
     when(options.shouldAuthenticate()).thenReturn(false);

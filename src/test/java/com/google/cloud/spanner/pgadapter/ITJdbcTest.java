@@ -739,14 +739,13 @@ public class ITJdbcTest implements IntegrationTest {
   public void testPGSettings() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       // First verify the default value.
-      // TODO: JDBC actually sets the DateStyle to 'ISO' for every connection at startup. This is
-      //       currently not respected by PGAdapter.
+      // JDBC sets the DateStyle to 'ISO' for every connection in the connection request.
       try (ResultSet resultSet =
           connection
               .createStatement()
               .executeQuery("select setting from pg_settings where name='DateStyle'")) {
         assertTrue(resultSet.next());
-        assertEquals("ISO, MDY", resultSet.getString("setting"));
+        assertEquals("ISO", resultSet.getString("setting"));
         assertFalse(resultSet.next());
       }
       // Verify that we can also use a statement parameter to query the pg_settings table.
@@ -755,7 +754,7 @@ public class ITJdbcTest implements IntegrationTest {
         preparedStatement.setString(1, "DateStyle");
         try (ResultSet resultSet = preparedStatement.executeQuery()) {
           assertTrue(resultSet.next());
-          assertEquals("ISO, MDY", resultSet.getString("setting"));
+          assertEquals("ISO", resultSet.getString("setting"));
           assertFalse(resultSet.next());
         }
       }
@@ -789,6 +788,18 @@ public class ITJdbcTest implements IntegrationTest {
               .executeQuery("select setting from pg_settings where name='DateStyle'")) {
         assertTrue(resultSet.next());
         assertEquals("iso, ymd", resultSet.getString("setting"));
+        assertFalse(resultSet.next());
+      }
+
+      // Resetting the value should bring it back to the initial value.
+      connection.createStatement().execute("reset datestyle");
+      connection.commit();
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select setting from pg_settings where name='DateStyle'")) {
+        assertTrue(resultSet.next());
+        assertEquals("ISO", resultSet.getString("setting"));
         assertFalse(resultSet.next());
       }
     }
