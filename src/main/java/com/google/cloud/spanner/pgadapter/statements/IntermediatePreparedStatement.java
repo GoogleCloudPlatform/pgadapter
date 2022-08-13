@@ -280,10 +280,10 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   static @Nullable Statement transformInsertToSelectParams(
       Connection connection, String sql, Set<String> parameters) {
     SimpleParser parser = new SimpleParser(sql);
-    if (!parser.eat("insert")) {
+    if (!parser.eatKeyword("insert")) {
       return null;
     }
-    parser.eat("into");
+    parser.eatKeyword("into");
     TableOrIndexName table = parser.readTableOrIndexName();
     if (table == null) {
       return null;
@@ -291,21 +291,31 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     parser.skipWhitespaces();
 
     List<String> columnsList = null;
-    if (parser.eat("(")) {
-      columnsList = parser.parseExpressionList();
-      if (!parser.eat(")")) {
-        return null;
+    int posBeforeToken = parser.getPos();
+    if (parser.eatToken("(")) {
+      if (parser.peekKeyword("select") || parser.peekToken("(")) {
+        // Revert and assume that the insert uses a select statement.
+        parser.setPos(posBeforeToken);
+      } else {
+        columnsList = parser.parseExpressionList();
+        if (!parser.eatToken(")")) {
+          return null;
+        }
       }
     }
 
     parser.skipWhitespaces();
     int potentialSelectStart = parser.getPos();
-    if (parser.eat("select")) {
-      // This is an `insert into <table> [(...)] select ...` statement. Then we can just use the
-      // select statement as the result.
-      return transformSelectToSelectParams(
-          parser.getSql().substring(potentialSelectStart), parameters);
-    } else if (!parser.eat("values")) {
+    if (!parser.eatKeyword("values")) {
+      while (parser.eatToken("(")) {
+        // ignore
+      }
+      if (parser.eatKeyword("select")) {
+        // This is an `insert into <table> [(...)] select ...` statement. Then we can just use the
+        // select statement as the result.
+        return transformSelectToSelectParams(
+            parser.getSql().substring(potentialSelectStart), parameters);
+      }
       return null;
     }
 
@@ -313,13 +323,16 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       columnsList = getAllColumns(connection, table);
     }
     List<List<String>> rows = new ArrayList<>();
-    while (parser.eat("(")) {
+    while (parser.eatToken("(")) {
       List<String> row = parser.parseExpressionList();
-      if (row == null || row.isEmpty() || !parser.eat(")") || row.size() != columnsList.size()) {
+      if (row == null
+          || row.isEmpty()
+          || !parser.eatToken(")")
+          || row.size() != columnsList.size()) {
         return null;
       }
       rows.add(row);
-      if (!parser.eat(",")) {
+      if (!parser.eatToken(",")) {
         break;
       }
     }
@@ -377,23 +390,23 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   @VisibleForTesting
   static Statement transformUpdateToSelectParams(String sql, Set<String> parameters) {
     SimpleParser parser = new SimpleParser(sql);
-    if (!parser.eat("update")) {
+    if (!parser.eatKeyword("update")) {
       return null;
     }
-    parser.eat("only");
+    parser.eatKeyword("only");
     TableOrIndexName table = parser.readTableOrIndexName();
     if (table == null) {
       return null;
     }
-    if (!parser.eat("set")) {
+    if (!parser.eatKeyword("set")) {
       return null;
     }
-    List<String> assignmentsList = parser.parseExpressionListUntil("where");
+    List<String> assignmentsList = parser.parseExpressionListUntilKeyword("where");
     if (assignmentsList == null || assignmentsList.isEmpty()) {
       return null;
     }
     int whereStart = parser.getPos();
-    if (!parser.eat("where")) {
+    if (!parser.eatKeyword("where")) {
       whereStart = -1;
     }
 
@@ -427,17 +440,17 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   @VisibleForTesting
   static Statement transformDeleteToSelectParams(String sql, Set<String> parameters) {
     SimpleParser parser = new SimpleParser(sql);
-    if (!parser.eat("delete")) {
+    if (!parser.eatKeyword("delete")) {
       return null;
     }
-    parser.eat("from");
+    parser.eatKeyword("from");
     TableOrIndexName table = parser.readTableOrIndexName();
     if (table == null) {
       return null;
     }
     parser.skipWhitespaces();
     int whereStart = parser.getPos();
-    if (!parser.eat("where")) {
+    if (!parser.eatKeyword("where")) {
       // Deletes must have a where clause, otherwise there cannot be any parameters.
       return null;
     }
