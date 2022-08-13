@@ -193,6 +193,7 @@
       <column name="col_text" type="text"/>
     </createTable>
   </changeSet>
+  <!-- Load data into a table with all supported data types. -->
   <changeSet id="8 - load data for all data types" author="loite">
     <loadData
       encoding="UTF-8"
@@ -233,5 +234,51 @@
         name="col_text"
         type="string"/>
     </loadData>
+  </changeSet>
+
+  <changeSet id="9 - custom SQL change" author="loite">
+    <sql
+      splitStatements="true"
+      endDelimiter=";"><![CDATA[
+        create table venues (
+            venue_id varchar(36) not null primary key,
+            name     varchar(100) not null
+        );
+        create table concerts (
+            concert_id varchar(36) not null primary key,
+            venue_id   varchar(36) not null,
+            start_time timestamptz,
+            end_time   timestamptz,
+            singer_id  varchar(36) not null,
+            constraint fk_concerts_venues foreign key (venue_id) references venues (venue_id),
+            constraint fk_concerts_singers foreign key (singer_id) references singers (singer_id),
+            constraint chk_concert_end_time_after_start_time check (
+                coalesce(start_time, '0001-01-01T00:00:00Z'::timestamptz) <
+                coalesce(end_time, '9999-12-31T23:59:59Z'::timestamptz)
+            )
+        );
+      ]]>
+    </sql>
+  </changeSet>
+  <changeSet id="9.1 - fix check constraint" author="loite">
+    <sql
+      splitStatements="true"
+      endDelimiter=";"><![CDATA[
+        alter table concerts drop constraint chk_concert_end_time_after_start_time;
+        alter table concerts add constraint chk_concert_end_time_after_start_time check (
+            coalesce(start_time, '0001-01-01 00:00:00+00'::timestamptz) <
+            coalesce(end_time, '9999-12-31 23:59:59+00'::timestamptz)
+          );
+      ]]>
+    </sql>
+  </changeSet>
+  <changeSet id="10 - insert data with SQL" author="loite">
+    <sql
+      splitStatements="true"
+      endDelimiter=";">
+      insert into venues values ('45850c71-c2ea-404b-98b8-bcf985ec3a8c', 'Venue 1');
+      insert into concerts values ('149e4411-fa1e-46a1-8b95-d5da83d7e7a7', '45850c71-c2ea-404b-98b8-bcf985ec3a8c', null, null, '014a1c27-a8af-4911-bb71-6da16a540df1');
+      insert into concerts values ('89b2cf6f-322d-45e8-8228-89544e948908', '45850c71-c2ea-404b-98b8-bcf985ec3a8c', '2022-08-31 20:30:00+02:00'::timestamptz, '2022-09-01 02:00:00+02:00'::timestamptz, '014a1c27-a8af-4911-bb71-6da16a540df1');
+    </sql>
   </changeSet>
 </databaseChangeLog>
