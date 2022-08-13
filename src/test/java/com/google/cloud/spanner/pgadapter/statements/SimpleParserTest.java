@@ -30,24 +30,63 @@ import org.junit.runners.JUnit4;
 public class SimpleParserTest {
 
   @Test
-  public void testEat() {
-    assertTrue(new SimpleParser("insert into foo").eat("insert"));
-    assertTrue(new SimpleParser("   insert   into foo").eat("insert"));
-    assertTrue(new SimpleParser("\tinsert   foo").eat("insert"));
+  public void testEatKeyword() {
+    assertTrue(new SimpleParser("insert").eatKeyword("insert"));
+    assertTrue(new SimpleParser("insert into foo").eatKeyword("insert"));
+    assertTrue(new SimpleParser("   insert   into foo").eatKeyword("insert"));
+    assertTrue(new SimpleParser("\tinsert   foo").eatKeyword("insert"));
 
-    assertFalse(new SimpleParser("inset into foo").eat("insert"));
-    assertFalse(new SimpleParser("\"insert\" into foo").eat("insert"));
+    assertFalse(new SimpleParser("inset into foo").eatKeyword("insert"));
+    assertFalse(new SimpleParser("\"insert\" into foo").eatKeyword("insert"));
 
-    assertTrue(new SimpleParser("insert into foo").eat("insert", "into"));
-    assertTrue(new SimpleParser("   insert   into foo").eat("insert", "into"));
+    assertTrue(new SimpleParser("insert into foo").eatKeyword("insert", "into"));
+    assertTrue(new SimpleParser("   insert   into foo").eatKeyword("insert", "into"));
 
-    assertFalse(new SimpleParser("\tinsert   foo").eat("insert", "into"));
-    assertFalse(new SimpleParser("inset into foo").eat("insert", "into"));
-    assertFalse(new SimpleParser("\"insert\" into foo").eat("insert", "into"));
+    assertFalse(new SimpleParser("\tinsert   foo").eatKeyword("insert", "into"));
+    assertFalse(new SimpleParser("inset into foo").eatKeyword("insert", "into"));
+    assertFalse(new SimpleParser("\"insert\" into foo").eatKeyword("insert", "into"));
+
+    assertFalse(new SimpleParser("insertinto foo").eatKeyword("insert", "into"));
+    assertFalse(new SimpleParser("insert intofoo").eatKeyword("insert", "into"));
+    assertFalse(new SimpleParser("\"insert\"into foo").eatKeyword("insert", "into"));
+
+    assertTrue(new SimpleParser("values (1, 2)").eatKeyword("values"));
+    assertTrue(new SimpleParser("values(1, 2)").eatKeyword("values"));
+    assertTrue(new SimpleParser("null)").eatKeyword("null"));
+
+    assertTrue(new SimpleParser("select\"id\"from\"foo\"").eatKeyword("select"));
+    assertTrue(new SimpleParser("select/*comment*/id from foo").eatKeyword("select"));
+    assertFalse(new SimpleParser("select$$foo$$").eatKeyword("select"));
+  }
+
+  @Test
+  public void testEatToken() {
+    assertTrue(new SimpleParser("(foo").eatToken("("));
+    assertTrue(new SimpleParser("(").eatToken("("));
+    assertTrue(new SimpleParser("( ").eatToken("("));
+
+    assertTrue(new SimpleParser("\t(   foo").eatToken("("));
+    assertFalse(new SimpleParser("foo(").eatToken("("));
+    assertFalse(new SimpleParser("").eatToken("("));
+  }
+
+  @Test
+  public void testDotOperator() {
+    assertTrue(new SimpleParser(".foo").eatDotOperator());
+    assertFalse(new SimpleParser(". foo").eatDotOperator());
+    assertFalse(new SimpleParser(" .foo").eatDotOperator());
+    assertFalse(new SimpleParser(".").eatDotOperator());
+    assertFalse(new SimpleParser(". ").eatDotOperator());
+
+    assertTrue(new SimpleParser("\t(   foo").eatToken("("));
+    assertFalse(new SimpleParser("foo(").eatToken("("));
+    assertFalse(new SimpleParser("").eatToken("("));
   }
 
   @Test
   public void testReadTableOrIndexNamePart() {
+    assertEquals("\"foo\"", new SimpleParser("\"foo\"(id)").readIdentifierPart());
+
     assertEquals("foo", new SimpleParser("foo bar").readIdentifierPart());
     assertEquals("foo", new SimpleParser("foo").readIdentifierPart());
     assertEquals("\"foo\"", new SimpleParser("\"foo\" bar").readIdentifierPart());
@@ -79,6 +118,15 @@ public class SimpleParserTest {
 
   @Test
   public void testReadTableOrIndexName() {
+    assertEquals(new TableOrIndexName("foo"), new SimpleParser("foo .bar").readTableOrIndexName());
+    // The following is an invalid name, but the simple parser should just accept this and let the
+    // backend return an error.
+    assertEquals(
+        new TableOrIndexName("foo", ""), new SimpleParser("foo. bar").readTableOrIndexName());
+    assertNull(new SimpleParser(".bar").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("foo", ""), new SimpleParser("foo.\"bar").readTableOrIndexName());
+
     assertEquals(new TableOrIndexName("foo"), new SimpleParser("foo bar").readTableOrIndexName());
     assertEquals(new TableOrIndexName("foo"), new SimpleParser("foo").readTableOrIndexName());
     assertEquals(

@@ -258,13 +258,13 @@ public class SessionStatementParser {
       return null;
     }
     SimpleParser parser = new SimpleParser(parsedStatement.getSqlWithoutComments());
-    if (parser.eat("set")) {
+    if (parser.eatKeyword("set")) {
       return parseSetStatement(parser);
     }
-    if (parser.eat("reset")) {
+    if (parser.eatKeyword("reset")) {
       return parseResetStatement(parser);
     }
-    if (parser.eat("show")) {
+    if (parser.eatKeyword("show")) {
       return parseShowStatement(parser);
     }
 
@@ -273,11 +273,11 @@ public class SessionStatementParser {
 
   static SetStatement parseSetStatement(SimpleParser parser) {
     SetStatement.Builder builder = new Builder();
-    if (parser.eat("local")) {
+    if (parser.eatKeyword("local")) {
       builder.setLocal();
     } else {
       // Ignore, this is the default.
-      parser.eat("session");
+      parser.eatKeyword("session");
     }
     TableOrIndexName name = parser.readTableOrIndexName();
     if (name == null) {
@@ -287,7 +287,7 @@ public class SessionStatementParser {
     }
     builder.setName(name);
 
-    if (!(parser.eat("to") || parser.eat("="))) {
+    if (!(parser.eatKeyword("to") || parser.eatToken("="))) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT,
           "Invalid SET statement: " + parser.getSql() + ". Expected TO or =.");
@@ -318,7 +318,7 @@ public class SessionStatementParser {
   }
 
   static ResetStatement parseResetStatement(SimpleParser parser) {
-    if (parser.eat("all")) {
+    if (parser.eatKeyword("all")) {
       String remaining = parser.parseExpression();
       if (!Strings.isNullOrEmpty(remaining)) {
         throw SpannerExceptionFactory.newSpannerException(
@@ -350,7 +350,7 @@ public class SessionStatementParser {
   }
 
   static ShowStatement parseShowStatement(SimpleParser parser) {
-    if (parser.eat("all")) {
+    if (parser.eatKeyword("all")) {
       String remaining = parser.parseExpression();
       if (!Strings.isNullOrEmpty(remaining)) {
         throw SpannerExceptionFactory.newSpannerException(
