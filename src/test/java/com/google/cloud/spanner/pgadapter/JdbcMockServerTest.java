@@ -2070,6 +2070,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
+  @Test
+  public void testSettingInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl()
+                + "?options=-c%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction")) {
+      verifySettingValue(
+          connection, "spanner.ddl_transaction_mode", "AutocommitExplicitTransaction");
+    }
+  }
+
   private void verifySettingIsNull(Connection connection, String setting) throws SQLException {
     try (ResultSet resultSet =
         connection.createStatement().executeQuery(String.format("show %s", setting))) {

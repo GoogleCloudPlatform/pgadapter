@@ -177,12 +177,16 @@ public class SessionState {
   }
 
   /** Sets the value of the specified setting at connection startup. */
-  public void setConnectionStartupValue(String name, String value) {
-    String key = toKey(null, name);
+  public void setConnectionStartupValue(String extension, String name, String value) {
+    String key = toKey(extension, name);
     PGSetting setting = this.settings.get(key);
-    if (setting == null) {
+    if (setting == null && extension == null) {
       // Ignore unknown settings.
       return;
+    }
+    if (setting == null) {
+      setting = new PGSetting(extension, name);
+      this.settings.put(key, setting);
     }
     try {
       setting.initConnectionValue(value);

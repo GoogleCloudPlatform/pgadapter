@@ -48,6 +48,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactio
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
+import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
@@ -467,7 +468,27 @@ public class BackendConnection {
    * called during startup with values that come from the connection request.
    */
   public void initSessionSetting(String name, String value) {
-    this.sessionState.setConnectionStartupValue(name, value);
+    if ("options".equalsIgnoreCase(name)) {
+      String[] commands = value.split("-c\\s+");
+      for (String command : commands) {
+        String[] keyValue = command.split("=", 2);
+        if (keyValue.length == 2) {
+          SimpleParser parser = new SimpleParser(keyValue[0]);
+          TableOrIndexName key = parser.readTableOrIndexName();
+          if (key == null) {
+            continue;
+          }
+          this.sessionState.setConnectionStartupValue(key.schema, key.name, keyValue[1]);
+        }
+      }
+    } else {
+      SimpleParser parser = new SimpleParser(name);
+      TableOrIndexName key = parser.readTableOrIndexName();
+      if (key == null) {
+        return;
+      }
+      this.sessionState.setConnectionStartupValue(key.schema, key.name, value);
+    }
   }
 
   /** Returns the Spanner connection used by this {@link BackendConnection}. */
