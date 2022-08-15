@@ -119,8 +119,12 @@ class SimpleParser {
     int parens = 0;
     while (pos < sql.length()) {
       if (quoted) {
-        if (sql.charAt(pos) == startQuote && sql.charAt(pos - 1) != '\\') {
-          quoted = false;
+        if (sql.charAt(pos) == startQuote) {
+          if (pos == (sql.length() - 1) || sql.charAt(pos + 1) != startQuote) {
+            quoted = false;
+          } else {
+            pos++;
+          }
         }
       } else {
         if (sql.charAt(pos) == '\'' || sql.charAt(pos) == '"') {
@@ -257,18 +261,27 @@ class SimpleParser {
       boolean skipWhitespaceBefore,
       boolean requireWhitespaceAfter,
       boolean updatePos) {
+    int originalPos = pos;
     if (skipWhitespaceBefore) {
       skipWhitespaces();
     }
     if (pos + keyword.length() > sql.length()) {
+      if (!updatePos) {
+        pos = originalPos;
+      }
       return false;
     }
     if (sql.substring(pos, pos + keyword.length()).equalsIgnoreCase(keyword)
         && (!requireWhitespaceAfter || isValidEndOfKeyword(pos + keyword.length()))) {
       if (updatePos) {
         pos = pos + keyword.length();
+      } else {
+        pos = originalPos;
       }
       return true;
+    }
+    if (!updatePos) {
+      pos = originalPos;
     }
     return false;
   }
