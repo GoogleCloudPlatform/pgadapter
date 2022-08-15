@@ -54,6 +54,7 @@ import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
@@ -1518,6 +1519,7 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
     when(connectionHandler.getConnectionId()).thenReturn(1);
+    when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
     when(server.getOptions()).thenReturn(options);
     when(options.getServerVersion()).thenReturn("13.4");
     when(options.shouldAuthenticate()).thenReturn(false);
@@ -1594,6 +1596,86 @@ public class ProtocolTest {
     assertEquals("TimeZone\0", readUntil(outputResult, "TimeZone\0".length()));
     // Timezone will vary depending on the default location of the JVM that is running.
     readUntilNullTerminator(outputResult);
+
+    // ReadyResponse
+    assertEquals('Z', outputResult.readByte());
+    assertEquals(5, outputResult.readInt());
+    assertEquals('I', outputResult.readByte());
+  }
+
+  @Test
+  public void testStartUpHint() throws Exception {
+    byte[] protocol = intToBytes(196608);
+    byte[] payload = "database\0databasename\0".getBytes();
+    byte[] length = intToBytes(8 + payload.length);
+
+    byte[] value = Bytes.concat(length, protocol, payload);
+
+    Map<String, String> expectedParameters = new HashMap<>();
+    expectedParameters.put("database", "databasename");
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(connectionHandler.getConnectionId()).thenReturn(1);
+    when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.PSQL);
+    when(server.getOptions()).thenReturn(options);
+    when(options.showHints()).thenReturn(true);
+    when(options.getServerVersion()).thenReturn("13.4");
+    when(options.shouldAuthenticate()).thenReturn(false);
+    when(connectionMetadata.peekInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.peekOutputStream()).thenReturn(outputStream);
+
+    WireMessage message = BootstrapMessage.create(connectionHandler);
+    assertEquals(StartupMessage.class, message.getClass());
+
+    assertEquals(expectedParameters, ((StartupMessage) message).getParameters());
+
+    message.send();
+
+    DataInputStream outputResult = inputStreamFromOutputStream(result);
+    verify(connectionHandler).connectToSpanner("databasename", null);
+
+    // AuthenticationOkResponse
+    assertEquals('R', outputResult.readByte());
+    assertEquals(8, outputResult.readInt());
+    assertEquals(0, outputResult.readInt());
+
+    // KeyDataResponse
+    assertEquals('K', outputResult.readByte());
+    assertEquals(12, outputResult.readInt());
+    assertEquals(1, outputResult.readInt());
+    assertEquals(0, outputResult.readInt());
+
+    // ParameterStatusResponse (x11)
+    byte lastMsg = 0;
+    while ((lastMsg = outputResult.readByte()) == 'S') {
+      int msgLength = outputResult.readInt();
+      // -4 as we have already read the length.
+      readUntil(outputResult, msgLength - 4);
+    }
+
+    // Check that we receive a hint.
+    assertEquals('N', lastMsg);
+    int msgLength = outputResult.readInt();
+    assertEquals('S', outputResult.readByte());
+    assertEquals("TIP", readUntil(outputResult, 3));
+    assertEquals(0, outputResult.readByte());
+    assertEquals('M', outputResult.readByte());
+    // We don't know what the message will be.
+    readUntilNullTerminator(outputResult);
+    // The message might also contain a hint.
+    byte nextField = outputResult.readByte();
+    if (nextField != 0) {
+      assertEquals('H', nextField);
+      // We don't know what the hint will be.
+      readUntilNullTerminator(outputResult);
+      // 0 means no more fields in the NoticeResponse.
+      assertEquals(0, outputResult.readByte());
+    }
 
     // ReadyResponse
     assertEquals('Z', outputResult.readByte());

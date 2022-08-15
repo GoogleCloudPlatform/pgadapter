@@ -77,6 +77,7 @@ public class OptionsMetadata {
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
+  private static final String OPTION_DISABLE_PSQL_HINTS = "disable_psql_hints";
   private static final String OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS =
       "disable_default_local_statements";
   private static final String OPTION_PSQL_MODE = "q";
@@ -109,6 +110,7 @@ public class OptionsMetadata {
   private final boolean binaryFormat;
   private final boolean authenticate;
   private final boolean disableAutoDetectClient;
+  private final boolean disablePsqlHints;
   private final boolean disableDefaultLocalStatements;
   private final boolean requiresMatcher;
   private final DdlTransactionMode ddlTransactionMode;
@@ -160,6 +162,7 @@ public class OptionsMetadata {
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
     this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
+    this.disablePsqlHints = commandLine.hasOption(OPTION_DISABLE_PSQL_HINTS);
     this.disableDefaultLocalStatements =
         commandLine.hasOption(OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS);
     this.requiresMatcher =
@@ -216,6 +219,7 @@ public class OptionsMetadata {
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
+    this.disablePsqlHints = false;
     this.disableAutoDetectClient = false;
     this.disableDefaultLocalStatements = false;
     this.requiresMatcher = requiresMatcher;
@@ -273,8 +277,7 @@ public class OptionsMetadata {
 
   private String buildSocketFile(CommandLine commandLine) {
     // Unix domain sockets are disabled by default on Windows.
-    String directory =
-        commandLine.getOptionValue(OPTION_SOCKET_DIR, isWindows() ? "" : DEFAULT_SOCKET_DIR).trim();
+    String directory = getSocketDir();
     if (!Strings.isNullOrEmpty(directory)) {
       if (directory.charAt(directory.length() - 1) != File.separatorChar) {
         directory += File.separatorChar;
@@ -282,6 +285,12 @@ public class OptionsMetadata {
       return directory + SOCKET_FILE_NAME;
     }
     return "";
+  }
+
+  public String getSocketDir() {
+    return commandLine
+        .getOptionValue(OPTION_SOCKET_DIR, isWindows() ? "" : DEFAULT_SOCKET_DIR)
+        .trim();
   }
 
   private int buildMaxBacklog(CommandLine commandLine) {
@@ -508,6 +517,11 @@ public class OptionsMetadata {
         "This option turns off automatic detection of well-known clients. "
             + "Use this option if you do not want PGAdapter to automatically apply query "
             + "replacements based on the client that is connected to PGAdapter.");
+    options.addOption(
+        null,
+        OPTION_DISABLE_PSQL_HINTS,
+        false,
+        "This option turns off the automatic hints that are shown for new psql connections.");
     options.addOption(
         null,
         OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS,
@@ -751,12 +765,20 @@ public class OptionsMetadata {
     return !this.disableAutoDetectClient;
   }
 
+  public boolean showHints() {
+    return !this.disablePsqlHints;
+  }
+
   public boolean useDefaultLocalStatements() {
     return !this.disableDefaultLocalStatements;
   }
 
   public boolean requiresMatcher() {
     return this.requiresMatcher;
+  }
+
+  public boolean hasPsqlCommandLineOptions() {
+    return this.commandLine.hasOption(OPTION_PSQL_MODE);
   }
 
   public boolean isReplaceJdbcMetadataQueries() {

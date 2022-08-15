@@ -60,7 +60,6 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -304,7 +303,7 @@ public abstract class AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl(), "d", Collections.emptyList());
+        new MockSpannerServiceImpl(), "d", ImmutableList.of("-disable_psql_hints"));
   }
 
   protected static void doStartMockSpannerAndPgAdapterServers(

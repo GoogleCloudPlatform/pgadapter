@@ -48,6 +48,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
 import java.io.DataOutputStream;
@@ -84,6 +85,7 @@ public class ConnectionHandler extends Thread {
 
   private final ProxyServer server;
   private final Socket socket;
+  private final boolean isTcpSocket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
   private static final Map<Integer, IntermediateStatement> activeStatementsMap =
@@ -103,10 +105,16 @@ public class ConnectionHandler extends Thread {
   private WellKnownClient wellKnownClient;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
 
+  @VisibleForTesting
   ConnectionHandler(ProxyServer server, Socket socket) {
+    this(server, socket, true);
+  }
+
+  ConnectionHandler(ProxyServer server, Socket socket, boolean isTcpSocket) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
     this.socket = socket;
+    this.isTcpSocket = isTcpSocket;
     this.secret = new SecureRandom().nextInt();
     setDaemon(true);
     logger.log(
@@ -570,6 +578,11 @@ public class ConnectionHandler extends Thread {
 
   public void setWellKnownClient(WellKnownClient wellKnownClient) {
     this.wellKnownClient = wellKnownClient;
+  }
+
+  /** Returns true if this connection uses a TCP connection. */
+  public boolean isTcpConnection() {
+    return this.isTcpSocket;
   }
 
   /** Status of a {@link ConnectionHandler} */
