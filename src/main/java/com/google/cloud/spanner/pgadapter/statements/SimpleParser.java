@@ -14,9 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import javax.annotation.Nullable;
 
@@ -53,16 +58,40 @@ class SimpleParser {
         return false;
       }
       TableOrIndexName other = (TableOrIndexName) o;
-      return Objects.equals(this.schema, other.schema) && Objects.equals(this.name, other.name);
+      return Objects.equals(
+              unquoteOrFoldIdentifier(this.schema), unquoteOrFoldIdentifier(other.schema))
+          && Objects.equals(
+              unquoteOrFoldIdentifier(this.name), unquoteOrFoldIdentifier(other.name));
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(this.schema, this.name);
+      return Objects.hash(unquoteOrFoldIdentifier(this.schema), unquoteOrFoldIdentifier(this.name));
     }
   }
 
-  private final String sql;
+  static String unquoteOrFoldIdentifier(String identifier) {
+    if (Strings.isNullOrEmpty(identifier)) {
+      return null;
+    }
+    if (identifier.charAt(0) == '"'
+        && identifier.charAt(identifier.length() - 1) == '"'
+        && identifier.length() > 1) {
+      return identifier.substring(1, identifier.length() - 1);
+    }
+    return identifier.toLowerCase();
+  }
+
+  static Statement copyStatement(Statement original, String sql) {
+    Statement.Builder builder = Statement.newBuilder(sql);
+    Map<String, Value> parameters = original.getParameters();
+    for (Entry<String, Value> param : parameters.entrySet()) {
+      builder.bind(param.getKey()).to(param.getValue());
+    }
+    return builder.build();
+  }
+
+  private String sql;
   private int pos;
 
   SimpleParser(String sql) {
@@ -71,6 +100,10 @@ class SimpleParser {
 
   String getSql() {
     return sql;
+  }
+
+  void setSql(String sql) {
+    this.sql = sql;
   }
 
   int getPos() {
@@ -112,6 +145,13 @@ class SimpleParser {
   }
 
   String parseExpressionUntilKeyword(ImmutableList<String> keywords) {
+    return parseExpressionUntilKeyword(keywords, true);
+  }
+
+  String parseExpressionUntilKeyword(
+      ImmutableList<String> keywords, boolean stopAtEndOfExpression) {
+    // TODO: Skip dollar-quoted strings
+    // TODO: Skip comments
     skipWhitespaces();
     int start = pos;
     boolean quoted = false;
@@ -119,8 +159,12 @@ class SimpleParser {
     int parens = 0;
     while (pos < sql.length()) {
       if (quoted) {
-        if (sql.charAt(pos) == startQuote && sql.charAt(pos - 1) != '\\') {
-          quoted = false;
+        if (sql.charAt(pos) == startQuote) {
+          if (pos == (sql.length() - 1) || sql.charAt(pos + 1) != startQuote) {
+            quoted = false;
+          } else {
+            pos++;
+          }
         }
       } else {
         if (sql.charAt(pos) == '\'' || sql.charAt(pos) == '"') {
@@ -130,13 +174,13 @@ class SimpleParser {
           parens++;
         } else if (sql.charAt(pos) == ')') {
           parens--;
-          if (parens < 0) {
+          if (stopAtEndOfExpression && parens < 0) {
             break;
           }
-        } else if (parens == 0 && sql.charAt(pos) == ',') {
+        } else if (stopAtEndOfExpression && parens == 0 && sql.charAt(pos) == ',') {
           break;
         }
-        if (keywords.stream().anyMatch(this::peekKeyword)) {
+        if (!quoted && keywords.stream().anyMatch(this::peekKeyword)) {
           break;
         }
       }
@@ -257,18 +301,27 @@ class SimpleParser {
       boolean skipWhitespaceBefore,
       boolean requireWhitespaceAfter,
       boolean updatePos) {
+    int originalPos = pos;
     if (skipWhitespaceBefore) {
       skipWhitespaces();
     }
     if (pos + keyword.length() > sql.length()) {
+      if (!updatePos) {
+        pos = originalPos;
+      }
       return false;
     }
     if (sql.substring(pos, pos + keyword.length()).equalsIgnoreCase(keyword)
         && (!requireWhitespaceAfter || isValidEndOfKeyword(pos + keyword.length()))) {
       if (updatePos) {
         pos = pos + keyword.length();
+      } else {
+        pos = originalPos;
       }
       return true;
+    }
+    if (!updatePos) {
+      pos = originalPos;
     }
     return false;
   }

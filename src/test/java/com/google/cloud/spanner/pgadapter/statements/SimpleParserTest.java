@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -28,6 +29,12 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class SimpleParserTest {
+
+  @Test
+  public void testTableOrIndexName() {
+    assertEquals(new TableOrIndexName(null, "foo"), new TableOrIndexName(null, "foo"));
+    assertNotEquals(new TableOrIndexName(null, "foo"), new TableOrIndexName(null, "bar"));
+  }
 
   @Test
   public void testEatKeyword() {
@@ -189,9 +196,9 @@ public class SimpleParserTest {
     assertEquals(
         "(foo('bar\", test'))", new SimpleParser("  (foo('bar\", test')),bar").parseExpression());
     assertEquals(
-        "(foo('bar\\', test'))", new SimpleParser("  (foo('bar\\', test')),bar").parseExpression());
+        "(foo('bar'', test'))", new SimpleParser("  (foo('bar'', test')),bar").parseExpression());
     assertEquals("''", new SimpleParser("''").parseExpression());
-    assertEquals("'\\''", new SimpleParser("'\\''").parseExpression());
+    assertEquals("''''", new SimpleParser("''''").parseExpression());
     assertEquals("'\"'", new SimpleParser("'\"'").parseExpression());
 
     assertNull(new SimpleParser("\"foo").parseExpression());
@@ -256,11 +263,10 @@ public class SimpleParserTest {
         Arrays.asList("(foo('bar\", test'))", "bar"),
         new SimpleParser("  (foo('bar\", test')),bar").parseExpressionList());
     assertEquals(
-        Arrays.asList("(foo('bar\\', test'))", "bar"),
-        new SimpleParser("  (foo('bar\\', test')),bar").parseExpressionList());
+        Arrays.asList("(foo('bar'', test'))", "bar"),
+        new SimpleParser("  (foo('bar'', test')),bar").parseExpressionList());
     assertEquals(Collections.singletonList("''"), new SimpleParser("''").parseExpressionList());
-    assertEquals(
-        Collections.singletonList("'\\''"), new SimpleParser("'\\''").parseExpressionList());
+    assertEquals(Collections.singletonList("''''"), new SimpleParser("''''").parseExpressionList());
     assertEquals(Collections.singletonList("'\"'"), new SimpleParser("'\"'").parseExpressionList());
 
     assertNull(new SimpleParser("\"foo").parseExpressionList());

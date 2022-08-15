@@ -202,7 +202,8 @@ public class BackendConnection {
         } else if (parsedStatement.isDdl()) {
           result.set(ddlExecutor.execute(parsedStatement, statement));
         } else {
-          result.set(spannerConnection.execute(statement));
+          Statement updatedStatement = PgCatalog.replacePgCatalogTables(statement);
+          result.set(spannerConnection.execute(updatedStatement));
         }
       } catch (SpannerException spannerException) {
         // Executing queries against the information schema in a transaction is unsupported.
