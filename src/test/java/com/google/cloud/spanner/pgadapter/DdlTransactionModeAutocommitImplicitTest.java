@@ -228,9 +228,7 @@ public class DdlTransactionModeAutocommitImplicitTest extends DdlTransactionMode
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (Statement statement = connection.createStatement()) {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
       }
     }
 

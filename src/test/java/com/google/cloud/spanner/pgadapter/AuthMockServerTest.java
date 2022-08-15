@@ -38,6 +38,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
 public class AuthMockServerTest extends AbstractMockServerTest {
@@ -73,12 +74,13 @@ public class AuthMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testConnectFailsWithRandomAuth() {
-    SQLException exception =
+    PSQLException exception =
         assertThrows(
-            SQLException.class, () -> DriverManager.getConnection(createUrl(), "foo", "bar"));
-    assertTrue(
-        exception.getMessage(),
-        exception.getMessage().contains("PERMISSION_DENIED: Invalid credentials received."));
+            PSQLException.class, () -> DriverManager.getConnection(createUrl(), "foo", "bar"));
+    // TODO: Split this error message into a message and a hint.
+    assertEquals(
+        "ERROR: Invalid credentials received. PGAdapter expects the password to contain the JSON payload of a credentials file. Alternatively, the password may contain only the private key of a service account. The user name must in that case contain the service account email address.",
+        exception.getMessage());
   }
 
   @Test

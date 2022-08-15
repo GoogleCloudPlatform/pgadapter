@@ -420,9 +420,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         SQLException exception = assertThrows(SQLException.class, preparedStatement::executeQuery);
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("Table non_existing_table not found"));
+        assertEquals(
+            "ERROR: Table non_existing_table not found - Statement: 'select * from non_existing_table where id=$1'",
+            exception.getMessage());
       }
     }
 
@@ -446,9 +446,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         SQLException exception = assertThrows(SQLException.class, preparedStatement::executeUpdate);
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("Table non_existing_table not found"));
+        assertEquals("ERROR: Table non_existing_table not found", exception.getMessage());
       }
     }
 
@@ -556,9 +554,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         SQLException exception =
             assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("Table non_existing_table not found"));
+        assertEquals(
+            "ERROR: Table non_existing_table not found - Statement: 'select * from non_existing_table where id=$1'",
+            exception.getMessage());
       }
     }
 
@@ -592,9 +590,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         SQLException exception =
             assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("Table non_existing_table not found"));
+        assertEquals("ERROR: Table non_existing_table not found", exception.getMessage());
       }
     }
 
@@ -1617,7 +1613,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       SQLException sqlException =
           assertThrows(SQLException.class, () -> connection.createStatement().executeQuery(sql));
       assertEquals(
-          "ERROR: INTERNAL: io.grpc.StatusRuntimeException: INTERNAL: test error - Statement: 'SELECT * FROM INFORMATION_SCHEMA.TABLES'",
+          "ERROR: test error - Statement: 'SELECT * FROM INFORMATION_SCHEMA.TABLES'",
           sqlException.getMessage());
 
       // Make sure that the connection is now in the aborted state.
@@ -1626,7 +1622,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               SQLException.class,
               () -> connection.createStatement().executeQuery(SELECT2.getSql()));
       assertEquals(
-          "ERROR: INVALID_ARGUMENT: current transaction is aborted, commands ignored until end of transaction block",
+          "ERROR: current transaction is aborted, commands ignored until end of transaction block",
           abortedException.getMessage());
     }
 
@@ -1660,8 +1656,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               SQLException.class,
               () -> connection.createStatement().executeQuery("show random_setting"));
       assertEquals(
-          "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"random_setting\"",
-          exception.getMessage());
+          "ERROR: unrecognized configuration parameter \"random_setting\"", exception.getMessage());
     }
   }
 
@@ -1702,8 +1697,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               () ->
                   connection.createStatement().executeQuery("set random_setting to 'some-value'"));
       assertEquals(
-          "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"random_setting\"",
-          exception.getMessage());
+          "ERROR: unrecognized configuration parameter \"random_setting\"", exception.getMessage());
     }
   }
 
@@ -1738,8 +1732,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               SQLException.class,
               () -> connection.createStatement().executeQuery("reset random_setting"));
       assertEquals(
-          "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"random_setting\"",
-          exception.getMessage());
+          "ERROR: unrecognized configuration parameter \"random_setting\"", exception.getMessage());
     }
   }
 
@@ -1751,7 +1744,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               SQLException.class,
               () -> connection.createStatement().executeQuery("show spanner.some_setting"));
       assertEquals(
-          "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"spanner.some_setting\"",
+          "ERROR: unrecognized configuration parameter \"spanner.some_setting\"",
           exception.getMessage());
     }
   }
@@ -1950,7 +1943,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           assertThrows(
               SQLException.class,
               () -> connection.createStatement().execute("show application_name "));
-      assertEquals("ERROR: INVALID_ARGUMENT: " + TRANSACTION_ABORTED_ERROR, exception.getMessage());
+      assertEquals("ERROR: " + TRANSACTION_ABORTED_ERROR, exception.getMessage());
 
       connection.rollback();
 
@@ -2043,8 +2036,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             SQLException.class,
             () -> connection.createStatement().execute(String.format("show %s", setting)));
     assertEquals(
-        String.format(
-            "ERROR: INVALID_ARGUMENT: unrecognized configuration parameter \"%s\"", setting),
+        String.format("ERROR: unrecognized configuration parameter \"%s\"", setting),
         exception.getMessage());
   }
 }
