@@ -16,12 +16,14 @@ package com.google.cloud.spanner.pgadapter.utils;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
+import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
 import com.google.common.collect.Iterators;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -29,7 +31,6 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
 import java.time.format.DateTimeParseException;
 import java.util.Iterator;
 import java.util.logging.Level;
@@ -152,9 +153,9 @@ class CsvCopyParser implements CopyInParser {
           case DATE:
             return Value.date(recordValue == null ? null : Date.parseDate(recordValue));
           case TIMESTAMP:
-            Timestamp timestamp = timestampUtils.toTimestamp(null, recordValue);
-            return Value.timestamp(
-                timestamp == null ? null : com.google.cloud.Timestamp.of(timestamp));
+            Timestamp timestamp =
+                recordValue == null ? null : TimestampParser.toTimestamp(recordValue);
+            return Value.timestamp(timestamp);
           default:
             SpannerException spannerException =
                 SpannerExceptionFactory.newSpannerException(
