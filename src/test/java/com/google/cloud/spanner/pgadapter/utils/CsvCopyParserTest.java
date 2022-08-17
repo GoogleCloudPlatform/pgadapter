@@ -155,6 +155,9 @@ public class CsvCopyParserTest {
   @Test
   public void testGetSpannerValueTimestamp() {
     assertEquals(
+        Value.timestamp(Timestamp.parseTimestamp("2093-08-02T14:53:40.481913Z")),
+        CsvCopyRecord.getSpannerValue(Type.timestamp(), "2093-08-02T14:53:40.481913+00"));
+    assertEquals(
         Value.timestamp(Timestamp.parseTimestamp("2022-08-17T10:11:12.123456789Z")),
         CsvCopyRecord.getSpannerValue(Type.timestamp(), "2022-08-17T10:11:12.123456789Z"));
     assertEquals(
