@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -76,21 +77,27 @@ class SimpleParser {
     return pos;
   }
 
-  List<String> parseExpressionList() {
-    return parseExpressionListUntil(null);
+  void setPos(int pos) {
+    this.pos = pos;
   }
 
-  List<String> parseExpressionListUntil(@Nullable String delimiter) {
+  List<String> parseExpressionList() {
+    return parseExpressionListUntilKeyword(null);
+  }
+
+  List<String> parseExpressionListUntilKeyword(@Nullable String keyword) {
     skipWhitespaces();
     List<String> result = new ArrayList<>();
     int start = pos;
     while (pos < sql.length()) {
-      String expression = parseExpression(delimiter);
+      String expression =
+          parseExpressionUntilKeyword(
+              keyword == null ? ImmutableList.of() : ImmutableList.of(keyword));
       if (expression == null) {
         return null;
       }
       result.add(expression);
-      if (!eat(",")) {
+      if (!eatToken(",")) {
         break;
       }
     }
@@ -101,10 +108,10 @@ class SimpleParser {
   }
 
   String parseExpression() {
-    return parseExpression(null);
+    return parseExpressionUntilKeyword(ImmutableList.of());
   }
 
-  String parseExpression(@Nullable String delimiter) {
+  String parseExpressionUntilKeyword(ImmutableList<String> keywords) {
     skipWhitespaces();
     int start = pos;
     boolean quoted = false;
@@ -112,8 +119,12 @@ class SimpleParser {
     int parens = 0;
     while (pos < sql.length()) {
       if (quoted) {
-        if (sql.charAt(pos) == startQuote && sql.charAt(pos - 1) != '\\') {
-          quoted = false;
+        if (sql.charAt(pos) == startQuote) {
+          if (pos == (sql.length() - 1) || sql.charAt(pos + 1) != startQuote) {
+            quoted = false;
+          } else {
+            pos++;
+          }
         }
       } else {
         if (sql.charAt(pos) == '\'' || sql.charAt(pos) == '"') {
@@ -129,7 +140,7 @@ class SimpleParser {
         } else if (parens == 0 && sql.charAt(pos) == ',') {
           break;
         }
-        if (delimiter != null && peek(delimiter)) {
+        if (keywords.stream().anyMatch(this::peekKeyword)) {
           break;
         }
       }
@@ -146,10 +157,13 @@ class SimpleParser {
     if (nameOrSchema == null) {
       return null;
     }
-    if (eat(".")) {
-      String name = readIdentifierPart();
-      if (name == null) {
-        name = "";
+    if (peekToken(".")) {
+      String name = "";
+      if (eatDotOperator()) {
+        name = readIdentifierPart();
+        if (name == null) {
+          name = "";
+        }
       }
       return new TableOrIndexName(nameOrSchema, name);
     }
@@ -204,30 +218,79 @@ class SimpleParser {
     return isValidIdentifierFirstChar(c) || Character.isDigit(c) || c == '$';
   }
 
-  boolean peek(String keyword) {
-    return internalEat(keyword, false);
+  boolean peekKeyword(String keyword) {
+    return peek(true, true, keyword);
   }
 
-  boolean eat(String... keywords) {
-    boolean result = true;
-    for (String keyword : keywords) {
-      result &= internalEat(keyword, true);
-    }
-    return result;
+  boolean peekToken(String token) {
+    return peek(false, false, token);
   }
 
-  private boolean internalEat(String keyword, boolean updatePos) {
-    skipWhitespaces();
-    if (pos + keyword.length() > sql.length()) {
-      return false;
-    }
-    if (sql.substring(pos, pos + keyword.length()).equalsIgnoreCase(keyword)) {
-      if (updatePos) {
-        pos = pos + keyword.length();
+  boolean peek(boolean skipWhitespaceBefore, boolean requireWhitespaceAfter, String keyword) {
+    return internalEat(keyword, skipWhitespaceBefore, requireWhitespaceAfter, false);
+  }
+
+  boolean eatKeyword(String... keywords) {
+    return eat(true, true, keywords);
+  }
+
+  boolean eatToken(String token) {
+    return eat(true, false, token);
+  }
+
+  boolean eatDotOperator() {
+    if (eat(false, false, ".")) {
+      if (pos == sql.length() || Character.isWhitespace(sql.charAt(pos))) {
+        return false;
       }
       return true;
     }
     return false;
+  }
+
+  boolean eat(boolean skipWhitespaceBefore, boolean requireWhitespaceAfter, String... keywords) {
+    boolean result = true;
+    for (String keyword : keywords) {
+      result &= internalEat(keyword, skipWhitespaceBefore, requireWhitespaceAfter, true);
+    }
+    return result;
+  }
+
+  private boolean internalEat(
+      String keyword,
+      boolean skipWhitespaceBefore,
+      boolean requireWhitespaceAfter,
+      boolean updatePos) {
+    int originalPos = pos;
+    if (skipWhitespaceBefore) {
+      skipWhitespaces();
+    }
+    if (pos + keyword.length() > sql.length()) {
+      if (!updatePos) {
+        pos = originalPos;
+      }
+      return false;
+    }
+    if (sql.substring(pos, pos + keyword.length()).equalsIgnoreCase(keyword)
+        && (!requireWhitespaceAfter || isValidEndOfKeyword(pos + keyword.length()))) {
+      if (updatePos) {
+        pos = pos + keyword.length();
+      } else {
+        pos = originalPos;
+      }
+      return true;
+    }
+    if (!updatePos) {
+      pos = originalPos;
+    }
+    return false;
+  }
+
+  private boolean isValidEndOfKeyword(int index) {
+    if (sql.length() == index) {
+      return true;
+    }
+    return !isValidIdentifierChar(sql.charAt(index));
   }
 
   void skipWhitespaces() {

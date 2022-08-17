@@ -23,11 +23,11 @@ import com.google.api.client.util.Strings;
 import com.google.api.core.InternalApi;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
-import com.google.cloud.spanner.ErrorCode;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import java.io.IOException;
 import java.io.StringReader;
@@ -61,10 +61,11 @@ public class PasswordMessage extends ControlMessage {
     if (!useAuthentication()) {
       new ErrorResponse(
               this.outputStream,
-              SpannerExceptionFactory.newSpannerException(
-                  ErrorCode.FAILED_PRECONDITION,
-                  "Received PasswordMessage while authentication is disabled."),
-              State.ProtocolViolation)
+              PGException.newBuilder()
+                  .setMessage("Received PasswordMessage while authentication is disabled.")
+                  .setSQLState(SQLState.ProtocolViolation)
+                  .setSeverity(Severity.ERROR)
+                  .build())
           .send(false);
       new TerminateResponse(this.outputStream).send();
       return;
@@ -74,13 +75,15 @@ public class PasswordMessage extends ControlMessage {
     if (credentials == null) {
       new ErrorResponse(
               this.outputStream,
-              SpannerExceptionFactory.newSpannerException(
-                  ErrorCode.PERMISSION_DENIED,
-                  "Invalid credentials received. "
-                      + "PGAdapter expects the password to contain the JSON payload of a credentials file. "
-                      + "Alternatively, the password may contain only the private key of a service account. "
-                      + "The user name must in that case contain the service account email address."),
-              State.InvalidPassword)
+              PGException.newBuilder()
+                  .setMessage(
+                      "Invalid credentials received. "
+                          + "PGAdapter expects the password to contain the JSON payload of a credentials file. "
+                          + "Alternatively, the password may contain only the private key of a service account. "
+                          + "The user name must in that case contain the service account email address.")
+                  .setSQLState(SQLState.InvalidPassword)
+                  .setSeverity(Severity.ERROR)
+                  .build())
           .send(false);
       new TerminateResponse(this.outputStream).send();
     } else {
