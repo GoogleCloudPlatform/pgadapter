@@ -154,8 +154,7 @@ public class ITJdbcTest implements IntegrationTest {
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("SELECT 'Hello World!'")) {
         assertTrue(resultSet.next());
-        // TODO: Remove, this is only to verify that the automated issue generation works.
-        assertEquals("Hello World! - fail", resultSet.getString(1));
+        assertEquals("Hello World!", resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
