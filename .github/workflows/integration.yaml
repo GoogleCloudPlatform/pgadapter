@@ -134,5 +134,3 @@ jobs:
         with:
           filename: .github/integration-test-failed-template.md
           assignees: pratickchokhani, gauravsnj, olavloite
-          update_existing: true
-          search_existing: open
