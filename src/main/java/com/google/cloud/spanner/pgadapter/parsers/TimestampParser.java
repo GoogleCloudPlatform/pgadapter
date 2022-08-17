@@ -57,7 +57,7 @@ public class TimestampParser extends Parser<Timestamp> {
           .parseLenient()
           .parseCaseInsensitive()
           .appendPattern("yyyy-MM-dd HH:mm:ss")
-          .appendFraction(ChronoField.MICRO_OF_SECOND, 0, 9, true)
+          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
           .appendOffset("+HH:mm", "Z")
           .toFormatter();
 
