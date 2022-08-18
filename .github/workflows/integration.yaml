@@ -123,11 +123,7 @@ jobs:
           path_to_write_report: ./coverage/codecov_report.txt
           verbose: true
       - id: create-issue-on-failure
-        if: |
-          ${{ 
-            failure() &&
-            (github.event.schedule=='52 4 * * *' || github.event.schedule=='14 3 * * *' || inputs.endpoint)
-          }}
+        if: "${{ failure() && (github.event.schedule=='52 4 * * *' || github.event.schedule=='14 3 * * *' || inputs.endpoint != '')}}"
         uses: JasonEtco/create-an-issue@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
