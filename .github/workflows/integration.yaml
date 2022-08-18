@@ -131,7 +131,7 @@ jobs:
         uses: JasonEtco/create-an-issue@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ENDPOINT: ${{ GOOGLE_CLOUD_ENDPOINT }}
+          ENDPOINT: ${{ env.GOOGLE_CLOUD_ENDPOINT }}
         with:
           filename: .github/integration-test-failed-template.md
           assignees: pratickchokhani, gauravsnj, olavloite
