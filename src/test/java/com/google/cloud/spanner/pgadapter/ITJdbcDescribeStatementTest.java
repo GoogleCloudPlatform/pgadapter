@@ -39,7 +39,6 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Collections;
-import java.util.logging.Logger;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -53,8 +52,6 @@ import org.postgresql.jdbc.PgStatement;
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
 public class ITJdbcDescribeStatementTest implements IntegrationTest {
-  private static final Logger LOGGER =
-      Logger.getLogger(ITJdbcDescribeStatementTest.class.getName());
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
 
@@ -109,7 +106,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testParameterMetaData() throws SQLException {
-    LOGGER.info("Running test");
     for (String sql :
         new String[] {
           "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
@@ -216,7 +212,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testManualParameters() throws SQLException {
-    LOGGER.info("Running test");
     String sql = "select * from (select ?, ?, ?, ?, ?, ?) p";
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -236,7 +231,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   @Test
   @Ignore("Parameterized limit and offset are not yet supported by Spangres")
   public void testParameterMetaDataInLimit() throws SQLException {
-    LOGGER.info("Running test");
     String sql = "select * from all_types order by col_varchar limit ? offset ?";
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -250,7 +244,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testDescribeInvalidStatements() throws SQLException {
-    LOGGER.info("Running test");
     for (String sql :
         new String[] {
           "select borked "
@@ -301,7 +294,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testResultSetMetaData() throws SQLException {
-    LOGGER.info("Running test");
     ImmutableList<String> columnNames =
         ImmutableList.of(
             "col_bigint",
@@ -354,7 +346,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testSelectWithParameters() throws SQLException {
-    LOGGER.info("Running test");
     String sql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "
@@ -410,7 +401,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testInsertWithParameters() throws SQLException {
-    LOGGER.info("Running test");
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement =
           connection.prepareStatement(
@@ -461,7 +451,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testUpdateWithParameters() throws SQLException {
-    LOGGER.info("Running test");
     String sql =
         "update all_types set "
             + "col_bool=?, "
@@ -524,7 +513,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testNullValues() throws SQLException {
-    LOGGER.info("Running test");
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement =
           connection.prepareStatement(
