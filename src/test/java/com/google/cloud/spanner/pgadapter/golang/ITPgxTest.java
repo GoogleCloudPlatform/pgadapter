@@ -18,7 +18,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeTrue;
+import static org.junit.Assume.assumeFalse;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -85,7 +85,7 @@ public class ITPgxTest implements IntegrationTest {
     } catch (UnsatisfiedLinkError unsatisfiedLinkError) {
       // This probably means that there is a version mismatch for GLIBC (or no GLIBC at all
       // installed).
-      assumeTrue(
+      assumeFalse(
           "Skipping ecosystem test because of missing dependency",
           System.getProperty("allowSkipUnsupportedEcosystemTest", "false")
               .equalsIgnoreCase("true"));

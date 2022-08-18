@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.python;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -59,11 +58,12 @@ public class ITPsycopg2Test extends PythonTestSetup {
 
   @BeforeClass
   public static void setup() throws Exception {
-    assumeTrue(
-        "Skipping ecosystem test because of missing dependency",
-        isPythonAvailable()
-            || System.getProperty("allowSkipUnsupportedEcosystemTest", "false")
-                .equalsIgnoreCase("true"));
+    if (!isPythonAvailable()
+        && !System.getProperty("allowSkipUnsupportedEcosystemTest", "false")
+            .equalsIgnoreCase("true")) {
+      throw new IllegalStateException(
+          "python has not been set up on this system and allowSkipUnsupportedEcosystemTest has not been set");
+    }
 
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
