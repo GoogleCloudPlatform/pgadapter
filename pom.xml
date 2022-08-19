@@ -18,8 +18,10 @@
     <java.version>1.8</java.version>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <skipUnits>false</skipUnits>
+    <skipTests>false</skipTests>
+    <skipUnits>${skipTests}</skipUnits>
     <skipITs>true</skipITs>
+    <it.forkCount>8</it.forkCount>
     <clirr.skip>true</clirr.skip>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -320,6 +322,7 @@
         <configuration>
           <forkedProcessExitTimeoutInSeconds>3</forkedProcessExitTimeoutInSeconds>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
+          <!--suppress UnresolvedMavenProperty -->
           <argLine>${surefire.jacoco.args}</argLine>
           <excludedGroups>${excludedTests}</excludedGroups>
           <reportNameSuffix>sponge_log</reportNameSuffix>
@@ -428,14 +431,15 @@
         </executions>
         <configuration>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
-          <forkCount>8</forkCount>
+          <forkCount>${it.forkCount}</forkCount>
           <reuseForks>true</reuseForks>
+          <!--suppress UnresolvedMavenProperty -->
           <argLine>${failsafe.jacoco.args}</argLine>
           <skipITs>${skipITs}</skipITs>
           <systemProperties>
             <property>
               <name>java.util.logging.config.file</name>
-              <value>src/test/resources/logging.properties</value>
+              <value>src/test/resources/integration-test-logging.properties</value>
             </property>
           </systemProperties>
         </configuration>
