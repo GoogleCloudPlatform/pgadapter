@@ -37,6 +37,7 @@ import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.Mutation;
 import com.google.spanner.v1.Mutation.OperationCase;
 import com.google.spanner.v1.ResultSetMetadata;
@@ -701,6 +702,57 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         "5", commitRequest.getMutations(0).getInsert().getValues(1).getValues(1).getStringValue());
     assertEquals(
         "6", commitRequest.getMutations(0).getInsert().getValues(1).getValues(2).getStringValue());
+  }
+
+  @Test
+  public void testSelect1InPsql() throws Exception {
+    assumeTrue("This test requires psql to be installed", isPsqlAvailable());
+
+    String host = useDomainSocket ? "/tmp" : "localhost";
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand =
+        new String[] {"psql", "-h", host, "-p", String.valueOf(pgServer.getLocalPort())};
+    builder.command(psqlCommand);
+    Process process = builder.start();
+    String errors;
+    String output;
+
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      writer.write("SELECT 1;\nbegin;\nSELECT 1;\nrollback;\nSELECT 1;\n\\q\n");
+      writer.flush();
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    assertEquals("", errors);
+    assertEquals(
+        " C \n"
+            + "---\n"
+            + " 1\n"
+            + "(1 row)\n"
+            + "\n"
+            + "BEGIN\n"
+            + " C \n"
+            + "---\n"
+            + " 1\n"
+            + "(1 row)\n"
+            + "\n"
+            + "ROLLBACK\n"
+            + " C \n"
+            + "---\n"
+            + " 1\n"
+            + "(1 row)\n",
+        output);
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    // Verify that we receive exactly 3 ExecuteSql requests.
+    List<ExecuteSqlRequest> sqlRequests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(3, sqlRequests.size());
   }
 
   @Test
