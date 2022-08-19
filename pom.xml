@@ -18,8 +18,10 @@
     <java.version>1.8</java.version>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <skipUnits>false</skipUnits>
+    <skipTests>false</skipTests>
+    <skipUnits>${skipTests}</skipUnits>
     <skipITs>true</skipITs>
+    <it.forkCount>8</it.forkCount>
     <clirr.skip>true</clirr.skip>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -31,7 +33,7 @@
       com.google.cloud.spanner.pgadapter.python.PythonTest
     </excludedTests>
 
-    <spanner.version>6.27.0</spanner.version>
+    <spanner.version>6.28.0</spanner.version>
     <junixsocket.version>2.5.1</junixsocket.version>
   </properties>
 
@@ -109,6 +111,11 @@
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
       <version>3.8.6</version>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk15on</artifactId>
+      <version>1.70</version>
     </dependency>
 
     <!-- Test dependencies -->
@@ -320,6 +327,7 @@
         <configuration>
           <forkedProcessExitTimeoutInSeconds>3</forkedProcessExitTimeoutInSeconds>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
+          <!--suppress UnresolvedMavenProperty -->
           <argLine>${surefire.jacoco.args}</argLine>
           <excludedGroups>${excludedTests}</excludedGroups>
           <reportNameSuffix>sponge_log</reportNameSuffix>
@@ -428,14 +436,15 @@
         </executions>
         <configuration>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
-          <forkCount>8</forkCount>
+          <forkCount>${it.forkCount}</forkCount>
           <reuseForks>true</reuseForks>
+          <!--suppress UnresolvedMavenProperty -->
           <argLine>${failsafe.jacoco.args}</argLine>
           <skipITs>${skipITs}</skipITs>
           <systemProperties>
             <property>
               <name>java.util.logging.config.file</name>
-              <value>src/test/resources/logging.properties</value>
+              <value>src/test/resources/integration-test-logging.properties</value>
             </property>
           </systemProperties>
         </configuration>

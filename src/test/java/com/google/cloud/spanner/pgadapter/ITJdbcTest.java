@@ -551,7 +551,7 @@ public class ITJdbcTest implements IntegrationTest {
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
       assertEquals(
-          "ERROR: FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.\n"
+          "ERROR: Record count: 2001 has exceeded the limit: 2000.\n"
               + "\n"
               + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
               + "\n"

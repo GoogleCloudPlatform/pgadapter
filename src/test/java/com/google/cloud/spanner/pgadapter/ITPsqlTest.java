@@ -59,6 +59,7 @@ import org.junit.runners.JUnit4;
 public class ITPsqlTest implements IntegrationTest {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
+  private static boolean allAssumptionsPassed = false;
 
   public static final String POSTGRES_HOST = System.getenv("POSTGRES_HOST");
   public static final String POSTGRES_PORT = System.getenv("POSTGRES_PORT");
@@ -82,6 +83,7 @@ public class ITPsqlTest implements IntegrationTest {
     assumeFalse(
         "This test the environment variable POSTGRES_DATABASE to point to a valid PostgreSQL database",
         Strings.isNullOrEmpty(POSTGRES_DATABASE));
+    allAssumptionsPassed = true;
 
     // Make sure the PG JDBC driver is loaded.
     Class.forName("org.postgresql.Driver");
@@ -96,9 +98,11 @@ public class ITPsqlTest implements IntegrationTest {
 
   @AfterClass
   public static void teardown() throws Exception {
-    testEnv.stopPGAdapterServer();
-    testEnv.cleanUp();
-    dropDataModel();
+    if (allAssumptionsPassed) {
+      testEnv.stopPGAdapterServer();
+      testEnv.cleanUp();
+      dropDataModel();
+    }
   }
 
   private static boolean isPsqlAvailable() {

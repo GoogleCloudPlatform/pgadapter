@@ -211,6 +211,24 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   }
 
   @Test
+  public void testManualParameters() throws SQLException {
+    String sql = "select * from (select ?, ?, ?, ?, ?, ?) p";
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        statement.setNull(1, Types.BIGINT);
+        statement.setNull(4, Types.BIGINT);
+        ParameterMetaData metadata = statement.getParameterMetaData();
+        assertEquals(Types.BIGINT, metadata.getParameterType(1));
+        assertEquals(Types.VARCHAR, metadata.getParameterType(2));
+        assertEquals(Types.VARCHAR, metadata.getParameterType(3));
+        assertEquals(Types.BIGINT, metadata.getParameterType(4));
+        assertEquals(Types.VARCHAR, metadata.getParameterType(5));
+        assertEquals(Types.VARCHAR, metadata.getParameterType(6));
+      }
+    }
+  }
+
+  @Test
   @Ignore("Parameterized limit and offset are not yet supported by Spangres")
   public void testParameterMetaDataInLimit() throws SQLException {
     String sql = "select * from all_types order by col_varchar limit ? offset ?";
