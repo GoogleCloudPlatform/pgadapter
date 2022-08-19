@@ -62,8 +62,8 @@ class ArrayParser extends Parser<List<?>> {
         return value.getBoolArray();
       case DATE:
         return value.getDateArray();
-      case JSON:
-        return value.getJsonArray();
+      case PG_JSONB:
+        return value.getPgJsonbArray();
       case BYTES:
         return value.getBytesArray();
       case INT64:

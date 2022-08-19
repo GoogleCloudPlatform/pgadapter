@@ -199,6 +199,14 @@ public abstract class AbstractMockServerTest {
                       Field.newBuilder()
                           .setName("col_varchar")
                           .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
+                  .addFields(
+                      Field.newBuilder()
+                          .setName("col_jsonb")
+                          .setType(
+                              Type.newBuilder()
+                                  .setCode(TypeCode.JSON)
+                                  .setTypeAnnotation(TypeAnnotationCode.PG_JSONB)
+                                  .build()))
                   .build())
           .build();
   protected static final com.google.spanner.v1.ResultSet ALL_TYPES_RESULTSET =
@@ -221,6 +229,7 @@ public abstract class AbstractMockServerTest {
                       Value.newBuilder().setStringValue("2022-02-16T13:18:02.123456789Z").build())
                   .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
                   .addValues(Value.newBuilder().setStringValue("test").build())
+                  .addValues(Value.newBuilder().setStringValue("{\"key\": \"value\"}").build())
                   .build())
           .build();
   protected static final com.google.spanner.v1.ResultSet ALL_TYPES_NULLS_RESULTSET =
@@ -228,6 +237,7 @@ public abstract class AbstractMockServerTest {
           .setMetadata(ALL_TYPES_METADATA)
           .addRows(
               ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                   .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())

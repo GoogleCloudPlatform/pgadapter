@@ -108,6 +108,8 @@ public abstract class Parser<T> {
       case Oid.TIMESTAMP:
       case Oid.TIMESTAMPTZ:
         return new TimestampParser(item, formatCode);
+      case Oid.JSONB:
+        return new JsonbParser(item, formatCode);
       case Oid.UNSPECIFIED:
         // Try to guess the type based on the value. Use an unspecified parser if no type could be
         // determined.
@@ -147,9 +149,12 @@ public abstract class Parser<T> {
         return new StringParser(result, columnarPosition);
       case TIMESTAMP:
         return new TimestampParser(result, columnarPosition);
+      case PG_JSONB:
+        return new JsonbParser(result, columnarPosition);
       case ARRAY:
         return new ArrayParser(result, columnarPosition);
       case NUMERIC:
+      case JSON:
       case STRUCT:
       default:
         throw new IllegalArgumentException("Illegal or unknown element type: " + type);
@@ -181,6 +186,8 @@ public abstract class Parser<T> {
         return new StringParser(result);
       case TIMESTAMP:
         return new TimestampParser(result);
+      case PG_JSONB:
+        return new JsonbParser(result);
       case NUMERIC:
       case ARRAY:
       case STRUCT:
@@ -207,7 +214,7 @@ public abstract class Parser<T> {
         return Oid.FLOAT8;
       case STRING:
         return Oid.VARCHAR;
-      case JSON:
+      case PG_JSONB:
         return Oid.JSONB;
       case BYTES:
         return Oid.BYTEA;
@@ -227,7 +234,7 @@ public abstract class Parser<T> {
             return Oid.FLOAT8_ARRAY;
           case STRING:
             return Oid.VARCHAR_ARRAY;
-          case JSON:
+          case PG_JSONB:
             return Oid.JSONB_ARRAY;
           case BYTES:
             return Oid.BYTEA_ARRAY;
@@ -236,6 +243,7 @@ public abstract class Parser<T> {
           case DATE:
             return Oid.DATE_ARRAY;
           case NUMERIC:
+          case JSON:
           case ARRAY:
           case STRUCT:
           default:
@@ -243,6 +251,7 @@ public abstract class Parser<T> {
                 ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown array type: " + type);
         }
       case NUMERIC:
+      case JSON:
       case STRUCT:
       default:
         throw SpannerExceptionFactory.newSpannerException(
