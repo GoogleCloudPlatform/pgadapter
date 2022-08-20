@@ -14,27 +14,32 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
-public class TableParser {
+class TableParser {
+  private static final ImmutableSet<TableOrIndexName> EMPTY_TABLE_SET = ImmutableSet.of();
   private static final ImmutableList<String> KEYWORDS_BEFORE_TABLE =
       ImmutableList.of("from", "join", "insert", "update", "delete");
   private final Statement originalStatement;
   private final SimpleParser parser;
 
-  public TableParser(Statement statement) {
+  TableParser(Statement statement) {
     this.originalStatement = statement;
     this.parser = new SimpleParser(statement.getSql());
   }
 
-  public Statement replaceTables(Map<TableOrIndexName, TableOrIndexName> tableReplacements) {
+  Tuple<Set<TableOrIndexName>, Statement> detectAndReplaceTables(
+      Map<TableOrIndexName, TableOrIndexName> detectAndReplaceMap) {
     boolean potentialMatch = false;
     String lowerCaseSql = parser.getSql().toLowerCase();
-    for (Entry<TableOrIndexName, TableOrIndexName> entry : tableReplacements.entrySet()) {
+    for (Entry<TableOrIndexName, TableOrIndexName> entry : detectAndReplaceMap.entrySet()) {
       if (lowerCaseSql.contains(entry.getKey().name.toLowerCase())
           && (entry.getKey().schema == null
               || lowerCaseSql.contains(entry.getKey().schema.toLowerCase()))) {
@@ -43,10 +48,11 @@ public class TableParser {
       }
     }
     if (!potentialMatch) {
-      return originalStatement;
+      return Tuple.of(EMPTY_TABLE_SET, originalStatement);
     }
 
-    boolean replaced = false;
+    ImmutableSet.Builder<TableOrIndexName> detectedTablesBuilder = ImmutableSet.builder();
+    boolean detectedOrReplacedTable = false;
     while (parser.getPos() < parser.getSql().length()) {
       parser.parseExpressionUntilKeyword(KEYWORDS_BEFORE_TABLE, false);
       if (parser.getPos() >= parser.getSql().length()) {
@@ -61,7 +67,7 @@ public class TableParser {
           || parser.eatKeyword("from")
           || parser.eatKeyword("join"))) {
         // This shouldn't happen.
-        return originalStatement;
+        return Tuple.of(EMPTY_TABLE_SET, originalStatement);
       }
       if (parser.eatToken("(")) {
         continue;
@@ -71,19 +77,29 @@ public class TableParser {
       if (tableOrIndexName == null) {
         continue;
       }
-      if (tableReplacements.containsKey(tableOrIndexName)) {
-        replaced = true;
-        parser.setSql(
-            parser.getSql().substring(0, positionBeforeName)
-                + tableReplacements.get(tableOrIndexName)
-                + parser.getSql().substring(parser.getPos()));
-        // Reset the position to take into account that the new name might have been shorter than
-        // the replaced name.
-        parser.setPos(positionBeforeName);
+      if (detectAndReplaceMap.containsKey(tableOrIndexName)) {
+        detectedOrReplacedTable = true;
+        // Add the translated table name to the set of discovered tables so that a CTE can be added
+        // for it.
+        detectedTablesBuilder.add(detectAndReplaceMap.get(tableOrIndexName));
+        // Check if the entry in the table map contains a different replacement value than the
+        // original. Some tables may be added to the map of replacements with the same replacement
+        // value as the original with the sole purpose of detecting the use of the table.
+        if (!detectAndReplaceMap.get(tableOrIndexName).equals(tableOrIndexName)) {
+          parser.setSql(
+              parser.getSql().substring(0, positionBeforeName)
+                  + detectAndReplaceMap.get(tableOrIndexName)
+                  + parser.getSql().substring(parser.getPos()));
+          // Reset the position to take into account that the new name might have been shorter than
+          // the replaced name.
+          parser.setPos(positionBeforeName);
+        }
       }
     }
-    return replaced
-        ? SimpleParser.copyStatement(originalStatement, parser.getSql())
-        : originalStatement;
+    return detectedOrReplacedTable
+        ? Tuple.of(
+            detectedTablesBuilder.build(),
+            SimpleParser.copyStatement(originalStatement, parser.getSql()))
+        : Tuple.of(EMPTY_TABLE_SET, originalStatement);
   }
 }

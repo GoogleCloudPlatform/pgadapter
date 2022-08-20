@@ -30,11 +30,11 @@ public class TableParserTest {
   @Test
   public void testReplaceTables() {
     Statement original = Statement.of("select * from foo");
-    assertSame(original, new TableParser(original).replaceTables(ImmutableMap.of()));
+    assertSame(original, new TableParser(original).detectAndReplaceTables(ImmutableMap.of()));
     assertSame(
         original,
         new TableParser(original)
-            .replaceTables(
+            .detectAndReplaceTables(
                 ImmutableMap.of(
                     new TableOrIndexName(null, "bar"), new TableOrIndexName(null, "foo"))));
 
@@ -228,52 +228,56 @@ public class TableParserTest {
     assertEquals(
         Statement.of("select * from foo"),
         new TableParser(Statement.of("select * from foo"))
-            .replaceTables(
+            .detectAndReplaceTables(
                 ImmutableMap.of(
                     new TableOrIndexName("pg_catalog", "pg_type"),
                         new TableOrIndexName(null, "pg_type"),
                     new TableOrIndexName("pg_catalog", "pg_settings"),
                         new TableOrIndexName(null, "pg_settings"),
                     new TableOrIndexName("pg_catalog", "pg_class"),
-                        new TableOrIndexName(null, "pg_class"))));
+                        new TableOrIndexName(null, "pg_class")))
+            .y());
     assertEquals(
         Statement.of("select * from pg_settings"),
         new TableParser(Statement.of("select * from pg_catalog.pg_settings"))
-            .replaceTables(
+            .detectAndReplaceTables(
                 ImmutableMap.of(
                     new TableOrIndexName("pg_catalog", "pg_type"),
                         new TableOrIndexName(null, "pg_type"),
                     new TableOrIndexName("pg_catalog", "pg_settings"),
                         new TableOrIndexName(null, "pg_settings"),
                     new TableOrIndexName("pg_catalog", "pg_class"),
-                        new TableOrIndexName(null, "pg_class"))));
+                        new TableOrIndexName(null, "pg_class")))
+            .y());
     assertEquals(
         Statement.of("select s.name, (select min(name) from pg_type) from pg_settings s"),
         new TableParser(
                 Statement.of(
                     "select s.name, (select min(name) from pg_catalog.pg_type) from pg_catalog.pg_settings s"))
-            .replaceTables(
+            .detectAndReplaceTables(
                 ImmutableMap.of(
                     new TableOrIndexName("pg_catalog", "pg_type"),
                         new TableOrIndexName(null, "pg_type"),
                     new TableOrIndexName("pg_catalog", "pg_settings"),
                         new TableOrIndexName(null, "pg_settings"),
                     new TableOrIndexName("pg_catalog", "pg_class"),
-                        new TableOrIndexName(null, "pg_class"))));
+                        new TableOrIndexName(null, "pg_class")))
+            .y());
     assertEquals(
         Statement.of(
             "select s.name, (select min(name) from pg_type) from pg_settings s inner join pg_class c on s.name=c.name where s.setting in (select name from pg_class)"),
         new TableParser(
                 Statement.of(
                     "select s.name, (select min(name) from pg_catalog.pg_type) from pg_catalog.pg_settings s inner join pg_catalog.pg_class c on s.name=c.name where s.setting in (select name from pg_catalog.pg_class)"))
-            .replaceTables(
+            .detectAndReplaceTables(
                 ImmutableMap.of(
                     new TableOrIndexName("pg_catalog", "pg_type"),
                         new TableOrIndexName(null, "pg_type"),
                     new TableOrIndexName("pg_catalog", "pg_settings"),
                         new TableOrIndexName(null, "pg_settings"),
                     new TableOrIndexName("pg_catalog", "pg_class"),
-                        new TableOrIndexName(null, "pg_class"))));
+                        new TableOrIndexName(null, "pg_class")))
+            .y());
   }
 
   static Statement replace(Statement original, String table, String withTable) {
@@ -283,8 +287,9 @@ public class TableParserTest {
   static Statement replace(
       Statement original, String schema, String table, String withSchema, String withTable) {
     return new TableParser(original)
-        .replaceTables(
+        .detectAndReplaceTables(
             ImmutableMap.of(
-                new TableOrIndexName(schema, table), new TableOrIndexName(withSchema, withTable)));
+                new TableOrIndexName(schema, table), new TableOrIndexName(withSchema, withTable)))
+        .y();
   }
 }
