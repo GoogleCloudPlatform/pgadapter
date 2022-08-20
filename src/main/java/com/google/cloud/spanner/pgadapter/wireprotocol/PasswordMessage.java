@@ -88,7 +88,7 @@ public class PasswordMessage extends ControlMessage {
       new TerminateResponse(this.outputStream).send();
     } else {
       createConnectionAndSendStartupMessage(
-          this.connection, this.parameters.get(DATABASE_KEY), credentials);
+          this.connection, this.parameters.get(DATABASE_KEY), this.parameters, credentials);
     }
   }
 

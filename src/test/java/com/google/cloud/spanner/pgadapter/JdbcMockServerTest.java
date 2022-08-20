@@ -1649,6 +1649,18 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testShowSettingWithStartupValue() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // DATESTYLE is set to 'ISO' by the JDBC driver at startup.
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show DATESTYLE")) {
+        assertTrue(resultSet.next());
+        assertEquals("ISO", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testShowInvalidSetting() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       SQLException exception =
@@ -1719,6 +1731,33 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           connection.createStatement().executeQuery("show application_name ")) {
         assertTrue(resultSet.next());
         assertNull(resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testResetSettingWithStartupValue() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show datestyle")) {
+        assertTrue(resultSet.next());
+        assertEquals("ISO", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+
+      connection.createStatement().execute("set datestyle to 'iso, ymd'");
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show datestyle")) {
+        assertTrue(resultSet.next());
+        assertEquals("iso, ymd", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+
+      connection.createStatement().execute("reset datestyle");
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show datestyle")) {
+        assertTrue(resultSet.next());
+        assertEquals("ISO", resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
@@ -1967,7 +2006,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(308, count);
+        assertEquals(345, count);
       }
     }
   }
@@ -2008,6 +2047,30 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set application_name to ''");
       verifySettingValue(connection, "application_name", "");
+    }
+  }
+
+  @Test
+  public void testSettingsAreUniqueToConnections() throws SQLException {
+    // Verify that each new connection gets a separate set of settings.
+    for (int connectionNum = 0; connectionNum < 5; connectionNum++) {
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        // Verify that the initial value is null.
+        verifySettingIsNull(connection, "application_name");
+        connection.createStatement().execute("set application_name to \"my-application\"");
+        verifySettingValue(connection, "application_name", "my-application");
+      }
+    }
+  }
+
+  @Test
+  public void testSettingInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl()
+                + "?options=-c%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction")) {
+      verifySettingValue(
+          connection, "spanner.ddl_transaction_mode", "AutocommitExplicitTransaction");
     }
   }
 
