@@ -775,6 +775,26 @@ public class OptionsMetadata {
     return serverVersion;
   }
 
+  public String getServerVersionNum() {
+    String[] components = serverVersion.split("\\.");
+    if (components.length >= 2) {
+      int major = tryParseInt(components[0]);
+      int minor = tryParseInt(components[1]);
+      if (major > -1 && minor > -1) {
+        return String.valueOf(major * 10000 + minor);
+      }
+    }
+    return serverVersion;
+  }
+
+  private static int tryParseInt(String value) {
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException ignore) {
+      return -1;
+    }
+  }
+
   /** Returns true if the OS is Windows. */
   public boolean isWindows() {
     return osName.toLowerCase().startsWith("windows");
