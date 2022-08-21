@@ -56,6 +56,7 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyManager;
+import org.postgresql.core.Oid;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
@@ -801,6 +802,78 @@ public class ITJdbcTest implements IntegrationTest {
         assertTrue(resultSet.next());
         assertEquals("ISO", resultSet.getString("setting"));
         assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSelectNamespaces() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet namespaces =
+          connection
+              .createStatement()
+              .executeQuery("select nspname from pg_namespace order by oid")) {
+        assertTrue(namespaces.next());
+        assertEquals("pg_catalog", namespaces.getString(1));
+        assertTrue(namespaces.next());
+        assertEquals("public", namespaces.getString(1));
+
+        assertFalse(namespaces.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSelectTypes() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet types =
+          connection
+              .createStatement()
+              .executeQuery("select oid, typname from pg_type order by oid")) {
+        assertTrue(types.next());
+        assertEquals(Oid.BOOL, types.getInt(1));
+        assertEquals("bool", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.BYTEA, types.getInt(1));
+        assertEquals("bytea", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.INT8, types.getInt(1));
+        assertEquals("int8", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.INT2, types.getInt(1));
+        assertEquals("int2", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.INT4, types.getInt(1));
+        assertEquals("int4", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.TEXT, types.getInt(1));
+        assertEquals("text", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.FLOAT4, types.getInt(1));
+        assertEquals("float4", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.FLOAT8, types.getInt(1));
+        assertEquals("float8", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.VARCHAR, types.getInt(1));
+        assertEquals("varchar", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.DATE, types.getInt(1));
+        assertEquals("date", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.TIMESTAMP, types.getInt(1));
+        assertEquals("timestamp", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.TIMESTAMPTZ, types.getInt(1));
+        assertEquals("timestamptz", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.NUMERIC, types.getInt(1));
+        assertEquals("numeric", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.JSONB, types.getInt(1));
+        assertEquals("jsonb", types.getString(2));
+
+        assertFalse(types.next());
       }
     }
   }
