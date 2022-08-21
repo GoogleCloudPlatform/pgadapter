@@ -30,6 +30,39 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class SimpleParserTest {
 
+  /** Helper methods to reuse existing tests */
+  public static ImmutableList<String> splitStatements(String sql) {
+    return new SimpleParser(sql).splitStatements();
+  }
+
+  public static int skipQuotedString(String sql, int startIndex) {
+    SimpleParser parser = new SimpleParser(sql);
+    parser.setPos(startIndex);
+    parser.skipQuotedString();
+    return parser.getPos();
+  }
+
+  public static int skipSingleLineComment(String sql, int startIndex) {
+    SimpleParser parser = new SimpleParser(sql);
+    parser.setPos(startIndex);
+    parser.skipSingleLineComment();
+    return parser.getPos();
+  }
+
+  public static int skipMultiLineComment(String sql, int startIndex) {
+    SimpleParser parser = new SimpleParser(sql);
+    parser.setPos(startIndex);
+    parser.skipMultiLineComment();
+    return parser.getPos();
+  }
+
+  public static int skipDollarQuotedString(String sql, int startIndex) {
+    SimpleParser parser = new SimpleParser(sql);
+    parser.setPos(startIndex);
+    parser.skipDollarQuotedString();
+    return parser.getPos();
+  }
+
   @Test
   public void testEatKeyword() {
     assertTrue(new SimpleParser("insert").eatKeyword("insert"));

@@ -18,7 +18,7 @@ import static com.google.cloud.spanner.pgadapter.statements.IntermediatePrepared
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.transformDeleteToSelectParams;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.transformInsertToSelectParams;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.transformUpdateToSelectParams;
-import static com.google.cloud.spanner.pgadapter.utils.StatementParser.splitStatements;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParserTest.splitStatements;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
