@@ -14,12 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import com.google.api.client.util.Strings;
 import com.google.api.core.InternalApi;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /** A very simple parser that can interpret SQL statements to find specific parts in the string. */
@@ -97,23 +99,19 @@ public class SimpleParser {
     SimpleParser parser = new SimpleParser(sql);
     if (parser.eatKeyword("with")) {
       do {
-        if (parser.readIdentifierPart() == null) {
-          return "";
-        }
-        if (!parser.eatKeyword("as")) {
-          return "";
-        }
-        if (!parser.eatToken("(")) {
-          return "";
-        }
-        parser.parseExpressionUntilKeyword(ImmutableList.of());
-        if (!parser.eatToken(")")) {
-          return "";
+        if (!parser.skipCommonTableExpression()) {
+          // Return WITH as the command tag if we encounter an invalid CTE. This is for safety, as
+          // the chances that we encounter an invalid CTE is a lot larger than encountering any
+          // other statement without a logical first keyword.
+          return "WITH";
         }
       } while (parser.eatToken(","));
     }
     String keyword = parser.readKeyword();
-    return keyword == null ? null : keyword.toUpperCase();
+    if (Strings.isNullOrEmpty(keyword)) {
+      keyword = new SimpleParser(sql).readKeyword();
+    }
+    return keyword.toUpperCase();
   }
 
   /** Returns true if the given sql string is the given command. */
@@ -157,12 +155,34 @@ public class SimpleParser {
     return builder.build();
   }
 
-  List<String> parseExpressionList() {
-    return parseExpressionListUntilKeyword(null, false);
+  boolean skipCommonTableExpression() {
+    if (readIdentifierPart() == null) {
+      return false;
+    }
+    if (eatToken("(")) {
+      List<String> columnNames = parseExpressionList();
+      if (columnNames.isEmpty()) {
+        return false;
+      }
+      if (!eatToken(")")) {
+        return false;
+      }
+    }
+    if (!eatKeyword("as")) {
+      return false;
+    }
+    if (!eatToken("(")) {
+      return false;
+    }
+    parseExpressionUntilKeyword(ImmutableList.of());
+    if (!eatToken(")")) {
+      return false;
+    }
+    return true;
   }
 
-  List<String> parseExpressionListUntilKeyword(@Nullable String keyword) {
-    return parseExpressionListUntilKeyword(keyword, false);
+  List<String> parseExpressionList() {
+    return parseExpressionListUntilKeyword(null, false);
   }
 
   List<String> parseExpressionListUntilKeyword(
@@ -226,6 +246,7 @@ public class SimpleParser {
     return sql.substring(start, pos).trim();
   }
 
+  @Nonnull
   String readKeyword() {
     skipWhitespaces();
     int startPos = pos;

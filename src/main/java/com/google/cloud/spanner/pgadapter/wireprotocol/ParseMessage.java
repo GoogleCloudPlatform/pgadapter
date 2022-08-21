@@ -84,7 +84,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
       ParsedStatement parsedStatement,
       Statement originalStatement,
       int[] parameterDataTypes) {
-    if (isCommand(COPY, parsedStatement.getSqlWithoutComments())) {
+    if (isCommand(COPY, originalStatement.getSql())) {
       CopyOptions copyOptions = parseCopyStatement(parsedStatement);
       if (copyOptions.getFromTo() == FromTo.FROM) {
         return new CopyStatement(

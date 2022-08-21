@@ -365,11 +365,29 @@ public class SimpleParserTest {
             "with my_cte as (select * from foo) -- also a comment\n, my_cte2 as (select * from bar) /* this is a comment*/update bar set col1='one'"));
     assertEquals(
         "UPSERT", parseCommand("with my_cte as (select * from foo) upsert bar set col1='one'"));
-
-    assertEquals("", parseCommand("with my_cte as (select * from foo update bar set col1='one'"));
-    assertEquals("", parseCommand("with my_cte as (select * from foo), update bar set col1='one'"));
-    assertEquals("", parseCommand("with my_cte (select * from foo) update bar set col1='one'"));
     assertEquals(
-        "", parseCommand("with my_cte.bar as (select * from foo) update bar set col1='one'"));
+        "SELECT",
+        parseCommand(
+            "WITH temp (value) as (SELECT avg(id) FROM users) SELECT id FROM users, temp ORDER BY id"));
+    assertEquals(
+        "SELECT",
+        parseCommand(
+            "WITH temp (col1,/*comment*/col2, col3) as (SELECT avg(id) FROM users) SELECT id FROM users, temp ORDER BY id"));
+
+    // The parser returns 'WITH' as the command tag if the CTE appears to be invalid.
+    assertEquals(
+        "WITH", parseCommand("with my_cte as (select * from foo update bar set col1='one'"));
+    assertEquals(
+        "WITH", parseCommand("with my_cte as (select * from foo), update bar set col1='one'"));
+    assertEquals("WITH", parseCommand("with my_cte (select * from foo) update bar set col1='one'"));
+    assertEquals(
+        "WITH", parseCommand("with my_cte.bar as (select * from foo) update bar set col1='one'"));
+    assertEquals("WITH", parseCommand("with (select * from foo update bar set col1='one'"));
+    assertEquals("WITH", parseCommand("with 1 as (select * from foo update bar set col1='one'"));
+    assertEquals(
+        "WITH", parseCommand("with my_cte as select * from foo update bar set col1='one'"));
+
+    assertEquals("WITH", parseCommand("with my_cte as (select * from foo)"));
+    assertEquals("", parseCommand("/*only a comment*/"));
   }
 }
