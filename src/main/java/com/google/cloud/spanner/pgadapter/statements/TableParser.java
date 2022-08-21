@@ -54,7 +54,7 @@ class TableParser {
     ImmutableSet.Builder<TableOrIndexName> detectedTablesBuilder = ImmutableSet.builder();
     boolean detectedOrReplacedTable = false;
     while (parser.getPos() < parser.getSql().length()) {
-      parser.parseExpressionUntilKeyword(KEYWORDS_BEFORE_TABLE, false);
+      parser.parseExpressionUntilKeyword(KEYWORDS_BEFORE_TABLE, false, false);
       if (parser.getPos() >= parser.getSql().length()) {
         break;
       }

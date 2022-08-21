@@ -78,8 +78,16 @@ public class PgCatalog {
     Statement.Builder builder =
         Statement.newBuilder("with ")
             .append(tableExpressionsSql)
-            .append(hadCommonTableExpressions ? ", " : "")
-            .append(parser.getSql().substring(parser.getPos()));
+            .append(hadCommonTableExpressions ? ", " : "");
+    if (hadCommonTableExpressions) {
+      // Include the entire original statement except the 'with' keyword.
+      builder
+          .append(parser.getSql().substring(0, parser.getPos() - 4))
+          .append(parser.getSql().substring(parser.getPos()));
+    } else {
+      // Include the entire original statement (including any comments at the beginning).
+      builder.append(parser.getSql());
+    }
     Map<String, Value> parameters = statement.getParameters();
     for (Entry<String, Value> param : parameters.entrySet()) {
       builder.bind(param.getKey()).to(param.getValue());

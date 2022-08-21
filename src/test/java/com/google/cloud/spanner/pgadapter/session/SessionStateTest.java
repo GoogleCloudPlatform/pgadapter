@@ -20,11 +20,8 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.mock;
 
-import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
-import com.google.cloud.spanner.connection.AbstractStatementParser;
-import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
 import java.util.List;
@@ -497,8 +494,6 @@ public class SessionStateTest {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     PgCatalog pgCatalog = new PgCatalog(state);
     Statement statement = Statement.of("/* This comment is preserved */ select * from pg_settings");
-    ParsedStatement parsedStatement =
-        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
 
     Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
 
@@ -531,15 +526,13 @@ public class SessionStateTest {
     Statement statement =
         Statement.of(
             "/* This comment is preserved */ with foo as (select * from bar)\nselect * from pg_settings");
-    ParsedStatement parsedStatement =
-        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
 
     Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
 
     assertEquals(
         "with "
             + getDefaultSessionStateExpression()
-            + ", /* This comment is preserved */ foo as (select * from bar)\nselect * from pg_settings",
+            + ", /* This comment is preserved */  foo as (select * from bar)\nselect * from pg_settings",
         withSessionState.getSql());
   }
 }
