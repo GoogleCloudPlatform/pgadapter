@@ -26,6 +26,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
 import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -450,33 +451,30 @@ public class SessionStateTest {
   @Test
   public void testAddSessionState() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
+    PgCatalog pgCatalog = new PgCatalog(state);
     Statement statement = Statement.of("select * from pg_settings");
-    ParsedStatement parsedStatement =
-        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
 
-    Statement withSessionState = state.addSessionState(parsedStatement, statement);
+    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
 
     assertEquals(
-        "with " + getDefaultSessionStateExpression() + " " + statement.getSql(),
+        "with " + getDefaultSessionStateExpression() + statement.getSql(),
         withSessionState.getSql());
   }
 
   @Test
   public void testAddSessionStateWithParameters() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
+    PgCatalog pgCatalog = new PgCatalog(state);
     Statement statement =
         Statement.newBuilder("select * from pg_settings where name=$1")
             .bind("p1")
             .to("some-name")
             .build();
-    ParsedStatement parsedStatement =
-        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
 
-    Statement withSessionState = state.addSessionState(parsedStatement, statement);
+    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
 
     assertEquals(
-        Statement.newBuilder(
-                "with " + getDefaultSessionStateExpression() + " " + statement.getSql())
+        Statement.newBuilder("with " + getDefaultSessionStateExpression() + statement.getSql())
             .bind("p1")
             .to("some-name")
             .build(),
@@ -486,11 +484,10 @@ public class SessionStateTest {
   @Test
   public void testAddSessionStateWithoutPgSettings() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
+    PgCatalog pgCatalog = new PgCatalog(state);
     Statement statement = Statement.of("select * from some_table");
-    ParsedStatement parsedStatement =
-        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
 
-    Statement withSessionState = state.addSessionState(parsedStatement, statement);
+    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
 
     assertSame(statement, withSessionState);
   }
@@ -498,36 +495,51 @@ public class SessionStateTest {
   @Test
   public void testAddSessionStateWithComments() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
-    Statement statement =
-        Statement.of("/* This comment is not preserved */ select * from pg_settings");
+    PgCatalog pgCatalog = new PgCatalog(state);
+    Statement statement = Statement.of("/* This comment is preserved */ select * from pg_settings");
     ParsedStatement parsedStatement =
         AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
 
-    Statement withSessionState = state.addSessionState(parsedStatement, statement);
+    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
 
     assertEquals(
-        "with "
-            + getDefaultSessionStateExpression()
-            + " "
-            + parsedStatement.getSqlWithoutComments(),
+        "with " + getDefaultSessionStateExpression() + statement.getSql(),
         withSessionState.getSql());
   }
 
   @Test
-  public void testAddSessionStateWithExistingCte() {
+  public void testAddSessionStateWithExistingCTE() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
+    PgCatalog pgCatalog = new PgCatalog(state);
     Statement statement =
         Statement.of(
             "with my_cte as (select col1, col2 from foo) select * from pg_settings inner join my_cte on my_cte.col1=pg_settings.name");
-    ParsedStatement parsedStatement =
-        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
 
-    Statement withSessionState = state.addSessionState(parsedStatement, statement);
+    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
 
     assertEquals(
         "with "
             + getDefaultSessionStateExpression()
             + ",  my_cte as (select col1, col2 from foo) select * from pg_settings inner join my_cte on my_cte.col1=pg_settings.name",
+        withSessionState.getSql());
+  }
+
+  @Test
+  public void testAddSessionStateWithCommentsAndExistingCTE() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    PgCatalog pgCatalog = new PgCatalog(state);
+    Statement statement =
+        Statement.of(
+            "/* This comment is preserved */ with foo as (select * from bar)\nselect * from pg_settings");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+
+    Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
+
+    assertEquals(
+        "with "
+            + getDefaultSessionStateExpression()
+            + ", /* This comment is preserved */ foo as (select * from bar)\nselect * from pg_settings",
         withSessionState.getSql());
   }
 }

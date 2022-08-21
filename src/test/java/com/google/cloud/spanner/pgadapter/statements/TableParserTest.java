@@ -30,13 +30,14 @@ public class TableParserTest {
   @Test
   public void testReplaceTables() {
     Statement original = Statement.of("select * from foo");
-    assertSame(original, new TableParser(original).detectAndReplaceTables(ImmutableMap.of()));
+    assertSame(original, new TableParser(original).detectAndReplaceTables(ImmutableMap.of()).y());
     assertSame(
         original,
         new TableParser(original)
             .detectAndReplaceTables(
                 ImmutableMap.of(
-                    new TableOrIndexName(null, "bar"), new TableOrIndexName(null, "foo"))));
+                    new TableOrIndexName(null, "bar"), new TableOrIndexName(null, "foo")))
+            .y());
 
     assertEquals(Statement.of("select * from bar"), replace(original, "foo", "bar"));
     assertEquals(Statement.of("select * from bar"), replace(original, "FOO", "bar"));

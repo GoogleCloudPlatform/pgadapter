@@ -18,9 +18,6 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.Statement;
-import com.google.cloud.spanner.Value;
-import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -87,47 +84,6 @@ public class SessionState {
   }
 
   /**
-   * Potentially add any session state to the given statement if that is needed. This can for
-   * example include a CTE for pg_settings, if the statement references that table. This method can
-   * be extended in the future to include CTEs for more tables that require session state, or that
-   * are not yet supported in pg_catalog.
-   */
-  public Statement addSessionState(ParsedStatement parsedStatement, Statement statement) {
-    if (parsedStatement.isQuery()
-        && parsedStatement.getSqlWithoutComments().contains("pg_settings")) {
-      String pgSettingsCte = generatePGSettingsCte();
-      // Check whether we can safely use the original SQL statement.
-      String sql =
-          startsWithIgnoreCase(statement.getSql(), "select")
-                  || startsWithIgnoreCase(statement.getSql(), "with")
-              ? statement.getSql()
-              : parsedStatement.getSqlWithoutComments();
-      Statement.Builder builder = null;
-      if (startsWithIgnoreCase(sql, "select")) {
-        builder = Statement.newBuilder("with ").append(pgSettingsCte).append(" ").append(sql);
-      } else if (startsWithIgnoreCase(sql, "with")) {
-        builder =
-            Statement.newBuilder("with ")
-                .append(pgSettingsCte)
-                .append(", ")
-                .append(sql.substring("with".length()));
-      }
-      if (builder != null) {
-        Map<String, Value> parameters = statement.getParameters();
-        for (Entry<String, Value> param : parameters.entrySet()) {
-          builder.bind(param.getKey()).to(param.getValue());
-        }
-        statement = builder.build();
-      }
-    }
-    return statement;
-  }
-
-  static boolean startsWithIgnoreCase(String string, String prefix) {
-    return string.substring(0, prefix.length()).equalsIgnoreCase(prefix);
-  }
-
-  /**
    * Generates a Common Table Expression that represents the pg_settings table. Note that the
    * generated query adds two additional CTEs that could in theory hide existing user tables. It is
    * however strongly recommended that user tables never start with 'pg_', as all system tables in
@@ -136,7 +92,7 @@ public class SessionState {
    * with 'pg_' always risk being hidden by user tables, unless pg_catalog has been explicitly added
    * to the search_path after one or more user schemas.
    */
-  String generatePGSettingsCte() {
+  public String generatePGSettingsCte() {
     return "pg_settings_inmem_ as (\n"
         + getAll().stream()
             .filter(setting -> SUPPORTED_PG_SETTINGS_KEYS.contains(setting.getCasePreservingKey()))
