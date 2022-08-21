@@ -96,8 +96,21 @@ public class SimpleParser {
   public static String parseCommand(String sql) {
     SimpleParser parser = new SimpleParser(sql);
     if (parser.eatKeyword("with")) {
-      // Skip all common table expressions until we hit the actual command tag.
-      parser.parseExpressionUntilKeyword(ImmutableList.of("select", "insert", "update", "delete"));
+      do {
+        if (parser.readIdentifierPart() == null) {
+          return "";
+        }
+        if (!parser.eatKeyword("as")) {
+          return "";
+        }
+        if (!parser.eatToken("(")) {
+          return "";
+        }
+        parser.parseExpressionUntilKeyword(ImmutableList.of());
+        if (!parser.eatToken(")")) {
+          return "";
+        }
+      } while (parser.eatToken(","));
     }
     String keyword = parser.readKeyword();
     return keyword == null ? null : keyword.toUpperCase();
@@ -145,17 +158,23 @@ public class SimpleParser {
   }
 
   List<String> parseExpressionList() {
-    return parseExpressionListUntilKeyword(null);
+    return parseExpressionListUntilKeyword(null, false);
   }
 
   List<String> parseExpressionListUntilKeyword(@Nullable String keyword) {
+    return parseExpressionListUntilKeyword(keyword, false);
+  }
+
+  List<String> parseExpressionListUntilKeyword(
+      @Nullable String keyword, boolean sameParensLevelAsStart) {
     skipWhitespaces();
     List<String> result = new ArrayList<>();
     int start = pos;
     while (pos < sql.length()) {
       String expression =
           parseExpressionUntilKeyword(
-              keyword == null ? ImmutableList.of() : ImmutableList.of(keyword));
+              keyword == null ? ImmutableList.of() : ImmutableList.of(keyword),
+              sameParensLevelAsStart);
       if (expression == null) {
         return null;
       }
@@ -175,6 +194,11 @@ public class SimpleParser {
   }
 
   String parseExpressionUntilKeyword(ImmutableList<String> keywords) {
+    return parseExpressionUntilKeyword(keywords, false);
+  }
+
+  String parseExpressionUntilKeyword(
+      ImmutableList<String> keywords, boolean sameParensLevelAsStart) {
     skipWhitespaces();
     int start = pos;
     boolean valid;
@@ -190,7 +214,8 @@ public class SimpleParser {
       } else if (parens == 0 && sql.charAt(pos) == ',') {
         break;
       }
-      if (keywords.stream().anyMatch(this::peekKeyword)) {
+      if ((!sameParensLevelAsStart || parens == 0)
+          && keywords.stream().anyMatch(this::peekKeyword)) {
         break;
       }
       pos++;

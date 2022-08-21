@@ -267,6 +267,11 @@ public class IntermediateStatementTest {
         transformUpdate(
                 "update foo set col1=$1, col2=$2, col3=$3, col4=$4, col5=$5, col6=$6, col7=$7, col8=$8, col9=$9  where id=$10")
             .getSql());
+    assertEquals(
+        "select $1, $2, $3 from (select col1=(select col2 from bar where col3=$1), col2=$2 from foo where id=$3) p",
+        transformUpdate(
+                "update foo set col1=(select col2 from bar where col3=$1), col2=$2 where id=$3")
+            .getSql());
   }
 
   @Test

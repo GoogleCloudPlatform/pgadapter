@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -340,5 +341,35 @@ public class SimpleParserTest {
         "insert into foo (\"\"\"\")",
         new SimpleParser("insert into foo (\"\"\"\") select * from bar")
             .parseExpressionUntilKeyword(ImmutableList.of("select")));
+  }
+
+  @Test
+  public void testParseCommand() {
+    assertEquals("SELECT", parseCommand("select * from foo"));
+    assertEquals("INSERT", parseCommand("insert into foo values (1, 'One')"));
+    assertEquals("SELECT", parseCommand("/* this is a comment */ select * from foo"));
+    assertEquals("CREATE", parseCommand("/* ddl statements are also supported */create table foo"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select * from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE",
+        parseCommand(
+            "with my_cte as (select * from foo), my_cte2 as (select * from bar) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE",
+        parseCommand(
+            "with my_cte as (select * from foo), my_cte2 as (select * from bar) /* this is a comment*/update bar set col1='one'"));
+    assertEquals(
+        "UPDATE",
+        parseCommand(
+            "with my_cte as (select * from foo) -- also a comment\n, my_cte2 as (select * from bar) /* this is a comment*/update bar set col1='one'"));
+    assertEquals(
+        "UPSERT", parseCommand("with my_cte as (select * from foo) upsert bar set col1='one'"));
+
+    assertEquals("", parseCommand("with my_cte as (select * from foo update bar set col1='one'"));
+    assertEquals("", parseCommand("with my_cte as (select * from foo), update bar set col1='one'"));
+    assertEquals("", parseCommand("with my_cte (select * from foo) update bar set col1='one'"));
+    assertEquals(
+        "", parseCommand("with my_cte.bar as (select * from foo) update bar set col1='one'"));
   }
 }
