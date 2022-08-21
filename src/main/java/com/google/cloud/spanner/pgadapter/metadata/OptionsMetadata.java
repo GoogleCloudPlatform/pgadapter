@@ -79,6 +79,8 @@ public class OptionsMetadata {
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
   private static final String OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS =
       "disable_default_local_statements";
+  private static final String OPTION_DISABLE_PG_CATALOG_REPLACEMENTS =
+      "disable_pg_catalog_replacements";
   private static final String OPTION_PSQL_MODE = "q";
   private static final String OPTION_DDL_TRANSACTION_MODE = "ddl";
   private static final String OPTION_JDBC_MODE = "jdbc";
@@ -110,6 +112,7 @@ public class OptionsMetadata {
   private final boolean authenticate;
   private final boolean disableAutoDetectClient;
   private final boolean disableDefaultLocalStatements;
+  private final boolean disablePgCatalogReplacements;
   private final boolean requiresMatcher;
   private final DdlTransactionMode ddlTransactionMode;
   private final boolean replaceJdbcMetadataQueries;
@@ -162,6 +165,8 @@ public class OptionsMetadata {
     this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
     this.disableDefaultLocalStatements =
         commandLine.hasOption(OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS);
+    this.disablePgCatalogReplacements =
+        commandLine.hasOption(OPTION_DISABLE_PG_CATALOG_REPLACEMENTS);
     this.requiresMatcher =
         commandLine.hasOption(OPTION_PSQL_MODE)
             || commandLine.hasOption(OPTION_COMMAND_METADATA_FILE);
@@ -218,6 +223,7 @@ public class OptionsMetadata {
     this.authenticate = authenticate;
     this.disableAutoDetectClient = false;
     this.disableDefaultLocalStatements = false;
+    this.disablePgCatalogReplacements = false;
     this.requiresMatcher = requiresMatcher;
     this.ddlTransactionMode = DdlTransactionMode.AutocommitImplicitTransaction;
     this.replaceJdbcMetadataQueries = replaceJdbcMetadataQueries;
@@ -517,6 +523,14 @@ public class OptionsMetadata {
             + "Use this option if you do not want PGAdapter to automatically apply query "
             + "replacements for these statements.");
     options.addOption(
+        null,
+        OPTION_DISABLE_PG_CATALOG_REPLACEMENTS,
+        false,
+        "This option turns off automatic replacement of pg_catalog tables with "
+            + "common table expressions for pg_catalog tables that are not yet supported by "
+            + "Cloud Spanner. Use this option if you do not want PGAdapter to automatically apply "
+            + "replacements for pg_catalog tables.");
+    options.addOption(
         OPTION_PSQL_MODE,
         "psql-mode",
         false,
@@ -753,6 +767,10 @@ public class OptionsMetadata {
 
   public boolean useDefaultLocalStatements() {
     return !this.disableDefaultLocalStatements;
+  }
+
+  public boolean replacePgCatalogTables() {
+    return !this.disablePgCatalogReplacements;
   }
 
   public boolean requiresMatcher() {

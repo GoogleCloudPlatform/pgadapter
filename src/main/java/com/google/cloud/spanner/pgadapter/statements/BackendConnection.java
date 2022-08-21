@@ -204,7 +204,10 @@ public class BackendConnection {
           result.set(ddlExecutor.execute(parsedStatement, statement));
         } else {
           // Potentially replace pg_catalog table references with common table expressions.
-          Statement updatedStatement = pgCatalog.replacePgCatalogTables(statement);
+          Statement updatedStatement =
+              optionsMetadata.replacePgCatalogTables()
+                  ? pgCatalog.replacePgCatalogTables(statement)
+                  : statement;
           result.set(spannerConnection.execute(updatedStatement));
         }
       } catch (SpannerException spannerException) {
