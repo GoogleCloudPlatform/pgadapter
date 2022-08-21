@@ -161,7 +161,7 @@ public class SimpleParser {
     }
     if (eatToken("(")) {
       List<String> columnNames = parseExpressionList();
-      if (columnNames.isEmpty()) {
+      if (columnNames == null || columnNames.isEmpty()) {
         return false;
       }
       if (!eatToken(")")) {

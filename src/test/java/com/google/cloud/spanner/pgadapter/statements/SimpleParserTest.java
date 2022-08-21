@@ -349,6 +349,7 @@ public class SimpleParserTest {
     assertEquals("INSERT", parseCommand("insert into foo values (1, 'One')"));
     assertEquals("SELECT", parseCommand("/* this is a comment */ select * from foo"));
     assertEquals("CREATE", parseCommand("/* ddl statements are also supported */create table foo"));
+
     assertEquals(
         "UPDATE", parseCommand("with my_cte as (select * from foo) update bar set col1='one'"));
     assertEquals(
@@ -386,8 +387,26 @@ public class SimpleParserTest {
     assertEquals("WITH", parseCommand("with 1 as (select * from foo update bar set col1='one'"));
     assertEquals(
         "WITH", parseCommand("with my_cte as select * from foo update bar set col1='one'"));
+    assertEquals("WITH", parseCommand("with my_cte () as (select * from foo)"));
+    assertEquals("WITH", parseCommand("with my_cte (,) as (select * from foo)"));
+    assertEquals("WITH", parseCommand("with my_cte (bar"));
+    assertEquals("WITH", parseCommand("with my_cte (bar-"));
+    assertEquals("WITH", parseCommand("with my_cte (bar/"));
 
     assertEquals("WITH", parseCommand("with my_cte as (select * from foo)"));
     assertEquals("", parseCommand("/*only a comment*/"));
+
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a/b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a*b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a-b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a / b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a * b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a - b from foo) update bar set col1='one'"));
   }
 }

@@ -71,6 +71,7 @@ import org.junit.runners.JUnit4;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.jdbc.PgStatement;
+import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
@@ -124,6 +125,21 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertTrue(request.getTransaction().hasSingleUse());
       assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
     }
+  }
+
+  @Test
+  public void testInvalidQuery() throws SQLException {
+    String sql = "/ not a valid comment / SELECT 1";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PSQLException exception =
+          assertThrows(PSQLException.class, () -> connection.createStatement().executeQuery(sql));
+      assertEquals(
+          "ERROR: Unknown statement: / not a valid comment / SELECT 1", exception.getMessage());
+    }
+
+    // The statement is not sent to the mock server.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test
