@@ -454,7 +454,7 @@ public class SessionStateTest {
     Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
 
     assertEquals(
-        "with " + getDefaultSessionStateExpression() + statement.getSql(),
+        "with " + getDefaultSessionStateExpression() + "\n" + statement.getSql(),
         withSessionState.getSql());
   }
 
@@ -471,7 +471,8 @@ public class SessionStateTest {
     Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
 
     assertEquals(
-        Statement.newBuilder("with " + getDefaultSessionStateExpression() + statement.getSql())
+        Statement.newBuilder(
+                "with " + getDefaultSessionStateExpression() + "\n" + statement.getSql())
             .bind("p1")
             .to("some-name")
             .build(),
@@ -498,7 +499,7 @@ public class SessionStateTest {
     Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
 
     assertEquals(
-        "with " + getDefaultSessionStateExpression() + statement.getSql(),
+        "with " + getDefaultSessionStateExpression() + "\n" + statement.getSql(),
         withSessionState.getSql());
   }
 
@@ -515,7 +516,7 @@ public class SessionStateTest {
     assertEquals(
         "with "
             + getDefaultSessionStateExpression()
-            + ",  my_cte as (select col1, col2 from foo) select * from pg_settings inner join my_cte on my_cte.col1=pg_settings.name",
+            + ",\n my_cte as (select col1, col2 from foo) select * from pg_settings inner join my_cte on my_cte.col1=pg_settings.name",
         withSessionState.getSql());
   }
 
@@ -532,7 +533,7 @@ public class SessionStateTest {
     assertEquals(
         "with "
             + getDefaultSessionStateExpression()
-            + ", /* This comment is preserved */  foo as (select * from bar)\nselect * from pg_settings",
+            + ",\n/* This comment is preserved */  foo as (select * from bar)\nselect * from pg_settings",
         withSessionState.getSql());
   }
 }
