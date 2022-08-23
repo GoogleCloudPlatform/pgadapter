@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.PREPARE;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
@@ -33,6 +34,7 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import com.google.cloud.spanner.pgadapter.statements.PrepareStatement;
 import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
@@ -68,12 +70,22 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
    */
   public ParseMessage(
       ConnectionHandler connection, ParsedStatement parsedStatement, Statement originalStatement) {
+    this(connection, "", new int[0], parsedStatement, originalStatement);
+  }
+
+  /** Constructor for manually created Parse messages that originate from a PREPARE statement. */
+  public ParseMessage(
+      ConnectionHandler connection,
+      String name,
+      int[] parameterDataTypes,
+      ParsedStatement parsedStatement,
+      Statement originalStatement) {
     super(
         connection,
         5 + parsedStatement.getSqlWithoutComments().length(),
         ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
-    this.name = "";
-    this.parameterDataTypes = new int[0];
+    this.name = name;
+    this.parameterDataTypes = parameterDataTypes;
     this.statement =
         createStatement(connection, name, parsedStatement, originalStatement, parameterDataTypes);
   }
@@ -100,6 +112,13 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, "Unsupported COPY direction: " + copyOptions.getFromTo());
       }
+    } else if (StatementParser.isCommand(PREPARE, parsedStatement.getSqlWithoutComments())) {
+      return new PrepareStatement(
+          connectionHandler,
+          connectionHandler.getServer().getOptions(),
+          name,
+          parsedStatement,
+          originalStatement);
     } else {
       IntermediatePreparedStatement statement =
           new IntermediatePreparedStatement(
