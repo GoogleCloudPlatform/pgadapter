@@ -194,6 +194,9 @@ public class StatementParserTest {
     assertEquals(15, skipDollarQuotedString("$bar$foo$$, bar", 0));
 
     assertEquals(11, skipDollarQuotedString("$$foo$bar$$, bar", 0));
+    assertEquals(5, skipDollarQuotedString("$$foo", 0));
+    assertEquals(0, skipDollarQuotedString("foo", 0));
+    assertEquals(1, skipDollarQuotedString("$-$bar$-$", 0));
   }
 
   @Test
