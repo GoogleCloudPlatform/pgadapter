@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
@@ -33,7 +34,6 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
 import java.text.MessageFormat;
@@ -84,7 +84,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
       ParsedStatement parsedStatement,
       Statement originalStatement,
       int[] parameterDataTypes) {
-    if (StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments())) {
+    if (isCommand(COPY, originalStatement.getSql())) {
       CopyOptions copyOptions = parseCopyStatement(parsedStatement);
       if (copyOptions.getFromTo() == FromTo.FROM) {
         return new CopyStatement(
