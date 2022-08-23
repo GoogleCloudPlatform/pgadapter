@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -62,9 +63,23 @@ public class BooleanParserTest {
   }
 
   @Test
+  public void testBinaryParse() {
+    assertArrayEquals(new byte[] {1}, new BooleanParser(Boolean.TRUE).binaryParse());
+    assertArrayEquals(new byte[] {0}, new BooleanParser(Boolean.FALSE).binaryParse());
+    assertNull(new BooleanParser(null).binaryParse());
+  }
+
+  @Test
   public void testStringParse() {
     assertEquals("t", new BooleanParser(Boolean.TRUE).stringParse());
     assertEquals("f", new BooleanParser(Boolean.FALSE).stringParse());
     assertNull(new BooleanParser(null).stringParse());
+  }
+
+  @Test
+  public void testSpannerParse() {
+    assertEquals("true", new BooleanParser(Boolean.TRUE).spannerParse());
+    assertEquals("false", new BooleanParser(Boolean.FALSE).spannerParse());
+    assertNull(new BooleanParser(null).spannerParse());
   }
 }
