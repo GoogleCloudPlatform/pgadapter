@@ -37,6 +37,7 @@ import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.Mutation;
 import com.google.spanner.v1.Mutation.OperationCase;
 import com.google.spanner.v1.ResultSetMetadata;
@@ -180,8 +181,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                   copyManager.copyIn(
                       "COPY users (id, foo) FROM STDIN;", new StringReader("5\t5\n6\t6\n7\t7\n")));
       assertEquals(
-          "ERROR: INVALID_ARGUMENT: Column \"foo\" of relation \"users\" does not exist",
-          sqlException.getMessage());
+          "ERROR: Column \"foo\" of relation \"users\" does not exist", sqlException.getMessage());
     }
 
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -334,8 +334,9 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
 
+      // TODO: Split this error message into a message and a hint.
       assertEquals(
-          "ERROR: FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.\n"
+          "ERROR: Record count: 2001 has exceeded the limit: 2000.\n"
               + "\n"
               + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
               + "\n"
@@ -397,9 +398,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
           assertThrows(
               SQLException.class,
               () -> copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\t5\t5\n")));
-      assertEquals(
-          "ERROR: INVALID_ARGUMENT: Table users is not found in information_schema",
-          exception.getMessage());
+      assertEquals("ERROR: Table users is not found in information_schema", exception.getMessage());
 
       // Verify that we can use the connection for normal queries.
       try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
@@ -612,12 +611,12 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         }
       }
       assertEquals(
-          "ERROR\n"
+          "FATAL\n"
               + "XX000\n"
               + "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: 'Q'\n"
               + "ERROR\n"
               + "P0001\n"
-              + "CANCELLED: Error\n",
+              + "Error\n",
           errorMessage.toString());
 
       stream.sendChar('x');
@@ -706,6 +705,57 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSelect1InPsql() throws Exception {
+    assumeTrue("This test requires psql to be installed", isPsqlAvailable());
+
+    String host = useDomainSocket ? "/tmp" : "localhost";
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand =
+        new String[] {"psql", "-h", host, "-p", String.valueOf(pgServer.getLocalPort())};
+    builder.command(psqlCommand);
+    Process process = builder.start();
+    String errors;
+    String output;
+
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      writer.write("SELECT 1;\nbegin;\nSELECT 1;\nrollback;\nSELECT 1;\n\\q\n");
+      writer.flush();
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    assertEquals("", errors);
+    assertEquals(
+        " C \n"
+            + "---\n"
+            + " 1\n"
+            + "(1 row)\n"
+            + "\n"
+            + "BEGIN\n"
+            + " C \n"
+            + "---\n"
+            + " 1\n"
+            + "(1 row)\n"
+            + "\n"
+            + "ROLLBACK\n"
+            + " C \n"
+            + "---\n"
+            + " 1\n"
+            + "(1 row)\n",
+        output);
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    // Verify that we receive exactly 3 ExecuteSql requests.
+    List<ExecuteSqlRequest> sqlRequests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(3, sqlRequests.size());
+  }
+
+  @Test
   public void testCopyInBatchPsqlWithError() throws Exception {
     assumeTrue("This test requires psql to be installed", isPsqlAvailable());
     setupCopyInformationSchemaResults();
@@ -736,9 +786,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
       output = reader.lines().collect(Collectors.joining("\n"));
     }
 
-    assertEquals(
-        "ERROR:  INVALID_ARGUMENT: com.google.api.gax.rpc.InvalidArgumentException: io.grpc.StatusRuntimeException: INVALID_ARGUMENT: Statement is invalid.",
-        errors);
+    assertEquals("ERROR:  Statement is invalid.", errors);
     assertEquals("", output);
     int res = process.waitFor();
     assertEquals(0, res);
@@ -954,7 +1002,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         }
       }
       assertTrue(receivedErrorMessage);
-      assertEquals("ERROR\n" + "P0001\n" + "CANCELLED: Changed my mind\n", errorMessage.toString());
+      assertEquals("ERROR\n" + "P0001\n" + "Changed my mind\n", errorMessage.toString());
     }
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
@@ -1146,7 +1194,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     while (scanner.hasNextLine()) {
       error.append(scanner.nextLine()).append('\n');
     }
-    assertEquals("ERROR:  INVALID_ARGUMENT: Invalid length for int8: 2\n", error.toString());
+    assertEquals("ERROR:  Invalid length for int8: 2\n", error.toString());
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 

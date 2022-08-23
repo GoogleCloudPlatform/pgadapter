@@ -244,7 +244,7 @@ public class IntermediateStatementTest {
         "select $1, $2, $3 from (select col1=$1, col2=$2 from foo where id=$3) p",
         transformUpdate("update foo set col1=$1, col2=$2  where id=$3").getSql());
     assertEquals(
-        "select $1, $2, $3 from (select col1=col2 + $1 , "
+        "select $1, $2, $3 from (select col1=col2 + $1, "
             + "col2=coalesce($1, $2, $3, to_char(current_timestamp())), "
             + "col3 = 15 "
             + "from foo where id=$3 and value>100) p",
