@@ -413,9 +413,9 @@ public class BackendConnectionTest {
         .execute(
             Statement.of(
                 "with pg_namespace as (\n"
-                    + "  select 11 as oid, 'pg_catalog' as nspname, null as nspowner, null as nspacl\n"
-                    + "  union all\n"
-                    + "  select 2200, 'public', null, null\n"
+                    + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+                    + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+                    + "  from information_schema.schemata\n"
                     + "),\n"
                     + "pg_type as (\n"
                     + "  select 16 as oid, 'bool' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 1 as typlen, true as typbyval, 'b' as typtype, 'B' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1000 as typarray, 'boolin' as typinput, 'boolout' as typoutput, 'boolrecv' as typreceive, 'boolsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"

@@ -59,42 +59,56 @@ class TableParser {
         break;
       }
 
+      boolean multipleTables = false;
       if (parser.eatKeyword("insert")) {
         parser.eatKeyword("into");
       } else if (parser.eatKeyword("delete")) {
         parser.eatKeyword("from");
-      } else if (!(parser.eatKeyword("update")
-          || parser.eatKeyword("from")
-          || parser.eatKeyword("join"))) {
+      } else if (parser.eatKeyword("update")) {
+        parser.eatKeyword("only");
+      } else if (parser.eatKeyword("from") || parser.eatKeyword("join")) {
+        // There could be multiple tables.
+        multipleTables = true;
+      } else {
         // This shouldn't happen.
         return Tuple.of(EMPTY_TABLE_SET, originalStatement);
       }
       if (parser.eatToken("(")) {
         continue;
       }
-      int positionBeforeName = parser.getPos();
-      TableOrIndexName tableOrIndexName = parser.readTableOrIndexName();
-      if (tableOrIndexName == null) {
-        continue;
-      }
-      if (detectAndReplaceMap.containsKey(tableOrIndexName)) {
-        detectedOrReplacedTable = true;
-        // Add the translated table name to the set of discovered tables so that a CTE can be added
-        // for it.
-        detectedTablesBuilder.add(detectAndReplaceMap.get(tableOrIndexName));
-        // Check if the entry in the table map contains a different replacement value than the
-        // original. Some tables may be added to the map of replacements with the same replacement
-        // value as the original with the sole purpose of detecting the use of the table.
-        if (!detectAndReplaceMap.get(tableOrIndexName).equals(tableOrIndexName)) {
-          parser.setSql(
-              parser.getSql().substring(0, positionBeforeName)
-                  + detectAndReplaceMap.get(tableOrIndexName)
-                  + parser.getSql().substring(parser.getPos()));
-          // Reset the position to take into account that the new name might have been shorter than
-          // the replaced name.
-          parser.setPos(positionBeforeName);
+      do {
+        // Skip all whitespaces to get the actual position before the next table name.
+        parser.skipWhitespaces();
+        int positionBeforeName = parser.getPos();
+        TableOrIndexName tableOrIndexName = parser.readTableOrIndexName();
+        if (tableOrIndexName == null) {
+          break;
         }
-      }
+        if (detectAndReplaceMap.containsKey(tableOrIndexName)) {
+          detectedOrReplacedTable = true;
+          // Add the translated table name to the set of discovered tables so that a CTE can be
+          // added
+          // for it.
+          detectedTablesBuilder.add(detectAndReplaceMap.get(tableOrIndexName));
+          // Check if the entry in the table map contains a different replacement value than the
+          // original. Some tables may be added to the map of replacements with the same replacement
+          // value as the original with the sole purpose of detecting the use of the table.
+          if (!detectAndReplaceMap.get(tableOrIndexName).equals(tableOrIndexName)) {
+            parser.setSql(
+                parser.getSql().substring(0, positionBeforeName)
+                    + detectAndReplaceMap.get(tableOrIndexName)
+                    + parser.getSql().substring(parser.getPos()));
+            // Set the position of the parser to after the replaced table name.
+            parser.setPos(
+                positionBeforeName + detectAndReplaceMap.get(tableOrIndexName).toString().length());
+          }
+        }
+        // Skip any aliases.
+        if (multipleTables && !parser.peekKeyword("join")) {
+          parser.eatKeyword("as");
+          parser.readIdentifierPart();
+        }
+      } while (multipleTables && parser.eatToken(","));
     }
     return detectedOrReplacedTable
         ? Tuple.of(

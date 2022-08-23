@@ -2096,9 +2096,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.of(
                 "with pg_namespace as (\n"
-                    + "  select 11 as oid, 'pg_catalog' as nspname, null as nspowner, null as nspacl\n"
-                    + "  union all\n"
-                    + "  select 2200, 'public', null, null\n"
+                    + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+                    + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+                    + "  from information_schema.schemata\n"
                     + "),\n"
                     + "pg_type as (\n"
                     + "  select 16 as oid, 'bool' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 1 as typlen, true as typbyval, 'b' as typtype, 'B' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1000 as typarray, 'boolin' as typinput, 'boolout' as typoutput, 'boolrecv' as typreceive, 'boolsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
@@ -2137,9 +2137,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.of(
                 "with pg_namespace as (\n"
-                    + "  select 11 as oid, 'pg_catalog' as nspname, null as nspowner, null as nspacl\n"
-                    + "  union all\n"
-                    + "  select 2200, 'public', null, null\n"
+                    + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+                    + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+                    + "  from information_schema.schemata\n"
                     + "),\n"
                     + "pg_type as (\n"
                     + "  select 16 as oid, 'bool' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 1 as typlen, true as typbyval, 'b' as typtype, 'B' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1000 as typarray, 'boolin' as typinput, 'boolout' as typoutput, 'boolrecv' as typreceive, 'boolsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
@@ -2157,8 +2157,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                     + "  select 1700 as oid, 'numeric' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1231 as typarray, 'numeric_in' as typinput, 'numeric_out' as typoutput, 'numeric_recv' as typreceive, 'numeric_send' as typsend, 'numerictypmodin' as typmodin, 'numerictypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'm' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
                     + "  select 3802 as oid, 'jsonb' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 3807 as typarray, 'jsonb_in' as typinput, 'jsonb_out' as typoutput, 'jsonb_recv' as typreceive, 'jsonb_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl\n"
                     + ")\n"
-                    + "select * from pg_type "
-                    + "join pg_namespace on pg_type.typnamespace=pg_namespace.oid"),
+                    + "select * from pg_type join pg_namespace on pg_type.typnamespace=pg_namespace.oid"),
             SELECT1_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {

@@ -130,9 +130,9 @@ public class PgCatalog {
   private static class PgNamespace implements PgCatalogTable {
     private static final String PG_NAMESPACE_CTE =
         "pg_namespace as (\n"
-            + "  select 11 as oid, 'pg_catalog' as nspname, null as nspowner, null as nspacl\n"
-            + "  union all\n"
-            + "  select 2200, 'public', null, null\n"
+            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+            + "  from information_schema.schemata\n"
             + ")";
 
     @Override
