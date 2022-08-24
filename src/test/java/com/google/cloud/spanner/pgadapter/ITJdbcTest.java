@@ -812,11 +812,15 @@ public class ITJdbcTest implements IntegrationTest {
       try (ResultSet namespaces =
           connection
               .createStatement()
-              .executeQuery("select nspname from pg_namespace order by oid")) {
+              .executeQuery("select nspname from pg_namespace order by oid desc, nspname")) {
+        assertTrue(namespaces.next());
+        assertEquals("public", namespaces.getString(1));
         assertTrue(namespaces.next());
         assertEquals("pg_catalog", namespaces.getString(1));
         assertTrue(namespaces.next());
-        assertEquals("public", namespaces.getString(1));
+        assertEquals("information_schema", namespaces.getString(1));
+        assertTrue(namespaces.next());
+        assertEquals("spanner_sys", namespaces.getString(1));
 
         assertFalse(namespaces.next());
       }
