@@ -30,7 +30,7 @@ import java.util.Set;
 
 @InternalApi
 public class PgCatalog {
-  private static final Map<TableOrIndexName, TableOrIndexName> TABLE_REPLACEMENTS =
+  private static final ImmutableMap<TableOrIndexName, TableOrIndexName> TABLE_REPLACEMENTS =
       ImmutableMap.of(
           new TableOrIndexName("pg_catalog", "pg_namespace"),
               new TableOrIndexName(null, "pg_namespace"),

@@ -18,9 +18,10 @@ import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 
 class TableParser {
@@ -36,7 +37,13 @@ class TableParser {
   }
 
   Tuple<Set<TableOrIndexName>, Statement> detectAndReplaceTables(
-      Map<TableOrIndexName, TableOrIndexName> detectAndReplaceMap) {
+      ImmutableMap<TableOrIndexName, TableOrIndexName> detectAndReplaceMap) {
+    return detectAndReplaceTables(detectAndReplaceMap, true);
+  }
+
+  Tuple<Set<TableOrIndexName>, Statement> detectAndReplaceTables(
+      ImmutableMap<TableOrIndexName, TableOrIndexName> detectAndReplaceMap,
+      boolean searchForKeywordBeforeFirstTable) {
     boolean potentialMatch = false;
     String lowerCaseSql = parser.getSql().toLowerCase();
     for (Entry<TableOrIndexName, TableOrIndexName> entry : detectAndReplaceMap.entrySet()) {
@@ -54,29 +61,66 @@ class TableParser {
     ImmutableSet.Builder<TableOrIndexName> detectedTablesBuilder = ImmutableSet.builder();
     boolean detectedOrReplacedTable = false;
     while (parser.getPos() < parser.getSql().length()) {
-      parser.parseExpressionUntilKeyword(KEYWORDS_BEFORE_TABLE, false, false);
-      if (parser.getPos() >= parser.getSql().length()) {
-        break;
-      }
-
       boolean multipleTables = false;
-      if (parser.eatKeyword("insert")) {
-        parser.eatKeyword("into");
-      } else if (parser.eatKeyword("delete")) {
-        parser.eatKeyword("from");
-      } else if (parser.eatKeyword("update")) {
-        parser.eatKeyword("only");
-      } else if (parser.eatKeyword("from") || parser.eatKeyword("join")) {
-        // There could be multiple tables.
-        multipleTables = true;
-      } else {
-        // This shouldn't happen.
-        return Tuple.of(EMPTY_TABLE_SET, originalStatement);
+      if (searchForKeywordBeforeFirstTable) {
+        parser.parseExpressionUntilKeyword(KEYWORDS_BEFORE_TABLE, false, false);
+        if (parser.getPos() >= parser.getSql().length()) {
+          break;
+        }
+
+        if (parser.eatKeyword("insert")) {
+          parser.eatKeyword("into");
+        } else if (parser.eatKeyword("delete")) {
+          parser.eatKeyword("from");
+        } else if (parser.eatKeyword("update")) {
+          parser.eatKeyword("only");
+        } else if (parser.eatKeyword("from") || parser.eatKeyword("join")) {
+          // There could be multiple tables.
+          multipleTables = true;
+        } else {
+          // This shouldn't happen.
+          return Tuple.of(EMPTY_TABLE_SET, originalStatement);
+        }
       }
+      searchForKeywordBeforeFirstTable = true;
+      detectedOrReplacedTable =
+          parseTableList(detectAndReplaceMap, detectedTablesBuilder, multipleTables)
+              || detectedOrReplacedTable;
+    }
+    return detectedOrReplacedTable
+        ? Tuple.of(
+            detectedTablesBuilder.build(),
+            SimpleParser.copyStatement(originalStatement, parser.getSql()))
+        : Tuple.of(EMPTY_TABLE_SET, originalStatement);
+  }
+
+  private boolean parseTableList(
+      ImmutableMap<TableOrIndexName, TableOrIndexName> detectAndReplaceMap,
+      ImmutableSet.Builder<TableOrIndexName> detectedTablesBuilder,
+      boolean multipleTables) {
+    boolean detectedOrReplacedTable = false;
+    boolean wasJoin = false;
+    do {
       if (parser.eatToken("(")) {
-        continue;
-      }
-      do {
+        int startPosition = parser.getPos();
+        String subExpression = parser.eatSubExpression();
+        TableParser subParser = new TableParser(Statement.of(subExpression));
+        Tuple<Set<TableOrIndexName>, Statement> subResult =
+            subParser.detectAndReplaceTables(
+                detectAndReplaceMap,
+                subParser.parser.peekKeyword("select") || subParser.parser.peekKeyword("with"));
+        if (!subResult.x().isEmpty()) {
+          detectedOrReplacedTable = true;
+          detectedTablesBuilder.addAll(subResult.x());
+          parser.setSql(
+              parser.getSql().substring(0, startPosition)
+                  + subResult.y().getSql()
+                  + parser.getSql().substring(parser.getPos()));
+          // Set the position of the parser to after the replaced sub-expression.
+          parser.setPos(startPosition + subResult.y().getSql().length());
+          parser.eatToken(")");
+        }
+      } else {
         // Skip all whitespaces to get the actual position before the next table name.
         parser.skipWhitespaces();
         int positionBeforeName = parser.getPos();
@@ -89,31 +133,41 @@ class TableParser {
           // Add the translated table name to the set of discovered tables so that a CTE can be
           // added
           // for it.
-          detectedTablesBuilder.add(detectAndReplaceMap.get(tableOrIndexName));
+          detectedTablesBuilder.add(
+              Objects.requireNonNull(detectAndReplaceMap.get(tableOrIndexName)));
           // Check if the entry in the table map contains a different replacement value than the
           // original. Some tables may be added to the map of replacements with the same replacement
           // value as the original with the sole purpose of detecting the use of the table.
-          if (!detectAndReplaceMap.get(tableOrIndexName).equals(tableOrIndexName)) {
+          if (!Objects.equals(detectAndReplaceMap.get(tableOrIndexName), tableOrIndexName)) {
             parser.setSql(
                 parser.getSql().substring(0, positionBeforeName)
                     + detectAndReplaceMap.get(tableOrIndexName)
                     + parser.getSql().substring(parser.getPos()));
             // Set the position of the parser to after the replaced table name.
             parser.setPos(
-                positionBeforeName + detectAndReplaceMap.get(tableOrIndexName).toString().length());
+                positionBeforeName
+                    + Objects.requireNonNull(detectAndReplaceMap.get(tableOrIndexName))
+                        .toString()
+                        .length());
           }
         }
-        // Skip any aliases.
-        if (multipleTables && !parser.peekKeyword("join")) {
-          parser.eatKeyword("as");
-          parser.readIdentifierPart();
-        }
-      } while (multipleTables && parser.eatToken(","));
-    }
-    return detectedOrReplacedTable
-        ? Tuple.of(
-            detectedTablesBuilder.build(),
-            SimpleParser.copyStatement(originalStatement, parser.getSql()))
-        : Tuple.of(EMPTY_TABLE_SET, originalStatement);
+      }
+      // Skip any aliases.
+      if (multipleTables && !parser.peekJoinKeyword()) {
+        parser.eatKeyword("as");
+        parser.readIdentifierPart();
+      }
+      if (wasJoin) {
+        // Skip the join condition.
+        parser.eatJoinCondition();
+      }
+    } while (multipleTables && (parser.eatToken(",") || (wasJoin = parser.eatJoinType())));
+
+    return detectedOrReplacedTable;
+  }
+
+  @Override
+  public String toString() {
+    return parser.toString();
   }
 }

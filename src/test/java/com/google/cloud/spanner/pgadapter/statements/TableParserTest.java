@@ -21,7 +21,6 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -400,6 +399,58 @@ public class TableParserTest {
                     + "select value from keyvalue"),
             "keyvalue",
             "replaced"));
+    assertEquals(
+        Statement.of("SELECT key FROM replaced FULL JOIN \"KeyValue2\" USING (key);"),
+        replace(
+            Statement.of("SELECT key FROM keyvalue FULL JOIN \"KeyValue2\" USING (key);"),
+            "keyvalue",
+            "replaced"));
+    assertEquals(
+        Statement.of(
+            "SELECT keyvalue.key FROM (replaced LEFT JOIN \"KeyValue2\" ON ((keyvalue.key = \"KeyValue2\".key)))"),
+        replace(
+            Statement.of(
+                "SELECT keyvalue.key FROM (keyvalue LEFT JOIN \"KeyValue2\" ON ((keyvalue.key = \"KeyValue2\".key)))"),
+            "keyvalue",
+            "replaced"));
+    assertEquals(
+        Statement.of(
+            "SELECT keyvalue.key FROM (replaced LEFT JOIN \"KeyValue2\" ON ((keyvalue.key = \"KeyValue2\".key))), replaced as kv2 join replaced kv3 using (id)"),
+        replace(
+            Statement.of(
+                "SELECT keyvalue.key FROM (keyvalue LEFT JOIN \"KeyValue2\" ON ((keyvalue.key = \"KeyValue2\".key))), keyvalue as kv2 join KeyValue kv3 using (id)"),
+            "keyvalue",
+            "replaced"));
+    assertEquals(
+        Statement.of(
+            "select key from replaced\n"
+                + "inner join\n"
+                + "(select key as k1, key as k2 from \"KeyValue2\") as subquery1\n"
+                + "on subquery1.k1 = key;\n"
+                + "select key from replaced\n"
+                + "inner join\n"
+                + "(select key as k1, key as k2 from KeyValue2) as subquery1\n"
+                + "on subquery1.k1 = key;"),
+        replace(
+            Statement.of(
+                "select key from keyvalue\n"
+                    + "inner join\n"
+                    + "(select key as k1, key as k2 from \"KeyValue2\") as subquery1\n"
+                    + "on subquery1.k1 = key;\n"
+                    + "select key from keyvalue\n"
+                    + "inner join\n"
+                    + "(select key as k1, key as k2 from KeyValue2) as subquery1\n"
+                    + "on subquery1.k1 = key;"),
+            "keyvalue",
+            "replaced"));
+    assertEquals(
+        Statement.of(
+            "select * from (select 1 as col1) s1 join replaced on true join withpseudo on true"),
+        replace(
+            Statement.of(
+                "select * from (select 1 as col1) s1 join keyvalue on true join withpseudo on true"),
+            "keyvalue",
+            "replaced"));
   }
 
   @Test
@@ -762,7 +813,6 @@ public class TableParserTest {
             .y());
   }
 
-  @Ignore("These constructs are not yet supported")
   @Test
   public void testNestedTableExpressions() {
     assertEquals(
@@ -770,21 +820,25 @@ public class TableParserTest {
             "select kv.key, kv2.value2, kv3.value, kv4.key from\n"
                 + "  replaced kv left join \"KeyValue2\" kv2 on kv.value = kv2.value2,\n"
                 + "  (replaced kv3 join replaced kv4 on kv3.key = kv4.key\n"
-                + "    join replaced kv5 on kv4.value = kv5.value);\n"
-                + "select kv.key, kv2.value2, kv3.value, kv4.key from\n"
-                + "  replaced kv left join KeyValue2 kv2 on kv.value = kv2.value2,\n"
-                + "  (replaced kv3 join replaced kv4 on kv3.key = kv4.key\n"
-                + "    join replaced kv5 on kv4.value = kv5.value)"),
+                + "    join replaced kv5 on kv4.value = kv5.value);\n"),
         replace(
             Statement.of(
                 "select kv.key, kv2.value2, kv3.value, kv4.key from\n"
                     + "  keyvalue kv left join \"KeyValue2\" kv2 on kv.value = kv2.value2,\n"
                     + "  (keyvalue kv3 join keyvalue kv4 on kv3.key = kv4.key\n"
-                    + "    join keyvalue kv5 on kv4.value = kv5.value);\n"
-                    + "select kv.key, kv2.value2, kv3.value, kv4.key from\n"
-                    + "  keyvalue kv left join KeyValue2 kv2 on kv.value = kv2.value2,\n"
-                    + "  (keyvalue kv3 join keyvalue kv4 on kv3.key = kv4.key\n"
-                    + "    join keyvalue kv5 on kv4.value = kv5.value)"),
+                    + "    join keyvalue kv5 on kv4.value = kv5.value);\n"),
+            "keyvalue",
+            "replaced"));
+    assertEquals(
+        Statement.of(
+            "SELECT kv.key, kv2.value2, kv3.value, kv4.key "
+                + "FROM (replaced kv LEFT JOIN \"KeyValue2\" kv2 ON ((kv.value = kv2.value2))), "
+                + "((replaced kv3 JOIN replaced kv4 ON ((kv3.key = kv4.key))) JOIN replaced kv5 ON ((kv4.value = kv5.value)))"),
+        replace(
+            Statement.of(
+                "SELECT kv.key, kv2.value2, kv3.value, kv4.key "
+                    + "FROM (keyvalue kv LEFT JOIN \"KeyValue2\" kv2 ON ((kv.value = kv2.value2))), "
+                    + "((keyvalue kv3 JOIN keyvalue kv4 ON ((kv3.key = kv4.key))) JOIN keyvalue kv5 ON ((kv4.value = kv5.value)))"),
             "keyvalue",
             "replaced"));
   }

@@ -377,12 +377,72 @@ public class SimpleParser {
     return eat(true, false, token);
   }
 
+  /** Eats everything until an end parentheses at the same level as the current level. */
+  String eatSubExpression() {
+    int start = pos;
+    boolean valid;
+    int parens = 0;
+    while ((valid = skipCommentsAndLiterals()) && pos < sql.length()) {
+      if (sql.charAt(pos) == '(') {
+        parens++;
+      } else if (sql.charAt(pos) == ')') {
+        parens--;
+        if (parens < 0) {
+          break;
+        }
+      }
+      pos++;
+    }
+    if (pos == start || !valid || parens >= 0) {
+      return null;
+    }
+    return sql.substring(start, pos);
+  }
+
   boolean eatDotOperator() {
     if (eat(false, false, ".")) {
       if (pos == sql.length() || Character.isWhitespace(sql.charAt(pos))) {
         return false;
       }
       return true;
+    }
+    return false;
+  }
+
+  boolean peekJoinKeyword() {
+    return peekKeyword("join")
+        || peekKeyword("left")
+        || peekKeyword("right")
+        || peekKeyword("full")
+        || peekKeyword("inner")
+        || peekKeyword("outer")
+        || peekKeyword("cross");
+  }
+
+  boolean eatJoinType() {
+    boolean foundValidJoin;
+    if (eatKeyword("left") || eatKeyword("right") || eatKeyword("full")) {
+      eatKeyword("outer");
+      foundValidJoin = eatKeyword("join");
+    } else if (eatKeyword("inner")) {
+      foundValidJoin = eatKeyword("join");
+    } else if (eatKeyword("cross")) {
+      foundValidJoin = eatKeyword("join");
+    } else {
+      foundValidJoin = eatKeyword("join");
+    }
+    return foundValidJoin;
+  }
+
+  boolean eatJoinCondition() {
+    if (eatKeyword("on")) {
+      parseExpressionUntilKeyword(
+          ImmutableList.of("left", "right", "full", "inner", "cross", "join", "where"), true, true);
+    } else if (eatKeyword("using")) {
+      if (eatToken("(")) {
+        parseExpressionList();
+        return eatToken(")");
+      }
     }
     return false;
   }
@@ -559,5 +619,17 @@ public class SimpleParser {
       }
     }
     return false;
+  }
+
+  @Override
+  public String toString() {
+    if (sql.contains("\n")) {
+      return sql.substring(0, pos) + "|" + sql.substring(Math.min(pos, sql.length() - 1));
+    }
+    return sql
+        + "\n"
+        + Strings.repeat(" ", pos)
+        + "^"
+        + Strings.repeat(" ", Math.max(sql.length() - pos - 1, 0));
   }
 }
