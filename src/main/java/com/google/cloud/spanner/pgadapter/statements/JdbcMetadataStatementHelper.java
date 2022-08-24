@@ -155,7 +155,7 @@ class JdbcMetadataStatementHelper {
         .replace(
             " JOIN pg_catalog.pg_description",
             String.format(" JOIN (%s)", PgJdbcCatalog.PG_DESCRIPTION))
-        .replace(" pg_catalog.pg_type ", String.format(" (%s) ", PgJdbcCatalog.PG_TYPE))
+        // .replace(" pg_catalog.pg_type ", String.format(" (%s) ", PgJdbcCatalog.PG_TYPE))
         .replace(" pg_catalog.pg_am", String.format(" (%s)", PgJdbcCatalog.PG_AM))
         .replaceAll(
             "\\s+FROM\\s+pg_catalog\\.pg_settings",

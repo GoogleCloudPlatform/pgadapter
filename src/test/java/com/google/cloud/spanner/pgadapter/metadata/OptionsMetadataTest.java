@@ -231,4 +231,14 @@ public class OptionsMetadataTest {
       System.setOut(originalOut);
     }
   }
+
+  @Test
+  public void testDisablePgCatalogReplacements() {
+    OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
+    assertTrue(options.replacePgCatalogTables());
+
+    options =
+        new OptionsMetadata(new String[] {"-p p", "-i i", "-disable_pg_catalog_replacements"});
+    assertFalse(options.replacePgCatalogTables());
+  }
 }
