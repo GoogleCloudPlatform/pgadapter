@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
@@ -48,10 +49,10 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactio
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
+import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.annotations.VisibleForTesting;
@@ -202,7 +203,12 @@ public class BackendConnection {
         } else if (parsedStatement.isDdl()) {
           result.set(ddlExecutor.execute(parsedStatement, statement));
         } else {
-          result.set(spannerConnection.execute(statement));
+          // Potentially replace pg_catalog table references with common table expressions.
+          Statement updatedStatement =
+              optionsMetadata.replacePgCatalogTables()
+                  ? pgCatalog.replacePgCatalogTables(statement)
+                  : statement;
+          result.set(spannerConnection.execute(updatedStatement));
         }
       } catch (SpannerException spannerException) {
         // Executing queries against the information schema in a transaction is unsupported.
@@ -366,6 +372,7 @@ public class BackendConnection {
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
   private final SessionState sessionState;
+  private final PgCatalog pgCatalog;
   private final ImmutableMap<String, LocalStatement> localStatements;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
@@ -386,6 +393,7 @@ public class BackendConnection {
       OptionsMetadata optionsMetadata,
       ImmutableList<LocalStatement> localStatements) {
     this.sessionState = new SessionState(optionsMetadata);
+    this.pgCatalog = new PgCatalog(this.sessionState);
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
@@ -456,6 +464,34 @@ public class BackendConnection {
       flush(true);
     } finally {
       endImplicitTransaction();
+    }
+  }
+
+  /**
+   * Sets the initial value of a pg_settings setting for this connection. This method should only be
+   * called during startup with values that come from the connection request.
+   */
+  public void initSessionSetting(String name, String value) {
+    if ("options".equalsIgnoreCase(name)) {
+      String[] commands = value.split("-c\\s+");
+      for (String command : commands) {
+        String[] keyValue = command.split("=", 2);
+        if (keyValue.length == 2) {
+          SimpleParser parser = new SimpleParser(keyValue[0]);
+          TableOrIndexName key = parser.readTableOrIndexName();
+          if (key == null) {
+            continue;
+          }
+          this.sessionState.setConnectionStartupValue(key.schema, key.name, keyValue[1]);
+        }
+      }
+    } else {
+      SimpleParser parser = new SimpleParser(name);
+      TableOrIndexName key = parser.readTableOrIndexName();
+      if (key == null) {
+        return;
+      }
+      this.sessionState.setConnectionStartupValue(key.schema, key.name, value);
     }
   }
 
@@ -739,8 +775,7 @@ public class BackendConnection {
             statement ->
                 statement.parsedStatement.getType() == StatementType.UPDATE
                     || statement.parsedStatement.getType() == StatementType.UNKNOWN
-                        && StatementParser.isCommand(
-                            COPY, statement.parsedStatement.getSqlWithoutComments()));
+                        && isCommand(COPY, statement.parsedStatement.getSqlWithoutComments()));
   }
 
   private int getStatementCount() {

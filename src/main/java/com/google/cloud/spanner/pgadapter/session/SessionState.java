@@ -19,6 +19,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,12 +28,37 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /** {@link SessionState} contains all session variables for a connection. */
 @InternalApi
 public class SessionState {
+  /**
+   * This set contains the settings that show up in the pg_settings CTE. Not all settings are
+   * included in the CTE because Cloud Spanner has a limit of max 60 union all clauses in a
+   * sub-select.
+   */
+  private static final ImmutableSet<String> SUPPORTED_PG_SETTINGS_KEYS =
+      ImmutableSet.of(
+          "application_name",
+          "bytea_output",
+          "DateStyle",
+          "default_transaction_isolation",
+          "default_transaction_read_only",
+          "extra_float_digits",
+          "max_connections",
+          "max_index_keys",
+          "port",
+          "search_path",
+          "server_version",
+          "server_version_num",
+          "TimeZone",
+          "transaction_isolation",
+          "transaction_read_only");
+
   private static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
 
   static {
@@ -49,14 +75,81 @@ public class SessionState {
   private Map<String, PGSetting> localSettings;
 
   public SessionState(OptionsMetadata options) {
-    this.settings = new HashMap<>(SERVER_SETTINGS);
+    this.settings = new HashMap<>(SERVER_SETTINGS.size());
+    for (Entry<String, PGSetting> entry : SERVER_SETTINGS.entrySet()) {
+      this.settings.put(entry.getKey(), entry.getValue().copy());
+    }
     this.settings.get("server_version").initSettingValue(options.getServerVersion());
+    this.settings.get("server_version_num").initSettingValue(options.getServerVersionNum());
+  }
+
+  /**
+   * Generates a Common Table Expression that represents the pg_settings table. Note that the
+   * generated query adds two additional CTEs that could in theory hide existing user tables. It is
+   * however strongly recommended that user tables never start with 'pg_', as all system tables in
+   * PostgreSQL start with 'pg_' and 'pg_catalog' is by design always included in the search_path
+   * and is by default the first entry on the search_path. This means that user tables that start
+   * with 'pg_' always risk being hidden by user tables, unless pg_catalog has been explicitly added
+   * to the search_path after one or more user schemas.
+   */
+  public String generatePGSettingsCte() {
+    return "pg_settings_inmem_ as (\n"
+        + getAll().stream()
+            .filter(setting -> SUPPORTED_PG_SETTINGS_KEYS.contains(setting.getCasePreservingKey()))
+            .map(PGSetting::getSelectStatement)
+            .collect(Collectors.joining("\nunion all\n"))
+        + "\n),\n"
+        + "pg_settings_names_ as (\n"
+        + "select name from pg_settings_inmem_\n"
+        + "union\n"
+        + "select name from pg_catalog.pg_settings\n"
+        + "),\n"
+        + "pg_settings as (\n"
+        + "select n.name, "
+        + generatePgSettingsColumnExpressions()
+        + "\n"
+        + "from pg_settings_names_ n\n"
+        + "left join pg_settings_inmem_ s1 using (name)\n"
+        + "left join pg_catalog.pg_settings s2 using (name)\n"
+        + "order by name\n"
+        + ")\n";
+  }
+
+  /**
+   * Generates a string of `coalesce(s1.col, s2.col) as col` for all column names (except `name`) in
+   * pg_settings.
+   */
+  private static String generatePgSettingsColumnExpressions() {
+    return PGSetting.getColumnNames().stream()
+        .skip(1)
+        .map(column -> "coalesce(s1." + column + ", s2." + column + ") as " + column)
+        .collect(Collectors.joining(","));
   }
 
   private static String toKey(String extension, String name) {
     return extension == null
         ? name.toLowerCase(Locale.ROOT)
         : extension.toLowerCase(Locale.ROOT) + "." + name.toLowerCase(Locale.ROOT);
+  }
+
+  /** Sets the value of the specified setting at connection startup. */
+  public void setConnectionStartupValue(String extension, String name, String value) {
+    String key = toKey(extension, name);
+    PGSetting setting = this.settings.get(key);
+    if (setting == null && extension == null) {
+      // Ignore unknown settings.
+      return;
+    }
+    if (setting == null) {
+      setting = new PGSetting(extension, name);
+      this.settings.put(key, setting);
+    }
+    try {
+      setting.initConnectionValue(value);
+    } catch (Exception ignore) {
+      // ignore errors in startup values to prevent unknown or invalid settings from stopping a
+      // connection from being made.
+    }
   }
 
   /**
@@ -146,7 +239,7 @@ public class SessionState {
     for (String key : keys) {
       result.add(internalGet(key));
     }
-    result.sort(Comparator.comparing(PGSetting::getKey));
+    result.sort(Comparator.comparing(PGSetting::getCasePreservingKey));
     return result;
   }
 

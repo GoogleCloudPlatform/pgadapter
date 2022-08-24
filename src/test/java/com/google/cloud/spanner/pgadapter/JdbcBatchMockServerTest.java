@@ -173,7 +173,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
             assertThrows(
                 SQLException.class,
                 () -> statement.execute(String.format("%s;%s;", INSERT_STATEMENT, INVALID_DML)));
-        assertTrue(exception.getMessage().contains("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
       }
     }
 
@@ -199,9 +199,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
 
         // Execute a client side statement to verify that the transaction is in the aborted state.
         exception =
@@ -247,9 +245,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
       }
     }
 
@@ -284,9 +280,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
       }
     }
 
@@ -314,9 +308,8 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals(
+            "ERROR: Statement is invalid. - Statement: 'SELECT foo'", exception.getMessage());
 
         // Verify that the transaction was rolled back and that the connection is usable.
         assertTrue(statement.execute("show transaction isolation level"));
@@ -699,9 +692,7 @@ public class JdbcBatchMockServerTest extends AbstractMockServerTest {
 
         SQLException exception =
             assertThrows(SQLException.class, () -> statement.execute(INVALID_DML.getSql()));
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
 
         assertFalse(statement.execute("COMMIT"));
         assertEquals(0, statement.getUpdateCount());

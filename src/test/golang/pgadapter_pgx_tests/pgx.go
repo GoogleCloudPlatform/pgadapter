@@ -738,8 +738,8 @@ func TestReadWriteTransactionIsolationLevelRepeatableRead(connString string) *C.
 	if err == nil {
 		return C.CString("missing expected error for BeginTx with isolation level RepeatableRead")
 	}
-	if g, w := err.Error(), "ERROR: INVALID_ARGUMENT: Unknown statement: begin isolation level repeatable read (SQLSTATE P0001)"; g != w {
-		return C.CString(fmt.Sprintf("error mismatch\nGot:  %v\n Want: %v", g, w))
+	if g, w := err.Error(), "ERROR: Unknown statement: begin isolation level repeatable read (SQLSTATE P0001)"; g != w {
+		return C.CString(fmt.Sprintf("error mismatch\nGot:  %v\nWant: %v", g, w))
 	}
 
 	return nil

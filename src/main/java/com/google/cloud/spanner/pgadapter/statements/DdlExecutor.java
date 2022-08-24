@@ -188,9 +188,9 @@ class DdlExecutor {
    */
   Statement translate(ParsedStatement parsedStatement, Statement statement) {
     SimpleParser parser = new SimpleParser(parsedStatement.getSqlWithoutComments());
-    if (parser.eat("create")) {
+    if (parser.eatKeyword("create")) {
       statement = translateCreate(parser, statement);
-    } else if (parser.eat("drop")) {
+    } else if (parser.eatKeyword("drop")) {
       statement = translateDrop(parser, statement);
     }
 
@@ -198,25 +198,25 @@ class DdlExecutor {
   }
 
   Statement translateCreate(SimpleParser parser, Statement statement) {
-    if (parser.eat("table")) {
+    if (parser.eatKeyword("table")) {
       Statement createTableStatement = translateCreateTable(parser, statement);
       if (createTableStatement == null) {
         return null;
       }
       return maybeRemovePrimaryKeyConstraintName(createTableStatement);
     }
-    boolean unique = parser.eat("unique");
-    if (parser.eat("index")) {
+    boolean unique = parser.eatKeyword("unique");
+    if (parser.eatKeyword("index")) {
       return translateCreateIndex(parser, statement, unique);
     }
     return statement;
   }
 
   Statement translateDrop(SimpleParser parser, Statement statement) {
-    if (parser.eat("table")) {
+    if (parser.eatKeyword("table")) {
       return translateDropTable(parser, statement);
     }
-    if (parser.eat("index")) {
+    if (parser.eatKeyword("index")) {
       return translateDropIndex(parser, statement);
     }
     return statement;
@@ -244,7 +244,7 @@ class DdlExecutor {
       Statement statement,
       String type,
       Function<TableOrIndexName, Boolean> existsFunction) {
-    if (!parser.eat("if", "not", "exists")) {
+    if (!parser.eatKeyword("if", "not", "exists")) {
       return statement;
     }
     return maybeExecuteStatement(
@@ -256,7 +256,7 @@ class DdlExecutor {
       Statement statement,
       String type,
       Function<TableOrIndexName, Boolean> existsFunction) {
-    if (!parser.eat("if", "exists")) {
+    if (!parser.eatKeyword("if", "exists")) {
       return statement;
     }
     return maybeExecuteStatement(parser, statement, "drop", type, existsFunction);
@@ -348,25 +348,25 @@ class DdlExecutor {
     ParsedStatement parsedStatement =
         AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(createTableStatement);
     SimpleParser parser = new SimpleParser(parsedStatement.getSqlWithoutComments());
-    parser.eat("create", "table", "if", "not", "exists");
+    parser.eatKeyword("create", "table", "if", "not", "exists");
     TableOrIndexName tableName = parser.readTableOrIndexName();
     if (tableName == null) {
       return createTableStatement;
     }
-    if (!parser.eat("(")) {
+    if (!parser.eatToken("(")) {
       return createTableStatement;
     }
     while (true) {
-      if (parser.eat(")")) {
+      if (parser.eatToken(")")) {
         break;
-      } else if (parser.eat(",")) {
+      } else if (parser.eatToken(",")) {
         continue;
-      } else if (parser.peek("constraint")) {
+      } else if (parser.peekKeyword("constraint")) {
         int positionBeforeConstraintDefinition = parser.getPos();
-        parser.eat("constraint");
+        parser.eatKeyword("constraint");
         String constraintName = unquoteIdentifier(parser.readIdentifierPart());
         int positionAfterConstraintName = parser.getPos();
-        if (parser.eat("primary", "key")) {
+        if (parser.eatKeyword("primary", "key")) {
           if (!constraintName.equalsIgnoreCase("pk_" + unquoteIdentifier(tableName.name))) {
             return createTableStatement;
           }
