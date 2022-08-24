@@ -205,7 +205,7 @@ public class BackendConnection {
         } else {
           // Potentially replace pg_catalog table references with common table expressions.
           Statement updatedStatement =
-              optionsMetadata.replacePgCatalogTables()
+              sessionState.isReplacePgCatalogTables()
                   ? pgCatalog.replacePgCatalogTables(statement)
                   : statement;
           result.set(spannerConnection.execute(updatedStatement));
@@ -381,7 +381,6 @@ public class BackendConnection {
   private final Connection spannerConnection;
   private final DatabaseId databaseId;
   private final DdlExecutor ddlExecutor;
-  private final OptionsMetadata optionsMetadata;
 
   /**
    * Creates a PG backend connection that uses the given Spanner {@link Connection} and {@link
@@ -397,7 +396,6 @@ public class BackendConnection {
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
-    this.optionsMetadata = optionsMetadata;
     if (localStatements.isEmpty()) {
       this.localStatements = EMPTY_LOCAL_STATEMENTS;
     } else {
@@ -508,11 +506,6 @@ public class BackendConnection {
   /** Returns the id of the database that this connection uses. */
   public String getCurrentDatabase() {
     return this.databaseId.getDatabase();
-  }
-
-  /** Returns the options that are used for this connection. */
-  public OptionsMetadata getOptionsMetadata() {
-    return this.optionsMetadata;
   }
 
   /**
@@ -655,7 +648,7 @@ public class BackendConnection {
    * allowed.
    */
   private void prepareExecuteDdl(BufferedStatement<?> bufferedStatement) {
-    DdlTransactionMode ddlTransactionMode = this.optionsMetadata.getDdlTransactionMode();
+    DdlTransactionMode ddlTransactionMode = sessionState.getDdlTransactionMode();
     try {
       // Single statements are simpler to check, so we do that in a separate check.
       if (bufferedStatements.size() == 1) {
