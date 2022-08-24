@@ -450,4 +450,8 @@ public class PGSetting {
   public String getResetVal() {
     return resetVal;
   }
+
+  public String getBootVal() {
+    return bootVal;
+  }
 }

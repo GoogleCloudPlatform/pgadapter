@@ -149,7 +149,7 @@ public class SessionStateTest {
   public void testGetAll() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(345, allSettings.size());
+    assertEquals(347, allSettings.size());
   }
 
   @Test
@@ -187,7 +187,7 @@ public class SessionStateTest {
     state.setLocal("spanner", "custom_local_setting", "value2");
 
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(347, allSettings.size());
+    assertEquals(349, allSettings.size());
 
     PGSetting applicationName =
         allSettings.stream()
@@ -417,6 +417,10 @@ public class SessionStateTest {
         + "select 'server_version' as name, null as setting, null as unit, 'Preset Options' as category, null as short_desc, null as extra_desc, 'internal' as context, 'string' as vartype, null as min_val, null as max_val, null::text[] as enumvals, '14.1 (Debian 14.1-1.pgdg110+1)' as boot_val, '14.1 (Debian 14.1-1.pgdg110+1)' as reset_val, 'default' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
         + "select 'server_version_num' as name, null as setting, null as unit, 'Preset Options' as category, null as short_desc, null as extra_desc, 'internal' as context, 'integer' as vartype, '140001' as min_val, '140001' as max_val, null::text[] as enumvals, '140001' as boot_val, '140001' as reset_val, 'default' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
+        + "union all\n"
+        + "select 'spanner.ddl_transaction_mode' as name, 'Batch' as setting, null as unit, 'PGAdapter Options' as category, null as short_desc, null as extra_desc, 'user' as context, 'enum' as vartype, null as min_val, null as max_val, '{\"Single\", \"Batch\", \"AutocommitImplicitTransaction\", \"AutocommitExplicitTransaction\"}'::text[] as enumvals, 'Batch' as boot_val, 'Batch' as reset_val, 'default' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
+        + "union all\n"
+        + "select 'spanner.replace_pg_catalog_tables' as name, 'false' as setting, null as unit, 'PGAdapter Options' as category, null as short_desc, null as extra_desc, 'user' as context, 'bool' as vartype, null as min_val, null as max_val, null::text[] as enumvals, 'on' as boot_val, 'on' as reset_val, 'default' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
         + "select 'transaction_isolation' as name, 'serializable' as setting, null as unit, 'Client Connection Defaults / Statement Behavior' as category, null as short_desc, null as extra_desc, 'user' as context, 'enum' as vartype, null as min_val, null as max_val, '{\"serializable\", \"repeatable read\", \"read committed\", \"read uncommitted\"}'::text[] as enumvals, 'serializable' as boot_val, 'serializable' as reset_val, 'override' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"

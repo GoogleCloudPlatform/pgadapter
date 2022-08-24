@@ -19,6 +19,9 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
+import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
@@ -31,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
 /** {@link SessionState} contains all session variables for a connection. */
@@ -57,7 +61,9 @@ public class SessionState {
           "server_version_num",
           "TimeZone",
           "transaction_isolation",
-          "transaction_read_only");
+          "transaction_read_only",
+          "spanner.ddl_transaction_mode",
+          "spanner.replace_pg_catalog_tables");
 
   private static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
 
@@ -81,6 +87,14 @@ public class SessionState {
     }
     this.settings.get("server_version").initSettingValue(options.getServerVersion());
     this.settings.get("server_version_num").initSettingValue(options.getServerVersionNum());
+    this.settings
+        .get("spanner.ddl_transaction_mode")
+        .initSettingValue(
+            MoreObjects.firstNonNull(options.getDdlTransactionMode(), DdlTransactionMode.Batch)
+                .name());
+    this.settings
+        .get("spanner.replace_pg_catalog_tables")
+        .initSettingValue(Boolean.toString(options.replacePgCatalogTables()));
   }
 
   /**
@@ -276,5 +290,51 @@ public class SessionState {
   public void rollback() {
     this.localSettings = null;
     this.transactionSettings = null;
+  }
+
+  /** Returns the current setting for replacing pg_catalog tables with common table expressions. */
+  public boolean isReplacePgCatalogTables() {
+    PGSetting setting = get("spanner", "replace_pg_catalog_tables");
+    if (setting == null) {
+      return true;
+    }
+    //noinspection unchecked
+    return tryGetFirstNonNull(
+        true,
+        () -> BooleanParser.toBoolean(setting.getSetting()),
+        () -> BooleanParser.toBoolean(setting.getResetVal()),
+        () -> BooleanParser.toBoolean(setting.getBootVal()));
+  }
+
+  /** Returns the {@link DdlTransactionMode} that is used for this connection at this time. */
+  public DdlTransactionMode getDdlTransactionMode() {
+    PGSetting setting = get("spanner", "ddl_transaction_mode");
+    if (setting == null) {
+      return DdlTransactionMode.Batch;
+    }
+    //noinspection unchecked
+    return tryGetFirstNonNull(
+        DdlTransactionMode.Batch,
+        () -> DdlTransactionMode.valueOf(setting.getSetting()),
+        () -> DdlTransactionMode.valueOf(setting.getResetVal()),
+        () -> DdlTransactionMode.valueOf(setting.getBootVal()));
+  }
+
+  static <T> T tryGetFirstNonNull(T defaultResult, Callable<T>... callables) {
+    T value;
+    for (Callable<T> callable : callables) {
+      if ((value = tryGet(callable)) != null) {
+        return value;
+      }
+    }
+    return defaultResult;
+  }
+
+  static <T> T tryGet(Callable<T> callable) {
+    try {
+      return callable.call();
+    } catch (Throwable ignored) {
+      return null;
+    }
   }
 }
