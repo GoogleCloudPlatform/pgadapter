@@ -203,10 +203,12 @@ public class BackendConnection {
         } else if (parsedStatement.isDdl()) {
           result.set(ddlExecutor.execute(parsedStatement, statement));
         } else {
-          // Potentially add session state in the form of CTE(s) to the statement.
-          Statement statementWithSessionState =
-              sessionState.addSessionState(parsedStatement, statement);
-          result.set(spannerConnection.execute(statementWithSessionState));
+          // Potentially replace pg_catalog table references with common table expressions.
+          Statement updatedStatement =
+              optionsMetadata.replacePgCatalogTables()
+                  ? pgCatalog.replacePgCatalogTables(statement)
+                  : statement;
+          result.set(spannerConnection.execute(updatedStatement));
         }
       } catch (SpannerException spannerException) {
         // Executing queries against the information schema in a transaction is unsupported.
@@ -370,6 +372,7 @@ public class BackendConnection {
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
   private final SessionState sessionState;
+  private final PgCatalog pgCatalog;
   private final ImmutableMap<String, LocalStatement> localStatements;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
@@ -390,6 +393,7 @@ public class BackendConnection {
       OptionsMetadata optionsMetadata,
       ImmutableList<LocalStatement> localStatements) {
     this.sessionState = new SessionState(optionsMetadata);
+    this.pgCatalog = new PgCatalog(this.sessionState);
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
