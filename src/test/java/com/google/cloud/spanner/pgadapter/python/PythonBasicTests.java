@@ -382,7 +382,7 @@ public class PythonBasicTests extends PythonTestSetup {
     parameters.add("b'VALUE3'");
 
     String sql2 =
-        "SELECT * FROM some_table where COLUMN_NAME1 = 'VALUE1'::bytea and COLUMN_NAME2 = 'VALUE2'::bytea or COLUMN_NAME3 = 'VALUE3'::bytea";
+        "SELECT * FROM some_table where COLUMN_NAME1 = '\\x56414c554531'::bytea and COLUMN_NAME2 = '\\x56414c554532'::bytea or COLUMN_NAME3 = '\\x56414c554533'::bytea";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
 
     String actualOutput =

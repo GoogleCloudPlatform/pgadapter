@@ -375,7 +375,7 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createResultSet(1, "abcd")));
 
-    String expectedOutput = "the 'deferrable' setting is only available from PostgreSQL 9.1\n";
+    String expectedOutput = "Unknown statement: BEGIN DEFERRABLE\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
 
     assertEquals(expectedOutput, actualOutput);
@@ -401,7 +401,7 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createResultSet(1, "abcd")));
 
-    String expectedOutput = "the 'deferrable' setting is only available from PostgreSQL 9.1\n";
+    String expectedOutput = "Unknown statement: BEGIN DEFERRABLE\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
 
     assertEquals(expectedOutput, actualOutput);
@@ -629,10 +629,11 @@ public class PythonTransactionTests extends PythonTestSetup {
   // ISOLATION_LEVEL_SERIALIZABLE -> 3
   // ISOLATION_LEVEL_READ_UNCOMMITTED -> 4
   @Test
-  public void testUnsupportedIsolationLevelsInTransactions()
-      throws IOException, InterruptedException {
+  public void testUnsupportedIsolationLevelsInTransactionsWithOldVersion() throws Exception {
     // tests isolation_level settings for unsupported isolation levels using
-    // connection.isolation_level variable
+    // connection.isolation_level variable using an old PG version
+    restartServerWithDifferentVersion("1.0");
+
     List<String> unsupportedIsolationLevels = Arrays.asList("1", "4");
 
     String sql1 = "Select * from some_table";
@@ -704,13 +705,15 @@ public class PythonTransactionTests extends PythonTestSetup {
         getWireMessagesOfType(QueryMessage.class).stream()
             .filter(qm -> qm.toString().contains("READ COMMITTED"))
             .count());
+
+    restartServerWithDifferentVersion("14.1");
   }
 
   @Test
   public void testUnsupportedIsolationLevelsSessionInTransactions()
       throws IOException, InterruptedException {
     // tests isolation_level settings for unsupported isolation levels using set_session function
-    List<String> unsupportedIsolationLevels = Arrays.asList("1", "4");
+    List<String> unsupportedIsolationLevels = Arrays.asList("1", "2", "4");
 
     String sql1 = "Select * from some_table";
     String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
@@ -723,9 +726,6 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql3), createResultSet(2, "pqrs")));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
-
-    String expectedOutput =
-        "(1, 'abcd')\n" + "1\n" + "Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED\n";
 
     for (String unsupportedIsolationLevel : unsupportedIsolationLevels) {
       List<String> statements = new ArrayList<>();
@@ -748,6 +748,25 @@ public class PythonTransactionTests extends PythonTestSetup {
       // query won't be executed because the previous setting would've thrown error
       statements.add("query");
       statements.add(sql3);
+
+      String isolationLevel;
+      switch (unsupportedIsolationLevel) {
+        case "1":
+          isolationLevel = "READ COMMITTED";
+          break;
+        case "2":
+          isolationLevel = "REPEATABLE READ";
+          break;
+        case "4":
+          isolationLevel = "READ UNCOMMITTED";
+          break;
+        default:
+          isolationLevel = unsupportedIsolationLevel;
+      }
+      String expectedOutput =
+          "(1, 'abcd')\n"
+              + "1\n"
+              + String.format("Unknown statement: BEGIN ISOLATION LEVEL %s\n", isolationLevel);
 
       String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
       assertEquals(expectedOutput, actualOutput);
@@ -774,12 +793,6 @@ public class PythonTransactionTests extends PythonTestSetup {
 
       mockSpanner.clearRequests();
     }
-
-    assertEquals(
-        2,
-        getWireMessagesOfType(QueryMessage.class).stream()
-            .filter(qm -> qm.toString().contains("READ COMMITTED"))
-            .count());
   }
 
   @Test
@@ -947,10 +960,11 @@ public class PythonTransactionTests extends PythonTestSetup {
   // 9.1
   // will not lead to any error, even though we don't support REPEATABLE_READ
   @Test
-  public void testRepeatableReadIsolationLevelWithLowerVersions()
-      throws IOException, InterruptedException {
+  public void testRepeatableReadIsolationLevelWithLowerVersions() throws Exception {
     // tests repeatable read isolation_level settings with default version 1.0 using
     // connection.isolation_level variable
+    restartServerWithDifferentVersion("1.0");
+
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
     String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
@@ -1028,13 +1042,16 @@ public class PythonTransactionTests extends PythonTestSetup {
         getWireMessagesOfType(QueryMessage.class).stream()
             .filter(qm -> qm.toString().contains("SERIALIZABLE"))
             .count());
+
+    restartServerWithDifferentVersion("14.1");
   }
 
   @Test
-  public void testRepeatableReadIsolationLevelSessionWithLowerVersions()
-      throws IOException, InterruptedException {
-    // tests repeatable read with default version 1.0 isolation_level settings using set_session
+  public void testRepeatableReadIsolationLevelSessionWithLowerVersions() throws Exception {
+    // tests repeatable read with version 1.0 isolation_level settings using set_session
     // function
+    restartServerWithDifferentVersion("1.0");
+
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
     String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
@@ -1112,6 +1129,8 @@ public class PythonTransactionTests extends PythonTestSetup {
         getWireMessagesOfType(QueryMessage.class).stream()
             .filter(qm -> qm.toString().contains("SERIALIZABLE"))
             .count());
+
+    restartServerWithDifferentVersion("14.1");
   }
 
   private void restartServerWithDifferentVersion(String version) throws Exception {
@@ -1125,8 +1144,6 @@ public class PythonTransactionTests extends PythonTestSetup {
     // tests repeatable read isolation_level settings with version 9.1 using
     // connection.isolation_level variable
 
-    restartServerWithDifferentVersion("9.1");
-
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
     String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
@@ -1203,15 +1220,11 @@ public class PythonTransactionTests extends PythonTestSetup {
         getWireMessagesOfType(QueryMessage.class).stream()
             .filter(qm -> qm.toString().contains("REPEATABLE READ"))
             .count());
-
-    restartServerWithDifferentVersion("1.0");
   }
 
   @Test
   public void testRepeatableReadIsolationLevelSessionWithHigherVersions() throws Exception {
     // tests repeatable read isolation_level settings with version 9.1 using set_session function
-
-    restartServerWithDifferentVersion("9.1");
 
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
@@ -1289,8 +1302,6 @@ public class PythonTransactionTests extends PythonTestSetup {
         getWireMessagesOfType(QueryMessage.class).stream()
             .filter(qm -> qm.toString().contains("REPEATABLE READ"))
             .count());
-
-    restartServerWithDifferentVersion("1.0");
   }
 
   @Test
