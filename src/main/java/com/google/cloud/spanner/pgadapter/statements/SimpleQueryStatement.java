@@ -14,7 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import static com.google.cloud.spanner.pgadapter.utils.StatementParser.splitStatements;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
@@ -28,7 +28,6 @@ import com.google.cloud.spanner.pgadapter.commands.Command;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.ConnectionState;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
@@ -85,7 +84,7 @@ public class SimpleQueryStatement {
         // We need to flush the entire pipeline if we encounter a COPY statement, as COPY statements
         // require additional messages to be sent back and forth, and this ensures that we get
         // everything in the correct order.
-        boolean isCopy = StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments());
+        boolean isCopy = isCommand(COPY, parsedStatement.getSqlWithoutComments());
         if (!isFirst && isCopy) {
           new FlushMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN).send();
           if (connectionHandler
@@ -148,7 +147,8 @@ public class SimpleQueryStatement {
   protected static ImmutableList<Statement> parseStatements(Statement statement) {
     Preconditions.checkNotNull(statement);
     ImmutableList.Builder<Statement> builder = ImmutableList.builder();
-    for (String sql : splitStatements(statement.getSql())) {
+    SimpleParser parser = new SimpleParser(statement.getSql());
+    for (String sql : parser.splitStatements()) {
       builder.add(Statement.of(sql));
     }
     return builder.build();

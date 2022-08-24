@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
@@ -52,7 +53,6 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.annotations.VisibleForTesting;
@@ -771,8 +771,7 @@ public class BackendConnection {
             statement ->
                 statement.parsedStatement.getType() == StatementType.UPDATE
                     || statement.parsedStatement.getType() == StatementType.UNKNOWN
-                        && StatementParser.isCommand(
-                            COPY, statement.parsedStatement.getSqlWithoutComments()));
+                        && isCommand(COPY, statement.parsedStatement.getSqlWithoutComments()));
   }
 
   private int getStatementCount() {

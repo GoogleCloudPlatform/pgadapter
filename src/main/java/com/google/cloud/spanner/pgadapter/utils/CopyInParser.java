@@ -23,7 +23,6 @@ import java.io.PipedOutputStream;
 import java.util.Iterator;
 import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVFormat;
-import org.postgresql.jdbc.TimestampUtils;
 
 /** Common interface for parsers that implement one or more of the PostgreSQL COPY formats. */
 @InternalApi
@@ -49,10 +48,6 @@ public interface CopyInParser {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, "Unsupported COPY format: " + format);
     }
-  }
-
-  static TimestampUtils createDefaultTimestampUtils() {
-    return new TimestampUtils(false, () -> null);
   }
 
   /** Returns an iterator of COPY records. */
