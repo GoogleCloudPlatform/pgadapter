@@ -322,7 +322,7 @@ class JdbcMetadataStatementHelper {
     } else {
       return sql;
     }
-    replacedSql += " WHERE TRUE " + sql.substring(startIndex);
+    replacedSql += " WHERE TRUE " + sql.substring(startIndex).replace(") c WHERE true", "");
     return replacedSql
         .replace(" AND n.nspname LIKE ", " AND TABLE_SCHEMA LIKE ")
         .replace(" AND c.relname LIKE ", " AND TABLE_NAME LIKE ")

@@ -106,7 +106,9 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   }
 
   private String createUrl() {
-    return String.format("jdbc:postgresql://%s/", testEnv.getPGAdapterHostAndPort());
+    return String.format(
+        "jdbc:postgresql://%s/?options=-c%%20spanner.replace_pg_catalog_tables=off",
+        testEnv.getPGAdapterHostAndPort());
   }
 
   private void runForAllVersions(Consumer<Connection> runnable) throws Exception {
