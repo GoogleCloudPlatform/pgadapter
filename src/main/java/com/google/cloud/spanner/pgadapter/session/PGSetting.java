@@ -19,6 +19,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -160,7 +161,8 @@ public class PGSetting {
     this.enumVals = null;
   }
 
-  private PGSetting(
+  @VisibleForTesting
+  PGSetting(
       String extension,
       String name,
       String category,
