@@ -2092,8 +2092,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     // Verify that each new connection gets a separate set of settings.
     for (int connectionNum = 0; connectionNum < 5; connectionNum++) {
       try (Connection connection = DriverManager.getConnection(createUrl())) {
-        // Verify that the initial value is null.
-        verifySettingIsNull(connection, "application_name");
+        // Verify that the initial value is 'PostgreSQL JDBC Driver'.
+        verifySettingValue(connection, "application_name", "PostgreSQL JDBC Driver");
         connection.createStatement().execute("set application_name to \"my-application\"");
         verifySettingValue(connection, "application_name", "my-application");
       }
