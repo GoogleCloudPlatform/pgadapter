@@ -1,7 +1,7 @@
 {
   "commands": [
     {
-      "input_pattern": "SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace\nWHERE c\\.relkind IN \\('r'(?:,'p')?,'v','m','S','f',''\\)[ \n]+AND n\\.nspname <> 'pg_catalog'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?n\\.nspname !~ '\\^pg_toast'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;?$",
+      "input_pattern": "SELECT n\\.nspname as \"[^\"]*\",[ \n]+c\\.relname as \"[^\"]*\",[ \n]+CASE c\\.relkind (WHEN '.' THEN '[^']*' )+END as \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(c\\.relowner\\) as \"[^\"]*\"\nFROM pg_catalog\\.pg_class c[ \n]+LEFT JOIN pg_catalog\\.pg_namespace n ON n\\.oid = c\\.relnamespace(?:[ \n]+LEFT JOIN pg_catalog\\.pg_am am ON am\\.oid = c\\.relam)?\nWHERE c\\.relkind IN \\('r'(?:,'p')?,'v','m','S','f',''\\)[ \n]+AND n\\.nspname <> 'pg_catalog'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?n\\.nspname !~ '\\^pg_toast'[ \n]+AND (?:n\\.nspname <> 'information_schema'[ \n]+AND )?pg_catalog\\.pg_table_is_visible\\(c\\.oid\\)\nORDER BY 1,2;?$",
       "output_pattern": "SELECT t.table_schema as \"Schema\", t.table_name as \"Name\", 'table' as \"Type\", 'me' as \"Owner\" FROM information_schema.tables AS t WHERE t.table_schema = 'public';",
       "matcher_array": [],
       "blurb": "This command is equivalent to the PSQL \\d meta-command."

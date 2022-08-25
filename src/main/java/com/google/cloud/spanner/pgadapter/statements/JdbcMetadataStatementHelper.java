@@ -65,10 +65,17 @@ class JdbcMetadataStatementHelper {
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_1)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_2)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_3)
-        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_4)) {
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_4)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_1_1)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_2_1)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_3_1)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMNS_PREFIX_4_1)) {
       return replaceGetColumnsQuery(sql);
     }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_1)) {
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_1)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_2)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_3)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_INDEXES_PREFIX_1_1)) {
       return replaceGetIndexInfoQuery(sql);
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_PRIMARY_KEY_PREFIX_1)
@@ -97,7 +104,8 @@ class JdbcMetadataStatementHelper {
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_2)) {
       return PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT;
     }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1)) {
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1)
+        || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1_1)) {
       return PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT;
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_BEST_ROW_IDENTIFIER_PREFIX)) {
@@ -155,7 +163,6 @@ class JdbcMetadataStatementHelper {
         .replace(
             " JOIN pg_catalog.pg_description",
             String.format(" JOIN (%s)", PgJdbcCatalog.PG_DESCRIPTION))
-        // .replace(" pg_catalog.pg_type ", String.format(" (%s) ", PgJdbcCatalog.PG_TYPE))
         .replace(" pg_catalog.pg_am", String.format(" (%s)", PgJdbcCatalog.PG_AM))
         .replaceAll(
             "\\s+FROM\\s+pg_catalog\\.pg_settings",
@@ -335,10 +342,18 @@ class JdbcMetadataStatementHelper {
   private static String replaceGetIndexInfoQuery(String sql) {
     String replacedSql = PgJdbcCatalog.PG_JDBC_GET_INDEXES_REPLACEMENT;
     int startIndex;
+    int endIndex;
     String wherePrefix1 =
         " WHERE ct.oid=i.indrelid AND ci.oid=i.indexrelid AND a.attrelid=ci.oid AND ci.relam=am.oid  AND n.oid = ct.relnamespace ";
+    String wherePrefix2 = "WHERE true ";
     if (sql.contains(wherePrefix1)) {
       startIndex = sql.indexOf(wherePrefix1) + wherePrefix1.length();
+      endIndex = sql.length();
+    } else if (sql.contains(wherePrefix2)) {
+      startIndex = sql.indexOf(wherePrefix2) + wherePrefix2.length();
+      endIndex =
+          sql.indexOf(
+              ") AS tmp ORDER BY NON_UNIQUE, TYPE, INDEX_NAME, ORDINAL_POSITION", startIndex);
     } else {
       return sql;
     }
@@ -347,6 +362,9 @@ class JdbcMetadataStatementHelper {
         .replace(" AND n.nspname = ", " AND IDX.TABLE_SCHEMA = ")
         .replace(" AND ct.relname = ", " AND IDX.TABLE_NAME = ")
         .replace(" AND i.indisunique ", " AND IDX.IS_UNIQUE='YES' ")
+        .replace(
+            ") AS tmp ORDER BY NON_UNIQUE, TYPE, INDEX_NAME, ORDINAL_POSITION",
+            " ORDER BY IDX.TABLE_NAME, IS_UNIQUE DESC, IDX.INDEX_NAME, CASE WHEN ORDINAL_POSITION IS NULL THEN 0 ELSE ORDINAL_POSITION END")
         .replace(
             "ORDER BY NON_UNIQUE, TYPE, INDEX_NAME, ORDINAL_POSITION",
             "ORDER BY IDX.TABLE_NAME, IS_UNIQUE DESC, IDX.INDEX_NAME, CASE WHEN ORDINAL_POSITION IS NULL THEN 0 ELSE ORDINAL_POSITION END");
