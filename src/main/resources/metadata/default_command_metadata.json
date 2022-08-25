@@ -21,6 +21,12 @@
       "blurb": "This command is equivalent to the PSQL \\d <param> meta-command. This command is split up among multiple parts, this being the second. Here normally would fetch catalogue metadata, but due to Spanner structure, we expect it to be static, and thus just hardcode it."
     },
     {
+      "input_pattern": "^SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, c.relhastriggers, c.relrowsecurity, c.relforcerowsecurity, c.relhasoids, '', c.reltablespace, CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, c.relpersistence, c.relreplident\nFROM pg_catalog.pg_class c\n LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)\nWHERE c.oid = '.*';?$",
+      "output_pattern": "SELECT 0 as relchecks, 'r' as relkind, false as relhasindex, false as relhasrules, false as relhastriggers, false as relrowsecurity, false as relforcerowsecurity, false as relhasoids, '', '' as reltablespace, '', '' as relpersitence, 0 as relreplident;",
+      "matcher_array": [],
+      "blurb": "This command is equivalent to the PSQL \\d <param> meta-command. This command is split up among multiple parts, this being the second. Here normally would fetch catalogue metadata, but due to Spanner structure, we expect it to be static, and thus just hardcode it."
+    },
+    {
       "input_pattern": "^SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, c.relhastriggers, c.relrowsecurity, c.relforcerowsecurity, false AS relhasoids, c.relispartition, '', c.reltablespace, CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, c.relpersistence, c.relreplident, am.amname\nFROM pg_catalog.pg_class c\n LEFT JOIN pg_catalog.pg_class tc ON \\(c.reltoastrelid = tc.oid\\)\nLEFT JOIN pg_catalog.pg_am am ON \\(c.relam = am.oid\\)\nWHERE c.oid = '.*';?$",
       "output_pattern": "SELECT 0 as relchecks, 'r' as relkind, false as relhasindex, false as relhasrules, false as relhastriggers, false as relrowsecurity, false as relforcerowsecurity, false as relhasoids, false as relispartition, '', '' as reltablespace, '', '' as relpersitence, 0 as relreplident, '' as amname;",
       "matcher_array": [],
