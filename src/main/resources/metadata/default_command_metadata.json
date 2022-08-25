@@ -213,7 +213,7 @@
       "blurb": "This command is equivalent to the PSQL \\dn meta-command."
     },
     {
-      "input_pattern": "^SELECT n\\.nspname AS \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(n\\.nspowner\\) AS \"[^\"]*\"\nFROM pg_catalog\\.pg_namespace n\nWHERE n\\.nspname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<schemaname>.*)\\)\\$'\\s+(?:COLLATE pg_catalog\\.default)?\nORDER BY 1;?$",
+      "input_pattern": "^SELECT n\\.nspname AS \"[^\"]*\",[ \n]+pg_catalog\\.pg_get_userbyid\\(n\\.nspowner\\) AS \"[^\"]*\"\nFROM pg_catalog\\.pg_namespace n\nWHERE n\\.nspname OPERATOR\\(pg_catalog\\.~\\) '\\^\\((?<schemaname>.*)\\)\\$'\\s*(?:COLLATE pg_catalog\\.default)?\nORDER BY 1;?$",
       "output_pattern": "SELECT * FROM information_schema.schemata WHERE LOWER(schema_name) = LOWER('%s');",
       "matcher_array": [
         "schemaname"
