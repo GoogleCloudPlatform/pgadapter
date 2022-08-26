@@ -30,6 +30,7 @@ public class Server {
     try {
       System.out.printf("-- Starting PGAdapter version %s --\n", getVersion());
       OptionsMetadata optionsMetadata = new OptionsMetadata(args);
+      System.out.printf("-- PostgreSQL version: %s -- \n", optionsMetadata.getServerVersion());
       ProxyServer server = new ProxyServer(optionsMetadata);
       server.startServer();
     } catch (Exception e) {
