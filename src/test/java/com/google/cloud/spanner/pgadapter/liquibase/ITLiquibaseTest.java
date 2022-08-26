@@ -94,23 +94,12 @@ public class ITLiquibaseTest {
     }
     originalLiquibaseProperties = original.toString();
     try (FileWriter writer = new FileWriter(LIQUIBASE_PROPERTIES_FILE)) {
-      String connectionUrl =
-          String.format(
-              "jdbc:postgresql://localhost/%s?"
-                  + "&socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
-                  + "&socketFactoryArg=/tmp/.s.PGSQL.%d"
-                  + "&options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction",
-              database.getId().getDatabase(), testEnv.getPGAdapterPort());
-
-      //      String properties =
-      //          String.format(
-      //              "changeLogFile: dbchangelog.xml\n"
-      //                  + "url: jdbc:postgresql://localhost:%d/%s"
-      //                  +
-      // "?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction\n",
-      //              testEnv.getPGAdapterPort(), database.getId().getDatabase());
       String properties =
-          String.format("changeLogFile: dbchangelog.xml\n" + "url: %s", connectionUrl);
+          String.format(
+              "changeLogFile: dbchangelog.xml\n"
+                  + "url: jdbc:postgresql://localhost:%d/%s"
+                  + "?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction\n",
+              testEnv.getPGAdapterPort(), database.getId().getDatabase());
       LOGGER.info("Using Liquibase properties:\n" + properties);
       writer.write(properties);
     }
@@ -127,112 +116,12 @@ public class ITLiquibaseTest {
 
   @Test
   public void testLiquibaseUpdate() throws IOException, InterruptedException, SQLException {
-    // Run `cat liquibase.properties`.
-    ProcessBuilder builder = new ProcessBuilder();
-    String[] liquibaseCommand = new String[] {"cat", "liquibase.properties"};
-    builder.command(liquibaseCommand);
-    builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
-    Process process = builder.start();
-
-    String errors;
-    String output;
-
-    LOGGER.info("-------------------------------------");
-    LOGGER.info("Running cat liquibase.properties");
-    try (BufferedReader reader =
-            new BufferedReader(new InputStreamReader(process.getInputStream()));
-        BufferedReader errorReader =
-            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-      errors = errorReader.lines().collect(Collectors.joining("\n"));
-      output = reader.lines().collect(Collectors.joining("\n"));
-    }
-    LOGGER.info("Finished running cat liquibase.properties");
-    LOGGER.info("-------------------------------------");
-    LOGGER.info("");
-
-    LOGGER.warning(errors);
-    LOGGER.info(output);
-
-    int res = process.waitFor();
-    assertEquals(0, res);
-
-    // Run `mvn test`.
-    builder = new ProcessBuilder();
-    liquibaseCommand = new String[] {"mvn", "-B", "test"};
-    builder.command(liquibaseCommand);
-    builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
-    process = builder.start();
-
-    LOGGER.info("-------------------------------------");
-    LOGGER.info("Running mvn test");
-    try (BufferedReader reader =
-        new BufferedReader(new InputStreamReader(process.getInputStream()));
-        BufferedReader errorReader =
-            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-      errors = errorReader.lines().collect(Collectors.joining("\n"));
-      output = reader.lines().collect(Collectors.joining("\n"));
-    }
-    LOGGER.info("Finished running mvn test");
-    LOGGER.info("-------------------------------------");
-    LOGGER.info("");
-
-    LOGGER.warning(errors);
-    LOGGER.info(output);
-
-    res = process.waitFor();
-    assertEquals(0, res);
-
-    // Run `mvn liquibase:validate`.
-    builder = new ProcessBuilder();
-    liquibaseCommand = new String[] {"mvn", "-B", "liquibase:validate"};
-    builder.command(liquibaseCommand);
-    builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
-    process = builder.start();
-
-    LOGGER.info("-------------------------------------");
-    LOGGER.info("Running mvn liquibase:validate");
-    try (BufferedReader reader =
-            new BufferedReader(new InputStreamReader(process.getInputStream()));
-        BufferedReader errorReader =
-            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-      errors = errorReader.lines().collect(Collectors.joining("\n"));
-      output = reader.lines().collect(Collectors.joining("\n"));
-    }
-    LOGGER.info("Finished running mvn liquibase:update");
-    LOGGER.info("-------------------------------------");
-    LOGGER.info("");
-
-    LOGGER.warning(errors);
-    LOGGER.info(output);
-
-    res = process.waitFor();
-    assertEquals(0, res);
-
-    // Run `mvn liquibase:update`.
-    builder = new ProcessBuilder();
-    liquibaseCommand = new String[] {"mvn", "-B", "liquibase:update"};
-    builder.command(liquibaseCommand);
-    builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
-    process = builder.start();
-
-    LOGGER.info("-------------------------------------");
-    LOGGER.info("Running mvn liquibase:update");
-    try (BufferedReader reader =
-            new BufferedReader(new InputStreamReader(process.getInputStream()));
-        BufferedReader errorReader =
-            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-      errors = errorReader.lines().collect(Collectors.joining("\n"));
-      output = reader.lines().collect(Collectors.joining("\n"));
-    }
-    LOGGER.info("Finished running mvn liquibase:update");
-    LOGGER.info("-------------------------------------");
-    LOGGER.info("");
-
-    LOGGER.warning(errors);
-    LOGGER.info(output);
-
-    res = process.waitFor();
-    assertEquals(0, res);
+    // Validate the Liquibase changelog.
+    runLiquibaseCommand("liquibase:validate");
+    // Verify that there is a rollback available for each change set.
+    runLiquibaseCommand("liquibase:futureRollbackSQL");
+    // Update the database with all defined change sets.
+    runLiquibaseCommand("liquibase:update");
 
     // Verify that all tables were created and all data was loaded.
     String url =
@@ -276,6 +165,62 @@ public class ITLiquibaseTest {
             resultSet.getTimestamp(1));
         assertFalse(resultSet.next());
       }
+
+      try (ResultSet resultSet = connection.createStatement()
+          .executeQuery("select count(*) from concerts")) {
+        assertTrue(resultSet.next());
+        assertEquals(2, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Rollback to v3.1.
+      runLiquibaseCommand("liquibase:rollback", "-D-Dliquibase.rollbackTag=v3.1");
+      // Verify that the data in the concerts table was removed.
+      try (ResultSet resultSet = connection.createStatement()
+          .executeQuery("select count(*) from concerts")) {
+        assertTrue(resultSet.next());
+        assertEquals(2, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Rollback everything.
+      runLiquibaseCommand("liquibase:rollback", "-Dliquibase.rollbackTag=v0.0");
+      // Verify that all tables have been removed.
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "select table_name from information_schema.tables where table_schema='public' order by table_name")) {
+        assertFalse(resultSet.next());
+      }
     }
+  }
+
+  void runLiquibaseCommand(String... commands) throws IOException, InterruptedException {
+    ProcessBuilder builder = new ProcessBuilder();
+    ImmutableList<String> liquibaseCommand = ImmutableList.<String>builder()
+        .add("mvn", "-B")
+        .add(commands)
+        .build();
+    builder.command(liquibaseCommand);
+    builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
+    Process process = builder.start();
+
+    String errors;
+    String output;
+
+    try (BufferedReader reader =
+        new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    LOGGER.warning(errors);
+    LOGGER.info(output);
+
+    int res = process.waitFor();
+    assertEquals(0, res);
   }
 }
