@@ -94,12 +94,23 @@ public class ITLiquibaseTest {
     }
     originalLiquibaseProperties = original.toString();
     try (FileWriter writer = new FileWriter(LIQUIBASE_PROPERTIES_FILE)) {
-      String properties =
+      String connectionUrl =
           String.format(
-              "changeLogFile: dbchangelog.xml\n"
-                  + "url: jdbc:postgresql://localhost:%d/%s"
-                  + "?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction\n",
-              testEnv.getPGAdapterPort(), database.getId().getDatabase());
+              "jdbc:postgresql://localhost/%s?"
+                  + "&socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
+                  + "&socketFactoryArg=/tmp/.s.PGSQL.%d"
+                  + "&options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction",
+              database.getId().getDatabase(), testEnv.getPGAdapterPort());
+
+      //      String properties =
+      //          String.format(
+      //              "changeLogFile: dbchangelog.xml\n"
+      //                  + "url: jdbc:postgresql://localhost:%d/%s"
+      //                  +
+      // "?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction\n",
+      //              testEnv.getPGAdapterPort(), database.getId().getDatabase());
+      String properties =
+          String.format("changeLogFile: dbchangelog.xml\n" + "url: %s", connectionUrl);
       LOGGER.info("Using Liquibase properties:\n" + properties);
       writer.write(properties);
     }
