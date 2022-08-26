@@ -342,18 +342,13 @@ class JdbcMetadataStatementHelper {
   private static String replaceGetIndexInfoQuery(String sql) {
     String replacedSql = PgJdbcCatalog.PG_JDBC_GET_INDEXES_REPLACEMENT;
     int startIndex;
-    int endIndex;
     String wherePrefix1 =
         " WHERE ct.oid=i.indrelid AND ci.oid=i.indexrelid AND a.attrelid=ci.oid AND ci.relam=am.oid  AND n.oid = ct.relnamespace ";
     String wherePrefix2 = "WHERE true ";
     if (sql.contains(wherePrefix1)) {
       startIndex = sql.indexOf(wherePrefix1) + wherePrefix1.length();
-      endIndex = sql.length();
     } else if (sql.contains(wherePrefix2)) {
       startIndex = sql.indexOf(wherePrefix2) + wherePrefix2.length();
-      endIndex =
-          sql.indexOf(
-              ") AS tmp ORDER BY NON_UNIQUE, TYPE, INDEX_NAME, ORDINAL_POSITION", startIndex);
     } else {
       return sql;
     }
