@@ -158,7 +158,7 @@ public class ITLiquibaseTest {
 
     // Run `mvn test`.
     builder = new ProcessBuilder();
-    liquibaseCommand = new String[] {"mvn", "test"};
+    liquibaseCommand = new String[] {"mvn", "-B", "test"};
     builder.command(liquibaseCommand);
     builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
     process = builder.start();
@@ -184,7 +184,7 @@ public class ITLiquibaseTest {
 
     // Run `mvn liquibase:validate`.
     builder = new ProcessBuilder();
-    liquibaseCommand = new String[] {"mvn", "liquibase:validate"};
+    liquibaseCommand = new String[] {"mvn", "-B", "liquibase:validate"};
     builder.command(liquibaseCommand);
     builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
     process = builder.start();
@@ -210,7 +210,7 @@ public class ITLiquibaseTest {
 
     // Run `mvn liquibase:update`.
     builder = new ProcessBuilder();
-    liquibaseCommand = new String[] {"mvn", "liquibase:update"};
+    liquibaseCommand = new String[] {"mvn", "-B", "liquibase:update"};
     builder.command(liquibaseCommand);
     builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
     process = builder.start();
