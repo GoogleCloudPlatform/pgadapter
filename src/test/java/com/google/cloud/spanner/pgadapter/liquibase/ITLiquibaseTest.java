@@ -116,15 +116,67 @@ public class ITLiquibaseTest {
 
   @Test
   public void testLiquibaseUpdate() throws IOException, InterruptedException, SQLException {
-    // Run `mvn liquibase:update`.
+    // Run `cat liquibase.properties`.
     ProcessBuilder builder = new ProcessBuilder();
-    String[] psqlCommand = new String[] {"mvn", "liquibase:update"};
-    builder.command(psqlCommand);
+    String[] liquibaseCommand = new String[] {"cat", "liquibase.properties"};
+    builder.command(liquibaseCommand);
     builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
     Process process = builder.start();
 
     String errors;
     String output;
+
+    LOGGER.info("-------------------------------------");
+    LOGGER.info("Running cat liquibase.properties");
+    try (BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+    LOGGER.info("Finished running cat liquibase.properties");
+    LOGGER.info("-------------------------------------");
+    LOGGER.info("");
+
+    LOGGER.warning(errors);
+    LOGGER.info(output);
+
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    // Run `mvn liquibase:validate`.
+    builder = new ProcessBuilder();
+    liquibaseCommand = new String[] {"mvn", "liquibase:validate"};
+    builder.command(liquibaseCommand);
+    builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
+    process = builder.start();
+
+    LOGGER.info("-------------------------------------");
+    LOGGER.info("Running mvn liquibase:validate");
+    try (BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+    LOGGER.info("Finished running mvn liquibase:update");
+    LOGGER.info("-------------------------------------");
+    LOGGER.info("");
+
+    LOGGER.warning(errors);
+    LOGGER.info(output);
+
+    res = process.waitFor();
+    assertEquals(0, res);
+
+    // Run `mvn liquibase:update`.
+    builder = new ProcessBuilder();
+    liquibaseCommand = new String[] {"mvn", "liquibase:update"};
+    builder.command(liquibaseCommand);
+    builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
+    process = builder.start();
 
     LOGGER.info("-------------------------------------");
     LOGGER.info("Running mvn liquibase:update");
@@ -142,7 +194,7 @@ public class ITLiquibaseTest {
     LOGGER.warning(errors);
     LOGGER.info(output);
 
-    int res = process.waitFor();
+    res = process.waitFor();
     assertEquals(0, res);
 
     // Verify that all tables were created and all data was loaded.
