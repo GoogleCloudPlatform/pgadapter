@@ -156,6 +156,32 @@ public class ITLiquibaseTest {
     int res = process.waitFor();
     assertEquals(0, res);
 
+    // Run `mvn test`.
+    builder = new ProcessBuilder();
+    liquibaseCommand = new String[] {"mvn", "test"};
+    builder.command(liquibaseCommand);
+    builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
+    process = builder.start();
+
+    LOGGER.info("-------------------------------------");
+    LOGGER.info("Running mvn test");
+    try (BufferedReader reader =
+        new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+    LOGGER.info("Finished running mvn test");
+    LOGGER.info("-------------------------------------");
+    LOGGER.info("");
+
+    LOGGER.warning(errors);
+    LOGGER.info(output);
+
+    res = process.waitFor();
+    assertEquals(0, res);
+
     // Run `mvn liquibase:validate`.
     builder = new ProcessBuilder();
     liquibaseCommand = new String[] {"mvn", "liquibase:validate"};
