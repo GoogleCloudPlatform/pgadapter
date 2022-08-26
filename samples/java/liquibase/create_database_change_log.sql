@@ -1,4 +1,4 @@
-BEGIN;
+START BATCH DDL;
 
 CREATE TABLE databasechangeloglock (
     ID INTEGER NOT NULL,
@@ -25,4 +25,4 @@ CREATE TABLE databasechangelog (
     DEPLOYMENT_ID VARCHAR(10)
 );
 
-COMMIT;
+RUN BATCH;

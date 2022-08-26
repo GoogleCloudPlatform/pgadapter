@@ -62,7 +62,7 @@ public class ITLiquibaseTest {
 
     testEnv.setUp();
     database = testEnv.createDatabase(ImmutableList.of());
-    testEnv.startPGAdapterServer(ImmutableList.of("-ddl=AutocommitExplicitTransaction"));
+    testEnv.startPGAdapterServer(ImmutableList.of());
     // Create databasechangelog and databasechangeloglock tables.
     StringBuilder builder = new StringBuilder();
     try (Scanner scanner = new Scanner(new FileReader(LIQUIBASE_DB_CHANGELOG_DDL_FILE))) {
@@ -74,11 +74,12 @@ public class ITLiquibaseTest {
     String[] ddl = builder.toString().split(";");
     String url =
         String.format(
-            "jdbc:postgresql://localhost:%d/%s",
+            "jdbc:postgresql://localhost:%d/%s?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction",
             testEnv.getPGAdapterPort(), database.getId().getDatabase());
     try (Connection connection = DriverManager.getConnection(url)) {
       try (Statement statement = connection.createStatement()) {
         for (String sql : ddl) {
+          LOGGER.info("Executing " + sql);
           statement.execute(sql);
         }
       }
@@ -93,10 +94,14 @@ public class ITLiquibaseTest {
     }
     originalLiquibaseProperties = original.toString();
     try (FileWriter writer = new FileWriter(LIQUIBASE_PROPERTIES_FILE)) {
-      writer.write(
+      String properties =
           String.format(
-              "changeLogFile: dbchangelog.xml\n" + "url: jdbc:postgresql://localhost:%d/%s\n",
-              testEnv.getPGAdapterPort(), database.getId().getDatabase()));
+              "changeLogFile: dbchangelog.xml\n"
+                  + "url: jdbc:postgresql://localhost:%d/%s"
+                  + "?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction\n",
+              testEnv.getPGAdapterPort(), database.getId().getDatabase());
+      LOGGER.info("Using Liquibase properties:\n" + properties);
+      writer.write(properties);
     }
   }
 
@@ -121,6 +126,8 @@ public class ITLiquibaseTest {
     String errors;
     String output;
 
+    LOGGER.info("-------------------------------------");
+    LOGGER.info("Running mvn liquibase:update");
     try (BufferedReader reader =
             new BufferedReader(new InputStreamReader(process.getInputStream()));
         BufferedReader errorReader =
@@ -128,9 +135,10 @@ public class ITLiquibaseTest {
       errors = errorReader.lines().collect(Collectors.joining("\n"));
       output = reader.lines().collect(Collectors.joining("\n"));
     }
+    LOGGER.info("Finished running mvn liquibase:update");
+    LOGGER.info("-------------------------------------");
+    LOGGER.info("");
 
-    // errors are normally not empty, as Liquibase warns about a too old PostgreSQL version.
-    // TODO: Check for no errors when PGAdapter can return a recent version by default.
     LOGGER.warning(errors);
     LOGGER.info(output);
 
