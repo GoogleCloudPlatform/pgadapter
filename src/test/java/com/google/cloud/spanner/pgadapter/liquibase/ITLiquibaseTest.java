@@ -62,7 +62,7 @@ public class ITLiquibaseTest {
 
     testEnv.setUp();
     database = testEnv.createDatabase(ImmutableList.of());
-    testEnv.startPGAdapterServer(ImmutableList.of("-ddl=AutocommitExplicitTransaction"));
+    testEnv.startPGAdapterServer(ImmutableList.of());
     // Create databasechangelog and databasechangeloglock tables.
     StringBuilder builder = new StringBuilder();
     try (Scanner scanner = new Scanner(new FileReader(LIQUIBASE_DB_CHANGELOG_DDL_FILE))) {
@@ -74,11 +74,12 @@ public class ITLiquibaseTest {
     String[] ddl = builder.toString().split(";");
     String url =
         String.format(
-            "jdbc:postgresql://localhost:%d/%s",
+            "jdbc:postgresql://localhost:%d/%s?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction",
             testEnv.getPGAdapterPort(), database.getId().getDatabase());
     try (Connection connection = DriverManager.getConnection(url)) {
       try (Statement statement = connection.createStatement()) {
         for (String sql : ddl) {
+          LOGGER.info("Executing " + sql);
           statement.execute(sql);
         }
       }
@@ -93,10 +94,14 @@ public class ITLiquibaseTest {
     }
     originalLiquibaseProperties = original.toString();
     try (FileWriter writer = new FileWriter(LIQUIBASE_PROPERTIES_FILE)) {
-      writer.write(
+      String properties =
           String.format(
-              "changeLogFile: dbchangelog.xml\n" + "url: jdbc:postgresql://localhost:%d/%s\n",
-              testEnv.getPGAdapterPort(), database.getId().getDatabase()));
+              "changeLogFile: dbchangelog.xml\n"
+                  + "url: jdbc:postgresql://localhost:%d/%s"
+                  + "?options=-c%%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction\n",
+              testEnv.getPGAdapterPort(), database.getId().getDatabase());
+      LOGGER.info("Using Liquibase properties:\n" + properties);
+      writer.write(properties);
     }
   }
 
@@ -111,31 +116,12 @@ public class ITLiquibaseTest {
 
   @Test
   public void testLiquibaseUpdate() throws IOException, InterruptedException, SQLException {
-    // Run `mvn liquibase:update`.
-    ProcessBuilder builder = new ProcessBuilder();
-    String[] psqlCommand = new String[] {"mvn", "liquibase:update"};
-    builder.command(psqlCommand);
-    builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
-    Process process = builder.start();
-
-    String errors;
-    String output;
-
-    try (BufferedReader reader =
-            new BufferedReader(new InputStreamReader(process.getInputStream()));
-        BufferedReader errorReader =
-            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-      errors = errorReader.lines().collect(Collectors.joining("\n"));
-      output = reader.lines().collect(Collectors.joining("\n"));
-    }
-
-    // errors are normally not empty, as Liquibase warns about a too old PostgreSQL version.
-    // TODO: Check for no errors when PGAdapter can return a recent version by default.
-    LOGGER.warning(errors);
-    LOGGER.info(output);
-
-    int res = process.waitFor();
-    assertEquals(0, res);
+    // Validate the Liquibase changelog.
+    runLiquibaseCommand("liquibase:validate");
+    // Verify that there is a rollback available for each change set.
+    runLiquibaseCommand("liquibase:futureRollbackSQL");
+    // Update the database with all defined change sets.
+    runLiquibaseCommand("liquibase:update");
 
     // Verify that all tables were created and all data was loaded.
     String url =
@@ -179,6 +165,62 @@ public class ITLiquibaseTest {
             resultSet.getTimestamp(1));
         assertFalse(resultSet.next());
       }
+
+      try (ResultSet resultSet = connection.createStatement()
+          .executeQuery("select count(*) from concerts")) {
+        assertTrue(resultSet.next());
+        assertEquals(2, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Rollback to v3.1.
+      runLiquibaseCommand("liquibase:rollback", "-D-Dliquibase.rollbackTag=v3.1");
+      // Verify that the data in the concerts table was removed.
+      try (ResultSet resultSet = connection.createStatement()
+          .executeQuery("select count(*) from concerts")) {
+        assertTrue(resultSet.next());
+        assertEquals(2, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Rollback everything.
+      runLiquibaseCommand("liquibase:rollback", "-Dliquibase.rollbackTag=v0.0");
+      // Verify that all tables have been removed.
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "select table_name from information_schema.tables where table_schema='public' order by table_name")) {
+        assertFalse(resultSet.next());
+      }
     }
+  }
+
+  void runLiquibaseCommand(String... commands) throws IOException, InterruptedException {
+    ProcessBuilder builder = new ProcessBuilder();
+    ImmutableList<String> liquibaseCommand = ImmutableList.<String>builder()
+        .add("mvn", "-B")
+        .add(commands)
+        .build();
+    builder.command(liquibaseCommand);
+    builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
+    Process process = builder.start();
+
+    String errors;
+    String output;
+
+    try (BufferedReader reader =
+        new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    LOGGER.warning(errors);
+    LOGGER.info(output);
+
+    int res = process.waitFor();
+    assertEquals(0, res);
   }
 }

@@ -14,8 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -245,8 +243,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception =
             assertThrows(SQLException.class, () -> statement.execute(INVALID_DML.getSql()));
-        assertThat(
-            exception.getMessage(), containsString("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
 
         // Verify that the transaction was rolled back and that the connection is usable.
         assertTrue(statement.execute("show transaction isolation level"));
@@ -269,8 +266,8 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception =
             assertThrows(SQLException.class, () -> statement.execute(INVALID_SELECT.getSql()));
-        assertThat(
-            exception.getMessage(), containsString("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals(
+            "ERROR: Statement is invalid. - Statement: 'SELECT foo'", exception.getMessage());
 
         // Verify that the transaction was rolled back and that the connection is usable.
         assertTrue(statement.execute("show transaction isolation level"));
@@ -292,8 +289,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception =
             assertThrows(SQLException.class, () -> statement.execute(INVALID_DDL.getSql()));
-        assertThat(
-            exception.getMessage(), containsString("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
 
         // Verify that the transaction was rolled back and that the connection is usable.
         assertTrue(statement.execute("show transaction isolation level"));

@@ -204,14 +204,69 @@ public class PgJdbcCatalog {
           + "       NULL AS SELF_REFERENCING_COL_NAME, NULL AS REF_GENERATION\n"
           + "FROM INFORMATION_SCHEMA.TABLES AS T\n";
 
+  // This prefix is used for versions [42.3.2, ...).
   public static final String PG_JDBC_GET_COLUMNS_PREFIX_1 =
-      "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,t.typtypmod,a.attnum,null as attidentity,null as attgenerated,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+      "SELECT * FROM (SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,t.typtypmod,row_number() OVER (PARTITION BY a.attrelid ORDER BY a.attnum) AS attnum, nullif(a.attidentity, '') as attidentity,nullif(a.attgenerated, '') as attgenerated,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+  // This prefix is used for versions [42.2.9, 42.3.1].
   public static final String PG_JDBC_GET_COLUMNS_PREFIX_2 =
-      "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,t.typtypmod,a.attnum,null as attidentity,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+      "SELECT * FROM (SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,t.typtypmod,row_number() OVER (PARTITION BY a.attrelid ORDER BY a.attnum) AS attnum, nullif(a.attidentity, '') as attidentity,"
+          + "pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype "
+          + " FROM pg_catalog.pg_namespace n "
+          + " JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid) "
+          + " JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid) "
+          + " JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid) "
+          + " LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum) "
+          + " LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid) "
+          + " LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class') "
+          + " LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog') "
+          + " WHERE c.relkind in ('r','p','v','f','m') and a.attnum > 0 AND NOT a.attisdropped ";
+
+  // This prefix is used for versions [42.1.2, 42.2.8].
   public static final String PG_JDBC_GET_COLUMNS_PREFIX_3 =
-      "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,a.attnum,null as attidentity,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+      "SELECT * FROM (SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,row_number() OVER (PARTITION BY a.attrelid ORDER BY a.attnum) AS attnum, nullif(a.attidentity, '') as attidentity,"
+          + "pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype "
+          + " FROM pg_catalog.pg_namespace n "
+          + " JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid) "
+          + " JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid) "
+          + " JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid) "
+          + " LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum) "
+          + " LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid) "
+          + " LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class') "
+          + " LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog') ";
+
+  // This prefix is used for versions [42.0.0, 42.1.1].
   public static final String PG_JDBC_GET_COLUMNS_PREFIX_4 =
+      // "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND
+      // t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,a.attnum,pg_catalog.pg_get_expr(def.adbin,
+      // def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace
+      // n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a
+      // ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN
+      // pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN
+      // pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN
+      // pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN
+      // pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+      "SELECT * FROM (SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,row_number() OVER (PARTITION BY a.attrelid ORDER BY a.attnum) AS attnum, "
+          + "pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype "
+          + " FROM pg_catalog.pg_namespace n "
+          + " JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid) "
+          + " JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid) "
+          + " JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid) "
+          + " LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum) "
+          + " LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid) "
+          + " LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class') "
+          + " LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog') "
+          + " WHERE c.relkind in ('r','v','f','m') and a.attnum > 0 AND NOT a.attisdropped ";
+
+  // These prefixes are for PGAdapter versions that claim to be PostgreSQL version 1.0.
+  public static final String PG_JDBC_GET_COLUMNS_PREFIX_1_1 =
+      "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,t.typtypmod,a.attnum,null as attidentity,null as attgenerated,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+  public static final String PG_JDBC_GET_COLUMNS_PREFIX_2_1 =
+      "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,t.typtypmod,a.attnum,null as attidentity,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+  public static final String PG_JDBC_GET_COLUMNS_PREFIX_3_1 =
+      "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,a.attnum,null as attidentity,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+  public static final String PG_JDBC_GET_COLUMNS_PREFIX_4_1 =
       "SELECT n.nspname,c.relname,a.attname,a.atttypid,a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) AS attnotnull,a.atttypmod,a.attlen,a.attnum,pg_catalog.pg_get_expr(def.adbin, def.adrelid) AS adsrc,dsc.description,t.typbasetype,t.typtype  FROM pg_catalog.pg_namespace n  JOIN pg_catalog.pg_class c ON (c.relnamespace = n.oid)  JOIN pg_catalog.pg_attribute a ON (a.attrelid=c.oid)  JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)  LEFT JOIN pg_catalog.pg_attrdef def ON (a.attrelid=def.adrelid AND a.attnum = def.adnum)  LEFT JOIN pg_catalog.pg_description dsc ON (c.oid=dsc.objoid AND a.attnum = dsc.objsubid)  LEFT JOIN pg_catalog.pg_class dc ON (dc.oid=dsc.classoid AND dc.relname='pg_class')  LEFT JOIN pg_catalog.pg_namespace dn ON (dc.relnamespace=dn.oid AND dn.nspname='pg_catalog')";
+
   public static final String PG_JDBC_GET_COLUMNS_REPLACEMENT =
       "SELECT TABLE_CATALOG AS \"TABLE_CAT\", TABLE_SCHEMA AS nspname, TABLE_NAME AS relname, COLUMN_NAME AS attname, '' as typtype,\n"
           + "       CASE\n"
@@ -286,6 +341,86 @@ public class PgJdbcCatalog {
           + "FROM INFORMATION_SCHEMA.COLUMNS C\n";
 
   public static final String PG_JDBC_GET_INDEXES_PREFIX_1 =
+      "SELECT "
+          + "    tmp.TABLE_CAT, "
+          + "    tmp.TABLE_SCHEM, "
+          + "    tmp.TABLE_NAME, "
+          + "    tmp.NON_UNIQUE, "
+          + "    tmp.INDEX_QUALIFIER, "
+          + "    tmp.INDEX_NAME, "
+          + "    tmp.TYPE, "
+          + "    tmp.ORDINAL_POSITION, "
+          + "    trim(both '\"' from pg_catalog.pg_get_indexdef(tmp.CI_OID, tmp.ORDINAL_POSITION, false)) AS COLUMN_NAME, "
+          + "  CASE tmp.AM_NAME "
+          + "    WHEN 'btree' THEN CASE tmp.I_INDOPTION[tmp.ORDINAL_POSITION - 1] & 1::smallint "
+          + "      WHEN 1 THEN 'D' "
+          + "      ELSE 'A' "
+          + "    END "
+          + "    ELSE NULL "
+          + "  END AS ASC_OR_DESC, "
+          + "    tmp.CARDINALITY, "
+          + "    tmp.PAGES, "
+          + "    tmp.FILTER_CONDITION "
+          + "FROM (";
+  public static final String PG_JDBC_GET_INDEXES_PREFIX_2 =
+      "SELECT "
+          + "    tmp.TABLE_CAT, "
+          + "    tmp.TABLE_SCHEM, "
+          + "    tmp.TABLE_NAME, "
+          + "    tmp.NON_UNIQUE, "
+          + "    tmp.INDEX_QUALIFIER, "
+          + "    tmp.INDEX_NAME, "
+          + "    tmp.TYPE, "
+          + "    tmp.ORDINAL_POSITION, "
+          + "    trim(both '\"' from pg_catalog.pg_get_indexdef(tmp.CI_OID, tmp.ORDINAL_POSITION, false)) AS COLUMN_NAME, "
+          + "  CASE tmp.AM_NAME "
+          + "    WHEN 'btree' THEN CASE tmp.I_INDOPTION[tmp.ORDINAL_POSITION - 1] & 1 "
+          + "      WHEN 1 THEN 'D' "
+          + "      ELSE 'A' "
+          + "    END "
+          + "    ELSE NULL "
+          + "  END AS ASC_OR_DESC, "
+          + "    tmp.CARDINALITY, "
+          + "    tmp.PAGES, "
+          + "    tmp.FILTER_CONDITION "
+          + "FROM (";
+  public static final String PG_JDBC_GET_INDEXES_PREFIX_3 =
+      "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM, "
+          + "  ct.relname AS TABLE_NAME, NOT i.indisunique AS NON_UNIQUE, "
+          + "  NULL AS INDEX_QUALIFIER, ci.relname AS INDEX_NAME, "
+          + "  CASE i.indisclustered "
+          + "    WHEN true THEN "
+          + java.sql.DatabaseMetaData.tableIndexClustered
+          + "    ELSE CASE am.amname "
+          + "      WHEN 'hash' THEN "
+          + java.sql.DatabaseMetaData.tableIndexHashed
+          + "      ELSE "
+          + java.sql.DatabaseMetaData.tableIndexOther
+          + "    END "
+          + "  END AS TYPE, "
+          + "  (i.keys).n AS ORDINAL_POSITION, "
+          + "  trim(both '\"' from pg_catalog.pg_get_indexdef(ci.oid, (i.keys).n, false)) AS COLUMN_NAME, "
+          + "  CASE am.amname "
+          + "    WHEN 'btree' THEN CASE i.indoption[(i.keys).n - 1] & 1 "
+          + "      WHEN 1 THEN 'D' "
+          + "      ELSE 'A' "
+          + "    END "
+          + "    ELSE NULL "
+          + "  END AS ASC_OR_DESC, "
+          + "  ci.reltuples AS CARDINALITY, "
+          + "  ci.relpages AS PAGES, "
+          + "  pg_catalog.pg_get_expr(i.indpred, i.indrelid) AS FILTER_CONDITION "
+          + "FROM pg_catalog.pg_class ct "
+          + "  JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid) "
+          + "  JOIN (SELECT i.indexrelid, i.indrelid, i.indoption, "
+          + "          i.indisunique, i.indisclustered, i.indpred, "
+          + "          i.indexprs, "
+          + "          information_schema._pg_expandarray(i.indkey) AS keys "
+          + "        FROM pg_catalog.pg_index i) i "
+          + "    ON (ct.oid = i.indrelid) "
+          + "  JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid) "
+          + "  JOIN pg_catalog.pg_am am ON (ci.relam = am.oid) ";
+  public static final String PG_JDBC_GET_INDEXES_PREFIX_1_1 =
       "SELECT NULL AS TABLE_CAT, n.nspname AS TABLE_SCHEM,  ct.relname AS TABLE_NAME, NOT i.indisunique AS NON_UNIQUE, NULL AS INDEX_QUALIFIER, ci.relname AS INDEX_NAME,  CASE i.indisclustered  WHEN true THEN 1 ELSE CASE am.amname  WHEN 'hash' THEN 2 ELSE 3 END  END AS TYPE,  a.attnum AS ORDINAL_POSITION,  CASE WHEN i.indexprs IS NULL THEN a.attname  ELSE pg_catalog.pg_get_indexdef(ci.oid,a.attnum,false) END AS COLUMN_NAME,  NULL AS ASC_OR_DESC,  ci.reltuples AS CARDINALITY,  ci.relpages AS PAGES,  pg_catalog.pg_get_expr(i.indpred, i.indrelid) AS FILTER_CONDITION  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class ct, pg_catalog.pg_class ci,  pg_catalog.pg_attribute a, pg_catalog.pg_am am , pg_catalog.pg_index i";
   public static final String PG_JDBC_GET_INDEXES_REPLACEMENT =
       "SELECT IDX.TABLE_CATALOG AS \"TABLE_CAT\", IDX.TABLE_SCHEMA AS \"TABLE_SCHEM\", IDX.TABLE_NAME AS \"TABLE_NAME\",\n"
@@ -451,6 +586,8 @@ public class PgJdbcCatalog {
   public static final String PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT =
       "select '' as nspname, '' as relname, '' as rolname, '' as relacl from (select 1) t where false";
   public static final String PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1 =
+      "SELECT n.nspname,c.relname,r.rolname,c.relacl, a.attacl,  a.attname  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c,  pg_catalog.pg_roles r, pg_catalog.pg_attribute a  WHERE c.relnamespace = n.oid  AND c.relowner = r.oid  AND c.oid = a.attrelid  AND c.relkind = 'r'  AND a.attnum > 0 AND NOT a.attisdropped";
+  public static final String PG_JDBC_GET_COLUMN_PRIVILEGES_PREFIX_1_1 =
       "SELECT n.nspname,c.relname,r.rolname,c.relacl,  a.attname  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c,  pg_catalog.pg_roles r, pg_catalog.pg_attribute a  WHERE c.relnamespace = n.oid  AND c.relowner = r.oid  AND c.oid = a.attrelid  AND c.relkind = 'r'  AND a.attnum > 0 AND NOT a.attisdropped";
   public static final String PG_JDBC_GET_COLUMN_PRIVILEGES_REPLACEMENT =
       "select '' as nspname, '' as relname, '' as rolname, '' as relacl, '' as attname from (select 1) t where false";

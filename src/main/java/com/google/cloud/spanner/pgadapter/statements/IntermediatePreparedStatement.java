@@ -401,7 +401,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     if (!parser.eatKeyword("set")) {
       return null;
     }
-    List<String> assignmentsList = parser.parseExpressionListUntilKeyword("where");
+    List<String> assignmentsList = parser.parseExpressionListUntilKeyword("where", true);
     if (assignmentsList == null || assignmentsList.isEmpty()) {
       return null;
     }

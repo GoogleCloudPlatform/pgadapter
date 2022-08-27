@@ -9,6 +9,12 @@
 		http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd
 		http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd">
 
+
+  <!-- Add a tag to the empty database, so we can roll back to this version later if we want -->
+  <changeSet id="tag-v0.0" author="loite">
+    <tagDatabase tag="v0.0"/>
+  </changeSet>
+
   <!--
     Each change set is applied in a separate transaction. Cloud Spanner however does not support
     DDL transactions, only DDL batches. A DDL batch is not guaranteed to be atomic. If a statement
@@ -119,6 +125,9 @@
         name="active"
         type="boolean"/>
     </loadData>
+    <rollback>
+      <!-- No specific rollback -->
+    </rollback>
   </changeSet>
   <changeSet id="4 - load albums" author="loite">
     <loadData
@@ -139,6 +148,9 @@
         name="title"
         type="string"/>
     </loadData>
+    <rollback>
+      <!-- No specific rollback -->
+    </rollback>
   </changeSet>
   <changeSet id="5 - load tracks" author="loite">
     <loadData
@@ -159,6 +171,13 @@
         name="title"
         type="string"/>
     </loadData>
+    <rollback>
+      <!-- No specific rollback -->
+    </rollback>
+  </changeSet>
+  <!-- Add a tag to the database, so we can roll back to this version later if we want -->
+  <changeSet id="tag-v1.0" author="loite">
+    <tagDatabase tag="v1.0"/>
   </changeSet>
 
   <!-- Add a non-null column to an existing table. -->
@@ -173,6 +192,10 @@
         <constraints nullable="false" />
       </column>
     </addColumn>
+  </changeSet>
+  <!-- Add a tag to the database, so we can roll back to this version later if we want -->
+  <changeSet id="tag-v1.1" author="loite">
+    <tagDatabase tag="v1.1"/>
   </changeSet>
 
   <!-- Create a table that contains a column with each supported data type. -->
@@ -234,6 +257,13 @@
         name="col_text"
         type="string"/>
     </loadData>
+    <rollback>
+      <!-- No specific rollback -->
+    </rollback>
+  </changeSet>
+  <!-- Add a tag to the database, so we can roll back to this version later if we want -->
+  <changeSet id="tag-v2.0" author="loite">
+    <tagDatabase tag="v2.0"/>
   </changeSet>
 
   <changeSet id="9 - custom SQL change" author="loite">
@@ -259,7 +289,21 @@
         );
       ]]>
     </sql>
+    <rollback>
+      <sql
+        splitStatements="true"
+        endDelimiter=";"><![CDATA[
+          drop table concerts;
+          drop table venues;
+        ]]>
+      </sql>
+    </rollback>
   </changeSet>
+  <!-- Add a tag to the database, so we can roll back to this version later if we want -->
+  <changeSet id="tag-v3.0" author="loite">
+    <tagDatabase tag="v3.0"/>
+  </changeSet>
+
   <changeSet id="9.1 - fix check constraint" author="loite">
     <sql
       splitStatements="true"
@@ -271,7 +315,24 @@
           );
       ]]>
     </sql>
+    <rollback>
+      <sql
+        splitStatements="true"
+        endDelimiter=";"><![CDATA[
+          alter table concerts drop constraint chk_concert_end_time_after_start_time;
+          alter table concerts add constraint chk_concert_end_time_after_start_time check (
+                coalesce(start_time, '0001-01-01T00:00:00Z'::timestamptz) <
+                coalesce(end_time, '9999-12-31T23:59:59Z'::timestamptz)
+            );
+      ]]>
+      </sql>
+    </rollback>
   </changeSet>
+  <!-- Add a tag to the database, so we can roll back to this version later if we want -->
+  <changeSet id="tag-v3.1" author="loite">
+    <tagDatabase tag="v3.1"/>
+  </changeSet>
+
   <changeSet id="10 - insert data with SQL" author="loite">
     <sql
       splitStatements="true"
@@ -280,5 +341,19 @@
       insert into concerts values ('149e4411-fa1e-46a1-8b95-d5da83d7e7a7', '45850c71-c2ea-404b-98b8-bcf985ec3a8c', null, null, '014a1c27-a8af-4911-bb71-6da16a540df1');
       insert into concerts values ('89b2cf6f-322d-45e8-8228-89544e948908', '45850c71-c2ea-404b-98b8-bcf985ec3a8c', '2022-08-31 20:30:00+02:00'::timestamptz, '2022-09-01 02:00:00+02:00'::timestamptz, '014a1c27-a8af-4911-bb71-6da16a540df1');
     </sql>
+    <rollback>
+      <sql
+        splitStatements="true"
+        endDelimiter=";">
+        delete from concerts where concert_id='89b2cf6f-322d-45e8-8228-89544e948908';
+        delete from concerts where concert_id='149e4411-fa1e-46a1-8b95-d5da83d7e7a7';
+        delete from venues where venue_id='45850c71-c2ea-404b-98b8-bcf985ec3a8c';
+      </sql>
+    </rollback>
   </changeSet>
+  <!-- Add a tag to the database, so we can roll back to this version later if we want -->
+  <changeSet id="tag-v3.2" author="loite">
+    <tagDatabase tag="v3.2"/>
+  </changeSet>
+
 </databaseChangeLog>

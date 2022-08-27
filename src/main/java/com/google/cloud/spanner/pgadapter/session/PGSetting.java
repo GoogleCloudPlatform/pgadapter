@@ -19,12 +19,14 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 
 /** Represents a row in the pg_settings table. */
@@ -47,6 +49,26 @@ public class PGSetting {
   private static final int SOURCEFILE_INDEX = 14;
   private static final int SOURCELINE_INDEX = 15;
   private static final int PENDING_RESTART_INDEX = 16;
+  /** The column names of the pg_settings table. */
+  private static final ImmutableList<String> COLUMN_NAMES =
+      ImmutableList.of(
+          "name",
+          "setting",
+          "unit",
+          "category",
+          "short_desc",
+          "extra_desc",
+          "context",
+          "vartype",
+          "source",
+          "min_val",
+          "max_val",
+          "enumvals",
+          "boot_val",
+          "reset_val",
+          "sourcefile",
+          "sourceline",
+          "pending_restart");
 
   private final String extension;
   private final String name;
@@ -139,7 +161,8 @@ public class PGSetting {
     this.enumVals = null;
   }
 
-  private PGSetting(
+  @VisibleForTesting
+  PGSetting(
       String extension,
       String name,
       String category,
@@ -178,6 +201,7 @@ public class PGSetting {
     this.pendingRestart = pendingRestart;
   }
 
+  /** Returns a copy of this {@link PGSetting}. */
   PGSetting copy() {
     return new PGSetting(
         extension,
@@ -200,7 +224,86 @@ public class PGSetting {
         pendingRestart);
   }
 
-  public String getKey() {
+  /** Returns this setting as a SELECT statement that can be used in a query or CTE. */
+  String getSelectStatement() {
+    return "select "
+        + toSelectExpression(getCasePreservingKey())
+        + " as name, "
+        + toSelectExpression(setting)
+        + " as setting, "
+        + toSelectExpression(unit)
+        + " as unit, "
+        + toSelectExpression(category)
+        + " as category, "
+        + toSelectExpression((String) null)
+        + " as short_desc, "
+        + toSelectExpression((String) null)
+        + " as extra_desc, "
+        + toSelectExpression(context)
+        + " as context, "
+        + toSelectExpression(vartype)
+        + " as vartype, "
+        + toSelectExpression(minVal)
+        + " as min_val, "
+        + toSelectExpression(maxVal)
+        + " as max_val, "
+        + toSelectExpression(enumVals)
+        + " as enumvals, "
+        + toSelectExpression(bootVal)
+        + " as boot_val, "
+        + toSelectExpression(resetVal)
+        + " as reset_val, "
+        + toSelectExpression(source)
+        + " as source, "
+        + toSelectExpression((String) null)
+        + " as sourcefile, "
+        + toSelectExpression((Integer) null)
+        + "::bigint as sourceline, "
+        + toSelectExpression(pendingRestart)
+        + "::boolean as pending_restart";
+  }
+
+  /** Returns the column names of the pg_settings table. */
+  static ImmutableList<String> getColumnNames() {
+    return COLUMN_NAMES;
+  }
+
+  /** Converts a string to a SQL literal expression that can be used in a select statement. */
+  String toSelectExpression(String value) {
+    return value == null ? "null" : "'" + value + "'";
+  }
+
+  /**
+   * Converts a string array to a SQL literal expression that can be used in a select statement. The
+   * expression is cast to text[].
+   */
+  String toSelectExpression(String[] value) {
+    return value == null
+        ? "null::text[]"
+        : "'{"
+            + Arrays.stream(value)
+                .map(s -> s.startsWith("\"") ? s : "\"" + s + "\"")
+                .collect(Collectors.joining(", "))
+            + "}'::text[]";
+  }
+
+  /** Converts an Integer to a SQL literal expression that can be used in a select statement. */
+  String toSelectExpression(Integer value) {
+    return value == null ? "null" : value.toString();
+  }
+
+  /** Converts a Boolean to a SQL literal expression that can be used in a select statement. */
+  String toSelectExpression(Boolean value) {
+    return value == null ? "null" : (value ? "'t'" : "'f'");
+  }
+
+  /**
+   * Returns the case-preserving key of this setting. Some settings have a key that is written in
+   * camel case (e.g. 'DateStyle') instead of snake case (e.g. 'server_version'). This key should
+   * not be used to look up a setting in the session state map, but should be used in for example
+   * the pg_settings table.
+   */
+  public String getCasePreservingKey() {
     if (extension == null) {
       return name;
     }
@@ -225,6 +328,12 @@ public class PGSetting {
     this.setting = value;
   }
 
+  /** Initializes the value of the setting at connection startup. */
+  void initConnectionValue(String value) {
+    setSetting(value);
+    this.resetVal = value;
+  }
+
   /**
    * Sets the value for this setting. Throws {@link SpannerException} if the value is not valid, or
    * if the setting is not settable.
@@ -247,7 +356,7 @@ public class PGSetting {
 
   private void checkValidContext() {
     if (!isSettable()) {
-      throw invalidContextError(getKey(), this.context);
+      throw invalidContextError(getCasePreservingKey(), this.context);
     }
   }
 
@@ -277,22 +386,22 @@ public class PGSetting {
       try {
         BooleanParser.toBoolean(value);
       } catch (IllegalArgumentException exception) {
-        throw invalidBoolError(getKey());
+        throw invalidBoolError(getCasePreservingKey());
       }
     } else if ("integer".equals(this.vartype)) {
       try {
         Integer.parseInt(value);
       } catch (NumberFormatException exception) {
-        throw invalidValueError(getKey(), value);
+        throw invalidValueError(getCasePreservingKey(), value);
       }
     } else if ("real".equals(this.vartype)) {
       try {
         Double.parseDouble(value);
       } catch (NumberFormatException exception) {
-        throw invalidValueError(getKey(), value);
+        throw invalidValueError(getCasePreservingKey(), value);
       }
     } else if (enumVals != null && !Iterables.contains(Arrays.asList(this.enumVals), value)) {
-      throw invalidValueError(getKey(), value);
+      throw invalidValueError(getCasePreservingKey(), value);
     }
   }
 
@@ -342,5 +451,9 @@ public class PGSetting {
 
   public String getResetVal() {
     return resetVal;
+  }
+
+  public String getBootVal() {
+    return bootVal;
   }
 }
