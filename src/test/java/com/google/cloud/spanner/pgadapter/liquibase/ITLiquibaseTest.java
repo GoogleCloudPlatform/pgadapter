@@ -166,18 +166,18 @@ public class ITLiquibaseTest {
         assertFalse(resultSet.next());
       }
 
-      try (ResultSet resultSet = connection.createStatement()
-          .executeQuery("select count(*) from concerts")) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select count(*) from concerts")) {
         assertTrue(resultSet.next());
         assertEquals(2, resultSet.getInt(1));
         assertFalse(resultSet.next());
       }
 
       // Rollback to v3.1.
-      runLiquibaseCommand("liquibase:rollback", "-D-Dliquibase.rollbackTag=v3.1");
+      runLiquibaseCommand("liquibase:rollback", "-Dliquibase.rollbackTag=v3.1");
       // Verify that the data in the concerts table was removed.
-      try (ResultSet resultSet = connection.createStatement()
-          .executeQuery("select count(*) from concerts")) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select count(*) from concerts")) {
         assertTrue(resultSet.next());
         assertEquals(2, resultSet.getInt(1));
         assertFalse(resultSet.next());
@@ -198,10 +198,8 @@ public class ITLiquibaseTest {
 
   void runLiquibaseCommand(String... commands) throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
-    ImmutableList<String> liquibaseCommand = ImmutableList.<String>builder()
-        .add("mvn", "-B")
-        .add(commands)
-        .build();
+    ImmutableList<String> liquibaseCommand =
+        ImmutableList.<String>builder().add("mvn", "-B").add(commands).build();
     builder.command(liquibaseCommand);
     builder.directory(new File(LIQUIBASE_SAMPLE_DIRECTORY));
     Process process = builder.start();
@@ -210,7 +208,7 @@ public class ITLiquibaseTest {
     String output;
 
     try (BufferedReader reader =
-        new BufferedReader(new InputStreamReader(process.getInputStream()));
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
         BufferedReader errorReader =
             new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
       errors = errorReader.lines().collect(Collectors.joining("\n"));
