@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.session;
 
+import com.google.api.client.util.Strings;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
@@ -31,6 +32,20 @@ import javax.annotation.Nonnull;
 /** Represents a row in the pg_settings table. */
 @InternalApi
 public class PGSetting {
+  public enum Context {
+    USER,
+    SUPERUSER,
+    BACKEND,
+    SUPERUSER_BACKEND,
+    SIGHUP,
+    POSTMASTER,
+    INTERNAL;
+
+    String getSqlValue() {
+      return name().toLowerCase().replace('_', '-');
+    }
+  }
+
   private static final int NAME_INDEX = 0;
   private static final int SETTING_INDEX = 1;
   private static final int UNIT_INDEX = 2;
@@ -74,7 +89,7 @@ public class PGSetting {
   private final String category;
   private final String shortDesc;
   private final String extraDesc;
-  private final String context;
+  private final Context context;
   private final String vartype;
   private final String minVal;
   private final String maxVal;
@@ -150,10 +165,10 @@ public class PGSetting {
   PGSetting(String extension, String name) {
     this.extension = extension;
     this.name = name;
+    this.context = Context.USER;
     this.category = null;
     this.shortDesc = null;
     this.extraDesc = null;
-    this.context = null;
     this.vartype = null;
     this.minVal = null;
     this.maxVal = null;
@@ -184,7 +199,7 @@ public class PGSetting {
     this.category = category;
     this.shortDesc = shortDesc;
     this.extraDesc = extraDesc;
-    this.context = context;
+    this.context = tryParseContext(context);
     this.vartype = vartype;
     this.minVal = minVal;
     this.maxVal = maxVal;
@@ -207,7 +222,7 @@ public class PGSetting {
         category,
         shortDesc,
         extraDesc,
-        context,
+        context.name(),
         vartype,
         minVal,
         maxVal,
@@ -220,6 +235,16 @@ public class PGSetting {
         sourcefile,
         sourceline,
         pendingRestart);
+  }
+
+  static Context tryParseContext(String value) {
+    try {
+      return Strings.isNullOrEmpty(value)
+          ? Context.USER
+          : Context.valueOf(value.toUpperCase().replace('-', '_'));
+    } catch (Exception ignore) {
+      return Context.USER;
+    }
   }
 
   /** Returns this setting as a SELECT statement that can be used in a query or CTE. */
@@ -237,7 +262,7 @@ public class PGSetting {
         + " as short_desc, "
         + toSelectExpression((String) null)
         + " as extra_desc, "
-        + toSelectExpression(context)
+        + toSelectExpression(context.getSqlValue())
         + " as context, "
         + toSelectExpression(vartype)
         + " as vartype, "
@@ -328,7 +353,7 @@ public class PGSetting {
 
   /** Initializes the value of the setting at connection startup. */
   void initConnectionValue(String value) {
-    setSetting(value);
+    setSetting(Context.BACKEND, value);
     this.resetVal = value;
   }
 
@@ -336,9 +361,9 @@ public class PGSetting {
    * Sets the value for this setting. Throws {@link SpannerException} if the value is not valid, or
    * if the setting is not settable.
    */
-  void setSetting(String value) {
+  void setSetting(Context context, String value) {
     if (this.context != null) {
-      checkValidContext();
+      checkValidContext(context);
     }
     if (this.vartype != null) {
       // Check validity of the value.
@@ -347,34 +372,39 @@ public class PGSetting {
     this.setting = value;
   }
 
-  boolean isSettable() {
-    // Consider all users as superuser.
-    return "user".equals(this.context) || "superuser".equals(this.context);
+  boolean isSettable(Context context) {
+    Preconditions.checkNotNull(context);
+    return this.context.ordinal() <= context.ordinal();
   }
 
-  private void checkValidContext() {
-    if (!isSettable()) {
+  private void checkValidContext(Context context) {
+    if (!isSettable(context)) {
       throw invalidContextError(getCasePreservingKey(), this.context);
     }
   }
 
-  static SpannerException invalidContextError(String key, String context) {
-    if ("internal".equals(context)) {
-      return SpannerExceptionFactory.newSpannerException(
-          ErrorCode.INVALID_ARGUMENT, String.format("parameter \"%s\" cannot be changed", key));
+  static SpannerException invalidContextError(String key, Context context) {
+    switch (context) {
+      case INTERNAL:
+        return SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT, String.format("parameter \"%s\" cannot be changed", key));
+      case POSTMASTER:
+        return SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            String.format("parameter \"%s\" cannot be changed without restarting the server", key));
+      case SIGHUP:
+        return SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            String.format("parameter \"%s\" cannot be changed now", key));
+      case SUPERUSER_BACKEND:
+      case BACKEND:
+      case SUPERUSER:
+      case USER:
+      default:
+        return SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            String.format("parameter \"%s\" cannot be set after connection start", key));
     }
-    if ("postmaster".equals(context)) {
-      return SpannerExceptionFactory.newSpannerException(
-          ErrorCode.INVALID_ARGUMENT,
-          String.format("parameter \"%s\" cannot be changed without restarting the server", key));
-    }
-    if ("sighup".equals(context)) {
-      return SpannerExceptionFactory.newSpannerException(
-          ErrorCode.INVALID_ARGUMENT, String.format("parameter \"%s\" cannot be changed now", key));
-    }
-    return SpannerExceptionFactory.newSpannerException(
-        ErrorCode.INVALID_ARGUMENT,
-        String.format("parameter \"%s\" cannot be set after connection start", key));
   }
 
   private void checkValidValue(String value) {
@@ -427,7 +457,7 @@ public class PGSetting {
     return extraDesc;
   }
 
-  public String getContext() {
+  public Context getContext() {
     return context;
   }
 

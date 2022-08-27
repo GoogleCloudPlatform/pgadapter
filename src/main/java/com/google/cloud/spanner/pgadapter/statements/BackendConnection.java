@@ -482,7 +482,7 @@ public class BackendConnection {
           if (key == null) {
             continue;
           }
-          this.sessionState.setConnectionStartupValue(key.schema, key.name, keyValue[1]);
+          this.sessionState.setConnectionStartupValue(key.schema, key.name, keyValue[1].trim());
         }
       }
     } else {
@@ -513,6 +513,11 @@ public class BackendConnection {
   /** Returns the options that are used for this connection. */
   public OptionsMetadata getOptionsMetadata() {
     return this.optionsMetadata;
+  }
+
+  /** Returns the session state of this connection. */
+  public SessionState getSessionState() {
+    return this.sessionState;
   }
 
   /**
