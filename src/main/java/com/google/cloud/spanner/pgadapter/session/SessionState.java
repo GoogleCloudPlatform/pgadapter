@@ -60,7 +60,7 @@ public class SessionState {
           "transaction_isolation",
           "transaction_read_only");
 
-  private static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
+  static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
 
   static {
     for (PGSetting setting : PGSetting.read()) {
@@ -150,7 +150,7 @@ public class SessionState {
       // Also update server_version_num if the server_version is set in the connection startup
       // message. This is something that is not supported by PostgreSQL, but for PGAdapter the
       // minimum context needed for setting the server_version is BACKEND.
-      if (toKey(setting.getExtension(), setting.getName()).equals(toKey(null, "server_version"))) {
+      if (key.equals(toKey(null, "server_version"))) {
         setting = this.settings.get(toKey(null, "server_version_num"));
         setting.setSetting(Context.INTERNAL, OptionsMetadata.toServerVersionNum(value));
       }
