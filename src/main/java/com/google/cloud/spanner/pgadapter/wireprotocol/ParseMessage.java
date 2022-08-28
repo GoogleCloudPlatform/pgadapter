@@ -15,7 +15,10 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.DEALLOCATE;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.EXECUTE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.PREPARE;
 
 import com.google.api.core.InternalApi;
@@ -33,9 +36,10 @@ import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
+import com.google.cloud.spanner.pgadapter.statements.DeallocateStatement;
+import com.google.cloud.spanner.pgadapter.statements.ExecuteStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.PrepareStatement;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
 import java.text.MessageFormat;
@@ -96,7 +100,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
       ParsedStatement parsedStatement,
       Statement originalStatement,
       int[] parameterDataTypes) {
-    if (StatementParser.isCommand(COPY, parsedStatement.getSqlWithoutComments())) {
+    if (isCommand(COPY, originalStatement.getSql())) {
       CopyOptions copyOptions = parseCopyStatement(parsedStatement);
       if (copyOptions.getFromTo() == FromTo.FROM) {
         return new CopyStatement(
@@ -112,8 +116,22 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, "Unsupported COPY direction: " + copyOptions.getFromTo());
       }
-    } else if (StatementParser.isCommand(PREPARE, parsedStatement.getSqlWithoutComments())) {
+    } else if (isCommand(PREPARE, originalStatement.getSql())) {
       return new PrepareStatement(
+          connectionHandler,
+          connectionHandler.getServer().getOptions(),
+          name,
+          parsedStatement,
+          originalStatement);
+    } else if (isCommand(EXECUTE, originalStatement.getSql())) {
+      return new ExecuteStatement(
+          connectionHandler,
+          connectionHandler.getServer().getOptions(),
+          name,
+          parsedStatement,
+          originalStatement);
+    } else if (isCommand(DEALLOCATE, originalStatement.getSql())) {
+      return new DeallocateStatement(
           connectionHandler,
           connectionHandler.getServer().getOptions(),
           name,

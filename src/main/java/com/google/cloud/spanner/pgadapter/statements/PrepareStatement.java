@@ -84,7 +84,7 @@ public class PrepareStatement extends IntermediatePortalStatement {
       ParsedStatement parsedStatement,
       Statement originalStatement) {
     super(connectionHandler, options, name, parsedStatement, originalStatement);
-    this.preparedStatement = parse(parsedStatement.getSqlWithoutComments());
+    this.preparedStatement = parse(originalStatement.getSql());
   }
 
   @Override

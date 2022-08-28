@@ -250,6 +250,9 @@ public abstract class ControlMessage extends WireMessage {
       new EmptyQueryResponse(this.outputStream).send(false);
       return;
     }
+    if (statement.getStatementResult() == null) {
+      return;
+    }
 
     switch (statement.getStatementType()) {
       case DDL:

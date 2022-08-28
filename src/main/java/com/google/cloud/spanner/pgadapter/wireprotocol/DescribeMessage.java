@@ -66,7 +66,11 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
     super(connection, 4, manuallyCreatedToken);
     this.type = type;
     this.name = name;
-    this.statement = this.connection.getPortal(this.name);
+    if (this.type == PreparedType.Portal) {
+      this.statement = this.connection.getPortal(this.name);
+    } else {
+      this.statement = this.connection.getStatement(this.name);
+    }
   }
 
   @SuppressWarnings("unchecked")

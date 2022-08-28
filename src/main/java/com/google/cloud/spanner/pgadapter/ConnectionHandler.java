@@ -487,6 +487,12 @@ public class ConnectionHandler extends Thread {
     this.statementsMap.remove(statementName);
   }
 
+  public void closeAllStatements() {
+    for (String statementName : this.statementsMap.keySet()) {
+      closeStatement(statementName);
+    }
+  }
+
   public boolean hasStatement(String statementName) {
     return this.statementsMap.containsKey(statementName);
   }
