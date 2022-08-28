@@ -515,6 +515,11 @@ public class BackendConnection {
     return this.optionsMetadata;
   }
 
+  /** Returns the session state of this connection. */
+  public SessionState getSessionState() {
+    return this.sessionState;
+  }
+
   /**
    * Flushes all buffered statements to Cloud Spanner and commits/rolls back the transaction at the
    * end if isSync=true.

@@ -436,8 +436,8 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   public void testCopyInExceedsCommitSizeLimit_FailsInAtomicMode() throws SQLException {
     setupCopyInformationSchemaResults();
 
+    System.setProperty("copy_in_commit_limit", "10");
     try (Connection connection = DriverManager.getConnection(createUrl())) {
-      System.setProperty("copy_in_commit_limit", "10");
       CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
       SQLException exception =
           assertThrows(
@@ -460,8 +460,8 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   public void testCopyInExceedsCommitSizeLimit_BatchesInNonAtomicMode()
       throws SQLException, IOException {
     setupCopyInformationSchemaResults();
+    System.setProperty("copy_in_commit_limit", "10");
     try (Connection connection = DriverManager.getConnection(createUrl())) {
-      System.setProperty("copy_in_commit_limit", "10");
       connection
           .createStatement()
           .execute("set spanner.autocommit_dml_mode='partitioned_non_atomic'");

@@ -14,11 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter.session;
 
+import static com.google.cloud.spanner.pgadapter.session.CopySettings.initCopySettings;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
@@ -81,6 +84,8 @@ public class SessionState {
     }
     this.settings.get("server_version").initSettingValue(options.getServerVersion());
     this.settings.get("server_version_num").initSettingValue(options.getServerVersionNum());
+
+    initCopySettings(this.settings);
   }
 
   /**
@@ -205,10 +210,10 @@ public class SessionState {
 
   /** Returns the current value of the specified setting. */
   public PGSetting get(String extension, String name) {
-    return internalGet(toKey(extension, name));
+    return internalGet(toKey(extension, name), true);
   }
 
-  private PGSetting internalGet(String key) {
+  private PGSetting internalGet(String key, boolean throwForUnknownParam) {
     if (localSettings != null && localSettings.containsKey(key)) {
       return localSettings.get(key);
     }
@@ -218,7 +223,43 @@ public class SessionState {
     if (settings.containsKey(key)) {
       return settings.get(key);
     }
-    throw unknownParamError(key);
+    if (throwForUnknownParam) {
+      throw unknownParamError(key);
+    }
+    return null;
+  }
+
+  boolean getBoolSetting(String extension, String name, boolean defaultValue) {
+    PGSetting setting = internalGet(toKey(extension, name), false);
+    if (setting != null) {
+      try {
+        return BooleanParser.toBoolean(setting.getSetting());
+      } catch (Exception ignore) {
+      }
+    }
+    return defaultValue;
+  }
+
+  int getIntegerSetting(String extension, String name, int defaultValue) {
+    PGSetting setting = internalGet(toKey(extension, name), false);
+    if (setting != null) {
+      try {
+        return Integer.parseInt(setting.getSetting());
+      } catch (Exception ignore) {
+      }
+    }
+    return defaultValue;
+  }
+
+  float getFloatSetting(String extension, String name, float defaultValue) {
+    PGSetting setting = internalGet(toKey(extension, name), false);
+    if (setting != null) {
+      try {
+        return Float.parseFloat(setting.getSetting());
+      } catch (Exception ignore) {
+      }
+    }
+    return defaultValue;
   }
 
   /** Returns all settings and their current values. */
@@ -237,7 +278,7 @@ public class SessionState {
                     ? Collections.emptySet()
                     : transactionSettings.keySet()));
     for (String key : keys) {
-      result.add(internalGet(key));
+      result.add(internalGet(key, true));
     }
     result.sort(Comparator.comparing(PGSetting::getCasePreservingKey));
     return result;

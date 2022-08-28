@@ -48,6 +48,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.ConnectionState;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
@@ -1413,6 +1414,13 @@ public class ProtocolTest {
   @Test
   public void testCopyFromFilePipe() throws Exception {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        mock(ExtendedQueryProtocolHandler.class);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    SessionState sessionState = new SessionState(options);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
     setupQueryInformationSchemaResults();
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));

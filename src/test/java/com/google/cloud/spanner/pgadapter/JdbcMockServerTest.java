@@ -2022,7 +2022,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(345, count);
+        assertEquals(354, count);
       }
     }
   }
