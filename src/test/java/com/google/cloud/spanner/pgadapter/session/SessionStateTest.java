@@ -15,9 +15,11 @@
 package com.google.cloud.spanner.pgadapter.session;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import com.google.cloud.spanner.SpannerException;
@@ -535,5 +537,56 @@ public class SessionStateTest {
             + getDefaultSessionStateExpression()
             + ",\n/* This comment is preserved */  foo as (select * from bar)\nselect * from pg_settings",
         withSessionState.getSql());
+  }
+
+  @Test
+  public void testGetBoolSetting() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    assertFalse(state.getBoolSetting("spanner", "unknown_setting", false));
+    assertTrue(state.getBoolSetting("spanner", "unknown_setting", true));
+
+    state.set("spanner", "custom_setting", "on");
+    assertTrue(state.getBoolSetting("spanner", "custom_setting", false));
+    state.set("spanner", "custom_setting", "off");
+    assertFalse(state.getBoolSetting("spanner", "custom_setting", true));
+
+    state.set("spanner", "custom_setting", "foo");
+    assertFalse(state.getBoolSetting("spanner", "custom_setting", false));
+    state.set("spanner", "custom_setting", "foo");
+    assertTrue(state.getBoolSetting("spanner", "custom_setting", true));
+  }
+
+  @Test
+  public void testGetIntegerSetting() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    assertEquals(100, state.getIntegerSetting("spanner", "unknown_setting", 100));
+    assertEquals(0, state.getIntegerSetting("spanner", "unknown_setting", 0));
+
+    state.set("spanner", "custom_setting", "200");
+    assertEquals(200, state.getIntegerSetting("spanner", "custom_setting", 100));
+    state.set("spanner", "custom_setting", "-200");
+    assertEquals(-200, state.getIntegerSetting("spanner", "custom_setting", 100));
+
+    state.set("spanner", "custom_setting", "foo");
+    assertEquals(100, state.getIntegerSetting("spanner", "custom_setting", 100));
+    state.set("spanner", "custom_setting", "bar");
+    assertEquals(0, state.getIntegerSetting("spanner", "custom_setting", 0));
+  }
+
+  @Test
+  public void testGetFloatSetting() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    assertEquals(1.1f, state.getFloatSetting("spanner", "unknown_setting", 1.1f), 0.0f);
+    assertEquals(0.0f, state.getFloatSetting("spanner", "unknown_setting", 0.0f), 0.0f);
+
+    state.set("spanner", "custom_setting", "2");
+    assertEquals(2f, state.getFloatSetting("spanner", "custom_setting", 1f), 0.0f);
+    state.set("spanner", "custom_setting", "-2.9");
+    assertEquals(-2.9f, state.getFloatSetting("spanner", "custom_setting", 1.5f), 0.0f);
+
+    state.set("spanner", "custom_setting", "foo");
+    assertEquals(4.4f, state.getFloatSetting("spanner", "custom_setting", 4.4f), 0.0f);
+    state.set("spanner", "custom_setting", "bar");
+    assertEquals(0f, state.getFloatSetting("spanner", "custom_setting", 0f), 0.0f);
   }
 }
