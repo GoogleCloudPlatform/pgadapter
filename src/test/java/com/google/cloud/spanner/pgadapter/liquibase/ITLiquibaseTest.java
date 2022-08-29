@@ -179,7 +179,7 @@ public class ITLiquibaseTest {
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("select count(*) from concerts")) {
         assertTrue(resultSet.next());
-        assertEquals(2, resultSet.getInt(1));
+        assertEquals(0, resultSet.getInt(1));
         assertFalse(resultSet.next());
       }
 
@@ -191,6 +191,11 @@ public class ITLiquibaseTest {
               .createStatement()
               .executeQuery(
                   "select table_name from information_schema.tables where table_schema='public' order by table_name")) {
+        // Only the databasechangelog tables should be in the database after the rollback.
+        assertTrue(resultSet.next());
+        assertEquals("databasechangelog", resultSet.getString(1));
+        assertTrue(resultSet.next());
+        assertEquals("databasechangeloglock", resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
