@@ -794,15 +794,19 @@ public class OptionsMetadata {
   }
 
   public String getServerVersionNum() {
-    String[] components = serverVersion.split("\\.");
+    return toServerVersionNum(this.serverVersion);
+  }
+
+  public static String toServerVersionNum(String version) {
+    String[] components = version.split("\\.");
     if (components.length >= 2) {
       int major = tryParseInt(components[0]);
-      int minor = tryParseInt(components[1]);
+      int minor = tryParseInt(components[1].split("\\s+")[0]);
       if (major > -1 && minor > -1) {
         return String.valueOf(major * 10000 + minor);
       }
     }
-    return serverVersion;
+    return version;
   }
 
   private static int tryParseInt(String value) {

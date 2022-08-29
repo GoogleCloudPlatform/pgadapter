@@ -2112,6 +2112,35 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testMultipleSettingsInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20spanner.setting1=value1%20-c%20spanner.setting2=value2")) {
+      verifySettingValue(connection, "spanner.setting1", "value1");
+      verifySettingValue(connection, "spanner.setting2", "value2");
+    }
+  }
+
+  @Test
+  public void testServerVersionInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20server_version=4.1")) {
+      verifySettingValue(connection, "server_version", "4.1");
+      verifySettingValue(connection, "server_version_num", "40001");
+    }
+  }
+
+  @Test
+  public void testCustomServerVersionInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20server_version=5.2 custom version")) {
+      verifySettingValue(connection, "server_version", "5.2 custom version");
+      verifySettingValue(connection, "server_version_num", "50002");
+    }
+  }
+
+  @Test
   public void testSelectPgType() throws SQLException {
     mockSpanner.putStatementResult(
         StatementResult.query(

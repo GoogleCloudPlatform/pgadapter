@@ -477,7 +477,7 @@ public class BackendConnection {
           if (key == null) {
             continue;
           }
-          this.sessionState.setConnectionStartupValue(key.schema, key.name, keyValue[1]);
+          this.sessionState.setConnectionStartupValue(key.schema, key.name, keyValue[1].trim());
         }
       }
     } else {
@@ -503,6 +503,11 @@ public class BackendConnection {
   /** Returns the id of the database that this connection uses. */
   public String getCurrentDatabase() {
     return this.databaseId.getDatabase();
+  }
+
+  /** Returns the session state of this connection. */
+  public SessionState getSessionState() {
+    return this.sessionState;
   }
 
   /**
