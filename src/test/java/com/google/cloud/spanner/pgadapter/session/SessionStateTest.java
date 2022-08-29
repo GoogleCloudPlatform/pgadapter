@@ -14,16 +14,23 @@
 
 package com.google.cloud.spanner.pgadapter.session;
 
+import static com.google.cloud.spanner.pgadapter.session.SessionState.tryGet;
+import static com.google.cloud.spanner.pgadapter.session.SessionState.tryGetFirstNonNull;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -149,7 +156,7 @@ public class SessionStateTest {
   public void testGetAll() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(345, allSettings.size());
+    assertEquals(347, allSettings.size());
   }
 
   @Test
@@ -187,7 +194,7 @@ public class SessionStateTest {
     state.setLocal("spanner", "custom_local_setting", "value2");
 
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(347, allSettings.size());
+    assertEquals(349, allSettings.size());
 
     PGSetting applicationName =
         allSettings.stream()
@@ -418,6 +425,10 @@ public class SessionStateTest {
         + "union all\n"
         + "select 'server_version_num' as name, null as setting, null as unit, 'Preset Options' as category, null as short_desc, null as extra_desc, 'internal' as context, 'integer' as vartype, '140001' as min_val, '140001' as max_val, null::text[] as enumvals, '140001' as boot_val, '140001' as reset_val, 'default' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
+        + "select 'spanner.ddl_transaction_mode' as name, 'Batch' as setting, null as unit, 'PGAdapter Options' as category, null as short_desc, null as extra_desc, 'user' as context, 'enum' as vartype, null as min_val, null as max_val, '{\"Single\", \"Batch\", \"AutocommitImplicitTransaction\", \"AutocommitExplicitTransaction\"}'::text[] as enumvals, 'Batch' as boot_val, 'Batch' as reset_val, 'default' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
+        + "union all\n"
+        + "select 'spanner.replace_pg_catalog_tables' as name, 'false' as setting, null as unit, 'PGAdapter Options' as category, null as short_desc, null as extra_desc, 'user' as context, 'bool' as vartype, null as min_val, null as max_val, null::text[] as enumvals, 'on' as boot_val, 'on' as reset_val, 'default' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
+        + "union all\n"
         + "select 'transaction_isolation' as name, 'serializable' as setting, null as unit, 'Client Connection Defaults / Statement Behavior' as category, null as short_desc, null as extra_desc, 'user' as context, 'enum' as vartype, null as min_val, null as max_val, '{\"serializable\", \"repeatable read\", \"read committed\", \"read uncommitted\"}'::text[] as enumvals, 'serializable' as boot_val, 'serializable' as reset_val, 'override' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
         + "select 'transaction_read_only' as name, 'off' as setting, null as unit, 'Client Connection Defaults / Statement Behavior' as category, null as short_desc, null as extra_desc, 'user' as context, 'bool' as vartype, null as min_val, null as max_val, null::text[] as enumvals, 'off' as boot_val, 'off' as reset_val, 'override' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
@@ -535,5 +546,208 @@ public class SessionStateTest {
             + getDefaultSessionStateExpression()
             + ",\n/* This comment is preserved */  foo as (select * from bar)\nselect * from pg_settings",
         withSessionState.getSql());
+  }
+
+  @Test
+  public void testTryGet() {
+    assertNull(
+        tryGet(
+            () -> {
+              throw new IllegalArgumentException();
+            }));
+    assertEquals("test", tryGet(() -> "test"));
+  }
+
+  @Test
+  public void testTryGetFirstNonNull() {
+    assertEquals("default", tryGetFirstNonNull("default"));
+    assertEquals("test", tryGetFirstNonNull("default", () -> "test"));
+    assertEquals("test", tryGetFirstNonNull("default", () -> null, () -> "test"));
+    assertEquals("default", tryGetFirstNonNull("default", () -> null, () -> null));
+  }
+
+  @Test
+  public void testIsReplacePgCatalogTables_noDefault() {
+    SessionState state = new SessionState(ImmutableMap.of(), mock(OptionsMetadata.class));
+    assertTrue(state.isReplacePgCatalogTables());
+  }
+
+  @Test
+  public void testIsReplacePgCatalogTables_defaultFalse() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    when(optionsMetadata.replacePgCatalogTables()).thenReturn(false);
+    SessionState state =
+        new SessionState(
+            ImmutableMap.of(
+                "spanner.replace_pg_catalog_tables",
+                new PGSetting("spanner", "replace_pg_catalog_tables")),
+            optionsMetadata);
+    assertFalse(state.isReplacePgCatalogTables());
+  }
+
+  @Test
+  public void testIsReplacePgCatalogTables_defaultTrue() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    when(optionsMetadata.replacePgCatalogTables()).thenReturn(true);
+    SessionState state =
+        new SessionState(
+            ImmutableMap.of(
+                "spanner.replace_pg_catalog_tables",
+                new PGSetting("spanner", "replace_pg_catalog_tables")),
+            optionsMetadata);
+    assertTrue(state.isReplacePgCatalogTables());
+  }
+
+  @Test
+  public void testIsReplacePgCatalogTables_resetVal() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    PGSetting setting =
+        new PGSetting(
+            "spanner",
+            "replace_pg_catalog_tables",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            /* resetVal = */ "off",
+            null,
+            null,
+            false);
+    SessionState state =
+        new SessionState(
+            ImmutableMap.of("spanner.replace_pg_catalog_tables", setting), optionsMetadata);
+    state.set("spanner", "replace_pg_catalog_tables", null);
+
+    assertFalse(state.isReplacePgCatalogTables());
+  }
+
+  @Test
+  public void testIsReplacePgCatalogTables_bootVal() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    PGSetting setting =
+        new PGSetting(
+            "spanner",
+            "replace_pg_catalog_tables",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            /* bootVal = */ "off",
+            null,
+            null,
+            null,
+            false);
+    SessionState state =
+        new SessionState(
+            ImmutableMap.of("spanner.replace_pg_catalog_tables", setting), optionsMetadata);
+    state.set("spanner", "replace_pg_catalog_tables", null);
+
+    assertFalse(state.isReplacePgCatalogTables());
+  }
+
+  @Test
+  public void testDdlTransactionMode_noDefault() {
+    SessionState state = new SessionState(ImmutableMap.of(), mock(OptionsMetadata.class));
+    assertEquals(DdlTransactionMode.Batch, state.getDdlTransactionMode());
+  }
+
+  @Test
+  public void testDdlTransactionMode_defaultSingle() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    when(optionsMetadata.getDdlTransactionMode()).thenReturn(DdlTransactionMode.Single);
+    SessionState state =
+        new SessionState(
+            ImmutableMap.of(
+                "spanner.ddl_transaction_mode", new PGSetting("spanner", "ddl_transaction_mode")),
+            optionsMetadata);
+    assertEquals(DdlTransactionMode.Single, state.getDdlTransactionMode());
+  }
+
+  @Test
+  public void testDdlTransactionMode_defaultExplicit() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    when(optionsMetadata.getDdlTransactionMode())
+        .thenReturn(DdlTransactionMode.AutocommitExplicitTransaction);
+    SessionState state =
+        new SessionState(
+            ImmutableMap.of(
+                "spanner.ddl_transaction_mode", new PGSetting("spanner", "ddl_transaction_mode")),
+            optionsMetadata);
+    assertEquals(DdlTransactionMode.AutocommitExplicitTransaction, state.getDdlTransactionMode());
+  }
+
+  @Test
+  public void testDdlTransactionMode_resetVal() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    PGSetting setting =
+        new PGSetting(
+            "spanner",
+            "ddl_transaction_mode",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            /* resetVal = */ "Single",
+            null,
+            null,
+            false);
+    SessionState state =
+        new SessionState(ImmutableMap.of("spanner.ddl_transaction_mode", setting), optionsMetadata);
+    state.set("spanner", "ddl_transaction_mode", null);
+
+    assertEquals(DdlTransactionMode.Single, state.getDdlTransactionMode());
+  }
+
+  @Test
+  public void testDdlTransactionMode_bootVal() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    PGSetting setting =
+        new PGSetting(
+            "spanner",
+            "ddl_transaction_mode",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            /* bootVal = */ "Single",
+            null,
+            null,
+            null,
+            false);
+    SessionState state =
+        new SessionState(ImmutableMap.of("spanner.ddl_transaction_mode", setting), optionsMetadata);
+    state.set("spanner", "ddl_transaction_mode", null);
+
+    assertEquals(DdlTransactionMode.Single, state.getDdlTransactionMode());
   }
 }
