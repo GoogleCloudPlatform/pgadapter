@@ -19,6 +19,11 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
+import com.google.cloud.spanner.pgadapter.session.PGSetting.Context;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
@@ -31,6 +36,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
 /** {@link SessionState} contains all session variables for a connection. */
@@ -57,9 +63,11 @@ public class SessionState {
           "server_version_num",
           "TimeZone",
           "transaction_isolation",
-          "transaction_read_only");
+          "transaction_read_only",
+          "spanner.ddl_transaction_mode",
+          "spanner.replace_pg_catalog_tables");
 
-  private static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
+  static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
 
   static {
     for (PGSetting setting : PGSetting.read()) {
@@ -75,12 +83,29 @@ public class SessionState {
   private Map<String, PGSetting> localSettings;
 
   public SessionState(OptionsMetadata options) {
-    this.settings = new HashMap<>(SERVER_SETTINGS.size());
-    for (Entry<String, PGSetting> entry : SERVER_SETTINGS.entrySet()) {
+    this(SERVER_SETTINGS, options);
+  }
+
+  @VisibleForTesting
+  SessionState(Map<String, PGSetting> serverSettings, OptionsMetadata options) {
+    this.settings = new HashMap<>(serverSettings.size());
+    for (Entry<String, PGSetting> entry : serverSettings.entrySet()) {
       this.settings.put(entry.getKey(), entry.getValue().copy());
     }
-    this.settings.get("server_version").initSettingValue(options.getServerVersion());
-    this.settings.get("server_version_num").initSettingValue(options.getServerVersionNum());
+    initSettingValue("server_version", options.getServerVersion());
+    initSettingValue("server_version_num", options.getServerVersionNum());
+    initSettingValue(
+        "spanner.ddl_transaction_mode",
+        MoreObjects.firstNonNull(options.getDdlTransactionMode(), DdlTransactionMode.Batch).name());
+    initSettingValue(
+        "spanner.replace_pg_catalog_tables", Boolean.toString(options.replacePgCatalogTables()));
+  }
+
+  void initSettingValue(String key, String value) {
+    PGSetting setting = this.settings.get(key);
+    if (setting != null) {
+      setting.initSettingValue(value);
+    }
   }
 
   /**
@@ -146,6 +171,13 @@ public class SessionState {
     }
     try {
       setting.initConnectionValue(value);
+      // Also update server_version_num if the server_version is set in the connection startup
+      // message. This is something that is not supported by PostgreSQL, but for PGAdapter the
+      // minimum context needed for setting the server_version is BACKEND.
+      if (key.equals(toKey(null, "server_version"))) {
+        setting = this.settings.get(toKey(null, "server_version_num"));
+        setting.setSetting(Context.INTERNAL, OptionsMetadata.toServerVersionNum(value));
+      }
     } catch (Exception ignore) {
       // ignore errors in startup values to prevent unknown or invalid settings from stopping a
       // connection from being made.
@@ -199,16 +231,17 @@ public class SessionState {
     if (setting == null) {
       setting = newSetting.getResetVal();
     }
-    newSetting.setSetting(setting);
+    // Consider all users as SUPERUSER.
+    newSetting.setSetting(Context.SUPERUSER, setting);
     currentSettings.put(key, newSetting);
   }
 
   /** Returns the current value of the specified setting. */
   public PGSetting get(String extension, String name) {
-    return internalGet(toKey(extension, name));
+    return internalGet(toKey(extension, name), true);
   }
 
-  private PGSetting internalGet(String key) {
+  private PGSetting internalGet(String key, boolean throwForUnknownParam) {
     if (localSettings != null && localSettings.containsKey(key)) {
       return localSettings.get(key);
     }
@@ -218,7 +251,10 @@ public class SessionState {
     if (settings.containsKey(key)) {
       return settings.get(key);
     }
-    throw unknownParamError(key);
+    if (throwForUnknownParam) {
+      throw unknownParamError(key);
+    }
+    return null;
   }
 
   /** Returns all settings and their current values. */
@@ -237,7 +273,7 @@ public class SessionState {
                     ? Collections.emptySet()
                     : transactionSettings.keySet()));
     for (String key : keys) {
-      result.add(internalGet(key));
+      result.add(internalGet(key, true));
     }
     result.sort(Comparator.comparing(PGSetting::getCasePreservingKey));
     return result;
@@ -246,7 +282,8 @@ public class SessionState {
   /** Resets all values to their 'reset' value. */
   public void resetAll() {
     for (PGSetting setting : getAll()) {
-      if (setting.isSettable() && !Objects.equals(setting.getSetting(), setting.getResetVal())) {
+      if (setting.isSettable(Context.SUPERUSER)
+          && !Objects.equals(setting.getSetting(), setting.getResetVal())) {
         set(setting.getExtension(), setting.getName(), setting.getResetVal());
       }
     }
@@ -276,5 +313,50 @@ public class SessionState {
   public void rollback() {
     this.localSettings = null;
     this.transactionSettings = null;
+  }
+
+  /** Returns the current setting for replacing pg_catalog tables with common table expressions. */
+  public boolean isReplacePgCatalogTables() {
+    PGSetting setting = internalGet(toKey("spanner", "replace_pg_catalog_tables"), false);
+    if (setting == null) {
+      return true;
+    }
+    return tryGetFirstNonNull(
+        true,
+        () -> BooleanParser.toBoolean(setting.getSetting()),
+        () -> BooleanParser.toBoolean(setting.getResetVal()),
+        () -> BooleanParser.toBoolean(setting.getBootVal()));
+  }
+
+  /** Returns the {@link DdlTransactionMode} that is used for this connection at this time. */
+  public DdlTransactionMode getDdlTransactionMode() {
+    PGSetting setting = internalGet(toKey("spanner", "ddl_transaction_mode"), false);
+    if (setting == null) {
+      return DdlTransactionMode.Batch;
+    }
+    return tryGetFirstNonNull(
+        DdlTransactionMode.Batch,
+        () -> DdlTransactionMode.valueOf(setting.getSetting()),
+        () -> DdlTransactionMode.valueOf(setting.getResetVal()),
+        () -> DdlTransactionMode.valueOf(setting.getBootVal()));
+  }
+
+  @SafeVarargs
+  static <T> T tryGetFirstNonNull(T defaultResult, Callable<T>... callables) {
+    T value;
+    for (Callable<T> callable : callables) {
+      if ((value = tryGet(callable)) != null) {
+        return value;
+      }
+    }
+    return defaultResult;
+  }
+
+  static <T> T tryGet(Callable<T> callable) {
+    try {
+      return callable.call();
+    } catch (Throwable ignored) {
+      return null;
+    }
   }
 }

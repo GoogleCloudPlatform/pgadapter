@@ -2043,7 +2043,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(345, count);
+        assertEquals(347, count);
       }
     }
   }
@@ -2108,6 +2108,35 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 + "?options=-c%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction")) {
       verifySettingValue(
           connection, "spanner.ddl_transaction_mode", "AutocommitExplicitTransaction");
+    }
+  }
+
+  @Test
+  public void testMultipleSettingsInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20spanner.setting1=value1%20-c%20spanner.setting2=value2")) {
+      verifySettingValue(connection, "spanner.setting1", "value1");
+      verifySettingValue(connection, "spanner.setting2", "value2");
+    }
+  }
+
+  @Test
+  public void testServerVersionInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20server_version=4.1")) {
+      verifySettingValue(connection, "server_version", "4.1");
+      verifySettingValue(connection, "server_version_num", "40001");
+    }
+  }
+
+  @Test
+  public void testCustomServerVersionInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20server_version=5.2 custom version")) {
+      verifySettingValue(connection, "server_version", "5.2 custom version");
+      verifySettingValue(connection, "server_version_num", "50002");
     }
   }
 
@@ -2193,6 +2222,59 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertTrue(resultSet.next());
         assertEquals(1L, resultSet.getLong(1));
         assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testDefaultReplacePgCatalogTables() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.replace_pg_catalog_tables")) {
+        assertTrue(resultSet.next());
+        assertTrue(resultSet.getBoolean(1));
+        assertFalse(resultSet.next());
+      }
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of(
+                  "with pg_namespace as (\n"
+                      + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+                      + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+                      + "  from information_schema.schemata\n"
+                      + ")\n"
+                      + "select * from pg_namespace"),
+              SELECT1_RESULTSET));
+      // Just verify that this works, we don't care about the result.
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select * from pg_catalog.pg_namespace")) {
+        //noinspection StatementWithEmptyBody
+        while (resultSet.next()) {}
+      }
+    }
+  }
+
+  @Test
+  public void testReplacePgCatalogTablesOff() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20spanner.replace_pg_catalog_tables=off")) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.replace_pg_catalog_tables")) {
+        assertTrue(resultSet.next());
+        assertFalse(resultSet.getBoolean(1));
+        assertFalse(resultSet.next());
+      }
+
+      // The query will now not be modified by PGAdapter before it is sent to Cloud Spanner.
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of("select * from pg_catalog.pg_namespace"), SELECT1_RESULTSET));
+      // Just verify that this works, we don't care about the result.
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select * from pg_catalog.pg_namespace")) {
+        //noinspection StatementWithEmptyBody
+        while (resultSet.next()) {}
       }
     }
   }
