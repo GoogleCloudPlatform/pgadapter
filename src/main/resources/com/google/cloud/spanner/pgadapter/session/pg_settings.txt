@@ -248,7 +248,7 @@ search_path	public	\N	Client Connection Defaults / Statement Behavior	Sets the s
 segment_size	131072	8kB	Preset Options	Shows the number of pages per disk file.	\N	internal	integer	default	131072	131072	\N	131072	131072	\N	\N	f
 seq_page_cost	1	\N	Query Tuning / Planner Cost Constants	Sets the planner's estimate of the cost of a sequentially fetched disk page.	\N	user	real	default	0	1.79769e+308	\N	1	1	\N	\N	f
 server_encoding	UTF8	\N	Preset Options	Shows the server (database) character set encoding.	\N	internal	string	override	\N	\N	\N	SQL_ASCII	UTF8	\N	\N	f
-server_version	14.1 (Debian 14.1-1.pgdg110+1)	\N	Preset Options	Shows the server version.	\N	internal	string	default	\N	\N	\N	14.1 (Debian 14.1-1.pgdg110+1)	14.1 (Debian 14.1-1.pgdg110+1)	\N	\N	f
+server_version	14.1 (Debian 14.1-1.pgdg110+1)	\N	Preset Options	Shows the server version.	\N	backend	string	default	\N	\N	\N	14.1 (Debian 14.1-1.pgdg110+1)	14.1 (Debian 14.1-1.pgdg110+1)	\N	\N	f
 server_version_num	140001	\N	Preset Options	Shows the server version as an integer.	\N	internal	integer	default	140001	140001	\N	140001	140001	\N	\N	f
 session_preload_libraries		\N	Client Connection Defaults / Shared Library Preloading	Lists shared libraries to preload into each backend.	\N	superuser	string	default	\N	\N	\N			\N	\N	f
 session_replication_role	origin	\N	Client Connection Defaults / Statement Behavior	Sets the session's behavior for triggers and rewrite rules.	\N	superuser	enum	default	\N	\N	{origin,replica,local}	origin	origin	\N	\N	f

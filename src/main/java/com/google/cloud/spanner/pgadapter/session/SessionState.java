@@ -21,6 +21,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
+import com.google.cloud.spanner.pgadapter.session.PGSetting.Context;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableSet;
@@ -66,7 +67,7 @@ public class SessionState {
           "spanner.ddl_transaction_mode",
           "spanner.replace_pg_catalog_tables");
 
-  private static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
+  static final Map<String, PGSetting> SERVER_SETTINGS = new HashMap<>();
 
   static {
     for (PGSetting setting : PGSetting.read()) {
@@ -170,6 +171,13 @@ public class SessionState {
     }
     try {
       setting.initConnectionValue(value);
+      // Also update server_version_num if the server_version is set in the connection startup
+      // message. This is something that is not supported by PostgreSQL, but for PGAdapter the
+      // minimum context needed for setting the server_version is BACKEND.
+      if (key.equals(toKey(null, "server_version"))) {
+        setting = this.settings.get(toKey(null, "server_version_num"));
+        setting.setSetting(Context.INTERNAL, OptionsMetadata.toServerVersionNum(value));
+      }
     } catch (Exception ignore) {
       // ignore errors in startup values to prevent unknown or invalid settings from stopping a
       // connection from being made.
@@ -223,7 +231,8 @@ public class SessionState {
     if (setting == null) {
       setting = newSetting.getResetVal();
     }
-    newSetting.setSetting(setting);
+    // Consider all users as SUPERUSER.
+    newSetting.setSetting(Context.SUPERUSER, setting);
     currentSettings.put(key, newSetting);
   }
 
@@ -273,7 +282,8 @@ public class SessionState {
   /** Resets all values to their 'reset' value. */
   public void resetAll() {
     for (PGSetting setting : getAll()) {
-      if (setting.isSettable() && !Objects.equals(setting.getSetting(), setting.getResetVal())) {
+      if (setting.isSettable(Context.SUPERUSER)
+          && !Objects.equals(setting.getSetting(), setting.getResetVal())) {
         set(setting.getExtension(), setting.getName(), setting.getResetVal());
       }
     }
