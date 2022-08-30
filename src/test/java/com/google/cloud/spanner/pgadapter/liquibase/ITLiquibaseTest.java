@@ -120,8 +120,8 @@ public class ITLiquibaseTest {
     runLiquibaseCommand("liquibase:validate");
     // Verify that there is a rollback available for each change set.
     runLiquibaseCommand("liquibase:futureRollbackSQL");
-    // Update the database with all defined change sets.
-    runLiquibaseCommand("liquibase:update");
+    // Update the database with all defined change sets up to v3.3.
+    runLiquibaseCommand("liquibase:update", "-Dliquibase.toTag=v3.3");
 
     // Verify that all tables were created and all data was loaded.
     String url =
@@ -147,6 +147,8 @@ public class ITLiquibaseTest {
         assertTrue(resultSet.next());
         assertEquals("singers", resultSet.getString(1));
         assertTrue(resultSet.next());
+        assertEquals("singers_by_last_name", resultSet.getString(1));
+        assertTrue(resultSet.next());
         assertEquals("tracks", resultSet.getString(1));
         assertTrue(resultSet.next());
         assertEquals("venues", resultSet.getString(1));
@@ -170,6 +172,19 @@ public class ITLiquibaseTest {
           connection.createStatement().executeQuery("select count(*) from concerts")) {
         assertTrue(resultSet.next());
         assertEquals(2, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Apply all remaining change sets.
+      runLiquibaseCommand("liquibase:update");
+      // The singers table should now contain an 'address' column that has a null value for all
+      // rows.
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select count(*) from singers where address is null")) {
+        assertTrue(resultSet.next());
+        assertEquals(5L, resultSet.getLong(1));
         assertFalse(resultSet.next());
       }
 

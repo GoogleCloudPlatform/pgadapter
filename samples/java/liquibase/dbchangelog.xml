@@ -48,6 +48,11 @@
       </column>
       <column name="active" type="boolean" defaultValueBoolean="true"/>
     </createTable>
+
+    <createIndex indexName="idx_singers_last_name" tableName="singers">
+      <column name="last_name" />
+    </createIndex>
+
     <createTable  tableName="albums">
       <column  name="album_id"  type="varchar(36)">
         <!-- Setting the primary key name to 'pk_<table_name>' is required! -->
@@ -272,7 +277,7 @@
       endDelimiter=";"><![CDATA[
         create table venues (
             venue_id varchar(36) not null primary key,
-            name     varchar(100) not null
+            name     varchar(100)
         );
         create table concerts (
             concert_id varchar(36) not null primary key,
@@ -280,7 +285,6 @@
             start_time timestamptz,
             end_time   timestamptz,
             singer_id  varchar(36) not null,
-            constraint fk_concerts_venues foreign key (venue_id) references venues (venue_id),
             constraint fk_concerts_singers foreign key (singer_id) references singers (singer_id),
             constraint chk_concert_end_time_after_start_time check (
                 coalesce(start_time, '0001-01-01T00:00:00Z'::timestamptz) <
@@ -299,12 +303,18 @@
       </sql>
     </rollback>
   </changeSet>
+  <changeSet id="9.1 - add index for concert times" author="loite">
+    <createIndex indexName="idx_concerts_singer_start_time" tableName="concerts" unique="true">
+      <column name="singer_id" />
+      <column name="start_time" descending="true" />
+    </createIndex>
+  </changeSet>
   <!-- Add a tag to the database, so we can roll back to this version later if we want -->
   <changeSet id="tag-v3.0" author="loite">
     <tagDatabase tag="v3.0"/>
   </changeSet>
 
-  <changeSet id="9.1 - fix check constraint" author="loite">
+  <changeSet id="9.2 - fix check constraint" author="loite">
     <sql
       splitStatements="true"
       endDelimiter=";"><![CDATA[
@@ -354,6 +364,135 @@
   <!-- Add a tag to the database, so we can roll back to this version later if we want -->
   <changeSet id="tag-v3.2" author="loite">
     <tagDatabase tag="v3.2"/>
+  </changeSet>
+
+  <changeSet id="11 - create singers view" author="loite">
+    <!-- Set fullDefinition="true" to ensure the `sql security invoker` clause is included. -->
+    <createView viewName="singers_by_last_name" fullDefinition="true" replaceIfExists="true">
+      create view singers_by_last_name sql security invoker as
+          select singer_id, full_name from singers order by last_name
+    </createView>
+  </changeSet>
+  <!-- Add a tag to the database, so we can roll back to this version later if we want -->
+  <changeSet id="tag-v3.3" author="loite">
+    <tagDatabase tag="v3.3"/>
+  </changeSet>
+
+  <changeSet id="12 - drop duration column from tracks" author="loite">
+    <dropColumn tableName="tracks" columnName="duration" />
+    <rollback changeSetId="6 - add duration column to tracks" changeSetAuthor="loite" />
+  </changeSet>
+
+  <changeSet id="13 - drop concerts index" author="loite">
+    <dropIndex tableName="concerts" indexName="idx_concerts_singer_start_time" />
+    <rollback changeSetId="9.1 - add index for concert times" changeSetAuthor="loite"/>
+  </changeSet>
+
+  <changeSet id="14 - drop all_types table" author="loite">
+    <dropTable tableName="all_types" />
+    <rollback changeSetId="7 - add table with all types" changeSetAuthor="loite" />
+  </changeSet>
+
+  <changeSet id="15 - drop singers view" author="loite">
+    <dropView viewName="singers_by_last_name" />
+    <rollback changeSetId="11 - create singers view" changeSetAuthor="loite" />
+  </changeSet>
+
+  <changeSet id="16 - add venue name default value" author="loite">
+    <addDefaultValue tableName="venues" columnName="name" defaultValue="'my-venue'" />
+  </changeSet>
+
+  <changeSet id="16.1 - drop default value for venues(name)" author="loite">
+    <dropDefaultValue tableName="venues" columnName="name" />
+    <rollback changeSetId="16 - add venue name default value" changeSetAuthor="loite" />
+  </changeSet>
+
+  <changeSet id="17 - add foreign key concerts - venues" author="loite">
+    <addForeignKeyConstraint
+      baseColumnNames="venue_id"
+      baseTableName="concerts"
+      baseTableSchemaName="public"
+      constraintName="fk_concerts_venues"
+      referencedColumnNames="venue_id"
+      referencedTableName="venues"
+      referencedTableSchemaName="public"/>
+  </changeSet>
+
+  <changeSet id="18 - drop foreign key concerts - venues" author="loite">
+    <dropForeignKeyConstraint
+      baseTableName="concerts"
+      constraintName="fk_concerts_venues" />
+    <rollback changeSetId="17 - add foreign key concerts - venues" changeSetAuthor="loite" />
+  </changeSet>
+
+  <changeSet id="19 - add an extra track" author="loite">
+    <sql
+      splitStatements="true"
+      endDelimiter=";"><![CDATA[
+        insert into tracks (album_id, track_number, title) values ('0e3f2ac2-28e9-47b2-ba24-3086b04bd6f3',8,'Track 8');
+      ]]>
+    </sql>
+    <rollback>
+      <sql
+        splitStatements="true"
+        endDelimiter=";"><![CDATA[
+          delete from tracks where album_id='0e3f2ac2-28e9-47b2-ba24-3086b04bd6f3' and track_number=8;
+        ]]>
+      </sql>
+    </rollback>
+  </changeSet>
+
+  <changeSet id="20 - delete track 8" author="loite">
+    <delete tableName="tracks">
+      <where>album_id='0e3f2ac2-28e9-47b2-ba24-3086b04bd6f3' and track_number=8</where>
+    </delete>
+    <rollback changeSetId="19 - add an extra track" changeSetAuthor="loite" />
+  </changeSet>
+
+  <changeSet id="21 - re-insert track 8" author="loite">
+    <insert tableName="tracks">
+      <column name="album_id" value="0e3f2ac2-28e9-47b2-ba24-3086b04bd6f3"/>
+      <column name="track_number" value="8" />
+      <column name="title" value="Track 8" />
+    </insert>
+    <rollback changeSetId="20 - delete track 8" changeSetAuthor="loite" />
+  </changeSet>
+
+  <changeSet id="22.0 - create address columns" author="loite">
+    <addColumn tableName="singers">
+      <column name="street" type="varchar" />
+      <column name="house_number" type="varchar" />
+    </addColumn>
+    <update tableName="singers">
+      <column name="street" value="my street"/>
+      <column name="house_number" value="1"/>
+    </update>
+    <rollback>
+      <dropColumn tableName="singers" columnName="street" />
+      <dropColumn tableName="singers" columnName="house_number" />
+    </rollback>
+  </changeSet>
+
+  <changeSet id="22.1 - merge street and house number" author="loite">
+    <mergeColumns
+      column1Name="street"
+      column2Name="house_number"
+      finalColumnName="address"
+      finalColumnType="varchar"
+      joinString=" "
+      tableName="singers"/>
+    <rollback>
+      <dropColumn tableName="singers" columnName="address" />
+    </rollback>
+    <rollback changeSetId="22.0 - create address columns" changeSetAuthor="loite" />
+  </changeSet>
+
+  <changeSet id="23 - remove all addresses" author="loite">
+    <update tableName="singers">
+      <column name="address" value="null"/>
+    </update>
+    <!-- There's no rollback for this change -->
+    <rollback />
   </changeSet>
 
 </databaseChangeLog>
