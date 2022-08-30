@@ -1675,9 +1675,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testShowValidSetting() throws SQLException {
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20server_version=14.1")) {
       try (ResultSet resultSet =
-          connection.createStatement().executeQuery("show application_name ")) {
+          connection.createStatement().executeQuery("show application_name")) {
         assertTrue(resultSet.next());
         assertEquals("PostgreSQL JDBC Driver", resultSet.getString(1));
         assertFalse(resultSet.next());
@@ -1875,7 +1876,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCommitSet() throws SQLException {
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20server_version=14.1")) {
       connection.setAutoCommit(false);
 
       // Verify that the initial value is 'PostgreSQL JDBC Driver'.
@@ -1890,7 +1892,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testRollbackSet() throws SQLException {
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20server_version=14.1")) {
       connection.setAutoCommit(false);
 
       // Verify that the initial value is null.
@@ -1949,7 +1952,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCommitSetLocal() throws SQLException {
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20server_version=14.1")) {
       connection.setAutoCommit(false);
 
       // Verify that the initial value is 'PostgreSQL JDBC Driver'.
@@ -1965,7 +1969,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCommitSetLocalAndSession() throws SQLException {
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20server_version=14.1")) {
       connection.setAutoCommit(false);
 
       // Verify that the initial value is 'PostgreSQL JDBC Driver'.
@@ -2008,7 +2013,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testInvalidShowAbortsTransaction() throws SQLException {
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20server_version=14.1")) {
       connection.setAutoCommit(false);
 
       // Verify that executing an invalid show statement will abort the transaction.
@@ -2091,7 +2097,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testSettingsAreUniqueToConnections() throws SQLException {
     // Verify that each new connection gets a separate set of settings.
     for (int connectionNum = 0; connectionNum < 5; connectionNum++) {
-      try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Connection connection =
+          DriverManager.getConnection(createUrl() + "?options=-c%20server_version=14.1")) {
         // Verify that the initial value is 'PostgreSQL JDBC Driver'.
         verifySettingValue(connection, "application_name", "PostgreSQL JDBC Driver");
         connection.createStatement().execute("set application_name to \"my-application\"");
