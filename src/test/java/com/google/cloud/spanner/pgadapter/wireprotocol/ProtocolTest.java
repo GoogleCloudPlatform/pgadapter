@@ -48,6 +48,8 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.session.PGSetting;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.ConnectionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
@@ -1523,6 +1525,11 @@ public class ProtocolTest {
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    SessionState sessionState = mock(SessionState.class);
+    PGSetting serverVersionSetting = mock(PGSetting.class);
+    when(serverVersionSetting.getSetting()).thenReturn("13.4");
+    when(sessionState.get(null, "server_version")).thenReturn(serverVersionSetting);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
     when(server.getOptions()).thenReturn(options);
     when(options.getServerVersion()).thenReturn("13.4");
     when(options.shouldAuthenticate()).thenReturn(false);
