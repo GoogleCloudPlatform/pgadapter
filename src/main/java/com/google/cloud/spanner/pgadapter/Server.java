@@ -46,10 +46,10 @@ public class Server {
   }
 
   static void printError(Exception exception, PrintStream err, PrintStream out) {
-    err.println(
-        "The server could not be started because an error occurred: "
-            + (exception.getMessage() == null ? exception.toString() : exception.getMessage()));
-    out.println("Run with option -h or --help to get help");
+    err.printf(
+        "The server could not be started because an error occurred: %s\n",
+        (exception.getMessage() == null ? exception.toString() : exception.getMessage()));
+    out.print("Run with option -h or --help to get help\n");
     out.printf("Version: %s\n", getVersion());
   }
 
