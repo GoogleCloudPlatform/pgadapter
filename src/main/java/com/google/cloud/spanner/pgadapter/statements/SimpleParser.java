@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -79,6 +80,24 @@ public class SimpleParser {
     @Override
     public int hashCode() {
       return Objects.hash(unquoteOrFoldIdentifier(this.schema), unquoteOrFoldIdentifier(this.name));
+    }
+  }
+
+  static class TypeDefinition {
+    final String name;
+    final int length;
+    final int scale;
+    final boolean array;
+
+    TypeDefinition(String name, int length, int scale, boolean array) {
+      this.name = name;
+      this.length = length;
+      this.scale = scale;
+      this.array = array;
+    }
+
+    String getNameAndArrayBrackets() {
+      return array ? name + "[]" : name;
     }
   }
 
@@ -289,6 +308,46 @@ public class SimpleParser {
       pos++;
     }
     return sql.substring(startPos, pos);
+  }
+
+  TypeDefinition readType() {
+    StringBuilder name = new StringBuilder();
+    int length = 0;
+    int scale = 0;
+    boolean array = false;
+    String keyword;
+    while (!(keyword = readKeyword()).equalsIgnoreCase("")) {
+      if (name.length() > 0) {
+        name.append(' ');
+      }
+      name.append(keyword);
+    }
+    if (eatToken("(")) {
+      String lengthString = parseExpression();
+      length = parseInt(lengthString);
+      if (eatToken(",")) {
+        String scaleExpression = parseExpression();
+        scale = parseInt(scaleExpression);
+      }
+      if (!eatToken(")")) {
+        throw PGExceptionFactory.newPGException("missing ')' for type length");
+      }
+    }
+    if (eatToken("[")) {
+      if (!eatToken("]")) {
+        throw PGExceptionFactory.newPGException("missing ']' for array definition");
+      }
+      array = true;
+    }
+    return new TypeDefinition(name.toString(), length, scale, array);
+  }
+
+  int parseInt(String value) {
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException exception) {
+      throw PGExceptionFactory.toPGException(exception);
+    }
   }
 
   TableOrIndexName readTableOrIndexName() {

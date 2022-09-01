@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TypeDefinition;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
@@ -44,27 +45,50 @@ public class PrepareStatement extends IntermediatePortalStatement {
   private static final ImmutableMap<String, Integer> TYPE_NAME_TO_OID_MAPPING =
       ImmutableMap.<String, Integer>builder()
           .put("bigint", Oid.INT8)
+          .put("bigint[]", Oid.INT8_ARRAY)
           .put("int8", Oid.INT8)
+          .put("int8[]", Oid.INT8_ARRAY)
+          .put("int4", Oid.INT4)
+          .put("int4[]", Oid.INT4_ARRAY)
+          .put("int", Oid.INT4)
+          .put("int[]", Oid.INT4_ARRAY)
+          .put("integer", Oid.INT4)
+          .put("integer[]", Oid.INT4_ARRAY)
           .put("boolean", Oid.BOOL)
+          .put("boolean[]", Oid.BOOL_ARRAY)
           .put("bool", Oid.BOOL)
+          .put("bool[]", Oid.BOOL_ARRAY)
           .put("bytea", Oid.BYTEA)
+          .put("bytea[]", Oid.BYTEA_ARRAY)
           .put("character varying", Oid.VARCHAR)
+          .put("character varying[]", Oid.VARCHAR_ARRAY)
           .put("varchar", Oid.VARCHAR)
+          .put("varchar[]", Oid.VARCHAR_ARRAY)
           .put("date", Oid.DATE)
+          .put("date[]", Oid.DATE_ARRAY)
           .put("double precision", Oid.FLOAT8)
+          .put("double precision[]", Oid.FLOAT8_ARRAY)
           .put("float8", Oid.FLOAT8)
+          .put("float8[]", Oid.FLOAT8_ARRAY)
           .put("jsonb", Oid.JSONB)
+          .put("jsonb[]", Oid.JSONB_ARRAY)
           .put("numeric", Oid.NUMERIC)
+          .put("numeric[]", Oid.NUMERIC_ARRAY)
+          .put("decimal", Oid.NUMERIC)
+          .put("decimal[]", Oid.NUMERIC_ARRAY)
           .put("text", Oid.TEXT)
+          .put("text[]", Oid.TEXT_ARRAY)
           .put("timestamp with time zone", Oid.TIMESTAMPTZ)
+          .put("timestamp with time zone[]", Oid.TIMESTAMPTZ_ARRAY)
           .put("timestamptz", Oid.TIMESTAMPTZ)
+          .put("timestamptz[]", Oid.TIMESTAMPTZ_ARRAY)
           .build();
 
   static final class ParsedPreparedStatement {
-    private final String name;
-    private final int[] dataTypes;
-    private final Statement originalPreparedStatement;
-    private final ParsedStatement parsedPreparedStatement;
+    final String name;
+    final int[] dataTypes;
+    final Statement originalPreparedStatement;
+    final ParsedStatement parsedPreparedStatement;
 
     private ParsedPreparedStatement(String name, int[] dataTypes, String sql) {
       this.name = name;
@@ -155,6 +179,9 @@ public class PrepareStatement extends IntermediatePortalStatement {
       if (dataTypesNames.isEmpty()) {
         throw PGExceptionFactory.newPGException("invalid data type list");
       }
+      if (!parser.eatToken(")")) {
+        throw PGExceptionFactory.newPGException("missing closing parentheses in data type list");
+      }
       dataTypesBuilder.addAll(
           dataTypesNames.stream()
               .map(PrepareStatement::dataTypeNameToOid)
@@ -171,22 +198,9 @@ public class PrepareStatement extends IntermediatePortalStatement {
 
   static int dataTypeNameToOid(String type) {
     SimpleParser parser = new SimpleParser(type);
-    TableOrIndexName name = parser.readTableOrIndexName();
-    if (name == null || name.schema != null) {
-      throw PGExceptionFactory.newPGException("unknown type name: " + type);
-    }
-    if (parser.eatToken("(")) {
-      // Just skip everything inside parentheses.
-      parser.parseExpression();
-    }
-    String typeNameWithoutParams;
-    if (parser.getPos() < parser.getSql().length()) {
-      typeNameWithoutParams = name.name + parser.getSql().substring(parser.getPos());
-    } else {
-      typeNameWithoutParams = name.name;
-    }
-    typeNameWithoutParams = typeNameWithoutParams.replaceAll("\\s+", " ");
-    Integer oid = TYPE_NAME_TO_OID_MAPPING.get(typeNameWithoutParams);
+    TypeDefinition typeDefinition = parser.readType();
+    Integer oid =
+        TYPE_NAME_TO_OID_MAPPING.get(typeDefinition.getNameAndArrayBrackets().toLowerCase());
     if (oid != null) {
       return oid;
     }
