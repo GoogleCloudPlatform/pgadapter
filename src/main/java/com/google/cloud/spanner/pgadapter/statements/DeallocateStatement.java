@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.unquoteOrFoldIdentifier;
+
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
@@ -30,7 +32,7 @@ import java.util.concurrent.Future;
 
 public class DeallocateStatement extends IntermediatePortalStatement {
   static final class ParsedDeallocateStatement {
-    private final String name;
+    final String name;
 
     private ParsedDeallocateStatement(String name) {
       this.name = name;
@@ -106,7 +108,7 @@ public class DeallocateStatement extends IntermediatePortalStatement {
       if (name == null || name.schema != null) {
         throw PGExceptionFactory.newPGException("invalid prepared statement name");
       }
-      statementName = name.name;
+      statementName = unquoteOrFoldIdentifier(name.name);
     }
     parser.skipWhitespaces();
     if (parser.getPos() < parser.getSql().length()) {

@@ -471,7 +471,8 @@ public class ConnectionHandler extends Thread {
 
   public IntermediatePreparedStatement getStatement(String statementName) {
     if (!hasStatement(statementName)) {
-      throw new IllegalStateException("Unregistered statement: " + statementName);
+      throw PGExceptionFactory.newPGException(
+          "prepared statement " + statementName + " does not exist");
     }
     return this.statementsMap.get(statementName);
   }
@@ -482,7 +483,8 @@ public class ConnectionHandler extends Thread {
 
   public void closeStatement(String statementName) {
     if (!hasStatement(statementName)) {
-      throw new IllegalStateException("Unregistered statement: " + statementName);
+      throw PGExceptionFactory.newPGException(
+          "prepared statement " + statementName + " does not exist");
     }
     this.statementsMap.remove(statementName);
   }

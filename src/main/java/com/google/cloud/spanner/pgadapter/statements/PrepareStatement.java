@@ -166,7 +166,7 @@ public class PrepareStatement extends IntermediatePortalStatement {
     return new ParsedPreparedStatement(
         name.name,
         dataTypesBuilder.build().stream().mapToInt(i -> i).toArray(),
-        parser.getSql().substring(parser.getPos()));
+        parser.getSql().substring(parser.getPos()).trim());
   }
 
   static int dataTypeNameToOid(String type) {
