@@ -103,3 +103,10 @@ batch.Queue("create table singers (singerid varchar primary key, name varchar)")
 batch.Queue("create index idx_singers_name on singers (name)")
 res := conn.SendBatch(context.Background(), batch)
 ```
+
+## Known Issues
+- Copy operations can fail at startup because `pgx` does not wait for a CopyInResponse before
+  sending data to the backend. This can cause PGAdapter to miss the first CopyData message which
+  contains the binary copy header. No data corruption will occur, as the copy operation will be
+  aborted when the required binary header is missing. Retrying the copy operation will normally
+  work. A proposed solution for this problem has been submitted her: https://github.com/jackc/pgconn/pull/127
