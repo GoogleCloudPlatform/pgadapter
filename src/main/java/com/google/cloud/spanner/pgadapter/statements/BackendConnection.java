@@ -203,10 +203,12 @@ public class BackendConnection {
         } else if (parsedStatement.isDdl()) {
           result.set(ddlExecutor.execute(parsedStatement, statement));
         } else {
-          // Potentially add session state in the form of CTE(s) to the statement.
-          Statement statementWithSessionState =
-              sessionState.addSessionState(parsedStatement, statement);
-          result.set(spannerConnection.execute(statementWithSessionState));
+          // Potentially replace pg_catalog table references with common table expressions.
+          Statement updatedStatement =
+              sessionState.isReplacePgCatalogTables()
+                  ? pgCatalog.replacePgCatalogTables(statement)
+                  : statement;
+          result.set(spannerConnection.execute(updatedStatement));
         }
       } catch (SpannerException spannerException) {
         // Executing queries against the information schema in a transaction is unsupported.
@@ -370,6 +372,7 @@ public class BackendConnection {
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
   private final SessionState sessionState;
+  private final PgCatalog pgCatalog;
   private final ImmutableMap<String, LocalStatement> localStatements;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
@@ -378,7 +381,6 @@ public class BackendConnection {
   private final Connection spannerConnection;
   private final DatabaseId databaseId;
   private final DdlExecutor ddlExecutor;
-  private final OptionsMetadata optionsMetadata;
 
   /**
    * Creates a PG backend connection that uses the given Spanner {@link Connection} and {@link
@@ -390,10 +392,10 @@ public class BackendConnection {
       OptionsMetadata optionsMetadata,
       ImmutableList<LocalStatement> localStatements) {
     this.sessionState = new SessionState(optionsMetadata);
+    this.pgCatalog = new PgCatalog(this.sessionState);
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
-    this.optionsMetadata = optionsMetadata;
     if (localStatements.isEmpty()) {
       this.localStatements = EMPTY_LOCAL_STATEMENTS;
     } else {
@@ -478,7 +480,7 @@ public class BackendConnection {
           if (key == null) {
             continue;
           }
-          this.sessionState.setConnectionStartupValue(key.schema, key.name, keyValue[1]);
+          this.sessionState.setConnectionStartupValue(key.schema, key.name, keyValue[1].trim());
         }
       }
     } else {
@@ -506,9 +508,9 @@ public class BackendConnection {
     return this.databaseId.getDatabase();
   }
 
-  /** Returns the options that are used for this connection. */
-  public OptionsMetadata getOptionsMetadata() {
-    return this.optionsMetadata;
+  /** Returns the session state of this connection. */
+  public SessionState getSessionState() {
+    return this.sessionState;
   }
 
   /**
@@ -651,7 +653,7 @@ public class BackendConnection {
    * allowed.
    */
   private void prepareExecuteDdl(BufferedStatement<?> bufferedStatement) {
-    DdlTransactionMode ddlTransactionMode = this.optionsMetadata.getDdlTransactionMode();
+    DdlTransactionMode ddlTransactionMode = sessionState.getDdlTransactionMode();
     try {
       // Single statements are simpler to check, so we do that in a separate check.
       if (bufferedStatements.size() == 1) {

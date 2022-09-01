@@ -248,7 +248,7 @@ search_path	public	\N	Client Connection Defaults / Statement Behavior	Sets the s
 segment_size	131072	8kB	Preset Options	Shows the number of pages per disk file.	\N	internal	integer	default	131072	131072	\N	131072	131072	\N	\N	f
 seq_page_cost	1	\N	Query Tuning / Planner Cost Constants	Sets the planner's estimate of the cost of a sequentially fetched disk page.	\N	user	real	default	0	1.79769e+308	\N	1	1	\N	\N	f
 server_encoding	UTF8	\N	Preset Options	Shows the server (database) character set encoding.	\N	internal	string	override	\N	\N	\N	SQL_ASCII	UTF8	\N	\N	f
-server_version	14.1 (Debian 14.1-1.pgdg110+1)	\N	Preset Options	Shows the server version.	\N	internal	string	default	\N	\N	\N	14.1 (Debian 14.1-1.pgdg110+1)	14.1 (Debian 14.1-1.pgdg110+1)	\N	\N	f
+server_version	14.1 (Debian 14.1-1.pgdg110+1)	\N	Preset Options	Shows the server version.	\N	backend	string	default	\N	\N	\N	14.1 (Debian 14.1-1.pgdg110+1)	14.1 (Debian 14.1-1.pgdg110+1)	\N	\N	f
 server_version_num	140001	\N	Preset Options	Shows the server version as an integer.	\N	internal	integer	default	140001	140001	\N	140001	140001	\N	\N	f
 session_preload_libraries		\N	Client Connection Defaults / Shared Library Preloading	Lists shared libraries to preload into each backend.	\N	superuser	string	default	\N	\N	\N			\N	\N	f
 session_replication_role	origin	\N	Client Connection Defaults / Statement Behavior	Sets the session's behavior for triggers and rewrite rules.	\N	superuser	enum	default	\N	\N	{origin,replica,local}	origin	origin	\N	\N	f
@@ -343,3 +343,5 @@ work_mem	4096	kB	Resource Usage / Memory	Sets the maximum memory to be used for 
 xmlbinary	base64	\N	Client Connection Defaults / Statement Behavior	Sets how binary values are to be encoded in XML.	\N	user	enum	default	\N	\N	{base64,hex}	base64	base64	\N	\N	f
 xmloption	content	\N	Client Connection Defaults / Statement Behavior	Sets whether XML data in implicit parsing and serialization operations is to be considered as documents or content fragments.	\N	user	enum	default	\N	\N	{content,document}	content	content	\N	\N	f
 zero_damaged_pages	off	\N	Developer Options	Continues processing past damaged page headers.	Detection of a damaged page header normally causes PostgreSQL to report an error, aborting the current transaction. Setting zero_damaged_pages to true causes the system to instead report a warning, zero out the damaged page, and continue processing. This behavior will destroy data, namely all the rows on the damaged page.	superuser	bool	default	\N	\N	\N	off	off	\N	\N	f
+spanner.ddl_transaction_mode	Batch	\N	PGAdapter Options	DDL transaction mode.	\N	user	enum	default	\N	\N	{Single,Batch,AutocommitImplicitTransaction,AutocommitExplicitTransaction}	Batch	Batch	\N	\N	f
+spanner.replace_pg_catalog_tables	on	\N	PGAdapter Options	Automatically replace pg_catalog table references with Common Table Expressions.	\N	user	bool	default	\N	\N	\N	on	on	\N	\N	f

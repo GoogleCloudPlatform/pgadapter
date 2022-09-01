@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.toServerVersionNum;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -230,5 +231,25 @@ public class OptionsMetadataTest {
     } finally {
       System.setOut(originalOut);
     }
+  }
+
+  @Test
+  public void testDisablePgCatalogReplacements() {
+    OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
+    assertTrue(options.replacePgCatalogTables());
+
+    options =
+        new OptionsMetadata(new String[] {"-p p", "-i i", "-disable_pg_catalog_replacements"});
+    assertFalse(options.replacePgCatalogTables());
+  }
+
+  @Test
+  public void testToServerVersionNum() {
+    assertEquals("10000", toServerVersionNum("1.0"));
+    assertEquals("140001", toServerVersionNum("14.1"));
+    assertEquals("80004", toServerVersionNum("8.4"));
+    assertEquals("10000", toServerVersionNum("1.0.1"));
+    assertEquals("10000", toServerVersionNum("1.0 custom build"));
+    assertEquals("10010", toServerVersionNum("1.10 custom build"));
   }
 }
