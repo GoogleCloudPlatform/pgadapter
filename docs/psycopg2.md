@@ -69,6 +69,21 @@ connection.close()
 This example uses the pre-built Docker image to run PGAdapter.
 See [README](../README.md) for more possibilities on how to run PGAdapter.
 
+## Limitations and Known Bugs
+- Only [copy_expert](https://www.psycopg.org/docs/cursor.html#cursor.copy_expert) is supported.
+  [copy_from](https://www.psycopg.org/docs/cursor.html#cursor.copy_from) and [copy_to](https://www.psycopg.org/docs/cursor.html#cursor.copy_to) are NOT supported.
+- [copy_expert](https://www.psycopg.org/docs/cursor.html#cursor.copy_expert) has the following additional limitations:
+  - copy_expert does not support NULL option
+  - copy_expert does not support escape characters for the DELIMITER option
+  - copy_expert does not support the `AS` keyword
+- `set transaction_isolation level to default` is not supported.
+- `set_session(deferrable = false)` is not supported.
+- `connection.lobject()` is not supported
+- Most `pg_catalog` tables and functions are not supported
+- The Python datetime module only supports timestamp up to microsecond precision. Cloud Spanner
+  supports timestamps with nanosecond precision. The nanosecond precision will be lost when used
+  with the `psycopg2` driver.
+
 
 ## Performance Considerations
 
