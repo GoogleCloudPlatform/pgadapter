@@ -33,9 +33,11 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 @Category(IntegrationTest.class)
 public class ITPsycopg2Test extends PythonTestSetup {
 
@@ -54,6 +56,13 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_timestamptz timestamptz, "
             + "col_date date, "
             + "col_varchar varchar(100))");
+  }
+
+  @Parameter public String host;
+
+  @Parameters(name = "host = {0}")
+  public static Object[] data() {
+    return new Object[] {"localhost", "/tmp"};
   }
 
   @BeforeClass
@@ -128,7 +137,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "'2022-10-02', "
             + "'some string')";
 
-    String actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql, "update");
+    String actualOutput = executeWithoutParameters(host, testEnv.getPGAdapterPort(), sql, "update");
     String expectedOutput = "1\n";
     assertEquals(expectedOutput, actualOutput);
   }
@@ -146,7 +155,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_date , "
             + "col_varchar "
             + "from all_types where col_bigint = 1";
-    String actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql, "query");
+    String actualOutput = executeWithoutParameters(host, testEnv.getPGAdapterPort(), sql, "query");
     String expectedOutput =
         "(1, True, 3.14, 100, Decimal('6.626'), datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), datetime.date(2022, 3, 29), 'test')\n";
     assertEquals(expectedOutput, actualOutput);
@@ -165,7 +174,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_varchar = 'new string' "
             + "where col_bigint = 1";
 
-    String actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql, "update");
+    String actualOutput = executeWithoutParameters(host, testEnv.getPGAdapterPort(), sql, "update");
     String expectedOutput = "1\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -181,7 +190,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "col_varchar "
             + "from all_types where col_bigint = 1";
 
-    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql, "query");
+    actualOutput = executeWithoutParameters(host, testEnv.getPGAdapterPort(), sql, "query");
     expectedOutput =
         "(1, False, 3.14, 20, Decimal('99.99'), datetime.datetime(2019, 5, 12, 21, 30, tzinfo=datetime.timezone.utc), datetime.date(1989, 9, 2), 'new string')\n";
     assertEquals(expectedOutput, actualOutput);
@@ -191,13 +200,13 @@ public class ITPsycopg2Test extends PythonTestSetup {
   public void testDelete() throws IOException, InterruptedException {
     String sql = "DELETE FROM all_types where col_bigint = 1";
 
-    String actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql, "update");
+    String actualOutput = executeWithoutParameters(host, testEnv.getPGAdapterPort(), sql, "update");
     String expectedOutput = "1\n";
     assertEquals(expectedOutput, actualOutput);
 
     sql = "Select COUNT(*) from all_types where col_bigint = 1";
 
-    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), sql, "query");
+    actualOutput = executeWithoutParameters(host, testEnv.getPGAdapterPort(), sql, "query");
     expectedOutput = "(0,)\n";
     assertEquals(expectedOutput, actualOutput);
   }
@@ -256,7 +265,8 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("34");
 
     String actualOutput =
-        executeWithNamedParameters(testEnv.getPGAdapterPort(), sql, "data_type_update", parameters);
+        executeWithNamedParameters(
+            host, testEnv.getPGAdapterPort(), sql, "data_type_update", parameters);
     String expectedOutput = "1\n";
     assertEquals(expectedOutput, actualOutput);
   }
@@ -279,7 +289,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("test");
 
     String actualOutput =
-        executeWithParameters(testEnv.getPGAdapterPort(), sql, "query", parameters);
+        executeWithParameters(host, testEnv.getPGAdapterPort(), sql, "query", parameters);
     String expectedOutput =
         "(1, True, 3.14, 100, Decimal('6.626'), datetime.datetime(2022, 2, 16, 13, 18, 2, tzinfo=datetime.timezone.utc), datetime.date(2022, 3, 29), 'test')\n";
     assertEquals(expectedOutput, actualOutput);
@@ -325,7 +335,8 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("69");
 
     String actualOutput =
-        executeWithNamedParameters(testEnv.getPGAdapterPort(), sql, "data_type_update", parameters);
+        executeWithNamedParameters(
+            host, testEnv.getPGAdapterPort(), sql, "data_type_update", parameters);
     String expectedOutput = "1\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -346,7 +357,8 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("1");
 
     actualOutput =
-        executeWithNamedParameters(testEnv.getPGAdapterPort(), sql, "data_type_query", parameters);
+        executeWithNamedParameters(
+            host, testEnv.getPGAdapterPort(), sql, "data_type_query", parameters);
     expectedOutput =
         "(1, False, 98.6, 69, Decimal('77.46'), datetime.datetime(2022, 10, 2, 14, 34, 26, tzinfo=datetime.timezone.utc), datetime.date(2021, 12, 23), 'hello psycopg2')\n";
     assertEquals(expectedOutput, actualOutput);
@@ -359,7 +371,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
     ArrayList<String> parameters = new ArrayList<>();
     parameters.add("test");
     String actualOutput =
-        executeWithParameters(testEnv.getPGAdapterPort(), sql, "update", parameters);
+        executeWithParameters(host, testEnv.getPGAdapterPort(), sql, "update", parameters);
     String expectedOutput = "1\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -370,7 +382,8 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("1");
 
     actualOutput =
-        executeWithNamedParameters(testEnv.getPGAdapterPort(), sql, "data_type_query", parameters);
+        executeWithNamedParameters(
+            host, testEnv.getPGAdapterPort(), sql, "data_type_query", parameters);
     expectedOutput = "(0,)\n";
     assertEquals(expectedOutput, actualOutput);
   }
@@ -440,7 +453,8 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("69");
 
     String actualOutput =
-        executeInBatch(testEnv.getPGAdapterPort(), insertSql, "named_execute_many", parameters);
+        executeInBatch(
+            host, testEnv.getPGAdapterPort(), insertSql, "named_execute_many", parameters);
     String expectedOutput = "2\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -479,7 +493,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "'bye bye world')"
             + "\n";
 
-    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), selectSql, "query");
+    actualOutput = executeWithoutParameters(host, testEnv.getPGAdapterPort(), selectSql, "query");
     assertEquals(expectedOutput, actualOutput);
   }
 
@@ -548,7 +562,8 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("69");
 
     String actualOutput =
-        executeInBatch(testEnv.getPGAdapterPort(), insertSql, "named_execute_batch", parameters);
+        executeInBatch(
+            host, testEnv.getPGAdapterPort(), insertSql, "named_execute_batch", parameters);
     String expectedOutput = "1\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -587,7 +602,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "'bye bye world')"
             + "\n";
 
-    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), selectSql, "query");
+    actualOutput = executeWithoutParameters(host, testEnv.getPGAdapterPort(), selectSql, "query");
     assertEquals(expectedOutput, actualOutput);
   }
 
@@ -630,7 +645,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
     parameters.add("bye bye world");
 
     String actualOutput =
-        executeInBatch(testEnv.getPGAdapterPort(), insertSql, "execute_values", parameters);
+        executeInBatch(host, testEnv.getPGAdapterPort(), insertSql, "execute_values", parameters);
     String expectedOutput = "2\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -669,7 +684,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
             + "'bye bye world')"
             + "\n";
 
-    actualOutput = executeWithoutParameters(testEnv.getPGAdapterPort(), selectSql, "query");
+    actualOutput = executeWithoutParameters(host, testEnv.getPGAdapterPort(), selectSql, "query");
     assertEquals(expectedOutput, actualOutput);
   }
 }
