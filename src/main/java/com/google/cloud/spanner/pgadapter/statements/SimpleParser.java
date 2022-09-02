@@ -14,12 +14,16 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import com.google.api.client.util.Strings;
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -66,16 +70,40 @@ public class SimpleParser {
         return false;
       }
       TableOrIndexName other = (TableOrIndexName) o;
-      return Objects.equals(this.schema, other.schema) && Objects.equals(this.name, other.name);
+      return Objects.equals(
+              unquoteOrFoldIdentifier(this.schema), unquoteOrFoldIdentifier(other.schema))
+          && Objects.equals(
+              unquoteOrFoldIdentifier(this.name), unquoteOrFoldIdentifier(other.name));
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(this.schema, this.name);
+      return Objects.hash(unquoteOrFoldIdentifier(this.schema), unquoteOrFoldIdentifier(this.name));
     }
   }
 
-  private final String sql;
+  static String unquoteOrFoldIdentifier(String identifier) {
+    if (Strings.isNullOrEmpty(identifier)) {
+      return null;
+    }
+    if (identifier.charAt(0) == '"'
+        && identifier.charAt(identifier.length() - 1) == '"'
+        && identifier.length() > 1) {
+      return identifier.substring(1, identifier.length() - 1);
+    }
+    return identifier.toLowerCase();
+  }
+
+  static Statement copyStatement(Statement original, String sql) {
+    Statement.Builder builder = Statement.newBuilder(sql);
+    Map<String, Value> parameters = original.getParameters();
+    for (Entry<String, Value> param : parameters.entrySet()) {
+      builder.bind(param.getKey()).to(param.getValue());
+    }
+    return builder.build();
+  }
+
+  private String sql;
   private int pos;
 
   SimpleParser(String sql) {
@@ -84,6 +112,10 @@ public class SimpleParser {
 
   String getSql() {
     return sql;
+  }
+
+  void setSql(String sql) {
+    this.sql = sql;
   }
 
   int getPos() {
@@ -194,7 +226,8 @@ public class SimpleParser {
       String expression =
           parseExpressionUntilKeyword(
               keyword == null ? ImmutableList.of() : ImmutableList.of(keyword),
-              sameParensLevelAsStart);
+              sameParensLevelAsStart,
+              true);
       if (expression == null) {
         return null;
       }
@@ -214,11 +247,13 @@ public class SimpleParser {
   }
 
   String parseExpressionUntilKeyword(ImmutableList<String> keywords) {
-    return parseExpressionUntilKeyword(keywords, false);
+    return parseExpressionUntilKeyword(keywords, false, true);
   }
 
   String parseExpressionUntilKeyword(
-      ImmutableList<String> keywords, boolean sameParensLevelAsStart) {
+      ImmutableList<String> keywords,
+      boolean sameParensLevelAsStart,
+      boolean stopAtEndOfExpression) {
     skipWhitespaces();
     int start = pos;
     boolean valid;
@@ -228,10 +263,10 @@ public class SimpleParser {
         parens++;
       } else if (sql.charAt(pos) == ')') {
         parens--;
-        if (parens < 0) {
+        if (stopAtEndOfExpression && parens < 0) {
           break;
         }
-      } else if (parens == 0 && sql.charAt(pos) == ',') {
+      } else if (stopAtEndOfExpression && parens == 0 && sql.charAt(pos) == ',') {
         break;
       }
       if ((!sameParensLevelAsStart || parens == 0)
@@ -342,12 +377,72 @@ public class SimpleParser {
     return eat(true, false, token);
   }
 
+  /** Eats everything until an end parentheses at the same level as the current level. */
+  String eatSubExpression() {
+    int start = pos;
+    boolean valid;
+    int parens = 0;
+    while ((valid = skipCommentsAndLiterals()) && pos < sql.length()) {
+      if (sql.charAt(pos) == '(') {
+        parens++;
+      } else if (sql.charAt(pos) == ')') {
+        parens--;
+        if (parens < 0) {
+          break;
+        }
+      }
+      pos++;
+    }
+    if (pos == start || !valid || parens >= 0) {
+      return null;
+    }
+    return sql.substring(start, pos);
+  }
+
   boolean eatDotOperator() {
     if (eat(false, false, ".")) {
       if (pos == sql.length() || Character.isWhitespace(sql.charAt(pos))) {
         return false;
       }
       return true;
+    }
+    return false;
+  }
+
+  boolean peekJoinKeyword() {
+    return peekKeyword("join")
+        || peekKeyword("left")
+        || peekKeyword("right")
+        || peekKeyword("full")
+        || peekKeyword("inner")
+        || peekKeyword("outer")
+        || peekKeyword("cross");
+  }
+
+  boolean eatJoinType() {
+    boolean foundValidJoin;
+    if (eatKeyword("left") || eatKeyword("right") || eatKeyword("full")) {
+      eatKeyword("outer");
+      foundValidJoin = eatKeyword("join");
+    } else if (eatKeyword("inner")) {
+      foundValidJoin = eatKeyword("join");
+    } else if (eatKeyword("cross")) {
+      foundValidJoin = eatKeyword("join");
+    } else {
+      foundValidJoin = eatKeyword("join");
+    }
+    return foundValidJoin;
+  }
+
+  boolean eatJoinCondition() {
+    if (eatKeyword("on")) {
+      parseExpressionUntilKeyword(
+          ImmutableList.of("left", "right", "full", "inner", "cross", "join", "where"), true, true);
+    } else if (eatKeyword("using")) {
+      if (eatToken("(")) {
+        parseExpressionList();
+        return eatToken(")");
+      }
     }
     return false;
   }
@@ -524,5 +619,17 @@ public class SimpleParser {
       }
     }
     return false;
+  }
+
+  @Override
+  public String toString() {
+    if (sql.contains("\n")) {
+      return sql.substring(0, pos) + "|" + sql.substring(Math.min(pos, sql.length() - 1));
+    }
+    return sql
+        + "\n"
+        + Strings.repeat(" ", pos)
+        + "^"
+        + Strings.repeat(" ", Math.max(sql.length() - pos - 1, 0));
   }
 }

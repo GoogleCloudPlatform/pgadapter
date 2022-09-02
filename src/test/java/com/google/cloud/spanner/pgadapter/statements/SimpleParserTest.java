@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -62,6 +63,12 @@ public class SimpleParserTest {
     parser.setPos(startIndex);
     parser.skipDollarQuotedString();
     return parser.getPos();
+  }
+
+  @Test
+  public void testTableOrIndexName() {
+    assertEquals(new TableOrIndexName(null, "foo"), new TableOrIndexName(null, "foo"));
+    assertNotEquals(new TableOrIndexName(null, "foo"), new TableOrIndexName(null, "bar"));
   }
 
   @Test
@@ -387,6 +394,9 @@ public class SimpleParserTest {
     assertEquals("WITH", parseCommand("with 1 as (select * from foo update bar set col1='one'"));
     assertEquals(
         "WITH", parseCommand("with my_cte as select * from foo update bar set col1='one'"));
+
+    assertEquals("WITH", parseCommand("with my_cte as (select * from foo)"));
+    assertEquals("", parseCommand("/*only a comment*/"));
     assertEquals("WITH", parseCommand("with my_cte () as (select * from foo)"));
     assertEquals("WITH", parseCommand("with my_cte (,) as (select * from foo)"));
     assertEquals("WITH", parseCommand("with my_cte (bar"));

@@ -92,7 +92,7 @@ public class StartupMessage extends BootstrapMessage {
         connection.getConnectionMetadata().peekOutputStream(),
         connection.getConnectionId(),
         connection.getSecret(),
-        connection.getServer().getOptions());
+        connection.getExtendedQueryProtocolHandler().getBackendConnection().getSessionState());
     connection.setStatus(ConnectionStatus.AUTHENTICATED);
   }
 
