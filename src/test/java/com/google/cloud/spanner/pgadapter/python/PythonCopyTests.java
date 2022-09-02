@@ -18,6 +18,10 @@ import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.wireprotocol.CopyDataMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.CopyDoneMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.ResultSet;
@@ -27,6 +31,7 @@ import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import java.io.IOException;
+import java.util.List;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -141,6 +146,13 @@ public class PythonCopyTests extends PythonTestSetup {
     String actualOutput = executeCopy(pgServer.getLocalPort(), sql, file, copyType);
 
     assertEquals("2\n", actualOutput);
+
+    List<QueryMessage> qm = getWireMessagesOfType(QueryMessage.class);
+    assertEquals(1, qm.size());
+    assertEquals(sql, qm.get(0).getStatement().getSql());
+
+    assertEquals(1, getWireMessagesOfType(CopyDataMessage.class).size());
+    assertEquals(1, getWireMessagesOfType(CopyDoneMessage.class).size());
   }
 
   @Test
@@ -173,5 +185,11 @@ public class PythonCopyTests extends PythonTestSetup {
     String expectedOutput = "1,hello\n" + "2,world\n";
 
     assertEquals(expectedOutput, actualOutput);
+
+    for (WireMessage wm : getWireMessages()) System.out.println(wm.getClass());
+
+    List<QueryMessage> qm = getWireMessagesOfType(QueryMessage.class);
+    assertEquals(1, qm.size());
+    assertEquals(sql, qm.get(0).getStatement().getSql());
   }
 }
