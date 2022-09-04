@@ -470,7 +470,7 @@ public class PythonTransactionTests extends PythonTestSetup {
             + "2\n"
             + "(1, 'abcd')\n"
             + "(2, 'pqrs')\n"
-            + "FAILED_PRECONDITION: Update statements are not allowed for read-only transactions\n";
+            + "Update statements are not allowed for read-only transactions\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
@@ -577,7 +577,7 @@ public class PythonTransactionTests extends PythonTestSetup {
             + "2\n"
             + "(1, 'abcd')\n"
             + "(2, 'pqrs')\n"
-            + "FAILED_PRECONDITION: Update statements are not allowed for read-only transactions\n";
+            + "Update statements are not allowed for read-only transactions\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
@@ -648,9 +648,7 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
 
     String expectedOutput =
-        "(1, 'abcd')\n"
-            + "1\n"
-            + "INVALID_ARGUMENT: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED\n";
+        "(1, 'abcd')\n" + "1\n" + "Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED\n";
 
     for (String unsupportedIsolationLevel : unsupportedIsolationLevels) {
       List<String> statements = new ArrayList<>();
@@ -727,9 +725,7 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
 
     String expectedOutput =
-        "(1, 'abcd')\n"
-            + "1\n"
-            + "INVALID_ARGUMENT: Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED\n";
+        "(1, 'abcd')\n" + "1\n" + "Unknown value for TRANSACTION: ISOLATION LEVEL READ COMMITTED\n";
 
     for (String unsupportedIsolationLevel : unsupportedIsolationLevels) {
       List<String> statements = new ArrayList<>();
@@ -1171,7 +1167,7 @@ public class PythonTransactionTests extends PythonTestSetup {
         "(1, 'abcd')\n"
             + "1\n"
             + "2\n"
-            + "INVALID_ARGUMENT: Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n";
+            + "Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
@@ -1257,7 +1253,7 @@ public class PythonTransactionTests extends PythonTestSetup {
         "(1, 'abcd')\n"
             + "1\n"
             + "2\n"
-            + "INVALID_ARGUMENT: Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n";
+            + "Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n";
     String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 

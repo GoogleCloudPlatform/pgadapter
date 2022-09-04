@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.toServerVersionNum;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -21,8 +22,10 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -208,5 +211,45 @@ public class OptionsMetadataTest {
 
     options = new OptionsMetadata(new String[] {"-p p", "-i i", "-disable_auto_detect_client"});
     assertFalse(options.shouldAutoDetectClient());
+  }
+
+  @Test
+  public void testDeprecatedBinaryFormat() {
+    PrintStream originalOut = System.out;
+    try {
+      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+      System.setOut(new PrintStream(outputStream));
+      OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i", "-b"});
+      assertTrue(options.isBinaryFormat());
+
+      assertEquals(
+          "Forcing the server to return results using the binary format is a violation "
+              + "of the PostgreSQL wire-protocol. Using this option can cause unexpected errors.\nIt is "
+              + "recommended not to use the -b option."
+              + System.lineSeparator(),
+          outputStream.toString());
+    } finally {
+      System.setOut(originalOut);
+    }
+  }
+
+  @Test
+  public void testDisablePgCatalogReplacements() {
+    OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
+    assertTrue(options.replacePgCatalogTables());
+
+    options =
+        new OptionsMetadata(new String[] {"-p p", "-i i", "-disable_pg_catalog_replacements"});
+    assertFalse(options.replacePgCatalogTables());
+  }
+
+  @Test
+  public void testToServerVersionNum() {
+    assertEquals("10000", toServerVersionNum("1.0"));
+    assertEquals("140001", toServerVersionNum("14.1"));
+    assertEquals("80004", toServerVersionNum("8.4"));
+    assertEquals("10000", toServerVersionNum("1.0.1"));
+    assertEquals("10000", toServerVersionNum("1.0 custom build"));
+    assertEquals("10010", toServerVersionNum("1.10 custom build"));
   }
 }

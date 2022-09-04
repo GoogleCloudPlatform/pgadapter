@@ -24,6 +24,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationCleartextPass
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -68,21 +69,30 @@ public class StartupMessage extends BootstrapMessage {
   protected void sendPayload() throws Exception {
     if (!authenticate) {
       createConnectionAndSendStartupMessage(
-          this.connection, this.parameters.get(DATABASE_KEY), null);
+          this.connection, this.parameters.get(DATABASE_KEY), this.parameters, null);
     } else {
       new AuthenticationCleartextPasswordResponse(this.outputStream).send();
     }
   }
 
   static void createConnectionAndSendStartupMessage(
-      ConnectionHandler connection, String database, @Nullable GoogleCredentials credentials)
+      ConnectionHandler connection,
+      String database,
+      Map<String, String> parameters,
+      @Nullable GoogleCredentials credentials)
       throws Exception {
     connection.connectToSpanner(database, credentials);
+    for (Entry<String, String> parameter : parameters.entrySet()) {
+      connection
+          .getExtendedQueryProtocolHandler()
+          .getBackendConnection()
+          .initSessionSetting(parameter.getKey(), parameter.getValue());
+    }
     sendStartupMessage(
         connection.getConnectionMetadata().peekOutputStream(),
         connection.getConnectionId(),
         connection.getSecret(),
-        connection.getServer().getOptions());
+        connection.getExtendedQueryProtocolHandler().getBackendConnection().getSessionState());
     connection.setStatus(ConnectionStatus.AUTHENTICATED);
   }
 
