@@ -15,9 +15,12 @@
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -339,5 +342,22 @@ public final class RowDescriptionTest {
       // format code
       assertEquals(i, outputReader.readShort());
     }
+  }
+
+  @Test
+  public void testUnknownTypeReturnsUnspecified() throws Exception {
+    ResultSet resultSet = mock(ResultSet.class);
+    when(resultSet.getColumnType(0))
+        .thenThrow(SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "unknown type"));
+
+    RowDescriptionResponse response =
+        new RowDescriptionResponse(
+            mock(DataOutputStream.class),
+            mock(IntermediateStatement.class),
+            resultSet,
+            mock(OptionsMetadata.class),
+            QueryMode.SIMPLE);
+
+    assertEquals(Oid.UNSPECIFIED, response.getOidType(0));
   }
 }
