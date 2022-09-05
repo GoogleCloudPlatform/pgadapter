@@ -88,7 +88,7 @@ public class CopySettings {
 
   /** Returns the batch size to use for non-atomic COPY operations. */
   public int getNonAtomicBatchSize() {
-    return sessionState.getIntegerSetting("spanner", "copy_batch_size", 500);
+    return sessionState.getIntegerSetting("spanner", "copy_batch_size", 5000);
   }
 
   /** Returns the maximum number of mutations in a single commit request. */
