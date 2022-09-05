@@ -56,6 +56,7 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyManager;
+import org.postgresql.core.Oid;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
@@ -155,6 +156,18 @@ public class ITJdbcTest implements IntegrationTest {
           connection.createStatement().executeQuery("SELECT 'Hello World!'")) {
         assertTrue(resultSet.next());
         assertEquals("Hello World!", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSelectCurrentSchema() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select current_schema()")) {
+        assertTrue(resultSet.next());
+        assertEquals("public", resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
@@ -546,11 +559,11 @@ public class ITJdbcTest implements IntegrationTest {
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
       assertEquals(
-          "ERROR: FAILED_PRECONDITION: Record count: 2001 has exceeded the limit: 2000.\n"
+          "ERROR: Record count: 2001 has exceeded the limit: 2000.\n"
               + "\n"
               + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
               + "\n"
-              + "Execute `SET AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.\n\n",
+              + "Execute `SET SPANNER.AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.\n\n",
           exception.getMessage());
     }
 
@@ -727,6 +740,152 @@ public class ITJdbcTest implements IntegrationTest {
         }
       }
       connection.commit();
+    }
+  }
+
+  @Test
+  public void testPGSettings() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      // First verify the default value.
+      // JDBC sets the DateStyle to 'ISO' for every connection in the connection request.
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select setting from pg_settings where name='DateStyle'")) {
+        assertTrue(resultSet.next());
+        assertEquals("ISO", resultSet.getString("setting"));
+        assertFalse(resultSet.next());
+      }
+      // Verify that we can also use a statement parameter to query the pg_settings table.
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("select setting from pg_settings where name=?")) {
+        preparedStatement.setString(1, "DateStyle");
+        try (ResultSet resultSet = preparedStatement.executeQuery()) {
+          assertTrue(resultSet.next());
+          assertEquals("ISO", resultSet.getString("setting"));
+          assertFalse(resultSet.next());
+        }
+      }
+      // Change the date style and verify that it is also reflected in  pg_settings.
+      connection.createStatement().execute("set datestyle to 'iso, ymd'");
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select setting from pg_settings where name='DateStyle'")) {
+        assertTrue(resultSet.next());
+        assertEquals("iso, ymd", resultSet.getString("setting"));
+        assertFalse(resultSet.next());
+      }
+
+      // Verify that pg_settings also respects transactions.
+      connection.setAutoCommit(false);
+      connection.createStatement().execute("set datestyle to 'iso'");
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select setting from pg_settings where name='DateStyle'")) {
+        assertTrue(resultSet.next());
+        assertEquals("iso", resultSet.getString("setting"));
+        assertFalse(resultSet.next());
+      }
+      // This should also roll back the changes to pg_settings.
+      connection.rollback();
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select setting from pg_settings where name='DateStyle'")) {
+        assertTrue(resultSet.next());
+        assertEquals("iso, ymd", resultSet.getString("setting"));
+        assertFalse(resultSet.next());
+      }
+
+      // Resetting the value should bring it back to the initial value.
+      connection.createStatement().execute("reset datestyle");
+      connection.commit();
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("select setting from pg_settings where name='DateStyle'")) {
+        assertTrue(resultSet.next());
+        assertEquals("ISO", resultSet.getString("setting"));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSelectNamespaces() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet namespaces =
+          connection
+              .createStatement()
+              .executeQuery("select nspname from pg_namespace order by oid desc, nspname")) {
+        assertTrue(namespaces.next());
+        assertEquals("public", namespaces.getString(1));
+        assertTrue(namespaces.next());
+        assertEquals("pg_catalog", namespaces.getString(1));
+        assertTrue(namespaces.next());
+        assertEquals("information_schema", namespaces.getString(1));
+        assertTrue(namespaces.next());
+        assertEquals("spanner_sys", namespaces.getString(1));
+
+        assertFalse(namespaces.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSelectTypes() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet types =
+          connection
+              .createStatement()
+              .executeQuery("select oid, typname from pg_type order by oid")) {
+        assertTrue(types.next());
+        assertEquals(Oid.BOOL, types.getInt(1));
+        assertEquals("bool", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.BYTEA, types.getInt(1));
+        assertEquals("bytea", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.INT8, types.getInt(1));
+        assertEquals("int8", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.INT2, types.getInt(1));
+        assertEquals("int2", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.INT4, types.getInt(1));
+        assertEquals("int4", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.TEXT, types.getInt(1));
+        assertEquals("text", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.FLOAT4, types.getInt(1));
+        assertEquals("float4", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.FLOAT8, types.getInt(1));
+        assertEquals("float8", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.VARCHAR, types.getInt(1));
+        assertEquals("varchar", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.DATE, types.getInt(1));
+        assertEquals("date", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.TIMESTAMP, types.getInt(1));
+        assertEquals("timestamp", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.TIMESTAMPTZ, types.getInt(1));
+        assertEquals("timestamptz", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.NUMERIC, types.getInt(1));
+        assertEquals("numeric", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.JSONB, types.getInt(1));
+        assertEquals("jsonb", types.getString(2));
+
+        assertFalse(types.next());
+      }
     }
   }
 

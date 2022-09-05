@@ -52,11 +52,11 @@ import org.junit.runners.JUnit4;
 public class ITJdbcMetadataTest implements IntegrationTest {
   private static final String[] VERSIONS =
       new String[] {
-        "42.4.0", "42.3.6", "42.3.5", "42.3.4", "42.3.3", "42.3.2", "42.3.1", "42.3.0", "42.2.25",
-        "42.2.24", "42.2.23", "42.2.22", "42.2.21", "42.2.20", "42.2.19", "42.2.18", "42.2.17",
-        "42.2.16", "42.2.15", "42.2.14", "42.2.13", "42.2.12", "42.2.11", "42.2.10", "42.2.9",
-        "42.2.8", "42.2.7", "42.2.6", "42.2.5", "42.2.4", "42.2.3", "42.2.2", "42.2.1", "42.2.0",
-        "42.1.4", "42.1.3", "42.1.2", "42.1.1", "42.1.0", "42.0.0"
+        "42.5.0", "42.4.2", "42.4.1", "42.4.0", "42.3.6", "42.3.5", "42.3.4", "42.3.3", "42.3.2",
+        "42.3.1", "42.3.0", "42.2.25", "42.2.24", "42.2.23", "42.2.22", "42.2.21", "42.2.20",
+        "42.2.19", "42.2.18", "42.2.17", "42.2.16", "42.2.15", "42.2.14", "42.2.13", "42.2.12",
+        "42.2.11", "42.2.10", "42.2.9", "42.2.8", "42.2.7", "42.2.6", "42.2.5", "42.2.4", "42.2.3",
+        "42.2.2", "42.2.1", "42.2.0", "42.1.4", "42.1.3", "42.1.2", "42.1.1", "42.1.0", "42.0.0"
       };
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
@@ -138,6 +138,13 @@ public class ITJdbcMetadataTest implements IntegrationTest {
                 },
                 defaultClassLoader.getParent());
         Thread.currentThread().setContextClassLoader(classLoader);
+        // Verify that we can load the PG JDBC driver from this class loader.
+        try {
+          classLoader.loadClass("org.postgresql.Driver");
+        } catch (Throwable t) {
+          throw new Exception(
+              "Could not load PostgreSQL driver using URLClassLoader: " + t.getMessage(), t);
+        }
         Class<?> runnerClass = classLoader.loadClass(TestRunner.class.getName());
         Constructor<?> constructor = runnerClass.getDeclaredConstructor();
         Object runner = constructor.newInstance();
@@ -175,6 +182,24 @@ public class ITJdbcMetadataTest implements IntegrationTest {
               assertEquals(
                   testEnv.getServer().getOptions().getServerVersion(),
                   metadata.getDatabaseProductVersion());
+            }
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
+  }
+
+  @Test
+  public void testSelectEdbRedwoodDateSetting() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            try (ResultSet resultSet =
+                connection
+                    .createStatement()
+                    .executeQuery(
+                        "select setting from pg_settings where name = 'edb_redwood_date'")) {
+              assertFalse(resultSet.next());
             }
           } catch (SQLException e) {
             throw SpannerExceptionFactory.asSpannerException(e);
@@ -262,6 +287,54 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet tables =
                 metadata.getTables(null, "public", "%a%", new String[] {"TABLE", "VIEW"})) {
+              assertTrue(tables.next());
+              assertEquals("albums", tables.getString("TABLE_NAME"));
+              assertTrue(tables.next());
+              assertEquals("all_types", tables.getString("TABLE_NAME"));
+              assertTrue(tables.next());
+              assertEquals("recording_attempt", tables.getString("TABLE_NAME"));
+              assertTrue(tables.next());
+              assertEquals("tracks", tables.getString("TABLE_NAME"));
+
+              assertFalse(tables.next());
+            }
+          } catch (SQLException e) {
+            throw SpannerExceptionFactory.asSpannerException(e);
+          }
+        });
+  }
+
+  @Test
+  public void testDatabaseMetaDataTables_AllTypes() throws Exception {
+    runForAllVersions(
+        connection -> {
+          try {
+            DatabaseMetaData metadata = connection.getMetaData();
+            try (ResultSet tables =
+                metadata.getTables(
+                    null,
+                    "public",
+                    "%a%",
+                    new String[] {
+                      "TABLE",
+                      "PARTITIONED TABLE",
+                      "INDEX",
+                      "PARTITIONED INDEX",
+                      "SEQUENCE",
+                      "TYPE",
+                      "SYSTEM TABLE",
+                      "SYSTEM TOAST TABLE",
+                      "SYSTEM TOAST INDEX",
+                      "SYSTEM VIEW",
+                      "SYSTEM INDEX",
+                      "TEMPORARY TABLE",
+                      "TEMPORARY INDEX",
+                      "TEMPORARY VIEW",
+                      "TEMPORARY SEQUENCE",
+                      "FOREIGN TABLE",
+                      "MATERIALIZED VIEW",
+                      "VIEW"
+                    })) {
               assertTrue(tables.next());
               assertEquals("albums", tables.getString("TABLE_NAME"));
               assertTrue(tables.next());

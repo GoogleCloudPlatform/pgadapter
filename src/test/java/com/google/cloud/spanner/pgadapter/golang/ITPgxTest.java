@@ -18,6 +18,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -79,7 +80,17 @@ public class ITPgxTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() throws Exception {
-    pgxTest = GolangTest.compile("pgadapter_pgx_tests/pgx.go", PgxTest.class);
+    try {
+      pgxTest = GolangTest.compile("pgadapter_pgx_tests/pgx.go", PgxTest.class);
+    } catch (UnsatisfiedLinkError unsatisfiedLinkError) {
+      // This probably means that there is a version mismatch for GLIBC (or no GLIBC at all
+      // installed).
+      assumeFalse(
+          "Skipping ecosystem test because of missing dependency",
+          System.getProperty("allowSkipUnsupportedEcosystemTest", "false")
+              .equalsIgnoreCase("true"));
+      throw unsatisfiedLinkError;
+    }
 
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());

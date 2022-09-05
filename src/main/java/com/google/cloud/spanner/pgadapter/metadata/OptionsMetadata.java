@@ -77,6 +77,10 @@ public class OptionsMetadata {
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
+  private static final String OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS =
+      "disable_default_local_statements";
+  private static final String OPTION_DISABLE_PG_CATALOG_REPLACEMENTS =
+      "disable_pg_catalog_replacements";
   private static final String OPTION_PSQL_MODE = "q";
   private static final String OPTION_DDL_TRANSACTION_MODE = "ddl";
   private static final String OPTION_JDBC_MODE = "jdbc";
@@ -107,6 +111,8 @@ public class OptionsMetadata {
   private final boolean binaryFormat;
   private final boolean authenticate;
   private final boolean disableAutoDetectClient;
+  private final boolean disableDefaultLocalStatements;
+  private final boolean disablePgCatalogReplacements;
   private final boolean requiresMatcher;
   private final DdlTransactionMode ddlTransactionMode;
   private final boolean replaceJdbcMetadataQueries;
@@ -157,6 +163,10 @@ public class OptionsMetadata {
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
     this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
+    this.disableDefaultLocalStatements =
+        commandLine.hasOption(OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS);
+    this.disablePgCatalogReplacements =
+        commandLine.hasOption(OPTION_DISABLE_PG_CATALOG_REPLACEMENTS);
     this.requiresMatcher =
         commandLine.hasOption(OPTION_PSQL_MODE)
             || commandLine.hasOption(OPTION_COMMAND_METADATA_FILE);
@@ -212,6 +222,8 @@ public class OptionsMetadata {
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
     this.disableAutoDetectClient = false;
+    this.disableDefaultLocalStatements = false;
+    this.disablePgCatalogReplacements = false;
     this.requiresMatcher = requiresMatcher;
     this.ddlTransactionMode = DdlTransactionMode.AutocommitImplicitTransaction;
     this.replaceJdbcMetadataQueries = replaceJdbcMetadataQueries;
@@ -503,6 +515,22 @@ public class OptionsMetadata {
             + "Use this option if you do not want PGAdapter to automatically apply query "
             + "replacements based on the client that is connected to PGAdapter.");
     options.addOption(
+        null,
+        OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS,
+        false,
+        "This option turns off translations for commonly used statements that are "
+            + "currently not supported by Cloud Spanner (e.g. `select current_schema`). "
+            + "Use this option if you do not want PGAdapter to automatically apply query "
+            + "replacements for these statements.");
+    options.addOption(
+        null,
+        OPTION_DISABLE_PG_CATALOG_REPLACEMENTS,
+        false,
+        "This option turns off automatic replacement of pg_catalog tables with "
+            + "common table expressions for pg_catalog tables that are not yet supported by "
+            + "Cloud Spanner. Use this option if you do not want PGAdapter to automatically apply "
+            + "replacements for pg_catalog tables.");
+    options.addOption(
         OPTION_PSQL_MODE,
         "psql-mode",
         false,
@@ -559,7 +587,8 @@ public class OptionsMetadata {
         OPTION_BINARY_FORMAT,
         "force-binary-format",
         false,
-        "Force the server to send data back in binary PostgreSQL format when no specific "
+        "DEPRECATED: This option violates the PostgreSQL wire-protocol.\n"
+            + "Force the server to send data back in binary PostgreSQL format when no specific "
             + "format has been requested. The PostgreSQL wire protocol specifies that the server "
             + "should send data in text format in those cases. This setting overrides this default "
             + "and should be used with caution, for example for testing purposes, as clients might "
@@ -587,7 +616,11 @@ public class OptionsMetadata {
         true,
         "This option specifies what server_version PG Adapter should claim to be. If not specified "
             + " it will default to version "
-            + DEFAULT_SERVER_VERSION);
+            + DEFAULT_SERVER_VERSION
+            + ".\nBe careful when changing this value. Unless otherwise specified, all clients and drivers that "
+            + "have been tested with PGAdapter have been tested using the default value for this option. Changing "
+            + "the value of this option could cause a client or driver to alter its behavior and cause unexpected "
+            + "errors when used with PGAdapter.");
     options.addOption(
         OPTION_DEBUG_MODE,
         "debug-mode",
@@ -613,6 +646,12 @@ public class OptionsMetadata {
   }
 
   static void printDeprecatedWarnings(CommandLine commandLine) {
+    if (commandLine.hasOption(OPTION_BINARY_FORMAT)) {
+      System.out.println(
+          "Forcing the server to return results using the binary format is a violation "
+              + "of the PostgreSQL wire-protocol. Using this option can cause unexpected errors.\nIt is "
+              + "recommended not to use the -b option.");
+    }
     if (!commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT)) {
       if (commandLine.hasOption(OPTION_PSQL_MODE)) {
         System.out.printf(
@@ -726,6 +765,14 @@ public class OptionsMetadata {
     return !this.disableAutoDetectClient;
   }
 
+  public boolean useDefaultLocalStatements() {
+    return !this.disableDefaultLocalStatements;
+  }
+
+  public boolean replacePgCatalogTables() {
+    return !this.disablePgCatalogReplacements;
+  }
+
   public boolean requiresMatcher() {
     return this.requiresMatcher;
   }
@@ -744,6 +791,30 @@ public class OptionsMetadata {
 
   public String getServerVersion() {
     return serverVersion;
+  }
+
+  public String getServerVersionNum() {
+    return toServerVersionNum(this.serverVersion);
+  }
+
+  public static String toServerVersionNum(String version) {
+    String[] components = version.split("\\.");
+    if (components.length >= 2) {
+      int major = tryParseInt(components[0]);
+      int minor = tryParseInt(components[1].split("\\s+")[0]);
+      if (major > -1 && minor > -1) {
+        return String.valueOf(major * 10000 + minor);
+      }
+    }
+    return version;
+  }
+
+  private static int tryParseInt(String value) {
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException ignore) {
+      return -1;
+    }
   }
 
   /** Returns true if the OS is Windows. */

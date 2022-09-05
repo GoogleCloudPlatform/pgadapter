@@ -37,7 +37,7 @@ public class BooleanParser extends Parser<Boolean> {
   private static final Set<String> TRUE_VALUES =
       ImmutableSet.of("t", "tr", "tru", "true", "y", "ye", "yes", "on", "1");
   private static final Set<String> FALSE_VALUES =
-      ImmutableSet.of("f", "fa", "fal", "fals", "false", "n", "no", "of", "off");
+      ImmutableSet.of("f", "fa", "fal", "fals", "false", "n", "no", "of", "off", "0");
 
   BooleanParser(ResultSet item, int position) {
     this.item = item.getBoolean(position);

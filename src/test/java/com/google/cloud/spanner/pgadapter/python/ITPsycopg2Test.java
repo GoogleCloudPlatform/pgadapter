@@ -58,6 +58,13 @@ public class ITPsycopg2Test extends PythonTestSetup {
 
   @BeforeClass
   public static void setup() throws Exception {
+    if (!isPythonAvailable()
+        && !System.getProperty("allowSkipUnsupportedEcosystemTest", "false")
+            .equalsIgnoreCase("true")) {
+      throw new IllegalStateException(
+          "python has not been set up on this system and allowSkipUnsupportedEcosystemTest has not been set");
+    }
+
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());

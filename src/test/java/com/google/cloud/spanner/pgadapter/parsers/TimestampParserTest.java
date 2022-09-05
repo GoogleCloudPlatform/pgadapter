@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import static com.google.cloud.spanner.pgadapter.parsers.Parser.PG_EPOCH_SECONDS;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -22,6 +23,8 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -46,6 +49,20 @@ public class TimestampParserTest {
     SpannerException spannerException =
         assertThrows(SpannerException.class, () -> TimestampParser.toTimestamp(new byte[4]));
     assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
+
+    assertArrayEquals(data, new TimestampParser(TimestampParser.toTimestamp(data)).binaryParse());
+    assertNull(new TimestampParser(null).binaryParse());
+  }
+
+  @Test
+  public void testSpannerParse() {
+    assertEquals(
+        "2022-07-08T07:22:59.123456789Z",
+        new TimestampParser(
+                "2022-07-08 07:22:59.123456789+00".getBytes(StandardCharsets.UTF_8),
+                FormatCode.TEXT)
+            .spannerParse());
+    assertNull(new TimestampParser(null).spannerParse());
   }
 
   @Test

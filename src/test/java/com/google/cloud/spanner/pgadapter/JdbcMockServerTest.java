@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -36,6 +37,8 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
+import com.google.spanner.v1.BeginTransactionRequest;
+import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
@@ -68,6 +71,7 @@ import org.junit.runners.JUnit4;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.jdbc.PgStatement;
+import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
@@ -121,6 +125,128 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertTrue(request.getTransaction().hasSingleUse());
       assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
     }
+  }
+
+  @Test
+  public void testInvalidQuery() throws SQLException {
+    String sql = "/ not a valid comment / SELECT 1";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PSQLException exception =
+          assertThrows(PSQLException.class, () -> connection.createStatement().executeQuery(sql));
+      assertEquals(
+          "ERROR: Unknown statement: / not a valid comment / SELECT 1", exception.getMessage());
+    }
+
+    // The statement is not sent to the mock server.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testSelectCurrentSchema() throws SQLException {
+    String sql = "SELECT current_schema";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals("public", resultSet.getString("current_schema"));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testSelectCurrentDatabase() throws SQLException {
+    for (String sql :
+        new String[] {
+          "SELECT current_database()",
+          "select current_database()",
+          "select * from CURRENT_DATABASE()"
+        }) {
+
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("d", resultSet.getString("current_database"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testSelectCurrentCatalog() throws SQLException {
+    for (String sql :
+        new String[] {
+          "SELECT current_catalog", "select current_catalog", "select * from CURRENT_CATALOG"
+        }) {
+
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("d", resultSet.getString("current_catalog"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testShowSearchPath() throws SQLException {
+    String sql = "show search_path";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals("public", resultSet.getString("search_path"));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testSetSearchPath() throws SQLException {
+    String sql = "set search_path to public";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertFalse(statement.execute(sql));
+        assertEquals(0, statement.getUpdateCount());
+        assertFalse(statement.getMoreResults());
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testShowServerVersion() throws SQLException {
+    String sql = "show server_version";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(
+            pgServer.getOptions().getServerVersion(), resultSet.getString("server_version"));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test
@@ -310,9 +436,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         SQLException exception = assertThrows(SQLException.class, preparedStatement::executeQuery);
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("Table non_existing_table not found"));
+        assertEquals(
+            "ERROR: Table non_existing_table not found - Statement: 'select * from non_existing_table where id=$1'",
+            exception.getMessage());
       }
     }
 
@@ -336,9 +462,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         SQLException exception = assertThrows(SQLException.class, preparedStatement::executeUpdate);
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("Table non_existing_table not found"));
+        assertEquals("ERROR: Table non_existing_table not found", exception.getMessage());
       }
     }
 
@@ -497,9 +621,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         SQLException exception =
             assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("Table non_existing_table not found"));
+        assertEquals(
+            "ERROR: Table non_existing_table not found - Statement: 'select * from non_existing_table where id=$1'",
+            exception.getMessage());
       }
     }
 
@@ -533,9 +657,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
         SQLException exception =
             assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
-        assertTrue(
-            exception.getMessage(),
-            exception.getMessage().contains("Table non_existing_table not found"));
+        assertEquals("ERROR: Table non_existing_table not found", exception.getMessage());
       }
     }
 
@@ -1372,5 +1494,847 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(1).getStatement().getSql());
       assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
     }
+  }
+
+  @Test
+  public void testInformationSchemaQueryInTransaction() throws SQLException {
+    String sql = "SELECT * FROM INFORMATION_SCHEMA.TABLES";
+    // Register a result for the query. Note that we don't really care what the result is, just that
+    // there is a result.
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Make sure that we start a transaction.
+      connection.setAutoCommit(false);
+
+      // Execute a query to start the transaction.
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT1.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+
+      // This ensures that the following query returns an error the first time it is executed, and
+      // then succeeds the second time. This happens because the exception is 'popped' from the
+      // response queue when it is returned. The next time the query is executed, it will return the
+      // actual result that we set.
+      mockSpanner.setExecuteStreamingSqlExecutionTime(
+          SimulatedExecutionTime.ofException(
+              Status.INVALID_ARGUMENT
+                  .withDescription(
+                      "Unsupported concurrency mode in query using INFORMATION_SCHEMA.")
+                  .asRuntimeException()));
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Make sure that the connection is still usable.
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT2.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(2L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      connection.commit();
+    }
+
+    // We should receive the INFORMATION_SCHEMA statement twice on Cloud Spanner:
+    // 1. The first time it returns an error because it is using the wrong concurrency mode.
+    // 2. The specific error will cause the connection to retry the statement using a single-use
+    //    read-only transaction.
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // The first statement should start a transaction
+    assertTrue(requests.get(0).getTransaction().hasBegin());
+    // The second statement (the initial attempt of the INFORMATION_SCHEMA query) should try to use
+    // the transaction.
+    assertTrue(requests.get(1).getTransaction().hasId());
+    assertEquals(sql, requests.get(1).getSql());
+    // The INFORMATION_SCHEMA query is then retried using a single-use read-only transaction.
+    assertFalse(requests.get(2).hasTransaction());
+    assertEquals(sql, requests.get(2).getSql());
+    // The last statement should use the transaction.
+    assertTrue(requests.get(3).getTransaction().hasId());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(commitRequest.getTransactionId(), requests.get(1).getTransaction().getId());
+    assertEquals(commitRequest.getTransactionId(), requests.get(3).getTransaction().getId());
+  }
+
+  @Test
+  public void testInformationSchemaQueryAsFirstQueryInTransaction() throws SQLException {
+    // Running an information_schema query as the first query in a transaction will cause some
+    // additional retrying and transaction magic. This is because:
+    // 1. The first query in a transaction will also try to begin the transaction.
+    // 2. If the first query fails, it will also fail to create a transaction.
+    // 3. If an additional query is executed in the transaction, the entire transaction will be
+    //    retried using an explicit BeginTransaction RPC. This is done so that we can include the
+    //    first query in the transaction, as an error message in itself can give away information
+    //    about the state of the database, and therefore must be included in the transaction to
+    //    guarantee the consistency.
+
+    String sql = "SELECT * FROM INFORMATION_SCHEMA.TABLES";
+    // Register a result for the query. Note that we don't really care what the result is, just that
+    // there is a result.
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Make sure that we start a transaction.
+      connection.setAutoCommit(false);
+
+      // This makes sure the INFORMATION_SCHEMA query will return an error the first time it is
+      // executed. Then it is retried without a transaction.
+      mockSpanner.setExecuteStreamingSqlExecutionTime(
+          SimulatedExecutionTime.ofException(
+              Status.INVALID_ARGUMENT
+                  .withDescription(
+                      "Unsupported concurrency mode in query using INFORMATION_SCHEMA.")
+                  .asRuntimeException()));
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+
+      // This ensures that the next query will once again return the same error. The reason that we
+      // do this is that the following query will cause the entire transaction to be retried, and we
+      // need the first statement (the INFORMATION_SCHEMA query) to return exactly the same result
+      // as the first time in order to make the retry succeed.
+      mockSpanner.setExecuteStreamingSqlExecutionTime(
+          SimulatedExecutionTime.ofException(
+              Status.INVALID_ARGUMENT
+                  .withDescription(
+                      "Unsupported concurrency mode in query using INFORMATION_SCHEMA.")
+                  .asRuntimeException()));
+
+      // Verify that the connection is still usable.
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT2.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(2L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      connection.commit();
+    }
+
+    // We should receive the INFORMATION_SCHEMA statement three times on Cloud Spanner:
+    // 1. The first time it returns an error because it is using the wrong concurrency mode.
+    // 2. The specific error will cause the connection to retry the statement using a single-use
+    //    read-only transaction.
+    // 3. The second query in the transaction will cause the entire transaction to retry, which will
+    //    cause the INFORMATION_SCHEMA query to be executed once more.
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // The first statement should try to start a transaction (although it fails).
+    assertTrue(requests.get(0).getTransaction().hasBegin());
+    // The second statement is the INFORMATION_SCHEMA query without a transaction.
+    assertFalse(requests.get(1).hasTransaction());
+    assertEquals(sql, requests.get(1).getSql());
+
+    // The transaction is then retried, which means that we get the INFORMATION_SCHEMA query again.
+    // This time the query tries to use a transaction that has been created using an explicit
+    // BeginTransaction RPC invocation.
+    assertTrue(requests.get(2).getTransaction().hasId());
+    assertEquals(sql, requests.get(2).getSql());
+    // The last query should also use that transaction.
+    assertTrue(requests.get(3).getTransaction().hasId());
+    assertEquals(SELECT2.getSql(), requests.get(3).getSql());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(commitRequest.getTransactionId(), requests.get(2).getTransaction().getId());
+    assertEquals(commitRequest.getTransactionId(), requests.get(3).getTransaction().getId());
+    // Verify that we also got a BeginTransaction request.
+    assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+  }
+
+  @Test
+  public void testInformationSchemaQueryInTransactionWithErrorDuringRetry() throws SQLException {
+    String sql = "SELECT * FROM INFORMATION_SCHEMA.TABLES";
+    // Register a result for the query. Note that we don't really care what the result is, just that
+    // there is a result.
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Make sure that we start a transaction.
+      connection.setAutoCommit(false);
+
+      // Execute a query to start the transaction.
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT1.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+
+      // This ensures that the following query returns the specific concurrency error the first time
+      // it is executed, and then a different error.
+      mockSpanner.setExecuteStreamingSqlExecutionTime(
+          SimulatedExecutionTime.ofExceptions(
+              ImmutableList.of(
+                  Status.INVALID_ARGUMENT
+                      .withDescription(
+                          "Unsupported concurrency mode in query using INFORMATION_SCHEMA.")
+                      .asRuntimeException(),
+                  Status.INTERNAL.withDescription("test error").asRuntimeException())));
+      SQLException sqlException =
+          assertThrows(SQLException.class, () -> connection.createStatement().executeQuery(sql));
+      assertEquals(
+          "ERROR: test error - Statement: 'SELECT * FROM INFORMATION_SCHEMA.TABLES'",
+          sqlException.getMessage());
+
+      // Make sure that the connection is now in the aborted state.
+      SQLException abortedException =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().executeQuery(SELECT2.getSql()));
+      assertEquals(
+          "ERROR: current transaction is aborted, commands ignored until end of transaction block",
+          abortedException.getMessage());
+    }
+
+    // We should receive the INFORMATION_SCHEMA statement twice on Cloud Spanner:
+    // 1. The first time it returns an error because it is using the wrong concurrency mode.
+    // 2. The specific error will cause the connection to retry the statement using a single-use
+    //    read-only transaction. That will also fail with the second error.
+    // 3. The following SELECT query is never sent to Cloud Spanner, as the transaction is in the
+    //    aborted state.
+    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testShowValidSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show application_name ")) {
+        assertTrue(resultSet.next());
+        assertNull(resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testShowSettingWithStartupValue() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // DATESTYLE is set to 'ISO' by the JDBC driver at startup.
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show DATESTYLE")) {
+        assertTrue(resultSet.next());
+        assertEquals("ISO", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testShowInvalidSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().executeQuery("show random_setting"));
+      assertEquals(
+          "ERROR: unrecognized configuration parameter \"random_setting\"", exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testSetValidSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set application_name to 'my-application'");
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show application_name ")) {
+        assertTrue(resultSet.next());
+        assertEquals("my-application", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSetCaseInsensitiveSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // The setting is called 'DateStyle' in the pg_settings table.
+      connection.createStatement().execute("set datestyle to 'iso'");
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show DATESTYLE")) {
+        assertTrue(resultSet.next());
+        assertEquals("iso", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSetInvalidSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  connection.createStatement().executeQuery("set random_setting to 'some-value'"));
+      assertEquals(
+          "ERROR: unrecognized configuration parameter \"random_setting\"", exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testResetValidSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set application_name to 'my-application'");
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show application_name ")) {
+        assertTrue(resultSet.next());
+        assertEquals("my-application", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+
+      connection.createStatement().execute("reset application_name");
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show application_name ")) {
+        assertTrue(resultSet.next());
+        assertNull(resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testResetSettingWithStartupValue() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show datestyle")) {
+        assertTrue(resultSet.next());
+        assertEquals("ISO", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+
+      connection.createStatement().execute("set datestyle to 'iso, ymd'");
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show datestyle")) {
+        assertTrue(resultSet.next());
+        assertEquals("iso, ymd", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+
+      connection.createStatement().execute("reset datestyle");
+
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show datestyle")) {
+        assertTrue(resultSet.next());
+        assertEquals("ISO", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testResetInvalidSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().executeQuery("reset random_setting"));
+      assertEquals(
+          "ERROR: unrecognized configuration parameter \"random_setting\"", exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testShowUndefinedExtensionSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().executeQuery("show spanner.some_setting"));
+      assertEquals(
+          "ERROR: unrecognized configuration parameter \"spanner.some_setting\"",
+          exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testSetExtensionSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set spanner.some_setting to 'some-value'");
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.some_setting ")) {
+        assertTrue(resultSet.next());
+        assertEquals("some-value", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testResetValidExtensionSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set spanner.some_setting to 'some-value'");
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.some_setting")) {
+        assertTrue(resultSet.next());
+        assertEquals("some-value", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+
+      connection.createStatement().execute("reset spanner.some_setting");
+
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.some_setting")) {
+        assertTrue(resultSet.next());
+        assertNull(resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testResetUndefinedExtensionSetting() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Resetting an undefined extension setting is allowed by PostgreSQL, and will effectively set
+      // the extension setting to null.
+      connection.createStatement().execute("reset spanner.some_setting");
+
+      verifySettingIsNull(connection, "spanner.some_setting");
+    }
+  }
+
+  @Test
+  public void testCommitSet() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      // Verify that the initial value is null.
+      verifySettingIsNull(connection, "application_name");
+      connection.createStatement().execute("set application_name to \"my-application\"");
+      verifySettingValue(connection, "application_name", "my-application");
+      // Committing the transaction should persist the value.
+      connection.commit();
+      verifySettingValue(connection, "application_name", "my-application");
+    }
+  }
+
+  @Test
+  public void testRollbackSet() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      // Verify that the initial value is null.
+      verifySettingIsNull(connection, "application_name");
+      connection.createStatement().execute("set application_name to \"my-application\"");
+      verifySettingValue(connection, "application_name", "my-application");
+      // Rolling back the transaction should reset the value to what it was before the transaction.
+      connection.rollback();
+      verifySettingIsNull(connection, "application_name");
+    }
+  }
+
+  @Test
+  public void testCommitSetExtension() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().execute("set spanner.random_setting to \"42\"");
+      verifySettingValue(connection, "spanner.random_setting", "42");
+      // Committing the transaction should persist the value.
+      connection.commit();
+      verifySettingValue(connection, "spanner.random_setting", "42");
+    }
+  }
+
+  @Test
+  public void testRollbackSetExtension() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      connection.createStatement().execute("set spanner.random_setting to \"42\"");
+      verifySettingValue(connection, "spanner.random_setting", "42");
+      // Rolling back the transaction should reset the value to what it was before the transaction.
+      // In this case, that means that it should be undefined.
+      connection.rollback();
+      verifySettingIsUnrecognized(connection, "spanner.random_setting");
+    }
+  }
+
+  @Test
+  public void testRollbackDefinedExtension() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // First define the extension setting.
+      connection.createStatement().execute("set spanner.random_setting to '100'");
+
+      connection.setAutoCommit(false);
+
+      connection.createStatement().execute("set spanner.random_setting to \"42\"");
+      verifySettingValue(connection, "spanner.random_setting", "42");
+      // Rolling back the transaction should reset the value to what it was before the transaction.
+      // In this case, that means back to '100'.
+      connection.rollback();
+      verifySettingValue(connection, "spanner.random_setting", "100");
+    }
+  }
+
+  @Test
+  public void testCommitSetLocal() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      // Verify that the initial value is null.
+      verifySettingIsNull(connection, "application_name");
+      connection.createStatement().execute("set local application_name to \"my-application\"");
+      verifySettingValue(connection, "application_name", "my-application");
+      // Committing the transaction should not persist the value as it was only set for the current
+      // transaction.
+      connection.commit();
+      verifySettingIsNull(connection, "application_name");
+    }
+  }
+
+  @Test
+  public void testCommitSetLocalAndSession() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      // Verify that the initial value is null.
+      verifySettingIsNull(connection, "application_name");
+      // Set both a session and a local value. The session value will be 'hidden' by the local
+      // value, but the session value will be committed.
+      connection
+          .createStatement()
+          .execute("set session application_name to \"my-session-application\"");
+      verifySettingValue(connection, "application_name", "my-session-application");
+      connection
+          .createStatement()
+          .execute("set local application_name to \"my-local-application\"");
+      verifySettingValue(connection, "application_name", "my-local-application");
+      // Committing the transaction should persist the session value.
+      connection.commit();
+      verifySettingValue(connection, "application_name", "my-session-application");
+    }
+  }
+
+  @Test
+  public void testCommitSetLocalAndSessionExtension() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Verify that the initial value is undefined.
+      verifySettingIsUnrecognized(connection, "spanner.custom_setting");
+
+      connection.setAutoCommit(false);
+
+      // Set both a session and a local value. The session value will be 'hidden' by the local
+      // value, but the session value will be committed.
+      connection.createStatement().execute("set spanner.custom_setting to 'session-value'");
+      verifySettingValue(connection, "spanner.custom_setting", "session-value");
+      connection.createStatement().execute("set local spanner.custom_setting to 'local-value'");
+      verifySettingValue(connection, "spanner.custom_setting", "local-value");
+      // Committing the transaction should persist the session value.
+      connection.commit();
+      verifySettingValue(connection, "spanner.custom_setting", "session-value");
+    }
+  }
+
+  @Test
+  public void testInvalidShowAbortsTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      // Verify that executing an invalid show statement will abort the transaction.
+      assertThrows(
+          SQLException.class,
+          () -> connection.createStatement().execute("show spanner.non_existing_param"));
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().execute("show application_name "));
+      assertEquals("ERROR: " + TRANSACTION_ABORTED_ERROR, exception.getMessage());
+
+      connection.rollback();
+
+      // Verify that the connection is usable again.
+      verifySettingIsNull(connection, "application_name");
+    }
+  }
+
+  @Test
+  public void testShowAll() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery("show all")) {
+        assertEquals(3, resultSet.getMetaData().getColumnCount());
+        assertEquals("name", resultSet.getMetaData().getColumnName(1));
+        assertEquals("setting", resultSet.getMetaData().getColumnName(2));
+        assertEquals("description", resultSet.getMetaData().getColumnName(3));
+        int count = 0;
+        while (resultSet.next()) {
+          if ("client_encoding".equals(resultSet.getString("name"))) {
+            assertEquals("UTF8", resultSet.getString("setting"));
+          }
+          count++;
+        }
+        assertEquals(347, count);
+      }
+    }
+  }
+
+  @Test
+  public void testResetAll() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set application_name to 'my-app'");
+      connection.createStatement().execute("set search_path to 'my_schema'");
+      verifySettingValue(connection, "application_name", "my-app");
+      verifySettingValue(connection, "search_path", "my_schema");
+
+      connection.createStatement().execute("reset all");
+
+      verifySettingIsNull(connection, "application_name");
+      verifySettingValue(connection, "search_path", "public");
+    }
+  }
+
+  @Test
+  public void testSetToDefault() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set application_name to 'my-app'");
+      connection.createStatement().execute("set search_path to 'my_schema'");
+      verifySettingValue(connection, "application_name", "my-app");
+      verifySettingValue(connection, "search_path", "my_schema");
+
+      connection.createStatement().execute("set application_name to default");
+      connection.createStatement().execute("set search_path to default");
+
+      verifySettingIsNull(connection, "application_name");
+      verifySettingValue(connection, "search_path", "public");
+    }
+  }
+
+  @Test
+  public void testSetToEmpty() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set application_name to ''");
+      verifySettingValue(connection, "application_name", "");
+    }
+  }
+
+  @Test
+  public void testSettingsAreUniqueToConnections() throws SQLException {
+    // Verify that each new connection gets a separate set of settings.
+    for (int connectionNum = 0; connectionNum < 5; connectionNum++) {
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        // Verify that the initial value is null.
+        verifySettingIsNull(connection, "application_name");
+        connection.createStatement().execute("set application_name to \"my-application\"");
+        verifySettingValue(connection, "application_name", "my-application");
+      }
+    }
+  }
+
+  @Test
+  public void testSettingInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl()
+                + "?options=-c%20spanner.ddl_transaction_mode=AutocommitExplicitTransaction")) {
+      verifySettingValue(
+          connection, "spanner.ddl_transaction_mode", "AutocommitExplicitTransaction");
+    }
+  }
+
+  @Test
+  public void testMultipleSettingsInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20spanner.setting1=value1%20-c%20spanner.setting2=value2")) {
+      verifySettingValue(connection, "spanner.setting1", "value1");
+      verifySettingValue(connection, "spanner.setting2", "value2");
+    }
+  }
+
+  @Test
+  public void testServerVersionInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20server_version=4.1")) {
+      verifySettingValue(connection, "server_version", "4.1");
+      verifySettingValue(connection, "server_version_num", "40001");
+    }
+  }
+
+  @Test
+  public void testCustomServerVersionInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20server_version=5.2 custom version")) {
+      verifySettingValue(connection, "server_version", "5.2 custom version");
+      verifySettingValue(connection, "server_version_num", "50002");
+    }
+  }
+
+  @Test
+  public void testSelectPgType() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with pg_namespace as (\n"
+                    + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+                    + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+                    + "  from information_schema.schemata\n"
+                    + "),\n"
+                    + "pg_type as (\n"
+                    + "  select 16 as oid, 'bool' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 1 as typlen, true as typbyval, 'b' as typtype, 'B' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1000 as typarray, 'boolin' as typinput, 'boolout' as typoutput, 'boolrecv' as typreceive, 'boolsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 17 as oid, 'bytea' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1001 as typarray, 'byteain' as typinput, 'byteaout' as typoutput, 'bytearecv' as typreceive, 'byteasend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 20 as oid, 'int8' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1016 as typarray, 'int8in' as typinput, 'int8out' as typoutput, 'int8recv' as typreceive, 'int8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 21 as oid, 'int2' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 2 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1005 as typarray, 'int2in' as typinput, 'int2out' as typoutput, 'int2recv' as typreceive, 'int2send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 's' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 23 as oid, 'int4' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1007 as typarray, 'int4in' as typinput, 'int4out' as typoutput, 'int4recv' as typreceive, 'int4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 25 as oid, 'text' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1009 as typarray, 'textin' as typinput, 'textout' as typoutput, 'textrecv' as typreceive, 'textsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 700 as oid, 'float4' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1021 as typarray, 'float4in' as typinput, 'float4out' as typoutput, 'float4recv' as typreceive, 'float4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 701 as oid, 'float8' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1022 as typarray, 'float8in' as typinput, 'float8out' as typoutput, 'float8recv' as typreceive, 'float8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 1043 as oid, 'varchar' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1015 as typarray, 'varcharin' as typinput, 'varcharout' as typoutput, 'varcharrecv' as typreceive, 'varcharsend' as typsend, 'varchartypmodin' as typmodin, 'varchartypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 1082 as oid, 'date' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1182 as typarray, 'date_in' as typinput, 'date_out' as typoutput, 'date_recv' as typreceive, 'date_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 1114 as oid, 'timestamp' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1115 as typarray, 'timestamp_in' as typinput, 'timestamp_out' as typoutput, 'timestamp_recv' as typreceive, 'timestamp_send' as typsend, 'timestamptypmodin' as typmodin, 'timestamptypmodout' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 1184 as oid, 'timestamptz' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1185 as typarray, 'timestamptz_in' as typinput, 'timestamptz_out' as typoutput, 'timestamptz_recv' as typreceive, 'timestamptz_send' as typsend, 'timestamptztypmodin' as typmodin, 'timestamptztypmodout' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 1700 as oid, 'numeric' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1231 as typarray, 'numeric_in' as typinput, 'numeric_out' as typoutput, 'numeric_recv' as typreceive, 'numeric_send' as typsend, 'numerictypmodin' as typmodin, 'numerictypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'm' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 3802 as oid, 'jsonb' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 3807 as typarray, 'jsonb_in' as typinput, 'jsonb_out' as typoutput, 'jsonb_recv' as typreceive, 'jsonb_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl\n"
+                    + ")\n"
+                    + "select * from pg_type"),
+            SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select * from pg_catalog.pg_type")) {
+        // The result is not consistent with selecting from pg_type, but that's not relevant here.
+        // We just want to ensure that it includes the correct common table expressions.
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSelectPgTypeAndPgNamespace() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with pg_namespace as (\n"
+                    + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+                    + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+                    + "  from information_schema.schemata\n"
+                    + "),\n"
+                    + "pg_type as (\n"
+                    + "  select 16 as oid, 'bool' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 1 as typlen, true as typbyval, 'b' as typtype, 'B' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1000 as typarray, 'boolin' as typinput, 'boolout' as typoutput, 'boolrecv' as typreceive, 'boolsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 17 as oid, 'bytea' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1001 as typarray, 'byteain' as typinput, 'byteaout' as typoutput, 'bytearecv' as typreceive, 'byteasend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 20 as oid, 'int8' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1016 as typarray, 'int8in' as typinput, 'int8out' as typoutput, 'int8recv' as typreceive, 'int8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 21 as oid, 'int2' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 2 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1005 as typarray, 'int2in' as typinput, 'int2out' as typoutput, 'int2recv' as typreceive, 'int2send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 's' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 23 as oid, 'int4' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1007 as typarray, 'int4in' as typinput, 'int4out' as typoutput, 'int4recv' as typreceive, 'int4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 25 as oid, 'text' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1009 as typarray, 'textin' as typinput, 'textout' as typoutput, 'textrecv' as typreceive, 'textsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 700 as oid, 'float4' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1021 as typarray, 'float4in' as typinput, 'float4out' as typoutput, 'float4recv' as typreceive, 'float4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 701 as oid, 'float8' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1022 as typarray, 'float8in' as typinput, 'float8out' as typoutput, 'float8recv' as typreceive, 'float8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 1043 as oid, 'varchar' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1015 as typarray, 'varcharin' as typinput, 'varcharout' as typoutput, 'varcharrecv' as typreceive, 'varcharsend' as typsend, 'varchartypmodin' as typmodin, 'varchartypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 1082 as oid, 'date' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1182 as typarray, 'date_in' as typinput, 'date_out' as typoutput, 'date_recv' as typreceive, 'date_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 1114 as oid, 'timestamp' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1115 as typarray, 'timestamp_in' as typinput, 'timestamp_out' as typoutput, 'timestamp_recv' as typreceive, 'timestamp_send' as typsend, 'timestamptypmodin' as typmodin, 'timestamptypmodout' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 1184 as oid, 'timestamptz' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1185 as typarray, 'timestamptz_in' as typinput, 'timestamptz_out' as typoutput, 'timestamptz_recv' as typreceive, 'timestamptz_send' as typsend, 'timestamptztypmodin' as typmodin, 'timestamptztypmodout' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 1700 as oid, 'numeric' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1231 as typarray, 'numeric_in' as typinput, 'numeric_out' as typoutput, 'numeric_recv' as typreceive, 'numeric_send' as typsend, 'numerictypmodin' as typmodin, 'numerictypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'm' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
+                    + "  select 3802 as oid, 'jsonb' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 3807 as typarray, 'jsonb_in' as typinput, 'jsonb_out' as typoutput, 'jsonb_recv' as typreceive, 'jsonb_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl\n"
+                    + ")\n"
+                    + "select * from pg_type join pg_namespace on pg_type.typnamespace=pg_namespace.oid"),
+            SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery(
+                  "select * from pg_catalog.pg_type "
+                      + "join pg_catalog.pg_namespace on pg_type.typnamespace=pg_namespace.oid")) {
+        // The result is not consistent with selecting from pg_type, but that's not relevant here.
+        // We just want to ensure that it includes the correct common table expressions.
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testDefaultReplacePgCatalogTables() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.replace_pg_catalog_tables")) {
+        assertTrue(resultSet.next());
+        assertTrue(resultSet.getBoolean(1));
+        assertFalse(resultSet.next());
+      }
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of(
+                  "with pg_namespace as (\n"
+                      + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+                      + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+                      + "  from information_schema.schemata\n"
+                      + ")\n"
+                      + "select * from pg_namespace"),
+              SELECT1_RESULTSET));
+      // Just verify that this works, we don't care about the result.
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select * from pg_catalog.pg_namespace")) {
+        //noinspection StatementWithEmptyBody
+        while (resultSet.next()) {}
+      }
+    }
+  }
+
+  @Test
+  public void testReplacePgCatalogTablesOff() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20spanner.replace_pg_catalog_tables=off")) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.replace_pg_catalog_tables")) {
+        assertTrue(resultSet.next());
+        assertFalse(resultSet.getBoolean(1));
+        assertFalse(resultSet.next());
+      }
+
+      // The query will now not be modified by PGAdapter before it is sent to Cloud Spanner.
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of("select * from pg_catalog.pg_namespace"), SELECT1_RESULTSET));
+      // Just verify that this works, we don't care about the result.
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select * from pg_catalog.pg_namespace")) {
+        //noinspection StatementWithEmptyBody
+        while (resultSet.next()) {}
+      }
+    }
+  }
+
+  private void verifySettingIsNull(Connection connection, String setting) throws SQLException {
+    try (ResultSet resultSet =
+        connection.createStatement().executeQuery(String.format("show %s", setting))) {
+      assertTrue(resultSet.next());
+      assertNull(resultSet.getString(1));
+      assertFalse(resultSet.next());
+    }
+  }
+
+  private void verifySettingValue(Connection connection, String setting, String value)
+      throws SQLException {
+    try (ResultSet resultSet =
+        connection.createStatement().executeQuery(String.format("show %s", setting))) {
+      assertTrue(resultSet.next());
+      assertEquals(value, resultSet.getString(1));
+      assertFalse(resultSet.next());
+    }
+  }
+
+  private void verifySettingIsUnrecognized(Connection connection, String setting) {
+    SQLException exception =
+        assertThrows(
+            SQLException.class,
+            () -> connection.createStatement().execute(String.format("show %s", setting)));
+    assertEquals(
+        String.format("ERROR: unrecognized configuration parameter \"%s\"", setting),
+        exception.getMessage());
   }
 }

@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
@@ -40,20 +41,25 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
+import com.google.cloud.spanner.connection.ResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
+import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
+import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -72,6 +78,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 
 /**
  * This class emulates a backend PostgreSQL connection. Statements are buffered in memory until a
@@ -115,6 +122,7 @@ public class BackendConnection {
   enum TransactionMode {
     IMPLICIT,
     EXPLICIT,
+    DDL_BATCH,
   }
 
   /**
@@ -158,10 +166,13 @@ public class BackendConnection {
         //  SELECT statements, then we should create a read-only transaction. Also, if a transaction
         //  block always ends with a ROLLBACK, PGAdapter should skip the entire execution of that
         //  block.
+        SessionStatement sessionStatement = getSessionManagementStatement(parsedStatement);
         if (!localStatements.isEmpty() && localStatements.containsKey(statement.getSql())) {
           result.set(
               Objects.requireNonNull(localStatements.get(statement.getSql()))
-                  .execute(spannerConnection));
+                  .execute(BackendConnection.this));
+        } else if (sessionStatement != null) {
+          result.set(sessionStatement.execute(sessionState));
         } else if (connectionState == ConnectionState.ABORTED
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
@@ -172,6 +183,18 @@ public class BackendConnection {
           result.set(NO_RESULT);
         } else if ((isCommit(parsedStatement) || isRollback(parsedStatement))
             && !spannerConnection.isInTransaction()) {
+          // Check if we are in a DDL batch that was created from an explicit transaction.
+          if (transactionMode == TransactionMode.DDL_BATCH) {
+            try {
+              if (isCommit(parsedStatement)) {
+                spannerConnection.runBatch();
+              } else {
+                spannerConnection.abortBatch();
+              }
+            } finally {
+              transactionMode = TransactionMode.IMPLICIT;
+            }
+          }
           // Ignore the statement as it is a no-op to execute COMMIT/ROLLBACK when we are not in a
           // transaction. TODO: Return a warning.
           result.set(NO_RESULT);
@@ -180,12 +203,63 @@ public class BackendConnection {
         } else if (parsedStatement.isDdl()) {
           result.set(ddlExecutor.execute(parsedStatement, statement));
         } else {
-          result.set(spannerConnection.execute(statement));
+          // Potentially replace pg_catalog table references with common table expressions.
+          Statement updatedStatement =
+              sessionState.isReplacePgCatalogTables()
+                  ? pgCatalog.replacePgCatalogTables(statement)
+                  : statement;
+          result.set(spannerConnection.execute(updatedStatement));
         }
+      } catch (SpannerException spannerException) {
+        // Executing queries against the information schema in a transaction is unsupported.
+        // This ensures that those queries are retried using a separate single-use transaction.
+        if (isUnsupportedConcurrencyModeException(spannerException)) {
+          try {
+            result.set(
+                new QueryResult(
+                    ResultSetHelper.toDirectExecuteResultSet(
+                        spannerConnection
+                            .getDatabaseClient()
+                            .singleUse()
+                            .executeQuery(statement))));
+            return;
+          } catch (Exception exception) {
+            result.setException(exception);
+            throw exception;
+          }
+        }
+        result.setException(spannerException);
+        throw spannerException;
       } catch (Exception exception) {
         result.setException(exception);
         throw exception;
       }
+    }
+
+    /**
+     * Returns true if the given exception is the error that is returned by Cloud Spanner when an
+     * INFORMATION_SCHEMA query is not executed in a single-use read-only transaction.
+     */
+    boolean isUnsupportedConcurrencyModeException(SpannerException spannerException) {
+      return spannerException.getErrorCode() == ErrorCode.INVALID_ARGUMENT
+          && spannerException
+              .getMessage()
+              .startsWith(
+                  "INVALID_ARGUMENT: io.grpc.StatusRuntimeException: INVALID_ARGUMENT: Unsupported concurrency mode in query using INFORMATION_SCHEMA.");
+    }
+
+    @Nullable
+    SessionStatement getSessionManagementStatement(ParsedStatement parsedStatement) {
+      if (parsedStatement.getType() == StatementType.UNKNOWN
+          || (parsedStatement.getType() == StatementType.QUERY
+              && parsedStatement.getSqlWithoutComments().length() >= 4
+              && parsedStatement
+                  .getSqlWithoutComments()
+                  .substring(0, 4)
+                  .equalsIgnoreCase("show"))) {
+        return SessionStatementParser.parse(parsedStatement);
+      }
+      return null;
     }
   }
 
@@ -297,6 +371,8 @@ public class BackendConnection {
   private static final StatementResult ROLLBACK_RESULT = new NoResult("ROLLBACK");
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
+  private final SessionState sessionState;
+  private final PgCatalog pgCatalog;
   private final ImmutableMap<String, LocalStatement> localStatements;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
@@ -305,7 +381,6 @@ public class BackendConnection {
   private final Connection spannerConnection;
   private final DatabaseId databaseId;
   private final DdlExecutor ddlExecutor;
-  private final DdlTransactionMode ddlTransactionMode;
 
   /**
    * Creates a PG backend connection that uses the given Spanner {@link Connection} and {@link
@@ -314,22 +389,24 @@ public class BackendConnection {
   BackendConnection(
       DatabaseId databaseId,
       Connection spannerConnection,
-      DdlTransactionMode ddlTransactionMode,
+      OptionsMetadata optionsMetadata,
       ImmutableList<LocalStatement> localStatements) {
+    this.sessionState = new SessionState(optionsMetadata);
+    this.pgCatalog = new PgCatalog(this.sessionState);
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
-    this.ddlTransactionMode = ddlTransactionMode;
-    //noinspection UnstableApiUsage
-    this.localStatements =
-        localStatements.isEmpty()
-            ? EMPTY_LOCAL_STATEMENTS
-            : ImmutableMap.copyOf(
-                localStatements.stream()
-                    .map(
-                        localStatement ->
-                            new SimpleImmutableEntry<>(localStatement.getSql(), localStatement))
-                    .collect(Collectors.toList()));
+    if (localStatements.isEmpty()) {
+      this.localStatements = EMPTY_LOCAL_STATEMENTS;
+    } else {
+      Builder<String, LocalStatement> builder = ImmutableMap.builder();
+      for (LocalStatement localStatement : localStatements) {
+        for (String sql : localStatement.getSql()) {
+          builder.put(new SimpleImmutableEntry<>(sql, localStatement));
+        }
+      }
+      this.localStatements = builder.build();
+    }
   }
 
   /** Returns the current connection state. */
@@ -388,12 +465,52 @@ public class BackendConnection {
     }
   }
 
-  Connection getSpannerConnection() {
+  /**
+   * Sets the initial value of a pg_settings setting for this connection. This method should only be
+   * called during startup with values that come from the connection request.
+   */
+  public void initSessionSetting(String name, String value) {
+    if ("options".equalsIgnoreCase(name)) {
+      String[] commands = value.split("-c\\s+");
+      for (String command : commands) {
+        String[] keyValue = command.split("=", 2);
+        if (keyValue.length == 2) {
+          SimpleParser parser = new SimpleParser(keyValue[0]);
+          TableOrIndexName key = parser.readTableOrIndexName();
+          if (key == null) {
+            continue;
+          }
+          this.sessionState.setConnectionStartupValue(key.schema, key.name, keyValue[1].trim());
+        }
+      }
+    } else {
+      SimpleParser parser = new SimpleParser(name);
+      TableOrIndexName key = parser.readTableOrIndexName();
+      if (key == null) {
+        return;
+      }
+      this.sessionState.setConnectionStartupValue(key.schema, key.name, value);
+    }
+  }
+
+  /** Returns the Spanner connection used by this {@link BackendConnection}. */
+  public Connection getSpannerConnection() {
     return this.spannerConnection;
   }
 
-  String getCurrentSchema() {
+  /** Returns the current schema that is used by this {@link BackendConnection}. */
+  public String getCurrentSchema() {
     return this.currentSchema;
+  }
+
+  /** Returns the id of the database that this connection uses. */
+  public String getCurrentDatabase() {
+    return this.databaseId.getDatabase();
+  }
+
+  /** Returns the session state of this connection. */
+  public SessionState getSessionState() {
+    return this.sessionState;
   }
 
   /**
@@ -410,6 +527,19 @@ public class BackendConnection {
         // current transaction, depending on the settings for execute DDL in transactions.
         if (bufferedStatement.parsedStatement.isDdl()) {
           prepareExecuteDdl(bufferedStatement);
+        } else if (transactionMode == TransactionMode.DDL_BATCH && !isTransactionStatement(index)) {
+          // End the automatically created DDL batch and revert to an explicit transaction.
+          try {
+            spannerConnection.runBatch();
+          } catch (Exception exception) {
+            // Register the exception on the current statement, even though it was caused by a
+            // previous one.
+            bufferedStatements.get(index).result.setException(exception);
+            throw exception;
+          } finally {
+            transactionMode = TransactionMode.EXPLICIT;
+          }
+          spannerConnection.beginTransaction();
         }
         boolean canUseBatch = false;
         if (index < (getStatementCount() - 1)) {
@@ -427,6 +557,11 @@ public class BackendConnection {
             transactionMode = TransactionMode.EXPLICIT;
             connectionState = ConnectionState.TRANSACTION;
           } else if (isCommit(index) || isRollback(index)) {
+            if (isCommit(index)) {
+              sessionState.commit();
+            } else {
+              sessionState.rollback();
+            }
             transactionMode = TransactionMode.IMPLICIT;
             connectionState = ConnectionState.IDLE;
           }
@@ -435,9 +570,12 @@ public class BackendConnection {
       }
     } catch (Exception exception) {
       connectionState = ConnectionState.ABORTED;
+      sessionState.rollback();
       if (spannerConnection.isInTransaction()) {
         spannerConnection.setStatementTag(null);
         spannerConnection.execute(ROLLBACK);
+      } else if (spannerConnection.isDdlBatchActive()) {
+        spannerConnection.abortBatch();
       }
     } finally {
       bufferedStatements.clear();
@@ -488,6 +626,9 @@ public class BackendConnection {
     }
 
     try {
+      if (connectionState != ConnectionState.ABORTED) {
+        sessionState.commit();
+      }
       if (spannerConnection.isInTransaction()) {
         spannerConnection.setStatementTag(null);
         if (connectionState == ConnectionState.ABORTED) {
@@ -512,6 +653,7 @@ public class BackendConnection {
    * allowed.
    */
   private void prepareExecuteDdl(BufferedStatement<?> bufferedStatement) {
+    DdlTransactionMode ddlTransactionMode = sessionState.getDdlTransactionMode();
     try {
       // Single statements are simpler to check, so we do that in a separate check.
       if (bufferedStatements.size() == 1) {
@@ -532,7 +674,14 @@ public class BackendConnection {
             // might be active.
             if (spannerConnection.isInTransaction()) {
               spannerConnection.commit();
-              transactionMode = TransactionMode.IMPLICIT;
+              sessionState.commit();
+              if (transactionMode == TransactionMode.EXPLICIT) {
+                // Convert the explicit transaction to a DDL batch.
+                transactionMode = TransactionMode.DDL_BATCH;
+                spannerConnection.startBatchDdl();
+              } else {
+                transactionMode = TransactionMode.IMPLICIT;
+              }
             }
         }
         return;
@@ -565,7 +714,14 @@ public class BackendConnection {
           // Switch the execution state to implicit transaction.
           if (spannerConnection.isInTransaction()) {
             spannerConnection.commit();
-            transactionMode = TransactionMode.IMPLICIT;
+            sessionState.commit();
+            if (transactionMode == TransactionMode.EXPLICIT) {
+              // Convert the explicit transaction to a DDL batch.
+              transactionMode = TransactionMode.DDL_BATCH;
+              spannerConnection.startBatchDdl();
+            } else {
+              transactionMode = TransactionMode.IMPLICIT;
+            }
           }
       }
     } catch (SpannerException exception) {
@@ -617,8 +773,7 @@ public class BackendConnection {
             statement ->
                 statement.parsedStatement.getType() == StatementType.UPDATE
                     || statement.parsedStatement.getType() == StatementType.UNKNOWN
-                        && StatementParser.isCommand(
-                            COPY, statement.parsedStatement.getSqlWithoutComments()));
+                        && isCommand(COPY, statement.parsedStatement.getSqlWithoutComments()));
   }
 
   private int getStatementCount() {
@@ -666,26 +821,36 @@ public class BackendConnection {
     }
     List<StatementResult> statementResults = new ArrayList<>(getStatementCount());
     int index = fromIndex;
-    while (index < getStatementCount()) {
-      StatementType statementType = getStatementType(index);
-      if (canBeBatchedTogether(batchType, statementType)) {
-        // Send DDL statements to the DdlExecutor instead of executing them directly on the
-        // connection, so we can support certain DDL constructs that are currently not supported by
-        // the backend, such as IF [NOT] EXISTS.
-        if (batchType == StatementType.DDL) {
-          statementResults.add(
-              ddlExecutor.execute(
-                  bufferedStatements.get(index).parsedStatement,
-                  bufferedStatements.get(index).statement));
+    try {
+      while (index < getStatementCount()) {
+        StatementType statementType = getStatementType(index);
+        if (canBeBatchedTogether(batchType, statementType)) {
+          // Send DDL statements to the DdlExecutor instead of executing them directly on the
+          // connection, so we can support certain DDL constructs that are currently not supported
+          // by
+          // the backend, such as IF [NOT] EXISTS.
+          if (batchType == StatementType.DDL) {
+            statementResults.add(
+                ddlExecutor.execute(
+                    bufferedStatements.get(index).parsedStatement,
+                    bufferedStatements.get(index).statement));
+          } else {
+            spannerConnection.execute(bufferedStatements.get(index).statement);
+          }
+          index++;
         } else {
-          spannerConnection.execute(bufferedStatements.get(index).statement);
+          // End the batch here, as the statement type on this index can not be batched together
+          // with
+          // the other statements in the batch.
+          break;
         }
-        index++;
-      } else {
-        // End the batch here, as the statement type on this index can not be batched together with
-        // the other statements in the batch.
-        break;
       }
+    } catch (Exception exception) {
+      // This should normally not happen, as we are not sending any statements to Cloud Spanner yet,
+      // but is done as safety precaution to ensure that there is always at least one result.
+      // Register the exception on the first statement in the batch.
+      bufferedStatements.get(fromIndex).result.setException(exception);
+      throw exception;
     }
     try {
       long[] counts = spannerConnection.runBatch();
@@ -757,7 +922,7 @@ public class BackendConnection {
       this.commandTag = null;
     }
 
-    private NoResult(String commandTag) {
+    public NoResult(String commandTag) {
       this.commandTag = commandTag;
     }
 

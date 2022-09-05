@@ -18,7 +18,7 @@ import static com.google.cloud.spanner.pgadapter.statements.IntermediatePrepared
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.transformDeleteToSelectParams;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.transformInsertToSelectParams;
 import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.transformUpdateToSelectParams;
-import static com.google.cloud.spanner.pgadapter.utils.StatementParser.splitStatements;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParserTest.splitStatements;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -163,6 +163,18 @@ public class IntermediateStatementTest {
         transformInsert("insert into foo (col1, col2) values ($1, $2)").getSql());
     assertEquals(
         "select $1, $2 from (select col1=$1, col2=$2 from foo) p",
+        transformInsert("insert into foo(col1, col2) values ($1, $2)").getSql());
+    assertEquals(
+        "select $1, $2 from (select col1=$1, col2=$2 from foo) p",
+        transformInsert("insert into foo (col1, col2) values($1, $2)").getSql());
+    assertEquals(
+        "select $1, $2 from (select col1=$1, col2=$2 from foo) p",
+        transformInsert("insert into foo(col1, col2) values($1, $2)").getSql());
+    assertEquals(
+        "select $1, $2 from (select col1=$1, col2=$2 from foo) p",
+        transformInsert("insert foo(col1, col2) values($1, $2)").getSql());
+    assertEquals(
+        "select $1, $2 from (select col1=$1, col2=$2 from foo) p",
         transformInsert("insert foo (col1, col2) values ($1, $2)").getSql());
     assertEquals(
         "select $1, $2, $3, $4 from (select col1=$1, col2=$2, col1=$3, col2=$4 from foo) p",
@@ -190,6 +202,9 @@ public class IntermediateStatementTest {
                 "insert into foo (col1, col2, col3, col4, col5, col6, col7, col8, col9, col10) "
                     + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)")
             .getSql());
+    assertEquals(
+        "select $1, $2 from (select col1=$1, col2=$2 from \"foo\") p",
+        transformInsert("insert\"foo\"(col1, col2)values($1, $2)").getSql());
   }
 
   @Test
@@ -197,6 +212,13 @@ public class IntermediateStatementTest {
     assertEquals(
         "select $1 from (select * from bar where some_col=$1) p",
         transformInsert("insert into foo select * from bar where some_col=$1").getSql());
+    assertEquals(
+        "select $1 from ((select * from bar where some_col=$1)) p",
+        transformInsert("insert into foo (select * from bar where some_col=$1)").getSql());
+    assertEquals(
+        "select $1 from ((select * from(select col1, col2 from bar) where col2=$1)) p",
+        transformInsert("insert into foo (select * from(select col1, col2 from bar) where col2=$1)")
+            .getSql());
     assertEquals(
         "select $1 from (select * from bar where some_col=$1) p",
         transformInsert("insert foo select * from bar where some_col=$1").getSql());
@@ -213,6 +235,7 @@ public class IntermediateStatementTest {
         transformInsert(
                 "insert foo (col1, col2, col3) select * from bar where some_col=$1 limit $2")
             .getSql());
+    assertNull(transformInsert("insert into foo (col1 values ('test')"));
   }
 
   @Test
@@ -221,7 +244,7 @@ public class IntermediateStatementTest {
         "select $1, $2, $3 from (select col1=$1, col2=$2 from foo where id=$3) p",
         transformUpdate("update foo set col1=$1, col2=$2  where id=$3").getSql());
     assertEquals(
-        "select $1, $2, $3 from (select col1=col2 + $1 , "
+        "select $1, $2, $3 from (select col1=col2 + $1, "
             + "col2=coalesce($1, $2, $3, to_char(current_timestamp())), "
             + "col3 = 15 "
             + "from foo where id=$3 and value>100) p",
@@ -243,6 +266,11 @@ public class IntermediateStatementTest {
         "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col1=$1, col2=$2, col3=$3, col4=$4, col5=$5, col6=$6, col7=$7, col8=$8, col9=$9 from foo where id=$10) p",
         transformUpdate(
                 "update foo set col1=$1, col2=$2, col3=$3, col4=$4, col5=$5, col6=$6, col7=$7, col8=$8, col9=$9  where id=$10")
+            .getSql());
+    assertEquals(
+        "select $1, $2, $3 from (select col1=(select col2 from bar where col3=$1), col2=$2 from foo where id=$3) p",
+        transformUpdate(
+                "update foo set col1=(select col2 from bar where col3=$1), col2=$2 where id=$3")
             .getSql());
   }
 

@@ -32,6 +32,10 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
@@ -40,7 +44,6 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStateme
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
@@ -84,7 +87,13 @@ public class ConnectionHandler extends Thread {
 
   private final ProxyServer server;
   private final ByteChannel socketChannel;
-  private final InetSocketAddress remoteAddress;
+
+  /**
+   * Remote address of the client that is connected. This is null for Unix domain socket
+   * connections.
+   */
+  @Nullable private final InetSocketAddress remoteAddress;
+
   private final String remoteClient;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
@@ -109,6 +118,10 @@ public class ConnectionHandler extends Thread {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
     this.socketChannel = byteChannel;
+    // byteChannel is an instance of SocketChannel in case of a TCP connection.
+    // Unix domain socket connections use other implementations. The exact implementation depends on
+    // whether the connection uses the third-party AFUNIXSocketFactory or the Java 16+ Unix domain
+    // socket implementation.
     if (byteChannel instanceof SocketChannel
         && ((SocketChannel) byteChannel).getRemoteAddress() instanceof InetSocketAddress) {
       SocketChannel socketChannel = (SocketChannel) byteChannel;
@@ -237,7 +250,12 @@ public class ConnectionHandler extends Thread {
           && this.remoteAddress != null
           && !this.remoteAddress.getAddress().isAnyLocalAddress()
           && !this.remoteAddress.getAddress().isLoopbackAddress()) {
-        handleError(new IllegalAccessException("This proxy may only be accessed from localhost."));
+        handleError(
+            PGException.newBuilder()
+                .setMessage("This proxy may only be accessed from localhost.")
+                .setSeverity(Severity.FATAL)
+                .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
+                .build());
         return;
       }
 
@@ -259,8 +277,13 @@ public class ConnectionHandler extends Thread {
         while (this.status != ConnectionStatus.TERMINATED) {
           handleMessages();
         }
-      } catch (Exception e) {
-        this.handleError(e);
+      } catch (Exception exception) {
+        this.handleError(
+            PGException.newBuilder()
+                .setMessage(exception.getMessage())
+                .setSeverity(Severity.FATAL)
+                .setSQLState(SQLState.InternalError)
+                .build());
       }
     } catch (Exception e) {
       logger.log(
@@ -301,14 +324,19 @@ public class ConnectionHandler extends Thread {
       message.nextHandler();
       message.send();
     } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
-      this.handleError(fatalException);
+      this.handleError(
+          PGException.newBuilder()
+              .setSeverity(Severity.FATAL)
+              .setSQLState(SQLState.InternalError)
+              .setMessage(fatalException.getMessage())
+              .build());
       // Only terminate the connection if we are not in COPY_IN mode. In COPY_IN mode the mode will
       // switch to normal mode in these cases.
       if (this.status != ConnectionStatus.COPY_IN) {
         terminate();
       }
-    } catch (Exception e) {
-      this.handleError(e);
+    } catch (Exception exception) {
+      this.handleError(PGExceptionFactory.toPGException(exception));
     }
   }
 
@@ -345,7 +373,7 @@ public class ConnectionHandler extends Thread {
    * @param exception The exception to be related.
    * @throws IOException if there is some issue in the sending of the error messages.
    */
-  private void handleError(Exception exception) throws Exception {
+  private void handleError(PGException exception) throws Exception {
     logger.log(
         Level.WARNING,
         exception,
@@ -353,13 +381,12 @@ public class ConnectionHandler extends Thread {
             String.format("Exception on connection handler with ID %s: %s", getName(), exception));
     DataOutputStream output = getConnectionMetadata().peekOutputStream();
     if (this.status == ConnectionStatus.TERMINATED) {
-      new ErrorResponse(output, exception, ErrorResponse.State.InternalError, Severity.FATAL)
-          .send();
+      new ErrorResponse(output, exception).send();
       new TerminateResponse(output).send();
     } else if (this.status == ConnectionStatus.COPY_IN) {
-      new ErrorResponse(output, exception, ErrorResponse.State.InternalError).send();
+      new ErrorResponse(output, exception).send();
     } else {
-      new ErrorResponse(output, exception, ErrorResponse.State.InternalError).send();
+      new ErrorResponse(output, exception).send();
       new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
     }
   }

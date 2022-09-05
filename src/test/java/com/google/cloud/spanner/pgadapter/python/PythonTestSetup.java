@@ -24,6 +24,20 @@ import java.util.List;
 import java.util.Scanner;
 
 public class PythonTestSetup extends AbstractMockServerTest {
+  static boolean isPythonAvailable() {
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] pythonCommand = new String[] {"python3", "--version"};
+    builder.command(pythonCommand);
+    try {
+      Process process = builder.start();
+      int res = process.waitFor();
+
+      return res == 0;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
   static String executeWithoutParameters(int port, String sql, String statementType)
       throws IOException, InterruptedException {
     String[] runCommand =
@@ -110,6 +124,30 @@ public class PythonTestSetup extends AbstractMockServerTest {
     runCommand.add(statementType);
     runCommand.add(sql);
     runCommand.addAll(parameters);
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(runCommand);
+    builder.directory(new File("./src/test/python"));
+    Process process = builder.start();
+
+    Scanner scanner = new Scanner(process.getInputStream());
+    StringBuilder output = new StringBuilder();
+    while (scanner.hasNextLine()) {
+      output.append(scanner.nextLine()).append("\n");
+    }
+    int result = process.waitFor();
+    assertEquals(output.toString(), 0, result);
+
+    return output.toString();
+  }
+
+  static String executeTransactions(int port, List<String> statements)
+      throws IOException, InterruptedException {
+    List<String> runCommand = new ArrayList<>();
+    runCommand.add("python3");
+    runCommand.add("StatementsWithTransactions.py");
+    runCommand.add(Integer.toString(port));
+    runCommand.addAll(statements);
 
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);

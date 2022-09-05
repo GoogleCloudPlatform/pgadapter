@@ -18,12 +18,14 @@ import com.google.cloud.spanner.AbstractLazyInitializer;
 import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
@@ -186,9 +188,9 @@ class DdlExecutor {
    */
   Statement translate(ParsedStatement parsedStatement, Statement statement) {
     SimpleParser parser = new SimpleParser(parsedStatement.getSqlWithoutComments());
-    if (parser.eat("create")) {
+    if (parser.eatKeyword("create")) {
       statement = translateCreate(parser, statement);
-    } else if (parser.eat("drop")) {
+    } else if (parser.eatKeyword("drop")) {
       statement = translateDrop(parser, statement);
     }
 
@@ -196,21 +198,25 @@ class DdlExecutor {
   }
 
   Statement translateCreate(SimpleParser parser, Statement statement) {
-    if (parser.eat("table")) {
-      return translateCreateTable(parser, statement);
+    if (parser.eatKeyword("table")) {
+      Statement createTableStatement = translateCreateTable(parser, statement);
+      if (createTableStatement == null) {
+        return null;
+      }
+      return maybeRemovePrimaryKeyConstraintName(createTableStatement);
     }
-    boolean unique = parser.eat("unique");
-    if (parser.eat("index")) {
+    boolean unique = parser.eatKeyword("unique");
+    if (parser.eatKeyword("index")) {
       return translateCreateIndex(parser, statement, unique);
     }
     return statement;
   }
 
   Statement translateDrop(SimpleParser parser, Statement statement) {
-    if (parser.eat("table")) {
+    if (parser.eatKeyword("table")) {
       return translateDropTable(parser, statement);
     }
-    if (parser.eat("index")) {
+    if (parser.eatKeyword("index")) {
       return translateDropIndex(parser, statement);
     }
     return statement;
@@ -238,7 +244,7 @@ class DdlExecutor {
       Statement statement,
       String type,
       Function<TableOrIndexName, Boolean> existsFunction) {
-    if (!parser.eat("if", "not", "exists")) {
+    if (!parser.eatKeyword("if", "not", "exists")) {
       return statement;
     }
     return maybeExecuteStatement(
@@ -250,7 +256,7 @@ class DdlExecutor {
       Statement statement,
       String type,
       Function<TableOrIndexName, Boolean> existsFunction) {
-    if (!parser.eat("if", "exists")) {
+    if (!parser.eatKeyword("if", "exists")) {
       return statement;
     }
     return maybeExecuteStatement(parser, statement, "drop", type, existsFunction);
@@ -336,5 +342,44 @@ class DdlExecutor {
     } catch (Exception exception) {
       throw SpannerExceptionFactory.asSpannerException(exception);
     }
+  }
+
+  Statement maybeRemovePrimaryKeyConstraintName(Statement createTableStatement) {
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(createTableStatement);
+    SimpleParser parser = new SimpleParser(parsedStatement.getSqlWithoutComments());
+    parser.eatKeyword("create", "table", "if", "not", "exists");
+    TableOrIndexName tableName = parser.readTableOrIndexName();
+    if (tableName == null) {
+      return createTableStatement;
+    }
+    if (!parser.eatToken("(")) {
+      return createTableStatement;
+    }
+    while (true) {
+      if (parser.eatToken(")")) {
+        break;
+      } else if (parser.eatToken(",")) {
+        continue;
+      } else if (parser.peekKeyword("constraint")) {
+        int positionBeforeConstraintDefinition = parser.getPos();
+        parser.eatKeyword("constraint");
+        String constraintName = unquoteIdentifier(parser.readIdentifierPart());
+        int positionAfterConstraintName = parser.getPos();
+        if (parser.eatKeyword("primary", "key")) {
+          if (!constraintName.equalsIgnoreCase("pk_" + unquoteIdentifier(tableName.name))) {
+            return createTableStatement;
+          }
+          return Statement.of(
+              parser.getSql().substring(0, positionBeforeConstraintDefinition)
+                  + parser.getSql().substring(positionAfterConstraintName));
+        } else {
+          parser.parseExpression();
+        }
+      } else {
+        parser.parseExpression();
+      }
+    }
+    return createTableStatement;
   }
 }
