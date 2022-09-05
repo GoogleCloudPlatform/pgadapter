@@ -1679,7 +1679,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (ResultSet resultSet =
           connection.createStatement().executeQuery("show application_name ")) {
         assertTrue(resultSet.next());
-        assertEquals("PostgreSQL JDBC Driver", resultSet.getString(1));
+        assertNull(resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
@@ -1878,8 +1878,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
 
-      // Verify that the initial value is 'PostgreSQL JDBC Driver'.
-      verifySettingValue(connection, "application_name", "PostgreSQL JDBC Driver");
+      // Verify that the initial value is null.
+      verifySettingIsNull(connection, "application_name");
       connection.createStatement().execute("set application_name to \"my-application\"");
       verifySettingValue(connection, "application_name", "my-application");
       // Committing the transaction should persist the value.
@@ -1894,12 +1894,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       connection.setAutoCommit(false);
 
       // Verify that the initial value is null.
-      verifySettingValue(connection, "application_name", "PostgreSQL JDBC Driver");
+      verifySettingIsNull(connection, "application_name");
       connection.createStatement().execute("set application_name to \"my-application\"");
       verifySettingValue(connection, "application_name", "my-application");
       // Rolling back the transaction should reset the value to what it was before the transaction.
       connection.rollback();
-      verifySettingValue(connection, "application_name", "PostgreSQL JDBC Driver");
+      verifySettingIsNull(connection, "application_name");
     }
   }
 
@@ -1952,14 +1952,14 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
 
-      // Verify that the initial value is 'PostgreSQL JDBC Driver'.
-      verifySettingValue(connection, "application_name", "PostgreSQL JDBC Driver");
+      // Verify that the initial value is null.
+      verifySettingIsNull(connection, "application_name");
       connection.createStatement().execute("set local application_name to \"my-application\"");
       verifySettingValue(connection, "application_name", "my-application");
       // Committing the transaction should not persist the value as it was only set for the current
       // transaction.
       connection.commit();
-      verifySettingValue(connection, "application_name", "PostgreSQL JDBC Driver");
+      verifySettingIsNull(connection, "application_name");
     }
   }
 
@@ -1968,8 +1968,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
 
-      // Verify that the initial value is 'PostgreSQL JDBC Driver'.
-      verifySettingValue(connection, "application_name", "PostgreSQL JDBC Driver");
+      // Verify that the initial value is null.
+      verifySettingIsNull(connection, "application_name");
       // Set both a session and a local value. The session value will be 'hidden' by the local
       // value, but the session value will be committed.
       connection
@@ -2024,7 +2024,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       connection.rollback();
 
       // Verify that the connection is usable again.
-      verifySettingValue(connection, "application_name", "PostgreSQL JDBC Driver");
+      verifySettingIsNull(connection, "application_name");
     }
   }
 
@@ -2092,8 +2092,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     // Verify that each new connection gets a separate set of settings.
     for (int connectionNum = 0; connectionNum < 5; connectionNum++) {
       try (Connection connection = DriverManager.getConnection(createUrl())) {
-        // Verify that the initial value is 'PostgreSQL JDBC Driver'.
-        verifySettingValue(connection, "application_name", "PostgreSQL JDBC Driver");
+        // Verify that the initial value is null.
+        verifySettingIsNull(connection, "application_name");
         connection.createStatement().execute("set application_name to \"my-application\"");
         verifySettingValue(connection, "application_name", "my-application");
       }

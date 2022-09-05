@@ -68,9 +68,6 @@ public abstract class Parser<T> {
       if (TimestampParser.isTimestamp(value)) {
         return Oid.TIMESTAMPTZ;
       }
-      if (DateParser.isDate(value)) {
-        return Oid.DATE;
-      }
     }
     return Oid.UNSPECIFIED;
   }
