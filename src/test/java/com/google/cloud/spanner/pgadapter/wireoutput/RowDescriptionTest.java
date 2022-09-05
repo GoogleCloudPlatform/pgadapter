@@ -110,6 +110,13 @@ public final class RowDescriptionTest {
     // Types.TIMESTAMP
     assertEquals(Oid.TIMESTAMPTZ, response.getOidType(7));
     assertEquals(12, response.getOidTypeSize(Oid.TIMESTAMPTZ));
+
+    assertEquals(4, response.getOidTypeSize(Oid.INT4));
+    assertEquals(2, response.getOidTypeSize(Oid.INT2));
+    assertEquals(4, response.getOidTypeSize(Oid.FLOAT4));
+    assertEquals(1, response.getOidTypeSize(Oid.CHAR));
+    assertEquals(-1, response.getOidTypeSize(Oid.TEXT));
+    assertEquals(8, response.getOidTypeSize(Oid.TIME));
   }
 
   @Test
