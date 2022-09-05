@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -62,5 +63,34 @@ public class ServerTest {
             + expectedPGAdapterVersion
             + "\n",
         byteArrayStream.toString());
+  }
+
+  @Test
+  public void testMainWithInvalidParam() {
+    ByteArrayOutputStream outArrayStream = new ByteArrayOutputStream();
+    PrintStream out = new PrintStream(outArrayStream);
+    ByteArrayOutputStream errArrayStream = new ByteArrayOutputStream();
+    PrintStream err = new PrintStream(errArrayStream);
+
+    PrintStream originalOut = System.out;
+    PrintStream originalErr = System.err;
+    System.setOut(out);
+    System.setErr(err);
+
+    try {
+      Server.main(new String[] {"--invalid-param"});
+      assertEquals(
+          "The server could not be started because an error occurred: Unrecognized option: --invalid-param\n",
+          errArrayStream.toString());
+      assertTrue(
+          outArrayStream.toString(),
+          outArrayStream
+              .toString()
+              .startsWith(
+                  String.format("-- Starting PGAdapter version %s --", Server.getVersion())));
+    } finally {
+      System.setOut(originalOut);
+      System.setErr(originalErr);
+    }
   }
 }
