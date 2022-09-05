@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assume.assumeFalse;
 
 import com.google.cloud.spanner.Database;
 import com.google.common.collect.ImmutableList;
@@ -44,6 +45,10 @@ public final class ITQueryTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() {
+    assumeFalse(
+        "Query test does not support connecting to a specific database",
+        testEnv.isUsingExternalPGAdapter());
+
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());

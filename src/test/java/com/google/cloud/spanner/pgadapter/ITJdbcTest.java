@@ -139,10 +139,10 @@ public class ITJdbcTest implements IntegrationTest {
     if (useDomainSocket) {
       return String.format(
           "jdbc:postgresql://localhost/%s?"
-              + "preferQueryMode=%s"
-              + "&socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
-              + "&socketFactoryArg=/tmp/.s.PGSQL.%d",
-          database.getId().getDatabase(), preferQueryMode, testEnv.getPGAdapterPort());
+              + "socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg"
+              + "&socketFactoryArg=%s"
+              + "&preferQueryMode=%s",
+          database.getId().getDatabase(), testEnv.getPGAdapterSocketFile(), preferQueryMode);
     }
     return String.format(
         "jdbc:postgresql://%s/%s?preferQueryMode=%s",
@@ -385,52 +385,59 @@ public class ITJdbcTest implements IntegrationTest {
   @Test
   public void testNullValues() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
-      try (PreparedStatement statement =
-          connection.prepareStatement(
-              "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
-        int index = 0;
-        statement.setLong(++index, 2);
-        statement.setNull(++index, Types.BOOLEAN);
-        statement.setNull(++index, Types.BINARY);
-        statement.setNull(++index, Types.DOUBLE);
-        statement.setNull(++index, Types.INTEGER);
-        statement.setNull(++index, Types.NUMERIC);
-        statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
-        statement.setNull(++index, Types.DATE);
-        statement.setNull(++index, Types.VARCHAR);
+      for (boolean typed : new boolean[] {true, false}) {
+        try (PreparedStatement statement =
+            connection.prepareStatement(
+                "insert into all_types "
+                    + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                    + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+          int index = 0;
+          statement.setLong(++index, 2);
+          statement.setNull(++index, typed ? Types.BOOLEAN : Types.NULL);
+          statement.setNull(++index, typed ? Types.BINARY : Types.NULL);
+          statement.setNull(++index, typed ? Types.DOUBLE : Types.NULL);
+          statement.setNull(++index, typed ? Types.INTEGER : Types.NULL);
+          statement.setNull(++index, typed ? Types.NUMERIC : Types.NULL);
+          statement.setNull(++index, typed ? Types.TIMESTAMP_WITH_TIMEZONE : Types.NULL);
+          statement.setNull(++index, typed ? Types.DATE : Types.NULL);
+          statement.setNull(++index, typed ? Types.VARCHAR : Types.NULL);
 
-        assertEquals(1, statement.executeUpdate());
-      }
+          assertEquals(1, statement.executeUpdate());
+        }
 
-      try (ResultSet resultSet =
-          connection.createStatement().executeQuery("select * from all_types where col_bigint=2")) {
-        assertTrue(resultSet.next());
+        try (ResultSet resultSet =
+            connection
+                .createStatement()
+                .executeQuery("select * from all_types where col_bigint=2")) {
+          assertTrue(resultSet.next());
 
-        int index = 0;
-        assertEquals(2, resultSet.getLong(++index));
+          int index = 0;
+          assertEquals(2, resultSet.getLong(++index));
 
-        // Note: JDBC returns the zero-value for primitive types if the value is NULL, and you have
-        // to call wasNull() to determine whether the value was NULL or zero.
-        assertFalse(resultSet.getBoolean(++index));
-        assertTrue(resultSet.wasNull());
-        assertNull(resultSet.getBytes(++index));
-        assertTrue(resultSet.wasNull());
-        assertEquals(0d, resultSet.getDouble(++index), 0.0d);
-        assertTrue(resultSet.wasNull());
-        assertEquals(0, resultSet.getInt(++index));
-        assertTrue(resultSet.wasNull());
-        assertNull(resultSet.getBigDecimal(++index));
-        assertTrue(resultSet.wasNull());
-        assertNull(resultSet.getTimestamp(++index));
-        assertTrue(resultSet.wasNull());
-        assertNull(resultSet.getDate(++index));
-        assertTrue(resultSet.wasNull());
-        assertNull(resultSet.getString(++index));
-        assertTrue(resultSet.wasNull());
+          // Note: JDBC returns the zero-value for primitive types if the value is NULL, and you
+          // have to call wasNull() to determine whether the value was NULL or zero.
+          assertFalse(resultSet.getBoolean(++index));
+          assertTrue(resultSet.wasNull());
+          assertNull(resultSet.getBytes(++index));
+          assertTrue(resultSet.wasNull());
+          assertEquals(0d, resultSet.getDouble(++index), 0.0d);
+          assertTrue(resultSet.wasNull());
+          assertEquals(0, resultSet.getInt(++index));
+          assertTrue(resultSet.wasNull());
+          assertNull(resultSet.getBigDecimal(++index));
+          assertTrue(resultSet.wasNull());
+          assertNull(resultSet.getTimestamp(++index));
+          assertTrue(resultSet.wasNull());
+          assertNull(resultSet.getDate(++index));
+          assertTrue(resultSet.wasNull());
+          assertNull(resultSet.getString(++index));
+          assertTrue(resultSet.wasNull());
 
-        assertFalse(resultSet.next());
+          assertFalse(resultSet.next());
+        }
+        assertEquals(
+            1,
+            connection.createStatement().executeUpdate("delete from all_types where col_bigint=2"));
       }
     }
   }

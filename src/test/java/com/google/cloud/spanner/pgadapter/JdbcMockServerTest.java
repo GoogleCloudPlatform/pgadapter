@@ -558,6 +558,57 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testInsertUntypedNulls() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(
+                    "insert into all_types "
+                        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
+                .bind("p1")
+                .to(2L)
+                .bind("p2")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p3")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p4")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p5")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p6")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p7")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p8")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p9")
+                .to((com.google.cloud.spanner.Value) null)
+                .build(),
+            1L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement statement =
+          connection.prepareStatement(
+              "insert into all_types "
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+        int index = 0;
+        statement.setLong(++index, 2);
+        statement.setNull(++index, Types.NULL);
+        statement.setNull(++index, Types.NULL);
+        statement.setNull(++index, Types.NULL);
+        statement.setNull(++index, Types.NULL);
+        statement.setNull(++index, Types.NULL);
+        statement.setNull(++index, Types.NULL);
+        statement.setNull(++index, Types.NULL);
+        statement.setNull(++index, Types.NULL);
+
+        assertEquals(1, statement.executeUpdate());
+      }
+    }
+  }
+
+  @Test
   public void testDescribeQueryWithNonExistingTable() throws SQLException {
     String sql = "select * from non_existing_table where id=$1";
     mockSpanner.putStatementResult(
