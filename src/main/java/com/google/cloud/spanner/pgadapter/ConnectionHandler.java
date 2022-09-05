@@ -357,7 +357,7 @@ public class ConnectionHandler extends Thread {
         exception,
         () ->
             String.format("Exception on connection handler with ID %s: %s", getName(), exception));
-    DataOutputStream output = getConnectionMetadata().peekOutputStream();
+    DataOutputStream output = getConnectionMetadata().getOutputStream();
     if (this.status == ConnectionStatus.TERMINATED) {
       new ErrorResponse(output, exception).send();
       new TerminateResponse(output).send();

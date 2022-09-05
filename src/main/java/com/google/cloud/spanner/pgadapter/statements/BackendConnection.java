@@ -308,6 +308,9 @@ public class BackendConnection {
     }
   }
 
+  private static final ListeningExecutorService DATA_RECEIVER_EXECUTOR =
+      MoreExecutors.newDirectExecutorService();
+
   /**
    * This statement represents a COPY table FROM STDIN statement. This has no one-on-one mapping
    * with a Cloud Spanner SQL statement and is therefore executed using a custom {@link
@@ -343,8 +346,9 @@ public class BackendConnection {
         // to finish before continuing with the next statement. This ensures that all statements are
         // applied in sequential order.
         ListenableFuture<StatementResult> statementResultFuture = executor.submit(mutationWriter);
-        ListenableFuture<Void> copyDataReceiverFuture = executor.submit(copyDataReceiver);
         this.result.setFuture(statementResultFuture);
+        ListenableFuture<Void> copyDataReceiverFuture =
+            DATA_RECEIVER_EXECUTOR.submit(copyDataReceiver);
 
         // Make sure both the front-end CopyDataReceiver and the backend MutationWriter processes
         // have finished before we proceed.
