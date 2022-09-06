@@ -824,7 +824,6 @@ public class PythonTransactionTests extends PythonTestSetup {
         // that the number of rollback requests could be either 0 or 1.
         assertTrue(mockSpanner.countRequestsOfType(RollbackRequest.class) <= 1);
         assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-        assertEquals(5, requests.size());
       } else {
         assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
         assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
