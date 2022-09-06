@@ -33,8 +33,11 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 @Category(PythonTest.class)
 public class PythonBasicTests extends PythonTestSetup {
 
@@ -63,6 +66,14 @@ public class PythonBasicTests extends PythonTestSetup {
             .addValues(Value.newBuilder().setStringValue("abcd").build())
             .build());
     return resultSetBuilder.build();
+  }
+
+  @Parameter
+  public String pgVersion;
+
+  @Parameters(name = "pgVersion = {0}")
+  public static Object[] data() {
+    return new Object[] {"1.0", "14.1"};
   }
 
   @Test
@@ -381,9 +392,11 @@ public class PythonBasicTests extends PythonTestSetup {
     parameters.add("bytes");
     parameters.add("b'VALUE3'");
 
-    String sql2 =
+    String selectStatementVersion14 =
         "SELECT * FROM some_table where COLUMN_NAME1 = '\\x56414c554531'::bytea and COLUMN_NAME2 = '\\x56414c554532'::bytea or COLUMN_NAME3 = '\\x56414c554533'::bytea";
-    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
+    String selectStatementVersion1 = "SELECT * FROM some_table where COLUMN_NAME1 = 'VALUE1'::bytea and COLUMN_NAME2 = 'VALUE2'::bytea or COLUMN_NAME3 = 'VALUE3'::bytea";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(selectStatementVersion14), createResultSet()));
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(selectStatementVersion1), createResultSet()));
 
     String actualOutput =
         executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
@@ -391,7 +404,7 @@ public class PythonBasicTests extends PythonTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+    assertEquals(selectStatementVersion14, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
