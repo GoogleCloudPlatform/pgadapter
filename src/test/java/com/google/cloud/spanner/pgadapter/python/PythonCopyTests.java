@@ -15,15 +15,17 @@
 package com.google.cloud.spanner.pgadapter.python;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.CopyDataMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.CopyDoneMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
-import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.Mutation;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.StructType;
@@ -153,6 +155,15 @@ public class PythonCopyTests extends PythonTestSetup {
 
     assertEquals(1, getWireMessagesOfType(CopyDataMessage.class).size());
     assertEquals(1, getWireMessagesOfType(CopyDoneMessage.class).size());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.getRequestsOfType(CommitRequest.class).get(0).getMutationsCount());
+    Mutation mutation = mockSpanner.getRequestsOfType(CommitRequest.class).get(0).getMutations(0);
+
+    assertNotNull(mutation.getInsert());
+
+    assertEquals(2, mutation.getInsert().getColumnsCount());
+    assertEquals(2, mutation.getInsert().getValuesCount());
   }
 
   @Test
@@ -185,8 +196,6 @@ public class PythonCopyTests extends PythonTestSetup {
     String expectedOutput = "1,hello\n" + "2,world\n";
 
     assertEquals(expectedOutput, actualOutput);
-
-    for (WireMessage wm : getWireMessages()) System.out.println(wm.getClass());
 
     List<QueryMessage> qm = getWireMessagesOfType(QueryMessage.class);
     assertEquals(1, qm.size());
