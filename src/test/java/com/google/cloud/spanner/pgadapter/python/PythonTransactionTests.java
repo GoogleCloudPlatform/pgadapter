@@ -819,8 +819,10 @@ public class PythonTransactionTests extends PythonTestSetup {
       if (pgVersion.equals("1.0") && unsupportedIsolationLevel.equals("2")) {
         assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
         // There is a transaction active at the end of the test. This transaction is rolled back
-        // when the connection is closed.
-        assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+        // when the connection is closed using a shoot-and-forget request. It could be that it
+        // reaches the server before it is shut down, or it could be that it's lost, which means
+        // that the number of rollback requests could be either 0 or 1.
+        assertTrue(mockSpanner.countRequestsOfType(RollbackRequest.class) <= 1);
         assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
         assertEquals(5, requests.size());
       } else {
