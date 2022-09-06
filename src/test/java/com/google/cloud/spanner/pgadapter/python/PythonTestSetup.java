@@ -38,11 +38,18 @@ public class PythonTestSetup extends AbstractMockServerTest {
     }
   }
 
-  static String executeWithoutParameters(int port, String sql, String statementType)
+  static String executeWithoutParameters(
+      String pgVersion, String host, int port, String sql, String statementType)
       throws IOException, InterruptedException {
     String[] runCommand =
         new String[] {
-          "python3", "StatementsWithoutParameters.py", Integer.toString(port), statementType, sql
+          "python3",
+          "StatementsWithoutParameters.py",
+          pgVersion,
+          host,
+          Integer.toString(port),
+          statementType,
+          sql
         };
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
@@ -61,11 +68,18 @@ public class PythonTestSetup extends AbstractMockServerTest {
   }
 
   static String executeWithParameters(
-      int port, String sql, String statementType, ArrayList<String> parameters)
+      String pgVersion,
+      String host,
+      int port,
+      String sql,
+      String statementType,
+      ArrayList<String> parameters)
       throws IOException, InterruptedException {
     List<String> runCommand = new ArrayList<>();
     runCommand.add("python3");
     runCommand.add("StatementsWithParameters.py");
+    runCommand.add(pgVersion);
+    runCommand.add(host);
     runCommand.add(Integer.toString(port));
     runCommand.add(statementType);
     runCommand.add(sql);
@@ -81,18 +95,30 @@ public class PythonTestSetup extends AbstractMockServerTest {
     while (scanner.hasNextLine()) {
       output.append(scanner.nextLine()).append("\n");
     }
+    Scanner errorScanner = new Scanner(process.getErrorStream());
+    StringBuilder errors = new StringBuilder();
+    while (errorScanner.hasNextLine()) {
+      errors.append(errorScanner.nextLine()).append("\n");
+    }
     int result = process.waitFor();
-    assertEquals(output.toString(), 0, result);
+    assertEquals(errors.toString(), 0, result);
 
     return output.toString();
   }
 
   static String executeWithNamedParameters(
-      int port, String sql, String statementType, ArrayList<String> parameters)
+      String pgVersion,
+      String host,
+      int port,
+      String sql,
+      String statementType,
+      ArrayList<String> parameters)
       throws IOException, InterruptedException {
     List<String> runCommand = new ArrayList<>();
     runCommand.add("python3");
     runCommand.add("StatementsWithNamedParameters.py");
+    runCommand.add(pgVersion);
+    runCommand.add(host);
     runCommand.add(Integer.toString(port));
     runCommand.add(statementType);
     runCommand.add(sql);
@@ -103,23 +129,35 @@ public class PythonTestSetup extends AbstractMockServerTest {
     builder.directory(new File("./src/test/python"));
     Process process = builder.start();
 
+    Scanner errorScanner = new Scanner(process.getErrorStream());
     Scanner scanner = new Scanner(process.getInputStream());
     StringBuilder output = new StringBuilder();
     while (scanner.hasNextLine()) {
       output.append(scanner.nextLine()).append("\n");
     }
+    StringBuilder error = new StringBuilder();
+    while (errorScanner.hasNextLine()) {
+      error.append(errorScanner.nextLine()).append("\n");
+    }
     int result = process.waitFor();
-    assertEquals(output.toString(), 0, result);
+    assertEquals(error.toString(), 0, result);
 
     return output.toString();
   }
 
   static String executeInBatch(
-      int port, String sql, String statementType, ArrayList<String> parameters)
+      String pgVersion,
+      String host,
+      int port,
+      String sql,
+      String statementType,
+      ArrayList<String> parameters)
       throws IOException, InterruptedException {
     List<String> runCommand = new ArrayList<>();
     runCommand.add("python3");
     runCommand.add("Batching.py");
+    runCommand.add(pgVersion);
+    runCommand.add(host);
     runCommand.add(Integer.toString(port));
     runCommand.add(statementType);
     runCommand.add(sql);
@@ -141,11 +179,14 @@ public class PythonTestSetup extends AbstractMockServerTest {
     return output.toString();
   }
 
-  static String executeTransactions(int port, List<String> statements)
+  static String executeTransactions(
+      String pgVersion, String host, int port, List<String> statements)
       throws IOException, InterruptedException {
     List<String> runCommand = new ArrayList<>();
     runCommand.add("python3");
     runCommand.add("StatementsWithTransactions.py");
+    runCommand.add(pgVersion);
+    runCommand.add(host);
     runCommand.add(Integer.toString(port));
     runCommand.addAll(statements);
 

@@ -18,8 +18,11 @@ import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
+import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
@@ -29,10 +32,11 @@ import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
@@ -68,12 +72,18 @@ public class PythonBasicTests extends PythonTestSetup {
     return resultSetBuilder.build();
   }
 
-  @Parameter
-  public String pgVersion;
+  @Parameter public String pgVersion;
 
-  @Parameters(name = "pgVersion = {0}")
-  public static Object[] data() {
-    return new Object[] {"1.0", "14.1"};
+  @Parameter(1)
+  public String host;
+
+  @Parameters(name = "pgVersion = {0}, host = {1}")
+  public static List<Object[]> data() {
+    return ImmutableList.of(
+        new Object[] {"1.0", "localhost"},
+        new Object[] {"1.0", "/tmp"},
+        new Object[] {"14.1", "localhost"},
+        new Object[] {"14.1", "/tmp"});
   }
 
   @Test
@@ -82,7 +92,8 @@ public class PythonBasicTests extends PythonTestSetup {
 
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), createResultSet()));
 
-    String actualOutput = executeWithoutParameters(pgServer.getLocalPort(), sql, "query");
+    String actualOutput =
+        executeWithoutParameters(pgVersion, host, pgServer.getLocalPort(), sql, "query");
     String expectedOutput = "(1, 'abcd')\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -96,7 +107,8 @@ public class PythonBasicTests extends PythonTestSetup {
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10));
 
-    String actualOutput = executeWithoutParameters(pgServer.getLocalPort(), sql, "update");
+    String actualOutput =
+        executeWithoutParameters(pgVersion, host, pgServer.getLocalPort(), sql, "update");
     String expectedOutput = "10\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -111,7 +123,8 @@ public class PythonBasicTests extends PythonTestSetup {
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1));
 
-    String actualOutput = executeWithoutParameters(pgServer.getLocalPort(), sql, "update");
+    String actualOutput =
+        executeWithoutParameters(pgVersion, host, pgServer.getLocalPort(), sql, "update");
     String expectedOutput = "1\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -125,7 +138,8 @@ public class PythonBasicTests extends PythonTestSetup {
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 12));
 
-    String actualOutput = executeWithoutParameters(pgServer.getLocalPort(), sql, "update");
+    String actualOutput =
+        executeWithoutParameters(pgVersion, host, pgServer.getLocalPort(), sql, "update");
     String expectedOutput = "12\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -146,7 +160,8 @@ public class PythonBasicTests extends PythonTestSetup {
         "SELECT * FROM some_table where COLUMN_NAME1 = 'VALUE1' and COLUMN_NAME2 = 'VALUE2'";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
 
-    String actualOutput = executeWithParameters(pgServer.getLocalPort(), sql, "query", parameters);
+    String actualOutput =
+        executeWithParameters(pgVersion, host, pgServer.getLocalPort(), sql, "query", parameters);
     String expectedOutput = "(1, 'abcd')\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -165,7 +180,8 @@ public class PythonBasicTests extends PythonTestSetup {
     String sql2 = "UPDATE SET column_name='VALUE1' where column_name2 = 'VALUE2'";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 10));
 
-    String actualOutput = executeWithParameters(pgServer.getLocalPort(), sql, "update", parameters);
+    String actualOutput =
+        executeWithParameters(pgVersion, host, pgServer.getLocalPort(), sql, "update", parameters);
     String expectedOutput = "10\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -184,7 +200,8 @@ public class PythonBasicTests extends PythonTestSetup {
     String sql2 = "INSERT INTO SOME_TABLE(COLUMN_NAME) VALUES ('VALUE')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 1));
 
-    String actualOutput = executeWithParameters(pgServer.getLocalPort(), sql, "update", parameters);
+    String actualOutput =
+        executeWithParameters(pgVersion, host, pgServer.getLocalPort(), sql, "update", parameters);
     String expectedOutput = "1\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -202,7 +219,8 @@ public class PythonBasicTests extends PythonTestSetup {
     String sql2 = "DELETE FROM SOME_TABLE WHERE COLUMN_NAME = 'VALUE'";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 12));
 
-    String actualOutput = executeWithParameters(pgServer.getLocalPort(), sql, "update", parameters);
+    String actualOutput =
+        executeWithParameters(pgVersion, host, pgServer.getLocalPort(), sql, "update", parameters);
     String expectedOutput = "12\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -226,7 +244,8 @@ public class PythonBasicTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
 
     String actualOutput =
-        executeWithNamedParameters(pgServer.getLocalPort(), sql, "query", parameters);
+        executeWithNamedParameters(
+            pgVersion, host, pgServer.getLocalPort(), sql, "query", parameters);
     String expectedOutput = "(1, 'abcd')\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -248,7 +267,8 @@ public class PythonBasicTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 10));
 
     String actualOutput =
-        executeWithNamedParameters(pgServer.getLocalPort(), sql, "update", parameters);
+        executeWithNamedParameters(
+            pgVersion, host, pgServer.getLocalPort(), sql, "update", parameters);
     String expectedOutput = "10\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -269,7 +289,8 @@ public class PythonBasicTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 1));
 
     String actualOutput =
-        executeWithNamedParameters(pgServer.getLocalPort(), sql, "update", parameters);
+        executeWithNamedParameters(
+            pgVersion, host, pgServer.getLocalPort(), sql, "update", parameters);
     String expectedOutput = "1\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -289,7 +310,8 @@ public class PythonBasicTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 12));
 
     String actualOutput =
-        executeWithNamedParameters(pgServer.getLocalPort(), sql, "update", parameters);
+        executeWithNamedParameters(
+            pgVersion, host, pgServer.getLocalPort(), sql, "update", parameters);
     String expectedOutput = "12\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -315,7 +337,8 @@ public class PythonBasicTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
 
     String actualOutput =
-        executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
+        executeWithNamedParameters(
+            pgVersion, host, pgServer.getLocalPort(), sql, "data_type_query", parameters);
     String expectedOutput = "(1, 'abcd')\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -341,7 +364,8 @@ public class PythonBasicTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
 
     String actualOutput =
-        executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
+        executeWithNamedParameters(
+            pgVersion, host, pgServer.getLocalPort(), sql, "data_type_query", parameters);
     String expectedOutput = "(1, 'abcd')\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -367,7 +391,8 @@ public class PythonBasicTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
 
     String actualOutput =
-        executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
+        executeWithNamedParameters(
+            pgVersion, host, pgServer.getLocalPort(), sql, "data_type_query", parameters);
     String expectedOutput = "(1, 'abcd')\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -392,19 +417,22 @@ public class PythonBasicTests extends PythonTestSetup {
     parameters.add("bytes");
     parameters.add("b'VALUE3'");
 
-    String selectStatementVersion14 =
-        "SELECT * FROM some_table where COLUMN_NAME1 = '\\x56414c554531'::bytea and COLUMN_NAME2 = '\\x56414c554532'::bytea or COLUMN_NAME3 = '\\x56414c554533'::bytea";
-    String selectStatementVersion1 = "SELECT * FROM some_table where COLUMN_NAME1 = 'VALUE1'::bytea and COLUMN_NAME2 = 'VALUE2'::bytea or COLUMN_NAME3 = 'VALUE3'::bytea";
-    mockSpanner.putStatementResult(StatementResult.query(Statement.of(selectStatementVersion14), createResultSet()));
-    mockSpanner.putStatementResult(StatementResult.query(Statement.of(selectStatementVersion1), createResultSet()));
+    String selectStatement =
+        pgVersion.equals("1.0")
+            ? "SELECT * FROM some_table where COLUMN_NAME1 = 'VALUE1'::bytea and COLUMN_NAME2 = 'VALUE2'::bytea or COLUMN_NAME3 = 'VALUE3'::bytea"
+            : "SELECT * FROM some_table where COLUMN_NAME1 = '\\x56414c554531'::bytea and COLUMN_NAME2 = '\\x56414c554532'::bytea or COLUMN_NAME3 = '\\x56414c554533'::bytea";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(selectStatement), createResultSet()));
 
     String actualOutput =
-        executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
+        executeWithNamedParameters(
+            pgVersion, host, pgServer.getLocalPort(), sql, "data_type_query", parameters);
     String expectedOutput = "(1, 'abcd')\n";
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(selectStatementVersion14, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+    assertEquals(
+        selectStatement, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -426,7 +454,8 @@ public class PythonBasicTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
 
     String actualOutput =
-        executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
+        executeWithNamedParameters(
+            pgVersion, host, pgServer.getLocalPort(), sql, "data_type_query", parameters);
     String expectedOutput = "(1, 'abcd')\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -453,11 +482,61 @@ public class PythonBasicTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), createResultSet()));
 
     String actualOutput =
-        executeWithNamedParameters(pgServer.getLocalPort(), sql, "data_type_query", parameters);
+        executeWithNamedParameters(
+            pgVersion, host, pgServer.getLocalPort(), sql, "data_type_query", parameters);
     String expectedOutput = "(1, 'abcd')\n";
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+  }
+
+  @Test
+  public void testDmlBatch() throws IOException, InterruptedException {
+    String sql1 = "UPDATE SET column_name='value' where column_name2 = 'value2'";
+    String sql2 = "UPDATE SET column_name='other-value' where column_name2 = 'other-value2'";
+    String sql = String.format("%s;%s;", sql1, sql2);
+
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 10));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 20));
+
+    String actualOutput =
+        executeWithoutParameters(pgVersion, host, pgServer.getLocalPort(), sql, "update");
+    String expectedOutput = "20\n";
+
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(sql1, request.getStatements(0).getSql());
+    assertEquals(sql2, request.getStatements(1).getSql());
+  }
+
+  @Test
+  public void testDdlBatch() throws IOException, InterruptedException {
+    addDdlResponseToSpannerAdmin();
+
+    String sql1 = "CREATE TABLE foo";
+    String sql2 = "CREATE TABLE bar";
+    String sql = String.format("%s;%s;", sql1, sql2);
+
+    String actualOutput =
+        executeWithoutParameters(pgVersion, host, pgServer.getLocalPort(), sql, "update");
+    String expectedOutput = "-1\n";
+
+    assertEquals(expectedOutput, actualOutput);
+
+    List<UpdateDatabaseDdlRequest> requests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(r -> r instanceof UpdateDatabaseDdlRequest)
+            .map(r -> (UpdateDatabaseDdlRequest) r)
+            .collect(Collectors.toList());
+    assertEquals(1, requests.size());
+    UpdateDatabaseDdlRequest request = requests.get(0);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(sql1, request.getStatements(0));
+    assertEquals(sql2, request.getStatements(1));
   }
 }

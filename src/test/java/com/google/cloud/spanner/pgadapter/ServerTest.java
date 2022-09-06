@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import org.junit.Test;
@@ -31,7 +32,7 @@ public class ServerTest {
     ByteArrayOutputStream byteArrayStream = new ByteArrayOutputStream();
     PrintStream out = new PrintStream(byteArrayStream);
     String expectedPGAdapterVersion = Server.getVersion();
-    String expectedPostgreSQLVersion = "14.1";
+    String expectedPostgreSQLVersion = new OptionsMetadata(new String[] {}).getServerVersion();
 
     Server.extractMetadata(new String[] {}, out);
 

@@ -7,6 +7,8 @@ PGAdapter can be used with the following clients:
 1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
 2. `JDBC`: Versions 42.x and higher have __experimental support__. See [JDBC support](docs/jdbc.md) for more details.
 3. `pgx`: Version 4.15 and higher have __experimental support__. See [pgx support](docs/pgx.md) for more details.
+4. `psycopg2`: Version 2.9.3 and higher (but not `psycopg3`) have __experimental support__.
+   See [psycopg2](docs/psycopg2.md) for more details. PGAdapter has not yet been tested with `psycopg3`.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.

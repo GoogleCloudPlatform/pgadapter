@@ -93,7 +93,8 @@ jobs:
     - name: "Install gcloud alpha component"
       run: gcloud components install alpha
     - run: .ci/run-with-credentials.sh uber-jar-build
-    - run: .ci/run-with-credentials.sh e2e-psql 11
+    - run: .ci/run-with-credentials.sh e2e-psql 11 1.0
+    - run: .ci/run-with-credentials.sh e2e-psql 11 14.1
   e2e-psql-v12:
     needs: [check-env]
     if: needs.check-env.outputs.has-key == 'true'
@@ -119,7 +120,8 @@ jobs:
     - name: "Install gcloud alpha component"
       run: gcloud components install alpha
     - run: .ci/run-with-credentials.sh uber-jar-build
-    - run: .ci/run-with-credentials.sh e2e-psql 12
+    - run: .ci/run-with-credentials.sh e2e-psql 12 1.0
+    - run: .ci/run-with-credentials.sh e2e-psql 12 14.1
   e2e-psql-v13:
     needs: [check-env]
     if: needs.check-env.outputs.has-key == 'true'
@@ -145,7 +147,8 @@ jobs:
     - name: "Install gcloud alpha component"
       run: gcloud components install alpha
     - run: .ci/run-with-credentials.sh uber-jar-build
-    - run: .ci/run-with-credentials.sh e2e-psql 13
+    - run: .ci/run-with-credentials.sh e2e-psql 13 1.0
+    - run: .ci/run-with-credentials.sh e2e-psql 13 14.1
   e2e-psql-v14:
     needs: [check-env]
     if: needs.check-env.outputs.has-key == 'true'
@@ -171,4 +174,5 @@ jobs:
     - name: "Install gcloud alpha component"
       run: gcloud components install alpha
     - run: .ci/run-with-credentials.sh uber-jar-build
-    - run: .ci/run-with-credentials.sh e2e-psql 14
+    - run: .ci/run-with-credentials.sh e2e-psql 14 1.0
+    - run: .ci/run-with-credentials.sh e2e-psql 14 14.1
