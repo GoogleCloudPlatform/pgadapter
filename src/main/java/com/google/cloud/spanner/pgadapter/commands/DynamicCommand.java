@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.commands;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.metadata.DynamicCommandMetadata;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -51,9 +50,18 @@ public class DynamicCommand extends Command {
     } else {
       List<String> matcherList = new ArrayList<>();
       for (String argumentPosition : this.metadata.getMatcherOrder()) {
-        matcherList.add(StatementParser.singleQuoteEscape(this.matcher.group(argumentPosition)));
+        matcherList.add(singleQuoteEscape(this.matcher.group(argumentPosition)));
       }
       return String.format(this.metadata.getOutputPattern(), matcherList.toArray());
     }
+  }
+
+  /**
+   * Simple method to escape SQL. Ultimately it is preferred that a user uses PreparedStatements but
+   * for the case of psql emulation, we apply this to provide a simple layer of protection to the
+   * user. This method simply duplicates all single quotes (i.e. ' becomes '').
+   */
+  public static String singleQuoteEscape(String sql) {
+    return sql.replace("'", "''");
   }
 }

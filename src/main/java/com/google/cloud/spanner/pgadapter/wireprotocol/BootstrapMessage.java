@@ -16,7 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationOkResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.KeyDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterStatusResponse;
@@ -106,12 +106,14 @@ public abstract class BootstrapMessage extends WireMessage {
    * @throws Exception
    */
   public static void sendStartupMessage(
-      DataOutputStream output, int connectionId, int secret, OptionsMetadata options)
+      DataOutputStream output, int connectionId, int secret, SessionState sessionState)
       throws Exception {
     new AuthenticationOkResponse(output).send();
     new KeyDataResponse(output, connectionId, secret).send();
     new ParameterStatusResponse(
-            output, "server_version".getBytes(), options.getServerVersion().getBytes())
+            output,
+            "server_version".getBytes(),
+            sessionState.get(null, "server_version").getSetting().getBytes())
         .send();
     new ParameterStatusResponse(output, "application_name".getBytes(), "PGAdapter".getBytes())
         .send();

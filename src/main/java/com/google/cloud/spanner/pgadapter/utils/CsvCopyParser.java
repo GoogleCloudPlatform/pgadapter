@@ -16,12 +16,14 @@ package com.google.cloud.spanner.pgadapter.utils;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
+import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
 import com.google.common.collect.Iterators;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -29,7 +31,6 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
 import java.time.format.DateTimeParseException;
 import java.util.Iterator;
 import java.util.logging.Level;
@@ -38,13 +39,11 @@ import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
-import org.postgresql.jdbc.TimestampUtils;
 
 /** Implementation of {@link CopyInParser} for the TEXT and CSV formats. */
 class CsvCopyParser implements CopyInParser {
   private static final Logger logger = Logger.getLogger(CsvCopyParser.class.getName());
 
-  private final TimestampUtils timestampUtils = CopyInParser.createDefaultTimestampUtils();
   private final CSVFormat format;
   private final PipedOutputStream payload;
   private final int pipeBufferSize;
@@ -64,8 +63,7 @@ class CsvCopyParser implements CopyInParser {
   @Override
   public Iterator<CopyRecord> iterator() {
     return Iterators.transform(
-        parser.iterator(),
-        record -> new CsvCopyRecord(this.timestampUtils, record, this.hasHeader));
+        parser.iterator(), record -> new CsvCopyRecord(record, this.hasHeader));
   }
 
   @Override
@@ -91,12 +89,10 @@ class CsvCopyParser implements CopyInParser {
   }
 
   static class CsvCopyRecord implements CopyRecord {
-    private final TimestampUtils timestampUtils;
     private final CSVRecord record;
     private final boolean hasHeader;
 
-    CsvCopyRecord(TimestampUtils timestampUtils, CSVRecord record, boolean hasHeader) {
-      this.timestampUtils = timestampUtils;
+    CsvCopyRecord(CSVRecord record, boolean hasHeader) {
       this.record = record;
       this.hasHeader = hasHeader;
     }
@@ -114,17 +110,16 @@ class CsvCopyParser implements CopyInParser {
     @Override
     public Value getValue(Type type, String columnName) throws SpannerException {
       String recordValue = record.get(columnName);
-      return getSpannerValue(type, recordValue, this.timestampUtils);
+      return getSpannerValue(type, recordValue);
     }
 
     @Override
     public Value getValue(Type type, int columnIndex) throws SpannerException {
       String recordValue = record.get(columnIndex);
-      return getSpannerValue(type, recordValue, this.timestampUtils);
+      return getSpannerValue(type, recordValue);
     }
 
-    static Value getSpannerValue(Type type, String recordValue, TimestampUtils timestampUtils)
-        throws SpannerException {
+    static Value getSpannerValue(Type type, String recordValue) throws SpannerException {
       try {
         switch (type.getCode()) {
           case STRING:
@@ -152,9 +147,9 @@ class CsvCopyParser implements CopyInParser {
           case DATE:
             return Value.date(recordValue == null ? null : Date.parseDate(recordValue));
           case TIMESTAMP:
-            Timestamp timestamp = timestampUtils.toTimestamp(null, recordValue);
-            return Value.timestamp(
-                timestamp == null ? null : com.google.cloud.Timestamp.of(timestamp));
+            Timestamp timestamp =
+                recordValue == null ? null : TimestampParser.toTimestamp(recordValue);
+            return Value.timestamp(timestamp);
           default:
             SpannerException spannerException =
                 SpannerExceptionFactory.newSpannerException(

@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
-import static com.google.cloud.spanner.pgadapter.utils.CopyInParser.createDefaultTimestampUtils;
 import static com.google.cloud.spanner.pgadapter.utils.MutationWriter.calculateSize;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -538,9 +537,7 @@ public class MutationWriterTest {
               new StringReader("col\n\\N\n"), CSVFormat.POSTGRESQL_TEXT.withFirstRecordAsHeader());
       CSVRecord record = parser.getRecords().get(0);
 
-      Mutation mutation =
-          mutationWriter.buildMutation(
-              new CsvCopyRecord(createDefaultTimestampUtils(), record, true));
+      Mutation mutation = mutationWriter.buildMutation(new CsvCopyRecord(record, true));
 
       assertEquals(String.format("Type: %s", type), 1, mutation.asMap().size());
     }

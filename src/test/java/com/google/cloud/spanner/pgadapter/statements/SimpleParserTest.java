@@ -14,8 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -29,6 +31,45 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class SimpleParserTest {
+
+  /** Helper methods to reuse existing tests */
+  public static ImmutableList<String> splitStatements(String sql) {
+    return new SimpleParser(sql).splitStatements();
+  }
+
+  public static int skipQuotedString(String sql, int startIndex) {
+    SimpleParser parser = new SimpleParser(sql);
+    parser.setPos(startIndex);
+    parser.skipQuotedString();
+    return parser.getPos();
+  }
+
+  public static int skipSingleLineComment(String sql, int startIndex) {
+    SimpleParser parser = new SimpleParser(sql);
+    parser.setPos(startIndex);
+    parser.skipSingleLineComment();
+    return parser.getPos();
+  }
+
+  public static int skipMultiLineComment(String sql, int startIndex) {
+    SimpleParser parser = new SimpleParser(sql);
+    parser.setPos(startIndex);
+    parser.skipMultiLineComment();
+    return parser.getPos();
+  }
+
+  public static int skipDollarQuotedString(String sql, int startIndex) {
+    SimpleParser parser = new SimpleParser(sql);
+    parser.setPos(startIndex);
+    parser.skipDollarQuotedString();
+    return parser.getPos();
+  }
+
+  @Test
+  public void testTableOrIndexName() {
+    assertEquals(new TableOrIndexName(null, "foo"), new TableOrIndexName(null, "foo"));
+    assertNotEquals(new TableOrIndexName(null, "foo"), new TableOrIndexName(null, "bar"));
+  }
 
   @Test
   public void testEatKeyword() {
@@ -307,5 +348,75 @@ public class SimpleParserTest {
         "insert into foo (\"\"\"\")",
         new SimpleParser("insert into foo (\"\"\"\") select * from bar")
             .parseExpressionUntilKeyword(ImmutableList.of("select")));
+  }
+
+  @Test
+  public void testParseCommand() {
+    assertEquals("SELECT", parseCommand("select * from foo"));
+    assertEquals("INSERT", parseCommand("insert into foo values (1, 'One')"));
+    assertEquals("SELECT", parseCommand("/* this is a comment */ select * from foo"));
+    assertEquals("CREATE", parseCommand("/* ddl statements are also supported */create table foo"));
+
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select * from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE",
+        parseCommand(
+            "with my_cte as (select * from foo), my_cte2 as (select * from bar) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE",
+        parseCommand(
+            "with my_cte as (select * from foo), my_cte2 as (select * from bar) /* this is a comment*/update bar set col1='one'"));
+    assertEquals(
+        "UPDATE",
+        parseCommand(
+            "with my_cte as (select * from foo) -- also a comment\n, my_cte2 as (select * from bar) /* this is a comment*/update bar set col1='one'"));
+    assertEquals(
+        "UPSERT", parseCommand("with my_cte as (select * from foo) upsert bar set col1='one'"));
+    assertEquals(
+        "SELECT",
+        parseCommand(
+            "WITH temp (value) as (SELECT avg(id) FROM users) SELECT id FROM users, temp ORDER BY id"));
+    assertEquals(
+        "SELECT",
+        parseCommand(
+            "WITH temp (col1,/*comment*/col2, col3) as (SELECT avg(id) FROM users) SELECT id FROM users, temp ORDER BY id"));
+
+    // The parser returns 'WITH' as the command tag if the CTE appears to be invalid.
+    assertEquals(
+        "WITH", parseCommand("with my_cte as (select * from foo update bar set col1='one'"));
+    assertEquals(
+        "WITH", parseCommand("with my_cte as (select * from foo), update bar set col1='one'"));
+    assertEquals("WITH", parseCommand("with my_cte (select * from foo) update bar set col1='one'"));
+    assertEquals(
+        "WITH", parseCommand("with my_cte.bar as (select * from foo) update bar set col1='one'"));
+    assertEquals("WITH", parseCommand("with (select * from foo update bar set col1='one'"));
+    assertEquals("WITH", parseCommand("with 1 as (select * from foo update bar set col1='one'"));
+    assertEquals(
+        "WITH", parseCommand("with my_cte as select * from foo update bar set col1='one'"));
+
+    assertEquals("WITH", parseCommand("with my_cte as (select * from foo)"));
+    assertEquals("", parseCommand("/*only a comment*/"));
+    assertEquals("WITH", parseCommand("with my_cte () as (select * from foo)"));
+    assertEquals("WITH", parseCommand("with my_cte (,) as (select * from foo)"));
+    assertEquals("WITH", parseCommand("with my_cte (bar"));
+    assertEquals("WITH", parseCommand("with my_cte (bar-"));
+    assertEquals("WITH", parseCommand("with my_cte (bar/"));
+
+    assertEquals("WITH", parseCommand("with my_cte as (select * from foo)"));
+    assertEquals("", parseCommand("/*only a comment*/"));
+
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a/b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a*b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a-b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a / b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a * b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a - b from foo) update bar set col1='one'"));
   }
 }

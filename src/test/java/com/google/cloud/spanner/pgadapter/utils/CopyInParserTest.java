@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
@@ -49,10 +48,5 @@ public class CopyInParserTest {
     CopyInParser parser =
         CopyInParser.create(Format.BINARY, null, new PipedOutputStream(), 256, false);
     assertTrue(parser instanceof BinaryCopyParser);
-  }
-
-  @Test
-  public void testCreateTimestampUtils() {
-    assertNotNull(CopyInParser.createDefaultTimestampUtils());
   }
 }

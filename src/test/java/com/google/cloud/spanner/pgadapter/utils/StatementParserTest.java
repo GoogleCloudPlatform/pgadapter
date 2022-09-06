@@ -14,12 +14,12 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
-import static com.google.cloud.spanner.pgadapter.utils.StatementParser.singleQuoteEscape;
-import static com.google.cloud.spanner.pgadapter.utils.StatementParser.skipDollarQuotedString;
-import static com.google.cloud.spanner.pgadapter.utils.StatementParser.skipMultiLineComment;
-import static com.google.cloud.spanner.pgadapter.utils.StatementParser.skipQuotedString;
-import static com.google.cloud.spanner.pgadapter.utils.StatementParser.skipSingleLineComment;
-import static com.google.cloud.spanner.pgadapter.utils.StatementParser.splitStatements;
+import static com.google.cloud.spanner.pgadapter.commands.DynamicCommand.singleQuoteEscape;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParserTest.skipDollarQuotedString;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParserTest.skipMultiLineComment;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParserTest.skipQuotedString;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParserTest.skipSingleLineComment;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParserTest.splitStatements;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
@@ -194,6 +194,9 @@ public class StatementParserTest {
     assertEquals(15, skipDollarQuotedString("$bar$foo$$, bar", 0));
 
     assertEquals(11, skipDollarQuotedString("$$foo$bar$$, bar", 0));
+    assertEquals(5, skipDollarQuotedString("$$foo", 0));
+    assertEquals(0, skipDollarQuotedString("foo", 0));
+    assertEquals(1, skipDollarQuotedString("$-$bar$-$", 0));
   }
 
   @Test

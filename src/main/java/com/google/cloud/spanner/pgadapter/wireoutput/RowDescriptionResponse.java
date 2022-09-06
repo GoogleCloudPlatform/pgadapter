@@ -130,8 +130,12 @@ public class RowDescriptionResponse extends WireOutput {
   }
 
   int getOidType(int column_index) {
-    Type type = this.resultSet.getColumnType(column_index);
-    return Parser.toOid(type);
+    try {
+      Type type = this.resultSet.getColumnType(column_index);
+      return Parser.toOid(type);
+    } catch (Exception ignored) {
+      return Oid.UNSPECIFIED;
+    }
   }
 
   int getOidTypeSize(int oid_type) {
