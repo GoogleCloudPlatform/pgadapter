@@ -19,11 +19,10 @@ import pytz
 import datetime
 
 
-def create_connection(port):
+def create_connection(host, port):
   try:
-    connection = pg.connect(user="postgres",
-                            database="postgres",
-                            host="localhost",
+    connection = pg.connect(database="my-database",
+                            host=host,
                             port=port)
     connection.autocommit = True
     return connection
@@ -32,8 +31,8 @@ def create_connection(port):
     return None
 
 
-def execute_query(sql, parameters, port):
-  connection = create_connection(port)
+def execute_query(sql, parameters, host, port):
+  connection = create_connection(host, port)
   if connection == None:
     return
   try:
@@ -48,8 +47,8 @@ def execute_query(sql, parameters, port):
     connection.close()
 
 
-def execute_update(sql, parameters, port):
-  connection = create_connection(port)
+def execute_update(sql, parameters, host, port):
+  connection = create_connection(host, port)
   if connection == None:
     return
   try:
@@ -89,18 +88,19 @@ def parse(statement_type, parameters):
 
 
 if __name__ == '__main__':
-  port = sys.argv[1]
-  statement_type = sys.argv[2]
-  sql = sys.argv[3]
+  host = sys.argv[1]
+  port = sys.argv[2]
+  statement_type = sys.argv[3]
+  sql = sys.argv[4]
   try:
-    parameters = tuple(sys.argv[4:])
+    parameters = tuple(sys.argv[5:])
     statement_type, parameters = parse(statement_type, parameters)
   except Exception as e:
     print(e)
     sys.exit(0)
   if statement_type == 'query':
-    execute_query(sql, parameters, port)
+    execute_query(sql, parameters, host, port)
   elif statement_type == 'update':
-    execute_update(sql, parameters, port)
+    execute_update(sql, parameters, host, port)
   else:
     print('Invalid Statement Type', statement_type)
