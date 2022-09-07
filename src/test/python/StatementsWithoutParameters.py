@@ -17,11 +17,10 @@ import psycopg2 as pg
 import sys
 
 
-def create_connection(port):
+def create_connection(host, port):
   try:
-    connection = pg.connect(user="postgres",
-                            database="postgres",
-                            host="localhost",
+    connection = pg.connect(database="my-database",
+                            host=host,
                             port=port)
     connection.autocommit = True
     return connection
@@ -30,8 +29,8 @@ def create_connection(port):
     return None
 
 
-def execute_query(sql, port):
-  connection = create_connection(port)
+def execute_query(sql, host, port):
+  connection = create_connection(host, port)
   if connection is None:
     return
   try:
@@ -46,8 +45,8 @@ def execute_query(sql, port):
     connection.close()
 
 
-def execute_update(sql, port):
-  connection = create_connection(port)
+def execute_update(sql, host, port):
+  connection = create_connection(host, port)
   if connection == None:
     return
   try:
@@ -62,15 +61,16 @@ def execute_update(sql, port):
 
 
 if __name__ == '__main__':
-  assert len(sys.argv) == 4
+  assert len(sys.argv) >= 5
 
-  port = sys.argv[1]
-  statement_type = sys.argv[2]
-  sql = sys.argv[3]
+  host = sys.argv[1]
+  port = sys.argv[2]
+  statement_type = sys.argv[3]
+  sql = sys.argv[4]
 
   if statement_type == 'query':
-    execute_query(sql, port)
+    execute_query(sql, host, port)
   elif statement_type == 'update':
-    execute_update(sql, port)
+    execute_update(sql, host, port)
   else:
     print('Invalid Statement Type')

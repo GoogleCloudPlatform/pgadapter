@@ -25,11 +25,19 @@ import java.util.ArrayList;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
 @Category(PythonTest.class)
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class PythonBatchTests extends PythonTestSetup {
+  @Parameter public String host;
+
+  @Parameters(name = "host = {0}")
+  public static Object[] data() {
+    return new Object[] {"localhost", "/tmp"};
+  }
 
   @Test
   public void testInsertUsingExecuteMany() throws IOException, InterruptedException {
@@ -47,7 +55,8 @@ public class PythonBatchTests extends PythonTestSetup {
     String sql2 = "INSERT INTO SOME_TABLE VALUES('hello1', 'world1')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 20));
 
-    String actualOutput = executeInBatch(pgServer.getLocalPort(), sql, "execute_many", parameters);
+    String actualOutput =
+        executeInBatch(host, pgServer.getLocalPort(), sql, "execute_many", parameters);
     String expectedOutput = "30\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -73,7 +82,8 @@ public class PythonBatchTests extends PythonTestSetup {
     String sql2 = "INSERT INTO SOME_TABLE VALUES('hello1', 'world1')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 27));
 
-    String actualOutput = executeInBatch(pgServer.getLocalPort(), sql, "execute_batch", parameters);
+    String actualOutput =
+        executeInBatch(host, pgServer.getLocalPort(), sql, "execute_batch", parameters);
     String expectedOutput = "27\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -112,7 +122,7 @@ public class PythonBatchTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 57));
 
     String actualOutput =
-        executeInBatch(pgServer.getLocalPort(), sql, "execute_values", parameters);
+        executeInBatch(host, pgServer.getLocalPort(), sql, "execute_values", parameters);
     String expectedOutput = "57\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -142,7 +152,7 @@ public class PythonBatchTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 37));
 
     String actualOutput =
-        executeInBatch(pgServer.getLocalPort(), sql, "named_execute_many", parameters);
+        executeInBatch(host, pgServer.getLocalPort(), sql, "named_execute_many", parameters);
     String expectedOutput = "66\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -173,7 +183,7 @@ public class PythonBatchTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 27));
 
     String actualOutput =
-        executeInBatch(pgServer.getLocalPort(), sql, "named_execute_batch", parameters);
+        executeInBatch(host, pgServer.getLocalPort(), sql, "named_execute_batch", parameters);
     String expectedOutput = "27\n";
 
     assertEquals(expectedOutput, actualOutput);

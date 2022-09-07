@@ -41,11 +41,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
 @Category(PythonTest.class)
+@RunWith(Parameterized.class)
 public class PythonTransactionTests extends PythonTestSetup {
 
   private static ResultSet createResultSet(int id, String name) {
@@ -73,6 +77,13 @@ public class PythonTransactionTests extends PythonTestSetup {
             .addValues(Value.newBuilder().setStringValue(name).build())
             .build());
     return resultSetBuilder.build();
+  }
+
+  @Parameter public String host;
+
+  @Parameters(name = "host = {0}")
+  public static Object[] data() {
+    return new Object[] {"localhost", "/tmp"};
   }
 
   @Test
@@ -124,7 +135,7 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     String expectedOutput =
         "(1, 'abcd')\n" + "1\n" + "(2, 'pqrs')\n" + "(3, '1234')\n" + "2\n" + "(4, '6789')\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -223,7 +234,7 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
 
     String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n" + "1\n" + "2\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -315,7 +326,7 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
 
     String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n" + "1\n" + "2\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -376,7 +387,7 @@ public class PythonTransactionTests extends PythonTestSetup {
         StatementResult.query(Statement.of(sql), createResultSet(1, "abcd")));
 
     String expectedOutput = "the 'deferrable' setting is only available from PostgreSQL 9.1\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
 
     assertEquals(expectedOutput, actualOutput);
 
@@ -402,7 +413,7 @@ public class PythonTransactionTests extends PythonTestSetup {
         StatementResult.query(Statement.of(sql), createResultSet(1, "abcd")));
 
     String expectedOutput = "the 'deferrable' setting is only available from PostgreSQL 9.1\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
 
     assertEquals(expectedOutput, actualOutput);
 
@@ -471,7 +482,7 @@ public class PythonTransactionTests extends PythonTestSetup {
             + "(1, 'abcd')\n"
             + "(2, 'pqrs')\n"
             + "Update statements are not allowed for read-only transactions\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -578,7 +589,7 @@ public class PythonTransactionTests extends PythonTestSetup {
             + "(1, 'abcd')\n"
             + "(2, 'pqrs')\n"
             + "Update statements are not allowed for read-only transactions\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -672,7 +683,7 @@ public class PythonTransactionTests extends PythonTestSetup {
       statements.add("query");
       statements.add(sql3);
 
-      String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+      String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
       assertEquals(expectedOutput, actualOutput);
 
       assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -749,7 +760,7 @@ public class PythonTransactionTests extends PythonTestSetup {
       statements.add("query");
       statements.add(sql3);
 
-      String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+      String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
       assertEquals(expectedOutput, actualOutput);
 
       assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -821,7 +832,7 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
 
     String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -899,7 +910,7 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
 
     String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -988,7 +999,7 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
 
     String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -1072,7 +1083,7 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
 
     String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -1168,7 +1179,7 @@ public class PythonTransactionTests extends PythonTestSetup {
             + "1\n"
             + "2\n"
             + "Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -1254,7 +1265,7 @@ public class PythonTransactionTests extends PythonTestSetup {
             + "1\n"
             + "2\n"
             + "Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -1342,7 +1353,7 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql4), 2));
 
     String expectedOutput = "(1, 'abcd')\n" + "1\n" + "2\n" + "(2, 'pqrs')\n" + "1\n" + "2\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -1386,7 +1397,6 @@ public class PythonTransactionTests extends PythonTestSetup {
     assertEquals(CommitRequest.class, requests.get(8).getClass());
   }
 
-  @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
   @Test
   public void testSetAllPropertiesUsingSetSessionWithoutDeferrable() throws Exception {
     List<String> statements = new ArrayList<>();
@@ -1402,14 +1412,13 @@ public class PythonTransactionTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10));
 
     String expectedOutput = "10\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
-  @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
   @Test
   public void testSetAllPropertiesUsingSetSessionWithoutDeferrableError()
       throws IOException, InterruptedException {
@@ -1425,9 +1434,8 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10));
 
-    String expectedOutput =
-        "FAILED_PRECONDITION: Update statements are not allowed for read-only transactions\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String expectedOutput = "Update statements are not allowed for read-only transactions\n";
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
 
     assertEquals(expectedOutput, actualOutput);
 
@@ -1435,7 +1443,6 @@ public class PythonTransactionTests extends PythonTestSetup {
     assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
-  @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
   @Test
   public void testSetAllPropertiesUsingSetSessionWithDeferrableTrue()
       throws IOException, InterruptedException {
@@ -1451,9 +1458,8 @@ public class PythonTransactionTests extends PythonTestSetup {
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10));
 
-    // TODO: Update the Error Message according to the changes in the Java Client Library PR
-    String expectedOutput = "Some Error\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String expectedOutput = "the 'deferrable' setting is only available from PostgreSQL 9.1\n";
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
 
     assertEquals(expectedOutput, actualOutput);
 
@@ -1461,7 +1467,6 @@ public class PythonTransactionTests extends PythonTestSetup {
     assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
-  @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
   @Test
   public void testSetAllPropertiesUsingSetSessionWithDeferrableFalse()
       throws IOException, InterruptedException {
@@ -1475,9 +1480,8 @@ public class PythonTransactionTests extends PythonTestSetup {
     statements.add("update");
     statements.add(sql);
 
-    // TODO: Update the Error Message according to the changes in the Java Client Library PR
-    String expectedOutput = "Some Error\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String expectedOutput = "the 'deferrable' setting is only available from PostgreSQL 9.1\n";
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
 
     assertEquals(expectedOutput, actualOutput);
 
@@ -1485,7 +1489,6 @@ public class PythonTransactionTests extends PythonTestSetup {
     assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
-  @Ignore("To be Removed when the changes in the PR #1949 in the Java Client Library are live")
   @Test
   public void testSetAllPropertiesUsingSetSessionWithDeferrableTrueWithHigherVersions()
       throws Exception {
@@ -1501,9 +1504,9 @@ public class PythonTransactionTests extends PythonTestSetup {
     statements.add("update");
     statements.add(sql);
 
-    // TODO: Update the Error Message according to the changes in the Java Client Library PR
-    String expectedOutput = "Some Error\n";
-    String actualOutput = executeTransactions(pgServer.getLocalPort(), statements);
+    String expectedOutput =
+        "Unknown statement: BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY NOT DEFERRABLE\n";
+    String actualOutput = executeTransactions(host, pgServer.getLocalPort(), statements);
 
     assertEquals(expectedOutput, actualOutput);
 
