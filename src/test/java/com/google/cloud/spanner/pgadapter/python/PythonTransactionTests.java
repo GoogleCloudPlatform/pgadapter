@@ -814,7 +814,10 @@ public class PythonTransactionTests extends PythonTestSetup {
       List<AbstractMessage> requests = mockSpanner.getRequests();
       requests =
           requests.stream()
-              .filter(request -> !request.getClass().equals(BatchCreateSessionsRequest.class))
+              .filter(
+                  request ->
+                      !request.getClass().equals(BatchCreateSessionsRequest.class)
+                          && !request.getClass().equals(RollbackRequest.class))
               .collect(Collectors.toList());
       if (pgVersion.equals("1.0") && unsupportedIsolationLevel.equals("2")) {
         assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
