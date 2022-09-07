@@ -115,6 +115,11 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
     return this.name;
   }
 
+  @Override
+  public String getSql() {
+    return this.statement.getSql();
+  }
+
   public PreparedType getType() {
     return type;
   }

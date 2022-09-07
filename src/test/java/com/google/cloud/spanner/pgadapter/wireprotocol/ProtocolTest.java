@@ -623,6 +623,7 @@ public class ProtocolTest {
             resultCodesCount);
 
     when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
+    when(intermediatePreparedStatement.getSql()).thenReturn("select * from foo");
 
     byte[][] expectedParameters = {parameter};
     List<Short> expectedFormatCodes = new ArrayList<>();
@@ -646,6 +647,7 @@ public class ProtocolTest {
     assertArrayEquals(expectedParameters, ((BindMessage) message).getParameters());
     assertEquals(expectedFormatCodes, ((BindMessage) message).getFormatCodes());
     assertEquals(expectedFormatCodes, ((BindMessage) message).getResultFormatCodes());
+    assertEquals("select * from foo", ((BindMessage) message).getSql());
 
     when(intermediatePreparedStatement.bind(
             ArgumentMatchers.anyString(),
@@ -820,6 +822,7 @@ public class ProtocolTest {
     DataOutputStream outputStream = new DataOutputStream(result);
 
     when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
+    when(intermediatePortalStatement.getSql()).thenReturn("select * from foo");
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.peekInputStream()).thenReturn(inputStream);
     when(connectionMetadata.peekOutputStream()).thenReturn(outputStream);
@@ -829,6 +832,7 @@ public class ProtocolTest {
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(DescribeMessage.class, message.getClass());
     assertEquals(expectedStatementName, ((DescribeMessage) message).getName());
+    assertEquals("select * from foo", ((DescribeMessage) message).getSql());
 
     verify(connectionHandler).getPortal("some statement");
 

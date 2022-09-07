@@ -126,6 +126,11 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     return this.statementName;
   }
 
+  @Override
+  public String getSql() {
+    return this.statement.getSql();
+  }
+
   public byte[][] getParameters() {
     return this.parameters;
   }

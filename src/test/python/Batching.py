@@ -16,16 +16,14 @@
 import psycopg2 as pg
 import psycopg2.extras as extras
 import sys
-import pytz
-import datetime
 
 
-def create_connection(port):
+def create_connection(version, host, port):
   try:
-    connection = pg.connect(user="postgres",
-                            database="postgres",
-                            host="localhost",
-                            port=port)
+    connection = pg.connect(database="my-database",
+                            host=host,
+                            port=port,
+                            options="-c server_version=" + version)
     connection.autocommit = True
     return connection
   except Exception as e:
@@ -33,8 +31,8 @@ def create_connection(port):
     return None
 
 
-def execute_many(sql, parameters, port):
-  connection = create_connection(port)
+def execute_many(sql, parameters, version, host, port):
+  connection = create_connection(version, host, port)
   if connection == None:
     return
   try:
@@ -49,8 +47,8 @@ def execute_many(sql, parameters, port):
     connection.close()
 
 
-def execute_batch(sql, parameters, port, page_size = None):
-  connection = create_connection(port)
+def execute_batch(sql, parameters, version, host, port, page_size = None):
+  connection = create_connection(version, host, port)
   if connection == None:
     return
   try:
@@ -67,8 +65,8 @@ def execute_batch(sql, parameters, port, page_size = None):
     cursor.close()
     connection.close()
 
-def execute_values(sql, parameters, port, page_size = None):
-  connection = create_connection(port)
+def execute_values(sql, parameters, version, host, port, page_size = None):
+  connection = create_connection(version, host, port)
   if connection == None:
     return
   try:
@@ -127,20 +125,22 @@ def parse(statement_type, parameters):
 
 
 if __name__ == '__main__':
-  port = sys.argv[1]
-  statement_type = sys.argv[2]
-  sql = sys.argv[3]
+  version = sys.argv[1]
+  host = sys.argv[2]
+  port = sys.argv[3]
+  statement_type = sys.argv[4]
+  sql = sys.argv[5]
   try:
-    parameters = tuple(sys.argv[4:])
+    parameters = tuple(sys.argv[6:])
     statement_type, parameters = parse(statement_type, parameters)
   except Exception as e:
     print(e)
     sys.exit(0)
   if statement_type == 'execute_many':
-    execute_many(sql, parameters, port)
+    execute_many(sql, parameters, version, host, port)
   elif statement_type == 'execute_batch':
-    execute_batch(sql, parameters, port)
+    execute_batch(sql, parameters, version, host, port)
   elif statement_type == 'execute_values':
-    execute_values(sql, parameters, port)
+    execute_values(sql, parameters, version, host, port)
   else:
     print('Invalid Statement Type', statement_type)
