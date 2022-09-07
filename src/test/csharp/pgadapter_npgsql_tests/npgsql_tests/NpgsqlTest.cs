@@ -44,6 +44,22 @@ public class NpgsqlTest
         }
     }
 
+    public void TestShowServerVersion()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+
+        using var cmd = new NpgsqlCommand("show server_version", connection);
+        using (var reader = cmd.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var version = reader.GetString(0);
+                Console.WriteLine($"{version}");
+            }
+        }
+    }
+
     public void TestSelect1()
     {
         using var connection = new NpgsqlConnection(ConnectionString);
