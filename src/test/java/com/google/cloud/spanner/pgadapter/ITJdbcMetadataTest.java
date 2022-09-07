@@ -45,10 +45,12 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
 @Category(IntegrationTest.class)
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class ITJdbcMetadataTest implements IntegrationTest {
   private static final String[] VERSIONS =
       new String[] {
@@ -61,6 +63,13 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
+
+  @Parameter public String pgVersion;
+
+  @Parameters(name = "pgVersion = {0}")
+  public static Object[] data() {
+    return new Object[] {"1.0", "14.1"};
+  }
 
   @BeforeClass
   public static void setup() {
@@ -106,7 +115,9 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   }
 
   private String createUrl() {
-    return String.format("jdbc:postgresql://%s/", testEnv.getPGAdapterHostAndPort());
+    return String.format(
+        "jdbc:postgresql://%s/?options=-c%%20server_version=%s",
+        testEnv.getPGAdapterHostAndPort(), pgVersion);
   }
 
   private void runForAllVersions(Consumer<Connection> runnable) throws Exception {
