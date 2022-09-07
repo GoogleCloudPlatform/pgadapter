@@ -176,7 +176,7 @@ public class PrepareStatement extends IntermediatePortalStatement {
     ImmutableList.Builder<Integer> dataTypesBuilder = ImmutableList.builder();
     if (parser.eatToken("(")) {
       List<String> dataTypesNames = parser.parseExpressionList();
-      if (dataTypesNames.isEmpty()) {
+      if (dataTypesNames == null || dataTypesNames.isEmpty()) {
         throw PGExceptionFactory.newPGException("invalid data type list");
       }
       if (!parser.eatToken(")")) {

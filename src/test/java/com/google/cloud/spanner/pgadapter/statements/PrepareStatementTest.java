@@ -18,7 +18,9 @@ import static com.google.cloud.spanner.pgadapter.statements.PrepareStatement.dat
 import static com.google.cloud.spanner.pgadapter.statements.PrepareStatement.parse;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.statements.PrepareStatement.ParsedPreparedStatement;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -110,5 +112,10 @@ public class PrepareStatementTest {
     assertEquals(
         "select * from bar where active=$1 and age=$2",
         statement.originalPreparedStatement.getSql());
+
+    assertThrows(PGException.class, () -> parse("prepare foo ( as select 1"));
+    assertThrows(PGException.class, () -> parse("prepare foo () as select 1"));
+    assertThrows(PGException.class, () -> parse("prepare (bigint) as select 1"));
+    assertThrows(PGException.class, () -> parse("prepare as select 1"));
   }
 }

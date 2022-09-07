@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.unquoteOrFoldIdentifier;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -39,8 +41,8 @@ import java.util.stream.Collectors;
 @InternalApi
 public class ExecuteStatement extends IntermediatePortalStatement {
   static final class ParsedExecuteStatement {
-    private final String name;
-    private final byte[][] parameters;
+    final String name;
+    final byte[][] parameters;
 
     private ParsedExecuteStatement(String name, byte[][] parameters) {
       this.name = name;
@@ -123,11 +125,16 @@ public class ExecuteStatement extends IntermediatePortalStatement {
     if (name == null || name.schema != null) {
       throw PGExceptionFactory.newPGException("invalid prepared statement name");
     }
+    String statementName = unquoteOrFoldIdentifier(name.name);
+
     ImmutableList.Builder<String> parametersBuilder = ImmutableList.builder();
     if (parser.eatToken("(")) {
       List<String> parametersList = parser.parseExpressionList();
-      if (parametersList.isEmpty()) {
+      if (parametersList == null || parametersList.isEmpty()) {
         throw PGExceptionFactory.newPGException("invalid parameter list");
+      }
+      if (!parser.eatToken(")")) {
+        throw PGExceptionFactory.newPGException("missing closing parentheses in parameters list");
       }
       parametersBuilder.addAll(
           parametersList.stream()
@@ -140,7 +147,7 @@ public class ExecuteStatement extends IntermediatePortalStatement {
           "Syntax error. Unexpected tokens: " + parser.getSql().substring(parser.getPos()));
     }
     return new ParsedExecuteStatement(
-        name.name,
+        statementName,
         parametersBuilder.build().stream()
             .map(p -> p.getBytes(StandardCharsets.UTF_8))
             .toArray(byte[][]::new));
@@ -151,7 +158,7 @@ public class ExecuteStatement extends IntermediatePortalStatement {
         && parameter.length() > 1
         && parameter.charAt(0) == '\''
         && parameter.charAt(parameter.length() - 1) == '\'') {
-      return parameter.substring(1, parameter.length() - 2);
+      return parameter.substring(1, parameter.length() - 1);
     }
     return parameter;
   }
