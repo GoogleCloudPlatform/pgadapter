@@ -239,6 +239,6 @@ public class ITLiquibaseTest {
     LOGGER.info(output);
 
     int res = process.waitFor();
-    assertEquals(0, res);
+    assertEquals(errors, 0, res);
   }
 }
