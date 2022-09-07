@@ -239,7 +239,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
           Oid.NUMERIC,
           Oid.DATE,
           Oid.TIMESTAMPTZ,
-          Oid.VARCHAR
+          Oid.VARCHAR,
+          Oid.JSONB,
         }) {
       for (int format : new int[] {0, 1}) {
         String res = pgxTest.TestQueryAllDataTypes(createConnString(), oid, format);

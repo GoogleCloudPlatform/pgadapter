@@ -119,13 +119,15 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	var timestamptzValue time.Time
 	var dateValue time.Time
 	var varcharValue string
+	var jsonbValue string
 
 	var row pgx.Row
 	if oid != 0 {
 		formats := make(pgx.QueryResultFormatsByOID)
 		for _, o := range []uint32{
 			pgtype.Int8OID, pgtype.BoolOID, pgtype.ByteaOID, pgtype.Float8OID, pgtype.Int4OID,
-			pgtype.NumericOID, pgtype.TimestamptzOID, pgtype.DateOID, pgtype.VarcharOID} {
+			pgtype.NumericOID, pgtype.TimestamptzOID, pgtype.DateOID, pgtype.VarcharOID,
+			pgtype.JSONBOID} {
 			formats[o] = conn.ConnInfo().ResultFormatCodeForOID(o)
 		}
 		formats[uint32(oid)] = format
@@ -143,6 +145,7 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 		&timestamptzValue,
 		&dateValue,
 		&varcharValue,
+		&jsonbValue,
 	)
 	if err != nil {
 		return C.CString(fmt.Sprintf("Failed to execute query: %v", err.Error()))
@@ -181,6 +184,9 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 	if g, w := varcharValue, "test"; g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := jsonbValue, "{\"key\": \"value\"}"; g != w {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 

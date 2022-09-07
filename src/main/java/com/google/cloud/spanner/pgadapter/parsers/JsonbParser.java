@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import javax.annotation.Nonnull;
 
 /** Translate from wire protocol to jsonb. */
@@ -34,7 +35,19 @@ public class JsonbParser extends Parser<String> {
 
   JsonbParser(byte[] item, FormatCode formatCode) {
     if (item != null) {
-      this.item = toString(item);
+      switch (formatCode) {
+        case TEXT:
+          this.item = toString(item);
+          break;
+        case BINARY:
+          if (item.length > 0) {
+            this.item = toString(Arrays.copyOfRange(item, 1, item.length));
+          } else {
+            this.item = "";
+          }
+          break;
+        default:
+      }
     }
   }
 
@@ -50,7 +63,16 @@ public class JsonbParser extends Parser<String> {
 
   @Override
   protected byte[] binaryParse() {
-    return this.item == null ? null : this.item.getBytes(StandardCharsets.UTF_8);
+    if (this.item == null) {
+      return null;
+    }
+    byte[] value = this.item.getBytes(StandardCharsets.UTF_8);
+    byte[] result = new byte[value.length + 1];
+    // Set version = 1
+    result[0] = 1;
+    System.arraycopy(value, 0, result, 1, value.length);
+
+    return result;
   }
 
   @Override
