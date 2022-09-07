@@ -15,9 +15,12 @@
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -107,6 +110,13 @@ public final class RowDescriptionTest {
     // Types.TIMESTAMP
     assertEquals(Oid.TIMESTAMPTZ, response.getOidType(7));
     assertEquals(12, response.getOidTypeSize(Oid.TIMESTAMPTZ));
+
+    assertEquals(4, response.getOidTypeSize(Oid.INT4));
+    assertEquals(2, response.getOidTypeSize(Oid.INT2));
+    assertEquals(4, response.getOidTypeSize(Oid.FLOAT4));
+    assertEquals(1, response.getOidTypeSize(Oid.CHAR));
+    assertEquals(-1, response.getOidTypeSize(Oid.TEXT));
+    assertEquals(8, response.getOidTypeSize(Oid.TIME));
   }
 
   @Test
@@ -339,5 +349,22 @@ public final class RowDescriptionTest {
       // format code
       assertEquals(i, outputReader.readShort());
     }
+  }
+
+  @Test
+  public void testUnknownTypeReturnsUnspecified() throws Exception {
+    ResultSet resultSet = mock(ResultSet.class);
+    when(resultSet.getColumnType(0))
+        .thenThrow(SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "unknown type"));
+
+    RowDescriptionResponse response =
+        new RowDescriptionResponse(
+            mock(DataOutputStream.class),
+            mock(IntermediateStatement.class),
+            resultSet,
+            mock(OptionsMetadata.class),
+            QueryMode.SIMPLE);
+
+    assertEquals(Oid.UNSPECIFIED, response.getOidType(0));
   }
 }

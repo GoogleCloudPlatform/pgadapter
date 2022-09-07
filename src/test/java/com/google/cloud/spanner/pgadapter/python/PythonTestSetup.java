@@ -205,4 +205,26 @@ public class PythonTestSetup extends AbstractMockServerTest {
 
     return output.toString();
   }
+
+  static String executeCopy(int port, String sql, String file, String copyType)
+      throws IOException, InterruptedException {
+    String[] runCommand =
+        new String[] {
+          "python3", "StatementsWithCopy.py", Integer.toString(port), sql, file, copyType
+        };
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(runCommand);
+    builder.directory(new File("./src/test/python"));
+    Process process = builder.start();
+    Scanner scanner = new Scanner(process.getInputStream());
+
+    StringBuilder output = new StringBuilder();
+    while (scanner.hasNextLine()) {
+      output.append(scanner.nextLine()).append("\n");
+    }
+    int result = process.waitFor();
+    assertEquals(output.toString(), 0, result);
+
+    return output.toString();
+  }
 }
