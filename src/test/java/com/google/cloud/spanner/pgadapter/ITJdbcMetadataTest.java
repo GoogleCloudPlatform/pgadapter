@@ -189,13 +189,18 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   public void testDatabaseMetaDataVersion() throws Exception {
     runForAllVersions(
         (connection, version) -> {
+          int lastPointIndex = version.lastIndexOf('.');
+          int patchVersion = Integer.parseInt(version.substring(lastPointIndex + 1));
+          String comparableVersion =
+              version.substring(0, lastPointIndex + 1) + String.format("%03d", patchVersion);
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             // Options in the connection string are only supported from version 42.2.6.
-            if ("42.2.6".compareTo(version) >= 0) {
+            if (comparableVersion.compareTo("42.2.006") >= 0) {
               assertEquals(pgVersion, metadata.getDatabaseProductVersion());
             } else if (testEnv.getServer() != null) {
               assertEquals(
+                  pgVersion,
                   testEnv.getServer().getOptions().getServerVersion(),
                   metadata.getDatabaseProductVersion());
             }
