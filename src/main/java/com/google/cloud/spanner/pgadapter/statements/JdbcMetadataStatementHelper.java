@@ -123,6 +123,9 @@ class JdbcMetadataStatementHelper {
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_SQL_KEYWORDS_PREFIX)) {
       return PgJdbcCatalog.PG_JDBC_GET_SQL_KEYWORDS_REPLACEMENT;
     }
+    if (sql.equals(PgJdbcCatalog.PG_JDBC_GET_TYPE_NAME)) {
+      return PgJdbcCatalog.PG_JDBC_GET_TYPE_NAME_REPLACEMENT;
+    }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_PREFIX)) {
       return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_REPLACEMENT;
     }

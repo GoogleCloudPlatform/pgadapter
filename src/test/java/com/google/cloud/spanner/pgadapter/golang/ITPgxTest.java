@@ -114,7 +114,8 @@ public class ITPgxTest implements IntegrationTest {
             + "col_numeric numeric, "
             + "col_timestamptz timestamptz, "
             + "col_date date, "
-            + "col_varchar varchar(100))");
+            + "col_varchar varchar(100),"
+            + "col_jsonb jsonb)");
   }
 
   private GoString createConnString() {
@@ -155,6 +156,8 @@ public class ITPgxTest implements IntegrationTest {
                 .to(Date.parseDate("2022-03-29"))
                 .set("col_varchar")
                 .to("test")
+                .set("col_jsonb")
+                .to("{\"key\": \"value\"}")
                 .build()));
   }
 

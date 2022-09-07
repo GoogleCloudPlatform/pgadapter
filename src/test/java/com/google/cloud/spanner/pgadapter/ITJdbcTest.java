@@ -132,6 +132,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(Date.parseDate("2022-05-23"))
                 .set("col_varchar")
                 .to("test")
+                .set("col_jsonb")
+                .to("{\"key\": \"value\"}")
                 .build()));
   }
 
@@ -213,7 +215,8 @@ public class ITJdbcTest implements IntegrationTest {
             + "and col_numeric=? "
             + "and col_timestamptz=? "
             + "and col_date=? "
-            + "and col_varchar=?";
+            + "and col_varchar=? "
+            + "and col_jsonb=?";
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -231,6 +234,7 @@ public class ITJdbcTest implements IntegrationTest {
             ++index, Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00").toSqlTimestamp());
         statement.setObject(++index, LocalDate.of(2022, 5, 23));
         statement.setString(++index, "test");
+        statement.setString(++index, "{\"key\": \"value\"}");
 
         try (ResultSet resultSet = statement.executeQuery()) {
           assertTrue(resultSet.next());
@@ -252,6 +256,7 @@ public class ITJdbcTest implements IntegrationTest {
           assertEquals(
               LocalDate.parse("2022-05-23"), resultSet.getObject(++index, LocalDate.class));
           assertEquals("test", resultSet.getString(++index));
+          assertEquals("{\"key\": \"value\"}", resultSet.getString(++index));
 
           assertFalse(resultSet.next());
         }
@@ -266,8 +271,8 @@ public class ITJdbcTest implements IntegrationTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setBoolean(++index, true);
@@ -284,6 +289,7 @@ public class ITJdbcTest implements IntegrationTest {
             ++index, Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp());
         statement.setObject(++index, LocalDate.parse("2000-02-29"));
         statement.setString(++index, "string_test");
+        statement.setString(++index, "{\"key1\": \"value1\", \"key2\": \"value2\"}");
 
         assertEquals(1, statement.executeUpdate());
       }
@@ -309,6 +315,7 @@ public class ITJdbcTest implements IntegrationTest {
             resultSet.getTimestamp(++index));
         assertEquals(LocalDate.of(2000, 2, 29), resultSet.getObject(++index, LocalDate.class));
         assertEquals("string_test", resultSet.getString(++index));
+        assertEquals("{\"key1\": \"value1\", \"key2\": \"value2\"}", resultSet.getString(++index));
 
         assertFalse(resultSet.next());
       }
@@ -329,6 +336,7 @@ public class ITJdbcTest implements IntegrationTest {
             + "col_timestamptz=?, "
             + "col_date=?, "
             + "col_varchar=? "
+            + "col_jsonb=? "
             + "where col_bigint=?";
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
@@ -348,6 +356,7 @@ public class ITJdbcTest implements IntegrationTest {
             Timestamp.parseTimestamp("2022-02-11T14:04:59.123456789+01:00").toSqlTimestamp());
         statement.setObject(++index, LocalDate.of(2000, 1, 1));
         statement.setString(++index, "updated");
+        statement.setString(++index, "{\"key1\": \"updated1\", \"key2\": \"updated2\"}");
         statement.setLong(++index, 1);
 
         assertEquals(1, statement.executeUpdate());
@@ -376,6 +385,8 @@ public class ITJdbcTest implements IntegrationTest {
             resultSet.getTimestamp(++index));
         assertEquals(LocalDate.parse("2000-01-01"), resultSet.getObject(++index, LocalDate.class));
         assertEquals("updated", resultSet.getString(++index));
+        assertEquals(
+            "{\"key1\": \"updated1\", \"key2\": \"updated2\"}", resultSet.getString(++index));
 
         assertFalse(resultSet.next());
       }
@@ -388,8 +399,8 @@ public class ITJdbcTest implements IntegrationTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setNull(++index, Types.BOOLEAN);
@@ -399,6 +410,7 @@ public class ITJdbcTest implements IntegrationTest {
         statement.setNull(++index, Types.NUMERIC);
         statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
         statement.setNull(++index, Types.DATE);
+        statement.setNull(++index, Types.VARCHAR);
         statement.setNull(++index, Types.VARCHAR);
 
         assertEquals(1, statement.executeUpdate());
@@ -426,6 +438,8 @@ public class ITJdbcTest implements IntegrationTest {
         assertNull(resultSet.getTimestamp(++index));
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getDate(++index));
+        assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getString(++index));
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getString(++index));
         assertTrue(resultSet.wasNull());
