@@ -27,7 +27,9 @@ public class ListCommand extends Command {
           "^SELECT d\\.datname as \"Name\",\n"
               + "       pg_catalog\\.pg_get_userbyid\\(d.datdba\\) as \"Owner\",\n"
               + "       pg_catalog\\.pg_encoding_to_char\\(d\\.encoding\\) as \"Encoding\",\n"
-              + "       pg_catalog\\.array_to_string\\(d\\.datacl, '\\\\n'\\) AS \"Access privileges\"\n"
+              + "(?:\\s*d\\.datcollate as \"Collate\",\n)?"
+              + "(?:\\s*d\\.datctype as \"Ctype\",\n)?"
+              + "       pg_catalog\\.array_to_string\\(d\\.datacl, .*\\) AS \"Access privileges\"\n"
               + "FROM pg_catalog\\.pg_database d\n.*\n?"
               + "ORDER BY 1;?$");
 

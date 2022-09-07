@@ -16,11 +16,12 @@
 import psycopg2 as pg
 import sys
 
-def create_connection(host, port):
+def create_connection(version, host, port):
   try:
     connection = pg.connect(database="my-database",
                             host=host,
-                            port=port)
+                            port=port,
+                            options="-c server_version=" + version)
     return connection
   except Exception as e:
     print(e)
@@ -86,9 +87,9 @@ def execute_statement(connection, cursor, statement_type, sql):
 
 
 
-def execute_transaction_statements(statements, host, port):
+def execute_transaction_statements(statements, version, host, port):
   try:
-    connection = create_connection(host, port)
+    connection = create_connection(version, host, port)
     cursor = connection.cursor()
     i = 0
     while i < len(statements):
@@ -100,8 +101,9 @@ def execute_transaction_statements(statements, host, port):
     print(str(e).strip())
 
 if __name__ == '__main__':
-  host = sys.argv[1]
-  port = sys.argv[2]
-  statements = sys.argv[3:]
+  version = sys.argv[1]
+  host = sys.argv[2]
+  port = sys.argv[3]
+  statements = sys.argv[4:]
 
-  execute_transaction_statements(statements, host, port)
+  execute_transaction_statements(statements, version, host, port)

@@ -49,6 +49,12 @@
     <from>java.lang.String</from>
     <to>java.lang.String[]</to>
   </difference>
+  <!-- Added method for testing. This is only for internal use. -->
+  <difference>
+    <differenceType>7013</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/wireprotocol/AbstractQueryProtocolMessage</className>
+    <method>java.lang.String getSql()</method>
+  </difference>
 
   <!-- Add ignores for all sub packages, as these are considered internal. -->
   <difference>

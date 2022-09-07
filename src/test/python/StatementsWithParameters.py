@@ -16,19 +16,20 @@
 import psycopg2 as pg
 import sys
 
-def create_connection(host, port):
+def create_connection(version, host, port):
   try:
     connection = pg.connect(database = "my-database",
                             host = host,
-                            port = port)
+                            port = port,
+                            options="-c server_version=" + version)
     connection.autocommit = True
     return connection
   except Exception as e:
     print(e)
     return None
 
-def execute_query(sql, parameters, host, port):
-  connection = create_connection(host, port)
+def execute_query(sql, parameters, version, host, port):
+  connection = create_connection(version, host, port)
   if connection == None:
     return
   try:
@@ -42,8 +43,8 @@ def execute_query(sql, parameters, host, port):
     cursor.close()
     connection.close()
 
-def execute_update(sql, parameters, host, port):
-  connection = create_connection(host, port)
+def execute_update(sql, parameters, version, host, port):
+  connection = create_connection(version, host, port)
   if connection == None:
     return
   try:
@@ -57,15 +58,16 @@ def execute_update(sql, parameters, host, port):
     connection.close()
 
 if __name__ == '__main__':
-  host = sys.argv[1]
-  port = sys.argv[2]
-  statement_type = sys.argv[3]
-  sql = sys.argv[4]
-  parameters = tuple(sys.argv[5:])
+  version = sys.argv[1]
+  host = sys.argv[2]
+  port = sys.argv[3]
+  statement_type = sys.argv[4]
+  sql = sys.argv[5]
+  parameters = tuple(sys.argv[6:])
   if statement_type == 'query':
-    execute_query(sql, parameters, host, port)
+    execute_query(sql, parameters, version, host, port)
   elif statement_type == 'update':
-    execute_update(sql, parameters, host, port)
+    execute_update(sql, parameters, version, host, port)
   else:
     print('Invalid Statement Type')
 
