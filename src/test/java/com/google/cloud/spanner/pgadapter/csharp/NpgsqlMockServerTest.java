@@ -42,15 +42,25 @@ import java.util.stream.Collectors;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
 @Category(GolangTest.class)
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
+
+  @Parameter public String pgVersion;
+
+  @Parameters(name = "pgVersion = {0}")
+  public static Object[] data() {
+    return new Object[] {"1.0", "14.1"};
+  }
 
   private String createConnectionString() {
     return String.format(
-        "Host=localhost;Port=%d;Database=d;SSL Mode=Disable", pgServer.getLocalPort());
+        "Host=localhost;Port=%d;Database=d;SSL Mode=Disable;Options=-c server_version=%s",
+        pgServer.getLocalPort(), pgVersion);
   }
 
   @Test

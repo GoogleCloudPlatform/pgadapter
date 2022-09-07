@@ -1,4 +1,4 @@
-echo "Running tests with $(/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -V)"
+echo "Running tests with $(/usr/lib/postgresql/"${PSQL_VERSION}"/bin/psql -V) and backend PostgreSQL version ${PG_BACKEND_VERSION}"
 
 # add psql version
 sed -i "s/testdb_e2e_psql_v../$GOOGLE_CLOUD_DATABASE_WITH_VERSION/" .ci/e2e-expected/backslash-dt.txt
