@@ -32,6 +32,7 @@ public class PrepareStatementTest {
 
   @Test
   public void testDataTypeNameToOid() {
+    assertEquals(Oid.UNSPECIFIED, dataTypeNameToOid("unknown"));
     assertEquals(Oid.INT8, dataTypeNameToOid("bigint"));
     assertEquals(Oid.INT8_ARRAY, dataTypeNameToOid("bigint[]"));
     assertEquals(Oid.INT8, dataTypeNameToOid("int8"));

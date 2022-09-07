@@ -44,6 +44,7 @@ import org.postgresql.core.Oid;
 public class PrepareStatement extends IntermediatePortalStatement {
   private static final ImmutableMap<String, Integer> TYPE_NAME_TO_OID_MAPPING =
       ImmutableMap.<String, Integer>builder()
+          .put("unknown", Oid.UNSPECIFIED)
           .put("bigint", Oid.INT8)
           .put("bigint[]", Oid.INT8_ARRAY)
           .put("int8", Oid.INT8)
@@ -123,26 +124,28 @@ public class PrepareStatement extends IntermediatePortalStatement {
 
   @Override
   public void executeAsync(BackendConnection backendConnection) {
-    this.executed = true;
-    try {
-      new ParseMessage(
-              connectionHandler,
-              preparedStatement.name,
-              preparedStatement.dataTypes,
-              preparedStatement.parsedPreparedStatement,
-              preparedStatement.originalPreparedStatement)
-          .send();
-      new DescribeMessage(
-              connectionHandler,
-              PreparedType.Statement,
-              preparedStatement.name,
-              ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
-          .send();
-    } catch (Exception exception) {
-      setFutureStatementResult(Futures.immediateFailedFuture(exception));
-      return;
+    if (!this.executed) {
+      this.executed = true;
+      try {
+        new ParseMessage(
+                connectionHandler,
+                preparedStatement.name,
+                preparedStatement.dataTypes,
+                preparedStatement.parsedPreparedStatement,
+                preparedStatement.originalPreparedStatement)
+            .send();
+        new DescribeMessage(
+                connectionHandler,
+                PreparedType.Statement,
+                preparedStatement.name,
+                ManuallyCreatedToken.MANUALLY_CREATED_TOKEN)
+            .send();
+      } catch (Exception exception) {
+        setFutureStatementResult(Futures.immediateFailedFuture(exception));
+        return;
+      }
+      setFutureStatementResult(Futures.immediateFuture(new NoResult(getCommandTag())));
     }
-    setFutureStatementResult(Futures.immediateFuture(new NoResult(getCommandTag())));
   }
 
   @Override

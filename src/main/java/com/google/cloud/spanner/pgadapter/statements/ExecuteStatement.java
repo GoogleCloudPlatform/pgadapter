@@ -31,9 +31,9 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedTy
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
@@ -127,7 +127,7 @@ public class ExecuteStatement extends IntermediatePortalStatement {
     }
     String statementName = unquoteOrFoldIdentifier(name.name);
 
-    ImmutableList.Builder<String> parametersBuilder = ImmutableList.builder();
+    List<String> parameters;
     if (parser.eatToken("(")) {
       List<String> parametersList = parser.parseExpressionList();
       if (parametersList == null || parametersList.isEmpty()) {
@@ -136,10 +136,10 @@ public class ExecuteStatement extends IntermediatePortalStatement {
       if (!parser.eatToken(")")) {
         throw PGExceptionFactory.newPGException("missing closing parentheses in parameters list");
       }
-      parametersBuilder.addAll(
-          parametersList.stream()
-              .map(ExecuteStatement::unquoteString)
-              .collect(Collectors.toList()));
+      parameters =
+          parametersList.stream().map(ExecuteStatement::unquoteString).collect(Collectors.toList());
+    } else {
+      parameters = Collections.emptyList();
     }
     parser.skipWhitespaces();
     if (parser.getPos() < parser.getSql().length()) {
@@ -148,8 +148,8 @@ public class ExecuteStatement extends IntermediatePortalStatement {
     }
     return new ParsedExecuteStatement(
         statementName,
-        parametersBuilder.build().stream()
-            .map(p -> p.getBytes(StandardCharsets.UTF_8))
+        parameters.stream()
+            .map(p -> p == null ? null : p.getBytes(StandardCharsets.UTF_8))
             .toArray(byte[][]::new));
   }
 
@@ -159,6 +159,9 @@ public class ExecuteStatement extends IntermediatePortalStatement {
         && parameter.charAt(0) == '\''
         && parameter.charAt(parameter.length() - 1) == '\'') {
       return parameter.substring(1, parameter.length() - 1);
+    }
+    if (parameter != null && parameter.trim().equalsIgnoreCase("null")) {
+      return null;
     }
     return parameter;
   }

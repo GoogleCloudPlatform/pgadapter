@@ -39,6 +39,7 @@ import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.statements.DeallocateStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExecuteStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import com.google.cloud.spanner.pgadapter.statements.InvalidStatement;
 import com.google.cloud.spanner.pgadapter.statements.PrepareStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
@@ -100,53 +101,63 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
       ParsedStatement parsedStatement,
       Statement originalStatement,
       int[] parameterDataTypes) {
-    if (isCommand(COPY, originalStatement.getSql())) {
-      CopyOptions copyOptions = parseCopyStatement(parsedStatement);
-      if (copyOptions.getFromTo() == FromTo.FROM) {
-        return new CopyStatement(
-            connectionHandler,
-            connectionHandler.getServer().getOptions(),
-            name,
-            parsedStatement,
-            originalStatement);
-      } else if (copyOptions.getFromTo() == FromTo.TO) {
-        return new CopyToStatement(
-            connectionHandler, connectionHandler.getServer().getOptions(), name, copyOptions);
-      } else {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT, "Unsupported COPY direction: " + copyOptions.getFromTo());
-      }
-    } else if (isCommand(PREPARE, originalStatement.getSql())) {
-      return new PrepareStatement(
-          connectionHandler,
-          connectionHandler.getServer().getOptions(),
-          name,
-          parsedStatement,
-          originalStatement);
-    } else if (isCommand(EXECUTE, originalStatement.getSql())) {
-      return new ExecuteStatement(
-          connectionHandler,
-          connectionHandler.getServer().getOptions(),
-          name,
-          parsedStatement,
-          originalStatement);
-    } else if (isCommand(DEALLOCATE, originalStatement.getSql())) {
-      return new DeallocateStatement(
-          connectionHandler,
-          connectionHandler.getServer().getOptions(),
-          name,
-          parsedStatement,
-          originalStatement);
-    } else {
-      IntermediatePreparedStatement statement =
-          new IntermediatePreparedStatement(
+    try {
+      if (isCommand(COPY, originalStatement.getSql())) {
+        CopyOptions copyOptions = parseCopyStatement(parsedStatement);
+        if (copyOptions.getFromTo() == FromTo.FROM) {
+          return new CopyStatement(
               connectionHandler,
               connectionHandler.getServer().getOptions(),
               name,
               parsedStatement,
               originalStatement);
-      statement.setParameterDataTypes(parameterDataTypes);
-      return statement;
+        } else if (copyOptions.getFromTo() == FromTo.TO) {
+          return new CopyToStatement(
+              connectionHandler, connectionHandler.getServer().getOptions(), name, copyOptions);
+        } else {
+          throw SpannerExceptionFactory.newSpannerException(
+              ErrorCode.INVALID_ARGUMENT, "Unsupported COPY direction: " + copyOptions.getFromTo());
+        }
+      } else if (isCommand(PREPARE, originalStatement.getSql())) {
+        return new PrepareStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(EXECUTE, originalStatement.getSql())) {
+        return new ExecuteStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(DEALLOCATE, originalStatement.getSql())) {
+        return new DeallocateStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else {
+        IntermediatePreparedStatement statement =
+            new IntermediatePreparedStatement(
+                connectionHandler,
+                connectionHandler.getServer().getOptions(),
+                name,
+                parsedStatement,
+                originalStatement);
+        statement.setParameterDataTypes(parameterDataTypes);
+        return statement;
+      }
+    } catch (Exception exception) {
+      return new InvalidStatement(
+          connectionHandler,
+          connectionHandler.getServer().getOptions(),
+          name,
+          parsedStatement,
+          originalStatement,
+          exception);
     }
   }
 
@@ -171,8 +182,10 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
 
   @Override
   public void flush() throws Exception {
-    // The simple query protocol does not need the ParseComplete response.
-    if (isExtendedProtocol()) {
+    if (statement.hasException()) {
+      handleError(statement.getException());
+    } else if (isExtendedProtocol()) {
+      // The simple query protocol does not need the ParseComplete response.
       new ParseCompleteResponse(this.outputStream).send(false);
     }
   }
