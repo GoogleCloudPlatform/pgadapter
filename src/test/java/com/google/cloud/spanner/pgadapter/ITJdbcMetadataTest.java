@@ -187,7 +187,14 @@ public class ITJdbcMetadataTest implements IntegrationTest {
         connection -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
-            assertEquals(pgVersion, metadata.getDatabaseProductVersion());
+            // Options in the connection string are only supported from version 42.2.6.
+            if ("42.2.6".compareTo(pgVersion) >= 0) {
+              assertEquals(pgVersion, metadata.getDatabaseProductVersion());
+            } else if (testEnv.getServer() != null) {
+              assertEquals(
+                  testEnv.getServer().getOptions().getServerVersion(),
+                  metadata.getDatabaseProductVersion());
+            }
           } catch (SQLException e) {
             throw SpannerExceptionFactory.asSpannerException(e);
           }
