@@ -16,7 +16,11 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -28,5 +32,8 @@ public class ShortParserTest {
   public void testStringParse() {
     assertEquals("100", new ShortParser((short) 100).stringParse());
     assertNull(new ShortParser(null).stringParse());
+    assertThrows(
+        PGException.class,
+        () -> new ShortParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
   }
 }

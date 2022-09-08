@@ -20,7 +20,6 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import java.nio.charset.StandardCharsets;
-import java.sql.SQLException;
 import javax.annotation.Nonnull;
 import org.postgresql.core.Utils;
 import org.postgresql.util.PGbytea;
@@ -47,7 +46,7 @@ public class BinaryParser extends Parser<ByteArray> {
           try {
             this.item = ByteArray.copyFrom(PGbytea.toBytes(item));
             break;
-          } catch (SQLException e) {
+          } catch (Exception exception) {
             throw PGExceptionFactory.newPGException(
                 "Invalid binary value: " + new String(item, StandardCharsets.UTF_8));
           }
