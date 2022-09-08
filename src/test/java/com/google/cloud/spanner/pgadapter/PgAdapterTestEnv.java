@@ -37,6 +37,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.primitives.Bytes;
 import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
@@ -350,7 +351,9 @@ public class PgAdapterTestEnv {
       Database db = op.get();
       databases.add(db);
       logger.log(Level.INFO, "Created database [" + db.getId() + "]");
-      updateDdl(databaseId, ddlStatements);
+      if (!Iterables.isEmpty(ddlStatements)) {
+        updateDdl(databaseId, ddlStatements);
+      }
 
       return db;
     } catch (ExecutionException e) {
