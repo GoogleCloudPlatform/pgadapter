@@ -45,11 +45,13 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Bytes;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -262,6 +264,14 @@ public class StatementTest {
   public void testPreparedStatement() {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        mock(ExtendedQueryProtocolHandler.class);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    SessionState sessionState = mock(SessionState.class);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
+    when(sessionState.getGuessTypes()).thenReturn(ImmutableSet.of());
     String sqlStatement = "SELECT * FROM users WHERE age > $2 AND age < $3 AND name = $1";
     int[] parameterDataTypes = new int[] {Oid.VARCHAR, Oid.INT8, Oid.INT4};
 
@@ -303,6 +313,15 @@ public class StatementTest {
   @Test
   public void testPreparedStatementIllegalTypeThrowsException() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        mock(ExtendedQueryProtocolHandler.class);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    SessionState sessionState = mock(SessionState.class);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
+    when(sessionState.getGuessTypes()).thenReturn(ImmutableSet.of());
+
     String sqlStatement = "SELECT * FROM users WHERE metadata = $1";
     int[] parameterDataTypes = new int[] {Oid.JSON};
 

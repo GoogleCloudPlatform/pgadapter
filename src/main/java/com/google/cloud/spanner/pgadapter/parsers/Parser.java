@@ -24,6 +24,7 @@ import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 import org.postgresql.core.Oid;
 
 /**
@@ -61,12 +62,14 @@ public abstract class Parser<T> {
    * @return The {@link Oid} type code that is guessed for the value or {@link Oid#UNSPECIFIED} if
    *     no type could be guessed.
    */
-  private static int guessType(byte[] item, FormatCode formatCode) {
-    // TODO: Put 'guessType' behind a command line flag so it is only enabled when wanted.
+  private static int guessType(Set<Integer> guessTypes, byte[] item, FormatCode formatCode) {
     if (formatCode == FormatCode.TEXT && item != null) {
       String value = new String(item, StandardCharsets.UTF_8);
-      if (TimestampParser.isTimestamp(value)) {
+      if (guessTypes.contains(Oid.TIMESTAMPTZ) && TimestampParser.isTimestamp(value)) {
         return Oid.TIMESTAMPTZ;
+      }
+      if (guessTypes.contains(Oid.DATE) && DateParser.isDate(value)) {
+        return Oid.DATE;
       }
     }
     return Oid.UNSPECIFIED;
@@ -78,9 +81,11 @@ public abstract class Parser<T> {
    * @param item The data to be parsed
    * @param oidType The type of the designated data
    * @param formatCode The format of the data to be parsed
+   * @param guessTypes The OIDs of the types that may be 'guessed' based on the input value
    * @return The parser object for the designated data type.
    */
-  public static Parser<?> create(byte[] item, int oidType, FormatCode formatCode) {
+  public static Parser<?> create(
+      Set<Integer> guessTypes, byte[] item, int oidType, FormatCode formatCode) {
     switch (oidType) {
       case Oid.BOOL:
       case Oid.BIT:
@@ -111,11 +116,11 @@ public abstract class Parser<T> {
       case Oid.UNSPECIFIED:
         // Try to guess the type based on the value. Use an unspecified parser if no type could be
         // determined.
-        int type = guessType(item, formatCode);
+        int type = guessType(guessTypes, item, formatCode);
         if (type == Oid.UNSPECIFIED) {
           return new UnspecifiedParser(item, formatCode);
         }
-        return create(item, type, formatCode);
+        return create(guessTypes, item, type, formatCode);
       default:
         throw new IllegalArgumentException("Unsupported parameter type: " + oidType);
     }

@@ -42,6 +42,7 @@ import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOption
 import com.google.cloud.spanner.pgadapter.parsers.copy.ParseException;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -73,13 +74,13 @@ public class ParserTest {
   }
 
   private void validateCreateBinary(byte[] item, int oid, Object value) {
-    Parser<?> binary = Parser.create(item, oid, FormatCode.BINARY);
+    Parser<?> binary = Parser.create(ImmutableSet.of(), item, oid, FormatCode.BINARY);
 
     assertParserValueEqual(binary, value);
   }
 
   private void validateCreateText(byte[] item, int oid, Object value) {
-    Parser<?> text = Parser.create(item, oid, FormatCode.TEXT);
+    Parser<?> text = Parser.create(ImmutableSet.of(), item, oid, FormatCode.TEXT);
 
     assertParserValueEqual(text, value);
   }

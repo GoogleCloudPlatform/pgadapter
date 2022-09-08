@@ -72,6 +72,7 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
+import org.postgresql.core.Oid;
 import org.postgresql.jdbc.PgStatement;
 import org.postgresql.util.PSQLException;
 
@@ -1688,6 +1689,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testShowGuessTypes() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.guess_types")) {
+        assertTrue(resultSet.next());
+        assertEquals(String.format("%d,%d", Oid.TIMESTAMPTZ, Oid.DATE), resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testShowGuessTypesOverwritten() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20spanner.guess_types=0")) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.guess_types")) {
+        assertTrue(resultSet.next());
+        assertEquals("0", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testShowValidSetting() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet =
@@ -2057,7 +2083,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(347, count);
+        assertEquals(348, count);
       }
     }
   }
