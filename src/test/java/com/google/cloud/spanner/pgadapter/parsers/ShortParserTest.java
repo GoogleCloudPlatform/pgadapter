@@ -32,6 +32,9 @@ public class ShortParserTest {
   public void testStringParse() {
     assertEquals("100", new ShortParser((short) 100).stringParse());
     assertNull(new ShortParser(null).stringParse());
+    assertEquals(
+        "-200",
+        new ShortParser("-200".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).stringParse());
     assertThrows(
         PGException.class,
         () -> new ShortParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));

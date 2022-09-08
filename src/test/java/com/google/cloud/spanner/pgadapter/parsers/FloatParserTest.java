@@ -32,6 +32,9 @@ public class FloatParserTest {
   public void testStringParse() {
     assertEquals("3.14", new FloatParser(3.14f).stringParse());
     assertNull(new FloatParser(null).stringParse());
+    assertEquals(
+        "123.456",
+        new FloatParser("123.456".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).stringParse());
     assertThrows(
         PGException.class,
         () -> new FloatParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));

@@ -15,6 +15,10 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -23,7 +27,9 @@ import static org.mockito.Mockito.when;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -37,6 +43,55 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ConnectionHandlerTest {
+
+  @Test
+  public void testRegisterStatement() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    IntermediatePreparedStatement statement = mock(IntermediatePreparedStatement.class);
+
+    ConnectionHandler connection = new ConnectionHandler(server, socket);
+    connection.registerStatement("my-statement", statement);
+
+    assertTrue(connection.hasStatement("my-statement"));
+    assertSame(statement, connection.getStatement("my-statement"));
+
+    connection.closeStatement("my-statement");
+    assertFalse(connection.hasStatement("my-statement"));
+  }
+
+  @Test
+  public void testCloseUnknownStatement() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+
+    ConnectionHandler connection = new ConnectionHandler(server, socket);
+
+    assertThrows(PGException.class, () -> connection.closeStatement("unknown"));
+  }
+
+  @Test
+  public void testCloseAll() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    IntermediatePreparedStatement statement1 = mock(IntermediatePreparedStatement.class);
+    IntermediatePreparedStatement statement2 = mock(IntermediatePreparedStatement.class);
+
+    ConnectionHandler connection = new ConnectionHandler(server, socket);
+    connection.registerStatement("my-statement1", statement1);
+    connection.registerStatement("my-statement2", statement2);
+
+    connection.closeAllStatements();
+
+    assertFalse(connection.hasStatement("my-statement1"));
+    assertFalse(connection.hasStatement("my-statement2"));
+  }
 
   @Test
   public void testTerminateClosesSocket() throws IOException {

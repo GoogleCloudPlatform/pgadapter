@@ -57,9 +57,11 @@ import java.net.Socket;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -490,7 +492,8 @@ public class ConnectionHandler extends Thread {
   }
 
   public void closeAllStatements() {
-    for (String statementName : this.statementsMap.keySet()) {
+    Set<String> names = new HashSet<>(this.statementsMap.keySet());
+    for (String statementName : names) {
       closeStatement(statementName);
     }
   }

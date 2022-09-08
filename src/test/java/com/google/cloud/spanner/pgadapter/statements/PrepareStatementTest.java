@@ -79,6 +79,12 @@ public class PrepareStatementTest {
     assertEquals(Oid.VARCHAR_ARRAY, dataTypeNameToOid("varchar (100) []"));
     assertEquals(Oid.VARCHAR_ARRAY, dataTypeNameToOid("character     varying   ( 100 )  \t[\n]"));
     assertEquals(Oid.VARCHAR_ARRAY, dataTypeNameToOid("varchar\t(100)  \n[  ]"));
+
+    assertThrows(PGException.class, () -> dataTypeNameToOid("invalid_type"));
+    assertThrows(PGException.class, () -> dataTypeNameToOid("varchar(100"));
+    assertThrows(PGException.class, () -> dataTypeNameToOid("bigint["));
+    assertThrows(PGException.class, () -> dataTypeNameToOid("varchar(bar)"));
+    assertThrows(PGException.class, () -> dataTypeNameToOid("numeric(10, bar)"));
   }
 
   @Test
@@ -114,6 +120,7 @@ public class PrepareStatementTest {
         "select * from bar where active=$1 and age=$2",
         statement.originalPreparedStatement.getSql());
 
+    assertThrows(PGException.class, () -> parse("prpra foo ( as select 1"));
     assertThrows(PGException.class, () -> parse("prepare foo ( as select 1"));
     assertThrows(PGException.class, () -> parse("prepare foo () as select 1"));
     assertThrows(PGException.class, () -> parse("prepare (bigint) as select 1"));
