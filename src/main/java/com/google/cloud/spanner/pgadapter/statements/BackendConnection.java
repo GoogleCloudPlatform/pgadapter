@@ -382,10 +382,7 @@ public class BackendConnection {
   private final DatabaseId databaseId;
   private final DdlExecutor ddlExecutor;
 
-  /**
-   * Creates a PG backend connection that uses the given Spanner {@link Connection} and {@link
-   * DdlTransactionMode}.
-   */
+  /** Creates a PG backend connection that uses the given Spanner {@link Connection} and options. */
   BackendConnection(
       DatabaseId databaseId,
       Connection spannerConnection,

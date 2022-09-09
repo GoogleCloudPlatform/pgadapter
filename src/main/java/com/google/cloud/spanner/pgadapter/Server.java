@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter;
 
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.io.FileReader;
+import java.io.PrintStream;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 
@@ -23,22 +24,33 @@ import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 public class Server {
 
   /**
-   * Main method for running a Spanner PostgreSQL Adaptor {@link Server} as a stand-alone
+   * Main method for running a Spanner PostgreSQL Adapter {@link Server} as a stand-alone
    * application. Here we call for parameter parsing and start the Proxy Server.
    */
   public static void main(String[] args) {
     try {
-      System.out.printf("-- Starting PGAdapter version %s --\n", getVersion());
-      OptionsMetadata optionsMetadata = new OptionsMetadata(args);
+      OptionsMetadata optionsMetadata = extractMetadata(args, System.out);
       ProxyServer server = new ProxyServer(optionsMetadata);
       server.startServer();
     } catch (Exception e) {
-      System.err.println(
-          "The server could not be started because an error occurred: "
-              + (e.getMessage() == null ? e.toString() : e.getMessage()));
-      System.out.println("Run with option -h or --help to get help");
-      System.out.printf("Version: %s\n", getVersion());
+      printError(e, System.err, System.out);
     }
+  }
+
+  static OptionsMetadata extractMetadata(String[] args, PrintStream out) {
+    out.printf("-- Starting PGAdapter version %s --\n", getVersion());
+    OptionsMetadata optionsMetadata = new OptionsMetadata(args);
+    out.printf("-- PostgreSQL version: %s -- \n", optionsMetadata.getServerVersion());
+
+    return optionsMetadata;
+  }
+
+  static void printError(Exception exception, PrintStream err, PrintStream out) {
+    err.printf(
+        "The server could not be started because an error occurred: %s\n",
+        (exception.getMessage() == null ? exception.toString() : exception.getMessage()));
+    out.print("Run with option -h or --help to get help\n");
+    out.printf("Version: %s\n", getVersion());
   }
 
   static String getVersion() {
