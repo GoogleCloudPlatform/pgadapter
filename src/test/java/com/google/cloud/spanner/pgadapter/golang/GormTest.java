@@ -21,6 +21,8 @@ public interface GormTest extends Library {
 
   String TestFirst(GoString connString);
 
+  String TestCreateBlogAndUser(GoString connString);
+
   String TestQueryAllDataTypes(GoString connString);
 
   String TestQueryNullsAllDataTypes(GoString connString);

@@ -39,15 +39,26 @@ func main() {
 }
 
 type User struct {
-	ID           uint
+	// Prevent gorm from using an auto-generated key.
+	ID           int64 `gorm:"primaryKey;autoIncrement:false"`
 	Name         string
 	Email        *string
-	Age          uint8
+	Age          int64
 	Birthday     *time.Time
 	MemberNumber sql.NullString
 	ActivatedAt  sql.NullTime
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+type Blog struct {
+	ID          int64 `gorm:"primaryKey;autoIncrement:false"`
+	Name        string
+	Description *string
+	UserID      int64
+	User        User
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type AllTypes struct {
@@ -60,6 +71,55 @@ type AllTypes struct {
 	ColTimestamptz *time.Time
 	ColDate        *datatypes.Date
 	ColVarchar     *string `gorm:"primaryKey"`
+}
+
+//export TestCreateBlogAndUser
+func TestCreateBlogAndUser(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+
+	tx := db.Begin()
+	user := User{
+		ID:        1,
+		Name:      "User Name",
+		Age:       20,
+		CreatedAt: parseTimestamp("2022-09-09T12:00:00+01:00"),
+		UpdatedAt: parseTimestamp("2022-09-09T12:00:00+01:00"),
+	}
+	res := tx.Create(&user)
+	if res.Error != nil {
+		return C.CString(fmt.Sprintf("failed to create User: %v", res.Error))
+	}
+	if g, w := res.RowsAffected, int64(1); g != w {
+		return C.CString(fmt.Sprintf("affected row count mismatch for User\nGot:  %v\nWant: %v", g, w))
+	}
+	blog := Blog{
+		ID:        1,
+		Name:      "My Blog",
+		UserID:    1,
+		CreatedAt: parseTimestamp("2022-09-09T12:00:00+01:00"),
+		UpdatedAt: parseTimestamp("2022-09-09T12:00:00+01:00"),
+	}
+	res = tx.Create(&blog)
+	if res.Error != nil {
+		return C.CString(fmt.Sprintf("failed to create Blog: %v", res.Error))
+	}
+	if g, w := res.RowsAffected, int64(1); g != w {
+		return C.CString(fmt.Sprintf("affected row count mismatch for Blog\nGot:  %v\nWant: %v", g, w))
+	}
+	res = tx.Commit()
+	if res.Error != nil {
+		return C.CString(fmt.Sprintf("failed to create commit transaction: %v", res.Error))
+	}
+
+	return nil
 }
 
 //export TestFirst
@@ -76,7 +136,7 @@ func TestFirst(connString string) *C.char {
 	user := User{}
 	db.First(&user)
 
-	if g, w := user.ID, uint(1); g != w {
+	if g, w := user.ID, int64(1); g != w {
 		return C.CString(fmt.Sprintf("User ID mismatch\nGot:  %v\nWant: %v", g, w))
 	}
 	if g, w := user.Name, "Some Name"; g != w {
@@ -89,7 +149,7 @@ func TestFirst(connString string) *C.char {
 	} else {
 		return C.CString("Email is null")
 	}
-	if g, w := user.Age, uint8(62); g != w {
+	if g, w := user.Age, int64(62); g != w {
 		return C.CString(fmt.Sprintf("Age mismatch\nGot:  %v\nWant: %v", g, w))
 	}
 	if user.Birthday != nil {
