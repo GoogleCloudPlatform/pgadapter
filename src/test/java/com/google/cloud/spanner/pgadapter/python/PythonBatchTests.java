@@ -18,18 +18,36 @@ import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
 @Category(PythonTest.class)
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class PythonBatchTests extends PythonTestSetup {
+
+  @Parameter public String pgVersion;
+
+  @Parameter(1)
+  public String host;
+
+  @Parameters(name = "pgVersion = {0}, host = {1}")
+  public static List<Object[]> data() {
+    return ImmutableList.of(
+        new Object[] {"1.0", "localhost"},
+        new Object[] {"1.0", "/tmp"},
+        new Object[] {"14.1", "localhost"},
+        new Object[] {"14.1", "/tmp"});
+  }
 
   @Test
   public void testInsertUsingExecuteMany() throws IOException, InterruptedException {
@@ -47,7 +65,8 @@ public class PythonBatchTests extends PythonTestSetup {
     String sql2 = "INSERT INTO SOME_TABLE VALUES('hello1', 'world1')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 20));
 
-    String actualOutput = executeInBatch(pgServer.getLocalPort(), sql, "execute_many", parameters);
+    String actualOutput =
+        executeInBatch(pgVersion, host, pgServer.getLocalPort(), sql, "execute_many", parameters);
     String expectedOutput = "30\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -73,7 +92,8 @@ public class PythonBatchTests extends PythonTestSetup {
     String sql2 = "INSERT INTO SOME_TABLE VALUES('hello1', 'world1')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 27));
 
-    String actualOutput = executeInBatch(pgServer.getLocalPort(), sql, "execute_batch", parameters);
+    String actualOutput =
+        executeInBatch(pgVersion, host, pgServer.getLocalPort(), sql, "execute_batch", parameters);
     String expectedOutput = "27\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -112,7 +132,7 @@ public class PythonBatchTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 57));
 
     String actualOutput =
-        executeInBatch(pgServer.getLocalPort(), sql, "execute_values", parameters);
+        executeInBatch(pgVersion, host, pgServer.getLocalPort(), sql, "execute_values", parameters);
     String expectedOutput = "57\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -142,7 +162,8 @@ public class PythonBatchTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 37));
 
     String actualOutput =
-        executeInBatch(pgServer.getLocalPort(), sql, "named_execute_many", parameters);
+        executeInBatch(
+            pgVersion, host, pgServer.getLocalPort(), sql, "named_execute_many", parameters);
     String expectedOutput = "66\n";
 
     assertEquals(expectedOutput, actualOutput);
@@ -173,7 +194,8 @@ public class PythonBatchTests extends PythonTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 27));
 
     String actualOutput =
-        executeInBatch(pgServer.getLocalPort(), sql, "named_execute_batch", parameters);
+        executeInBatch(
+            pgVersion, host, pgServer.getLocalPort(), sql, "named_execute_batch", parameters);
     String expectedOutput = "27\n";
 
     assertEquals(expectedOutput, actualOutput);

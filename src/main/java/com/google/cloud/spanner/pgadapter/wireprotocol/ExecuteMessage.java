@@ -80,6 +80,11 @@ public class ExecuteMessage extends AbstractQueryProtocolMessage {
   }
 
   @Override
+  public String getSql() {
+    return this.statement.getSql();
+  }
+
+  @Override
   protected int getHeaderLength() {
     return 8;
   }
