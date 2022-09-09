@@ -64,6 +64,12 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   }
 
   @Test
+  public void testShowServerVersion() throws IOException, InterruptedException {
+    String result = execute("TestShowServerVersion", createConnectionString());
+    assertEquals(pgVersion + "\n", result);
+  }
+
+  @Test
   public void testSelect1() throws IOException, InterruptedException {
     String result = execute("TestSelect1", createConnectionString());
     assertEquals("Success\n", result);
