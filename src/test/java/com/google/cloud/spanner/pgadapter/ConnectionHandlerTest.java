@@ -29,6 +29,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import java.io.ByteArrayOutputStream;
@@ -140,6 +141,96 @@ public class ConnectionHandlerTest {
   }
 
   @Test
+  public void testTerminateClosesAllPortals() throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    IntermediatePortalStatement portal1 = mock(IntermediatePortalStatement.class);
+    IntermediatePortalStatement portal2 = mock(IntermediatePortalStatement.class);
+
+    ConnectionHandler connection = new ConnectionHandler(server, socket);
+    connection.registerPortal("portal1", portal1);
+    connection.registerPortal("portal2", portal2);
+
+    connection.terminate();
+
+    verify(portal1).close();
+    verify(portal2).close();
+  }
+
+  @Test
+  public void testTerminateIgnoresPortalCloseError() throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    IntermediatePortalStatement portal1 = mock(IntermediatePortalStatement.class);
+    IntermediatePortalStatement portal2 = mock(IntermediatePortalStatement.class);
+    doThrow(new Exception("test")).when(portal2).close();
+
+    ConnectionHandler connection = new ConnectionHandler(server, socket);
+    connection.registerPortal("portal1", portal1);
+    connection.registerPortal("portal2", portal2);
+
+    connection.terminate();
+
+    verify(portal1).close();
+    verify(portal2).close();
+  }
+
+  @Test
+  public void testGetPortal() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    IntermediatePortalStatement portal1 = mock(IntermediatePortalStatement.class);
+
+    ConnectionHandler connection = new ConnectionHandler(server, socket);
+    connection.registerPortal("portal1", portal1);
+
+    assertSame(portal1, connection.getPortal("portal1"));
+  }
+
+  @Test
+  public void testGetUnknownPortal() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+
+    ConnectionHandler connection = new ConnectionHandler(server, socket);
+    assertThrows(IllegalStateException.class, () -> connection.getPortal("unknown portal"));
+  }
+
+  @Test
+  public void testClosePortal() throws Exception {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    IntermediatePortalStatement portal1 = mock(IntermediatePortalStatement.class);
+
+    ConnectionHandler connection = new ConnectionHandler(server, socket);
+    connection.registerPortal("portal1", portal1);
+
+    connection.closePortal("portal1");
+    verify(portal1).close();
+  }
+
+  @Test
+  public void testCloseUnknownPortal() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+
+    ConnectionHandler connection = new ConnectionHandler(server, socket);
+    assertThrows(IllegalStateException.class, () -> connection.closePortal("unknown portal"));
+  }
+
+  @Test
   public void testHandleMessages_NonFatalException() throws Exception {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
@@ -147,7 +238,7 @@ public class ConnectionHandlerTest {
     when(socket.getInetAddress()).thenReturn(address);
     DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
     ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
-    when(connectionMetadata.peekOutputStream()).thenReturn(dataOutputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
     WireMessage message = mock(WireMessage.class);
     when(server.recordMessage(message)).thenReturn(message);
     doThrow(
@@ -177,7 +268,7 @@ public class ConnectionHandlerTest {
     when(socket.getInetAddress()).thenReturn(address);
     DataOutputStream dataOutputStream = new DataOutputStream(new ByteArrayOutputStream());
     ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
-    when(connectionMetadata.peekOutputStream()).thenReturn(dataOutputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(dataOutputStream);
     WireMessage message = mock(WireMessage.class);
     when(server.recordMessage(message)).thenReturn(message);
     doThrow(new EOFException("fatal test exception")).when(message).send();
