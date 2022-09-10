@@ -54,10 +54,23 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
 
   /** Constructor for manually created Describe messages from the simple query protocol. */
   public DescribeMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
+    this(connection, PreparedType.Portal, "", manuallyCreatedToken);
+  }
+
+  /** Constructor for manually created Describe messages from PREPARE statements. */
+  public DescribeMessage(
+      ConnectionHandler connection,
+      PreparedType type,
+      String name,
+      ManuallyCreatedToken manuallyCreatedToken) {
     super(connection, 4, manuallyCreatedToken);
-    this.type = PreparedType.Portal;
-    this.name = "";
-    this.statement = this.connection.getPortal(this.name);
+    this.type = type;
+    this.name = name;
+    if (this.type == PreparedType.Portal) {
+      this.statement = this.connection.getPortal(this.name);
+    } else {
+      this.statement = this.connection.getStatement(this.name);
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -173,17 +186,19 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   public void handleDescribeStatement() throws Exception {
     try (DescribeStatementMetadata metadata =
         (DescribeStatementMetadata) this.statement.describe()) {
-      new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send(false);
-      if (metadata.getResultSet() != null) {
-        new RowDescriptionResponse(
-                this.outputStream,
-                this.statement,
-                metadata.getResultSet(),
-                this.connection.getServer().getOptions(),
-                this.queryMode)
-            .send(false);
-      } else {
-        new NoDataResponse(this.outputStream).send(false);
+      if (isExtendedProtocol()) {
+        new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send(false);
+        if (metadata.getResultSet() != null) {
+          new RowDescriptionResponse(
+                  this.outputStream,
+                  this.statement,
+                  metadata.getResultSet(),
+                  this.connection.getServer().getOptions(),
+                  this.queryMode)
+              .send(false);
+        } else {
+          new NoDataResponse(this.outputStream).send(false);
+        }
       }
     } catch (SpannerException exception) {
       this.handleError(exception);

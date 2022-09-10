@@ -23,6 +23,9 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -59,7 +62,10 @@ public class BooleanParserTest {
     assertFalse(BooleanParser.toBoolean("fa"));
     assertFalse(BooleanParser.toBoolean("f"));
 
-    assertThrows(IllegalArgumentException.class, () -> BooleanParser.toBoolean("foo"));
+    assertThrows(PGException.class, () -> BooleanParser.toBoolean("foo"));
+    assertThrows(
+        PGException.class,
+        () -> new BooleanParser("bar".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
   }
 
   @Test

@@ -52,6 +52,7 @@ import com.google.cloud.spanner.pgadapter.session.PGSetting;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.ConnectionState;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
@@ -1183,6 +1184,7 @@ public class ProtocolTest {
     when(connectionHandler.getPortal("")).thenReturn(intermediatePortalStatement);
     when(intermediatePortalStatement.getCommandTag()).thenReturn("INSERT");
     when(intermediatePortalStatement.getStatementType()).thenReturn(StatementType.UPDATE);
+    when(intermediatePortalStatement.getStatementResult()).thenReturn(new UpdateCount(1L));
     when(intermediatePortalStatement.getUpdateCount()).thenReturn(1L);
     when(backendConnection.getConnectionState()).thenReturn(ConnectionState.TRANSACTION);
     OptionsMetadata options = mock(OptionsMetadata.class);

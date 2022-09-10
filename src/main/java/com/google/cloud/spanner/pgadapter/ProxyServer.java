@@ -270,6 +270,11 @@ public class ProxyServer extends AbstractApiService {
     handler.start();
   }
 
+  /** Returns an immutable copy of the current connection handlers at this server. */
+  ImmutableList<ConnectionHandler> getConnectionHandlers() {
+    return ImmutableList.copyOf(this.handlers);
+  }
+
   /**
    * Saves the handler locally
    *
