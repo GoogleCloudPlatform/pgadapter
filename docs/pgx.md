@@ -1,7 +1,6 @@
-# Google Cloud Spanner PGAdapter - pgx Experimental Support
+# Google Cloud Spanner PGAdapter - pgx
 
-PGAdapter has __experimental support__ for the [Go pgx driver](https://github.com/jackc/pgx)
-version 4.15.0 and higher. 
+PGAdapter supports the [Go pgx driver](https://github.com/jackc/pgx) version 4.15.0 and higher. 
 
 ## Usage
 
