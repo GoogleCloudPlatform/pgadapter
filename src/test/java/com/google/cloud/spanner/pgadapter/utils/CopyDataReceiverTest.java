@@ -57,7 +57,7 @@ public class CopyDataReceiverTest {
     DataOutputStream outputStream = new DataOutputStream(new ByteArrayOutputStream());
     CopyStatement statement = mock(CopyStatement.class);
     ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
-    when(connectionMetadata.peekOutputStream()).thenReturn(outputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
     when(connectionHandler.getStatus())
         .thenReturn(ConnectionStatus.AUTHENTICATED, ConnectionStatus.COPY_FAILED);
