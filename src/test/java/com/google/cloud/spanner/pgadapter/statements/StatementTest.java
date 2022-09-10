@@ -45,6 +45,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
@@ -437,6 +438,13 @@ public class StatementTest {
   public void testCopyInvalidBuildMutation() throws Exception {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        mock(ExtendedQueryProtocolHandler.class);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    SessionState sessionState = new SessionState(options);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
     setupQueryInformationSchemaResults();
 
     String sql = "COPY keyvalue FROM STDIN;";
@@ -514,6 +522,13 @@ public class StatementTest {
   @Test
   public void testCopyBatchSizeLimit() throws Exception {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        mock(ExtendedQueryProtocolHandler.class);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    SessionState sessionState = new SessionState(options);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
@@ -556,6 +571,13 @@ public class StatementTest {
   @Test
   public void testCopyDataRowLengthMismatchLimit() throws Exception {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        mock(ExtendedQueryProtocolHandler.class);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    SessionState sessionState = new SessionState(options);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(

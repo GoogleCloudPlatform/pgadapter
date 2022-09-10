@@ -1419,6 +1419,13 @@ public class ProtocolTest {
   @Test
   public void testCopyFromFilePipe() throws Exception {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        mock(ExtendedQueryProtocolHandler.class);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    SessionState sessionState = new SessionState(options);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
     setupQueryInformationSchemaResults();
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));
@@ -1533,7 +1540,6 @@ public class ProtocolTest {
     when(sessionState.get(null, "server_version")).thenReturn(serverVersionSetting);
     when(backendConnection.getSessionState()).thenReturn(sessionState);
     when(server.getOptions()).thenReturn(options);
-    when(options.getServerVersion()).thenReturn("13.4");
     when(options.shouldAuthenticate()).thenReturn(false);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
