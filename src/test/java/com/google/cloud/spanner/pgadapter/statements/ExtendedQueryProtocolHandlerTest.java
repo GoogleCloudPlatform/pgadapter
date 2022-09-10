@@ -65,7 +65,7 @@ public class ExtendedQueryProtocolHandlerTest {
   @Test
   public void testFlush() throws Exception {
     ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
-    when(connectionMetadata.peekOutputStream()).thenReturn(mock(DataOutputStream.class));
+    when(connectionMetadata.getOutputStream()).thenReturn(mock(DataOutputStream.class));
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     ParseMessage parseMessage = mock(ParseMessage.class);
     BindMessage bindMessage = mock(BindMessage.class);
@@ -96,7 +96,7 @@ public class ExtendedQueryProtocolHandlerTest {
   @Test
   public void testSync() throws Exception {
     ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
-    when(connectionMetadata.peekOutputStream()).thenReturn(mock(DataOutputStream.class));
+    when(connectionMetadata.getOutputStream()).thenReturn(mock(DataOutputStream.class));
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     ParseMessage parseMessage = mock(ParseMessage.class);
     BindMessage bindMessage = mock(BindMessage.class);

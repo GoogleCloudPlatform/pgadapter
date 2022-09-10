@@ -357,7 +357,7 @@ public class ConnectionHandler extends Thread {
         exception,
         () ->
             String.format("Exception on connection handler with ID %s: %s", getName(), exception));
-    DataOutputStream output = getConnectionMetadata().peekOutputStream();
+    DataOutputStream output = getConnectionMetadata().getOutputStream();
     if (this.status == ConnectionStatus.TERMINATED) {
       new ErrorResponse(output, exception).send();
       new TerminateResponse(output).send();
@@ -402,11 +402,12 @@ public class ConnectionHandler extends Thread {
     this.portalsMap.put(portalName, portal);
   }
 
-  public void closePortal(String portalName) {
+  public void closePortal(String portalName) throws Exception {
     if (!hasPortal(portalName)) {
-      throw new IllegalStateException("Unregistered statement: " + portalName);
+      throw new IllegalStateException("Unregistered portal: " + portalName);
     }
-    this.portalsMap.remove(portalName);
+    IntermediatePortalStatement portal = this.portalsMap.get(portalName);
+    portal.close();
   }
 
   public boolean hasPortal(String portalName) {
