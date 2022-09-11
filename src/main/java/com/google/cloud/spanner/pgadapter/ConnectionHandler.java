@@ -229,8 +229,7 @@ public class ConnectionHandler extends Thread {
           && !this.socket.getInetAddress().isAnyLocalAddress()
           && !this.socket.getInetAddress().isLoopbackAddress()) {
         handleError(
-            PGException.newBuilder()
-                .setMessage("This proxy may only be accessed from localhost.")
+            PGException.newBuilder("This proxy may only be accessed from localhost.")
                 .setSeverity(Severity.FATAL)
                 .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
                 .build());
@@ -257,8 +256,7 @@ public class ConnectionHandler extends Thread {
         }
       } catch (Exception exception) {
         this.handleError(
-            PGException.newBuilder()
-                .setMessage(exception.getMessage())
+            PGException.newBuilder(exception.getMessage())
                 .setSeverity(Severity.FATAL)
                 .setSQLState(SQLState.InternalError)
                 .build());
@@ -303,10 +301,9 @@ public class ConnectionHandler extends Thread {
       message.send();
     } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
       this.handleError(
-          PGException.newBuilder()
+          PGException.newBuilder(fatalException.getMessage())
               .setSeverity(Severity.FATAL)
               .setSQLState(SQLState.InternalError)
-              .setMessage(fatalException.getMessage())
               .build());
       // Only terminate the connection if we are not in COPY_IN mode. In COPY_IN mode the mode will
       // switch to normal mode in these cases.

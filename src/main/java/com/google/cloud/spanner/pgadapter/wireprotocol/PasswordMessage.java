@@ -61,8 +61,7 @@ public class PasswordMessage extends ControlMessage {
     if (!useAuthentication()) {
       new ErrorResponse(
               this.outputStream,
-              PGException.newBuilder()
-                  .setMessage("Received PasswordMessage while authentication is disabled.")
+              PGException.newBuilder("Received PasswordMessage while authentication is disabled.")
                   .setSQLState(SQLState.ProtocolViolation)
                   .setSeverity(Severity.ERROR)
                   .build())
@@ -75,8 +74,7 @@ public class PasswordMessage extends ControlMessage {
     if (credentials == null) {
       new ErrorResponse(
               this.outputStream,
-              PGException.newBuilder()
-                  .setMessage(
+              PGException.newBuilder(
                       "Invalid credentials received. "
                           + "PGAdapter expects the password to contain the JSON payload of a credentials file. "
                           + "Alternatively, the password may contain only the private key of a service account. "
