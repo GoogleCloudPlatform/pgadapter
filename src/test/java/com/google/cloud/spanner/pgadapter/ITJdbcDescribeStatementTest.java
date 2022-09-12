@@ -21,26 +21,12 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
-import com.google.api.gax.core.NoCredentialsProvider;
 import com.google.cloud.ByteArray;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
-import com.google.cloud.spanner.admin.database.v1.DatabaseAdminClient;
-import com.google.cloud.spanner.admin.database.v1.DatabaseAdminSettings;
-import com.google.cloud.spanner.pgadapter.channels.TestChannelWithCertificatesProvider;
-import com.google.cloud.spanner.v1.SpannerClient;
-import com.google.cloud.spanner.v1.SpannerSettings;
 import com.google.common.collect.ImmutableList;
-import com.google.spanner.admin.database.v1.CreateDatabaseRequest;
-import com.google.spanner.admin.database.v1.DatabaseDialect;
-import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
-import com.google.spanner.v1.CreateSessionRequest;
-import com.google.spanner.v1.ExecuteSqlRequest;
-import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
-import com.google.spanner.v1.Session;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -53,7 +39,6 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Collections;
-import java.util.logging.Logger;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -67,8 +52,6 @@ import org.postgresql.jdbc.PgStatement;
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
 public class ITJdbcDescribeStatementTest implements IntegrationTest {
-  private static final Logger LOGGER =
-      Logger.getLogger(ITJdbcDescribeStatementTest.class.getName());
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
 
@@ -123,7 +106,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testQuery() throws SQLException {
-    LOGGER.info("Running test");
     String sql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "
@@ -156,12 +138,10 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertEquals(Types.VARCHAR, metadata.getParameterType(++index));
       }
     }
-    LOGGER.info("Finished test");
   }
 
   @Test
   public void testParameterMetaData() throws SQLException {
-    LOGGER.info("Running test");
     for (String sql :
         new String[] {
           "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
@@ -264,167 +244,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         }
       }
     }
-    LOGGER.info("Finished test");
-  }
-
-  @Test
-  public void testManualDescribe() throws IOException {
-    System.out.println("Creating client");
-    SpannerClient client =
-        SpannerClient.create(
-            SpannerSettings.newBuilder()
-                .setCredentialsProvider(NoCredentialsProvider.create())
-                .setTransportChannelProvider(
-                    new TestChannelWithCertificatesProvider().getChannelProvider("localhost", 8790))
-                .build());
-    System.out.println("Created client");
-    Session session =
-        client.createSession(
-            CreateSessionRequest.newBuilder()
-                .setDatabase(
-                    "projects/test-project/instances/test-instance/databases/" + database.getId())
-                .setSession(Session.newBuilder().build())
-                .build());
-    System.out.println("Created session");
-    System.out.println("Analyzing query");
-    com.google.spanner.v1.ResultSet resultSet =
-        client.executeSql(
-            ExecuteSqlRequest.newBuilder()
-                .setSql(
-                    "select 1  from all_types where col_bigint=$1 and col_bool=$2 and col_float8=$3")
-                .setQueryMode(QueryMode.PLAN)
-                .setSession(session.getName())
-                .build());
-    System.out.println("Received result");
-    System.out.println(resultSet);
-  }
-
-  public static void main_pg(String[] args) throws Exception {
-    //    DatabaseAdminClient adminClient = DatabaseAdminClient.create(
-    //        DatabaseAdminSettings.newBuilder()
-    //            .setEndpoint("staging-wrenchworks.sandbox.googleapis.com:443")
-    //            .build()
-    //    );
-    //    System.out.println("Creating database");
-    //    adminClient.createDatabaseAsync(
-    //        CreateDatabaseRequest.newBuilder()
-    //            .setCreateStatement("create database \"knut-test-db\"")
-    //            .setParent("projects/span-cloud-testing/instances/pgadapter-testing")
-    //            .setDatabaseDialect(DatabaseDialect.POSTGRESQL)
-    //            .build()
-    //    ).get();
-    //    System.out.println("Creating tables");
-    //    adminClient.updateDatabaseDdlAsync(
-    //        UpdateDatabaseDdlRequest.newBuilder()
-    //
-    // .setDatabase("projects/span-cloud-testing/instances/pgadapter-testing/databases/knut-test-db")
-    //            .addAllStatements(ImmutableList.of(
-    //                "create table numbers (num int not null primary key, name varchar(100))",
-    //                "create table all_types ("
-    //                    + "col_bigint bigint not null primary key, "
-    //                    + "col_bool bool, "
-    //                    + "col_bytea bytea, "
-    //                    + "col_float8 float8, "
-    //                    + "col_int int, "
-    //                    + "col_numeric numeric, "
-    //                    + "col_timestamptz timestamptz, "
-    //                    + "col_date date, "
-    //                    + "col_varchar varchar(100))"))
-    //            .build()
-    //    ).get();
-
-    System.out.println("Creating client");
-    SpannerClient client =
-        SpannerClient.create(
-            SpannerSettings.newBuilder()
-                .setEndpoint("staging-wrenchworks.sandbox.googleapis.com:443")
-                .build());
-    System.out.println("Created client");
-    Session session =
-        client.createSession(
-            CreateSessionRequest.newBuilder()
-                .setDatabase(
-                    "projects/span-cloud-testing/instances/pgadapter-testing/databases/knut-test-db")
-                .setSession(Session.newBuilder().build())
-                .build());
-    System.out.println("Created session");
-    System.out.println("Analyzing query");
-    com.google.spanner.v1.ResultSet resultSet =
-        client.executeSql(
-            ExecuteSqlRequest.newBuilder()
-                .setSql(
-                    "select 1  from all_types where col_bigint=$1 and col_bool=$2 and col_float8=$3")
-                .setQueryMode(QueryMode.PLAN)
-                .setSession(session.getName())
-                .build());
-    System.out.println("Received result");
-    System.out.println(resultSet);
-  }
-
-  public static void main(String[] args) throws Exception {
-    DatabaseAdminClient adminClient =
-        DatabaseAdminClient.create(
-            DatabaseAdminSettings.newBuilder()
-                .setEndpoint("staging-wrenchworks.sandbox.googleapis.com:443")
-                .build());
-    System.out.println("Creating database");
-    adminClient
-        .createDatabaseAsync(
-            CreateDatabaseRequest.newBuilder()
-                .setCreateStatement("create database `knut-test-db-gsql`")
-                .setParent("projects/span-cloud-testing/instances/pgadapter-testing")
-                .setDatabaseDialect(DatabaseDialect.GOOGLE_STANDARD_SQL)
-                .build())
-        .get();
-    System.out.println("Creating tables");
-    adminClient
-        .updateDatabaseDdlAsync(
-            UpdateDatabaseDdlRequest.newBuilder()
-                .setDatabase(
-                    "projects/span-cloud-testing/instances/pgadapter-testing/databases/knut-test-db-gsql")
-                .addAllStatements(
-                    ImmutableList.of(
-                        "create table numbers (num int64 not null, name string(100)) primary key (num)",
-                        "create table all_types ("
-                            + "col_bigint int64 not null, "
-                            + "col_bool bool, "
-                            + "col_bytea bytes(max), "
-                            + "col_float8 float64, "
-                            + "col_int int64, "
-                            + "col_numeric numeric, "
-                            + "col_timestamptz timestamp, "
-                            + "col_date date, "
-                            + "col_varchar string(100)) "
-                            + " primary key (col_bigint)"))
-                .build())
-        .get();
-
-    System.out.println("Creating client");
-    SpannerClient client =
-        SpannerClient.create(
-            SpannerSettings.newBuilder()
-                .setEndpoint("staging-wrenchworks.sandbox.googleapis.com:443")
-                .build());
-    System.out.println("Created client");
-    Session session =
-        client.createSession(
-            CreateSessionRequest.newBuilder()
-                .setDatabase(
-                    "projects/span-cloud-testing/instances/pgadapter-testing/databases/knut-test-db-gsql")
-                .setSession(Session.newBuilder().build())
-                .build());
-    System.out.println("Created session");
-    System.out.println("Analyzing query");
-    com.google.spanner.v1.ResultSet resultSet =
-        client.executeSql(
-            ExecuteSqlRequest.newBuilder()
-                .setSql(
-                    "select 1  from all_types where col_bigint=@p1 and col_bool=@p2 and col_float8=@p3")
-                .setQueryMode(QueryMode.PLAN)
-                .setSession(session.getName())
-                .build());
-    System.out.println("Received result");
-    System.out.println(resultSet);
   }
 
   @Test
@@ -448,7 +267,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   @Test
   @Ignore("Parameterized limit and offset are not yet supported by Spangres")
   public void testParameterMetaDataInLimit() throws SQLException {
-    LOGGER.info("Running test");
     String sql = "select * from all_types order by col_varchar limit ? offset ?";
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -462,7 +280,6 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
 
   @Test
   public void testDescribeInvalidStatements() throws SQLException {
-    LOGGER.info("Running test");
     for (String sql :
         new String[] {
           "select borked "
@@ -509,12 +326,10 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         }
       }
     }
-    LOGGER.info("Finished test");
   }
 
   @Test
   public void testResultSetMetaData() throws SQLException {
-    LOGGER.info("Running test");
     ImmutableList<String> columnNames =
         ImmutableList.of(
             "col_bigint",
@@ -563,12 +378,10 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         }
       }
     }
-    LOGGER.info("Finished test");
   }
 
   @Test
   public void testSelectWithParameters() throws SQLException {
-    LOGGER.info("Running test");
     String sql =
         "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
             + "from all_types "
@@ -620,12 +433,10 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         }
       }
     }
-    LOGGER.info("Finished test");
   }
 
   @Test
   public void testInsertWithParameters() throws SQLException {
-    LOGGER.info("Running test");
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement =
           connection.prepareStatement(
@@ -672,12 +483,10 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertFalse(resultSet.next());
       }
     }
-    LOGGER.info("Finished test");
   }
 
   @Test
   public void testUpdateWithParameters() throws SQLException {
-    LOGGER.info("Running test");
     String sql =
         "update all_types set "
             + "col_bool=?, "
@@ -736,12 +545,10 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertFalse(resultSet.next());
       }
     }
-    LOGGER.info("Finished test");
   }
 
   @Test
   public void testNullValues() throws SQLException {
-    LOGGER.info("Running test");
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement =
           connection.prepareStatement(
@@ -795,6 +602,5 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertFalse(resultSet.next());
       }
     }
-    LOGGER.info("Finished test");
   }
 }
