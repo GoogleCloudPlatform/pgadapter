@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ResultSet;
@@ -32,7 +34,6 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
-import com.google.cloud.spanner.pgadapter.utils.StatementParser;
 import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import java.io.DataOutputStream;
@@ -105,9 +106,9 @@ public class IntermediateStatement {
     }
     this.parsedStatement = potentiallyReplacedStatement;
     this.connection = connectionHandler.getSpannerConnection();
-    this.command = StatementParser.parseCommand(this.parsedStatement.getSqlWithoutComments());
+    this.command = parseCommand(this.parsedStatement.getSqlWithoutComments());
     this.commandTag = this.command;
-    this.outputStream = connectionHandler.getConnectionMetadata().peekOutputStream();
+    this.outputStream = connectionHandler.getConnectionMetadata().getOutputStream();
   }
 
   /**
@@ -237,11 +238,13 @@ public class IntermediateStatement {
 
   public void setStatementResult(StatementResult statementResult) {
     this.statementResult = statementResult;
-    if (statementResult.getResultType() == ResultType.RESULT_SET) {
-      this.hasMoreData = statementResult.getResultSet().next();
-    } else if (statementResult instanceof NoResult
-        && ((NoResult) statementResult).hasCommandTag()) {
-      this.commandTag = ((NoResult) statementResult).getCommandTag();
+    if (statementResult != null) {
+      if (statementResult.getResultType() == ResultType.RESULT_SET) {
+        this.hasMoreData = statementResult.getResultSet().next();
+      } else if (statementResult instanceof NoResult
+          && ((NoResult) statementResult).hasCommandTag()) {
+        this.commandTag = ((NoResult) statementResult).getCommandTag();
+      }
     }
   }
 

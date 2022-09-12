@@ -33,13 +33,13 @@
       com.google.cloud.spanner.pgadapter.python.PythonTest
     </excludedTests>
 
-    <spanner.version>6.27.0</spanner.version>
+    <spanner.version>6.28.0</spanner.version>
     <junixsocket.version>2.5.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.6.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.7.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -79,7 +79,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.4.1</version>
+      <version>42.5.0</version>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>
@@ -112,6 +112,11 @@
       <artifactId>maven-model</artifactId>
       <version>3.8.6</version>
     </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk15on</artifactId>
+      <version>1.70</version>
+    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
@@ -143,7 +148,7 @@
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
-      <version>4.6.1</version>
+      <version>4.8.0</version>
       <scope>test</scope>
     </dependency>
   </dependencies>

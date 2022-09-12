@@ -44,6 +44,10 @@ public class SessionStatementParserTest {
   @Test
   public void testParseShow() {
     assertEquals(
+        new ShowStatement(new TableOrIndexName("foo", "bar")),
+        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show foo.bar"))));
+
+    assertEquals(
         new ShowStatement(new TableOrIndexName("foo")),
         SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show foo"))));
     assertEquals(

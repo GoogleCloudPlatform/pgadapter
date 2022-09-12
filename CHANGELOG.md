@@ -1,5 +1,56 @@
 # Changelog
 
+## [0.7.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.6.1...v0.7.0) (2022-09-10)
+
+
+### Features
+
+* add COPY settings to session state ([#338](https://github.com/GoogleCloudPlatform/pgadapter/issues/338)) ([31a2faf](https://github.com/GoogleCloudPlatform/pgadapter/commit/31a2faff3cf65578dd4a9a129113cd949cf19298))
+* add ddl_transaction_mode and replace_pg_catalog_tables settings ([#334](https://github.com/GoogleCloudPlatform/pgadapter/issues/334)) ([aed2b4d](https://github.com/GoogleCloudPlatform/pgadapter/commit/aed2b4d8559e84efc34c981b40e31213fee3d076))
+* allow setting the server version number in startup msg ([#336](https://github.com/GoogleCloudPlatform/pgadapter/issues/336)) ([808217e](https://github.com/GoogleCloudPlatform/pgadapter/commit/808217ea8661c7b7aa57d59c9028e12e650bbb1f))
+* auto-convert explicit DDL transactions to batches ([#292](https://github.com/GoogleCloudPlatform/pgadapter/issues/292)) ([612fc44](https://github.com/GoogleCloudPlatform/pgadapter/commit/612fc44b1bba70d86a33baae2c78bdf8ceb3dc66))
+* execute INFORMATION_SCHEMA in single-use transaction ([#276](https://github.com/GoogleCloudPlatform/pgadapter/issues/276)) ([fa7fe13](https://github.com/GoogleCloudPlatform/pgadapter/commit/fa7fe135161399dc599d9ef5991ab1eb42e5f120))
+* ignore named primary keys with correct name ([#286](https://github.com/GoogleCloudPlatform/pgadapter/issues/286)) ([6d90366](https://github.com/GoogleCloudPlatform/pgadapter/commit/6d903666025b43c328ffd3aad31e9cea35a215cb))
+* manage session state ([#305](https://github.com/GoogleCloudPlatform/pgadapter/issues/305)) ([9e4d391](https://github.com/GoogleCloudPlatform/pgadapter/commit/9e4d391b2bf5e8c35cf85d67d9586bdda756f2a7))
+* PREPARE statement support ([#332](https://github.com/GoogleCloudPlatform/pgadapter/issues/332)) ([980e764](https://github.com/GoogleCloudPlatform/pgadapter/commit/980e764c4febb7a741a96279741b8ca66c89b26c))
+* replace pg_catalog tables with common table expressions ([#331](https://github.com/GoogleCloudPlatform/pgadapter/issues/331)) ([4b01399](https://github.com/GoogleCloudPlatform/pgadapter/commit/4b01399e5f127900d4d9f9039f5972e07577c39e))
+* select current_schema ([#273](https://github.com/GoogleCloudPlatform/pgadapter/issues/273)) ([b80069d](https://github.com/GoogleCloudPlatform/pgadapter/commit/b80069d555c593730aa31a36b4c77e037f9c52b1))
+* set default PG version reported by PGAdapter to 14.1 ([#303](https://github.com/GoogleCloudPlatform/pgadapter/issues/303)) ([4dcceb1](https://github.com/GoogleCloudPlatform/pgadapter/commit/4dcceb1916fb63ed8b27d247aaa51d5a4404d0dd))
+* support (ignore) show and set search_path ([#288](https://github.com/GoogleCloudPlatform/pgadapter/issues/288)) ([93d8c14](https://github.com/GoogleCloudPlatform/pgadapter/commit/93d8c140bfbcdc17daaaece4a66b649d701f7777))
+* support pg_settings table as CTE ([#307](https://github.com/GoogleCloudPlatform/pgadapter/issues/307)) ([a5e5634](https://github.com/GoogleCloudPlatform/pgadapter/commit/a5e563419cd0cc83557719991469ff606429a976))
+
+
+### Bug Fixes
+
+* ( and ) are allowed at the end of keywords ([#312](https://github.com/GoogleCloudPlatform/pgadapter/issues/312)) ([f3ebfb5](https://github.com/GoogleCloudPlatform/pgadapter/commit/f3ebfb58a6f20ade8e3ad295038ee9a906faa65b))
+* allow 'T' in timestamp values in COPY operations ([#319](https://github.com/GoogleCloudPlatform/pgadapter/issues/319)) ([a239328](https://github.com/GoogleCloudPlatform/pgadapter/commit/a2393283c01c3b46da874e0b0b457da24794a1d6))
+* backslash is not a valid quote escape ([#317](https://github.com/GoogleCloudPlatform/pgadapter/issues/317)) ([dc32af4](https://github.com/GoogleCloudPlatform/pgadapter/commit/dc32af4a7cd6b4546292c2936b805a635acf8bf1))
+* catch unknown types in RowDescription ([#343](https://github.com/GoogleCloudPlatform/pgadapter/issues/343)) ([6562014](https://github.com/GoogleCloudPlatform/pgadapter/commit/65620142574a61070b13f397e2fb9caeb44670c1))
+* correctly detect end of unquoted identifier ([#301](https://github.com/GoogleCloudPlatform/pgadapter/issues/301)) ([e31fd02](https://github.com/GoogleCloudPlatform/pgadapter/commit/e31fd021ff0a6c27aa5b2b31e71c6cb371d0bde2))
+* hint for large copy operations missed 'spanner.' namespace ([#304](https://github.com/GoogleCloudPlatform/pgadapter/issues/304)) ([a5e8afc](https://github.com/GoogleCloudPlatform/pgadapter/commit/a5e8afc797c983908a1524032590991a9eaa4ea9))
+* remove Spanner error prefixes ([#306](https://github.com/GoogleCloudPlatform/pgadapter/issues/306)) ([819a653](https://github.com/GoogleCloudPlatform/pgadapter/commit/819a6535536ea74ea68e7f21684271fe1b5f51d7))
+* translate queries for all table types in JDBC metadata ([#295](https://github.com/GoogleCloudPlatform/pgadapter/issues/295)) ([4cb43e6](https://github.com/GoogleCloudPlatform/pgadapter/commit/4cb43e643f7648f00869247b55a6c3118edbb6d9))
+* use a longer timeout for Commit for COPY ([#308](https://github.com/GoogleCloudPlatform/pgadapter/issues/308)) ([0f4dea7](https://github.com/GoogleCloudPlatform/pgadapter/commit/0f4dea7c85ff0d6611ecaa143d37f3e396bd7bab))
+* use main thread for CopyDataReceiver ([#345](https://github.com/GoogleCloudPlatform/pgadapter/issues/345)) ([687c952](https://github.com/GoogleCloudPlatform/pgadapter/commit/687c9521ecb081f65062521e39820b7fedfccdd4))
+
+
+### Performance Improvements
+
+* treat 'flush and sync' as 'sync' ([#285](https://github.com/GoogleCloudPlatform/pgadapter/issues/285)) ([7fc5d51](https://github.com/GoogleCloudPlatform/pgadapter/commit/7fc5d51805722aadf968cb520f789f4f98ac70b8))
+
+
+### Dependencies
+
+* bump google-cloud-spanner from 6.27.0 to 6.28.0 ([#324](https://github.com/GoogleCloudPlatform/pgadapter/issues/324)) ([029da7e](https://github.com/GoogleCloudPlatform/pgadapter/commit/029da7e03f5c457130bd837e702248088083bf0e))
+
+
+### Documentation
+
+* document all command line arguments ([#296](https://github.com/GoogleCloudPlatform/pgadapter/issues/296)) ([e4b32e2](https://github.com/GoogleCloudPlatform/pgadapter/commit/e4b32e2a6ec7e7d196ae6e0f9d77bb58fcafa64b))
+* document COPY TO STDOUT ([#297](https://github.com/GoogleCloudPlatform/pgadapter/issues/297)) ([3dbb19f](https://github.com/GoogleCloudPlatform/pgadapter/commit/3dbb19f0293d2e9d79ab84f3c1a2c5d389424b5a))
+* document psycopg2 usage ([#344](https://github.com/GoogleCloudPlatform/pgadapter/issues/344)) ([4144c2d](https://github.com/GoogleCloudPlatform/pgadapter/commit/4144c2d61774d74b4982654fa381198ec899a8ac))
+* Liquibase samples and tests ([#291](https://github.com/GoogleCloudPlatform/pgadapter/issues/291)) ([d471056](https://github.com/GoogleCloudPlatform/pgadapter/commit/d471056e4e775b6469e740fce465b30d57cdb0f9))
+
 ## [0.6.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.6.0...v0.6.1) (2022-07-13)
 
 

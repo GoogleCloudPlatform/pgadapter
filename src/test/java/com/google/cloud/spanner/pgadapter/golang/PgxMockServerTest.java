@@ -987,8 +987,6 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     }
   }
 
-  @Ignore(
-      "pgx copy implementation seems buggy (CopyDone message can be sent before all data has been sent)")
   @Test
   public void testCopyIn() {
     CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, true);

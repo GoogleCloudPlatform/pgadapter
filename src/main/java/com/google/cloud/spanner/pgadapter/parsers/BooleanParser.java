@@ -19,6 +19,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.common.collect.ImmutableSet;
 import java.util.Locale;
 import java.util.Set;
@@ -37,7 +38,7 @@ public class BooleanParser extends Parser<Boolean> {
   private static final Set<String> TRUE_VALUES =
       ImmutableSet.of("t", "tr", "tru", "true", "y", "ye", "yes", "on", "1");
   private static final Set<String> FALSE_VALUES =
-      ImmutableSet.of("f", "fa", "fal", "fals", "false", "n", "no", "of", "off");
+      ImmutableSet.of("f", "fa", "fal", "fals", "false", "n", "no", "of", "off", "0");
 
   BooleanParser(ResultSet item, int position) {
     this.item = item.getBoolean(position);
@@ -79,7 +80,7 @@ public class BooleanParser extends Parser<Boolean> {
     } else if (FALSE_VALUES.contains(value)) {
       return false;
     } else {
-      throw new IllegalArgumentException(value + " is not a valid boolean value");
+      throw PGExceptionFactory.newPGException(value + " is not a valid boolean value");
     }
   }
 

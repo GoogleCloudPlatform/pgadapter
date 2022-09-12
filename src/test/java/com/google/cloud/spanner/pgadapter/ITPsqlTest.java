@@ -22,11 +22,14 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
+import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -216,6 +219,51 @@ public class ITPsqlTest implements IntegrationTest {
         testEnv.getPGAdapterHostAndPort(), database.getId().getDatabase());
   }
 
+  /**
+   * Runs the given SQL statement using psql and returns a String tuple containing the stdout and
+   * stderr text.
+   */
+  private Tuple<String, String> runUsingPsql(String sql) throws IOException, InterruptedException {
+    return runUsingPsql(ImmutableList.of(sql));
+  }
+
+  private Tuple<String, String> runUsingPsql(Iterable<String> commands)
+      throws IOException, InterruptedException {
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand =
+        new String[] {
+          "psql",
+          "-h",
+          (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost()),
+          "-p",
+          String.valueOf(testEnv.getPGAdapterPort()),
+          "-d",
+          database.getId().getDatabase()
+        };
+
+    builder.command(psqlCommand);
+    setPgPassword(builder);
+    Process process = builder.start();
+    String errors;
+    String output;
+
+    try (OutputStreamWriter writer = new OutputStreamWriter(process.getOutputStream());
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      for (String sql : commands) {
+        writer.write(sql);
+      }
+      writer.write("\\q\n");
+      writer.flush();
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+    process.waitFor();
+    return Tuple.of(output, errors);
+  }
+
   @Test
   public void testRealPostgreSQLHelloWorld() throws Exception {
     ProcessBuilder builder = new ProcessBuilder();
@@ -253,6 +301,84 @@ public class ITPsqlTest implements IntegrationTest {
     assertEquals("    hello     \n" + "--------------\n" + " Hello World!\n" + "(1 row)\n", output);
     int res = process.waitFor();
     assertEquals(0, res);
+  }
+
+  @Test
+  public void testSelectPgCatalogTables() throws IOException, InterruptedException {
+    String sql =
+        "select pg_type.typname\n"
+            + "from pg_catalog.pg_type\n"
+            + "inner join pg_catalog.pg_namespace on pg_type.typnamespace=pg_namespace.oid\n"
+            + "order by pg_type.oid;\n";
+    Tuple<String, String> result = runUsingPsql(sql);
+    String output = result.x(), errors = result.y();
+
+    assertEquals("", errors);
+    assertEquals(
+        "   typname   \n"
+            + "-------------\n"
+            + " bool\n"
+            + " bytea\n"
+            + " int8\n"
+            + " int2\n"
+            + " int4\n"
+            + " text\n"
+            + " float4\n"
+            + " float8\n"
+            + " varchar\n"
+            + " date\n"
+            + " timestamp\n"
+            + " timestamptz\n"
+            + " numeric\n"
+            + " jsonb\n"
+            + "(14 rows)\n",
+        output);
+  }
+
+  @Test
+  public void testPrepareExecuteDeallocate() throws IOException, InterruptedException {
+    Tuple<String, String> result =
+        runUsingPsql(
+            ImmutableList.of(
+                "prepare insert_row as "
+                    + "insert into all_types values ($1, $2, $3, $4, $5, $6, $7, $8, $9);\n",
+                "prepare find_row as "
+                    + "select * from all_types "
+                    + "where col_bigint=$1 "
+                    + "and col_bool=$2 "
+                    + "and col_bytea=$3 "
+                    + "and col_float8=$4 "
+                    + "and col_int=$5 "
+                    + "and col_numeric=$6 "
+                    + "and col_timestamptz=$7 "
+                    + "and col_date=$8 "
+                    + "and col_varchar=$9;\n",
+                "execute find_row (1, true, '\\xaabbcc', 3.14, 100, 6.626, "
+                    + "'2022-09-06 17:14:49+02', '2022-09-06', 'hello world');\n",
+                "execute insert_row (1, true, '\\xaabbcc', 3.14, 100, 6.626, "
+                    + "'2022-09-06 17:14:49+02', '2022-09-06', 'hello world');\n",
+                "execute find_row (1, true, '\\xaabbcc', 3.14, 100, 6.626, "
+                    + "'2022-09-06 17:14:49+02', '2022-09-06', 'hello world');\n",
+                "deallocate find_row;\n",
+                "deallocate insert_row;\n"));
+    String output = result.x(), errors = result.y();
+    assertEquals("", errors);
+    assertEquals(
+        "PREPARE\n"
+            + "PREPARE\n"
+            + " col_bigint | col_bool | col_bytea | col_float8 | col_int | col_numeric | col_timestamptz | col_date | col_varchar \n"
+            + "------------+----------+-----------+------------+---------+-------------+-----------------+----------+-------------\n"
+            + "(0 rows)\n"
+            + "\n"
+            + "INSERT 0 1\n"
+            + " col_bigint | col_bool | col_bytea | col_float8 | col_int | col_numeric |    col_timestamptz     |  col_date  | col_varchar \n"
+            + "------------+----------+-----------+------------+---------+-------------+------------------------+------------+-------------\n"
+            + "          1 | t        | \\xaabbcc  |       3.14 |     100 |       6.626 | 2022-09-06 15:14:49+00 | 2022-09-06 | hello world\n"
+            + "(1 row)\n"
+            + "\n"
+            + "DEALLOCATE\n"
+            + "DEALLOCATE",
+        output);
   }
 
   @Test

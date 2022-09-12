@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -22,6 +23,9 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -58,7 +62,17 @@ public class BooleanParserTest {
     assertFalse(BooleanParser.toBoolean("fa"));
     assertFalse(BooleanParser.toBoolean("f"));
 
-    assertThrows(IllegalArgumentException.class, () -> BooleanParser.toBoolean("foo"));
+    assertThrows(PGException.class, () -> BooleanParser.toBoolean("foo"));
+    assertThrows(
+        PGException.class,
+        () -> new BooleanParser("bar".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
+  }
+
+  @Test
+  public void testBinaryParse() {
+    assertArrayEquals(new byte[] {1}, new BooleanParser(Boolean.TRUE).binaryParse());
+    assertArrayEquals(new byte[] {0}, new BooleanParser(Boolean.FALSE).binaryParse());
+    assertNull(new BooleanParser(null).binaryParse());
   }
 
   @Test
@@ -66,5 +80,12 @@ public class BooleanParserTest {
     assertEquals("t", new BooleanParser(Boolean.TRUE).stringParse());
     assertEquals("f", new BooleanParser(Boolean.FALSE).stringParse());
     assertNull(new BooleanParser(null).stringParse());
+  }
+
+  @Test
+  public void testSpannerParse() {
+    assertEquals("true", new BooleanParser(Boolean.TRUE).spannerParse());
+    assertEquals("false", new BooleanParser(Boolean.FALSE).spannerParse());
+    assertNull(new BooleanParser(null).spannerParse());
   }
 }

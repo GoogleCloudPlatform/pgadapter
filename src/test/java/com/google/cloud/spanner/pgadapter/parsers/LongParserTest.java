@@ -20,6 +20,9 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -53,5 +56,8 @@ public class LongParserTest {
   public void testStringParse() {
     assertEquals("100", new LongParser(100L).stringParse());
     assertNull(new LongParser(null).stringParse());
+    assertThrows(
+        PGException.class,
+        () -> new LongParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
   }
 }

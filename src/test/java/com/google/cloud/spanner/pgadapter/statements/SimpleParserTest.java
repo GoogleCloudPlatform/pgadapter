@@ -14,12 +14,15 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import org.junit.Test;
@@ -29,25 +32,104 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class SimpleParserTest {
 
+  /** Helper methods to reuse existing tests */
+  public static ImmutableList<String> splitStatements(String sql) {
+    return new SimpleParser(sql).splitStatements();
+  }
+
+  public static int skipQuotedString(String sql, int startIndex) {
+    SimpleParser parser = new SimpleParser(sql);
+    parser.setPos(startIndex);
+    parser.skipQuotedString();
+    return parser.getPos();
+  }
+
+  public static int skipSingleLineComment(String sql, int startIndex) {
+    SimpleParser parser = new SimpleParser(sql);
+    parser.setPos(startIndex);
+    parser.skipSingleLineComment();
+    return parser.getPos();
+  }
+
+  public static int skipMultiLineComment(String sql, int startIndex) {
+    SimpleParser parser = new SimpleParser(sql);
+    parser.setPos(startIndex);
+    parser.skipMultiLineComment();
+    return parser.getPos();
+  }
+
+  public static int skipDollarQuotedString(String sql, int startIndex) {
+    SimpleParser parser = new SimpleParser(sql);
+    parser.setPos(startIndex);
+    parser.skipDollarQuotedString();
+    return parser.getPos();
+  }
+
   @Test
-  public void testEat() {
-    assertTrue(new SimpleParser("insert into foo").eat("insert"));
-    assertTrue(new SimpleParser("   insert   into foo").eat("insert"));
-    assertTrue(new SimpleParser("\tinsert   foo").eat("insert"));
+  public void testTableOrIndexName() {
+    assertEquals(new TableOrIndexName(null, "foo"), new TableOrIndexName(null, "foo"));
+    assertNotEquals(new TableOrIndexName(null, "foo"), new TableOrIndexName(null, "bar"));
+  }
 
-    assertFalse(new SimpleParser("inset into foo").eat("insert"));
-    assertFalse(new SimpleParser("\"insert\" into foo").eat("insert"));
+  @Test
+  public void testEatKeyword() {
+    assertTrue(new SimpleParser("insert").eatKeyword("insert"));
+    assertTrue(new SimpleParser("insert into foo").eatKeyword("insert"));
+    assertTrue(new SimpleParser("   insert   into foo").eatKeyword("insert"));
+    assertTrue(new SimpleParser("\tinsert   foo").eatKeyword("insert"));
 
-    assertTrue(new SimpleParser("insert into foo").eat("insert", "into"));
-    assertTrue(new SimpleParser("   insert   into foo").eat("insert", "into"));
+    assertFalse(new SimpleParser("inset into foo").eatKeyword("insert"));
+    assertFalse(new SimpleParser("\"insert\" into foo").eatKeyword("insert"));
 
-    assertFalse(new SimpleParser("\tinsert   foo").eat("insert", "into"));
-    assertFalse(new SimpleParser("inset into foo").eat("insert", "into"));
-    assertFalse(new SimpleParser("\"insert\" into foo").eat("insert", "into"));
+    assertTrue(new SimpleParser("insert into foo").eatKeyword("insert", "into"));
+    assertTrue(new SimpleParser("   insert   into foo").eatKeyword("insert", "into"));
+
+    assertFalse(new SimpleParser("\tinsert   foo").eatKeyword("insert", "into"));
+    assertFalse(new SimpleParser("inset into foo").eatKeyword("insert", "into"));
+    assertFalse(new SimpleParser("\"insert\" into foo").eatKeyword("insert", "into"));
+
+    assertFalse(new SimpleParser("insertinto foo").eatKeyword("insert", "into"));
+    assertFalse(new SimpleParser("insert intofoo").eatKeyword("insert", "into"));
+    assertFalse(new SimpleParser("\"insert\"into foo").eatKeyword("insert", "into"));
+
+    assertTrue(new SimpleParser("values (1, 2)").eatKeyword("values"));
+    assertTrue(new SimpleParser("values(1, 2)").eatKeyword("values"));
+    assertTrue(new SimpleParser("null)").eatKeyword("null"));
+
+    assertTrue(new SimpleParser("select\"id\"from\"foo\"").eatKeyword("select"));
+    assertTrue(new SimpleParser("select/*comment*/id from foo").eatKeyword("select"));
+    assertFalse(new SimpleParser("select$$foo$$").eatKeyword("select"));
+    assertFalse(new SimpleParser("'select").eatKeyword("select"));
+  }
+
+  @Test
+  public void testEatToken() {
+    assertTrue(new SimpleParser("(foo").eatToken("("));
+    assertTrue(new SimpleParser("(").eatToken("("));
+    assertTrue(new SimpleParser("( ").eatToken("("));
+
+    assertTrue(new SimpleParser("\t(   foo").eatToken("("));
+    assertFalse(new SimpleParser("foo(").eatToken("("));
+    assertFalse(new SimpleParser("").eatToken("("));
+  }
+
+  @Test
+  public void testDotOperator() {
+    assertTrue(new SimpleParser(".foo").eatDotOperator());
+    assertFalse(new SimpleParser(". foo").eatDotOperator());
+    assertFalse(new SimpleParser(" .foo").eatDotOperator());
+    assertFalse(new SimpleParser(".").eatDotOperator());
+    assertFalse(new SimpleParser(". ").eatDotOperator());
+
+    assertTrue(new SimpleParser("\t(   foo").eatToken("("));
+    assertFalse(new SimpleParser("foo(").eatToken("("));
+    assertFalse(new SimpleParser("").eatToken("("));
   }
 
   @Test
   public void testReadTableOrIndexNamePart() {
+    assertEquals("\"foo\"", new SimpleParser("\"foo\"(id)").readIdentifierPart());
+
     assertEquals("foo", new SimpleParser("foo bar").readIdentifierPart());
     assertEquals("foo", new SimpleParser("foo").readIdentifierPart());
     assertEquals("\"foo\"", new SimpleParser("\"foo\" bar").readIdentifierPart());
@@ -79,6 +161,15 @@ public class SimpleParserTest {
 
   @Test
   public void testReadTableOrIndexName() {
+    assertEquals(new TableOrIndexName("foo"), new SimpleParser("foo .bar").readTableOrIndexName());
+    // The following is an invalid name, but the simple parser should just accept this and let the
+    // backend return an error.
+    assertEquals(
+        new TableOrIndexName("foo", ""), new SimpleParser("foo. bar").readTableOrIndexName());
+    assertNull(new SimpleParser(".bar").readTableOrIndexName());
+    assertEquals(
+        new TableOrIndexName("foo", ""), new SimpleParser("foo.\"bar").readTableOrIndexName());
+
     assertEquals(new TableOrIndexName("foo"), new SimpleParser("foo bar").readTableOrIndexName());
     assertEquals(new TableOrIndexName("foo"), new SimpleParser("foo").readTableOrIndexName());
     assertEquals(
@@ -141,9 +232,9 @@ public class SimpleParserTest {
     assertEquals(
         "(foo('bar\", test'))", new SimpleParser("  (foo('bar\", test')),bar").parseExpression());
     assertEquals(
-        "(foo('bar\\', test'))", new SimpleParser("  (foo('bar\\', test')),bar").parseExpression());
+        "(foo('bar'', test'))", new SimpleParser("  (foo('bar'', test')),bar").parseExpression());
     assertEquals("''", new SimpleParser("''").parseExpression());
-    assertEquals("'\\''", new SimpleParser("'\\''").parseExpression());
+    assertEquals("''''", new SimpleParser("''''").parseExpression());
     assertEquals("'\"'", new SimpleParser("'\"'").parseExpression());
 
     assertNull(new SimpleParser("\"foo").parseExpression());
@@ -208,11 +299,10 @@ public class SimpleParserTest {
         Arrays.asList("(foo('bar\", test'))", "bar"),
         new SimpleParser("  (foo('bar\", test')),bar").parseExpressionList());
     assertEquals(
-        Arrays.asList("(foo('bar\\', test'))", "bar"),
-        new SimpleParser("  (foo('bar\\', test')),bar").parseExpressionList());
+        Arrays.asList("(foo('bar'', test'))", "bar"),
+        new SimpleParser("  (foo('bar'', test')),bar").parseExpressionList());
     assertEquals(Collections.singletonList("''"), new SimpleParser("''").parseExpressionList());
-    assertEquals(
-        Collections.singletonList("'\\''"), new SimpleParser("'\\''").parseExpressionList());
+    assertEquals(Collections.singletonList("''''"), new SimpleParser("''''").parseExpressionList());
     assertEquals(Collections.singletonList("'\"'"), new SimpleParser("'\"'").parseExpressionList());
 
     assertNull(new SimpleParser("\"foo").parseExpressionList());
@@ -222,5 +312,111 @@ public class SimpleParserTest {
         new SimpleParser("foo(bar, test)) bar").parseExpressionList());
     assertNull(new SimpleParser("foo((bar, test) bar").parseExpressionList());
     assertEquals(Collections.singletonList("foo"), new SimpleParser("foo)(").parseExpressionList());
+  }
+
+  @Test
+  public void testParseExpressionUntil() {
+    assertEquals(
+        "insert into foo values ('select')",
+        new SimpleParser("insert into foo values ('select')")
+            .parseExpressionUntilKeyword(ImmutableList.of("select")));
+    assertEquals(
+        "insert into foo",
+        new SimpleParser("insert into foo select * from bar")
+            .parseExpressionUntilKeyword(ImmutableList.of("select")));
+    assertEquals(
+        "insert into foo values ('''select''')",
+        new SimpleParser("insert into foo values ('''select''')")
+            .parseExpressionUntilKeyword(ImmutableList.of("select")));
+    assertEquals(
+        "insert into foo (\"''\")",
+        new SimpleParser("insert into foo (\"''\") select * from bar")
+            .parseExpressionUntilKeyword(ImmutableList.of("select")));
+    assertEquals(
+        "insert into foo values ('''select''')",
+        new SimpleParser("insert into foo values ('''select''') select 1")
+            .parseExpressionUntilKeyword(ImmutableList.of("select")));
+    assertEquals(
+        "select \"insert\" from bar",
+        new SimpleParser("select \"insert\" from bar")
+            .parseExpressionUntilKeyword(ImmutableList.of("insert")));
+    assertEquals(
+        "select \"\"\"insert\"\"\" from bar",
+        new SimpleParser("select \"\"\"insert\"\"\" from bar")
+            .parseExpressionUntilKeyword(ImmutableList.of("insert")));
+    assertEquals(
+        "insert into foo (\"\"\"\")",
+        new SimpleParser("insert into foo (\"\"\"\") select * from bar")
+            .parseExpressionUntilKeyword(ImmutableList.of("select")));
+  }
+
+  @Test
+  public void testParseCommand() {
+    assertEquals("SELECT", parseCommand("select * from foo"));
+    assertEquals("INSERT", parseCommand("insert into foo values (1, 'One')"));
+    assertEquals("SELECT", parseCommand("/* this is a comment */ select * from foo"));
+    assertEquals("CREATE", parseCommand("/* ddl statements are also supported */create table foo"));
+
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select * from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE",
+        parseCommand(
+            "with my_cte as (select * from foo), my_cte2 as (select * from bar) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE",
+        parseCommand(
+            "with my_cte as (select * from foo), my_cte2 as (select * from bar) /* this is a comment*/update bar set col1='one'"));
+    assertEquals(
+        "UPDATE",
+        parseCommand(
+            "with my_cte as (select * from foo) -- also a comment\n, my_cte2 as (select * from bar) /* this is a comment*/update bar set col1='one'"));
+    assertEquals(
+        "UPSERT", parseCommand("with my_cte as (select * from foo) upsert bar set col1='one'"));
+    assertEquals(
+        "SELECT",
+        parseCommand(
+            "WITH temp (value) as (SELECT avg(id) FROM users) SELECT id FROM users, temp ORDER BY id"));
+    assertEquals(
+        "SELECT",
+        parseCommand(
+            "WITH temp (col1,/*comment*/col2, col3) as (SELECT avg(id) FROM users) SELECT id FROM users, temp ORDER BY id"));
+
+    // The parser returns 'WITH' as the command tag if the CTE appears to be invalid.
+    assertEquals(
+        "WITH", parseCommand("with my_cte as (select * from foo update bar set col1='one'"));
+    assertEquals(
+        "WITH", parseCommand("with my_cte as (select * from foo), update bar set col1='one'"));
+    assertEquals("WITH", parseCommand("with my_cte (select * from foo) update bar set col1='one'"));
+    assertEquals(
+        "WITH", parseCommand("with my_cte.bar as (select * from foo) update bar set col1='one'"));
+    assertEquals("WITH", parseCommand("with (select * from foo update bar set col1='one'"));
+    assertEquals("WITH", parseCommand("with 1 as (select * from foo update bar set col1='one'"));
+    assertEquals(
+        "WITH", parseCommand("with my_cte as select * from foo update bar set col1='one'"));
+
+    assertEquals("WITH", parseCommand("with my_cte as (select * from foo)"));
+    assertEquals("", parseCommand("/*only a comment*/"));
+    assertEquals("WITH", parseCommand("with my_cte () as (select * from foo)"));
+    assertEquals("WITH", parseCommand("with my_cte (,) as (select * from foo)"));
+    assertEquals("WITH", parseCommand("with my_cte (bar"));
+    assertEquals("WITH", parseCommand("with my_cte (bar-"));
+    assertEquals("WITH", parseCommand("with my_cte (bar/"));
+
+    assertEquals("WITH", parseCommand("with my_cte as (select * from foo)"));
+    assertEquals("", parseCommand("/*only a comment*/"));
+
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a/b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a*b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a-b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a / b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a * b from foo) update bar set col1='one'"));
+    assertEquals(
+        "UPDATE", parseCommand("with my_cte as (select a - b from foo) update bar set col1='one'"));
   }
 }

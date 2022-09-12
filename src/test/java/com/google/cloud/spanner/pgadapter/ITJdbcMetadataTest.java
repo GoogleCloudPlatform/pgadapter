@@ -38,29 +38,38 @@ import java.sql.Types;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
 @Category(IntegrationTest.class)
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class ITJdbcMetadataTest implements IntegrationTest {
   private static final String[] VERSIONS =
       new String[] {
-        "42.4.1", "42.4.0", "42.3.6", "42.3.5", "42.3.4", "42.3.3", "42.3.2", "42.3.1", "42.3.0",
-        "42.2.25", "42.2.24", "42.2.23", "42.2.22", "42.2.21", "42.2.20", "42.2.19", "42.2.18",
-        "42.2.17", "42.2.16", "42.2.15", "42.2.14", "42.2.13", "42.2.12", "42.2.11", "42.2.10",
-        "42.2.9", "42.2.8", "42.2.7", "42.2.6", "42.2.5", "42.2.4", "42.2.3", "42.2.2", "42.2.1",
-        "42.2.0", "42.1.4", "42.1.3", "42.1.2", "42.1.1", "42.1.0", "42.0.0"
+        "42.5.0", "42.4.2", "42.4.1", "42.4.0", "42.3.6", "42.3.5", "42.3.4", "42.3.3", "42.3.2",
+        "42.3.1", "42.3.0", "42.2.25", "42.2.24", "42.2.23", "42.2.22", "42.2.21", "42.2.20",
+        "42.2.19", "42.2.18", "42.2.17", "42.2.16", "42.2.15", "42.2.14", "42.2.13", "42.2.12",
+        "42.2.11", "42.2.10", "42.2.9", "42.2.8", "42.2.7", "42.2.6", "42.2.5", "42.2.4", "42.2.3",
+        "42.2.2", "42.2.1", "42.2.0", "42.1.4", "42.1.3", "42.1.2", "42.1.1", "42.1.0", "42.0.0"
       };
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
+
+  @Parameter public String pgVersion;
+
+  @Parameters(name = "pgVersion = {0}")
+  public static Object[] data() {
+    return new Object[] {"1.0", "14.1"};
+  }
 
   @BeforeClass
   public static void setup() {
@@ -106,10 +115,12 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   }
 
   private String createUrl() {
-    return String.format("jdbc:postgresql://%s/", testEnv.getPGAdapterHostAndPort());
+    return String.format(
+        "jdbc:postgresql://%s/?options=-c%%20server_version=%s",
+        testEnv.getPGAdapterHostAndPort(), pgVersion);
   }
 
-  private void runForAllVersions(Consumer<Connection> runnable) throws Exception {
+  private void runForAllVersions(BiConsumer<Connection, String> runnable) throws Exception {
     for (String version : VERSIONS) {
       String mavenUrl =
           String.format(
@@ -146,8 +157,11 @@ public class ITJdbcMetadataTest implements IntegrationTest {
         Class<?> runnerClass = classLoader.loadClass(TestRunner.class.getName());
         Constructor<?> constructor = runnerClass.getDeclaredConstructor();
         Object runner = constructor.newInstance();
-        Method runMethod = runner.getClass().getDeclaredMethod("run", String.class, Consumer.class);
-        runMethod.invoke(runner, createUrl(), runnable);
+        Method runMethod =
+            runner
+                .getClass()
+                .getDeclaredMethod("run", String.class, String.class, BiConsumer.class);
+        runMethod.invoke(runner, createUrl(), version, runnable);
       } catch (Throwable t) {
         throw new Exception(String.format("Error for version %s:", version) + t.getMessage(), t);
       } finally {
@@ -157,11 +171,12 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   }
 
   public static class TestRunner {
-    public void run(String url, Consumer<Connection> runnable) throws Exception {
+    public void run(String url, String version, BiConsumer<Connection, String> runnable)
+        throws Exception {
       // Dynamically load the PG JDBC driver using the default class loader of the current thread.
       Class.forName("org.postgresql.Driver");
       try (Connection connection = DriverManager.getConnection(url)) {
-        runnable.accept(connection);
+        runnable.accept(connection, version);
       }
       // Deregister the current driver from the DriverManager to prevent 'the driver has already
       // been registered' errors.
@@ -173,11 +188,19 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataVersion() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
+          int lastPointIndex = version.lastIndexOf('.');
+          int patchVersion = Integer.parseInt(version.substring(lastPointIndex + 1));
+          String comparableVersion =
+              version.substring(0, lastPointIndex + 1) + String.format("%03d", patchVersion);
           try {
             DatabaseMetaData metadata = connection.getMetaData();
-            if (testEnv.getServer() != null) {
+            // Options in the connection string are only supported from version 42.2.6.
+            if (comparableVersion.compareTo("42.2.006") >= 0) {
+              assertEquals(pgVersion, metadata.getDatabaseProductVersion());
+            } else if (testEnv.getServer() != null) {
               assertEquals(
+                  pgVersion,
                   testEnv.getServer().getOptions().getServerVersion(),
                   metadata.getDatabaseProductVersion());
             }
@@ -190,7 +213,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testSelectEdbRedwoodDateSetting() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             try (ResultSet resultSet =
                 connection
@@ -208,7 +231,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataTables() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet tables =
@@ -237,7 +260,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataTables_Unfiltered() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet tables = metadata.getTables(null, null, null, null)) {
@@ -255,7 +278,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataTables_FilteredByName() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet tables =
@@ -280,7 +303,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataTables_TablesAndViews() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet tables =
@@ -305,7 +328,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataTables_AllTypes() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet tables =
@@ -353,7 +376,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataColumns() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet columns = metadata.getColumns(null, "public", "all_types", null)) {
@@ -414,7 +437,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataColumns_FilteredByName() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet columns = metadata.getColumns(null, "public", "all_types", "%a%")) {
@@ -455,7 +478,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataIndexInfo() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet indexInfo =
@@ -481,7 +504,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataIndexInfo_Unique() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet indexInfo =
@@ -504,7 +527,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataPrimaryKeys() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet primaryKeys = metadata.getPrimaryKeys(null, "public", "all_types")) {
@@ -531,7 +554,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataExportedKeys() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet exportedKeys = metadata.getExportedKeys(null, "public", "singers")) {
@@ -584,7 +607,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataImportedKeys() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet importedKeys = metadata.getImportedKeys(null, "public", "albums")) {
@@ -638,7 +661,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataCrossReference() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             // Retrieve the references from albums (foreign table) to singers (parent table).
@@ -704,7 +727,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataTypeInfo() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             Map<String, Integer> results = new HashMap<>();
@@ -738,7 +761,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataSuperTypes() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             // This method is not supported by the PG JDBC driver.
@@ -754,7 +777,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataTableTypes() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             boolean hasTable = false;
@@ -776,7 +799,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataTablePrivileges() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet tablePrivileges = metadata.getTablePrivileges(null, null, null)) {
@@ -795,7 +818,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataColumnPrivileges() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet columnPrivileges =
@@ -819,7 +842,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataAttributes() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             // This method is not supported by the PG JDBC driver.
@@ -836,7 +859,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataBestRowIdentifier() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             // PG just returns the primary key of each table for this method.
@@ -868,7 +891,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataBestRowIdentifier_NoData() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             // The current replacement returns an empty result set.
@@ -891,7 +914,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataCatalogs() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet catalogs = metadata.getCatalogs()) {
@@ -908,7 +931,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataSchemas() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet schemas = metadata.getSchemas()) {
@@ -947,7 +970,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataClientInfoProperties() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet clientInfoProperties = metadata.getClientInfoProperties()) {
@@ -963,7 +986,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataFunctions() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet functions = metadata.getFunctions(null, null, null)) {
@@ -978,7 +1001,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataFunctionColumns() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet functionColumns = metadata.getFunctionColumns(null, null, null, null)) {
@@ -993,7 +1016,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataProcedures() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet procedures = metadata.getProcedures(null, null, null)) {
@@ -1008,7 +1031,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataProcedureColumns() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet procedureColumns =
@@ -1024,7 +1047,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataPseudoColumns() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             assertThrows(
@@ -1039,7 +1062,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataVersionColumns() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet versionColumns = metadata.getVersionColumns(null, null, null)) {
@@ -1055,7 +1078,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataUDTs() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             try (ResultSet types = metadata.getUDTs(null, null, null, null)) {
@@ -1070,7 +1093,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataMaxNameLength() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             assertEquals(128, metadata.getMaxColumnNameLength());
@@ -1083,7 +1106,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
   @Test
   public void testDatabaseMetaDataSQLKeywords() throws Exception {
     runForAllVersions(
-        connection -> {
+        (connection, version) -> {
           try {
             DatabaseMetaData metadata = connection.getMetaData();
             assertTrue(metadata.getSQLKeywords().length() > 0);

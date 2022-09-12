@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
-import static com.google.cloud.spanner.pgadapter.utils.CopyInParser.createDefaultTimestampUtils;
 import static com.google.cloud.spanner.pgadapter.utils.MutationWriter.calculateSize;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -37,7 +36,9 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.utils.CsvCopyParser.CsvCopyRecord;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.common.collect.ImmutableList;
@@ -118,11 +119,13 @@ public class MutationWriterTest {
             .builder()
             .setHeader(tableColumns.keySet().toArray(new String[0]))
             .build();
+    SessionState sessionState = new SessionState(mock(OptionsMetadata.class));
     Connection connection = mock(Connection.class);
     DatabaseClient databaseClient = mock(DatabaseClient.class);
     when(connection.getDatabaseClient()).thenReturn(databaseClient);
     MutationWriter mutationWriter =
         new MutationWriter(
+            sessionState,
             CopyTransactionMode.ImplicitAtomic,
             connection,
             "numbers",
@@ -162,9 +165,11 @@ public class MutationWriterTest {
               .builder()
               .setHeader(tableColumns.keySet().toArray(new String[0]))
               .build();
+      SessionState sessionState = new SessionState(mock(OptionsMetadata.class));
       Connection connection = mock(Connection.class);
       MutationWriter mutationWriter =
           new MutationWriter(
+              sessionState,
               CopyTransactionMode.ImplicitAtomic,
               connection,
               "numbers",
@@ -181,7 +186,7 @@ public class MutationWriterTest {
       assertEquals(
           "FAILED_PRECONDITION: Record count: 2 has exceeded the limit: 1.\n"
               + "\n"
-              + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
+              + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 1.\n"
               + "\n"
               + "Execute `SET SPANNER.AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.\n\n",
           exception.getMessage());
@@ -204,12 +209,17 @@ public class MutationWriterTest {
               .builder()
               .setHeader(tableColumns.keySet().toArray(new String[0]))
               .build();
+      SessionState sessionState = new SessionState(mock(OptionsMetadata.class));
+      // 6 == 2 mutations per batch, as we have 2 columns + 1 indexed column.
+      sessionState.set("spanner", "copy_batch_size", "6");
+      sessionState.commit();
       Connection connection = mock(Connection.class);
       DatabaseClient databaseClient = mock(DatabaseClient.class);
       when(connection.getDatabaseClient()).thenReturn(databaseClient);
 
       MutationWriter mutationWriter =
           new MutationWriter(
+              sessionState,
               CopyTransactionMode.ImplicitNonAtomic,
               connection,
               "numbers",
@@ -245,9 +255,11 @@ public class MutationWriterTest {
               .builder()
               .setHeader(tableColumns.keySet().toArray(new String[0]))
               .build();
+      SessionState sessionState = new SessionState(mock(OptionsMetadata.class));
       Connection connection = mock(Connection.class);
       MutationWriter mutationWriter =
           new MutationWriter(
+              sessionState,
               CopyTransactionMode.ImplicitAtomic,
               connection,
               "numbers",
@@ -284,12 +296,14 @@ public class MutationWriterTest {
               .builder()
               .setHeader(tableColumns.keySet().toArray(new String[0]))
               .build();
+      SessionState sessionState = new SessionState(mock(OptionsMetadata.class));
       Connection connection = mock(Connection.class);
       DatabaseClient databaseClient = mock(DatabaseClient.class);
       when(connection.getDatabaseClient()).thenReturn(databaseClient);
 
       MutationWriter mutationWriter =
           new MutationWriter(
+              sessionState,
               CopyTransactionMode.ImplicitNonAtomic,
               connection,
               "numbers",
@@ -329,12 +343,14 @@ public class MutationWriterTest {
             .builder()
             .setHeader(tableColumns.keySet().toArray(new String[0]))
             .build();
+    SessionState sessionState = new SessionState(mock(OptionsMetadata.class));
     Connection connection = mock(Connection.class);
     DatabaseClient databaseClient = mock(DatabaseClient.class);
     when(connection.getDatabaseClient()).thenReturn(databaseClient);
 
     MutationWriter mutationWriter =
         new MutationWriter(
+            sessionState,
             CopyTransactionMode.ImplicitNonAtomic,
             connection,
             "numbers",
@@ -510,6 +526,7 @@ public class MutationWriterTest {
   @Test
   public void testBuildMutationNulls() throws IOException {
     // TODO(b/237831798): Add support for ARRAY in COPY operations.
+    SessionState sessionState = new SessionState(mock(OptionsMetadata.class));
     Connection connection = mock(Connection.class);
     for (Type type :
         new Type[] {
@@ -525,6 +542,7 @@ public class MutationWriterTest {
         }) {
       MutationWriter mutationWriter =
           new MutationWriter(
+              sessionState,
               CopyTransactionMode.ImplicitAtomic,
               connection,
               "my_table",
@@ -538,9 +556,7 @@ public class MutationWriterTest {
               new StringReader("col\n\\N\n"), CSVFormat.POSTGRESQL_TEXT.withFirstRecordAsHeader());
       CSVRecord record = parser.getRecords().get(0);
 
-      Mutation mutation =
-          mutationWriter.buildMutation(
-              new CsvCopyRecord(createDefaultTimestampUtils(), record, true));
+      Mutation mutation = mutationWriter.buildMutation(new CsvCopyRecord(record, true));
 
       assertEquals(String.format("Type: %s", type), 1, mutation.asMap().size());
     }

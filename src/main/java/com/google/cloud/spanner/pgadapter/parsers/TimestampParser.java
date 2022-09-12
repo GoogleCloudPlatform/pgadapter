@@ -20,6 +20,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
@@ -57,7 +58,7 @@ public class TimestampParser extends Parser<Timestamp> {
           .parseLenient()
           .parseCaseInsensitive()
           .appendPattern("yyyy-MM-dd HH:mm:ss")
-          .appendFraction(ChronoField.MICRO_OF_SECOND, 0, 9, true)
+          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
           .appendOffset("+HH:mm", "Z")
           .toFormatter();
 
@@ -73,12 +74,7 @@ public class TimestampParser extends Parser<Timestamp> {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          String stringValue = toPGString(new String(item, StandardCharsets.UTF_8));
-          TemporalAccessor temporalAccessor = TIMESTAMP_FORMATTER.parse(stringValue);
-          this.item =
-              Timestamp.ofTimeSecondsAndNanos(
-                  temporalAccessor.getLong(ChronoField.INSTANT_SECONDS),
-                  temporalAccessor.get(ChronoField.NANO_OF_SECOND));
+          this.item = toTimestamp(new String(item, StandardCharsets.UTF_8));
           break;
         case BINARY:
           this.item = toTimestamp(item);
@@ -100,6 +96,19 @@ public class TimestampParser extends Parser<Timestamp> {
     long javaSeconds = ts.getSeconds() + PG_EPOCH_SECONDS;
     int javaNanos = ts.getNanos();
     return Timestamp.ofTimeSecondsAndNanos(javaSeconds, javaNanos);
+  }
+
+  /** Converts the given string value to a {@link Timestamp}. */
+  public static Timestamp toTimestamp(String value) {
+    try {
+      String stringValue = toPGString(value);
+      TemporalAccessor temporalAccessor = TIMESTAMP_FORMATTER.parse(stringValue);
+      return Timestamp.ofTimeSecondsAndNanos(
+          temporalAccessor.getLong(ChronoField.INSTANT_SECONDS),
+          temporalAccessor.get(ChronoField.NANO_OF_SECOND));
+    } catch (Exception exception) {
+      throw PGExceptionFactory.newPGException("Invalid timestamp value: " + value);
+    }
   }
 
   /**

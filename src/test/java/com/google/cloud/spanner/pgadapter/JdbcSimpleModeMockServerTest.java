@@ -14,8 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -29,6 +27,7 @@ import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.RollbackRequest;
+import io.grpc.Status;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -245,8 +244,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception =
             assertThrows(SQLException.class, () -> statement.execute(INVALID_DML.getSql()));
-        assertThat(
-            exception.getMessage(), containsString("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
 
         // Verify that the transaction was rolled back and that the connection is usable.
         assertTrue(statement.execute("show transaction isolation level"));
@@ -269,8 +267,8 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception =
             assertThrows(SQLException.class, () -> statement.execute(INVALID_SELECT.getSql()));
-        assertThat(
-            exception.getMessage(), containsString("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals(
+            "ERROR: Statement is invalid. - Statement: 'SELECT foo'", exception.getMessage());
 
         // Verify that the transaction was rolled back and that the connection is usable.
         assertTrue(statement.execute("show transaction isolation level"));
@@ -292,8 +290,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       try (java.sql.Statement statement = connection.createStatement()) {
         SQLException exception =
             assertThrows(SQLException.class, () -> statement.execute(INVALID_DDL.getSql()));
-        assertThat(
-            exception.getMessage(), containsString("INVALID_ARGUMENT: Statement is invalid."));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
 
         // Verify that the transaction was rolled back and that the connection is usable.
         assertTrue(statement.execute("show transaction isolation level"));
@@ -428,6 +425,108 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
         // Make sure that we actually received a Rollback statement. The rollback was initiated by
         // PGAdapter when the transaction was aborted.
         assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+      }
+    }
+  }
+
+  @Test
+  public void testPrepareStatement() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertFalse(statement.execute("prepare my_statement as SELECT 1"));
+        assertTrue(statement.execute("execute my_statement"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.execute("deallocate my_statement"));
+      }
+    }
+  }
+
+  @Test
+  public void testInvalidPrepareStatement() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertThrows(SQLException.class, () -> statement.execute("prepare my_statement foo"));
+      }
+    }
+  }
+
+  @Test
+  public void testPrepareStatementWithError() throws SQLException {
+    String sql = "select * from non_existing_table where id=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            com.google.cloud.spanner.Statement.of(sql),
+            Status.NOT_FOUND
+                .withDescription("Table non_existing_table not found")
+                .asRuntimeException()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        SQLException exception =
+            assertThrows(
+                SQLException.class, () -> statement.execute("prepare my_statement as " + sql));
+        assertEquals(
+            "ERROR: Table non_existing_table not found - Statement: 'select * from non_existing_table where id=$1'",
+            exception.getMessage());
+      }
+    }
+  }
+
+  @Test
+  public void testStatementIsConnectionSpecific() throws SQLException {
+    try (Connection connection1 = DriverManager.getConnection(createUrl());
+        Connection connection2 = DriverManager.getConnection(createUrl())) {
+      connection1.createStatement().execute("prepare my_statement as SELECT 1");
+      assertTrue(connection1.createStatement().execute("execute my_statement"));
+      assertThrows(
+          SQLException.class, () -> connection2.createStatement().execute("execute my_statement"));
+    }
+  }
+
+  @Test
+  public void testDeallocateAll() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertFalse(statement.execute("prepare my_statement1 as SELECT 1"));
+        assertFalse(statement.execute("prepare my_statement2 as SELECT 2"));
+        assertTrue(statement.execute("execute my_statement1"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertTrue(statement.execute("execute my_statement2"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(2L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+        assertFalse(statement.execute("deallocate all"));
+
+        assertThrows(SQLException.class, () -> statement.execute("execute my_statement1"));
+        assertThrows(SQLException.class, () -> statement.execute("execute my_statement2"));
+      }
+    }
+  }
+
+  @Test
+  public void testDeallocateUnknownStatement() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertThrows(SQLException.class, () -> statement.execute("deallocate my_statement"));
+      }
+    }
+  }
+
+  @Test
+  public void testExecuteUnknownStatement() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertThrows(SQLException.class, () -> statement.execute("execute my_statement"));
       }
     }
   }

@@ -32,6 +32,10 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
@@ -40,7 +44,6 @@ import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStateme
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
@@ -54,9 +57,11 @@ import java.net.Socket;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -223,7 +228,12 @@ public class ConnectionHandler extends Thread {
       if (!server.getOptions().disableLocalhostCheck()
           && !this.socket.getInetAddress().isAnyLocalAddress()
           && !this.socket.getInetAddress().isLoopbackAddress()) {
-        handleError(new IllegalAccessException("This proxy may only be accessed from localhost."));
+        handleError(
+            PGException.newBuilder()
+                .setMessage("This proxy may only be accessed from localhost.")
+                .setSeverity(Severity.FATAL)
+                .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
+                .build());
         return;
       }
 
@@ -245,8 +255,13 @@ public class ConnectionHandler extends Thread {
         while (this.status != ConnectionStatus.TERMINATED) {
           handleMessages();
         }
-      } catch (Exception e) {
-        this.handleError(e);
+      } catch (Exception exception) {
+        this.handleError(
+            PGException.newBuilder()
+                .setMessage(exception.getMessage())
+                .setSeverity(Severity.FATAL)
+                .setSQLState(SQLState.InternalError)
+                .build());
       }
     } catch (Exception e) {
       logger.log(
@@ -287,14 +302,19 @@ public class ConnectionHandler extends Thread {
       message.nextHandler();
       message.send();
     } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
-      this.handleError(fatalException);
+      this.handleError(
+          PGException.newBuilder()
+              .setSeverity(Severity.FATAL)
+              .setSQLState(SQLState.InternalError)
+              .setMessage(fatalException.getMessage())
+              .build());
       // Only terminate the connection if we are not in COPY_IN mode. In COPY_IN mode the mode will
       // switch to normal mode in these cases.
       if (this.status != ConnectionStatus.COPY_IN) {
         terminate();
       }
-    } catch (Exception e) {
-      this.handleError(e);
+    } catch (Exception exception) {
+      this.handleError(PGExceptionFactory.toPGException(exception));
     }
   }
 
@@ -333,21 +353,20 @@ public class ConnectionHandler extends Thread {
    * @param exception The exception to be related.
    * @throws IOException if there is some issue in the sending of the error messages.
    */
-  private void handleError(Exception exception) throws Exception {
+  private void handleError(PGException exception) throws Exception {
     logger.log(
         Level.WARNING,
         exception,
         () ->
             String.format("Exception on connection handler with ID %s: %s", getName(), exception));
-    DataOutputStream output = getConnectionMetadata().peekOutputStream();
+    DataOutputStream output = getConnectionMetadata().getOutputStream();
     if (this.status == ConnectionStatus.TERMINATED) {
-      new ErrorResponse(output, exception, ErrorResponse.State.InternalError, Severity.FATAL)
-          .send();
+      new ErrorResponse(output, exception).send();
       new TerminateResponse(output).send();
     } else if (this.status == ConnectionStatus.COPY_IN) {
-      new ErrorResponse(output, exception, ErrorResponse.State.InternalError).send();
+      new ErrorResponse(output, exception).send();
     } else {
-      new ErrorResponse(output, exception, ErrorResponse.State.InternalError).send();
+      new ErrorResponse(output, exception).send();
       new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
     }
   }
@@ -385,11 +404,12 @@ public class ConnectionHandler extends Thread {
     this.portalsMap.put(portalName, portal);
   }
 
-  public void closePortal(String portalName) {
+  public void closePortal(String portalName) throws Exception {
     if (!hasPortal(portalName)) {
-      throw new IllegalStateException("Unregistered statement: " + portalName);
+      throw new IllegalStateException("Unregistered portal: " + portalName);
     }
-    this.portalsMap.remove(portalName);
+    IntermediatePortalStatement portal = this.portalsMap.get(portalName);
+    portal.close();
   }
 
   public boolean hasPortal(String portalName) {
@@ -454,7 +474,8 @@ public class ConnectionHandler extends Thread {
 
   public IntermediatePreparedStatement getStatement(String statementName) {
     if (!hasStatement(statementName)) {
-      throw new IllegalStateException("Unregistered statement: " + statementName);
+      throw PGExceptionFactory.newPGException(
+          "prepared statement " + statementName + " does not exist");
     }
     return this.statementsMap.get(statementName);
   }
@@ -465,9 +486,17 @@ public class ConnectionHandler extends Thread {
 
   public void closeStatement(String statementName) {
     if (!hasStatement(statementName)) {
-      throw new IllegalStateException("Unregistered statement: " + statementName);
+      throw PGExceptionFactory.newPGException(
+          "prepared statement " + statementName + " does not exist");
     }
     this.statementsMap.remove(statementName);
+  }
+
+  public void closeAllStatements() {
+    Set<String> names = new HashSet<>(this.statementsMap.keySet());
+    for (String statementName : names) {
+      closeStatement(statementName);
+    }
   }
 
   public boolean hasStatement(String statementName) {

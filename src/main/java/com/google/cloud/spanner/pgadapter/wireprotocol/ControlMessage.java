@@ -31,14 +31,16 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.SendResultSetState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.PartitionQueryResult;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.EmptyQueryResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.Severity;
-import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.State;
 import com.google.cloud.spanner.pgadapter.wireoutput.PortalSuspendedResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import com.google.common.base.Preconditions;
@@ -83,7 +85,7 @@ public abstract class ControlMessage extends WireMessage {
   private final ManuallyCreatedToken manuallyCreatedToken;
 
   public ControlMessage(ConnectionHandler connection) throws IOException {
-    super(connection, connection.getConnectionMetadata().peekInputStream().readInt());
+    super(connection, connection.getConnectionMetadata().getInputStream().readInt());
     this.manuallyCreatedToken = null;
   }
 
@@ -106,7 +108,7 @@ public abstract class ControlMessage extends WireMessage {
    */
   public static ControlMessage create(ConnectionHandler connection) throws Exception {
     boolean validMessage = true;
-    char nextMsg = (char) connection.getConnectionMetadata().peekInputStream().readUnsignedByte();
+    char nextMsg = (char) connection.getConnectionMetadata().getInputStream().readUnsignedByte();
     try {
       if (connection.getStatus() == ConnectionStatus.COPY_IN) {
         switch (nextMsg) {
@@ -174,13 +176,15 @@ public abstract class ControlMessage extends WireMessage {
         connection.increaseInvalidMessageCount();
         if (connection.getInvalidMessageCount() > MAX_INVALID_MESSAGE_COUNT) {
           new ErrorResponse(
-                  connection.getConnectionMetadata().peekOutputStream(),
-                  new IllegalStateException(
-                      String.format(
-                          "Received %d invalid/unexpected messages. Last received message: '%c'",
-                          connection.getInvalidMessageCount(), nextMsg)),
-                  State.InternalError,
-                  Severity.FATAL)
+                  connection.getConnectionMetadata().getOutputStream(),
+                  PGException.newBuilder()
+                      .setMessage(
+                          String.format(
+                              "Received %d invalid/unexpected messages. Last received message: '%c'",
+                              connection.getInvalidMessageCount(), nextMsg))
+                      .setSQLState(SQLState.ProtocolViolation)
+                      .setSeverity(Severity.FATAL)
+                      .build())
               .send();
           connection.setStatus(ConnectionStatus.TERMINATED);
         }
@@ -227,7 +231,7 @@ public abstract class ControlMessage extends WireMessage {
    * @throws Exception if there is some issue in the sending of the error messages.
    */
   protected void handleError(Exception exception) throws Exception {
-    new ErrorResponse(this.outputStream, exception, State.RaiseException).send(false);
+    new ErrorResponse(this.outputStream, PGExceptionFactory.toPGException(exception)).send(false);
   }
 
   /**
@@ -244,6 +248,9 @@ public abstract class ControlMessage extends WireMessage {
     String command = statement.getCommandTag();
     if (Strings.isNullOrEmpty(command)) {
       new EmptyQueryResponse(this.outputStream).send(false);
+      return;
+    }
+    if (statement.getStatementResult() == null) {
       return;
     }
 
