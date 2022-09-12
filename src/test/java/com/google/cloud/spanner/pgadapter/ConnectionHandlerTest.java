@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
@@ -284,5 +285,44 @@ public class ConnectionHandlerTest {
     connection.handleMessages();
 
     assertEquals(ConnectionStatus.TERMINATED, connection.getStatus());
+  }
+
+  @Test
+  public void testCancelActiveStatement() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    when(address.getHostAddress()).thenReturn("address1");
+    Connection spannerConnection = mock(Connection.class);
+
+    ConnectionHandler connectionHandler =
+        new ConnectionHandler(server, socket, mock(Connection.class));
+    ConnectionHandler connectionHandlerToCancel =
+        new ConnectionHandler(server, socket, spannerConnection);
+
+    // Cancelling yourself is not allowed.
+    assertFalse(
+        connectionHandler.cancelActiveStatement(
+            connectionHandler.getConnectionId(), connectionHandler.getSecret()));
+    // Cancelling a random non-existing connection should not work.
+    assertFalse(connectionHandler.cancelActiveStatement(100, 100));
+    // Cancelling another connecting using the wrong secret is not allowed.
+    assertFalse(
+        connectionHandler.cancelActiveStatement(
+            connectionHandlerToCancel.getConnectionId(),
+            connectionHandlerToCancel.getSecret() - 1));
+
+    assertTrue(
+        connectionHandler.cancelActiveStatement(
+            connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel.getSecret()));
+
+    // The method should just return false if an error occurs.
+    doThrow(SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "test error"))
+        .when(spannerConnection)
+        .cancel();
+    assertFalse(
+        connectionHandler.cancelActiveStatement(
+            connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel.getSecret()));
   }
 }

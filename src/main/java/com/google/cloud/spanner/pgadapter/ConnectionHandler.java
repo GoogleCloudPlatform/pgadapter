@@ -49,6 +49,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
 import java.io.DataOutputStream;
@@ -107,6 +108,12 @@ public class ConnectionHandler extends Thread {
   private CopyStatement activeCopyStatement;
 
   ConnectionHandler(ProxyServer server, Socket socket) {
+    this(server, socket, null);
+  }
+
+  /** Constructor only for testing. */
+  @VisibleForTesting
+  ConnectionHandler(ProxyServer server, Socket socket, Connection spannerConnection) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
     this.socket = socket;
@@ -120,6 +127,7 @@ public class ConnectionHandler extends Thread {
             String.format(
                 "Connection handler with ID %s created for client %s",
                 getName(), socket.getInetAddress().getHostAddress()));
+    this.spannerConnection = spannerConnection;
   }
 
   @InternalApi
@@ -424,20 +432,24 @@ public class ConnectionHandler extends Thread {
    * specific connection identified by connectionId. Since cancellation is a flimsy contract at
    * best, it is not imperative that the cancellation run, but it should be attempted nonetheless.
    *
-   * @param connectionId The connection owhose statement must be cancelled.
-   * @param secret The secret value linked to this connection. If it does not match, we cannot
-   *     cancel.
+   * @param connectionId The connection whose statement must be cancelled.
+   * @param secret The secret value linked to the connection that is being cancelled. If it does not
+   *     match, we cannot cancel.
+   * @return true if the statement was cancelled.
    */
-  public synchronized void cancelActiveStatement(int connectionId, int secret) {
+  public boolean cancelActiveStatement(int connectionId, int secret) {
+    if (connectionId == this.connectionId) {
+      // You can't cancel your own statement.
+      return false;
+    }
     ConnectionHandler connectionToCancel = CONNECTION_HANDLERS.get(connectionId);
     if (connectionToCancel == null) {
       logger.log(
           Level.WARNING,
           () ->
               MessageFormat.format(
-                  "User attempted to cancel an unknown connection." + "Connection: {}",
-                  connectionId));
-      return;
+                  "User attempted to cancel an unknown connection. Connection: {0}", connectionId));
+      return false;
     }
     if (secret != connectionToCancel.secret) {
       logger.log(
@@ -445,20 +457,20 @@ public class ConnectionHandler extends Thread {
           () ->
               MessageFormat.format(
                   "User attempted to cancel a connection with the incorrect secret."
-                      + "Connection: {}, Secret: {}, Expected Secret: {}",
-                  connectionId,
-                  secret,
-                  connectionToCancel.secret));
+                      + "Connection: {0}, Secret: {1}, Expected Secret: {2}",
+                  connectionId, secret, connectionToCancel.secret));
       // Since the user does not accept a response, there is no need to except here: simply return.
-      return;
+      return false;
     }
     // We can mostly ignore the exception since cancel does not expect any result (positive or
     // otherwise)
     try {
       connectionToCancel.getSpannerConnection().cancel();
       connectionToCancel.interrupt();
+      return true;
     } catch (Throwable ignore) {
     }
+    return false;
   }
 
   public IntermediatePreparedStatement getStatement(String statementName) {

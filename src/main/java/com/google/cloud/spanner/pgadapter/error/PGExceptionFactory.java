@@ -43,6 +43,7 @@ public class PGExceptionFactory {
         .build();
   }
 
+  /** Creates a new exception that indicates that the current query was cancelled by the client. */
   public static PGException newQueryCancelledException() {
     return newPGException("Query cancelled", SQLState.QueryCanceled);
   }
