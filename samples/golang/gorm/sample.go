@@ -21,6 +21,7 @@ import (
 	"github.com/shopspring/decimal"
 	"gorm.io/datatypes"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/logger"
 	"math/rand"
 	"time"
 
@@ -90,7 +91,9 @@ type Concert struct {
 var rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func main() {
-	db, err := gorm.Open(postgres.Open("host=/tmp port=5433 database=gorm-sample"), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open("host=/tmp port=5433 database=gorm-sample"), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Error),
+	})
 	if err != nil {
 		fmt.Printf("Failed to open gorm connection: %v\n", err)
 		return
@@ -101,29 +104,57 @@ func main() {
 		return
 	}
 	defer conn.Close()
+	fmt.Println("Starting sample...")
 
-	db.Exec("DELETE FROM concerts")
-	db.Exec("DELETE FROM venues")
-	db.Exec("DELETE FROM albums")
-	db.Exec("DELETE FROM singers")
+	// Delete all existing data to start with a clean database.
+	DeleteAllData(db)
+	fmt.Print("Purged all existing test data\n\n")
 
+	// Create some random Singers, Albums and Tracks.
+	fmt.Println("Creating random singers and albums")
+	CreateRandomSingersAndAlbums(db)
+	// Print the generated Singers, Albums and Tracks.
+	PrintSingersAlbumsAndTracks(db)
+
+	// Create a Concert for a random singer.
+	CreateVenueAndConcertInTransaction(db)
+	// Print all Concerts in the database.
+	PrintConcerts(db)
+	// Print all Albums that were released before 1900.
+	PrintAlbumsReleaseBefore1900(db)
+
+	fmt.Printf("Finished running sample\n")
+}
+
+// CreateRandomSingersAndAlbums creates some random test records and stores these in the database.
+func CreateRandomSingersAndAlbums(db *gorm.DB) {
+	// Create between 5 and 10 random singers.
 	for i := 0; i < randInt(5, 10); i++ {
 		singerId, err := CreateSinger(db, randFirstName(), randLastName())
 		if err != nil {
 			fmt.Printf("Failed to create singer: %v\n", err)
 			return
 		}
+		fmt.Print(".")
+		// Create between 2 and 12 random albums
 		for j := 0; j < randInt(2, 12); j++ {
 			_, err = CreateAlbumWithRandomTracks(db, singerId, randAlbumTitle(), randInt(1, 22))
 			if err != nil {
 				fmt.Printf("Failed to create album: %v\n", err)
 				return
 			}
+			fmt.Print(".")
 		}
 	}
+	fmt.Print("\n\n")
+}
 
+// PrintSingersAlbumsAndTracks queries and prints all Singers, Albums and Tracks in the database.
+func PrintSingersAlbumsAndTracks(db *gorm.DB) {
+	fmt.Println("Fetching all singers, albums and tracks")
 	var singers []*Singer
-	if err := db.Model(&Singer{}).Preload(clause.Associations).Find(&singers).Error; err != nil {
+	// Preload all associations of Singer.
+	if err := db.Model(&Singer{}).Preload(clause.Associations).Order("last_name").Find(&singers).Error; err != nil {
 		fmt.Printf("Failed to load all singers: %v\n", err)
 		return
 	}
@@ -139,10 +170,76 @@ func main() {
 			}
 		}
 	}
-
-	fmt.Printf("Finished running sample\n")
+	fmt.Println()
 }
 
+// CreateVenueAndConcertInTransaction creates a new Venue and a Concert in a read/write transaction.
+func CreateVenueAndConcertInTransaction(db *gorm.DB) {
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		// Load the first singer from the database.
+		singer := Singer{}
+		if res := tx.First(&singer); res.Error != nil {
+			return res.Error
+		}
+		// Create and save a Venue and a Concert for this singer.
+		venue := Venue{
+			BaseModel:   BaseModel{ID: uuid.NewString()},
+			Name:        "Avenue Park",
+			Description: `{"Capacity": 5000, "Location": "New York", "Country": "US"}`,
+		}
+		if res := tx.Create(&venue); res.Error != nil {
+			return res.Error
+		}
+		concert := Concert{
+			BaseModel: BaseModel{ID: uuid.NewString()},
+			Name:      "Avenue Park Open",
+			VenueId:   venue.ID,
+			SingerId:  singer.ID,
+			StartTime: parseTimestamp("2023-02-01T20:00:00-05:00"),
+			EndTime:   parseTimestamp("2023-02-02T02:00:00-05:00"),
+		}
+		if res := tx.Create(&concert); res.Error != nil {
+			return res.Error
+		}
+		// Return nil to instruct `gorm` to commit the transaction.
+		return nil
+	}); err != nil {
+		fmt.Printf("Failed to create a Venue and a Concert: %v\n", err)
+		return
+	}
+	fmt.Println("Created a concert")
+}
+
+// PrintConcerts prints the current concerts in the database to the console.
+// It will preload all its associations, so it can directly print the properties of these as well.
+func PrintConcerts(db *gorm.DB) {
+	var concerts []*Concert
+	db.Model(&Concert{}).Preload(clause.Associations).Find(&concerts)
+	for _, concert := range concerts {
+		fmt.Printf("Concert %q starting at %v will be performed by %s at %s\n",
+			concert.Name, concert.StartTime, concert.Singer.FullName, concert.Venue.Name)
+	}
+	fmt.Println()
+}
+
+func PrintAlbumsReleaseBefore1900(db *gorm.DB) {
+	fmt.Println("Searching for albums released before 1900")
+	var albums []*Album
+	db.Where(
+		"release_date < ?",
+		datatypes.Date(time.Date(1900, time.January, 1, 0, 0, 0, 0, time.UTC)),
+	).Order("release_date asc").Find(&albums)
+	if len(albums) == 0 {
+		fmt.Println("No albums found")
+	} else {
+		for _, album := range albums {
+			fmt.Printf("Album %q was released at %v\n", album.Title, time.Time(album.ReleaseDate).Format("2006-01-02"))
+		}
+	}
+}
+
+// CreateSinger creates a new Singer and stores in the database.
+// Returns the ID of the Singer.
 func CreateSinger(db *gorm.DB, firstName, lastName string) (string, error) {
 	singer := Singer{
 		BaseModel: BaseModel{ID: uuid.NewString()},
@@ -153,6 +250,9 @@ func CreateSinger(db *gorm.DB, firstName, lastName string) (string, error) {
 	return singer.ID, res.Error
 }
 
+// CreateAlbumWithRandomTracks creates and stores a new Album in the database.
+// Also generates numTracks random tracks for the Album.
+// Returns the ID of the Album.
 func CreateAlbumWithRandomTracks(db *gorm.DB, singerId, albumTitle string, numTracks int) (string, error) {
 	albumId := uuid.NewString()
 	// We cannot include the Tracks that we want to create in the definition here, as gorm would then try to
@@ -162,17 +262,31 @@ func CreateAlbumWithRandomTracks(db *gorm.DB, singerId, albumTitle string, numTr
 		BaseModel:       BaseModel{ID: albumId},
 		Title:           albumTitle,
 		MarketingBudget: decimal.NullDecimal{Decimal: decimal.NewFromFloat(randFloat64(0, 10000000))},
+		ReleaseDate:     randDate(),
 		SingerId:        singerId,
+		CoverPicture:    randBytes(randInt(5000, 15000)),
 	})
 	if res.Error != nil {
 		return albumId, res.Error
 	}
 	tracks := make([]*Track, numTracks)
 	for n := 0; n < numTracks; n++ {
-		tracks[n] = &Track{BaseModel: BaseModel{ID: albumId}, TrackNumber: int64(n + 1), Title: randTrackTitle()}
+		tracks[n] = &Track{BaseModel: BaseModel{ID: albumId}, TrackNumber: int64(n + 1), Title: randTrackTitle(), SampleRate: randFloat64(30.0, 60.0)}
 	}
+
+	// Note: The batch size is deliberately kept small here in order to prevent the statement from getting too big and
+	// exceeding the maximum number of parameters in a prepared statement. PGAdapter can currently handle at most 50
+	// parameters in a prepared statement.
 	res = db.CreateInBatches(tracks, 8)
 	return albumId, res.Error
+}
+
+// DeleteAllData deletes all existing records in the database.
+func DeleteAllData(db *gorm.DB) {
+	db.Exec("DELETE FROM concerts")
+	db.Exec("DELETE FROM venues")
+	db.Exec("DELETE FROM albums")
+	db.Exec("DELETE FROM singers")
 }
 
 func randFloat64(min, max float64) float64 {
@@ -181,6 +295,16 @@ func randFloat64(min, max float64) float64 {
 
 func randInt(min, max int) int {
 	return min + rnd.Int()%max
+}
+
+func randDate() datatypes.Date {
+	return datatypes.Date(time.Date(randInt(1500, 2010), time.Month(randInt(1, 12)), randInt(1, 28), 0, 0, 0, 0, time.UTC))
+}
+
+func randBytes(length int) []byte {
+	res := make([]byte, length)
+	rnd.Read(res)
+	return res
 }
 
 func randFirstName() string {

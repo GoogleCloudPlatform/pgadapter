@@ -1,12 +1,7 @@
+-- Executing the schema creation in a batch will improve execution speed.
 start batch ddl;
 
-drop table if exists concerts;
-drop table if exists venues;
-drop table if exists tracks;
-drop table if exists albums;
-drop table if exists singers;
-
-create table singers (
+create table if not exists singers (
     id         varchar not null primary key,
     first_name varchar,
     last_name  varchar not null,
@@ -16,7 +11,7 @@ create table singers (
     updated_at timestamptz
 );
 
-create table albums (
+create table if not exists albums (
     id               varchar not null primary key,
     title            varchar not null,
     marketing_budget numeric,
@@ -28,7 +23,7 @@ create table albums (
     constraint fk_albums_singers foreign key (singer_id) references singers (id)
 );
 
-create table tracks (
+create table if not exists tracks (
     id           varchar not null,
     track_number bigint not null,
     title        varchar not null,
@@ -38,7 +33,7 @@ create table tracks (
     primary key (id, track_number)
 ) interleave in parent albums on delete cascade;
 
-create table venues (
+create table if not exists venues (
     id          varchar not null primary key,
     name        varchar not null,
     description varchar not null,
@@ -46,16 +41,18 @@ create table venues (
     updated_at  timestamptz
 );
 
-create table concerts (
+create table if not exists concerts (
     id          varchar not null primary key,
     venue_id    varchar not null,
     singer_id   varchar not null,
+    name        varchar not null,
     start_time  timestamptz not null,
     end_time    timestamptz not null,
     created_at  timestamptz,
     updated_at  timestamptz,
     constraint fk_concerts_venues  foreign key (venue_id)  references venues  (id),
-    constraint fk_concerts_singers foreign key (singer_id) references singers (id)
+    constraint fk_concerts_singers foreign key (singer_id) references singers (id),
+    constraint chk_end_time_after_start_time check (end_time > start_time)
 );
 
 run batch;

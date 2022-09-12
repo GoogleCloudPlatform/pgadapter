@@ -1,6 +1,10 @@
 # PGAdapter and gorm
 
-PGAdapter has not yet been extensively tested with `gorm` and is therefore currently not supported.
+PGAdapter can be used with [gorm](https://gorm.io/) and the `pgx` driver. This document lists the limitations when
+working with `gorm`.
+
+The [sample.go](sample.go) file contains a sample application using `gorm` with PGAdapter. Use this as a reference for
+features of `gorm` that are supported with PGAdapter.
 
 ## Creating the Sample Data Model
 Run the following command in this directory. Replace the host, port and database name with the actual host, port and
@@ -10,21 +14,35 @@ database name for your PGAdapter and database setup.
 psql -h localhost -p 5432 -d my-database -f create_data_model.sql
 ```
 
+You can also drop an existing data model using the `drop_data_model.sql` script:
+
+```shell
+psql -h localhost -p 5432 -d my-database -f drop_data_model.sql
+```
+
 ## Limitations
 The following limitations are currently known:
 
-| Limitation             | Workaround                                                                                                                                   |
-|------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| Migrations             | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated migrations using `gorm` are therefore not supported.               |
-| Generated primary keys | Disable auto increment for primary key columns by adding the annotation `gorm:"primaryKey;autoIncrement:false"` to the primary key property. |
-| Generated columns      | Generated columns require support for `RETURNING` clauses. That is currently not supported by Cloud Spanner.                                 |
-| OnConflict             | OnConflict clauses are not supported                                                                                                         |
-| Auto-save associations | Auto saved associations are not supported, as these will automatically use an OnConflict clause                                              |
+| Limitation             | Workaround                                                                                                                                                                                                                                                         |
+|------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Migrations             | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated migrations using `gorm` are therefore not supported.                                                                                                                                     |
+| Generated primary keys | Disable auto increment for primary key columns by adding the annotation `gorm:"primaryKey;autoIncrement:false"` to the primary key property.                                                                                                                       |
+| Generated columns      | Generated columns require support for `RETURNING` clauses. That is currently not supported by Cloud Spanner.                                                                                                                                                       |
+| OnConflict             | OnConflict clauses are not supported                                                                                                                                                                                                                               |
+| Nested transactions    | Nested transactions and savepoints are not supported                                                                                                                                                                                                               |
+| Auto-save associations | Auto saved associations are not supported, as these will automatically use an OnConflict clause                                                                                                                                                                    |
+| Large CreateInBatches  | PGAdapter can handle at most 50 parameters in a prepared statement. A large number of rows in a `CreateInBatches` call can exceed this limit. Limit the batch size to a smaller number to prevent `gorm` from generating a statement with more than 50 parameters. |
+
+### Migrations
+Migrations are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect. It is recommended to
+create the schema manually. Note that PGAdapter does support `create table if not exists` / `drop table if exists`.
+See [create_data_model.sql](create_data_model.sql) for the data model for this example.
 
 ### Generated Primary Keys
 Generated primary keys are not supported and should be replaced with primary key definitions that
 are manually assigned. See https://cloud.google.com/spanner/docs/schema-design#primary-key-prevent-hotspots
-for more information on choosing a good primary key.
+for more information on choosing a good primary key. This sample uses UUIDs that are generated by the client for primary
+keys.
 
 ```go
 type User struct {
@@ -32,6 +50,17 @@ type User struct {
 	ID           int64 `gorm:"primaryKey;autoIncrement:false"`
 	Name         string
 }
+```
+
+### Generated Columns
+Generated columns can be used, but Cloud Spanner does not support the `RETURNING` keyword. This means that `gorm` is not
+able to get the value of the generated column directly after it has been updated.
+
+```go
+// FullName is generated by the database. The '->' marks this a read-only field. Preferably this field should also
+// include a `default:(-)` annotation, as that would make gorm read the value back using a RETURNING clause. That is
+// however currently not supported.
+FullName string `gorm:"->;type:GENERATED ALWAYS AS (coalesce(concat(first_name,' '::varchar,last_name))) STORED;"`
 ```
 
 ### OnConflict Clauses
@@ -82,3 +111,18 @@ blog := Blog{
 db.Create(&user)
 db.Create(&blog)
 ```
+
+### Nested Transactions
+`gorm` uses savepoints for nested transactions. Savepoints are currently not supported by Cloud Spanner. Nested
+transactions can therefore not be used with PGAdapter.
+
+### Large CreateInBatches
+The `CreateInBatches` function will generate an insert statement in the following form:
+
+```sql
+INSERT INTO my_table (col1, col2, col3)
+VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9), ..., ($x, $y, $z)
+```
+
+PGAdapter currently does not support prepared statements with more than 50 parameters. Either reduce the number of rows
+that are inserted in one batch or use the `SimpleQueryMode` to work around this limitation.
