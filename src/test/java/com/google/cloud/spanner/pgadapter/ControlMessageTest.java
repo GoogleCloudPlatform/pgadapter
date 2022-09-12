@@ -24,6 +24,8 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
@@ -65,11 +67,12 @@ public final class ControlMessageTest {
         new DataInputStream(
             new ByteArrayInputStream(new byte[] {(byte) QUERY_IDENTIFIER, 0, 0, 0, 5, 0}));
 
-    when(connectionMetadata.peekInputStream()).thenReturn(inputStream);
-    when(connectionMetadata.peekOutputStream()).thenReturn(outputStream);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(intermediateStatement.getStatementType()).thenReturn(StatementType.UPDATE);
     when(intermediateStatement.getCommandTag()).thenReturn("INSERT");
+    when(intermediateStatement.getStatementResult()).thenReturn(new UpdateCount(1L));
     when(intermediateStatement.getUpdateCount()).thenReturn(1L);
 
     JSONParser parser = new JSONParser();
@@ -111,14 +114,15 @@ public final class ControlMessageTest {
         new DataInputStream(
             new ByteArrayInputStream(new byte[] {(byte) QUERY_IDENTIFIER, 0, 0, 0, 5, 0}));
 
-    when(connectionMetadata.peekInputStream()).thenReturn(inputStream);
-    when(connectionMetadata.peekOutputStream()).thenReturn(outputStream);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     ExecuteMessage executeMessage =
         new ExecuteMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
     IntermediateStatement intermediateStatement = mock(IntermediateStatement.class);
     when(intermediateStatement.getCommandTag()).thenReturn("parse");
     when(intermediateStatement.getStatementType()).thenReturn(StatementType.UNKNOWN);
+    when(intermediateStatement.getStatementResult()).thenReturn(new NoResult("PARSE"));
 
     executeMessage.sendSpannerResult(intermediateStatement, QueryMode.SIMPLE, 0L);
 

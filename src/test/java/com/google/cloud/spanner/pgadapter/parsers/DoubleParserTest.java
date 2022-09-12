@@ -20,6 +20,9 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -45,5 +48,8 @@ public class DoubleParserTest {
   public void testStringParse() {
     assertEquals("3.14", new DoubleParser(3.14).stringParse());
     assertNull(new DoubleParser(null).stringParse());
+    assertThrows(
+        PGException.class,
+        () -> new DoubleParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
   }
 }

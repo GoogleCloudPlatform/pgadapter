@@ -44,7 +44,7 @@ public class SkipMessage extends ControlMessage {
     int skipLength = this.length - 4;
     int skipped = 0;
     // Read and skip bytes until we have reached the total message length.
-    DataInputStream input = connection.getConnectionMetadata().peekInputStream();
+    DataInputStream input = connection.getConnectionMetadata().getInputStream();
     // If the stream is potentially invalid we'll use a more pessimistic skipping algorithm than if
     // we just received a message that we want to skip. We do this because the Unix domain socket
     // implementation might block on skip(n) if the stream has no bytes more to read.

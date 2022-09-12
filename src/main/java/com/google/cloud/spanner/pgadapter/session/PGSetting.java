@@ -19,6 +19,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -415,7 +416,7 @@ public class PGSetting {
       // setting is not a valid boolean value.
       try {
         BooleanParser.toBoolean(value);
-      } catch (IllegalArgumentException exception) {
+      } catch (PGException exception) {
         throw invalidBoolError(getCasePreservingKey());
       }
     } else if ("integer".equals(this.vartype)) {

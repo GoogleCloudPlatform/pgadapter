@@ -50,11 +50,11 @@ public abstract class BootstrapMessage extends WireMessage {
    * @throws Exception If construction or reading fails.
    */
   public static BootstrapMessage create(ConnectionHandler connection) throws Exception {
-    int length = connection.getConnectionMetadata().peekInputStream().readInt();
+    int length = connection.getConnectionMetadata().getInputStream().readInt();
     if (length > MAX_BOOTSTRAP_MESSAGE_LENGTH) {
       throw new IllegalArgumentException("Invalid bootstrap message length: " + length);
     }
-    int protocol = connection.getConnectionMetadata().peekInputStream().readInt();
+    int protocol = connection.getConnectionMetadata().getInputStream().readInt();
     switch (protocol) {
       case SSLMessage.IDENTIFIER:
         return new SSLMessage(connection);

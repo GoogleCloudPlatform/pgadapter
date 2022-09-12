@@ -130,7 +130,7 @@ public class ExtendedQueryProtocolHandler {
         }
       }
     } finally {
-      connectionHandler.getConnectionMetadata().peekOutputStream().flush();
+      connectionHandler.getConnectionMetadata().getOutputStream().flush();
       messages.clear();
     }
   }
