@@ -488,6 +488,9 @@ public abstract class ControlMessage extends WireMessage {
       prefixSent.get();
       long rows = 0L;
       while (hasData) {
+        if (Thread.interrupted()) {
+          throw PGExceptionFactory.newQueryCancelledException();
+        }
         WireOutput wireOutput = describedResult.createDataRowResponse(resultSet, mode);
         synchronized (describedResult) {
           wireOutput.send(false);
