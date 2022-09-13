@@ -17,13 +17,14 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"math/rand"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"gorm.io/datatypes"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
-	"math/rand"
-	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -122,6 +123,20 @@ func main() {
 	PrintConcerts(db)
 	// Print all Albums that were released before 1900.
 	PrintAlbumsReleaseBefore1900(db)
+	// Print all Singers ordered by last name.
+	// The function executes multiple queries to fetch a batch of singers per query.
+	PrintSingersWithLimitAndOffset(db)
+	// Print all Albums that have a title where the first character of the title matches
+	// either the first character of the first name or first character of the last name
+	// of the Singer.
+	PrintAlbumsFirstCharTitleAndFirstOrLastNameEqual(db)
+	// Print all Albums whose title start with 'e'. The function uses a named argument for the query.
+	SearchAlbumsUsingNamedArgument(db, "e%")
+
+	// Update Venue description.
+	UpdateVenueDescription(db)
+	// Use FirstOrInit to create or update a Venue.
+	FirstOrInitVenue(db, "Berlin Arena")
 
 	fmt.Printf("Finished running sample\n")
 }
@@ -222,6 +237,52 @@ func PrintConcerts(db *gorm.DB) {
 	fmt.Println()
 }
 
+// UpdateVenueDescription updates the description of the 'Avenue Park' Venue.
+func UpdateVenueDescription(db *gorm.DB) {
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		venue := Venue{}
+		if res := tx.Find(&venue, "name = ?", "Avenue Park"); res != nil {
+			return res.Error
+		}
+		// Update the description of the Venue.
+		venue.Description = `{"Capacity": 10000, "Location": "New York", "Country": "US", "Type": "Park"}`
+
+		if res := tx.Update("description", &venue); res.Error != nil {
+			return res.Error
+		}
+		// Return nil to instruct `gorm` to commit the transaction.
+		return nil
+	}); err != nil {
+		fmt.Printf("Failed to update Venue 'Avenue Park': %v\n", err)
+		return
+	}
+	fmt.Print("Updated Venue 'Avenue Park'\n\n")
+}
+
+func FirstOrInitVenue(db *gorm.DB, name string) {
+	venue := Venue{}
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		// Use FirstOrInit to search and otherwise initialize a Venue entity.
+		// Note that we do not assign an ID in case the Venue was not found.
+		// This makes it possible for us to determine whether we need to call Create or Save, as Cloud Spanner does not
+		// support `ON CONFLICT UPDATE` clauses.
+		if err := db.FirstOrInit(&venue, Venue{Name: name}).Error; err != nil {
+			return err
+		}
+		venue.Description = `{"Capacity": 2000, "Location": "Europe/Berlin", "Country": "DE", "Type": "Arena"}`
+		// Create or update the Venue.
+		if venue.ID == "" {
+			return tx.Create(&venue).Error
+		}
+		return tx.Update("description", &venue).Error
+	}); err != nil {
+		fmt.Printf("Failed to create or update Venue %q: %v\n", name, err)
+		return
+	}
+	fmt.Printf("Created or updated Venue %q\n\n", name)
+
+}
+
 func PrintAlbumsReleaseBefore1900(db *gorm.DB) {
 	fmt.Println("Searching for albums released before 1900")
 	var albums []*Album
@@ -236,6 +297,69 @@ func PrintAlbumsReleaseBefore1900(db *gorm.DB) {
 			fmt.Printf("Album %q was released at %v\n", album.Title, time.Time(album.ReleaseDate).Format("2006-01-02"))
 		}
 	}
+	fmt.Print("\n\n")
+}
+
+func PrintSingersWithLimitAndOffset(db *gorm.DB) {
+	fmt.Println("Printing all singers ordered by last name")
+	var singers []*Singer
+	limit := 5; offset := 0
+	for true {
+		if err := db.Order("last_name, id").Limit(limit).Offset(offset).Find(&singers).Error; err != nil {
+			fmt.Printf("Failed to load singers at offset %d: %v", offset, err)
+			return
+		}
+		if len(singers) == 0 {
+			break
+		}
+		for _, singer := range singers {
+			fmt.Printf("%d: %v\n", offset, singer.FullName)
+			offset++
+		}
+	}
+	fmt.Printf("Found %d singers\n\n", offset)
+}
+
+func PrintAlbumsFirstCharTitleAndFirstOrLastNameEqual(db *gorm.DB) {
+	fmt.Println("Searching for albums that have a title that starts with the same character as the first or last name of the singer")
+	var albums []*Album
+	// Join the Singer association to use it in the Where clause.
+	// Note that `gorm` will use "Singer" (including quotes) as the alias for the singers table.
+	// That means that all references to "Singer" in the query must be quoted, as PostgreSQL treats
+	// the alias as case-sensitive.
+	if err := db.Joins("Singer").Where(
+		`lower(substring(albums.title, 1, 1)) = lower(substring("Singer".first_name, 1, 1))` +
+			`or lower(substring(albums.title, 1, 1)) = lower(substring("Singer".last_name, 1, 1))`,
+	).Order(`"Singer".last_name, "albums".release_date asc`).Find(&albums).Error; err != nil {
+		fmt.Printf("Failed to load albums: %v\n", err)
+		return
+	}
+	if len(albums) == 0 {
+		fmt.Println("No albums found that match the criteria")
+	} else {
+		for _, album := range albums {
+			fmt.Printf("Album %q was released by %v\n", album.Title, album.Singer.FullName)
+		}
+	}
+	fmt.Print("\n\n")
+}
+
+// SearchAlbumsUsingNamedArgument searches for Albums using a named argument.
+func SearchAlbumsUsingNamedArgument(db *gorm.DB, title string) {
+	fmt.Printf("Searching for albums like %q\n", title)
+	var albums []*Album
+	if err := db.Where("title like @title", sql.Named("title", title)).Order("title").Find(&albums).Error; err != nil {
+		fmt.Printf("Failed to load albums: %v\n", err)
+		return
+	}
+	if len(albums) == 0 {
+		fmt.Println("No albums found that match the criteria")
+	} else {
+		for _, album := range albums {
+			fmt.Printf("Album %q released at %v\n", album.Title, time.Time(album.ReleaseDate).Format("2006-01-02"))
+		}
+	}
+	fmt.Print("\n\n")
 }
 
 // CreateSinger creates a new Singer and stores in the database.
@@ -294,11 +418,11 @@ func randFloat64(min, max float64) float64 {
 }
 
 func randInt(min, max int) int {
-	return min + rnd.Int()%max
+	return min + rnd.Int()%(max-min)
 }
 
 func randDate() datatypes.Date {
-	return datatypes.Date(time.Date(randInt(1500, 2010), time.Month(randInt(1, 12)), randInt(1, 28), 0, 0, 0, 0, time.UTC))
+	return datatypes.Date(time.Date(randInt(1850, 2010), time.Month(randInt(1, 12)), randInt(1, 28), 0, 0, 0, 0, time.UTC))
 }
 
 func randBytes(length int) []byte {

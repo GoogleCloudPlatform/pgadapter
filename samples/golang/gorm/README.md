@@ -30,6 +30,7 @@ The following limitations are currently known:
 | Generated columns      | Generated columns require support for `RETURNING` clauses. That is currently not supported by Cloud Spanner.                                                                                                                                                       |
 | OnConflict             | OnConflict clauses are not supported                                                                                                                                                                                                                               |
 | Nested transactions    | Nested transactions and savepoints are not supported                                                                                                                                                                                                               |
+| Locking                | Lock clauses (e.g. `clause.Locking{Strength: "UPDATE"}`) are not supported. These are generally speaking also not required, as the default isolation level that is used by Cloud Spanner is serializable.                                                          |
 | Auto-save associations | Auto saved associations are not supported, as these will automatically use an OnConflict clause                                                                                                                                                                    |
 | Large CreateInBatches  | PGAdapter can handle at most 50 parameters in a prepared statement. A large number of rows in a `CreateInBatches` call can exceed this limit. Limit the batch size to a smaller number to prevent `gorm` from generating a statement with more than 50 parameters. |
 
@@ -115,6 +116,10 @@ db.Create(&blog)
 ### Nested Transactions
 `gorm` uses savepoints for nested transactions. Savepoints are currently not supported by Cloud Spanner. Nested
 transactions can therefore not be used with PGAdapter.
+
+### Locking
+Locking clauses, like `clause.Locking{Strength: "UPDATE"}`, are not supported. These are generally speaking also not
+required, as Cloud Spanner uses isolation level `serializable` for read/write transactions.
 
 ### Large CreateInBatches
 The `CreateInBatches` function will generate an insert statement in the following form:
