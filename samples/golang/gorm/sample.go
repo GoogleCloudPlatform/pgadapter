@@ -15,7 +15,9 @@
 package main
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -154,6 +156,9 @@ func main() {
 	// Delete a random Album from the database. This will also delete any child Track records interleaved with the
 	// Album.
 	DeleteRandomAlbum(db)
+
+	// Try to execute a query with a 1ms timeout. This will normally fail.
+	QueryWithTimeout(db)
 
 	fmt.Printf("Finished running sample\n")
 }
@@ -388,6 +393,23 @@ func PrintSingersWithLimitAndOffset(db *gorm.DB) {
 		}
 	}
 	fmt.Printf("Found %d singers\n\n", offset)
+}
+
+// QueryWithTimeout will try to execute a query with a 1ms timeout.
+// This will normally cause a Deadline Exceeded error to be returned.
+func QueryWithTimeout(db *gorm.DB) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	defer cancel()
+
+	var tracks []*Track
+	if err := db.WithContext(ctx).Where("substring(title, 1, 1)='a'").Find(&tracks).Error; err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			fmt.Printf("Query failed because of a timeout. This is expected.\n\n")
+			return
+		}
+		fmt.Printf("Query failed with an unexpected error: %v\n", err)
+	}
+	fmt.Print("Successfully queried all tracks in 1ms\n\n")
 }
 
 func PrintAlbumsFirstCharTitleAndFirstOrLastNameEqual(db *gorm.DB) {
