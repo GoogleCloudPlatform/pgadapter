@@ -30,10 +30,17 @@ import (
 	"gorm.io/gorm"
 )
 
+// TODO(developer): Change this to match your PGAdapter instance and database name
+var connectionString = "host=/tmp port=5432 database=gorm-sample"
+
 // BaseModel is embedded in all other models to add common database fields.
 type BaseModel struct {
 	// ID is the primary key of each model. The ID is generated client side as a UUID.
-	ID string
+	// Adding the `primaryKey` annotation is redundant for most models, as gorm will assume that the column with name ID
+	// is the primary key. This is however not redundant for models that add additional primary key columns, such as
+	// child tables in interleaved table hierarchies, as a missing primary key annotation here would then cause the
+	// primary key column defined on the child table to be the only primary key column.
+	ID string `gorm:"primaryKey;autoIncrement:false"`
 	// CreatedAt and UpdatedAt are managed automatically by gorm.
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -92,7 +99,7 @@ type Concert struct {
 var rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func main() {
-	db, err := gorm.Open(postgres.Open("host=/tmp port=5433 database=gorm-sample"), &gorm.Config{
+	db, err := gorm.Open(postgres.Open(connectionString), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Error),
 	})
 	if err != nil {
@@ -137,6 +144,16 @@ func main() {
 	UpdateVenueDescription(db)
 	// Use FirstOrInit to create or update a Venue.
 	FirstOrInitVenue(db, "Berlin Arena")
+	// Use FirstOrCreate to create a Venue if it does not already exist.
+	FirstOrCreateVenue(db, "Paris Central")
+	// Update all Tracks by fetching them in batches and then applying an update to each record.
+	UpdateTracksInBatches(db)
+
+	// Delete a random Track from the database.
+	DeleteRandomTrack(db)
+	// Delete a random Album from the database. This will also delete any child Track records interleaved with the
+	// Album.
+	DeleteRandomAlbum(db)
 
 	fmt.Printf("Finished running sample\n")
 }
@@ -259,6 +276,8 @@ func UpdateVenueDescription(db *gorm.DB) {
 	fmt.Print("Updated Venue 'Avenue Park'\n\n")
 }
 
+// FirstOrInitVenue tries to fetch an existing Venue from the database based on the name of the venue, and if not found,
+// initializes a Venue struct. This can then be used to create or update the record.
 func FirstOrInitVenue(db *gorm.DB, name string) {
 	venue := Venue{}
 	if err := db.Transaction(func(tx *gorm.DB) error {
@@ -266,7 +285,7 @@ func FirstOrInitVenue(db *gorm.DB, name string) {
 		// Note that we do not assign an ID in case the Venue was not found.
 		// This makes it possible for us to determine whether we need to call Create or Save, as Cloud Spanner does not
 		// support `ON CONFLICT UPDATE` clauses.
-		if err := db.FirstOrInit(&venue, Venue{Name: name}).Error; err != nil {
+		if err := tx.FirstOrInit(&venue, Venue{Name: name}).Error; err != nil {
 			return err
 		}
 		venue.Description = `{"Capacity": 2000, "Location": "Europe/Berlin", "Country": "DE", "Type": "Arena"}`
@@ -280,7 +299,57 @@ func FirstOrInitVenue(db *gorm.DB, name string) {
 		return
 	}
 	fmt.Printf("Created or updated Venue %q\n\n", name)
+}
 
+// FirstOrCreateVenue tries to fetch an existing Venue from the database based on the name of the venue, and if not
+// found, creates a new Venue record in the database.
+func FirstOrCreateVenue(db *gorm.DB, name string) {
+	venue := Venue{}
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		// Use FirstOrCreate to search and otherwise create a Venue record.
+		// Note that we manually assign the ID using the Attrs function. This ensures that the ID is only assigned if
+		// the record is not found.
+		return tx.Where(Venue{Name: name}).Attrs(Venue{
+			BaseModel:   BaseModel{ID: uuid.NewString()},
+			Description: `{"Capacity": 5000, "Location": "Europe/Paris", "Country": "FR", "Type": "Stadium"}`,
+		}).FirstOrCreate(&venue).Error
+	}); err != nil {
+		fmt.Printf("Failed to create Venue %q if it did not exist: %v\n", name, err)
+		return
+	}
+	fmt.Printf("Created Venue %q if it did not exist\n\n", name)
+}
+
+// UpdateTracksInBatches uses FindInBatches to iterate through a selection of Tracks in batches and updates each Track
+// that it found.
+func UpdateTracksInBatches(db *gorm.DB) {
+	fmt.Print("Updating tracks")
+	updated := 0
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		var tracks []*Track
+		return tx.Where("sample_rate > 44.1").FindInBatches(&tracks, 20, func(batchTx *gorm.DB, batch int) error {
+			for _, track := range tracks {
+				if track.SampleRate > 50 {
+					track.SampleRate = track.SampleRate * 0.9
+				} else {
+					track.SampleRate = track.SampleRate * 0.95
+				}
+				if res := tx.Model(&track).Update("sample_rate", track.SampleRate); res.Error != nil || res.RowsAffected != int64(1) {
+					if res.Error != nil {
+						return res.Error
+					}
+					return fmt.Errorf("update of Track{%s,%d} affected %d rows", track.ID, track.TrackNumber, res.RowsAffected)
+				}
+				updated++
+				fmt.Print(".")
+			}
+			return nil
+		}).Error
+	}); err != nil {
+		fmt.Printf("\nFailed to batch fetch and update tracks: %v\n", err)
+		return
+	}
+	fmt.Printf("\nUpdated %d tracks\n\n", updated)
 }
 
 func PrintAlbumsReleaseBefore1900(db *gorm.DB) {
@@ -303,7 +372,8 @@ func PrintAlbumsReleaseBefore1900(db *gorm.DB) {
 func PrintSingersWithLimitAndOffset(db *gorm.DB) {
 	fmt.Println("Printing all singers ordered by last name")
 	var singers []*Singer
-	limit := 5; offset := 0
+	limit := 5
+	offset := 0
 	for true {
 		if err := db.Order("last_name, id").Limit(limit).Offset(offset).Find(&singers).Error; err != nil {
 			fmt.Printf("Failed to load singers at offset %d: %v", offset, err)
@@ -403,6 +473,58 @@ func CreateAlbumWithRandomTracks(db *gorm.DB, singerId, albumTitle string, numTr
 	// parameters in a prepared statement.
 	res = db.CreateInBatches(tracks, 8)
 	return albumId, res.Error
+}
+
+// DeleteRandomTrack will delete a randomly chosen Track from the database.
+// This function shows how to delete a record with a primary key consisting of more than one column.
+func DeleteRandomTrack(db *gorm.DB) {
+	track := Track{}
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.First(&track).Error; err != nil {
+			return err
+		}
+		if track.ID == "" {
+			return fmt.Errorf("no track found")
+		}
+		if res := tx.Delete(&track); res.Error != nil || res.RowsAffected != int64(1) {
+			if res.Error != nil {
+				return res.Error
+			}
+			return fmt.Errorf("delete affected %d rows", res.RowsAffected)
+		}
+		return nil
+	}); err != nil {
+		fmt.Printf("Failed to delete a random track: %v\n", err)
+		return
+	}
+	fmt.Printf("Deleted track %q (%q)\n\n", track.ID, track.Title)
+}
+
+// DeleteRandomAlbum deletes a random Album. The Album could have one or more Tracks interleaved with it, but as the
+// `INTERLEAVE IN PARENT` clause includes `ON DELETE CASCADE`, the child rows will be deleted along with the parent.
+func DeleteRandomAlbum(db *gorm.DB) {
+	album := Album{}
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.First(&album).Error; err != nil {
+			return err
+		}
+		if album.ID == "" {
+			return fmt.Errorf("no album found")
+		}
+		// Note that the number of rows affected that is returned by Cloud Spanner excludes the number of child rows
+		// that was deleted along with the parent row. This means that the number of rows affected should always be 1.
+		if res := tx.Delete(&album); res.Error != nil || res.RowsAffected != int64(1) {
+			if res.Error != nil {
+				return res.Error
+			}
+			return fmt.Errorf("delete affected %d rows", res.RowsAffected)
+		}
+		return nil
+	}); err != nil {
+		fmt.Printf("Failed to delete a random album: %v\n", err)
+		return
+	}
+	fmt.Printf("Deleted album %q (%q)\n\n", album.ID, album.Title)
 }
 
 // DeleteAllData deletes all existing records in the database.

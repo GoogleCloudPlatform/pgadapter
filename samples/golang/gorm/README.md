@@ -1,10 +1,29 @@
 # PGAdapter and gorm
 
-PGAdapter can be used with [gorm](https://gorm.io/) and the `pgx` driver. This document lists the limitations when
-working with `gorm`.
+PGAdapter can be used with [gorm](https://gorm.io/) and the `pgx` driver. This document shows how to use this sample
+application, and lists the limitations when working with `gorm` with PGAdapter.
 
 The [sample.go](sample.go) file contains a sample application using `gorm` with PGAdapter. Use this as a reference for
-features of `gorm` that are supported with PGAdapter.
+features of `gorm` that are supported with PGAdapter. This sample assumes that the reader is familiar with `gorm`, and
+it is not intended as a tutorial for how to use `gorm` in general.
+
+## Start PGAdapter
+You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
+pre-built Docker image. See [Running PGAdapter](../../../README.md#usage) for more information on other options for how
+to run PGAdapter.
+
+```shell
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
+docker run \
+  -d -p 5432:5432 \
+  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
+  -e GOOGLE_APPLICATION_CREDENTIALS \
+  -v /tmp:/tmp \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter \
+  -p my-project -i my-instance \
+  -x
+```
 
 ## Creating the Sample Data Model
 Run the following command in this directory. Replace the host, port and database name with the actual host, port and
