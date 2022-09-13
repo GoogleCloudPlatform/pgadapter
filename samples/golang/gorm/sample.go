@@ -102,6 +102,10 @@ var rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func main() {
 	db, err := gorm.Open(postgres.Open(connectionString), &gorm.Config{
+		// DisableNestedTransaction will turn off the use of Savepoints if gorm
+		// detects a nested transaction. Cloud Spanner does not support Savepoints,
+		// so it is recommended to set this configuration option to true.
+		DisableNestedTransaction: true,
 		Logger: logger.Default.LogMode(logger.Error),
 	})
 	if err != nil {
@@ -165,23 +169,28 @@ func main() {
 
 // CreateRandomSingersAndAlbums creates some random test records and stores these in the database.
 func CreateRandomSingersAndAlbums(db *gorm.DB) {
-	// Create between 5 and 10 random singers.
-	for i := 0; i < randInt(5, 10); i++ {
-		singerId, err := CreateSinger(db, randFirstName(), randLastName())
-		if err != nil {
-			fmt.Printf("Failed to create singer: %v\n", err)
-			return
-		}
-		fmt.Print(".")
-		// Create between 2 and 12 random albums
-		for j := 0; j < randInt(2, 12); j++ {
-			_, err = CreateAlbumWithRandomTracks(db, singerId, randAlbumTitle(), randInt(1, 22))
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		// Create between 5 and 10 random singers.
+		for i := 0; i < randInt(5, 10); i++ {
+			singerId, err := CreateSinger(db, randFirstName(), randLastName())
 			if err != nil {
-				fmt.Printf("Failed to create album: %v\n", err)
-				return
+				fmt.Printf("Failed to create singer: %v\n", err)
+				return err
 			}
 			fmt.Print(".")
+			// Create between 2 and 12 random albums
+			for j := 0; j < randInt(2, 12); j++ {
+				_, err = CreateAlbumWithRandomTracks(db, singerId, randAlbumTitle(), randInt(1, 22))
+				if err != nil {
+					fmt.Printf("Failed to create album: %v\n", err)
+					return err
+				}
+				fmt.Print(".")
+			}
 		}
+		return nil
+	}); err != nil {
+		fmt.Printf("Transaction failed: %v\n", err)
 	}
 	fmt.Print("\n\n")
 }
