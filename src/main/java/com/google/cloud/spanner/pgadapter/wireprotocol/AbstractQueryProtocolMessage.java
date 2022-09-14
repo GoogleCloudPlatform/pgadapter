@@ -55,6 +55,8 @@ public abstract class AbstractQueryProtocolMessage extends ControlMessage {
 
   public abstract void flush() throws Exception;
 
+  public abstract String getSql();
+
   public boolean isReturnedErrorResponse() {
     return returnedErrorResponse;
   }

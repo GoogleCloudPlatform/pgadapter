@@ -57,9 +57,11 @@ import java.net.Socket;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -357,7 +359,7 @@ public class ConnectionHandler extends Thread {
         exception,
         () ->
             String.format("Exception on connection handler with ID %s: %s", getName(), exception));
-    DataOutputStream output = getConnectionMetadata().peekOutputStream();
+    DataOutputStream output = getConnectionMetadata().getOutputStream();
     if (this.status == ConnectionStatus.TERMINATED) {
       new ErrorResponse(output, exception).send();
       new TerminateResponse(output).send();
@@ -402,11 +404,12 @@ public class ConnectionHandler extends Thread {
     this.portalsMap.put(portalName, portal);
   }
 
-  public void closePortal(String portalName) {
+  public void closePortal(String portalName) throws Exception {
     if (!hasPortal(portalName)) {
-      throw new IllegalStateException("Unregistered statement: " + portalName);
+      throw new IllegalStateException("Unregistered portal: " + portalName);
     }
-    this.portalsMap.remove(portalName);
+    IntermediatePortalStatement portal = this.portalsMap.get(portalName);
+    portal.close();
   }
 
   public boolean hasPortal(String portalName) {
@@ -471,7 +474,8 @@ public class ConnectionHandler extends Thread {
 
   public IntermediatePreparedStatement getStatement(String statementName) {
     if (!hasStatement(statementName)) {
-      throw new IllegalStateException("Unregistered statement: " + statementName);
+      throw PGExceptionFactory.newPGException(
+          "prepared statement " + statementName + " does not exist");
     }
     return this.statementsMap.get(statementName);
   }
@@ -482,9 +486,17 @@ public class ConnectionHandler extends Thread {
 
   public void closeStatement(String statementName) {
     if (!hasStatement(statementName)) {
-      throw new IllegalStateException("Unregistered statement: " + statementName);
+      throw PGExceptionFactory.newPGException(
+          "prepared statement " + statementName + " does not exist");
     }
     this.statementsMap.remove(statementName);
+  }
+
+  public void closeAllStatements() {
+    Set<String> names = new HashSet<>(this.statementsMap.keySet());
+    for (String statementName : names) {
+      closeStatement(statementName);
+    }
   }
 
   public boolean hasStatement(String statementName) {

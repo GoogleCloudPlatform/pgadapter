@@ -85,7 +85,7 @@ public abstract class ControlMessage extends WireMessage {
   private final ManuallyCreatedToken manuallyCreatedToken;
 
   public ControlMessage(ConnectionHandler connection) throws IOException {
-    super(connection, connection.getConnectionMetadata().peekInputStream().readInt());
+    super(connection, connection.getConnectionMetadata().getInputStream().readInt());
     this.manuallyCreatedToken = null;
   }
 
@@ -108,7 +108,7 @@ public abstract class ControlMessage extends WireMessage {
    */
   public static ControlMessage create(ConnectionHandler connection) throws Exception {
     boolean validMessage = true;
-    char nextMsg = (char) connection.getConnectionMetadata().peekInputStream().readUnsignedByte();
+    char nextMsg = (char) connection.getConnectionMetadata().getInputStream().readUnsignedByte();
     try {
       if (connection.getStatus() == ConnectionStatus.COPY_IN) {
         switch (nextMsg) {
@@ -176,7 +176,7 @@ public abstract class ControlMessage extends WireMessage {
         connection.increaseInvalidMessageCount();
         if (connection.getInvalidMessageCount() > MAX_INVALID_MESSAGE_COUNT) {
           new ErrorResponse(
-                  connection.getConnectionMetadata().peekOutputStream(),
+                  connection.getConnectionMetadata().getOutputStream(),
                   PGException.newBuilder()
                       .setMessage(
                           String.format(
@@ -248,6 +248,9 @@ public abstract class ControlMessage extends WireMessage {
     String command = statement.getCommandTag();
     if (Strings.isNullOrEmpty(command)) {
       new EmptyQueryResponse(this.outputStream).send(false);
+      return;
+    }
+    if (statement.getStatementResult() == null) {
       return;
     }
 

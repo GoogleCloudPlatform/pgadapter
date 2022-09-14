@@ -20,6 +20,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.common.base.Preconditions;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -57,7 +58,11 @@ public class DateParser extends Parser<Date> {
           String stringValue = new String(item, UTF8);
           // Use the first 10 characters of the date string, as the string might contain a timezone
           // identifier, which is not supported by parseDate(String).
-          this.item = Date.parseDate(stringValue.substring(0, 10));
+          if (stringValue.length() >= 10) {
+            this.item = Date.parseDate(stringValue.substring(0, 10));
+          } else {
+            throw PGExceptionFactory.newPGException("Invalid date value: " + stringValue);
+          }
           break;
         case BINARY:
           this.item = toDate(item);

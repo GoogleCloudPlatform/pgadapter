@@ -16,12 +16,15 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.common.collect.ImmutableList;
 import com.google.rpc.ResourceInfo;
 import com.google.spanner.admin.database.v1.Database;
@@ -264,6 +267,44 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
         }
         assertFalse(statement.getMoreResults());
       }
+    }
+  }
+
+  @Test
+  public void testPrepareExecuteDeallocate() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      connection.createStatement().execute("prepare my_prepared_statement as SELECT 1");
+
+      assertEquals(1, pgServer.getNumberOfConnections());
+      ConnectionHandler connectionHandler = pgServer.getConnectionHandlers().get(0);
+      IntermediateStatement preparedStatement =
+          connectionHandler.getStatement("my_prepared_statement");
+      assertNotNull(preparedStatement);
+      assertEquals("SELECT 1", preparedStatement.getStatement());
+
+      try (java.sql.Statement statement = connection.createStatement()) {
+        assertTrue(statement.execute("execute my_prepared_statement"));
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
+
+      connection.createStatement().execute("deallocate my_prepared_statement");
+      PGException exception =
+          assertThrows(
+              PGException.class, () -> connectionHandler.getStatement("my_prepared_statement"));
+      assertEquals(
+          "prepared statement my_prepared_statement does not exist", exception.getMessage());
+
+      SQLException sqlException =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().execute("execute my_prepared_statement"));
+      assertEquals(
+          "ERROR: prepared statement my_prepared_statement does not exist",
+          sqlException.getMessage());
     }
   }
 

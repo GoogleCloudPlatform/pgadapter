@@ -20,7 +20,9 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -45,6 +47,10 @@ public class NumericParserTest {
   public void testStringParse() {
     assertEquals("3.14", new NumericParser("3.14").stringParse());
     assertEquals("NaN", new NumericParser("NaN").stringParse());
+    // Numeric values are not checked client side, as they are sent as text all the way.
+    assertEquals(
+        "foo",
+        new NumericParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).stringParse());
     assertNull(new NumericParser(null).stringParse());
   }
 }
