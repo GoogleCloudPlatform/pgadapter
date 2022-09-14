@@ -16,8 +16,11 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import static junit.framework.TestCase.assertNull;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
 import com.google.cloud.ByteArray;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -39,5 +42,8 @@ public class BinaryParserTest {
     assertEquals(
         "\\x010203", new BinaryParser(ByteArray.copyFrom(new byte[] {1, 2, 3})).stringParse());
     assertNull(new BinaryParser(null).stringParse());
+    assertThrows(
+        PGException.class,
+        () -> new BinaryParser("\\xzz".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
   }
 }

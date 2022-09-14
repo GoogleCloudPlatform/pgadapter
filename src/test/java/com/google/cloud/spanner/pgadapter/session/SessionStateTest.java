@@ -156,7 +156,7 @@ public class SessionStateTest {
   public void testGetAll() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(347, allSettings.size());
+    assertEquals(356, allSettings.size());
   }
 
   @Test
@@ -194,7 +194,7 @@ public class SessionStateTest {
     state.setLocal("spanner", "custom_local_setting", "value2");
 
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(349, allSettings.size());
+    assertEquals(358, allSettings.size());
 
     PGSetting applicationName =
         allSettings.stream()
@@ -421,7 +421,7 @@ public class SessionStateTest {
         + "union all\n"
         + "select 'search_path' as name, 'public' as setting, null as unit, 'Client Connection Defaults / Statement Behavior' as category, null as short_desc, null as extra_desc, 'user' as context, 'string' as vartype, null as min_val, null as max_val, null::text[] as enumvals, 'public' as boot_val, 'public' as reset_val, 'default' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
-        + "select 'server_version' as name, null as setting, null as unit, 'Preset Options' as category, null as short_desc, null as extra_desc, 'backend' as context, 'string' as vartype, null as min_val, null as max_val, null::text[] as enumvals, '14.1 (Debian 14.1-1.pgdg110+1)' as boot_val, '14.1 (Debian 14.1-1.pgdg110+1)' as reset_val, 'default' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
+        + "select 'server_version' as name, null as setting, null as unit, 'Preset Options' as category, null as short_desc, null as extra_desc, 'backend' as context, 'string' as vartype, null as min_val, null as max_val, null::text[] as enumvals, '14.1' as boot_val, '14.1' as reset_val, 'default' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
         + "select 'server_version_num' as name, null as setting, null as unit, 'Preset Options' as category, null as short_desc, null as extra_desc, 'internal' as context, 'integer' as vartype, '140001' as min_val, '140001' as max_val, null::text[] as enumvals, '140001' as boot_val, '140001' as reset_val, 'default' as source, null as sourcefile, null::bigint as sourceline, 'f'::boolean as pending_restart\n"
         + "union all\n"
@@ -549,6 +549,57 @@ public class SessionStateTest {
   }
 
   @Test
+  public void testGetBoolSetting() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    assertFalse(state.getBoolSetting("spanner", "unknown_setting", false));
+    assertTrue(state.getBoolSetting("spanner", "unknown_setting", true));
+
+    state.set("spanner", "custom_setting", "on");
+    assertTrue(state.getBoolSetting("spanner", "custom_setting", false));
+    state.set("spanner", "custom_setting", "off");
+    assertFalse(state.getBoolSetting("spanner", "custom_setting", true));
+
+    state.set("spanner", "custom_setting", "foo");
+    assertFalse(state.getBoolSetting("spanner", "custom_setting", false));
+    state.set("spanner", "custom_setting", "foo");
+    assertTrue(state.getBoolSetting("spanner", "custom_setting", true));
+  }
+
+  @Test
+  public void testGetIntegerSetting() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    assertEquals(100, state.getIntegerSetting("spanner", "unknown_setting", 100));
+    assertEquals(0, state.getIntegerSetting("spanner", "unknown_setting", 0));
+
+    state.set("spanner", "custom_setting", "200");
+    assertEquals(200, state.getIntegerSetting("spanner", "custom_setting", 100));
+    state.set("spanner", "custom_setting", "-200");
+    assertEquals(-200, state.getIntegerSetting("spanner", "custom_setting", 100));
+
+    state.set("spanner", "custom_setting", "foo");
+    assertEquals(100, state.getIntegerSetting("spanner", "custom_setting", 100));
+    state.set("spanner", "custom_setting", "bar");
+    assertEquals(0, state.getIntegerSetting("spanner", "custom_setting", 0));
+  }
+
+  @Test
+  public void testGetFloatSetting() {
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    assertEquals(1.1f, state.getFloatSetting("spanner", "unknown_setting", 1.1f), 0.0f);
+    assertEquals(0.0f, state.getFloatSetting("spanner", "unknown_setting", 0.0f), 0.0f);
+
+    state.set("spanner", "custom_setting", "2");
+    assertEquals(2f, state.getFloatSetting("spanner", "custom_setting", 1f), 0.0f);
+    state.set("spanner", "custom_setting", "-2.9");
+    assertEquals(-2.9f, state.getFloatSetting("spanner", "custom_setting", 1.5f), 0.0f);
+
+    state.set("spanner", "custom_setting", "foo");
+    assertEquals(4.4f, state.getFloatSetting("spanner", "custom_setting", 4.4f), 0.0f);
+    state.set("spanner", "custom_setting", "bar");
+    assertEquals(0f, state.getFloatSetting("spanner", "custom_setting", 0f), 0.0f);
+  }
+
+  @Test
   public void testTryGet() {
     assertNull(
         tryGet(
@@ -568,8 +619,8 @@ public class SessionStateTest {
 
   @Test
   public void testIsReplacePgCatalogTables_noDefault() {
-    SessionState state = new SessionState(ImmutableMap.of(), mock(OptionsMetadata.class));
-    assertTrue(state.isReplacePgCatalogTables());
+    SessionState state = new SessionState(mock(OptionsMetadata.class));
+    assertFalse(state.isReplacePgCatalogTables());
   }
 
   @Test

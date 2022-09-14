@@ -53,13 +53,22 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   /** Constructor for Bind messages that are constructed to execute a Query message. */
   public BindMessage(ConnectionHandler connection, ManuallyCreatedToken manuallyCreatedToken) {
+    this(connection, "", new byte[0][], manuallyCreatedToken);
+  }
+
+  /** Constructor for Bind messages that are created by EXECUTE statements. */
+  public BindMessage(
+      ConnectionHandler connection,
+      String statementName,
+      byte[][] parameters,
+      ManuallyCreatedToken manuallyCreatedToken) {
     super(connection, 4, manuallyCreatedToken);
     this.portalName = "";
-    this.statementName = "";
+    this.statementName = statementName;
     this.formatCodes = ImmutableList.of();
     this.resultFormatCodes = ImmutableList.of();
-    this.parameters = new byte[0][];
-    this.statement = connection.getStatement("");
+    this.parameters = parameters;
+    this.statement = connection.getStatement(statementName);
   }
 
   /** Given the prepared statement, bind it and save it locally. */
@@ -115,6 +124,11 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   public String getStatementName() {
     return this.statementName;
+  }
+
+  @Override
+  public String getSql() {
+    return this.statement.getSql();
   }
 
   public byte[][] getParameters() {

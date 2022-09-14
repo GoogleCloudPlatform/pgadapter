@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to short. */
@@ -28,7 +29,12 @@ class ShortParser extends Parser<Short> {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          this.item = Short.valueOf(new String(item));
+          String stringValue = new String(item);
+          try {
+            this.item = Short.valueOf(stringValue);
+          } catch (Exception exception) {
+            throw PGExceptionFactory.newPGException("Invalid int4 value: " + stringValue);
+          }
           break;
         case BINARY:
           this.item = ByteConverter.int2(item, 0);

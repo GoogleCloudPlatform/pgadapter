@@ -323,6 +323,10 @@ public class CopyStatement extends IntermediatePortalStatement {
       setParserFormat(this.options);
       mutationWriter =
           new MutationWriter(
+              connectionHandler
+                  .getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getSessionState(),
               getTransactionMode(),
               connection,
               options.getTableName(),

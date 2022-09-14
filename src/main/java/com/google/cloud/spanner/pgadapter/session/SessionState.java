@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.session;
 
+import static com.google.cloud.spanner.pgadapter.session.CopySettings.initCopySettings;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
@@ -24,6 +26,8 @@ import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.session.PGSetting.Context;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
@@ -83,22 +87,29 @@ public class SessionState {
   private Map<String, PGSetting> localSettings;
 
   public SessionState(OptionsMetadata options) {
-    this(SERVER_SETTINGS, options);
+    this(ImmutableMap.of(), options);
   }
 
   @VisibleForTesting
-  SessionState(Map<String, PGSetting> serverSettings, OptionsMetadata options) {
-    this.settings = new HashMap<>(serverSettings.size());
-    for (Entry<String, PGSetting> entry : serverSettings.entrySet()) {
+  SessionState(Map<String, PGSetting> extraServerSettings, OptionsMetadata options) {
+    Preconditions.checkNotNull(extraServerSettings);
+    Preconditions.checkNotNull(options);
+    this.settings = new HashMap<>(SERVER_SETTINGS.size() + extraServerSettings.size());
+    for (Entry<String, PGSetting> entry : SERVER_SETTINGS.entrySet()) {
       this.settings.put(entry.getKey(), entry.getValue().copy());
     }
-    initSettingValue("server_version", options.getServerVersion());
-    initSettingValue("server_version_num", options.getServerVersionNum());
+    for (Entry<String, PGSetting> entry : extraServerSettings.entrySet()) {
+      this.settings.put(entry.getKey(), entry.getValue().copy());
+    }
+    this.settings.get("server_version").initSettingValue(options.getServerVersion());
+    this.settings.get("server_version_num").initSettingValue(options.getServerVersionNum());
     initSettingValue(
         "spanner.ddl_transaction_mode",
         MoreObjects.firstNonNull(options.getDdlTransactionMode(), DdlTransactionMode.Batch).name());
     initSettingValue(
         "spanner.replace_pg_catalog_tables", Boolean.toString(options.replacePgCatalogTables()));
+
+    initCopySettings(this.settings);
   }
 
   void initSettingValue(String key, String value) {
@@ -255,6 +266,39 @@ public class SessionState {
       throw unknownParamError(key);
     }
     return null;
+  }
+
+  boolean getBoolSetting(String extension, String name, boolean defaultValue) {
+    PGSetting setting = internalGet(toKey(extension, name), false);
+    if (setting != null) {
+      try {
+        return BooleanParser.toBoolean(setting.getSetting());
+      } catch (Exception ignore) {
+      }
+    }
+    return defaultValue;
+  }
+
+  int getIntegerSetting(String extension, String name, int defaultValue) {
+    PGSetting setting = internalGet(toKey(extension, name), false);
+    if (setting != null) {
+      try {
+        return Integer.parseInt(setting.getSetting());
+      } catch (Exception ignore) {
+      }
+    }
+    return defaultValue;
+  }
+
+  float getFloatSetting(String extension, String name, float defaultValue) {
+    PGSetting setting = internalGet(toKey(extension, name), false);
+    if (setting != null) {
+      try {
+        return Float.parseFloat(setting.getSetting());
+      } catch (Exception ignore) {
+      }
+    }
+    return defaultValue;
   }
 
   /** Returns all settings and their current values. */

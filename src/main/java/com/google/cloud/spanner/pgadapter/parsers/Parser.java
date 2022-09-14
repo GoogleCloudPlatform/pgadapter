@@ -52,9 +52,7 @@ public abstract class Parser<T> {
   protected T item;
 
   /**
-   * TODO: Remove when we have full support for DescribeStatement.
-   *
-   * <p>Guess the type of a parameter with unspecified type.
+   * Guess the type of a parameter with unspecified type.
    *
    * @param item The value to guess the type for
    * @param formatCode The encoding that is used for the value
@@ -62,11 +60,14 @@ public abstract class Parser<T> {
    *     no type could be guessed.
    */
   private static int guessType(byte[] item, FormatCode formatCode) {
-    // TODO: Put 'guessType' behind a command line flag so it is only enabled when wanted.
+    // TODO: Put 'guessType' behind a session setting so it is only enabled when wanted.
     if (formatCode == FormatCode.TEXT && item != null) {
       String value = new String(item, StandardCharsets.UTF_8);
       if (TimestampParser.isTimestamp(value)) {
         return Oid.TIMESTAMPTZ;
+      }
+      if (DateParser.isDate(value)) {
+        return Oid.DATE;
       }
     }
     return Oid.UNSPECIFIED;

@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to int. */
@@ -33,7 +34,12 @@ class IntegerParser extends Parser<Integer> {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          this.item = Integer.valueOf(new String(item));
+          String stringValue = new String(item);
+          try {
+            this.item = Integer.valueOf(stringValue);
+          } catch (Exception exception) {
+            throw PGExceptionFactory.newPGException("Invalid int4 value: " + stringValue);
+          }
           break;
         case BINARY:
           this.item = ByteConverter.int4(item, 0);

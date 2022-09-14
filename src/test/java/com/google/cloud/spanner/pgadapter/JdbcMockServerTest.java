@@ -67,16 +67,28 @@ import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.jdbc.PgStatement;
 import org.postgresql.util.PSQLException;
 
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
   private static final int RANDOM_RESULTS_ROW_COUNT = 10;
   private static final Statement SELECT_RANDOM = Statement.of("select * from random_table");
+  private static final ImmutableList<String> JDBC_STARTUP_STATEMENTS =
+      ImmutableList.of(
+          "SET extra_float_digits = 3", "SET application_name = 'PostgreSQL JDBC Driver'");
+
+  @Parameter public String pgVersion;
+
+  @Parameters(name = "pgVersion = {0}")
+  public static Object[] data() {
+    return new Object[] {"1.0", "14.1"};
+  }
 
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
@@ -97,7 +109,13 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
    * mode for queries and DML statements.
    */
   private String createUrl() {
-    return String.format("jdbc:postgresql://localhost:%d/", pgServer.getLocalPort());
+    return String.format(
+        "jdbc:postgresql://localhost:%d/?options=-c%%20server_version=%s",
+        pgServer.getLocalPort(), pgVersion);
+  }
+
+  private String getExpectedInitialApplicationName() {
+    return pgVersion.equals("1.0") ? null : "PostgreSQL JDBC Driver";
   }
 
   @Test
@@ -239,8 +257,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         assertTrue(resultSet.next());
-        assertEquals(
-            pgServer.getOptions().getServerVersion(), resultSet.getString("server_version"));
+        assertEquals(pgVersion, resultSet.getString("server_version"));
         assertFalse(resultSet.next());
       }
     }
@@ -1322,7 +1339,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       DescribeMessage describeMessage = describeMessages.get(0);
       assertEquals(PreparedType.Portal, describeMessage.getType());
 
-      List<ExecuteMessage> executeMessages = getWireMessagesOfType(ExecuteMessage.class);
+      List<ExecuteMessage> executeMessages =
+          getWireMessagesOfType(ExecuteMessage.class).stream()
+              .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
+              .collect(Collectors.toList());
       assertEquals(5, executeMessages.size());
       assertEquals("", executeMessages.get(0).getName());
       for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
@@ -1331,7 +1351,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
 
-      List<ParseMessage> parseMessages = getWireMessagesOfType(ParseMessage.class);
+      List<ParseMessage> parseMessages =
+          getWireMessagesOfType(ParseMessage.class).stream()
+              .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
+              .collect(Collectors.toList());
       assertEquals(3, parseMessages.size());
       assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
       assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(1).getStatement().getSql());
@@ -1375,7 +1398,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       DescribeMessage describeMessage = describeMessages.get(0);
       assertEquals(PreparedType.Portal, describeMessage.getType());
 
-      List<ExecuteMessage> executeMessages = getWireMessagesOfType(ExecuteMessage.class);
+      List<ExecuteMessage> executeMessages =
+          getWireMessagesOfType(ExecuteMessage.class).stream()
+              .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
+              .collect(Collectors.toList());
       assertEquals(4, executeMessages.size());
       assertEquals("", executeMessages.get(0).getName());
       for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
@@ -1384,7 +1410,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
 
-      List<ParseMessage> parseMessages = getWireMessagesOfType(ParseMessage.class);
+      List<ParseMessage> parseMessages =
+          getWireMessagesOfType(ParseMessage.class).stream()
+              .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
+              .collect(Collectors.toList());
       assertEquals(3, parseMessages.size());
       assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
       assertEquals(SELECT_FIVE_ROWS.getSql(), parseMessages.get(1).getStatement().getSql());
@@ -1438,7 +1467,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       DescribeMessage describeMessage = describeMessages.get(0);
       assertEquals(PreparedType.Portal, describeMessage.getType());
 
-      List<ExecuteMessage> executeMessages = getWireMessagesOfType(ExecuteMessage.class);
+      List<ExecuteMessage> executeMessages =
+          getWireMessagesOfType(ExecuteMessage.class).stream()
+              .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
+              .collect(Collectors.toList());
       int expectedExecuteMessageCount =
           RANDOM_RESULTS_ROW_COUNT / fetchSize
               + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0)
@@ -1451,7 +1483,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
 
-      List<ParseMessage> parseMessages = getWireMessagesOfType(ParseMessage.class);
+      List<ParseMessage> parseMessages =
+          getWireMessagesOfType(ParseMessage.class).stream()
+              .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
+              .collect(Collectors.toList());
       assertEquals(3, parseMessages.size());
       assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
       assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(1).getStatement().getSql());
@@ -1670,9 +1705,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testShowValidSetting() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet =
-          connection.createStatement().executeQuery("show application_name ")) {
+          connection.createStatement().executeQuery("show application_name")) {
         assertTrue(resultSet.next());
-        assertNull(resultSet.getString(1));
+        assertEquals(getExpectedInitialApplicationName(), resultSet.getString(1));
         assertFalse(resultSet.next());
       }
     }
@@ -1871,8 +1906,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
 
-      // Verify that the initial value is null.
-      verifySettingIsNull(connection, "application_name");
+      // Verify that the initial value is 'PostgreSQL JDBC Driver'.
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
       connection.createStatement().execute("set application_name to \"my-application\"");
       verifySettingValue(connection, "application_name", "my-application");
       // Committing the transaction should persist the value.
@@ -1887,12 +1922,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       connection.setAutoCommit(false);
 
       // Verify that the initial value is null.
-      verifySettingIsNull(connection, "application_name");
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
       connection.createStatement().execute("set application_name to \"my-application\"");
       verifySettingValue(connection, "application_name", "my-application");
       // Rolling back the transaction should reset the value to what it was before the transaction.
       connection.rollback();
-      verifySettingIsNull(connection, "application_name");
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
     }
   }
 
@@ -1945,14 +1980,14 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
 
-      // Verify that the initial value is null.
-      verifySettingIsNull(connection, "application_name");
+      // Verify that the initial value is 'PostgreSQL JDBC Driver'.
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
       connection.createStatement().execute("set local application_name to \"my-application\"");
       verifySettingValue(connection, "application_name", "my-application");
       // Committing the transaction should not persist the value as it was only set for the current
       // transaction.
       connection.commit();
-      verifySettingIsNull(connection, "application_name");
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
     }
   }
 
@@ -1961,8 +1996,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
 
-      // Verify that the initial value is null.
-      verifySettingIsNull(connection, "application_name");
+      // Verify that the initial value is 'PostgreSQL JDBC Driver'.
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
       // Set both a session and a local value. The session value will be 'hidden' by the local
       // value, but the session value will be committed.
       connection
@@ -2017,7 +2052,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       connection.rollback();
 
       // Verify that the connection is usable again.
-      verifySettingIsNull(connection, "application_name");
+      verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
     }
   }
 
@@ -2036,7 +2071,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(347, count);
+        assertEquals(356, count);
       }
     }
   }
@@ -2085,8 +2120,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     // Verify that each new connection gets a separate set of settings.
     for (int connectionNum = 0; connectionNum < 5; connectionNum++) {
       try (Connection connection = DriverManager.getConnection(createUrl())) {
-        // Verify that the initial value is null.
-        verifySettingIsNull(connection, "application_name");
+        // Verify that the initial value is 'PostgreSQL JDBC Driver'.
+        verifySettingValue(connection, "application_name", getExpectedInitialApplicationName());
         connection.createStatement().execute("set application_name to \"my-application\"");
         verifySettingValue(connection, "application_name", "my-application");
       }
