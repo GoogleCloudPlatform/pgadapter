@@ -65,6 +65,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -439,6 +440,67 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         }
       }
     }
+  }
+
+  @Ignore("Enable when https://github.com/googleapis/java-spanner/pull/2010 has been released")
+  @Test
+  public void testTransactionAbortedWithPreparedStatements() throws SQLException {
+    String sql = "SELECT 1";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Use a read/write transaction to execute two queries.
+      connection.setAutoCommit(false);
+      // Force the use of prepared statements.
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      assertEquals(1, connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql()));
+      mockSpanner.abortAllTransactions();
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      connection.commit();
+    }
+
+    assertEquals(11, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(SELECT1.getSql(), requests.get(0).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
+    assertEquals(SELECT1.getSql(), requests.get(1).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(1).getQueryMode());
+
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(2).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(2).getQueryMode());
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(3).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(3).getQueryMode());
+
+    // This returns Aborted and initiates a retry.
+    assertEquals(SELECT1.getSql(), requests.get(4).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(4).getQueryMode());
+
+    // Start of retry.
+    assertEquals(SELECT1.getSql(), requests.get(5).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(5).getQueryMode());
+    assertEquals(SELECT1.getSql(), requests.get(6).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(6).getQueryMode());
+
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(7).getSql());
+    // This should be QueryMode.PLAN. See https://github.com/googleapis/java-spanner/issues/2009.
+    assertEquals(QueryMode.PLAN, requests.get(7).getQueryMode());
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(8).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(8).getQueryMode());
+
+    assertEquals(SELECT1.getSql(), requests.get(9).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(9).getQueryMode());
+
+    // End of retry.
+    assertEquals(SELECT1.getSql(), requests.get(10).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(10).getQueryMode());
   }
 
   @Test

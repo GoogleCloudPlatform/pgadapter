@@ -25,6 +25,14 @@ import java.io.IOException;
 /** Golang Test interface. */
 public interface GolangTest {
 
+  static File getTestDirectory(String goTestFileName) throws IOException {
+    String currentPath = new java.io.File(".").getCanonicalPath();
+    String testFilePath = String.format("%s/src/test/golang/%s", currentPath, goTestFileName);
+    File testFile = new File(testFilePath);
+    String testFileNameWithoutExtension = Files.getNameWithoutExtension(testFile.getName());
+    return testFile.getParentFile();
+  }
+
   /** Compiles a Go test file into a C shared library, so it can be called from Java using JNA. */
   static <T extends Library> T compile(String goTestFileName, Class<T> testClass)
       throws IOException, InterruptedException {
@@ -49,9 +57,12 @@ public interface GolangTest {
     // We explicitly use the full path to force JNA to look in a specific directory, instead of in
     // standard library directories.
     return Native.load(
-        String.format(
-            "%s/src/test/golang/%s/%s_test.so",
-            currentPath, directory.getName(), testFileNameWithoutExtension),
+        String.format("%s/%s_test.so", directory.getAbsolutePath(), testFileNameWithoutExtension),
         testClass);
+    //    return Native.load(
+    //        String.format(
+    //            "%s/src/test/golang/%s/%s_test.so",
+    //            currentPath, directory.getName(), testFileNameWithoutExtension),
+    //        testClass);
   }
 }

@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.error;
 
 import com.google.api.core.InternalApi;
-import com.google.common.base.Preconditions;
 
 /**
  * {@link PGException} contains all fields that are needed to send an {@link
@@ -58,7 +57,7 @@ public class PGException extends RuntimeException {
   private final SQLState sqlState;
 
   private PGException(Severity severity, SQLState sqlState, String message) {
-    super(Preconditions.checkNotNull(message));
+    super(message == null ? "" : message);
     this.severity = severity;
     this.sqlState = sqlState;
   }
