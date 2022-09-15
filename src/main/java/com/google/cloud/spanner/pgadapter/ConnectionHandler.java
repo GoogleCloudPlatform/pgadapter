@@ -266,10 +266,10 @@ public class ConnectionHandler extends Thread {
 
       try {
         this.message = this.server.recordMessage(BootstrapMessage.create(this));
-        this.message.send();
         if (!ssl
             && getServer().getOptions().getSslMode().isSslEnabled()
             && this.message instanceof SSLMessage) {
+          this.message.send();
           this.connectionMetadata.markForRestart();
           result = RunConnectionState.RESTART_WITH_SSL;
           return result;
@@ -279,6 +279,7 @@ public class ConnectionHandler extends Thread {
         if (!checkValidConnection(ssl)) {
           return result;
         }
+        this.message.send();
 
         while (this.status == ConnectionStatus.UNAUTHENTICATED) {
           try {

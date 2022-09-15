@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
@@ -172,10 +173,10 @@ public class SSLMockServerTest extends AbstractMockServerTest {
       output = reader.lines().collect(Collectors.joining("\n"));
     }
 
-    assertEquals("FATAL:  This proxy requires SSL.", errors);
+    assertTrue(errors.contains("FATAL:  This proxy requires SSL."));
     assertEquals("", output);
     int res = process.waitFor();
-    assertEquals(1, res);
+    assertNotEquals(0, res);
 
     assertEquals(
         0L, pgServer.getDebugMessages().stream().filter(m -> m instanceof SSLMessage).count());
