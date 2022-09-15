@@ -38,6 +38,7 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
@@ -266,23 +267,16 @@ public class ConnectionHandler extends Thread {
       try {
         this.message = this.server.recordMessage(BootstrapMessage.create(this));
         this.message.send();
-        if (getServer().getOptions().isSSLEnabled() && this.message instanceof SSLMessage) {
+        if (!ssl
+            && getServer().getOptions().getSslMode().isSslEnabled()
+            && this.message instanceof SSLMessage) {
           this.connectionMetadata.markForRestart();
           result = RunConnectionState.RESTART_WITH_SSL;
           return result;
         }
-        // Allow SSL connections from non-localhost even if the localhost check has not explicitly
-        // been disabled.
-        if (!ssl
-            && !server.getOptions().disableLocalhostCheck()
-            && !this.socket.getInetAddress().isAnyLocalAddress()
-            && !this.socket.getInetAddress().isLoopbackAddress()) {
-          handleError(
-              PGException.newBuilder()
-                  .setMessage("This proxy may only be accessed from localhost.")
-                  .setSeverity(Severity.FATAL)
-                  .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
-                  .build());
+        // Check whether the connection is valid. That is, the connection satisfies any restrictions
+        // on non-localhost connections and SSL requirements.
+        if (!checkValidConnection(ssl)) {
           return result;
         }
 
@@ -340,6 +334,33 @@ public class ConnectionHandler extends Thread {
       }
     }
     return result;
+  }
+
+  boolean checkValidConnection(boolean ssl) throws Exception {
+    // Allow SSL connections from non-localhost even if the localhost check has not explicitly
+    // been disabled.
+    if (!ssl
+        && !server.getOptions().disableLocalhostCheck()
+        && !this.socket.getInetAddress().isAnyLocalAddress()
+        && !this.socket.getInetAddress().isLoopbackAddress()) {
+      handleError(
+          PGException.newBuilder()
+              .setMessage("This proxy may only be accessed from localhost.")
+              .setSeverity(Severity.FATAL)
+              .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
+              .build());
+      return false;
+    }
+    if (!ssl && server.getOptions().getSslMode() == SslMode.Require) {
+      handleError(
+          PGException.newBuilder()
+              .setMessage("This proxy requires SSL.")
+              .setSeverity(Severity.FATAL)
+              .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
+              .build());
+      return false;
+    }
+    return true;
   }
 
   /**

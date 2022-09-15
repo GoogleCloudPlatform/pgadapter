@@ -50,7 +50,7 @@ public class SSLMockServerTest extends AbstractMockServerTest {
     System.setProperty("javax.net.ssl.keyStorePassword", "password");
 
     doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl(), "d", ImmutableList.of("-ssl"));
+        new MockSpannerServiceImpl(), "d", ImmutableList.of("-ssl", "require"));
   }
 
   @AfterClass
@@ -146,6 +146,39 @@ public class SSLMockServerTest extends AbstractMockServerTest {
     } catch (Exception ignored) {
       return false;
     }
+  }
+
+  @Test
+  public void testDisableSSL() throws Exception {
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand =
+        new String[] {
+          "psql",
+          String.format("sslmode=disable host=localhost port=%d", pgServer.getLocalPort()),
+          "-c",
+          "SELECT 1;"
+        };
+    builder.command(psqlCommand);
+    Process process = builder.start();
+
+    String output;
+    String errors;
+
+    try (BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    assertEquals("FATAL:  This proxy requires SSL.", errors);
+    assertEquals("", output);
+    int res = process.waitFor();
+    assertEquals(1, res);
+
+    assertEquals(
+        0L, pgServer.getDebugMessages().stream().filter(m -> m instanceof SSLMessage).count());
   }
 
   @Test

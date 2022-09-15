@@ -200,7 +200,7 @@ public class ProxyServer extends AbstractApiService {
    */
   void runTcpServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch) throws IOException {
     ServerSocket tcpSocket =
-        options.disableLocalhostCheck() || options.isSSLEnabled()
+        options.disableLocalhostCheck() || options.getSslMode().isSslEnabled()
             ? new ServerSocket(this.options.getProxyPort(), this.options.getMaxBacklog())
             : new ServerSocket(
                 this.options.getProxyPort(),

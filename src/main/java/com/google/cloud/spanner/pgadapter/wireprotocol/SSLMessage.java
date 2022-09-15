@@ -35,7 +35,7 @@ public class SSLMessage extends BootstrapMessage {
 
   @Override
   protected void sendPayload() throws Exception {
-    if (connection.getServer().getOptions().isSSLEnabled()) {
+    if (connection.getServer().getOptions().getSslMode().isSslEnabled()) {
       new AcceptSSLResponse(this.outputStream).send();
     } else {
       if (executedOnce.get()) {
