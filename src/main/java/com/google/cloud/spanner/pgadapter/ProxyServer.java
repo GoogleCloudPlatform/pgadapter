@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -199,7 +200,12 @@ public class ProxyServer extends AbstractApiService {
    */
   void runTcpServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch) throws IOException {
     ServerSocket tcpSocket =
-        new ServerSocket(this.options.getProxyPort(), this.options.getMaxBacklog());
+        options.disableLocalhostCheck() || options.isSSLEnabled()
+            ? new ServerSocket(this.options.getProxyPort(), this.options.getMaxBacklog())
+            : new ServerSocket(
+                this.options.getProxyPort(),
+                this.options.getMaxBacklog(),
+                InetAddress.getLoopbackAddress());
     this.serverSockets.add(tcpSocket);
     this.localPort = tcpSocket.getLocalPort();
     tcpStartedLatch.countDown();

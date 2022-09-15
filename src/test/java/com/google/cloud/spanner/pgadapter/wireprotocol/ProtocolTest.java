@@ -1672,6 +1672,7 @@ public class ProtocolTest {
 
     WireMessage message = BootstrapMessage.create(connectionHandler);
     assertEquals(SSLMessage.class, message.getClass());
+    assertEquals("SSLMessage, Length: 8", message.getPayloadString());
 
     message.send();
 

@@ -27,9 +27,9 @@ public class SSLMessage extends BootstrapMessage {
   private static final int MESSAGE_LENGTH = 8;
   public static final int IDENTIFIER = 80877103; // First Hextet: 1234, Second Hextet: 5679
 
-  private ThreadLocal<Boolean> executedOnce = ThreadLocal.withInitial(() -> false);
+  private final ThreadLocal<Boolean> executedOnce = ThreadLocal.withInitial(() -> false);
 
-  public SSLMessage(ConnectionHandler connection) throws Exception {
+  public SSLMessage(ConnectionHandler connection) {
     super(connection, MESSAGE_LENGTH);
   }
 
@@ -59,7 +59,7 @@ public class SSLMessage extends BootstrapMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0})")
+    return new MessageFormat("SSLMessage, Length: {0}")
         .format(
             new Object[] {
               this.length,

@@ -233,7 +233,7 @@ public class ConnectionHandler extends Thread {
             String.format(
                 "Connection handler with ID %s starting for client %s",
                 getName(), socket.getInetAddress().getHostAddress()));
-    if (runConnection() == RunConnectionState.RESTART_WITH_SSL) {
+    if (runConnection(false) == RunConnectionState.RESTART_WITH_SSL) {
       logger.log(
           Level.INFO,
           () ->
@@ -241,7 +241,7 @@ public class ConnectionHandler extends Thread {
                   "Connection handler with ID %s is restarted so it can use SSL", getName()));
       try {
         createSSLSocket();
-        runConnection();
+        runConnection(true);
       } catch (IOException ioException) {
         throw new RuntimeException(ioException);
       }
@@ -257,22 +257,11 @@ public class ConnectionHandler extends Thread {
    * Starts listening for incoming messages on the network socket. Returns RESTART_WITH_SSL if the
    * listening process should be restarted with SSL.
    */
-  private RunConnectionState runConnection() {
+  private RunConnectionState runConnection(boolean ssl) {
     RunConnectionState result = RunConnectionState.TERMINATED;
     try (ConnectionMetadata connectionMetadata =
         new ConnectionMetadata(this.socket.getInputStream(), this.socket.getOutputStream())) {
       this.connectionMetadata = connectionMetadata;
-      if (!server.getOptions().disableLocalhostCheck()
-          && !this.socket.getInetAddress().isAnyLocalAddress()
-          && !this.socket.getInetAddress().isLoopbackAddress()) {
-        handleError(
-            PGException.newBuilder()
-                .setMessage("This proxy may only be accessed from localhost.")
-                .setSeverity(Severity.FATAL)
-                .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
-                .build());
-        return result;
-      }
 
       try {
         this.message = this.server.recordMessage(BootstrapMessage.create(this));
@@ -282,6 +271,21 @@ public class ConnectionHandler extends Thread {
           result = RunConnectionState.RESTART_WITH_SSL;
           return result;
         }
+        // Allow SSL connections from non-localhost even if the localhost check has not explicitly
+        // been disabled.
+        if (!ssl
+            && !server.getOptions().disableLocalhostCheck()
+            && !this.socket.getInetAddress().isAnyLocalAddress()
+            && !this.socket.getInetAddress().isLoopbackAddress()) {
+          handleError(
+              PGException.newBuilder()
+                  .setMessage("This proxy may only be accessed from localhost.")
+                  .setSeverity(Severity.FATAL)
+                  .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
+                  .build());
+          return result;
+        }
+
         while (this.status == ConnectionStatus.UNAUTHENTICATED) {
           try {
             message.nextHandler();
