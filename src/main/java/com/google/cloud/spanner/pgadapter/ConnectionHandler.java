@@ -47,6 +47,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
@@ -68,6 +69,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLSocketFactory;
 
 /**
  * Handles a connection from a client to Spanner. This {@link ConnectionHandler} uses {@link
@@ -85,7 +87,7 @@ public class ConnectionHandler extends Thread {
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
 
   private final ProxyServer server;
-  private final Socket socket;
+  private Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
   private static final Map<Integer, IntermediateStatement> activeStatementsMap =
@@ -107,16 +109,26 @@ public class ConnectionHandler extends Thread {
 
   ConnectionHandler(ProxyServer server, Socket socket) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
-    this.server = server;
-    this.socket = socket;
-    this.secret = new SecureRandom().nextInt();
-    setDaemon(true);
-    logger.log(
-        Level.INFO,
-        () ->
-            String.format(
-                "Connection handler with ID %s created for client %s",
-                getName(), socket.getInetAddress().getHostAddress()));
+    try {
+      this.server = server;
+      this.socket = socket;
+      this.secret = new SecureRandom().nextInt();
+      setDaemon(true);
+      logger.log(
+          Level.INFO,
+          () ->
+              String.format(
+                  "Connection handler with ID %s created for client %s",
+                  getName(), socket.getInetAddress().getHostAddress()));
+    } catch (Exception exception) {
+      logger.log(Level.WARNING, () -> String.format("Failed to create connection: %s", exception));
+      throw PGExceptionFactory.toPGException(exception);
+    }
+  }
+
+  private void createSSLSocket() throws IOException {
+    this.socket =
+        ((SSLSocketFactory) SSLSocketFactory.getDefault()).createSocket(socket, null, true);
   }
 
   @InternalApi
@@ -221,7 +233,32 @@ public class ConnectionHandler extends Thread {
             String.format(
                 "Connection handler with ID %s starting for client %s",
                 getName(), socket.getInetAddress().getHostAddress()));
+    if (runConnection() == RunConnectionState.RESTART_WITH_SSL) {
+      logger.log(
+          Level.INFO,
+          () ->
+              String.format(
+                  "Connection handler with ID %s is restarted so it can use SSL", getName()));
+      try {
+        createSSLSocket();
+        runConnection();
+      } catch (IOException ioException) {
+        throw new RuntimeException(ioException);
+      }
+    }
+  }
 
+  enum RunConnectionState {
+    RESTART_WITH_SSL,
+    TERMINATED
+  }
+
+  /**
+   * Starts listening for incoming messages on the network socket. Returns RESTART_WITH_SSL if the
+   * listening process should be restarted with SSL.
+   */
+  private RunConnectionState runConnection() {
+    RunConnectionState result = RunConnectionState.TERMINATED;
     try (ConnectionMetadata connectionMetadata =
         new ConnectionMetadata(this.socket.getInputStream(), this.socket.getOutputStream())) {
       this.connectionMetadata = connectionMetadata;
@@ -234,12 +271,17 @@ public class ConnectionHandler extends Thread {
                 .setSeverity(Severity.FATAL)
                 .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
                 .build());
-        return;
+        return result;
       }
 
       try {
         this.message = this.server.recordMessage(BootstrapMessage.create(this));
         this.message.send();
+        if (getServer().getOptions().isSSLEnabled() && this.message instanceof SSLMessage) {
+          this.connectionMetadata.markForRestart();
+          result = RunConnectionState.RESTART_WITH_SSL;
+          return result;
+        }
         while (this.status == ConnectionStatus.UNAUTHENTICATED) {
           try {
             message.nextHandler();
@@ -272,24 +314,28 @@ public class ConnectionHandler extends Thread {
                   "Exception on connection handler with ID %s for client %s: %s",
                   getName(), socket.getInetAddress().getHostAddress(), e));
     } finally {
-      logger.log(
-          Level.INFO, () -> String.format("Closing connection handler with ID %s", getName()));
-      try {
-        if (this.spannerConnection != null) {
-          this.spannerConnection.close();
-        }
-        this.socket.close();
-      } catch (SpannerException | IOException e) {
+      if (result != RunConnectionState.RESTART_WITH_SSL) {
         logger.log(
-            Level.WARNING,
-            e,
-            () ->
-                String.format("Exception while closing connection handler with ID %s", getName()));
+            Level.INFO, () -> String.format("Closing connection handler with ID %s", getName()));
+        try {
+          if (this.spannerConnection != null) {
+            this.spannerConnection.close();
+          }
+          this.socket.close();
+        } catch (SpannerException | IOException e) {
+          logger.log(
+              Level.WARNING,
+              e,
+              () ->
+                  String.format(
+                      "Exception while closing connection handler with ID %s", getName()));
+        }
+        this.server.deregister(this);
+        logger.log(
+            Level.INFO, () -> String.format("Connection handler with ID %s closed", getName()));
       }
-      this.server.deregister(this);
-      logger.log(
-          Level.INFO, () -> String.format("Connection handler with ID %s closed", getName()));
     }
+    return result;
   }
 
   /**

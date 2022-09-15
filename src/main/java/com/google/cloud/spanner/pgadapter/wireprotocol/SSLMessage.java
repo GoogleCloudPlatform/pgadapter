@@ -16,17 +16,14 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.wireoutput.AcceptSSLResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.DeclineSSLResponse;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-/**
- * Handles SSL bootstrap message. Since we do not do SSL (connection is expected to be through
- * localhost after all), we decline the first message, and send an error for subsequent ones.
- */
+/** Handles SSL bootstrap message. */
 @InternalApi
 public class SSLMessage extends BootstrapMessage {
-
   private static final int MESSAGE_LENGTH = 8;
   public static final int IDENTIFIER = 80877103; // First Hextet: 1234, Second Hextet: 5679
 
@@ -38,19 +35,18 @@ public class SSLMessage extends BootstrapMessage {
 
   @Override
   protected void sendPayload() throws Exception {
-    if (executedOnce.get()) {
-      this.connection.handleTerminate();
-      throw new IOException("SSL not supported by server");
+    if (connection.getServer().getOptions().isSSLEnabled()) {
+      new AcceptSSLResponse(this.outputStream).send();
+    } else {
+      if (executedOnce.get()) {
+        this.connection.handleTerminate();
+        throw new IOException("SSL not supported by server");
+      }
+      new DeclineSSLResponse(this.outputStream).send();
+      executedOnce.set(true);
     }
-    new DeclineSSLResponse(this.outputStream).send();
-    executedOnce.set(true);
   }
 
-  /**
-   * Here we send another bootstrap factory, since we ignore SSL.
-   *
-   * @throws Exception
-   */
   @Override
   public void nextHandler() throws Exception {
     this.connection.setMessageState(BootstrapMessage.create(this.connection));
@@ -63,8 +59,11 @@ public class SSLMessage extends BootstrapMessage {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}, " + "Previously Executed: {1}")
-        .format(new Object[] {this.length, this.executedOnce.get()});
+    return new MessageFormat("Length: {0})")
+        .format(
+            new Object[] {
+              this.length,
+            });
   }
 
   @Override

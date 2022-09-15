@@ -41,6 +41,7 @@ import org.json.simple.JSONObject;
 
 /** Metadata extractor for CLI. */
 public class OptionsMetadata {
+
   public enum DdlTransactionMode {
 
     // Disables all DDL batching and DDL statements in transactions. Only single DDL statements
@@ -64,7 +65,7 @@ public class OptionsMetadata {
   }
 
   private static final Logger logger = Logger.getLogger(OptionsMetadata.class.getName());
-  private static final String DEFAULT_SERVER_VERSION = "1.0";
+  private static final String DEFAULT_SERVER_VERSION = "14.1";
   private static final String DEFAULT_USER_AGENT = "pg-adapter";
 
   private static final String OPTION_SERVER_PORT = "s";
@@ -76,6 +77,7 @@ public class OptionsMetadata {
   private static final String OPTION_CREDENTIALS_FILE = "c";
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
+  private static final String OPTION_ENABLE_SSL = "ssl";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
   private static final String OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS =
       "disable_default_local_statements";
@@ -110,6 +112,7 @@ public class OptionsMetadata {
   private final TextFormat textFormat;
   private final boolean binaryFormat;
   private final boolean authenticate;
+  private final boolean enableSSL;
   private final boolean disableAutoDetectClient;
   private final boolean disableDefaultLocalStatements;
   private final boolean disablePgCatalogReplacements;
@@ -162,6 +165,7 @@ public class OptionsMetadata {
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
+    this.enableSSL = commandLine.hasOption(OPTION_ENABLE_SSL);
     this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
     this.disableDefaultLocalStatements =
         commandLine.hasOption(OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS);
@@ -221,6 +225,7 @@ public class OptionsMetadata {
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
+    this.enableSSL = false;
     this.disableAutoDetectClient = false;
     this.disableDefaultLocalStatements = false;
     this.disablePgCatalogReplacements = false;
@@ -508,6 +513,14 @@ public class OptionsMetadata {
         false,
         "Whether you wish the proxy to perform an authentication step.");
     options.addOption(
+        OPTION_ENABLE_SSL,
+        "enable-ssl",
+        false,
+        "Enable SSL connections for this server. SSL only works if you "
+            + "have also configured a keystore for the Java Virtual Machine.\n"
+            + "See https://github.com/GoogleCloudPlatform/pgadapter/blob/postgresql-dialect/docs/ssl.md "
+            + "for more information.");
+    options.addOption(
         null,
         OPTION_DISABLE_AUTO_DETECT_CLIENT,
         false,
@@ -759,6 +772,10 @@ public class OptionsMetadata {
 
   public boolean shouldAuthenticate() {
     return this.authenticate;
+  }
+
+  public boolean isSSLEnabled() {
+    return this.enableSSL;
   }
 
   public boolean shouldAutoDetectClient() {

@@ -1664,6 +1664,9 @@ public class ProtocolTest {
     DataOutputStream outputStream = new DataOutputStream(result);
 
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
+    when(options.isSSLEnabled()).thenReturn(true);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -1674,8 +1677,8 @@ public class ProtocolTest {
 
     DataInputStream outputResult = inputStreamFromOutputStream(result);
 
-    // DeclineSSLResponse
-    assertEquals('N', outputResult.readByte());
+    // AcceptSSLResponse
+    assertEquals('S', outputResult.readByte());
   }
 
   @Test
@@ -1690,6 +1693,9 @@ public class ProtocolTest {
     DataOutputStream outputStream = new DataOutputStream(result);
 
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
+    when(options.isSSLEnabled()).thenReturn(false);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
