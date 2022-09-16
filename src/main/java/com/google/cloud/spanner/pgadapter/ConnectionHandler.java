@@ -172,12 +172,16 @@ public class ConnectionHandler extends Thread {
       // Note: Calling getDialect() will cause a SpannerException if the connection itself is
       // invalid, for example as a result of the credentials being wrong.
       if (spannerConnection.getDialect() != Dialect.POSTGRESQL) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            String.format(
-                "The database uses dialect %s. Currently PGAdapter only supports connections to PostgreSQL dialect databases. "
-                    + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
-                spannerConnection.getDialect()));
+        spannerConnection.close();
+        throw PGException.newBuilder()
+            .setMessage(
+                String.format(
+                    "The database uses dialect %s. Currently PGAdapter only supports connections to PostgreSQL dialect databases. "
+                        + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
+                    spannerConnection.getDialect()))
+            .setSeverity(Severity.FATAL)
+            .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
+            .build();
       }
     } catch (InstanceNotFoundException | DatabaseNotFoundException notFoundException) {
       SpannerException exceptionToThrow = notFoundException;
@@ -296,6 +300,8 @@ public class ConnectionHandler extends Thread {
         while (this.status != ConnectionStatus.TERMINATED) {
           handleMessages();
         }
+      } catch (PGException pgException) {
+        this.handleError(pgException);
       } catch (Exception exception) {
         this.handleError(
             PGException.newBuilder()
