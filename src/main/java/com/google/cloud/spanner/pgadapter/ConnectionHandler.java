@@ -438,7 +438,8 @@ public class ConnectionHandler extends Thread {
         () ->
             String.format("Exception on connection handler with ID %s: %s", getName(), exception));
     DataOutputStream output = getConnectionMetadata().getOutputStream();
-    if (this.status == ConnectionStatus.TERMINATED) {
+    if (this.status == ConnectionStatus.TERMINATED
+        || this.status == ConnectionStatus.UNAUTHENTICATED) {
       new ErrorResponse(output, exception).send();
       new TerminateResponse(output).send();
     } else if (this.status == ConnectionStatus.COPY_IN) {
