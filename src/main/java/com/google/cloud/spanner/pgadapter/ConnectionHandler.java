@@ -110,24 +110,19 @@ public class ConnectionHandler extends Thread {
 
   ConnectionHandler(ProxyServer server, Socket socket) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
-    try {
-      this.server = server;
-      this.socket = socket;
-      this.secret = new SecureRandom().nextInt();
-      setDaemon(true);
-      logger.log(
-          Level.INFO,
-          () ->
-              String.format(
-                  "Connection handler with ID %s created for client %s",
-                  getName(), socket.getInetAddress().getHostAddress()));
-    } catch (Exception exception) {
-      logger.log(Level.WARNING, () -> String.format("Failed to create connection: %s", exception));
-      throw PGExceptionFactory.toPGException(exception);
-    }
+    this.server = server;
+    this.socket = socket;
+    this.secret = new SecureRandom().nextInt();
+    setDaemon(true);
+    logger.log(
+        Level.INFO,
+        () ->
+            String.format(
+                "Connection handler with ID %s created for client %s",
+                getName(), socket.getInetAddress().getHostAddress()));
   }
 
-  private void createSSLSocket() throws IOException {
+  void createSSLSocket() throws IOException {
     this.socket =
         ((SSLSocketFactory) SSLSocketFactory.getDefault()).createSocket(socket, null, true);
   }
@@ -244,12 +239,26 @@ public class ConnectionHandler extends Thread {
           () ->
               String.format(
                   "Connection handler with ID %s is restarted so it can use SSL", getName()));
+      restartConnectionWithSsl();
+    }
+  }
+
+  void restartConnectionWithSsl() {
+    try {
+      createSSLSocket();
+      runConnection(true);
+    } catch (IOException ioException) {
+      PGException pgException =
+          PGException.newBuilder()
+              .setMessage("Failed to create SSL socket: " + ioException.getMessage())
+              .setSeverity(Severity.FATAL)
+              .setSQLState(SQLState.InternalError)
+              .build();
       try {
-        createSSLSocket();
-        runConnection(true);
-      } catch (IOException ioException) {
-        throw new RuntimeException(ioException);
+        handleError(pgException);
+      } catch (Exception ignore) {
       }
+      throw pgException;
     }
   }
 
@@ -431,7 +440,7 @@ public class ConnectionHandler extends Thread {
    * @param exception The exception to be related.
    * @throws IOException if there is some issue in the sending of the error messages.
    */
-  private void handleError(PGException exception) throws Exception {
+  void handleError(PGException exception) throws Exception {
     logger.log(
         Level.WARNING,
         exception,
