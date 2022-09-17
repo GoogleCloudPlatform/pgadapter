@@ -34,7 +34,7 @@
       com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest
     </excludedTests>
 
-    <spanner.version>6.28.0</spanner.version>
+    <spanner.version>6.30.0</spanner.version>
     <junixsocket.version>2.5.1</junixsocket.version>
   </properties>
 
