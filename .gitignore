@@ -11,3 +11,6 @@ src/test/golang/**/*.so
 
 src/test/csharp/**/bin
 src/test/csharp/**/obj
+
+src/test/nodejs/**/node_modules
+src/test/nodejs/**/package-lock.json
