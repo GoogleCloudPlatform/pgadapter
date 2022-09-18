@@ -21,7 +21,10 @@ import com.google.api.client.util.PemReader;
 import com.google.api.client.util.PemReader.Section;
 import com.google.api.client.util.Strings;
 import com.google.api.core.InternalApi;
+import com.google.auth.Credentials;
+import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.OAuth2Credentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
@@ -36,8 +39,15 @@ import java.util.Map;
 import org.postgresql.util.ReaderInputStream;
 
 /**
- * A Password Message takes a username and password and input and supposedly handles auth. Here,
- * however, since connections are through localhost, we do not do so.
+ * PGAdapter will convert a password message into gRPC authentication in the following ways:
+ *
+ * <ol>
+ *   <li>If the username is 'oauth2' the password will be interpreted as an OAuth2 token.
+ *   <li>If the username is an email address and the password contains private key section,
+ *       PGAdapter will construct a service account from the email address and private key.
+ *   <li>Otherwise, PGAdapter will try to construct a Google credentials instance from the string in
+ *       the password message. The username will be ignored.
+ * </ol>
  */
 @InternalApi
 public class PasswordMessage extends ControlMessage {
@@ -71,7 +81,7 @@ public class PasswordMessage extends ControlMessage {
       return;
     }
 
-    GoogleCredentials credentials = checkCredentials(this.username, this.password);
+    Credentials credentials = checkCredentials(this.username, this.password);
     if (credentials == null) {
       new ErrorResponse(
               this.outputStream,
@@ -96,7 +106,7 @@ public class PasswordMessage extends ControlMessage {
     return this.connection.getServer().getOptions().shouldAuthenticate();
   }
 
-  private GoogleCredentials checkCredentials(String username, String password) {
+  private Credentials checkCredentials(String username, String password) {
     if (Strings.isNullOrEmpty(password)) {
       return null;
     }
@@ -124,6 +134,11 @@ public class PasswordMessage extends ControlMessage {
       } catch (IOException ioException) {
         // Ignore and try to parse it as a credentials file.
       }
+    }
+
+    if (!Strings.isNullOrEmpty(username) && username.equalsIgnoreCase("oauth2")) {
+      // Interpret the password as an OAuth2 token.
+      return OAuth2Credentials.create(new AccessToken(password, null));
     }
 
     // Try to parse the password field as a JSON string that contains a credentials object.

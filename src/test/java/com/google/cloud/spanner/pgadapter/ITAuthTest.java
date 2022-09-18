@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
@@ -26,12 +27,15 @@ import com.google.api.client.json.JsonObjectParser;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.cloud.spanner.Database;
 import com.google.common.collect.ImmutableList;
+import java.io.BufferedReader;
 import java.io.FileInputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -72,6 +76,20 @@ public class ITAuthTest implements IntegrationTest {
         testEnv.getPGAdapterHostAndPort(), database.getId().getDatabase());
   }
 
+  private static boolean isGcloudAvailable() {
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] gcloudCommand = new String[] {"gcloud", "--version"};
+    builder.command(gcloudCommand);
+    try {
+      Process process = builder.start();
+      int res = process.waitFor();
+
+      return res == 0;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
   @Test
   public void testConnectFailsWithoutAuth() {
     // The server is started with authentication required. Trying to obtain a connection without any
@@ -98,6 +116,44 @@ public class ITAuthTest implements IntegrationTest {
             + "Alternatively, the password may contain only the private key of a service account. "
             + "The user name must in that case contain the service account email address.",
         exception.getMessage());
+  }
+
+  @Test
+  public void testConnectWithOAuth2Token() throws Exception {
+    String credentialsFile = System.getenv("GOOGLE_APPLICATION_CREDENTIALS");
+    assumeTrue("Auth tests require default (service account) credentials", credentialsFile != null);
+    assumeTrue("OAuth2 test requires gcloud", isGcloudAvailable());
+
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] gcloudCommand =
+        new String[] {"gcloud", "auth", "application-default", "print-access-token", "--quiet"};
+    builder.command(gcloudCommand);
+    Process process = builder.start();
+    String errors;
+    String output;
+
+    try (BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    assertEquals("", errors);
+    assertNotEquals("", output);
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    try (Connection connection =
+        DriverManager.getConnection(getConnectionUrl(), "oauth2", output)) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("SELECT 'Hello World!'")) {
+        assertTrue(resultSet.next());
+        assertEquals("Hello World!", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
   }
 
   @Test

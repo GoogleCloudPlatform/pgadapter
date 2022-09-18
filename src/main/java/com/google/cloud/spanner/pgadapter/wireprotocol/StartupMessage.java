@@ -15,7 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
-import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.Credentials;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
@@ -79,7 +79,7 @@ public class StartupMessage extends BootstrapMessage {
       ConnectionHandler connection,
       String database,
       Map<String, String> parameters,
-      @Nullable GoogleCredentials credentials)
+      @Nullable Credentials credentials)
       throws Exception {
     connection.connectToSpanner(database, credentials);
     for (Entry<String, String> parameter : parameters.entrySet()) {

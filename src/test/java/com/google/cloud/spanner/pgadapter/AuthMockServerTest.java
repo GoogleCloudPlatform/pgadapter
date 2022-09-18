@@ -84,6 +84,32 @@ public class AuthMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testConnectWithOAuth2Token() throws Exception {
+    String username = "oauth2";
+    String password = "any-random-oauth2-token";
+    // Note that even though we are sending credentials here, these will never reach the mock
+    // server. The Connection API will never send credentials over a plain-text connection to
+    // Spanner.
+    try (Connection connection = DriverManager.getConnection(createUrl(), username, password)) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT1.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(1, resultSet.getInt(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    PasswordMessage passwordMessage =
+        pgServer.getDebugMessages().stream()
+            .filter(message -> message instanceof PasswordMessage)
+            .map(message -> (PasswordMessage) message)
+            .findAny()
+            .orElseGet(null);
+    assertNotNull(passwordMessage);
+    assertEquals(username, passwordMessage.getUsername());
+    assertEquals(password, passwordMessage.getPassword());
+  }
+
+  @Test
   public void testConnectWithPrivateKey() throws Exception {
     String username = "foo@bar.com";
     String password = generateRandomPrivateKey();
