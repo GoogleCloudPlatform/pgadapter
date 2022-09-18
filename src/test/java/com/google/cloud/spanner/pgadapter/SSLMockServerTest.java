@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -65,7 +66,7 @@ public class SSLMockServerTest extends AbstractMockServerTest {
   }
 
   private static String generateSSLKey() throws Exception {
-    File keystore = File.createTempFile("serverkeystore", ".pfx");
+    File keystore = File.createTempFile("serverkeystore", ".p12");
     // Delete the temp file as keytool does not allow overwriting an existing file.
     assertTrue(keystore.delete());
     ProcessBuilder keytoolBuilder = new ProcessBuilder();
@@ -84,7 +85,13 @@ public class SSLMockServerTest extends AbstractMockServerTest {
           "-keyalg",
           "RSA",
           "-dname",
-          "CN=PGAdapter,OU=\"Cloud Spanner\",O=Google,L=Amsterdam,ST=\"North Holland\",C=NL"
+          String.format(
+              "CN=%s,OU=\"Cloud Spanner\",O=Google,L=Amsterdam,ST=\"North Holland\",C=NL",
+              InetAddress.getLocalHost().getHostName()),
+          "-ext",
+          String.format(
+              "SAN=DNS:%s,IP:%s,DNS:localhost",
+              InetAddress.getLocalHost().getHostName(), InetAddress.getLocalHost().getHostAddress())
         };
     keytoolBuilder.command(keytoolCommand);
     Process keytoolProcess = keytoolBuilder.start();
@@ -227,7 +234,6 @@ public class SSLMockServerTest extends AbstractMockServerTest {
           "-c",
           "SELECT 1;"
         };
-    builder.environment().put("", "");
     builder.command(psqlCommand);
     Process process = builder.start();
 
@@ -249,5 +255,48 @@ public class SSLMockServerTest extends AbstractMockServerTest {
 
     assertEquals(
         1L, pgServer.getDebugMessages().stream().filter(m -> m instanceof SSLMessage).count());
+  }
+
+  @Test
+  public void testSSLVerifyFull() throws Exception {
+    for (String host :
+        new String[] {
+          InetAddress.getLocalHost().getHostName(),
+          InetAddress.getLocalHost().getHostAddress(),
+          "localhost"
+        }) {
+      ProcessBuilder builder = new ProcessBuilder();
+      String[] psqlCommand =
+          new String[] {
+            "psql",
+            String.format(
+                "sslmode=verify-full sslrootcert=%s host=%s port=%d",
+                publicKeyFile, InetAddress.getLocalHost().getHostName(), pgServer.getLocalPort()),
+            "-c",
+            "SELECT 1;"
+          };
+      builder.command(psqlCommand);
+      Process process = builder.start();
+
+      String output;
+      String errors;
+
+      try (BufferedReader reader =
+              new BufferedReader(new InputStreamReader(process.getInputStream()));
+          BufferedReader errorReader =
+              new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+        errors = errorReader.lines().collect(Collectors.joining("\n"));
+        output = reader.lines().collect(Collectors.joining("\n"));
+      }
+
+      assertEquals(host, "", errors);
+      assertEquals(" C \n---\n 1\n(1 row)\n", output);
+      int res = process.waitFor();
+      assertEquals(0, res);
+
+      assertEquals(
+          1L, pgServer.getDebugMessages().stream().filter(m -> m instanceof SSLMessage).count());
+      pgServer.clearDebugMessages();
+    }
   }
 }
