@@ -1274,13 +1274,14 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             + "           3.14::float8 as col_float8, 100::bigint as col_int,\n"
             + "           6.626::numeric as col_numeric,\n"
             + "           '2022-07-07 08:16:48.123456+02:00'::timestamptz as col_timestamptz,\n"
-            + "           '2022-07-07'::date as col_date, 'hello world'::varchar as col_varchar\n"
+            + "           '2022-07-07'::date as col_date, 'hello world'::varchar as col_varchar,\n"
+            + "           '{\\\"key\\\": \\\"value\\\"}'::varchar as col_jsonb"
             + "    union all\n"
             + "    select null::bigint as col_bigint, null::bool as col_bool,\n"
             + "           null::bytea as col_bytea, null::float8 as col_float8,\n"
             + "           null::bigint as col_int, null::numeric as col_numeric,"
             + "           null::timestamptz as col_timestamptz, null::date as col_date,"
-            + "           null::varchar as col_varchar\n"
+            + "           null::varchar as col_varchar, null::varchar as col_jsonb\n"
             + "  ) to stdout binary\" "
             + "  | psql "
             + " -h "
@@ -1308,6 +1309,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     assertEquals("col_timestamptz", mutation.getInsert().getColumns(6));
     assertEquals("col_date", mutation.getInsert().getColumns(7));
     assertEquals("col_varchar", mutation.getInsert().getColumns(8));
+    assertEquals("col_jsonb", mutation.getInsert().getColumns(9));
 
     ListValue row1 = mutation.getInsert().getValues(0);
     assertEquals("1", row1.getValues(0).getStringValue());
@@ -1321,6 +1323,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     assertEquals("2022-07-07T06:16:48.123456000Z", row1.getValues(6).getStringValue());
     assertEquals("2022-07-07", row1.getValues(7).getStringValue());
     assertEquals("hello world", row1.getValues(8).getStringValue());
+    assertEquals("{\"key\": \"value\"}", row1.getValues(9).getStringValue());
 
     ListValue row2 = mutation.getInsert().getValues(1);
     for (int i = 0; i < row2.getValuesCount(); i++) {
