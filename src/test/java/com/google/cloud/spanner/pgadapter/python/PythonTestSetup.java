@@ -38,6 +38,8 @@ public class PythonTestSetup extends AbstractMockServerTest {
     }
   }
 
+  private static String PSYCOPG2_PATH = "./src/test/python/psycopg2";
+
   static String executeWithoutParameters(
       String pgVersion, String host, int port, String sql, String statementType)
       throws IOException, InterruptedException {
@@ -87,7 +89,7 @@ public class PythonTestSetup extends AbstractMockServerTest {
 
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
-    builder.directory(new File("./src/test/python"));
+    builder.directory(new File(PSYCOPG2_PATH));
     Process process = builder.start();
 
     Scanner scanner = new Scanner(process.getInputStream());
@@ -126,7 +128,7 @@ public class PythonTestSetup extends AbstractMockServerTest {
 
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
-    builder.directory(new File("./src/test/python"));
+    builder.directory(new File(PSYCOPG2_PATH));
     Process process = builder.start();
 
     Scanner errorScanner = new Scanner(process.getErrorStream());
@@ -165,7 +167,7 @@ public class PythonTestSetup extends AbstractMockServerTest {
 
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
-    builder.directory(new File("./src/test/python"));
+    builder.directory(new File(PSYCOPG2_PATH));
     Process process = builder.start();
 
     Scanner scanner = new Scanner(process.getInputStream());
@@ -192,7 +194,7 @@ public class PythonTestSetup extends AbstractMockServerTest {
 
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
-    builder.directory(new File("./src/test/python"));
+    builder.directory(new File(PSYCOPG2_PATH));
     Process process = builder.start();
 
     Scanner scanner = new Scanner(process.getInputStream());
@@ -214,7 +216,7 @@ public class PythonTestSetup extends AbstractMockServerTest {
         };
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
-    builder.directory(new File("./src/test/python"));
+    builder.directory(new File(PSYCOPG2_PATH));
     Process process = builder.start();
     Scanner scanner = new Scanner(process.getInputStream());
 
