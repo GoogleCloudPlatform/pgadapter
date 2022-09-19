@@ -336,7 +336,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
 
       // TODO: Split this error message into a message and a hint.
       assertEquals(
-          "ERROR: Record count: 2001 has exceeded the limit: 2000.\n"
+          "ERROR: Record count: 1819 has exceeded the limit: 1818.\n"
               + "\n"
               + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
               + "\n"
@@ -1494,6 +1494,11 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                     .addValues(Value.newBuilder().setStringValue("col_varchar").build())
                     .addValues(Value.newBuilder().setStringValue("character varying").build())
                     .build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("col_jsonb").build())
+                    .addValues(Value.newBuilder().setStringValue("jsonb").build())
+                    .build())
             .setMetadata(metadata)
             .build();
     mockSpanner.putStatementResult(
@@ -1541,7 +1546,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             indexedColumnsCountResultSet));
 
     String allTypesIndexedColumnsCountSql =
-        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3, $4, $5, $6, $7, $8, $9, $10)";
+        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
     ResultSetMetadata allTypesIndexedColumnsCountMetadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
@@ -1584,6 +1589,8 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                 .to("col_date")
                 .bind("p10")
                 .to("col_varchar")
+                .bind("p11")
+                .to("col_jsonb")
                 .build(),
             allTypesIndexedColumnsCountResultSet));
   }
