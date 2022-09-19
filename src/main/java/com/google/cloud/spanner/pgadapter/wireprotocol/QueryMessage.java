@@ -25,6 +25,9 @@ import java.text.MessageFormat;
 public class QueryMessage extends ControlMessage {
   protected static final char IDENTIFIER = 'Q';
   public static final String COPY = "COPY";
+  public static final String PREPARE = "PREPARE";
+  public static final String EXECUTE = "EXECUTE";
+  public static final String DEALLOCATE = "DEALLOCATE";
 
   private final Statement originalStatement;
   private final SimpleQueryStatement simpleQueryStatement;

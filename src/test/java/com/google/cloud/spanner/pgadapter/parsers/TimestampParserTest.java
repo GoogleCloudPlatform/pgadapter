@@ -23,6 +23,7 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
@@ -72,5 +73,8 @@ public class TimestampParserTest {
         new TimestampParser(Timestamp.parseTimestamp("2022-07-08T07:22:59.123456789Z"))
             .stringParse());
     assertNull(new TimestampParser(null).stringParse());
+    assertThrows(
+        PGException.class,
+        () -> new TimestampParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
   }
 }

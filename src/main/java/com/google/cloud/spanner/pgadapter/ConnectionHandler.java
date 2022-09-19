@@ -57,9 +57,11 @@ import java.net.Socket;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -472,7 +474,8 @@ public class ConnectionHandler extends Thread {
 
   public IntermediatePreparedStatement getStatement(String statementName) {
     if (!hasStatement(statementName)) {
-      throw new IllegalStateException("Unregistered statement: " + statementName);
+      throw PGExceptionFactory.newPGException(
+          "prepared statement " + statementName + " does not exist");
     }
     return this.statementsMap.get(statementName);
   }
@@ -483,9 +486,17 @@ public class ConnectionHandler extends Thread {
 
   public void closeStatement(String statementName) {
     if (!hasStatement(statementName)) {
-      throw new IllegalStateException("Unregistered statement: " + statementName);
+      throw PGExceptionFactory.newPGException(
+          "prepared statement " + statementName + " does not exist");
     }
     this.statementsMap.remove(statementName);
+  }
+
+  public void closeAllStatements() {
+    Set<String> names = new HashSet<>(this.statementsMap.keySet());
+    for (String statementName : names) {
+      closeStatement(statementName);
+    }
   }
 
   public boolean hasStatement(String statementName) {

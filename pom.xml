@@ -30,7 +30,8 @@
       com.google.cloud.spanner.pgadapter.IntegrationTest,
       com.google.cloud.spanner.pgadapter.golang.GolangTest,
       com.google.cloud.spanner.pgadapter.csharp.DotnetTest,
-      com.google.cloud.spanner.pgadapter.python.PythonTest
+      com.google.cloud.spanner.pgadapter.python.PythonTest,
+      com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest
     </excludedTests>
 
     <spanner.version>6.28.0</spanner.version>
@@ -39,7 +40,7 @@
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.6.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.7.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>

@@ -238,11 +238,13 @@ public class IntermediateStatement {
 
   public void setStatementResult(StatementResult statementResult) {
     this.statementResult = statementResult;
-    if (statementResult.getResultType() == ResultType.RESULT_SET) {
-      this.hasMoreData = statementResult.getResultSet().next();
-    } else if (statementResult instanceof NoResult
-        && ((NoResult) statementResult).hasCommandTag()) {
-      this.commandTag = ((NoResult) statementResult).getCommandTag();
+    if (statementResult != null) {
+      if (statementResult.getResultType() == ResultType.RESULT_SET) {
+        this.hasMoreData = statementResult.getResultSet().next();
+      } else if (statementResult instanceof NoResult
+          && ((NoResult) statementResult).hasCommandTag()) {
+        this.commandTag = ((NoResult) statementResult).getCommandTag();
+      }
     }
   }
 

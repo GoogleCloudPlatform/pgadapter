@@ -21,6 +21,9 @@ import static org.junit.Assert.assertThrows;
 import com.google.cloud.Date;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -42,5 +45,8 @@ public class DateParserTest {
   public void testStringParse() {
     assertEquals("2022-07-08", new DateParser(Date.fromYearMonthDay(2022, 7, 8)).stringParse());
     assertNull(new DateParser(null).stringParse());
+    assertThrows(
+        PGException.class,
+        () -> new DateParser("2022".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
   }
 }

@@ -105,6 +105,42 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   }
 
   @Test
+  public void testQuery() throws SQLException {
+    String sql =
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+            + "from all_types "
+            + "where col_bigint=? "
+            + "and col_bool=? "
+            + "and col_bytea=? "
+            + "and col_float8=? "
+            + "and col_int=? "
+            + "and col_numeric=? "
+            + "and col_timestamptz=? "
+            + "and col_date=? "
+            + "and col_varchar=?";
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        ParameterMetaData metadata = statement.getParameterMetaData();
+        assertEquals(9, metadata.getParameterCount());
+        for (int index = 1; index <= metadata.getParameterCount(); index++) {
+          assertEquals(ParameterMetaData.parameterModeIn, metadata.getParameterMode(index));
+          assertEquals(ParameterMetaData.parameterNullableUnknown, metadata.isNullable(index));
+        }
+        int index = 0;
+        assertEquals(sql, Types.BIGINT, metadata.getParameterType(++index));
+        assertEquals(Types.BIT, metadata.getParameterType(++index));
+        assertEquals(Types.BINARY, metadata.getParameterType(++index));
+        assertEquals(Types.DOUBLE, metadata.getParameterType(++index));
+        assertEquals(Types.BIGINT, metadata.getParameterType(++index));
+        assertEquals(Types.NUMERIC, metadata.getParameterType(++index));
+        assertEquals(Types.TIMESTAMP, metadata.getParameterType(++index));
+        assertEquals(Types.DATE, metadata.getParameterType(++index));
+        assertEquals(Types.VARCHAR, metadata.getParameterType(++index));
+      }
+    }
+  }
+
+  @Test
   public void testParameterMetaData() throws SQLException {
     for (String sql :
         new String[] {

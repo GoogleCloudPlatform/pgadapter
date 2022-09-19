@@ -19,6 +19,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
@@ -38,7 +39,12 @@ public class DoubleParser extends Parser<Double> {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          this.item = Double.valueOf(new String(item));
+          String stringValue = new String(item);
+          try {
+            this.item = Double.valueOf(stringValue);
+          } catch (Exception exception) {
+            throw PGExceptionFactory.newPGException("Invalid float8 value: " + stringValue);
+          }
           break;
         case BINARY:
           this.item = toDouble(item);
