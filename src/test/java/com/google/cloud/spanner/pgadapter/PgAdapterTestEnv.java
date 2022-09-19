@@ -121,7 +121,7 @@ public class PgAdapterTestEnv {
               + "col_timestamptz timestamptz, "
               + "col_date date, "
               + "col_varchar varchar(100), "
-              + "col_jsonb jsonb)");
+              + "col_jsonb text)");
 
   // The project Id. This can be overwritten.
   private String projectId;
