@@ -19,6 +19,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 
 import com.google.cloud.spanner.pgadapter.wireprotocol.PasswordMessage;
 import com.google.common.collect.ImmutableList;
@@ -42,6 +43,13 @@ import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
 public class AuthMockServerTest extends AbstractMockServerTest {
+  private static final String CREDENTIALS_ERROR =
+      "ERROR: Invalid credentials received.\n"
+          + "  Hint: PGAdapter expects credentials to be one of the following:\n"
+          + "1. Username contains the fixed string 'oauth2' and the password field contains a valid OAuth2 token.\n"
+          + "2. Username contains any string and the password field contains the JSON payload of a credentials file (e.g. a service account file).\n"
+          + "3. Username contains the email address of a service account and the password contains the corresponding private key for the service account.";
+
   @BeforeClass
   public static void loadPgJdbcDriver() throws Exception {
     // Make sure the PG JDBC driver is loaded.
@@ -77,9 +85,29 @@ public class AuthMockServerTest extends AbstractMockServerTest {
     PSQLException exception =
         assertThrows(
             PSQLException.class, () -> DriverManager.getConnection(createUrl(), "foo", "bar"));
-    // TODO: Split this error message into a message and a hint.
+    assertEquals(CREDENTIALS_ERROR, exception.getMessage());
+  }
+
+  @Test
+  public void testConnectFailsWithEmptyUsername() {
+    PSQLException exception =
+        assertThrows(
+            PSQLException.class,
+            () -> DriverManager.getConnection(createUrl(), "", "any-random-oauth2-token"));
+    assertEquals(CREDENTIALS_ERROR, exception.getMessage());
+  }
+
+  @Test
+  public void testConnectFailsWithEmptyPassword() {
+    PSQLException exception =
+        assertThrows(
+            PSQLException.class, () -> DriverManager.getConnection(createUrl(), "oauth2", ""));
     assertEquals(
-        "ERROR: Invalid credentials received. PGAdapter expects the password to contain the JSON payload of a credentials file. Alternatively, the password may contain only the private key of a service account. The user name must in that case contain the service account email address.",
+        "ERROR: Invalid credentials received.\n"
+            + "  Hint: PGAdapter expects credentials to be one of the following:\n"
+            + "1. Username contains the fixed string 'oauth2' and the password field contains a valid OAuth2 token.\n"
+            + "2. Username contains any string and the password field contains the JSON payload of a credentials file (e.g. a service account file).\n"
+            + "3. Username contains the email address of a service account and the password contains the corresponding private key for the service account.",
         exception.getMessage());
   }
 
@@ -103,7 +131,7 @@ public class AuthMockServerTest extends AbstractMockServerTest {
             .filter(message -> message instanceof PasswordMessage)
             .map(message -> (PasswordMessage) message)
             .findAny()
-            .orElseGet(null);
+            .orElseGet(() -> mock(PasswordMessage.class));
     assertNotNull(passwordMessage);
     assertEquals(username, passwordMessage.getUsername());
     assertEquals(password, passwordMessage.getPassword());
@@ -129,7 +157,7 @@ public class AuthMockServerTest extends AbstractMockServerTest {
             .filter(message -> message instanceof PasswordMessage)
             .map(message -> (PasswordMessage) message)
             .findAny()
-            .orElseGet(null);
+            .orElseGet(() -> mock(PasswordMessage.class));
     assertNotNull(passwordMessage);
     assertEquals("foo@bar.com", passwordMessage.getUsername());
     assertEquals(password, passwordMessage.getPassword());
@@ -174,7 +202,7 @@ public class AuthMockServerTest extends AbstractMockServerTest {
             .filter(message -> message instanceof PasswordMessage)
             .map(message -> (PasswordMessage) message)
             .findAny()
-            .orElseGet(null);
+            .orElseGet(() -> mock(PasswordMessage.class));
     assertNotNull(passwordMessage);
     assertEquals("whatever", passwordMessage.getUsername());
     assertEquals(password, passwordMessage.getPassword());

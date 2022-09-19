@@ -86,11 +86,12 @@ public class PasswordMessage extends ControlMessage {
       new ErrorResponse(
               this.outputStream,
               PGException.newBuilder()
-                  .setMessage(
-                      "Invalid credentials received. "
-                          + "PGAdapter expects the password to contain the JSON payload of a credentials file. "
-                          + "Alternatively, the password may contain only the private key of a service account. "
-                          + "The user name must in that case contain the service account email address.")
+                  .setMessage("Invalid credentials received.")
+                  .setHints(
+                      "PGAdapter expects credentials to be one of the following:\n"
+                          + "1. Username contains the fixed string 'oauth2' and the password field contains a valid OAuth2 token.\n"
+                          + "2. Username contains any string and the password field contains the JSON payload of a credentials file (e.g. a service account file).\n"
+                          + "3. Username contains the email address of a service account and the password contains the corresponding private key for the service account.")
                   .setSQLState(SQLState.InvalidPassword)
                   .setSeverity(Severity.ERROR)
                   .build())
