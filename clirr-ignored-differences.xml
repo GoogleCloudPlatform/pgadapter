@@ -71,7 +71,15 @@
     <className>com/google/cloud/spanner/pgadapter/ConnectionHandler</className>
     <method>void removeActiveStatement(com.google.cloud.spanner.pgadapter.statements.IntermediateStatement)</method>
   </difference>
+  <difference>
+    <differenceType>7006</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/ConnectionHandler</className>
+    <method>void cancelActiveStatement(int, int)</method>
+    <from>void</from>
+    <to>boolean</to>
+  </difference>
 
+  7006: com.google.cloud.spanner.pgadapter.ConnectionHandler: Return type of method 'public void cancelActiveStatement(int, int)' has been changed to boolean
   <!-- Add ignores for all sub packages, as these are considered internal. -->
   <difference>
     <differenceType>1001</differenceType>
