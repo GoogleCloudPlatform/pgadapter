@@ -888,7 +888,7 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals(Oid.NUMERIC, types.getInt(1));
         assertEquals("numeric", types.getString(2));
         assertTrue(types.next());
-        assertEquals(Oid.JSONB, types.getInt(1));
+        assertEquals(Oid.VARCHAR, types.getInt(1));
         assertEquals("jsonb", types.getString(2));
 
         assertFalse(types.next());
@@ -919,6 +919,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(Date.parseDate("2000-01-01"))
                 .set("col_varchar")
                 .to("bar")
+                .set("col_jsonb")
+                .to("{\"key\": \"value2\"}")
                 .build(),
             Mutation.newInsertBuilder("all_types")
                 .set("col_bigint")
@@ -938,6 +940,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .set("col_date")
                 .to((Date) null)
                 .set("col_varchar")
+                .to((String) null)
+                .set("col_jsonb")
                 .to((String) null)
                 .build(),
             Mutation.newInsertBuilder("all_types")
@@ -979,6 +983,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(Date.parseDate("0001-01-01"))
                 .set("col_varchar")
                 .to("")
+                .set("col_jsonb")
+                .to("{}")
                 .build()));
   }
 }
