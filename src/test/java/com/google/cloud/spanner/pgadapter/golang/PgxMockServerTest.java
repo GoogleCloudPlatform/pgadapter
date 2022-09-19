@@ -267,10 +267,10 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   @Test
   public void testUpdateAllDataTypes() {
     String sql =
-        "UPDATE \"all_types\" SET \"col_bigint\"=$1,\"col_bool\"=$2,\"col_bytea\"=$3,\"col_float8\"=$4,\"col_int\"=$5,\"col_numeric\"=$6,\"col_timestamptz\"=$7,\"col_date\"=$8,\"col_varchar\"=$9 WHERE \"col_varchar\" = $10";
+        "UPDATE \"all_types\" SET \"col_bigint\"=$1,\"col_bool\"=$2,\"col_bytea\"=$3,\"col_float8\"=$4,\"col_int\"=$5,\"col_numeric\"=$6,\"col_timestamptz\"=$7,\"col_date\"=$8,\"col_varchar\"=$9,\"col_jsonb\"=$10 WHERE \"col_varchar\" = $11";
     String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from "
-            + "(select \"col_bigint\"=$1, \"col_bool\"=$2, \"col_bytea\"=$3, \"col_float8\"=$4, \"col_int\"=$5, \"col_numeric\"=$6, \"col_timestamptz\"=$7, \"col_date\"=$8, \"col_varchar\"=$9 from \"all_types\" WHERE \"col_varchar\" = $10) p";
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11 from "
+            + "(select \"col_bigint\"=$1, \"col_bool\"=$2, \"col_bytea\"=$3, \"col_float8\"=$4, \"col_int\"=$5, \"col_numeric\"=$6, \"col_timestamptz\"=$7, \"col_date\"=$8, \"col_varchar\"=$9, \"col_jsonb\"=$10 from \"all_types\" WHERE \"col_varchar\" = $11) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(describeSql),
@@ -286,6 +286,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.NUMERIC,
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
+                            TypeCode.STRING,
+                            TypeCode.STRING,
                             TypeCode.STRING)))
                 .build()));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
@@ -310,6 +312,10 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .to(Date.parseDate("2022-04-02"))
                 .bind("p9")
                 .to("test_string")
+                .bind("p10")
+                .to("{\"key\": \"value\"}")
+                .bind("p11")
+                .to("test")
                 .build(),
             1L));
 
@@ -338,10 +344,10 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   public void testInsertAllDataTypes() {
     String sql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
     String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9 from all_types) p";
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(describeSql),
@@ -357,6 +363,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.NUMERIC,
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
+                            TypeCode.STRING,
                             TypeCode.STRING)))
                 .build()));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
@@ -381,6 +388,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .to(Date.parseDate("2022-04-02"))
                 .bind("p9")
                 .to("test_string")
+                .bind("p10")
+                .to("{\"key\": \"value\"}")
                 .build(),
             1L));
 
@@ -409,10 +418,10 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   public void testInsertBatch() {
     String sql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
     String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9 from all_types) p";
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(describeSql),
@@ -428,6 +437,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.NUMERIC,
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
+                            TypeCode.STRING,
                             TypeCode.STRING)))
                 .build()));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
@@ -456,6 +466,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                   .to(Date.parseDate(String.format("2022-04-%02d", i + 1)))
                   .bind("p9")
                   .to("test_string" + i)
+                  .bind("p10")
+                  .to(String.format("{\"key\": \"value%d\"}", i))
                   .build(),
               1L));
     }
@@ -499,10 +511,10 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   public void testMixedBatch() {
     String insertSql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
     String describeInsertSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9 from all_types) p";
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(describeInsertSql),
@@ -518,6 +530,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.NUMERIC,
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
+                            TypeCode.STRING,
                             TypeCode.STRING)))
                 .build()));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 0L));
@@ -593,6 +606,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                   .to(Date.parseDate(String.format("2022-04-%02d", i + 1)))
                   .bind("p9")
                   .to("test_string" + i)
+                  .bind("p10")
+                  .to(String.format("{\"key\": \"value%d\"}", i))
                   .build(),
               1L));
     }
@@ -761,11 +776,11 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   public void testBatchPrepareError() {
     String insertSql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 0L));
     String describeInsertSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9 from all_types) p";
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(describeInsertSql),
@@ -781,6 +796,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.NUMERIC,
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
+                            TypeCode.STRING,
                             TypeCode.STRING)))
                 .build()));
     // This select statement will fail during the PREPARE phase that pgx executes for all statements
@@ -822,10 +838,10 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   public void testBatchExecutionError() {
     String insertSql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
     String describeInsertSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9 from all_types) p";
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(describeInsertSql),
@@ -841,6 +857,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.NUMERIC,
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
+                            TypeCode.STRING,
                             TypeCode.STRING)))
                 .build()));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 0L));
@@ -866,6 +883,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
               .to(Date.parseDate(String.format("2022-04-%02d", i + 1)))
               .bind("p9")
               .to("test_string" + i)
+              .bind("p10")
+              .to(String.format("{\"key\": \"value%d\"}", i))
               .build();
       if (i == 1) {
         mockSpanner.putStatementResult(
@@ -899,10 +918,10 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   public void testInsertNullsAllDataTypes() {
     String sql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
     String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9 from all_types) p";
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(describeSql),
@@ -918,6 +937,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.NUMERIC,
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
+                            TypeCode.STRING,
                             TypeCode.STRING)))
                 .build()));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
@@ -941,6 +961,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .bind("p8")
                 .to((Date) null)
                 .bind("p9")
+                .to((String) null)
+                .bind("p10")
                 .to((String) null)
                 .build(),
             1L));
@@ -993,7 +1015,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, true);
 
     String sql =
-        "select \"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\" "
+        "select \"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\", \"col_jsonb\" "
             + "from \"all_types\"";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -1010,6 +1032,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.NUMERIC,
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
+                            TypeCode.STRING,
                             TypeCode.STRING)))
                 .build()));
 
@@ -1022,7 +1045,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     Mutation mutation = request.getMutations(0);
     assertEquals(OperationCase.INSERT, mutation.getOperationCase());
     assertEquals(2, mutation.getInsert().getValuesCount());
-    assertEquals(9, mutation.getInsert().getColumnsCount());
+    assertEquals(10, mutation.getInsert().getColumnsCount());
     ListValue insert = mutation.getInsert().getValues(0);
     assertEquals("1", insert.getValues(0).getStringValue());
     assertTrue(insert.getValues(1).getBoolValue());
@@ -1035,6 +1058,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     assertEquals("2022-03-24T12:39:10.123456000Z", insert.getValues(6).getStringValue());
     assertEquals("2022-07-01", insert.getValues(7).getStringValue());
     assertEquals("test", insert.getValues(8).getStringValue());
+    assertEquals("{\"key\": \"value\"}", insert.getValues(9).getStringValue());
 
     insert = mutation.getInsert().getValues(1);
     assertEquals("2", insert.getValues(0).getStringValue());
@@ -1047,10 +1071,10 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   public void testReadWriteTransaction() {
     String sql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
     String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9 from all_types) p";
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(describeSql),
@@ -1066,6 +1090,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.NUMERIC,
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
+                            TypeCode.STRING,
                             TypeCode.STRING)))
                 .build()));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
@@ -1091,6 +1116,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                   .to(Date.parseDate("2022-04-02"))
                   .bind("p9")
                   .to("test_string")
+                  .bind("p10")
+                  .to("{\"key\": \"value\"}")
                   .build(),
               1L));
     }

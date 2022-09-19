@@ -197,7 +197,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "col_numeric=?, "
               + "col_timestamptz=?, "
               + "col_date=?, "
-              + "col_varchar=? "
+              + "col_varchar=?, "
               + "col_jsonb=?",
           "update all_types set col_bigint=null, "
               + "col_bool=null, "
@@ -207,7 +207,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "col_numeric=null, "
               + "col_timestamptz=null, "
               + "col_date=null, "
-              + "col_varchar=null "
+              + "col_varchar=null, "
               + "col_jsonb=null "
               + "where col_bigint=? "
               + "and col_bool=? "
@@ -235,7 +235,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
       try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
           ParameterMetaData metadata = statement.getParameterMetaData();
-          assertEquals(9, metadata.getParameterCount());
+          assertEquals(10, metadata.getParameterCount());
           for (int index = 1; index <= metadata.getParameterCount(); index++) {
             assertEquals(ParameterMetaData.parameterModeIn, metadata.getParameterMode(index));
             assertEquals(ParameterMetaData.parameterNullableUnknown, metadata.isNullable(index));
