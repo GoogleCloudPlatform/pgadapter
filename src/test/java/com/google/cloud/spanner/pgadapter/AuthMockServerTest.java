@@ -43,7 +43,7 @@ import org.postgresql.util.PSQLException;
 
 @RunWith(JUnit4.class)
 public class AuthMockServerTest extends AbstractMockServerTest {
-  private static final String CREDENTIALS_ERROR =
+  static final String CREDENTIALS_ERROR =
       "ERROR: Invalid credentials received.\n"
           + "  Hint: PGAdapter expects credentials to be one of the following:\n"
           + "1. Username contains the fixed string 'oauth2' and the password field contains a valid OAuth2 token.\n"

@@ -110,12 +110,7 @@ public class ITAuthTest implements IntegrationTest {
         assertThrows(
             SQLException.class,
             () -> DriverManager.getConnection(getConnectionUrl(), "foo", "bar"));
-    assertEquals(
-        "ERROR: Invalid credentials received. "
-            + "PGAdapter expects the password to contain the JSON payload of a credentials file. "
-            + "Alternatively, the password may contain only the private key of a service account. "
-            + "The user name must in that case contain the service account email address.",
-        exception.getMessage());
+    assertEquals(AuthMockServerTest.CREDENTIALS_ERROR, exception.getMessage());
   }
 
   @Test
