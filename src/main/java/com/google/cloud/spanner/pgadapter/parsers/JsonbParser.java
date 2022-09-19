@@ -17,6 +17,9 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.error.Severity;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
@@ -41,7 +44,15 @@ public class JsonbParser extends Parser<String> {
           break;
         case BINARY:
           if (item.length > 0) {
-            this.item = toString(Arrays.copyOfRange(item, 1, item.length));
+            if (item[0] == 1) {
+              this.item = toString(Arrays.copyOfRange(item, 1, item.length));
+            } else {
+              throw PGException.newBuilder()
+                  .setSQLState(SQLState.RaiseException)
+                  .setSeverity(Severity.ERROR)
+                  .setMessage("Unknown version in binary jsonb value: " + item[0])
+                  .build();
+            }
           } else {
             this.item = "";
           }
