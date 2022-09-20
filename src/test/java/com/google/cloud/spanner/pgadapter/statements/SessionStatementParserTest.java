@@ -179,6 +179,9 @@ public class SessionStatementParserTest {
     assertEquals(
         new SetStatement(false, new TableOrIndexName("TIMEZONE"), "'UTC'"),
         SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set time zone 'UTC'"))));
+    assertEquals(
+        new SetStatement(false, new TableOrIndexName("TIMEZONE"), "'UTC'"),
+        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set TIME ZONE 'UTC'"))));
   }
 
 }

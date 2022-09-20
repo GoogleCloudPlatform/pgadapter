@@ -286,7 +286,6 @@ public class SessionStatementParser {
           "Invalid SET statement: " + parser.getSql() + ". Expected configuration parameter name.");
     }
     else if(name.toString().equalsIgnoreCase("TIME")){
-      //System.out.println("---->"+parser.readKeyword());
       if(parser.eatKeyword("ZONE")) {
         builder.setName(new TableOrIndexName("TIMEZONE"));
       }
@@ -298,7 +297,6 @@ public class SessionStatementParser {
     }
     else {
       builder.setName(name);
-      System.out.println("---->"+parser.readKeyword());
       if (!(parser.eatKeyword("to") || parser.eatToken("="))) {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT,
