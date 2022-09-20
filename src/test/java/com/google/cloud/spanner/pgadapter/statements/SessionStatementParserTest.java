@@ -173,4 +173,12 @@ public class SessionStatementParserTest {
         new SetStatement(false, new TableOrIndexName("foo"), null),
         SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set foo = default"))));
   }
+
+  @Test
+  public void testTimeZone(){
+    assertEquals(
+        new SetStatement(false, new TableOrIndexName("TIMEZONE"), "'UTC'"),
+        SessionStatementParser.parse(PG_PARSER.parse(Statement.of("set time zone 'UTC'"))));
+  }
+
 }
