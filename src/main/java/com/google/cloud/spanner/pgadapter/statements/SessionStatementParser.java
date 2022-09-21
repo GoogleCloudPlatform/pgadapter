@@ -279,23 +279,46 @@ public class SessionStatementParser {
       // Ignore, this is the default.
       parser.eatKeyword("session");
     }
+    if (parser.eatKeyword("time", "zone")) {
+      builder.setName(new TableOrIndexName("TIMEZONE"));
+
+      String value = parser.parseExpression();
+      if (value == null) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "Invalid SET statement: " + parser.getSql() + ". Expected value.");
+      }
+      if ("default".equalsIgnoreCase(value) || "local".equalsIgnoreCase(value)) {
+        builder.setValue("'UTC'");
+      } else {
+        builder.setValue(value);
+      }
+      String remaining = parser.parseExpression();
+      if (!Strings.isNullOrEmpty(remaining)) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "Invalid SET statement: "
+                + parser.getSql()
+                + ". Expected end of statement after "
+                + value);
+      }
+
+      return builder.build();
+    }
+
     TableOrIndexName name = parser.readTableOrIndexName();
     if (name == null) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT,
           "Invalid SET statement: " + parser.getSql() + ". Expected configuration parameter name.");
-    }
-    else if(name.toString().equalsIgnoreCase("TIME")){
-      if(parser.eatKeyword("ZONE")) {
-        builder.setName(new TableOrIndexName("TIMEZONE"));
-      }
-      else{
+    } else if (name.toString().equalsIgnoreCase("TIME")) {
+      if (parser.eatKeyword("ZONE")) {
+
+      } else {
         throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            "Invalid SET statement: " + parser.getSql());
+            ErrorCode.INVALID_ARGUMENT, "Invalid SET statement: " + parser.getSql());
       }
-    }
-    else {
+    } else {
       builder.setName(name);
       if (!(parser.eatKeyword("to") || parser.eatToken("="))) {
         throw SpannerExceptionFactory.newSpannerException(
@@ -372,6 +395,21 @@ public class SessionStatementParser {
       }
       return ShowStatement.createShowAll();
     }
+
+    if (parser.eatKeyword("time", "zone")) {
+      TableOrIndexName name = new TableOrIndexName("TIMEZONE");
+      String remaining = parser.parseExpression();
+      if (!Strings.isNullOrEmpty(remaining)) {
+        throw SpannerExceptionFactory.newSpannerException(
+            ErrorCode.INVALID_ARGUMENT,
+            "Invalid SHOW statement: "
+                + parser.getSql()
+                + ". Expected end of statement after "
+                + name);
+      }
+      return new ShowStatement(name);
+    }
+
     TableOrIndexName name = parser.readTableOrIndexName();
     if (name == null) {
       throw SpannerExceptionFactory.newSpannerException(

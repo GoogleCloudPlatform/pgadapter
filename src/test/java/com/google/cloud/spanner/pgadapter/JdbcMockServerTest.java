@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TR
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -2098,6 +2099,60 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set application_name to ''");
       verifySettingValue(connection, "application_name", "");
+    }
+  }
+
+  @Test
+  public void testSetTimeZone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'IST'");
+      verifySettingValue(connection, "timezone", "IST");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneToDefault() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone default");
+      verifySettingValue(connection, "timezone", "UTC");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneToLocal() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone local");
+      verifySettingValue(connection, "timezone", "UTC");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneWithTransactionCommit() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      connection.createStatement().execute("set time zone 'UTC'");
+      verifySettingValue(connection, "timezone", "UTC");
+      connection.commit();
+      verifySettingValue(connection, "timezone", "UTC");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneWithTransactionRollback() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      String originalTimeZone = null;
+      try (ResultSet rs = connection.createStatement().executeQuery("SHOW TIMEZONE")) {
+        assertTrue(rs.next());
+        originalTimeZone = rs.getString(1);
+        assertFalse(rs.next());
+      }
+      assertNotNull(originalTimeZone);
+      connection.setAutoCommit(false);
+
+      connection.createStatement().execute("set time zone 'UTC'");
+      verifySettingValue(connection, "time zone", "UTC");
+      connection.rollback();
+      verifySettingValue(connection, "time zone", originalTimeZone);
     }
   }
 
