@@ -311,22 +311,13 @@ public class SessionStatementParser {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT,
           "Invalid SET statement: " + parser.getSql() + ". Expected configuration parameter name.");
-    } else if (name.toString().equalsIgnoreCase("TIME")) {
-      if (parser.eatKeyword("ZONE")) {
-
-      } else {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT, "Invalid SET statement: " + parser.getSql());
-      }
-    } else {
-      builder.setName(name);
-      if (!(parser.eatKeyword("to") || parser.eatToken("="))) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            "Invalid SET statement: " + parser.getSql() + ". Expected TO or =.");
-      }
     }
-
+    builder.setName(name);
+    if (!(parser.eatKeyword("to") || parser.eatToken("="))) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.INVALID_ARGUMENT,
+          "Invalid SET statement: " + parser.getSql() + ". Expected TO or =.");
+    }
     String value = parser.parseExpression();
     if (value == null) {
       throw SpannerExceptionFactory.newSpannerException(
