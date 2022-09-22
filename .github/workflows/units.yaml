@@ -26,6 +26,9 @@ jobs:
           python-version: '3.9'
       - run: python --version
       - run: pip install -r ./src/test/python/requirements.txt
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
       - run: mvn -B test -Ptest-all
   windows:
     runs-on: windows-latest
@@ -75,4 +78,7 @@ jobs:
       - uses: actions/setup-dotnet@v2
         with:
           dotnet-version: '6.0.x'
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
       - run: mvn -B test -Ptest-all

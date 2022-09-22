@@ -211,6 +211,20 @@ public class JdbcParametersMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testJsonbParam() throws SQLException {
+    for (int oid : new int[] {Oid.JSONB}) {
+      testParamTransfer(
+          oid,
+          new Value[] {
+            Value.string("{\"key\":\"value\"}"), Value.string("{}"), Value.string("[]"),
+          },
+          new Object[] {
+            "{\"key\":\"value\"}", "{}", "[]",
+          });
+    }
+  }
+
+  @Test
   public void testDateParam() throws SQLException {
     testParamTransfer(
         Oid.DATE,
