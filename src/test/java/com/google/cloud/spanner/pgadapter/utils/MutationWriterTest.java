@@ -449,7 +449,7 @@ public class MutationWriterTest {
     assertEquals(
         12,
         calculateSize(
-            Mutation.newInsertBuilder("my_table").set("my_col").to(Value.json("foo")).build()));
+            Mutation.newInsertBuilder("my_table").set("my_col").to(Value.pgJsonb("foo")).build()));
 
     assertEquals(
         16,
@@ -519,7 +519,7 @@ public class MutationWriterTest {
         calculateSize(
             Mutation.newInsertBuilder("my_table")
                 .set("my_col")
-                .toJsonArray(ImmutableList.of("foo", "a"))
+                .toPgJsonbArray(ImmutableList.of("foo", "a"))
                 .build()));
   }
 
@@ -535,7 +535,7 @@ public class MutationWriterTest {
           Type.date(),
           Type.float64(),
           Type.int64(),
-          Type.json(),
+          Type.pgJsonb(),
           Type.pgNumeric(),
           Type.string(),
           Type.timestamp()

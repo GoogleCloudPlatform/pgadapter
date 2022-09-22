@@ -426,6 +426,12 @@ public class ITJdbcMetadataTest implements IntegrationTest {
               assertEquals(Types.VARCHAR, columns.getInt("DATA_TYPE"));
               assertEquals("varchar", columns.getString("TYPE_NAME"));
 
+              assertTrue(columns.next());
+              assertEquals("col_jsonb", columns.getString("COLUMN_NAME"));
+              // TODO: Change to jsonb when available.
+              assertEquals(Types.VARCHAR, columns.getInt("DATA_TYPE"));
+              assertEquals("varchar", columns.getString("TYPE_NAME"));
+
               assertFalse(columns.next());
             }
           } catch (SQLException e) {
