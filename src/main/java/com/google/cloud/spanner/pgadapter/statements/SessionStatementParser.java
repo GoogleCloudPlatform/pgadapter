@@ -284,8 +284,7 @@ public class SessionStatementParser {
     if (parser.eatKeyword("time", "zone")) {
       name = new TableOrIndexName("TIMEZONE");
       isSpacedTimeZone = true;
-    }
-    else{
+    } else {
       name = parser.readTableOrIndexName();
     }
     if (name == null) {
@@ -305,7 +304,8 @@ public class SessionStatementParser {
           ErrorCode.INVALID_ARGUMENT,
           "Invalid SET statement: " + parser.getSql() + ". Expected value.");
     }
-    if ("default".equalsIgnoreCase(value) || (isSpacedTimeZone && "local".equalsIgnoreCase(value))) {
+    if ("default".equalsIgnoreCase(value)
+        || (isSpacedTimeZone && "local".equalsIgnoreCase(value))) {
       builder.setValue(null);
     } else {
       builder.setValue(value);
@@ -370,8 +370,7 @@ public class SessionStatementParser {
     TableOrIndexName name = null;
     if (parser.eatKeyword("time", "zone")) {
       name = new TableOrIndexName("TIMEZONE");
-    }
-    else{
+    } else {
       name = parser.readTableOrIndexName();
     }
     if (name == null) {

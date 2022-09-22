@@ -186,7 +186,8 @@ public class SessionStatementParserTest {
 
   @Test
   public void testShowTimeZone() {
-    assertEquals(new ShowStatement(new TableOrIndexName("timezone")),
+    assertEquals(
+        new ShowStatement(new TableOrIndexName("timezone")),
         SessionStatementParser.parse(PG_PARSER.parse(Statement.of("show time zone"))));
     assertEquals(
         new ShowStatement(new TableOrIndexName("timezone")),

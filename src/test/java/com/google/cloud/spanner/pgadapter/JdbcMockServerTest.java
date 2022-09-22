@@ -2112,7 +2112,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testSetTimeZoneToDefault() throws SQLException {
-    try (Connection connection = DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
       connection.createStatement().execute("set time zone default");
       verifySettingValue(connection, "timezone", "IST");
     }
