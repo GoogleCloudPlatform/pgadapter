@@ -64,6 +64,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -2303,6 +2304,36 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           connection.createStatement().executeQuery("select * from pg_catalog.pg_namespace")) {
         //noinspection StatementWithEmptyBody
         while (resultSet.next()) {}
+      }
+    }
+  }
+
+  @Test
+  public void testDescribeStatementWithMoreThan50Parameters() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Force binary transfer + usage of server-side prepared statements.
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      String sql =
+          String.format(
+              "insert into foo values (%s)",
+              IntStream.rangeClosed(1, 51).mapToObj(i -> "?").collect(Collectors.joining(",")));
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        SQLException sqlException =
+            assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
+        assertEquals(
+            "ERROR: Cannot describe statements with more than 50 parameters",
+            sqlException.getMessage());
+      }
+
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        for (int i = 0; i < 51; i++) {
+          preparedStatement.setNull(i + 1, Types.NULL);
+        }
+        SQLException sqlException =
+            assertThrows(SQLException.class, preparedStatement::executeUpdate);
+        assertEquals(
+            "ERROR: Cannot describe statements with more than 50 parameters",
+            sqlException.getMessage());
       }
     }
   }
