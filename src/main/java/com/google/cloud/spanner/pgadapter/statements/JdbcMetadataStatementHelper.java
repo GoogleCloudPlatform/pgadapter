@@ -36,7 +36,7 @@ class JdbcMetadataStatementHelper {
   static boolean isPotentialJdbcMetadataStatement(String sql) {
     // All JDBC metadata queries that need any replacements reference the pg_catalog schema or the
     // pg_settings table.
-    return sql.contains("pg_catalog.") || sql.contains("pg_settings");
+    return sql.contains("pg_catalog.") || sql.contains("pg_settings") || sql.contains("pg_class");
   }
 
   static String replaceJdbcMetadataStatement(String sql) {
@@ -142,6 +142,9 @@ class JdbcMetadataStatementHelper {
     }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_SIMPLE_PREFIX_42_3)) {
       return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_REPLACEMENT_42_3;
+    }
+    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_SEQUENCES)) {
+      return PgJdbcCatalog.PG_JDBC_GET_SEQUENCES_REPLACEMENT;
     }
 
     // The query that is used to fetch the primary keys of a table was re-written when the PG driver
