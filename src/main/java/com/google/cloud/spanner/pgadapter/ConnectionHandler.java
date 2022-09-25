@@ -15,7 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.api.core.InternalApi;
-import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.Credentials;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseId;
@@ -128,7 +128,7 @@ public class ConnectionHandler extends Thread {
   }
 
   @InternalApi
-  public void connectToSpanner(String database, @Nullable GoogleCredentials credentials) {
+  public void connectToSpanner(String database, @Nullable Credentials credentials) {
     OptionsMetadata options = getServer().getOptions();
     String uri =
         options.hasDefaultConnectionUrl()
