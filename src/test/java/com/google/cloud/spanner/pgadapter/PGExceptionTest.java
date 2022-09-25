@@ -30,16 +30,14 @@ public class PGExceptionTest {
   @Test
   public void testHints() {
     assertNull(
-        PGException.newBuilder()
-            .setMessage("test message")
+        PGException.newBuilder("test message")
             .setSQLState(SQLState.InternalError)
             .setSeverity(Severity.ERROR)
             .build()
             .getHints());
     assertEquals(
         "test hint\nsecond line",
-        PGException.newBuilder()
-            .setMessage("test message")
+        PGException.newBuilder("test message")
             .setSQLState(SQLState.InternalError)
             .setSeverity(Severity.ERROR)
             .setHints("test hint\nsecond line")

@@ -41,8 +41,7 @@ public class ErrorResponseTest {
             + 2
             + 1,
         calculateLength(
-            PGException.newBuilder()
-                .setMessage("test message")
+            PGException.newBuilder("test message")
                 .setSeverity(Severity.ERROR)
                 .setSQLState(SQLState.RaiseException)
                 .build()));
@@ -58,8 +57,7 @@ public class ErrorResponseTest {
             + 2
             + 1,
         calculateLength(
-            PGException.newBuilder()
-                .setMessage("test message")
+            PGException.newBuilder("test message")
                 .setSeverity(Severity.ERROR)
                 .setSQLState(SQLState.RaiseException)
                 .setHints("test hint")
@@ -73,8 +71,7 @@ public class ErrorResponseTest {
     ErrorResponse response =
         new ErrorResponse(
             output,
-            PGException.newBuilder()
-                .setMessage("test message")
+            PGException.newBuilder("test message")
                 .setSeverity(Severity.ERROR)
                 .setSQLState(SQLState.RaiseException)
                 .build());
@@ -92,8 +89,7 @@ public class ErrorResponseTest {
     ErrorResponse response =
         new ErrorResponse(
             output,
-            PGException.newBuilder()
-                .setMessage("test message")
+            PGException.newBuilder("test message")
                 .setSeverity(Severity.ERROR)
                 .setSQLState(SQLState.RaiseException)
                 .setHints("test hint\nline 2")
