@@ -124,8 +124,8 @@ class CsvCopyParser implements CopyInParser {
         switch (type.getCode()) {
           case STRING:
             return Value.string(recordValue);
-          case JSON:
-            return Value.json(recordValue);
+          case PG_JSONB:
+            return Value.pgJsonb(recordValue);
           case BOOL:
             return Value.bool(recordValue == null ? null : BooleanParser.toBoolean(recordValue));
           case INT64:

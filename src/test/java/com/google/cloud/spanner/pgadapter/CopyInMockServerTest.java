@@ -336,7 +336,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
 
       // TODO: Split this error message into a message and a hint.
       assertEquals(
-          "ERROR: Record count: 2001 has exceeded the limit: 2000.\n"
+          "ERROR: Record count: 1819 has exceeded the limit: 1818.\n"
               + "\n"
               + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
               + "\n"
@@ -1274,13 +1274,14 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             + "           3.14::float8 as col_float8, 100::bigint as col_int,\n"
             + "           6.626::numeric as col_numeric,\n"
             + "           '2022-07-07 08:16:48.123456+02:00'::timestamptz as col_timestamptz,\n"
-            + "           '2022-07-07'::date as col_date, 'hello world'::varchar as col_varchar\n"
+            + "           '2022-07-07'::date as col_date, 'hello world'::varchar as col_varchar,\n"
+            + "           '{\\\"key\\\": \\\"value\\\"}'::varchar as col_jsonb"
             + "    union all\n"
             + "    select null::bigint as col_bigint, null::bool as col_bool,\n"
             + "           null::bytea as col_bytea, null::float8 as col_float8,\n"
             + "           null::bigint as col_int, null::numeric as col_numeric,"
             + "           null::timestamptz as col_timestamptz, null::date as col_date,"
-            + "           null::varchar as col_varchar\n"
+            + "           null::varchar as col_varchar, null::varchar as col_jsonb\n"
             + "  ) to stdout binary\" "
             + "  | psql "
             + " -h "
@@ -1308,6 +1309,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     assertEquals("col_timestamptz", mutation.getInsert().getColumns(6));
     assertEquals("col_date", mutation.getInsert().getColumns(7));
     assertEquals("col_varchar", mutation.getInsert().getColumns(8));
+    assertEquals("col_jsonb", mutation.getInsert().getColumns(9));
 
     ListValue row1 = mutation.getInsert().getValues(0);
     assertEquals("1", row1.getValues(0).getStringValue());
@@ -1321,6 +1323,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     assertEquals("2022-07-07T06:16:48.123456000Z", row1.getValues(6).getStringValue());
     assertEquals("2022-07-07", row1.getValues(7).getStringValue());
     assertEquals("hello world", row1.getValues(8).getStringValue());
+    assertEquals("{\"key\": \"value\"}", row1.getValues(9).getStringValue());
 
     ListValue row2 = mutation.getInsert().getValues(1);
     for (int i = 0; i < row2.getValuesCount(); i++) {
@@ -1494,6 +1497,11 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                     .addValues(Value.newBuilder().setStringValue("col_varchar").build())
                     .addValues(Value.newBuilder().setStringValue("character varying").build())
                     .build())
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("col_jsonb").build())
+                    .addValues(Value.newBuilder().setStringValue("jsonb").build())
+                    .build())
             .setMetadata(metadata)
             .build();
     mockSpanner.putStatementResult(
@@ -1541,7 +1549,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             indexedColumnsCountResultSet));
 
     String allTypesIndexedColumnsCountSql =
-        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3, $4, $5, $6, $7, $8, $9, $10)";
+        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
     ResultSetMetadata allTypesIndexedColumnsCountMetadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
@@ -1584,6 +1592,8 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                 .to("col_date")
                 .bind("p10")
                 .to("col_varchar")
+                .bind("p11")
+                .to("col_jsonb")
                 .build(),
             allTypesIndexedColumnsCountResultSet));
   }

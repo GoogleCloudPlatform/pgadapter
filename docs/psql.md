@@ -53,3 +53,6 @@ psql -h localhost -p 5433
 
 This example uses the pre-built Docker image to run PGAdapter.
 See [README](../README.md) for more possibilities on how to run PGAdapter.
+
+## Limitations
+- Server side [prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are limited to at most 50 parameters.
