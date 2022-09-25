@@ -18,6 +18,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
@@ -505,8 +506,9 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     assertEquals("123456789", insertRequest.getParams().getFieldsMap().get("p5").getStringValue());
     assertEquals("234.54235", insertRequest.getParams().getFieldsMap().get("p6").getStringValue());
     assertEquals(
-        "2022-07-22T20:15:42.011+02:00",
-        insertRequest.getParams().getFieldsMap().get("p7").getStringValue());
+        Timestamp.parseTimestamp("2022-07-22T20:15:42.011+02:00"),
+        Timestamp.parseTimestamp(
+            insertRequest.getParams().getFieldsMap().get("p7").getStringValue()));
     assertEquals("2022-07-22", insertRequest.getParams().getFieldsMap().get("p8").getStringValue());
     assertEquals(
         "some random string", insertRequest.getParams().getFieldsMap().get("p9").getStringValue());
