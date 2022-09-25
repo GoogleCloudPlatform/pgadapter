@@ -71,8 +71,7 @@ public class PasswordMessage extends ControlMessage {
     if (!useAuthentication()) {
       new ErrorResponse(
               this.outputStream,
-              PGException.newBuilder()
-                  .setMessage("Received PasswordMessage while authentication is disabled.")
+              PGException.newBuilder("Received PasswordMessage while authentication is disabled.")
                   .setSQLState(SQLState.ProtocolViolation)
                   .setSeverity(Severity.ERROR)
                   .build())
@@ -85,8 +84,7 @@ public class PasswordMessage extends ControlMessage {
     if (credentials == null) {
       new ErrorResponse(
               this.outputStream,
-              PGException.newBuilder()
-                  .setMessage("Invalid credentials received.")
+              PGException.newBuilder("Invalid credentials received.")
                   .setHints(
                       "PGAdapter expects credentials to be one of the following:\n"
                           + "1. Username contains the fixed string 'oauth2' and the password field contains a valid OAuth2 token.\n"

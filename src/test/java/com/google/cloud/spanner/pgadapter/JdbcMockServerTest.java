@@ -61,6 +61,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -73,6 +74,7 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
+import org.postgresql.core.Oid;
 import org.postgresql.jdbc.PgStatement;
 import org.postgresql.util.PSQLException;
 
@@ -425,6 +427,82 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals("{\"key\": \"value\"}", params.get("p10").getStringValue());
 
       mockSpanner.clearRequests();
+    }
+  }
+
+  @Test
+  public void testQueryWithLegacyDateParameter() throws SQLException {
+    String jdbcSql = "select col_date from all_types where col_date=?";
+    String pgSql = "select col_date from all_types where col_date=$1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(pgSql).bind("p1").to(Date.parseDate("2022-03-29")).build(),
+            ALL_TYPES_RESULTSET));
+
+    // Threshold 5 is the default. Use a named prepared statement if it is executed 5 times or more.
+    // Threshold 1 means always use a named prepared statement.
+    // Threshold 0 means never use a named prepared statement.
+    // Threshold -1 means use binary transfer of values and use DESCRIBE statement.
+    // (10 points to you if you guessed the last one up front!).
+    for (int preparedThreshold : new int[] {5, 1, 0, -1}) {
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (PreparedStatement preparedStatement = connection.prepareStatement(jdbcSql)) {
+          preparedStatement.unwrap(PgStatement.class).setPrepareThreshold(preparedThreshold);
+          int index = 0;
+          preparedStatement.setDate(++index, new java.sql.Date(2022 - 1900, Calendar.MARCH, 29));
+          try (ResultSet resultSet = preparedStatement.executeQuery()) {
+            assertTrue(resultSet.next());
+            assertEquals(
+                new java.sql.Date(2022 - 1900, Calendar.MARCH, 29), resultSet.getDate("col_date"));
+            assertFalse(resultSet.next());
+          }
+        }
+
+        List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+        // Prepare threshold less than 0 means use binary transfer + DESCRIBE statement.
+        // However, the legacy date type will never use BINARY transfer and will always be sent with
+        // unspecified type by the JDBC driver the first time. This means that we need 3 round trips
+        // for a query that uses a prepared statement the first time.
+        assertEquals(
+            "Prepare threshold: " + preparedThreshold,
+            preparedThreshold == 1 || preparedThreshold < 0 ? 3 : 1,
+            requests.size());
+
+        ExecuteSqlRequest executeRequest;
+        if (preparedThreshold == 1) {
+          // The order of statements here is a little strange. The execution of the statement is
+          // executed first, and the describe statements are then executed afterwards. The reason
+          // for
+          // this is that JDBC does the following when it encounters a statement parameter that is
+          // 'unknown' (it considers the legacy date type as unknown, as it does not know if the
+          // user
+          // means date, timestamp or timestamptz):
+          // 1. It sends a DescribeStatement message, but without a flush or a sync, as it is not
+          //    planning on using the information for this request.
+          // 2. It then sends the Execute message followed by a sync. This causes PGAdapter to sync
+          //    the backend connection and execute everything in the actual execution pipeline.
+          // 3. PGAdapter then executes anything left in the message queue. The DescribeMessage is
+          //    still there, and is therefore executed after the Execute message.
+          // All the above still works as intended, as the responses are sent in the expected order.
+          executeRequest = requests.get(0);
+          for (int i = 1; i < requests.size(); i++) {
+            assertEquals(QueryMode.PLAN, requests.get(i).getQueryMode());
+          }
+        } else {
+          executeRequest = requests.get(requests.size() - 1);
+        }
+        assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+        assertEquals(pgSql, executeRequest.getSql());
+
+        Map<String, Value> params = executeRequest.getParams().getFieldsMap();
+        Map<String, Type> types = executeRequest.getParamTypesMap();
+
+        assertEquals(TypeCode.DATE, types.get("p1").getCode());
+        assertEquals("2022-03-29", params.get("p1").getStringValue());
+
+        mockSpanner.clearRequests();
+      }
     }
   }
 
@@ -1703,6 +1781,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testShowGuessTypes() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.guess_types")) {
+        assertTrue(resultSet.next());
+        assertEquals(String.format("%d,%d", Oid.TIMESTAMPTZ, Oid.DATE), resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testShowGuessTypesOverwritten() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20spanner.guess_types=0")) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.guess_types")) {
+        assertTrue(resultSet.next());
+        assertEquals("0", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testShowValidSetting() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet =
@@ -2072,7 +2175,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(356, count);
+        assertEquals(357, count);
       }
     }
   }

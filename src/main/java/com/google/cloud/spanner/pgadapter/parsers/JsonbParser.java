@@ -47,10 +47,9 @@ public class JsonbParser extends Parser<String> {
             if (item[0] == 1) {
               this.item = toString(Arrays.copyOfRange(item, 1, item.length));
             } else {
-              throw PGException.newBuilder()
+              throw PGException.newBuilder("Unknown version in binary jsonb value: " + item[0])
                   .setSQLState(SQLState.RaiseException)
                   .setSeverity(Severity.ERROR)
-                  .setMessage("Unknown version in binary jsonb value: " + item[0])
                   .build();
             }
           } else {

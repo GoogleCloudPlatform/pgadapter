@@ -123,7 +123,16 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     for (int index = 0; index < parameters.length; index++) {
       short formatCode = portal.getParameterFormatCode(index);
       int type = this.parseType(parameters, index);
-      Parser<?> parser = Parser.create(parameters[index], type, FormatCode.of(formatCode));
+      Parser<?> parser =
+          Parser.create(
+              connectionHandler
+                  .getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getSessionState()
+                  .getGuessTypes(),
+              parameters[index],
+              type,
+              FormatCode.of(formatCode));
       parser.bind(builder, "p" + (index + 1));
     }
     this.statement = builder.build();

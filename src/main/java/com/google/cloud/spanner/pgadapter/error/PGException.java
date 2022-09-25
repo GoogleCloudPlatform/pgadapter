@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.error;
 
 import com.google.api.core.InternalApi;
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 
 /**
  * {@link PGException} contains all fields that are needed to send an {@link
@@ -24,12 +25,14 @@ import com.google.common.base.Preconditions;
 @InternalApi
 public class PGException extends RuntimeException {
   public static class Builder {
+    private final String message;
     private Severity severity;
     private SQLState sqlState;
-    private String message;
     private String hints;
 
-    private Builder() {}
+    private Builder(String message) {
+      this.message = message;
+    }
 
     public Builder setSeverity(Severity severity) {
       this.severity = severity;
@@ -38,11 +41,6 @@ public class PGException extends RuntimeException {
 
     public Builder setSQLState(SQLState sqlState) {
       this.sqlState = sqlState;
-      return this;
-    }
-
-    public Builder setMessage(String message) {
-      this.message = message == null ? "" : message;
       return this;
     }
 
@@ -56,8 +54,8 @@ public class PGException extends RuntimeException {
     }
   }
 
-  public static Builder newBuilder() {
-    return new Builder();
+  public static Builder newBuilder(String message) {
+    return new Builder(Preconditions.checkNotNull(message));
   }
 
   private final Severity severity;
@@ -77,6 +75,22 @@ public class PGException extends RuntimeException {
 
   public SQLState getSQLState() {
     return sqlState;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(this.getMessage(), this.severity, this.sqlState);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof PGException)) {
+      return false;
+    }
+    PGException other = (PGException) o;
+    return Objects.equals(this.getMessage(), other.getMessage())
+        && Objects.equals(this.severity, other.severity)
+        && Objects.equals(this.sqlState, other.sqlState);
   }
 
   public String getHints() {
