@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import org.postgresql.util.ByteConverter;
 
 /** Translate from wire protocol to float. */
@@ -28,7 +29,12 @@ class FloatParser extends Parser<Float> {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          this.item = Float.valueOf(new String(item));
+          String stringValue = new String(item);
+          try {
+            this.item = Float.valueOf(stringValue);
+          } catch (Exception exception) {
+            throw PGExceptionFactory.newPGException("Invalid float4 value: " + stringValue);
+          }
           break;
         case BINARY:
           this.item = ByteConverter.float4(item, 0);

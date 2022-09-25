@@ -65,6 +65,7 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -291,7 +292,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testQueryWithParameters() throws SQLException {
     String jdbcSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
@@ -301,9 +302,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_numeric=? "
             + "and col_timestamptz=? "
             + "and col_date=? "
-            + "and col_varchar=?";
+            + "and col_varchar=? "
+            + "and col_jsonb=?";
     String pgSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=$1 "
             + "and col_bool=$2 "
@@ -313,7 +315,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_numeric=$6 "
             + "and col_timestamptz=$7 "
             + "and col_date=$8 "
-            + "and col_varchar=$9";
+            + "and col_varchar=$9 "
+            + "and col_jsonb=$10";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -336,6 +339,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .to(Date.parseDate("2022-03-29"))
                 .bind("p9")
                 .to("test")
+                .bind("p10")
+                .to("{\"key\": \"value\"}")
                 .build(),
             ALL_TYPES_RESULTSET));
 
@@ -362,6 +367,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           preparedStatement.setObject(++index, offsetDateTime);
           preparedStatement.setObject(++index, LocalDate.of(2022, 3, 29));
           preparedStatement.setString(++index, "test");
+          preparedStatement.setString(++index, "{\"key\": \"value\"}");
           try (ResultSet resultSet = preparedStatement.executeQuery()) {
             assertTrue(resultSet.next());
             index = 0;
@@ -380,6 +386,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             }
             assertEquals(LocalDate.of(2022, 3, 29), resultSet.getObject(++index, LocalDate.class));
             assertEquals("test", resultSet.getString(++index));
+            assertEquals("{\"key\": \"value\"}", resultSet.getString(++index));
             assertFalse(resultSet.next());
           }
         }
@@ -417,6 +424,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals("2022-03-29", params.get("p8").getStringValue());
       assertEquals(TypeCode.STRING, types.get("p9").getCode());
       assertEquals("test", params.get("p9").getStringValue());
+      assertEquals("{\"key\": \"value\"}", params.get("p10").getStringValue());
 
       mockSpanner.clearRequests();
     }
@@ -1503,7 +1511,14 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           int rowCount = 0;
           while (resultSet.next()) {
             for (int col = 0; col < resultSet.getMetaData().getColumnCount(); col++) {
-              resultSet.getObject(col + 1);
+              // TODO: Remove once we have a replacement for pg_type, as the JDBC driver will try to
+              //       read type information from the backend when it hits an 'unknown' type (jsonb
+              //       is not one of the types that the JDBC driver will load automatically).
+              if (col == 5 || col == 14) {
+                resultSet.getString(col + 1);
+              } else {
+                resultSet.getObject(col + 1);
+              }
             }
             rowCount++;
           }
@@ -2160,7 +2175,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(348, count);
+        assertEquals(357, count);
       }
     }
   }
@@ -2392,6 +2407,36 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           connection.createStatement().executeQuery("select * from pg_catalog.pg_namespace")) {
         //noinspection StatementWithEmptyBody
         while (resultSet.next()) {}
+      }
+    }
+  }
+
+  @Test
+  public void testDescribeStatementWithMoreThan50Parameters() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Force binary transfer + usage of server-side prepared statements.
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      String sql =
+          String.format(
+              "insert into foo values (%s)",
+              IntStream.rangeClosed(1, 51).mapToObj(i -> "?").collect(Collectors.joining(",")));
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        SQLException sqlException =
+            assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
+        assertEquals(
+            "ERROR: Cannot describe statements with more than 50 parameters",
+            sqlException.getMessage());
+      }
+
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        for (int i = 0; i < 51; i++) {
+          preparedStatement.setNull(i + 1, Types.NULL);
+        }
+        SQLException sqlException =
+            assertThrows(SQLException.class, preparedStatement::executeUpdate);
+        assertEquals(
+            "ERROR: Cannot describe statements with more than 50 parameters",
+            sqlException.getMessage());
       }
     }
   }

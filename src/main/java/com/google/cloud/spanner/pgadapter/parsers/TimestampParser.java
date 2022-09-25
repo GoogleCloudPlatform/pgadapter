@@ -20,6 +20,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
@@ -99,11 +100,15 @@ public class TimestampParser extends Parser<Timestamp> {
 
   /** Converts the given string value to a {@link Timestamp}. */
   public static Timestamp toTimestamp(String value) {
-    String stringValue = toPGString(value);
-    TemporalAccessor temporalAccessor = TIMESTAMP_FORMATTER.parse(stringValue);
-    return Timestamp.ofTimeSecondsAndNanos(
-        temporalAccessor.getLong(ChronoField.INSTANT_SECONDS),
-        temporalAccessor.get(ChronoField.NANO_OF_SECOND));
+    try {
+      String stringValue = toPGString(value);
+      TemporalAccessor temporalAccessor = TIMESTAMP_FORMATTER.parse(stringValue);
+      return Timestamp.ofTimeSecondsAndNanos(
+          temporalAccessor.getLong(ChronoField.INSTANT_SECONDS),
+          temporalAccessor.get(ChronoField.NANO_OF_SECOND));
+    } catch (Exception exception) {
+      throw PGExceptionFactory.newPGException("Invalid timestamp value: " + value);
+    }
   }
 
   /**

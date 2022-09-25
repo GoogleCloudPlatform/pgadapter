@@ -131,6 +131,9 @@ class JdbcMetadataStatementHelper {
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_SQL_KEYWORDS_PREFIX)) {
       return PgJdbcCatalog.PG_JDBC_GET_SQL_KEYWORDS_REPLACEMENT;
     }
+    if (sql.equals(PgJdbcCatalog.PG_JDBC_GET_TYPE_NAME)) {
+      return PgJdbcCatalog.PG_JDBC_GET_TYPE_NAME_REPLACEMENT;
+    }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_PREFIX)) {
       return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_REPLACEMENT;
     }
@@ -249,6 +252,9 @@ class JdbcMetadataStatementHelper {
         .replace(" AND c.relname LIKE ", " AND TABLE_NAME LIKE ")
         .replace(
             "c.relkind = 'r' AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'",
+            "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TABLE'")
+        .replace(
+            "c.relkind = 'p' AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'",
             "(CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE TABLE_TYPE END) = 'TABLE'")
         .replace(
             "c.relkind IN ('r','p') AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'",

@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.common.base.Strings;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -32,15 +33,27 @@ public class ErrorResponse extends WireOutput {
   private static final byte CODE_FLAG = 'C';
   private static final byte MESSAGE_FLAG = 'M';
   private static final byte SEVERITY_FLAG = 'S';
+  private static final byte HINT_FLAG = 'H';
   private static final byte NULL_TERMINATOR = 0;
 
   private final byte[] severity;
   private final byte[] errorMessage;
   private final byte[] errorState;
+  private final byte[] hints;
 
   public ErrorResponse(DataOutputStream output, PGException pgException) {
-    super(
-        output,
+    super(output, calculateLength(pgException));
+    this.errorMessage = pgException.getMessage().getBytes(StandardCharsets.UTF_8);
+    this.errorState = pgException.getSQLState().getBytes();
+    this.severity = pgException.getSeverity().name().getBytes(StandardCharsets.UTF_8);
+    this.hints =
+        Strings.isNullOrEmpty(pgException.getHints())
+            ? null
+            : pgException.getHints().getBytes(StandardCharsets.UTF_8);
+  }
+
+  static int calculateLength(PGException pgException) {
+    int length =
         HEADER_LENGTH
             + FIELD_IDENTIFIER_LENGTH
             + pgException.getSeverity().name().getBytes(StandardCharsets.UTF_8).length
@@ -51,10 +64,14 @@ public class ErrorResponse extends WireOutput {
             + FIELD_IDENTIFIER_LENGTH
             + pgException.getMessage().getBytes(StandardCharsets.UTF_8).length
             + NULL_TERMINATOR_LENGTH
-            + NULL_TERMINATOR_LENGTH);
-    this.errorMessage = pgException.getMessage().getBytes(StandardCharsets.UTF_8);
-    this.errorState = pgException.getSQLState().getBytes();
-    this.severity = pgException.getSeverity().name().getBytes(StandardCharsets.UTF_8);
+            + NULL_TERMINATOR_LENGTH;
+    if (!Strings.isNullOrEmpty(pgException.getHints())) {
+      length +=
+          FIELD_IDENTIFIER_LENGTH
+              + pgException.getHints().getBytes(StandardCharsets.UTF_8).length
+              + NULL_TERMINATOR_LENGTH;
+    }
+    return length;
   }
 
   @Override
@@ -68,6 +85,11 @@ public class ErrorResponse extends WireOutput {
     this.outputStream.writeByte(MESSAGE_FLAG);
     this.outputStream.write(this.errorMessage);
     this.outputStream.writeByte(NULL_TERMINATOR);
+    if (this.hints != null) {
+      this.outputStream.writeByte(HINT_FLAG);
+      this.outputStream.write(this.hints);
+      this.outputStream.writeByte(NULL_TERMINATOR);
+    }
     this.outputStream.writeByte(NULL_TERMINATOR);
   }
 
@@ -83,7 +105,12 @@ public class ErrorResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}, " + "Error Message: {1}")
-        .format(new Object[] {this.length, new String(this.errorMessage, UTF8)});
+    return new MessageFormat("Length: {0}, Error Message: {1}, Hints: {2}")
+        .format(
+            new Object[] {
+              this.length,
+              new String(this.errorMessage, UTF8),
+              this.hints == null ? "" : new String(this.hints, UTF8)
+            });
   }
 }

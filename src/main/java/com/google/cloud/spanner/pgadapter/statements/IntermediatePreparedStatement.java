@@ -23,6 +23,7 @@ import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -157,6 +158,13 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
         || Arrays.stream(this.parameterDataTypes).anyMatch(p -> p == 0)) {
       // Note: We are only asking the backend to parse the types if there is at least one
       // parameter with unspecified type. Otherwise, we will rely on the types given in PARSE.
+
+      // We cannot describe statements with more than 50 parameters, as Cloud Spanner does not allow
+      // queries that select from a sub-query to contain more than 50 columns in the select list.
+      if (parameters.size() > 50) {
+        throw PGExceptionFactory.newPGException(
+            "Cannot describe statements with more than 50 parameters");
+      }
 
       // Transform the statement into a select statement that selects the parameters, and then
       // extract the types from the result set metadata.

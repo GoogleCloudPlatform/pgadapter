@@ -16,7 +16,11 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -28,5 +32,11 @@ public class FloatParserTest {
   public void testStringParse() {
     assertEquals("3.14", new FloatParser(3.14f).stringParse());
     assertNull(new FloatParser(null).stringParse());
+    assertEquals(
+        "123.456",
+        new FloatParser("123.456".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).stringParse());
+    assertThrows(
+        PGException.class,
+        () -> new FloatParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
   }
 }

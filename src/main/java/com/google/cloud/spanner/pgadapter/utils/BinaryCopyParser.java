@@ -260,8 +260,8 @@ class BinaryCopyParser implements CopyInParser {
           return Value.float64(field.data == null ? null : DoubleParser.toDouble(field.data));
         case STRING:
           return Value.string(field.data == null ? null : StringParser.toString(field.data));
-        case JSON:
-          return Value.json(field.data == null ? null : StringParser.toString(field.data));
+        case PG_JSONB:
+          return Value.pgJsonb(field.data == null ? null : StringParser.toString(field.data));
         case BYTES:
           return Value.bytes(field.data == null ? null : BinaryParser.toByteArray(field.data));
         case TIMESTAMP:

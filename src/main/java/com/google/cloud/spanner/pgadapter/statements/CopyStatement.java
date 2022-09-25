@@ -238,7 +238,7 @@ public class CopyStatement extends IntermediatePortalStatement {
       case "timestamp with time zone":
         return Type.timestamp();
       case "jsonb":
-        return Type.json();
+        return Type.pgJsonb();
       default:
         throw new IllegalArgumentException(
             "Unrecognized or unsupported column data type: " + columnType);
@@ -323,6 +323,10 @@ public class CopyStatement extends IntermediatePortalStatement {
       setParserFormat(this.options);
       mutationWriter =
           new MutationWriter(
+              connectionHandler
+                  .getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getSessionState(),
               getTransactionMode(),
               connection,
               options.getTableName(),

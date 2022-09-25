@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.metadata;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.Tuple;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import java.io.BufferedInputStream;
@@ -25,65 +24,51 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Stack;
 import java.util.concurrent.TimeUnit;
 
 @InternalApi
 public class ConnectionMetadata implements AutoCloseable {
   private static final int SOCKET_BUFFER_SIZE = 1 << 16;
 
-  private final InputStream rawInputStream;
-  private final OutputStream rawOutputStream;
-  private final Stack<DataInputStream> inputStream = new Stack<>();
-  private final Stack<DataOutputStream> outputStream = new Stack<>();
+  private final DataInputStream inputStream;
+  private final DataOutputStream outputStream;
+  private boolean markedForRestart;
 
   /**
    * Creates a {@link DataInputStream} and a {@link DataOutputStream} from the given raw streams and
    * pushes these as the current streams to use for communication for a connection.
    */
   public ConnectionMetadata(InputStream rawInputStream, OutputStream rawOutputStream) {
-    this.rawInputStream = Preconditions.checkNotNull(rawInputStream);
-    this.rawOutputStream = Preconditions.checkNotNull(rawOutputStream);
-    pushNewStreams();
+    this.inputStream =
+        new DataInputStream(
+            new BufferedInputStream(
+                Preconditions.checkNotNull(rawInputStream), SOCKET_BUFFER_SIZE));
+    this.outputStream =
+        new DataOutputStream(
+            new BufferedOutputStream(
+                Preconditions.checkNotNull(rawOutputStream), SOCKET_BUFFER_SIZE));
+  }
+
+  public void markForRestart() {
+    markedForRestart = true;
   }
 
   @Override
   public void close() throws Exception {
-    this.rawInputStream.close();
-    this.rawOutputStream.close();
-  }
-
-  /**
-   * Creates a new buffered {@link DataInputStream} and {@link DataOutputStream} tuple to use for
-   * the connection. This is used for the COPY sub-protocol to prevent mixing the buffers used for
-   * the normal protocol with the COPY protocol, as that would cause multithreaded access to those
-   * buffers.
-   */
-  public Tuple<DataInputStream, DataOutputStream> pushNewStreams() {
-    return Tuple.of(
-        this.inputStream.push(
-            new DataInputStream(new BufferedInputStream(this.rawInputStream, SOCKET_BUFFER_SIZE))),
-        this.outputStream.push(
-            new DataOutputStream(
-                new BufferedOutputStream(this.rawOutputStream, SOCKET_BUFFER_SIZE))));
-  }
-
-  /**
-   * Pops the current {@link DataInputStream} and {@link DataOutputStream} from the connection. This
-   * is done when the COPY sub-protocol has finished.
-   */
-  public Tuple<DataInputStream, DataOutputStream> popStreams() {
-    return Tuple.of(this.inputStream.pop(), this.outputStream.pop());
+    if (!markedForRestart) {
+      this.inputStream.close();
+      this.outputStream.close();
+    }
   }
 
   /** Returns the current {@link DataInputStream} for the connection. */
-  public DataInputStream peekInputStream() {
-    return inputStream.peek();
+  public DataInputStream getInputStream() {
+    return inputStream;
   }
 
   /** Returns the current {@link DataOutputStream} for the connection. */
-  public DataOutputStream peekOutputStream() {
-    return outputStream.peek();
+  public DataOutputStream getOutputStream() {
+    return outputStream;
   }
 
   /**
@@ -92,16 +77,15 @@ public class ConnectionMetadata implements AutoCloseable {
    * become available in the buffer.
    */
   public char peekNextByte(long maxWaitMillis) throws IOException {
-    DataInputStream dataInputStream = inputStream.peek();
     Stopwatch stopwatch = Stopwatch.createStarted();
-    while (dataInputStream.available() == 0
+    while (inputStream.available() == 0
         && stopwatch.elapsed(TimeUnit.MILLISECONDS) < maxWaitMillis) {
       Thread.yield();
     }
-    if (dataInputStream.available() > 0) {
-      dataInputStream.mark(1);
-      char result = (char) dataInputStream.readUnsignedByte();
-      dataInputStream.reset();
+    if (inputStream.available() > 0) {
+      inputStream.mark(1);
+      char result = (char) inputStream.readUnsignedByte();
+      inputStream.reset();
 
       return result;
     }

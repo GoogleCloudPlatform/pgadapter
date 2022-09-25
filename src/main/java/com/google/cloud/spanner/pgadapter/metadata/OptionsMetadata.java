@@ -41,6 +41,25 @@ import org.json.simple.JSONObject;
 
 /** Metadata extractor for CLI. */
 public class OptionsMetadata {
+
+  public enum SslMode {
+    /** Disables SSL connections. This is the default. */
+    Disable {
+      @Override
+      public boolean isSslEnabled() {
+        return false;
+      }
+    },
+    /** Enables SSL connections. Requires a valid key store to be configured. */
+    Enable,
+    /** Requires SSL connections. Non-SSL connections will be rejected. */
+    Require;
+
+    public boolean isSslEnabled() {
+      return true;
+    }
+  }
+
   public enum DdlTransactionMode {
 
     // Disables all DDL batching and DDL statements in transactions. Only single DDL statements
@@ -76,6 +95,7 @@ public class OptionsMetadata {
   private static final String OPTION_CREDENTIALS_FILE = "c";
   private static final String OPTION_BINARY_FORMAT = "b";
   private static final String OPTION_AUTHENTICATE = "a";
+  private static final String OPTION_SSL = "ssl";
   private static final String OPTION_DISABLE_AUTO_DETECT_CLIENT = "disable_auto_detect_client";
   private static final String OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS =
       "disable_default_local_statements";
@@ -110,6 +130,7 @@ public class OptionsMetadata {
   private final TextFormat textFormat;
   private final boolean binaryFormat;
   private final boolean authenticate;
+  private final SslMode sslMode;
   private final boolean disableAutoDetectClient;
   private final boolean disableDefaultLocalStatements;
   private final boolean disablePgCatalogReplacements;
@@ -162,6 +183,7 @@ public class OptionsMetadata {
     this.textFormat = TextFormat.POSTGRESQL;
     this.binaryFormat = commandLine.hasOption(OPTION_BINARY_FORMAT);
     this.authenticate = commandLine.hasOption(OPTION_AUTHENTICATE);
+    this.sslMode = parseSslMode(commandLine.getOptionValue(OPTION_SSL));
     this.disableAutoDetectClient = commandLine.hasOption(OPTION_DISABLE_AUTO_DETECT_CLIENT);
     this.disableDefaultLocalStatements =
         commandLine.hasOption(OPTION_DISABLE_DEFAULT_LOCAL_STATEMENTS);
@@ -221,6 +243,7 @@ public class OptionsMetadata {
     this.textFormat = textFormat;
     this.binaryFormat = forceBinary;
     this.authenticate = authenticate;
+    this.sslMode = SslMode.Disable;
     this.disableAutoDetectClient = false;
     this.disableDefaultLocalStatements = false;
     this.disablePgCatalogReplacements = false;
@@ -248,6 +271,19 @@ public class OptionsMetadata {
       }
     }
     return properties;
+  }
+
+  static SslMode parseSslMode(String value) {
+    if (value == null) {
+      return SslMode.Disable;
+    }
+    for (SslMode mode : SslMode.values()) {
+      if (mode.name().equalsIgnoreCase(value)) {
+        return mode;
+      }
+    }
+    throw new IllegalArgumentException(
+        String.format("Invalid SSL mode value specified: %s", value));
   }
 
   private DdlTransactionMode parseDdlTransactionMode(String value) {
@@ -508,6 +544,14 @@ public class OptionsMetadata {
         false,
         "Whether you wish the proxy to perform an authentication step.");
     options.addOption(
+        OPTION_SSL,
+        "sslmode",
+        true,
+        "Enable SSL connections for this server. SSL only works if you "
+            + "have also configured a keystore for the Java Virtual Machine.\n"
+            + "See https://github.com/GoogleCloudPlatform/pgadapter/blob/postgresql-dialect/docs/ssl.md "
+            + "for more information.");
+    options.addOption(
         null,
         OPTION_DISABLE_AUTO_DETECT_CLIENT,
         false,
@@ -759,6 +803,10 @@ public class OptionsMetadata {
 
   public boolean shouldAuthenticate() {
     return this.authenticate;
+  }
+
+  public SslMode getSslMode() {
+    return this.sslMode;
   }
 
   public boolean shouldAutoDetectClient() {

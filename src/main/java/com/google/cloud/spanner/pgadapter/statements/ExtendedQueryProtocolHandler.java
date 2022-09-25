@@ -89,9 +89,9 @@ public class ExtendedQueryProtocolHandler {
    */
   public void flush() throws Exception {
     if (isExtendedProtocol()) {
-      // Wait at most 5 milliseconds for the next message to arrive. The method will just return 0
+      // Wait at most 2 milliseconds for the next message to arrive. The method will just return 0
       // if no message could be found in the buffer within this timeframe.
-      char nextMessage = connectionHandler.getConnectionMetadata().peekNextByte(5L);
+      char nextMessage = connectionHandler.getConnectionMetadata().peekNextByte(2L);
       if (nextMessage == SyncMessage.IDENTIFIER) {
         // Do a sync instead of a flush, as the next message is a sync. This tells the backend
         // connection that it is safe to for example use a read-only transaction if the buffer only
@@ -130,7 +130,7 @@ public class ExtendedQueryProtocolHandler {
         }
       }
     } finally {
-      connectionHandler.getConnectionMetadata().peekOutputStream().flush();
+      connectionHandler.getConnectionMetadata().getOutputStream().flush();
       messages.clear();
     }
   }

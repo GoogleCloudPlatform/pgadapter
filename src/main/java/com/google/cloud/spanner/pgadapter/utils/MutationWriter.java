@@ -32,6 +32,8 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
+import com.google.cloud.spanner.pgadapter.session.CopySettings;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -85,45 +87,15 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
 
   private static final Logger logger = Logger.getLogger(MutationWriter.class.getName());
 
-  private static final int DEFAULT_MUTATION_LIMIT = 20_000; // 20k mutation count limit
-  private static final int DEFAULT_COMMIT_LIMIT =
-      100_000_000; // 100MB mutation API commit size limit
-  /**
-   * The factor that the size of the incoming payload is multiplied with to estimate whether the
-   * current commit size will exceed the maximum commit size. The factor is chosen conservatively to
-   * ensure that a COPY operation of a large file does not unnecessarily break because of an
-   * exceeded commit size.
-   */
-  private static final float DEFAULT_COMMIT_LIMIT_MULTIPLIER_FACTOR = 2.0f;
-
-  private static final int DEFAULT_COMMIT_TIMEOUT_SECONDS = 300;
-  private static final int DEFAULT_MAX_PARALLELISM = 128;
-  private static final int DEFAULT_PIPE_BUFFER_SIZE = 1 << 16;
-
-  /**
-   * COPY will INSERT records by default. This is consistent with how COPY on PostgreSQL works. This
-   * option allows PGAdapter to use InsertOrUpdate instead. This can be slightly more efficient for
-   * bulk uploading, and it makes it easier to retry a failed non-atomic batch that might have
-   * already uploaded some but not all data.
-   */
-  private final boolean insertOrUpdate =
-      Boolean.parseBoolean(System.getProperty("copy_in_insert_or_update", "false"));
-
-  private final int commitSizeLimit =
-      Integer.parseInt(
-          System.getProperty("copy_in_commit_limit", String.valueOf(DEFAULT_COMMIT_LIMIT)));
-  private final int commitTimeoutSeconds =
-      Integer.parseInt(
-          System.getProperty(
-              "copy_in_commit_timeout_seconds", String.valueOf(DEFAULT_COMMIT_TIMEOUT_SECONDS)));
   private final CopyTransactionMode transactionMode;
   private long rowCount;
   private final Connection connection;
   private final String tableName;
   private final Map<String, Type> tableColumns;
-  private final int maxBatchSize;
+  private final int maxAtomicBatchSize;
+  private final int nonAtomicBatchSize;
   private final long commitSizeLimitForBatching;
-  private final int maxParallelism;
+  private final CopySettings copySettings;
   private final CopyInParser parser;
   private final PipedOutputStream payload = new PipedOutputStream();
   private final AtomicBoolean commit = new AtomicBoolean(false);
@@ -138,6 +110,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private SpannerException exception;
 
   public MutationWriter(
+      SessionState sessionState,
       CopyTransactionMode transactionMode,
       Connection connection,
       String tableName,
@@ -151,35 +124,19 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     this.connection = connection;
     this.tableName = tableName;
     this.tableColumns = tableColumns;
-    int mutationLimit =
-        Math.max(
-            Integer.parseInt(
-                System.getProperty(
-                    "copy_in_mutation_limit", String.valueOf(DEFAULT_MUTATION_LIMIT))),
-            1);
-    this.maxBatchSize = Math.max(mutationLimit / (tableColumns.size() + indexedColumnsCount), 1);
-    float commitLimitMultiplierFactor =
-        Math.max(
-            Float.parseFloat(
-                System.getProperty(
-                    "copy_in_commit_limit_multiplier_factor",
-                    String.valueOf(DEFAULT_COMMIT_LIMIT_MULTIPLIER_FACTOR))),
-            1.0f);
+    this.copySettings = new CopySettings(sessionState);
+    int atomicMutationLimit = copySettings.getMaxAtomicMutationsLimit();
+    this.maxAtomicBatchSize =
+        Math.max(atomicMutationLimit / (tableColumns.size() + indexedColumnsCount), 1);
+    int nonAtomicMutations = copySettings.getNonAtomicBatchSize();
+    this.nonAtomicBatchSize =
+        Math.max(nonAtomicMutations / (tableColumns.size() + indexedColumnsCount), 1);
     this.commitSizeLimitForBatching =
-        Math.round((float) commitSizeLimit / commitLimitMultiplierFactor);
-    this.maxParallelism =
-        Math.max(
-            Integer.parseInt(
-                System.getProperty(
-                    "copy_in_max_parallelism", String.valueOf(DEFAULT_MAX_PARALLELISM))),
-            1);
-    int pipeBufferSize =
-        Math.max(
-            Integer.parseInt(
-                System.getProperty(
-                    "copy_in_pipe_buffer_size", String.valueOf(DEFAULT_PIPE_BUFFER_SIZE))),
-            1024);
-    this.parser = CopyInParser.create(copyFormat, format, payload, pipeBufferSize, hasHeader);
+        Math.round(
+            (float) copySettings.getMaxAtomicCommitSize() / copySettings.getCommitSizeMultiplier());
+    this.parser =
+        CopyInParser.create(
+            copyFormat, format, payload, copySettings.getPipeBufferSize(), hasHeader);
   }
 
   /** @return number of rows copied into Spanner */
@@ -240,7 +197,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     // pressure in our entire pipeline that consists of:
     // Client app (psql) -> CopyData message -> CSVParser -> Transaction.
     LinkedBlockingDeque<ApiFuture<Void>> activeCommitFutures =
-        new LinkedBlockingDeque<>(maxParallelism);
+        new LinkedBlockingDeque<>(copySettings.getMaxParallelism());
     // This list holds all transactions that we have started. We will wait on this entire list
     // before finishing, to ensure that all data has been written before we signal that we are done.
     List<ApiFuture<Void>> allCommitFutures = new ArrayList<>();
@@ -278,28 +235,28 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
         } else {
           mutations.add(mutation);
           currentBufferByteSize += mutationSize;
-          if (mutations.size() > maxBatchSize) {
+          if (mutations.size() > maxAtomicBatchSize) {
             throw SpannerExceptionFactory.newSpannerException(
                 ErrorCode.FAILED_PRECONDITION,
                 "Record count: "
                     + mutations.size()
                     + " has exceeded the limit: "
-                    + maxBatchSize
+                    + maxAtomicBatchSize
                     + ".\n\nThe number of mutations per record is equal to the number of columns in the record "
                     + "plus the number of indexed columns in the record. The maximum number of mutations "
                     + "in one transaction is "
-                    + DEFAULT_MUTATION_LIMIT
+                    + copySettings.getMaxAtomicMutationsLimit()
                     + ".\n\nExecute `SET SPANNER.AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation "
                     + "to instruct PGAdapter to automatically break large transactions into multiple smaller. "
                     + "This will make the COPY operation non-atomic.\n\n");
           }
-          if (currentBufferByteSize > commitSizeLimit) {
+          if (currentBufferByteSize > copySettings.getMaxAtomicCommitSize()) {
             throw SpannerExceptionFactory.newSpannerException(
                 ErrorCode.FAILED_PRECONDITION,
                 "Commit size: "
                     + currentBufferByteSize
                     + " has exceeded the limit: "
-                    + commitSizeLimit
+                    + copySettings.getMaxAtomicCommitSize()
                     + ".\n\nExecute `SET SPANNER.AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation "
                     + "to instruct PGAdapter to automatically break large transactions into multiple smaller. "
                     + "This will make the COPY operation non-atomic.\n\n");
@@ -363,8 +320,11 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       long currentBufferByteSize,
       int mutationSize)
       throws Exception {
-    // Flush before adding to the buffer if the commit size would be exceeded.
-    if (!mutations.isEmpty() && currentBufferByteSize + mutationSize > commitSizeLimitForBatching) {
+    // Flush before adding to the buffer if either of the commit size limits would be exceeded.
+    long estimatedNextSize = currentBufferByteSize + mutationSize;
+    if (!mutations.isEmpty()
+        && (estimatedNextSize > commitSizeLimitForBatching
+            || estimatedNextSize > copySettings.getMaxNonAtomicCommitSize())) {
       allCommitFutures.add(writeToSpannerAsync(activeCommitFutures, mutations));
       mutations.clear();
       mutations.add(mutation);
@@ -372,7 +332,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     }
 
     mutations.add(mutation);
-    if (mutations.size() == maxBatchSize) {
+    if (mutations.size() == nonAtomicBatchSize) {
       allCommitFutures.add(writeToSpannerAsync(activeCommitFutures, mutations));
       mutations.clear();
       return 0L; // Buffer is empty, so the batch size in bytes is now back to zero.
@@ -400,7 +360,8 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                       .withValue(
                           SpannerOptions.CALL_CONTEXT_CONFIGURATOR_KEY,
                           SpannerCallContextTimeoutConfigurator.create()
-                              .withCommitTimeout(Duration.ofSeconds(100L)));
+                              .withCommitTimeout(
+                                  Duration.ofSeconds(copySettings.getCommitTimeoutSeconds())));
               context.run(() -> dbClient.write(immutableMutations));
               return null;
             });
@@ -446,7 +407,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
           size += value.getString().length();
           break;
         case STRING:
-        case JSON:
+        case PG_JSONB:
           // Assume four bytes per character to be on the safe side.
           size += value.getString().length() * 4;
           break;
@@ -475,7 +436,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                 size += s.length();
               }
               break;
-            case JSON:
+            case PG_JSONB:
             case STRING:
               for (String s : value.getStringArray()) {
                 size += s.length() * 4;
@@ -494,11 +455,13 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
               break;
             case ARRAY:
             case NUMERIC:
+            case JSON:
             case STRUCT:
               break;
           }
           break;
         case NUMERIC:
+        case JSON:
         case STRUCT:
           break;
       }
@@ -513,7 +476,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     // useful for importing large datasets using PartitionedNonAtomic mode. If an import attempt
     // fails halfway, it can easily be retried with InsertOrUpdate as it will just overwrite
     // existing records instead of failing on a UniqueKeyConstraint violation.
-    if (this.insertOrUpdate) {
+    if (copySettings.isCopyUpsert()) {
       builder = Mutation.newInsertOrUpdateBuilder(this.tableName);
     } else {
       builder = Mutation.newInsertBuilder(this.tableName);

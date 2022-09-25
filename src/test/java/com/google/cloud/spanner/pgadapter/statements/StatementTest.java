@@ -437,8 +437,8 @@ public class StatementTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getServer()).thenReturn(server);
     when(server.getOptions()).thenReturn(options);
-    when(connectionMetadata.peekInputStream()).thenReturn(inputStream);
-    when(connectionMetadata.peekOutputStream()).thenReturn(outputStream);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(QueryMessage.class, message.getClass());
@@ -456,6 +456,13 @@ public class StatementTest {
   public void testCopyInvalidBuildMutation() throws Exception {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        mock(ExtendedQueryProtocolHandler.class);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    SessionState sessionState = new SessionState(options);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
     setupQueryInformationSchemaResults();
 
     String sql = "COPY keyvalue FROM STDIN;";
@@ -533,6 +540,13 @@ public class StatementTest {
   @Test
   public void testCopyBatchSizeLimit() throws Exception {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        mock(ExtendedQueryProtocolHandler.class);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    SessionState sessionState = new SessionState(options);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
@@ -575,6 +589,13 @@ public class StatementTest {
   @Test
   public void testCopyDataRowLengthMismatchLimit() throws Exception {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        mock(ExtendedQueryProtocolHandler.class);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    SessionState sessionState = new SessionState(options);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(

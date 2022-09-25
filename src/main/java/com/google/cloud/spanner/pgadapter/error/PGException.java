@@ -27,6 +27,7 @@ public class PGException extends RuntimeException {
     private Severity severity;
     private SQLState sqlState;
     private String message;
+    private String hints;
 
     private Builder() {}
 
@@ -41,12 +42,17 @@ public class PGException extends RuntimeException {
     }
 
     public Builder setMessage(String message) {
-      this.message = message;
+      this.message = message == null ? "" : message;
+      return this;
+    }
+
+    public Builder setHints(String hints) {
+      this.hints = Preconditions.checkNotNull(hints);
       return this;
     }
 
     public PGException build() {
-      return new PGException(severity, sqlState, message);
+      return new PGException(severity, sqlState, message, hints);
     }
   }
 
@@ -56,11 +62,13 @@ public class PGException extends RuntimeException {
 
   private final Severity severity;
   private final SQLState sqlState;
+  private final String hints;
 
-  private PGException(Severity severity, SQLState sqlState, String message) {
+  private PGException(Severity severity, SQLState sqlState, String message, String hints) {
     super(Preconditions.checkNotNull(message));
     this.severity = severity;
     this.sqlState = sqlState;
+    this.hints = hints;
   }
 
   public Severity getSeverity() {
@@ -69,5 +77,9 @@ public class PGException extends RuntimeException {
 
   public SQLState getSQLState() {
     return sqlState;
+  }
+
+  public String getHints() {
+    return hints;
   }
 }
