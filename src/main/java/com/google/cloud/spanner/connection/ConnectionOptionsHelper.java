@@ -15,7 +15,7 @@
 package com.google.cloud.spanner.connection;
 
 import com.google.api.core.InternalApi;
-import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.Credentials;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.connection.ConnectionOptions.Builder;
 
@@ -23,8 +23,7 @@ import com.google.cloud.spanner.connection.ConnectionOptions.Builder;
 @InternalApi
 public class ConnectionOptionsHelper {
   // TODO: Remove when Builder.setCredentials(..) has been made public.
-  public static Builder setCredentials(
-      Builder connectionOptionsBuilder, GoogleCredentials credentials) {
+  public static Builder setCredentials(Builder connectionOptionsBuilder, Credentials credentials) {
     return connectionOptionsBuilder.setCredentials(credentials);
   }
 

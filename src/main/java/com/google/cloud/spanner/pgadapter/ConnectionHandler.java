@@ -15,7 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.api.core.InternalApi;
-import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.Credentials;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.DatabaseId;
@@ -38,6 +38,7 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
@@ -47,6 +48,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
@@ -68,6 +70,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLSocketFactory;
 
 /**
  * Handles a connection from a client to Spanner. This {@link ConnectionHandler} uses {@link
@@ -85,7 +88,7 @@ public class ConnectionHandler extends Thread {
   private static final String CHANNEL_PROVIDER_PROPERTY = "CHANNEL_PROVIDER";
 
   private final ProxyServer server;
-  private final Socket socket;
+  private Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
   private static final Map<Integer, IntermediateStatement> activeStatementsMap =
@@ -119,8 +122,13 @@ public class ConnectionHandler extends Thread {
                 getName(), socket.getInetAddress().getHostAddress()));
   }
 
+  void createSSLSocket() throws IOException {
+    this.socket =
+        ((SSLSocketFactory) SSLSocketFactory.getDefault()).createSocket(socket, null, true);
+  }
+
   @InternalApi
-  public void connectToSpanner(String database, @Nullable GoogleCredentials credentials) {
+  public void connectToSpanner(String database, @Nullable Credentials credentials) {
     OptionsMetadata options = getServer().getOptions();
     String uri =
         options.hasDefaultConnectionUrl()
@@ -159,12 +167,15 @@ public class ConnectionHandler extends Thread {
       // Note: Calling getDialect() will cause a SpannerException if the connection itself is
       // invalid, for example as a result of the credentials being wrong.
       if (spannerConnection.getDialect() != Dialect.POSTGRESQL) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT,
-            String.format(
-                "The database uses dialect %s. Currently PGAdapter only supports connections to PostgreSQL dialect databases. "
-                    + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
-                spannerConnection.getDialect()));
+        spannerConnection.close();
+        throw PGException.newBuilder(
+                String.format(
+                    "The database uses dialect %s. Currently PGAdapter only supports connections to PostgreSQL dialect databases. "
+                        + "These can be created using https://cloud.google.com/spanner/docs/quickstart-console#postgresql",
+                    spannerConnection.getDialect()))
+            .setSeverity(Severity.FATAL)
+            .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
+            .build();
       }
     } catch (InstanceNotFoundException | DatabaseNotFoundException notFoundException) {
       SpannerException exceptionToThrow = notFoundException;
@@ -221,24 +232,66 @@ public class ConnectionHandler extends Thread {
             String.format(
                 "Connection handler with ID %s starting for client %s",
                 getName(), socket.getInetAddress().getHostAddress()));
+    if (runConnection(false) == RunConnectionState.RESTART_WITH_SSL) {
+      logger.log(
+          Level.INFO,
+          () ->
+              String.format(
+                  "Connection handler with ID %s is restarted so it can use SSL", getName()));
+      restartConnectionWithSsl();
+    }
+  }
 
+  void restartConnectionWithSsl() {
+    try {
+      createSSLSocket();
+      runConnection(true);
+    } catch (IOException ioException) {
+      PGException pgException =
+          PGException.newBuilder("Failed to create SSL socket: " + ioException.getMessage())
+              .setSeverity(Severity.FATAL)
+              .setSQLState(SQLState.InternalError)
+              .build();
+      try {
+        handleError(pgException);
+      } catch (Exception ignore) {
+      }
+      throw pgException;
+    }
+  }
+
+  enum RunConnectionState {
+    RESTART_WITH_SSL,
+    TERMINATED
+  }
+
+  /**
+   * Starts listening for incoming messages on the network socket. Returns RESTART_WITH_SSL if the
+   * listening process should be restarted with SSL.
+   */
+  private RunConnectionState runConnection(boolean ssl) {
+    RunConnectionState result = RunConnectionState.TERMINATED;
     try (ConnectionMetadata connectionMetadata =
         new ConnectionMetadata(this.socket.getInputStream(), this.socket.getOutputStream())) {
       this.connectionMetadata = connectionMetadata;
-      if (!server.getOptions().disableLocalhostCheck()
-          && !this.socket.getInetAddress().isAnyLocalAddress()
-          && !this.socket.getInetAddress().isLoopbackAddress()) {
-        handleError(
-            PGException.newBuilder("This proxy may only be accessed from localhost.")
-                .setSeverity(Severity.FATAL)
-                .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
-                .build());
-        return;
-      }
 
       try {
         this.message = this.server.recordMessage(BootstrapMessage.create(this));
+        if (!ssl
+            && getServer().getOptions().getSslMode().isSslEnabled()
+            && this.message instanceof SSLMessage) {
+          this.message.send();
+          this.connectionMetadata.markForRestart();
+          result = RunConnectionState.RESTART_WITH_SSL;
+          return result;
+        }
+        // Check whether the connection is valid. That is, the connection satisfies any restrictions
+        // on non-localhost connections and SSL requirements.
+        if (!checkValidConnection(ssl)) {
+          return result;
+        }
         this.message.send();
+
         while (this.status == ConnectionStatus.UNAUTHENTICATED) {
           try {
             message.nextHandler();
@@ -254,6 +307,8 @@ public class ConnectionHandler extends Thread {
         while (this.status != ConnectionStatus.TERMINATED) {
           handleMessages();
         }
+      } catch (PGException pgException) {
+        this.handleError(pgException);
       } catch (Exception exception) {
         this.handleError(
             PGException.newBuilder(exception.getMessage())
@@ -270,24 +325,53 @@ public class ConnectionHandler extends Thread {
                   "Exception on connection handler with ID %s for client %s: %s",
                   getName(), socket.getInetAddress().getHostAddress(), e));
     } finally {
-      logger.log(
-          Level.INFO, () -> String.format("Closing connection handler with ID %s", getName()));
-      try {
-        if (this.spannerConnection != null) {
-          this.spannerConnection.close();
-        }
-        this.socket.close();
-      } catch (SpannerException | IOException e) {
+      if (result != RunConnectionState.RESTART_WITH_SSL) {
         logger.log(
-            Level.WARNING,
-            e,
-            () ->
-                String.format("Exception while closing connection handler with ID %s", getName()));
+            Level.INFO, () -> String.format("Closing connection handler with ID %s", getName()));
+        try {
+          if (this.spannerConnection != null) {
+            this.spannerConnection.close();
+          }
+          this.socket.close();
+        } catch (SpannerException | IOException e) {
+          logger.log(
+              Level.WARNING,
+              e,
+              () ->
+                  String.format(
+                      "Exception while closing connection handler with ID %s", getName()));
+        }
+        this.server.deregister(this);
+        logger.log(
+            Level.INFO, () -> String.format("Connection handler with ID %s closed", getName()));
       }
-      this.server.deregister(this);
-      logger.log(
-          Level.INFO, () -> String.format("Connection handler with ID %s closed", getName()));
     }
+    return result;
+  }
+
+  boolean checkValidConnection(boolean ssl) throws Exception {
+    // Allow SSL connections from non-localhost even if the localhost check has not explicitly
+    // been disabled.
+    if (!ssl
+        && !server.getOptions().disableLocalhostCheck()
+        && !this.socket.getInetAddress().isAnyLocalAddress()
+        && !this.socket.getInetAddress().isLoopbackAddress()) {
+      handleError(
+          PGException.newBuilder("This proxy may only be accessed from localhost.")
+              .setSeverity(Severity.FATAL)
+              .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
+              .build());
+      return false;
+    }
+    if (!ssl && server.getOptions().getSslMode() == SslMode.Require) {
+      handleError(
+          PGException.newBuilder("This proxy requires SSL.")
+              .setSeverity(Severity.FATAL)
+              .setSQLState(SQLState.SQLServerRejectedEstablishmentOfSQLConnection)
+              .build());
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -350,14 +434,15 @@ public class ConnectionHandler extends Thread {
    * @param exception The exception to be related.
    * @throws IOException if there is some issue in the sending of the error messages.
    */
-  private void handleError(PGException exception) throws Exception {
+  void handleError(PGException exception) throws Exception {
     logger.log(
         Level.WARNING,
         exception,
         () ->
             String.format("Exception on connection handler with ID %s: %s", getName(), exception));
     DataOutputStream output = getConnectionMetadata().getOutputStream();
-    if (this.status == ConnectionStatus.TERMINATED) {
+    if (this.status == ConnectionStatus.TERMINATED
+        || this.status == ConnectionStatus.UNAUTHENTICATED) {
       new ErrorResponse(output, exception).send();
       new TerminateResponse(output).send();
     } else if (this.status == ConnectionStatus.COPY_IN) {
