@@ -21,6 +21,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationCleartextPasswordResponse;
+import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Map;
@@ -82,7 +83,10 @@ public class StartupMessage extends BootstrapMessage {
       @Nullable Credentials credentials)
       throws Exception {
     connection.connectToSpanner(database, credentials);
-    for (Entry<String, String> parameter : parameters.entrySet()) {
+    for (Entry<String, String> parameter :
+        Iterables.concat(
+            connection.getWellKnownClient().getDefaultParameters().entrySet(),
+            parameters.entrySet())) {
       connection
           .getExtendedQueryProtocolHandler()
           .getBackendConnection()
