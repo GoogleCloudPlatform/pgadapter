@@ -18,7 +18,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
@@ -477,13 +476,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         "INSERT INTO \"all_types\""
             + "(\"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\") "
             + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
-    mockSpanner.putStatementResult(
-        StatementResult.update(
-            Statement.newBuilder(insertSql)
-                .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-07-22T18:15:42.011000000Z"))
-                .build(),
-            1L));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 1L));
 
     String output = runTest("createAllTypes");
 
@@ -500,10 +493,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     // The NodeJS PostgreSQL driver sends parameters without any type information to the backend.
     // This means that all parameters are sent as untyped string values.
-    // PGAdapter however automatically recognizes untyped Timestamp values and converts these into
-    // typed Timestamp parameters to prevent confusion in the PostgreSQL parser whether the value
-    // should be interpreted as a timestamptz or timestamp (without time zone).
-    assertEquals(1, insertRequest.getParamTypesMap().size());
+    assertEquals(0, insertRequest.getParamTypesMap().size());
     assertEquals(9, insertRequest.getParams().getFieldsCount());
     assertEquals("2", insertRequest.getParams().getFieldsMap().get("p1").getStringValue());
     assertEquals("true", insertRequest.getParams().getFieldsMap().get("p2").getStringValue());
@@ -515,7 +505,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     assertEquals("123456789", insertRequest.getParams().getFieldsMap().get("p5").getStringValue());
     assertEquals("234.54235", insertRequest.getParams().getFieldsMap().get("p6").getStringValue());
     assertEquals(
-        "2022-07-22T18:15:42.011000000Z",
+        "2022-07-22T20:15:42.011+02:00",
         insertRequest.getParams().getFieldsMap().get("p7").getStringValue());
     assertEquals("2022-07-22", insertRequest.getParams().getFieldsMap().get("p8").getStringValue());
     assertEquals(
