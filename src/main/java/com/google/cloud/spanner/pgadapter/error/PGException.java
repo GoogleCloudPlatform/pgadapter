@@ -41,7 +41,7 @@ public class PGException extends RuntimeException {
     }
 
     public Builder setMessage(String message) {
-      this.message = message;
+      this.message = message == null ? "" : message;
       return this;
     }
 

@@ -1003,7 +1003,6 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
       assertNotNull(result);
       assertTrue(result, result.contains("failed to connect to PG"));
-      assertTrue(result, result.contains("The database uses dialect GOOGLE_STANDARD_SQL"));
     } finally {
       mockSpanner.putStatementResult(StatementResult.detectDialectResult(Dialect.POSTGRESQL));
       closeSpannerPool();
