@@ -146,20 +146,12 @@ public class RowDescriptionResponse extends WireOutput {
         return 4;
       case Oid.INT8:
         return 8;
-      case Oid.NUMERIC:
-        return -1;
       case Oid.FLOAT4:
         return 4;
       case Oid.FLOAT8:
         return 8;
       case Oid.CHAR:
         return 1;
-      case Oid.TEXT:
-        return -1;
-      case Oid.VARCHAR:
-        return -1;
-      case Oid.BYTEA:
-        return -1;
       case Oid.BOOL:
         return 1;
       case Oid.DATE:
@@ -168,6 +160,11 @@ public class RowDescriptionResponse extends WireOutput {
         return 8;
       case Oid.TIMESTAMPTZ:
         return 12;
+      case Oid.NUMERIC:
+      case Oid.TEXT:
+      case Oid.VARCHAR:
+      case Oid.BYTEA:
+      case Oid.JSONB:
       default:
         return -1;
     }
