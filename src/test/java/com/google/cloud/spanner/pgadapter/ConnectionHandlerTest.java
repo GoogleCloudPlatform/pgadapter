@@ -29,7 +29,11 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
@@ -37,8 +41,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -324,5 +331,166 @@ public class ConnectionHandlerTest {
     assertFalse(
         connectionHandler.cancelActiveStatement(
             connectionHandlerToCancel.getConnectionId(), connectionHandlerToCancel.getSecret()));
+  }
+
+  @Test
+  public void testRestartConnectionWithSsl_CreatesSslSocket() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    AtomicBoolean calledCreateSSLSocket = new AtomicBoolean();
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          void createSSLSocket() {
+            calledCreateSSLSocket.set(true);
+          }
+        };
+    connection.restartConnectionWithSsl();
+
+    assertTrue(calledCreateSSLSocket.get());
+  }
+
+  @Test
+  public void testRestartConnectionWithSsl_SendsPGException() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          void createSSLSocket() throws IOException {
+            throw new IOException("test exception");
+          }
+
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return new ConnectionMetadata(mock(InputStream.class), mock(OutputStream.class));
+          }
+        };
+    PGException pgException = assertThrows(PGException.class, connection::restartConnectionWithSsl);
+    assertEquals(Severity.FATAL, pgException.getSeverity());
+    assertEquals(SQLState.InternalError, pgException.getSQLState());
+  }
+
+  @Test
+  public void testRestartConnectionWithSsl_IgnoresExceptionErrorHandling() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          void createSSLSocket() throws IOException {
+            throw new IOException("test exception");
+          }
+
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return new ConnectionMetadata(mock(InputStream.class), mock(OutputStream.class));
+          }
+
+          @Override
+          void handleError(PGException exception) {
+            throw new RuntimeException("test error during error handling");
+          }
+        };
+    PGException pgException = assertThrows(PGException.class, connection::restartConnectionWithSsl);
+    assertEquals(Severity.FATAL, pgException.getSeverity());
+    assertEquals(SQLState.InternalError, pgException.getSQLState());
+  }
+
+  @Test
+  public void testCheckValidConnection_loopback() throws Exception {
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ProxyServer server = mock(ProxyServer.class);
+    when(server.getOptions()).thenReturn(options);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    ConnectionHandler connectionHandler =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return new ConnectionMetadata(mock(InputStream.class), mock(OutputStream.class));
+          }
+        };
+
+    when(address.isLoopbackAddress()).thenReturn(true);
+    assertTrue(connectionHandler.checkValidConnection(false));
+
+    when(address.isLoopbackAddress()).thenReturn(false);
+    assertFalse(connectionHandler.checkValidConnection(false));
+  }
+
+  @Test
+  public void testCheckValidConnection_anyLocalAddress() throws Exception {
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ProxyServer server = mock(ProxyServer.class);
+    when(server.getOptions()).thenReturn(options);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    ConnectionHandler connectionHandler =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return new ConnectionMetadata(mock(InputStream.class), mock(OutputStream.class));
+          }
+        };
+
+    when(address.isAnyLocalAddress()).thenReturn(true);
+    assertTrue(connectionHandler.checkValidConnection(false));
+
+    when(address.isAnyLocalAddress()).thenReturn(false);
+    assertFalse(connectionHandler.checkValidConnection(false));
+  }
+
+  @Test
+  public void testCheckValidConnection_ssl() throws Exception {
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ProxyServer server = mock(ProxyServer.class);
+    when(server.getOptions()).thenReturn(options);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    ConnectionHandler connectionHandler =
+        new ConnectionHandler(server, socket) {
+          @Override
+          public ConnectionMetadata getConnectionMetadata() {
+            return new ConnectionMetadata(mock(InputStream.class), mock(OutputStream.class));
+          }
+        };
+
+    when(options.getSslMode()).thenReturn(SslMode.Enable);
+    when(address.isLoopbackAddress()).thenReturn(true);
+    assertTrue(connectionHandler.checkValidConnection(false));
+
+    assertTrue(connectionHandler.checkValidConnection(true));
+    when(address.isLoopbackAddress()).thenReturn(false);
+    assertTrue(connectionHandler.checkValidConnection(true));
+
+    when(options.getSslMode()).thenReturn(SslMode.Require);
+    assertFalse(connectionHandler.checkValidConnection(false));
+    assertTrue(connectionHandler.checkValidConnection(true));
+  }
+
+  @Test
+  public void testCheckValidConnection_localhostCheckDisabled() throws Exception {
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    when(options.disableLocalhostCheck()).thenReturn(true);
+    ProxyServer server = mock(ProxyServer.class);
+    when(server.getOptions()).thenReturn(options);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
+
+    assertTrue(connectionHandler.checkValidConnection(false));
   }
 }

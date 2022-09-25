@@ -415,7 +415,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
           size += value.getString().length();
           break;
         case STRING:
-        case JSON:
+        case PG_JSONB:
           // Assume four bytes per character to be on the safe side.
           size += value.getString().length() * 4;
           break;
@@ -444,7 +444,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                 size += s.length();
               }
               break;
-            case JSON:
+            case PG_JSONB:
             case STRING:
               for (String s : value.getStringArray()) {
                 size += s.length() * 4;
@@ -463,11 +463,13 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
               break;
             case ARRAY:
             case NUMERIC:
+            case JSON:
             case STRUCT:
               break;
           }
           break;
         case NUMERIC:
+        case JSON:
         case STRUCT:
           break;
       }

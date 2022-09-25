@@ -210,7 +210,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       copyManager.copyOut("COPY all_types TO STDOUT", writer);
 
       assertEquals(
-          "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\n",
+          "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
           writer.toString());
 
       // Verify that we can use the connection for normal queries.
@@ -240,7 +240,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       StringWriter writer = new StringWriter();
       copyManager.copyOut("COPY all_types TO STDOUT", writer);
 
-      assertEquals("\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n", writer.toString());
+      assertEquals("\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n", writer.toString());
     }
   }
 

@@ -78,6 +78,18 @@
     <from>void</from>
     <to>boolean</to>
   </difference>
+  <difference>
+    <differenceType>7005</differenceType>
+    <className>com/google/cloud/spanner/connection/ConnectionOptionsHelper</className>
+    <method>com.google.cloud.spanner.connection.ConnectionOptions$Builder setCredentials(com.google.cloud.spanner.connection.ConnectionOptions$Builder, com.google.auth.oauth2.GoogleCredentials)</method>
+    <to>com.google.cloud.spanner.connection.ConnectionOptions$Builder setCredentials(com.google.cloud.spanner.connection.ConnectionOptions$Builder, com.google.auth.Credentials)</to>
+  </difference>
+  <difference>
+    <differenceType>7005</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/ConnectionHandler</className>
+    <method>void connectToSpanner(java.lang.String, com.google.auth.oauth2.GoogleCredentials)</method>
+    <to>void connectToSpanner(java.lang.String, com.google.auth.Credentials)</to>
+  </difference>
 
   7006: com.google.cloud.spanner.pgadapter.ConnectionHandler: Return type of method 'public void cancelActiveStatement(int, int)' has been changed to boolean
   <!-- Add ignores for all sub packages, as these are considered internal. -->
