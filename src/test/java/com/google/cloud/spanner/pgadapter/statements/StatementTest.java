@@ -422,7 +422,7 @@ public class StatementTest {
     backendConnection.flush();
 
     assertTrue(intermediateStatement.hasException());
-    SpannerException exception = (SpannerException) intermediateStatement.getException();
+    SpannerException exception = intermediateStatement.getException();
     assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
   }
 

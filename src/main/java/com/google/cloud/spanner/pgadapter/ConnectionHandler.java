@@ -39,6 +39,7 @@ import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
@@ -50,6 +51,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
 import java.io.DataOutputStream;
@@ -91,11 +93,10 @@ public class ConnectionHandler extends Thread {
   private Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
-  private static final Map<Integer, IntermediateStatement> activeStatementsMap =
+  private static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS =
       new ConcurrentHashMap<>();
-  private static final Map<Integer, Integer> connectionToSecretMapping = new ConcurrentHashMap<>();
   private volatile ConnectionStatus status = ConnectionStatus.UNAUTHENTICATED;
-  private int connectionId;
+  private final int connectionId;
   private final int secret;
   // Separate the following from the threat ID generator, since PG connection IDs are maximum
   //  32 bytes, and shouldn't be incremented on failed startups.
@@ -107,12 +108,21 @@ public class ConnectionHandler extends Thread {
   private DatabaseId databaseId;
   private WellKnownClient wellKnownClient;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
+  private CopyStatement activeCopyStatement;
 
   ConnectionHandler(ProxyServer server, Socket socket) {
+    this(server, socket, null);
+  }
+
+  /** Constructor only for testing. */
+  @VisibleForTesting
+  ConnectionHandler(ProxyServer server, Socket socket, Connection spannerConnection) {
     super("ConnectionHandler-" + CONNECTION_HANDLER_ID_GENERATOR.incrementAndGet());
     this.server = server;
     this.socket = socket;
     this.secret = new SecureRandom().nextInt();
+    this.connectionId = incrementingConnectionId.incrementAndGet();
+    CONNECTION_HANDLERS.put(this.connectionId, this);
     setDaemon(true);
     logger.log(
         Level.INFO,
@@ -120,6 +130,7 @@ public class ConnectionHandler extends Thread {
             String.format(
                 "Connection handler with ID %s created for client %s",
                 getName(), socket.getInetAddress().getHostAddress()));
+    this.spannerConnection = spannerConnection;
   }
 
   void createSSLSocket() throws IOException {
@@ -499,59 +510,49 @@ public class ConnectionHandler extends Thread {
   }
 
   /**
-   * Add a currently executing statement to a buffer. This is only used in case a statement in
-   * flight is cancelled. It must be saved separately, as a new connection is spawned to issue a
-   * cancellation (as per Postgres protocol standard). This means some sort of IPC is required,
-   * which in this case is a global Map.
-   *
-   * @param statement Currently executing statement to be saved.
-   */
-  public synchronized void addActiveStatement(IntermediateStatement statement) {
-    activeStatementsMap.put(this.connectionId, statement);
-  }
-
-  /**
-   * Remove a statement from the buffer if it is currently executing. For more information on this
-   * use-case, read addActiveStatement comment.
-   *
-   * @param statement The statement to be removed.
-   */
-  public synchronized void removeActiveStatement(IntermediateStatement statement) {
-    if (activeStatementsMap.get(this.connectionId) == statement) {
-      activeStatementsMap.remove(this.connectionId);
-    }
-  }
-
-  /**
    * To be used by a cancellation command to cancel a currently running statement, as contained in a
    * specific connection identified by connectionId. Since cancellation is a flimsy contract at
    * best, it is not imperative that the cancellation run, but it should be attempted nonetheless.
    *
-   * @param connectionId The connection owhose statement must be cancelled.
-   * @param secret The secret value linked to this connection. If it does not match, we cannot
-   *     cancel.
+   * @param connectionId The connection whose statement must be cancelled.
+   * @param secret The secret value linked to the connection that is being cancelled. If it does not
+   *     match, we cannot cancel.
+   * @return true if the statement was cancelled.
    */
-  public synchronized void cancelActiveStatement(int connectionId, int secret) {
-    int expectedSecret = ConnectionHandler.connectionToSecretMapping.get(connectionId);
-    if (secret != expectedSecret) {
+  public boolean cancelActiveStatement(int connectionId, int secret) {
+    if (connectionId == this.connectionId) {
+      // You can't cancel your own statement.
+      return false;
+    }
+    ConnectionHandler connectionToCancel = CONNECTION_HANDLERS.get(connectionId);
+    if (connectionToCancel == null) {
+      logger.log(
+          Level.WARNING,
+          () ->
+              MessageFormat.format(
+                  "User attempted to cancel an unknown connection. Connection: {0}", connectionId));
+      return false;
+    }
+    if (secret != connectionToCancel.secret) {
       logger.log(
           Level.WARNING,
           () ->
               MessageFormat.format(
                   "User attempted to cancel a connection with the incorrect secret."
-                      + "Connection: {}, Secret: {}, Expected Secret: {}",
-                  connectionId,
-                  secret,
-                  expectedSecret));
+                      + "Connection: {0}, Secret: {1}, Expected Secret: {2}",
+                  connectionId, secret, connectionToCancel.secret));
       // Since the user does not accept a response, there is no need to except here: simply return.
-      return;
+      return false;
     }
-    if (activeStatementsMap.containsKey(connectionId)) {
-      IntermediateStatement statement = activeStatementsMap.remove(connectionId);
-      // We can mostly ignore the exception since cancel does not expect any result (positive or
-      // otherwise)
-      statement.getConnection().cancel();
+    // We can mostly ignore the exception since cancel does not expect any result (positive or
+    // otherwise)
+    try {
+      connectionToCancel.getSpannerConnection().cancel();
+      connectionToCancel.interrupt();
+      return true;
+    } catch (Throwable ignore) {
     }
+    return false;
   }
 
   public IntermediatePreparedStatement getStatement(String statementName) {
@@ -581,6 +582,18 @@ public class ConnectionHandler extends Thread {
     }
   }
 
+  public void setActiveCopyStatement(CopyStatement copyStatement) {
+    this.activeCopyStatement = copyStatement;
+  }
+
+  public CopyStatement getActiveCopyStatement() {
+    return this.activeCopyStatement;
+  }
+
+  public void clearActiveCopyStatement() {
+    this.activeCopyStatement = null;
+  }
+
   public boolean hasStatement(String statementName) {
     return this.statementsMap.containsKey(statementName);
   }
@@ -598,10 +611,6 @@ public class ConnectionHandler extends Thread {
   }
 
   public int getConnectionId() {
-    if (this.connectionId == 0) {
-      this.connectionId = ConnectionHandler.incrementingConnectionId.incrementAndGet();
-      ConnectionHandler.connectionToSecretMapping.put(this.connectionId, this.secret);
-    }
     return this.connectionId;
   }
 
@@ -644,10 +653,6 @@ public class ConnectionHandler extends Thread {
 
   public ExtendedQueryProtocolHandler getExtendedQueryProtocolHandler() {
     return extendedQueryProtocolHandler;
-  }
-
-  public synchronized IntermediateStatement getActiveStatement() {
-    return activeStatementsMap.get(this.connectionId);
   }
 
   public synchronized ConnectionStatus getStatus() {

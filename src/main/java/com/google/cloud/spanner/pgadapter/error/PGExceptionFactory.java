@@ -28,10 +28,23 @@ public class PGExceptionFactory {
    * SQLState#RaiseException}.
    */
   public static PGException newPGException(String message) {
+    return newPGException(message, SQLState.RaiseException);
+  }
+
+  /**
+   * Creates a basic {@link PGException} with {@link Severity#ERROR} and the specified {@link
+   * SQLState}.
+   */
+  public static PGException newPGException(String message, SQLState sqlState) {
     return PGException.newBuilder(message)
         .setSeverity(Severity.ERROR)
-        .setSQLState(SQLState.RaiseException)
+        .setSQLState(sqlState)
         .build();
+  }
+
+  /** Creates a new exception that indicates that the current query was cancelled by the client. */
+  public static PGException newQueryCancelledException() {
+    return newPGException("Query cancelled", SQLState.QueryCanceled);
   }
 
   /** Converts the given {@link SpannerException} to a {@link PGException}. */

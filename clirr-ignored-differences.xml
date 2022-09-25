@@ -55,6 +55,29 @@
     <className>com/google/cloud/spanner/pgadapter/wireprotocol/AbstractQueryProtocolMessage</className>
     <method>java.lang.String getSql()</method>
   </difference>
+  <!-- ActiveStatement has been removed as it is not needed. Instead, we keep track of which connections are registered and just use the cancel feature built into the Connection API. -->
+  <difference>
+    <differenceType>7002</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/ConnectionHandler</className>
+    <method>void addActiveStatement(com.google.cloud.spanner.pgadapter.statements.IntermediateStatement)</method>
+  </difference>
+  <difference>
+    <differenceType>7002</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/ConnectionHandler</className>
+    <method>com.google.cloud.spanner.pgadapter.statements.IntermediateStatement getActiveStatement()</method>
+  </difference>
+  <difference>
+    <differenceType>7002</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/ConnectionHandler</className>
+    <method>void removeActiveStatement(com.google.cloud.spanner.pgadapter.statements.IntermediateStatement)</method>
+  </difference>
+  <difference>
+    <differenceType>7006</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/ConnectionHandler</className>
+    <method>void cancelActiveStatement(int, int)</method>
+    <from>void</from>
+    <to>boolean</to>
+  </difference>
   <difference>
     <differenceType>7005</differenceType>
     <className>com/google/cloud/spanner/connection/ConnectionOptionsHelper</className>
@@ -68,6 +91,7 @@
     <to>void connectToSpanner(java.lang.String, com.google.auth.Credentials)</to>
   </difference>
 
+  7006: com.google.cloud.spanner.pgadapter.ConnectionHandler: Return type of method 'public void cancelActiveStatement(int, int)' has been changed to boolean
   <!-- Add ignores for all sub packages, as these are considered internal. -->
   <difference>
     <differenceType>1001</differenceType>

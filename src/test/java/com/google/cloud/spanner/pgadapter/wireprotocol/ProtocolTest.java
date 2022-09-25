@@ -1265,7 +1265,7 @@ public class ProtocolTest {
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
     CopyStatement copyStatement = mock(CopyStatement.class);
-    when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
+    when(connectionHandler.getActiveCopyStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1293,7 +1293,7 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
-    when(connectionHandler.getActiveStatement()).thenReturn(null);
+    when(connectionHandler.getActiveCopyStatement()).thenReturn(null);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1330,7 +1330,7 @@ public class ProtocolTest {
         new CopyStatement(connectionHandler, options, "", parse(sql), Statement.of(sql));
     copyStatement.executeAsync(mock(BackendConnection.class));
 
-    when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
+    when(connectionHandler.getActiveCopyStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -1373,7 +1373,7 @@ public class ProtocolTest {
     CopyStatement copyStatement = mock(CopyStatement.class);
     MutationWriter mutationWriter = mock(MutationWriter.class);
     when(copyStatement.getMutationWriter()).thenReturn(mutationWriter);
-    when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
+    when(connectionHandler.getActiveCopyStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1405,7 +1405,7 @@ public class ProtocolTest {
     CopyStatement copyStatement = mock(CopyStatement.class);
     MutationWriter mutationWriter = mock(MutationWriter.class);
     when(copyStatement.getMutationWriter()).thenReturn(mutationWriter);
-    when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
+    when(connectionHandler.getActiveCopyStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);

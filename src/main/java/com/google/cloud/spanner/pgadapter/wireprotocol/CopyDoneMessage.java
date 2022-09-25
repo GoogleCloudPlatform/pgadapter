@@ -33,7 +33,7 @@ public class CopyDoneMessage extends ControlMessage {
 
   public CopyDoneMessage(ConnectionHandler connection) throws Exception {
     super(connection);
-    this.statement = (CopyStatement) connection.getActiveStatement();
+    this.statement = connection.getActiveCopyStatement();
   }
 
   @Override

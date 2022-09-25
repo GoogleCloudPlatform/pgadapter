@@ -31,7 +31,10 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -39,6 +42,8 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
@@ -353,6 +358,31 @@ public class BackendConnectionTest {
     ExecutionException executionException =
         assertThrows(ExecutionException.class, resultFuture::get);
     assertSame(executionException.getCause(), error);
+  }
+
+  @Test
+  public void testCancelledException() {
+    Connection connection = mock(Connection.class);
+    ParsedStatement parsedStatement = mock(ParsedStatement.class);
+    Statement statement = Statement.of("select foo from bar");
+    SpannerException error =
+        SpannerExceptionFactory.newSpannerException(ErrorCode.CANCELLED, "query cancelled");
+    when(connection.execute(statement)).thenThrow(error);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            mock(OptionsMetadata.class),
+            EMPTY_LOCAL_STATEMENTS);
+    Future<StatementResult> resultFuture = backendConnection.execute(parsedStatement, statement);
+    backendConnection.flush();
+
+    ExecutionException executionException =
+        assertThrows(ExecutionException.class, resultFuture::get);
+    assertEquals(PGException.class, executionException.getCause().getClass());
+    PGException pgException = (PGException) executionException.getCause();
+    assertEquals(SQLState.QueryCanceled, pgException.getSQLState());
   }
 
   @Test

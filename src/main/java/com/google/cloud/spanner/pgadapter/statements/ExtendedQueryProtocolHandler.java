@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.wireprotocol.AbstractQueryProtocolMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SyncMessage;
 import com.google.common.annotations.VisibleForTesting;
@@ -128,6 +129,9 @@ public class ExtendedQueryProtocolHandler {
         if (message.isReturnedErrorResponse()) {
           break;
         }
+      }
+      if (Thread.interrupted()) {
+        throw PGExceptionFactory.newQueryCancelledException();
       }
     } finally {
       connectionHandler.getConnectionMetadata().getOutputStream().flush();
