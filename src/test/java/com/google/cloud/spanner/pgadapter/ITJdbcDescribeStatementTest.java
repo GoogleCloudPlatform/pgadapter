@@ -97,6 +97,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
                 .to(com.google.cloud.Date.parseDate("2022-04-29"))
                 .set("col_varchar")
                 .to("test")
+                .set("col_jsonb")
+                .to("{\"key\": \"value\"}")
                 .build()));
   }
 
@@ -144,7 +146,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
   public void testParameterMetaData() throws SQLException {
     for (String sql :
         new String[] {
-          "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+          "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
               + "from all_types "
               + "where col_bigint=? "
               + "and col_bool=? "
@@ -154,13 +156,14 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_numeric=? "
               + "and col_timestamptz=? "
               + "and col_date=? "
-              + "and col_varchar=?",
+              + "and col_varchar=? "
+              + "and col_jsonb=?",
           "insert into all_types "
-              + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-              + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           "insert into all_types "
-              + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-              + "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+              + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
               + "from all_types "
               + "where col_bigint=? "
               + "and col_bool=? "
@@ -170,10 +173,11 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_numeric=? "
               + "and col_timestamptz=? "
               + "and col_date=? "
-              + "and col_varchar=?",
-          "insert into all_types " + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              + "and col_varchar=? "
+              + "and col_jsonb=?",
+          "insert into all_types " + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           "insert into all_types "
-              + "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+              + "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
               + "from all_types "
               + "where col_bigint=? "
               + "and col_bool=? "
@@ -183,7 +187,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_numeric=? "
               + "and col_timestamptz=? "
               + "and col_date=? "
-              + "and col_varchar=?",
+              + "and col_varchar=? "
+              + "and col_jsonb=?",
           "update all_types set col_bigint=?, "
               + "col_bool=?, "
               + "col_bytea=?, "
@@ -192,7 +197,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "col_numeric=?, "
               + "col_timestamptz=?, "
               + "col_date=?, "
-              + "col_varchar=?",
+              + "col_varchar=?, "
+              + "col_jsonb=?",
           "update all_types set col_bigint=null, "
               + "col_bool=null, "
               + "col_bytea=null, "
@@ -201,7 +207,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "col_numeric=null, "
               + "col_timestamptz=null, "
               + "col_date=null, "
-              + "col_varchar=null "
+              + "col_varchar=null, "
+              + "col_jsonb=null "
               + "where col_bigint=? "
               + "and col_bool=? "
               + "and col_bytea=? "
@@ -210,7 +217,8 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_numeric=? "
               + "and col_timestamptz=? "
               + "and col_date=? "
-              + "and col_varchar=?",
+              + "and col_varchar=? "
+              + "and col_jsonb=?",
           "delete "
               + "from all_types "
               + "where col_bigint=? "
@@ -221,12 +229,13 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_numeric=? "
               + "and col_timestamptz=? "
               + "and col_date=? "
-              + "and col_varchar=?"
+              + "and col_varchar=? "
+              + "and col_jsonb=?"
         }) {
       try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
           ParameterMetaData metadata = statement.getParameterMetaData();
-          assertEquals(9, metadata.getParameterCount());
+          assertEquals(10, metadata.getParameterCount());
           for (int index = 1; index <= metadata.getParameterCount(); index++) {
             assertEquals(ParameterMetaData.parameterModeIn, metadata.getParameterMode(index));
             assertEquals(ParameterMetaData.parameterNullableUnknown, metadata.isNullable(index));
@@ -240,6 +249,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
           assertEquals(Types.NUMERIC, metadata.getParameterType(++index));
           assertEquals(Types.TIMESTAMP, metadata.getParameterType(++index));
           assertEquals(Types.DATE, metadata.getParameterType(++index));
+          assertEquals(Types.VARCHAR, metadata.getParameterType(++index));
           assertEquals(Types.VARCHAR, metadata.getParameterType(++index));
         }
       }

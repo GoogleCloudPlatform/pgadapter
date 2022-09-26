@@ -316,6 +316,15 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
           .addRows(
               ListValue.newBuilder()
                   .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.JSONB)).build())
+                  .addValues(Value.newBuilder().setStringValue("jsonb").build())
+                  .addValues(Value.newBuilder().setStringValue("b").build())
+                  .addValues(Value.newBuilder().setBoolValue(false).build())
+                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                  .build())
+          .addRows(
+              ListValue.newBuilder()
+                  .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
                   .addValues(
                       Value.newBuilder().setStringValue(String.valueOf(Oid.TIMESTAMP)).build())
                   .addValues(Value.newBuilder().setStringValue("timestamp").build())

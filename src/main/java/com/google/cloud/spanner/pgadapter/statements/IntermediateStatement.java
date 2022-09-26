@@ -31,6 +31,7 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
@@ -205,6 +206,10 @@ public class IntermediateStatement {
     return this.connection;
   }
 
+  public ConnectionHandler getConnectionHandler() {
+    return this.connectionHandler;
+  }
+
   public String getStatement() {
     return this.parsedStatement.getSqlWithoutComments();
   }
@@ -220,7 +225,10 @@ public class IntermediateStatement {
       } catch (ExecutionException executionException) {
         setException(SpannerExceptionFactory.asSpannerException(executionException.getCause()));
       } catch (InterruptedException interruptedException) {
-        setException(SpannerExceptionFactory.propagateInterrupt(interruptedException));
+        // TODO(b/246193644): Switch to PGException
+        setException(
+            SpannerExceptionFactory.asSpannerException(
+                PGExceptionFactory.newQueryCancelledException()));
       } finally {
         this.futureStatementResult = null;
       }
