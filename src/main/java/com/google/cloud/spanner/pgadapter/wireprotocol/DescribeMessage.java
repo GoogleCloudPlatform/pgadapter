@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
@@ -174,7 +175,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
     } catch (ExecutionException executionException) {
       throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
     } catch (InterruptedException interruptedException) {
-      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+      throw PGExceptionFactory.newQueryCancelledException();
     }
   }
 

@@ -25,6 +25,17 @@ PGPASSWORD=$(cat /path/to/my-credentials.json) psql -h /tmp -d my-database
 
 See [authentication](authentication.md) for more information.
 
+### How can I turn on SSL support?
+The command line argument `-ssl` can be used to configure SSL support in PGAdapter. The following
+three values are supported:
+1. `Disabled`: This is the default. SSL connections will be rejected and the client will be asked to
+   connect using a plain-text connection.
+2. `Enabled`: SSL connections are accepted. Plain-text connections are also accepted.
+3. `Required`: Only SSL connections are accepted. Plain-text connections will be rejected.
+
+SSL modes `Enabled` and `Required` require that a private key and a public certificate is added to
+the Java keystore. See [SSL Connections](ssl.md) for more information.
+
 ### How can I configure the number of sessions and/or number of gRPC channels that PGAdapter should use?
 You can use the `-r` command line argument when starting PGAdapter to specify additional connection
 properties that PGAdapter should use when it is connecting to Cloud Spanner. All connection properties

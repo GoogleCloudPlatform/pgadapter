@@ -24,6 +24,7 @@ import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 import org.postgresql.core.Oid;
 
 /**
@@ -59,14 +60,13 @@ public abstract class Parser<T> {
    * @return The {@link Oid} type code that is guessed for the value or {@link Oid#UNSPECIFIED} if
    *     no type could be guessed.
    */
-  private static int guessType(byte[] item, FormatCode formatCode) {
-    // TODO: Put 'guessType' behind a session setting so it is only enabled when wanted.
+  private static int guessType(Set<Integer> guessTypes, byte[] item, FormatCode formatCode) {
     if (formatCode == FormatCode.TEXT && item != null) {
       String value = new String(item, StandardCharsets.UTF_8);
-      if (TimestampParser.isTimestamp(value)) {
+      if (guessTypes.contains(Oid.TIMESTAMPTZ) && TimestampParser.isTimestamp(value)) {
         return Oid.TIMESTAMPTZ;
       }
-      if (DateParser.isDate(value)) {
+      if (guessTypes.contains(Oid.DATE) && DateParser.isDate(value)) {
         return Oid.DATE;
       }
     }
@@ -79,9 +79,11 @@ public abstract class Parser<T> {
    * @param item The data to be parsed
    * @param oidType The type of the designated data
    * @param formatCode The format of the data to be parsed
+   * @param guessTypes The OIDs of the types that may be 'guessed' based on the input value
    * @return The parser object for the designated data type.
    */
-  public static Parser<?> create(byte[] item, int oidType, FormatCode formatCode) {
+  public static Parser<?> create(
+      Set<Integer> guessTypes, byte[] item, int oidType, FormatCode formatCode) {
     switch (oidType) {
       case Oid.BOOL:
       case Oid.BIT:
@@ -109,14 +111,16 @@ public abstract class Parser<T> {
       case Oid.TIMESTAMP:
       case Oid.TIMESTAMPTZ:
         return new TimestampParser(item, formatCode);
+      case Oid.JSONB:
+        return new JsonbParser(item, formatCode);
       case Oid.UNSPECIFIED:
         // Try to guess the type based on the value. Use an unspecified parser if no type could be
         // determined.
-        int type = guessType(item, formatCode);
+        int type = guessType(guessTypes, item, formatCode);
         if (type == Oid.UNSPECIFIED) {
           return new UnspecifiedParser(item, formatCode);
         }
-        return create(item, type, formatCode);
+        return create(guessTypes, item, type, formatCode);
       default:
         throw new IllegalArgumentException("Unsupported parameter type: " + oidType);
     }
@@ -148,9 +152,12 @@ public abstract class Parser<T> {
         return new StringParser(result, columnarPosition);
       case TIMESTAMP:
         return new TimestampParser(result, columnarPosition);
+      case PG_JSONB:
+        return new JsonbParser(result, columnarPosition);
       case ARRAY:
         return new ArrayParser(result, columnarPosition);
       case NUMERIC:
+      case JSON:
       case STRUCT:
       default:
         throw new IllegalArgumentException("Illegal or unknown element type: " + type);
@@ -182,6 +189,8 @@ public abstract class Parser<T> {
         return new StringParser(result);
       case TIMESTAMP:
         return new TimestampParser(result);
+      case PG_JSONB:
+        return new JsonbParser(result);
       case NUMERIC:
       case ARRAY:
       case STRUCT:
@@ -208,7 +217,7 @@ public abstract class Parser<T> {
         return Oid.FLOAT8;
       case STRING:
         return Oid.VARCHAR;
-      case JSON:
+      case PG_JSONB:
         return Oid.JSONB;
       case BYTES:
         return Oid.BYTEA;
@@ -228,7 +237,7 @@ public abstract class Parser<T> {
             return Oid.FLOAT8_ARRAY;
           case STRING:
             return Oid.VARCHAR_ARRAY;
-          case JSON:
+          case PG_JSONB:
             return Oid.JSONB_ARRAY;
           case BYTES:
             return Oid.BYTEA_ARRAY;
@@ -237,6 +246,7 @@ public abstract class Parser<T> {
           case DATE:
             return Oid.DATE_ARRAY;
           case NUMERIC:
+          case JSON:
           case ARRAY:
           case STRUCT:
           default:
@@ -244,6 +254,7 @@ public abstract class Parser<T> {
                 ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown array type: " + type);
         }
       case NUMERIC:
+      case JSON:
       case STRUCT:
       default:
         throw SpannerExceptionFactory.newSpannerException(
