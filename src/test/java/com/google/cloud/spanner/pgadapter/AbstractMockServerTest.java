@@ -38,6 +38,7 @@ import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
+import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.SpannerGrpc;
 import com.google.spanner.v1.StructType;
@@ -155,93 +156,114 @@ public abstract class AbstractMockServerTest {
   protected static final Statement INVALID_DML = Statement.of("INSERT INTO FOO VALUES ('abc')");
   protected static final Statement INVALID_DDL = Statement.of("CREATE TABLE FOO (id int64)");
 
-  protected static final ResultSetMetadata ALL_TYPES_METADATA =
-      ResultSetMetadata.newBuilder()
-          .setRowType(
-              StructType.newBuilder()
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_bigint")
-                          .setType(Type.newBuilder().setCode(TypeCode.INT64).build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_bool")
-                          .setType(Type.newBuilder().setCode(TypeCode.BOOL).build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_bytea")
-                          .setType(Type.newBuilder().setCode(TypeCode.BYTES).build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_float8")
-                          .setType(Type.newBuilder().setCode(TypeCode.FLOAT64).build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_int")
-                          .setType(Type.newBuilder().setCode(TypeCode.INT64).build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_numeric")
-                          .setType(
-                              Type.newBuilder()
-                                  .setCode(TypeCode.NUMERIC)
-                                  .setTypeAnnotation(TypeAnnotationCode.PG_NUMERIC)
-                                  .build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_timestamptz")
-                          .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_date")
-                          .setType(Type.newBuilder().setCode(TypeCode.DATE).build()))
-                  .addFields(
-                      Field.newBuilder()
-                          .setName("col_varchar")
-                          .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
-                  .build())
-          .build();
+  protected static final ResultSetMetadata ALL_TYPES_METADATA = createAllTypesResultSetMetadata("");
   protected static final com.google.spanner.v1.ResultSet ALL_TYPES_RESULTSET =
-      com.google.spanner.v1.ResultSet.newBuilder()
-          .setMetadata(ALL_TYPES_METADATA)
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setStringValue("1").build())
-                  .addValues(Value.newBuilder().setBoolValue(true).build())
-                  .addValues(
-                      Value.newBuilder()
-                          .setStringValue(
-                              Base64.getEncoder()
-                                  .encodeToString("test".getBytes(StandardCharsets.UTF_8)))
-                          .build())
-                  .addValues(Value.newBuilder().setNumberValue(3.14d).build())
-                  .addValues(Value.newBuilder().setStringValue("100").build())
-                  .addValues(Value.newBuilder().setStringValue("6.626").build())
-                  .addValues(
-                      Value.newBuilder().setStringValue("2022-02-16T13:18:02.123456789Z").build())
-                  .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
-                  .addValues(Value.newBuilder().setStringValue("test").build())
-                  .build())
-          .build();
+      createAllTypesResultSet("");
   protected static final com.google.spanner.v1.ResultSet ALL_TYPES_NULLS_RESULTSET =
-      com.google.spanner.v1.ResultSet.newBuilder()
-          .setMetadata(ALL_TYPES_METADATA)
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .build())
-          .build();
+      createAllTypesNullResultSet("");
 
   protected static final StatusRuntimeException EXCEPTION =
       Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException();
+
+  protected static ResultSet createAllTypesResultSet(String columnPrefix) {
+    return com.google.spanner.v1.ResultSet.newBuilder()
+        .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
+        .addRows(
+            ListValue.newBuilder()
+                .addValues(Value.newBuilder().setStringValue("1").build())
+                .addValues(Value.newBuilder().setBoolValue(true).build())
+                .addValues(
+                    Value.newBuilder()
+                        .setStringValue(
+                            Base64.getEncoder()
+                                .encodeToString("test".getBytes(StandardCharsets.UTF_8)))
+                        .build())
+                .addValues(Value.newBuilder().setNumberValue(3.14d).build())
+                .addValues(Value.newBuilder().setStringValue("100").build())
+                .addValues(Value.newBuilder().setStringValue("6.626").build())
+                .addValues(
+                    Value.newBuilder().setStringValue("2022-02-16T13:18:02.123456789Z").build())
+                .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
+                .addValues(Value.newBuilder().setStringValue("test").build())
+                .addValues(Value.newBuilder().setStringValue("{\"key\": \"value\"}").build())
+                .build())
+        .build();
+  }
+
+  protected static ResultSet createAllTypesNullResultSet(String columnPrefix) {
+    return com.google.spanner.v1.ResultSet.newBuilder()
+        .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
+        .addRows(
+            ListValue.newBuilder()
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .build())
+        .build();
+  }
+
+  protected static ResultSetMetadata createAllTypesResultSetMetadata(String columnPrefix) {
+    return ResultSetMetadata.newBuilder()
+        .setRowType(
+            StructType.newBuilder()
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_bigint")
+                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_bool")
+                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_bytea")
+                        .setType(Type.newBuilder().setCode(TypeCode.BYTES).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_float8")
+                        .setType(Type.newBuilder().setCode(TypeCode.FLOAT64).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_int")
+                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_numeric")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.NUMERIC)
+                                .setTypeAnnotation(TypeAnnotationCode.PG_NUMERIC)
+                                .build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_timestamptz")
+                        .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_date")
+                        .setType(Type.newBuilder().setCode(TypeCode.DATE).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_varchar")
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName("col_jsonb")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.JSON)
+                                .setTypeAnnotation(TypeAnnotationCode.PG_JSONB)
+                                .build()))
+                .build())
+        .build();
+  }
 
   protected static MockSpannerServiceImpl mockSpanner;
   protected static MockDatabaseAdminImpl mockDatabaseAdmin;

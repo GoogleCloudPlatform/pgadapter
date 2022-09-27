@@ -147,14 +147,14 @@ public abstract class ControlMessage extends WireMessage {
             return new ExecuteMessage(connection);
           case CloseMessage.IDENTIFIER:
             return new CloseMessage(connection);
-          case SyncMessage.IDENTIFIER:
-            return new SyncMessage(connection);
           case TerminateMessage.IDENTIFIER:
             return new TerminateMessage(connection);
           case FunctionCallMessage.IDENTIFIER:
             return new FunctionCallMessage(connection);
           case FlushMessage.IDENTIFIER:
             return new FlushMessage(connection);
+          case SyncMessage.IDENTIFIER:
+            return new SyncMessage(connection);
           case CopyDoneMessage.IDENTIFIER:
           case CopyDataMessage.IDENTIFIER:
           case CopyFailMessage.IDENTIFIER:
@@ -177,8 +177,7 @@ public abstract class ControlMessage extends WireMessage {
         if (connection.getInvalidMessageCount() > MAX_INVALID_MESSAGE_COUNT) {
           new ErrorResponse(
                   connection.getConnectionMetadata().getOutputStream(),
-                  PGException.newBuilder()
-                      .setMessage(
+                  PGException.newBuilder(
                           String.format(
                               "Received %d invalid/unexpected messages. Last received message: '%c'",
                               connection.getInvalidMessageCount(), nextMsg))
@@ -488,6 +487,9 @@ public abstract class ControlMessage extends WireMessage {
       prefixSent.get();
       long rows = 0L;
       while (hasData) {
+        if (Thread.interrupted()) {
+          throw PGExceptionFactory.newQueryCancelledException();
+        }
         WireOutput wireOutput = describedResult.createDataRowResponse(resultSet, mode);
         synchronized (describedResult) {
           wireOutput.send(false);

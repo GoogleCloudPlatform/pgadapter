@@ -119,13 +119,15 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	var timestamptzValue time.Time
 	var dateValue time.Time
 	var varcharValue string
+	var jsonbValue string
 
 	var row pgx.Row
 	if oid != 0 {
 		formats := make(pgx.QueryResultFormatsByOID)
 		for _, o := range []uint32{
 			pgtype.Int8OID, pgtype.BoolOID, pgtype.ByteaOID, pgtype.Float8OID, pgtype.Int4OID,
-			pgtype.NumericOID, pgtype.TimestamptzOID, pgtype.DateOID, pgtype.VarcharOID} {
+			pgtype.NumericOID, pgtype.TimestamptzOID, pgtype.DateOID, pgtype.VarcharOID,
+			pgtype.JSONBOID} {
 			formats[o] = conn.ConnInfo().ResultFormatCodeForOID(o)
 		}
 		formats[uint32(oid)] = format
@@ -143,6 +145,7 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 		&timestamptzValue,
 		&dateValue,
 		&varcharValue,
+		&jsonbValue,
 	)
 	if err != nil {
 		return C.CString(fmt.Sprintf("Failed to execute query: %v", err.Error()))
@@ -183,6 +186,9 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	if g, w := varcharValue, "test"; g != w {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
+	if g, w := jsonbValue, "{\"key\": \"value\"}"; g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
 
 	return nil
 }
@@ -196,7 +202,7 @@ func TestInsertAllDataTypes(connString string) *C.char {
 	}
 	defer conn.Close(ctx)
 
-	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
 	numeric := pgtype.Numeric{}
 	_ = numeric.Set("6.626")
 	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T07:39:10.123456789+01:00")
@@ -206,9 +212,9 @@ func TestInsertAllDataTypes(connString string) *C.char {
 	if strings.Contains(connString, "prefer_simple_protocol=true") {
 		// Simple mode will format the date as '2022-04-02 00:00:00Z', which is not supported by the
 		// backend yet.
-		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string")
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string", "{\"key\": \"value\"}")
 	} else {
-		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string")
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}")
 	}
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
@@ -233,8 +239,8 @@ func TestInsertNullsAllDataTypes(connString string) *C.char {
 	defer conn.Close(ctx)
 
 	var tag pgconn.CommandTag
-	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
-	tag, err = conn.Exec(ctx, sql, int64(100), nil, nil, nil, nil, nil, nil, nil, nil)
+	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
+	tag, err = conn.Exec(ctx, sql, int64(100), nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
 	}
@@ -257,7 +263,7 @@ func TestUpdateAllDataTypes(connString string) *C.char {
 	}
 	defer conn.Close(ctx)
 
-	sql := "UPDATE \"all_types\" SET \"col_bigint\"=$1,\"col_bool\"=$2,\"col_bytea\"=$3,\"col_float8\"=$4,\"col_int\"=$5,\"col_numeric\"=$6,\"col_timestamptz\"=$7,\"col_date\"=$8,\"col_varchar\"=$9 WHERE \"col_varchar\" = $10"
+	sql := "UPDATE \"all_types\" SET \"col_bigint\"=$1,\"col_bool\"=$2,\"col_bytea\"=$3,\"col_float8\"=$4,\"col_int\"=$5,\"col_numeric\"=$6,\"col_timestamptz\"=$7,\"col_date\"=$8,\"col_varchar\"=$9,\"col_jsonb\"=$10 WHERE \"col_varchar\" = $11"
 	numeric := pgtype.Numeric{}
 	_ = numeric.Set("6.626")
 	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T07:39:10.123456789+01:00")
@@ -267,9 +273,9 @@ func TestUpdateAllDataTypes(connString string) *C.char {
 	if strings.Contains(connString, "prefer_simple_protocol=true") {
 		// Simple mode will format the date as '2022-04-02 00:00:00Z', which is not supported by the
 		// backend yet.
-		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string")
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string", "{\"key\": \"value\"}", "test")
 	} else {
-		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string")
+		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}", "test")
 	}
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute update statement: %v", err))
@@ -294,12 +300,12 @@ func TestPrepareStatement(connString string) *C.char {
 	defer conn.Close(ctx)
 
 	sql := "UPDATE all_types SET col_int=$1, col_bool=$2, col_bytea=$3, col_float8=$4, " +
-		"col_numeric=$5, col_timestamptz=$6, col_date=$7, col_varchar=$8 WHERE col_bigint=$9"
+		"col_numeric=$5, col_timestamptz=$6, col_date=$7, col_varchar=$8, col_jsonb=$9 WHERE col_bigint=$10"
 	sd, err := conn.Prepare(ctx, "update_all_types", sql)
 	if err != nil {
 		return C.CString(err.Error())
 	}
-	if g, w := len(sd.ParamOIDs), 9; g != w {
+	if g, w := len(sd.ParamOIDs), 10; g != w {
 		return C.CString(fmt.Sprintf("param type count mismatch:\n Got: %v\nWant: %v", g, w))
 	}
 	wantParamTypes := []int{
@@ -310,6 +316,7 @@ func TestPrepareStatement(connString string) *C.char {
 		pgtype.NumericOID,
 		pgtype.TimestamptzOID,
 		pgtype.DateOID,
+		pgtype.VarcharOID,
 		pgtype.VarcharOID,
 		pgtype.Int8OID,
 	}
@@ -335,7 +342,7 @@ func TestPrepareSelectStatement(connString string) *C.char {
 	defer conn.Close(ctx)
 
 	sql := "SELECT * FROM all_types WHERE col_int=$1 AND col_bool=$2 AND col_bytea=$3 AND col_float8=$4 AND " +
-		"col_numeric=$5 AND col_timestamptz=$6 AND col_date=$7 AND col_varchar=$8 AND col_bigint=$9"
+		"col_numeric=$5 AND col_timestamptz=$6 AND col_date=$7 AND col_varchar=$8 AND col_jsonb=$9 AND col_bigint=$10"
 	sd, err := conn.Prepare(ctx, "update_all_types", sql)
 	if err != nil {
 		return C.CString(err.Error())
@@ -348,6 +355,7 @@ func TestPrepareSelectStatement(connString string) *C.char {
 		pgtype.NumericOID,
 		pgtype.TimestamptzOID,
 		pgtype.DateOID,
+		pgtype.VarcharOID,
 		pgtype.VarcharOID,
 		pgtype.Int8OID,
 	}
@@ -369,6 +377,7 @@ func TestPrepareSelectStatement(connString string) *C.char {
 		pgtype.NumericOID,
 		pgtype.TimestamptzOID,
 		pgtype.DateOID,
+		pgtype.VarcharOID,
 		pgtype.VarcharOID,
 	}
 	if g, w := len(sd.Fields), len(wantFieldTypes); g != w {
@@ -543,7 +552,7 @@ func TestBatchExecutionError(connString string) *C.char {
 }
 
 func insertBatch(batch *pgx.Batch, connString string, batchSize int) error {
-	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
 	numeric := pgtype.Numeric{}
 	for i := 0; i < batchSize; i++ {
 		_ = numeric.Set(strconv.Itoa(i) + ".123")
@@ -558,7 +567,7 @@ func insertBatch(batch *pgx.Batch, connString string, batchSize int) error {
 			_ = date.(*pgtype.Date).Set(fmt.Sprintf("2022-04-%02d", i+1))
 			timestamptz, _ = time.Parse(time.RFC3339Nano, fmt.Sprintf("2022-03-24T%02d:39:10.123456000Z", i))
 		}
-		batch.Queue(sql, 100+i, i%2 == 0, []byte(strconv.Itoa(i)+"test_bytes"), 3.14+float64(i), i, numeric, timestamptz, date, "test_string"+strconv.Itoa(i))
+		batch.Queue(sql, 100+i, i%2 == 0, []byte(strconv.Itoa(i)+"test_bytes"), 3.14+float64(i), i, numeric, timestamptz, date, "test_string"+strconv.Itoa(i), fmt.Sprintf("{\"key\": \"value%v\"}", i))
 	}
 	return nil
 }
@@ -590,13 +599,13 @@ func TestCopyIn(connString string) *C.char {
 	date := pgtype.Date{}
 	date.Set("2022-07-01")
 	rows := [][]interface{}{
-		{1, true, []byte{1, 2, 3}, 3.14, 10, numeric, timestamptz, date, "test"},
-		{2, nil, nil, nil, nil, nil, nil, nil, nil},
+		{1, true, []byte{1, 2, 3}, 3.14, 10, numeric, timestamptz, date, "test", "{\"key\": \"value\"}"},
+		{2, nil, nil, nil, nil, nil, nil, nil, nil, nil},
 	}
 	count, err := conn.CopyFrom(
 		ctx,
 		pgx.Identifier{"all_types"},
-		[]string{"col_bigint", "col_bool", "col_bytea", "col_float8", "col_int", "col_numeric", "col_timestamptz", "col_date", "col_varchar"},
+		[]string{"col_bigint", "col_bool", "col_bytea", "col_float8", "col_int", "col_numeric", "col_timestamptz", "col_date", "col_varchar", "col_jsonb"},
 		pgx.CopyFromRows(rows),
 	)
 	if err != nil {
@@ -633,7 +642,7 @@ func TestReadWriteTransaction(connString string) *C.char {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
 
-	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)"
+	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
 	numeric := pgtype.Numeric{}
 	_ = numeric.Set("6.626")
 	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T07:39:10.123456789+01:00")
@@ -644,9 +653,9 @@ func TestReadWriteTransaction(connString string) *C.char {
 		if strings.Contains(connString, "prefer_simple_protocol=true") {
 			// Simple mode will format the date as '2022-04-02 00:00:00Z', which is not supported by the
 			// backend yet.
-			tag, err = tx.Exec(ctx, sql, id, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string")
+			tag, err = tx.Exec(ctx, sql, id, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string", "{\"key\": \"value\"}")
 		} else {
-			tag, err = tx.Exec(ctx, sql, id, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string")
+			tag, err = tx.Exec(ctx, sql, id, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}")
 		}
 		if err != nil {
 			return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))

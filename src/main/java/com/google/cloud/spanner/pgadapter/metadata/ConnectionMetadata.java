@@ -32,6 +32,7 @@ public class ConnectionMetadata implements AutoCloseable {
 
   private final DataInputStream inputStream;
   private final DataOutputStream outputStream;
+  private boolean markedForRestart;
 
   /**
    * Creates a {@link DataInputStream} and a {@link DataOutputStream} from the given raw streams and
@@ -48,10 +49,16 @@ public class ConnectionMetadata implements AutoCloseable {
                 Preconditions.checkNotNull(rawOutputStream), SOCKET_BUFFER_SIZE));
   }
 
+  public void markForRestart() {
+    markedForRestart = true;
+  }
+
   @Override
   public void close() throws Exception {
-    this.inputStream.close();
-    this.outputStream.close();
+    if (!markedForRestart) {
+      this.inputStream.close();
+      this.outputStream.close();
+    }
   }
 
   /** Returns the current {@link DataInputStream} for the connection. */
