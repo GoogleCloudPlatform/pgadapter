@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import java.io.File;
 import java.io.FileReader;
 import java.io.PrintStream;
 import org.apache.maven.model.Model;
@@ -41,6 +42,12 @@ public class Server {
     out.printf("-- Starting PGAdapter version %s --\n", getVersion());
     OptionsMetadata optionsMetadata = new OptionsMetadata(args);
     out.printf("-- PostgreSQL version: %s -- \n", optionsMetadata.getServerVersion());
+    if (System.getProperty("javax.net.ssl.keyStore") != null) {
+      if (!new File(System.getProperty("javax.net.ssl.keyStore")).exists()) {
+        throw new IllegalArgumentException(
+            "Key store " + System.getProperty("javax.net.ssl.keyStore") + " does not exist");
+      }
+    }
 
     return optionsMetadata;
   }

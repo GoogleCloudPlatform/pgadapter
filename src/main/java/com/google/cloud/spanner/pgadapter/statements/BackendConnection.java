@@ -44,6 +44,7 @@ import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.ResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
@@ -228,7 +229,11 @@ public class BackendConnection {
             throw exception;
           }
         }
-        result.setException(spannerException);
+        if (spannerException.getErrorCode() == ErrorCode.CANCELLED || Thread.interrupted()) {
+          result.setException(PGExceptionFactory.newQueryCancelledException());
+        } else {
+          result.setException(spannerException);
+        }
         throw spannerException;
       } catch (Exception exception) {
         result.setException(exception);
@@ -360,8 +365,8 @@ public class BackendConnection {
         result.setException(executionException.getCause());
         throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
       } catch (InterruptedException interruptedException) {
-        result.setException(SpannerExceptionFactory.propagateInterrupt(interruptedException));
-        throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+        result.setException(PGExceptionFactory.newQueryCancelledException());
+        throw PGExceptionFactory.newQueryCancelledException();
       } catch (Exception exception) {
         result.setException(exception);
         throw exception;

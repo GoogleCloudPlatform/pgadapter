@@ -15,12 +15,13 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
-import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.Credentials;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationCleartextPasswordResponse;
+import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Map;
@@ -79,10 +80,13 @@ public class StartupMessage extends BootstrapMessage {
       ConnectionHandler connection,
       String database,
       Map<String, String> parameters,
-      @Nullable GoogleCredentials credentials)
+      @Nullable Credentials credentials)
       throws Exception {
     connection.connectToSpanner(database, credentials);
-    for (Entry<String, String> parameter : parameters.entrySet()) {
+    for (Entry<String, String> parameter :
+        Iterables.concat(
+            connection.getWellKnownClient().getDefaultParameters().entrySet(),
+            parameters.entrySet())) {
       connection
           .getExtendedQueryProtocolHandler()
           .getBackendConnection()

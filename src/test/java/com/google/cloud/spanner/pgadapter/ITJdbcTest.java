@@ -132,6 +132,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(Date.parseDate("2022-05-23"))
                 .set("col_varchar")
                 .to("test")
+                .set("col_jsonb")
+                .to("{\"key\": \"value\"}")
                 .build()));
   }
 
@@ -202,7 +204,7 @@ public class ITJdbcTest implements IntegrationTest {
   public void testSelectWithParameters() throws SQLException {
     boolean isSimpleMode = "simple".equalsIgnoreCase(preferQueryMode);
     String sql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
@@ -213,7 +215,8 @@ public class ITJdbcTest implements IntegrationTest {
             + "and col_numeric=? "
             + "and col_timestamptz=? "
             + "and col_date=? "
-            + "and col_varchar=?";
+            + "and col_varchar=? "
+            + "and col_jsonb=?";
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -231,6 +234,7 @@ public class ITJdbcTest implements IntegrationTest {
             ++index, Timestamp.parseTimestamp("2022-01-27T17:51:30+01:00").toSqlTimestamp());
         statement.setObject(++index, LocalDate.of(2022, 5, 23));
         statement.setString(++index, "test");
+        statement.setString(++index, "{\"key\": \"value\"}");
 
         try (ResultSet resultSet = statement.executeQuery()) {
           assertTrue(resultSet.next());
@@ -252,6 +256,7 @@ public class ITJdbcTest implements IntegrationTest {
           assertEquals(
               LocalDate.parse("2022-05-23"), resultSet.getObject(++index, LocalDate.class));
           assertEquals("test", resultSet.getString(++index));
+          assertEquals("{\"key\": \"value\"}", resultSet.getString(++index));
 
           assertFalse(resultSet.next());
         }
@@ -266,8 +271,8 @@ public class ITJdbcTest implements IntegrationTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setBoolean(++index, true);
@@ -284,6 +289,7 @@ public class ITJdbcTest implements IntegrationTest {
             ++index, Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp());
         statement.setObject(++index, LocalDate.parse("2000-02-29"));
         statement.setString(++index, "string_test");
+        statement.setString(++index, "{\"key1\": \"value1\", \"key2\": \"value2\"}");
 
         assertEquals(1, statement.executeUpdate());
       }
@@ -309,6 +315,7 @@ public class ITJdbcTest implements IntegrationTest {
             resultSet.getTimestamp(++index));
         assertEquals(LocalDate.of(2000, 2, 29), resultSet.getObject(++index, LocalDate.class));
         assertEquals("string_test", resultSet.getString(++index));
+        assertEquals("{\"key1\": \"value1\", \"key2\": \"value2\"}", resultSet.getString(++index));
 
         assertFalse(resultSet.next());
       }
@@ -328,7 +335,8 @@ public class ITJdbcTest implements IntegrationTest {
             + "col_numeric=?, "
             + "col_timestamptz=?, "
             + "col_date=?, "
-            + "col_varchar=? "
+            + "col_varchar=?, "
+            + "col_jsonb=? "
             + "where col_bigint=?";
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
@@ -348,6 +356,7 @@ public class ITJdbcTest implements IntegrationTest {
             Timestamp.parseTimestamp("2022-02-11T14:04:59.123456789+01:00").toSqlTimestamp());
         statement.setObject(++index, LocalDate.of(2000, 1, 1));
         statement.setString(++index, "updated");
+        statement.setString(++index, "{\"key1\": \"updated1\", \"key2\": \"updated2\"}");
         statement.setLong(++index, 1);
 
         assertEquals(1, statement.executeUpdate());
@@ -376,6 +385,8 @@ public class ITJdbcTest implements IntegrationTest {
             resultSet.getTimestamp(++index));
         assertEquals(LocalDate.parse("2000-01-01"), resultSet.getObject(++index, LocalDate.class));
         assertEquals("updated", resultSet.getString(++index));
+        assertEquals(
+            "{\"key1\": \"updated1\", \"key2\": \"updated2\"}", resultSet.getString(++index));
 
         assertFalse(resultSet.next());
       }
@@ -388,8 +399,8 @@ public class ITJdbcTest implements IntegrationTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setNull(++index, Types.BOOLEAN);
@@ -399,6 +410,7 @@ public class ITJdbcTest implements IntegrationTest {
         statement.setNull(++index, Types.NUMERIC);
         statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
         statement.setNull(++index, Types.DATE);
+        statement.setNull(++index, Types.VARCHAR);
         statement.setNull(++index, Types.VARCHAR);
 
         assertEquals(1, statement.executeUpdate());
@@ -426,6 +438,8 @@ public class ITJdbcTest implements IntegrationTest {
         assertNull(resultSet.getTimestamp(++index));
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getDate(++index));
+        assertTrue(resultSet.wasNull());
+        assertNull(resultSet.getString(++index));
         assertTrue(resultSet.wasNull());
         assertNull(resultSet.getString(++index));
         assertTrue(resultSet.wasNull());
@@ -471,10 +485,16 @@ public class ITJdbcTest implements IntegrationTest {
    * <p>The data that is used for the COPY tests were generated using this statement:
    *
    * <p><code>
+   * cat > copy_all_types.sql <<- EOM
+   * copy (
    * select (random()*1000000000)::bigint, random()<0.5, md5(random()::text ||
    * clock_timestamp()::text)::bytea, random()*123456789, (random()*999999)::int,
-   * (random()*999999)::numeric, now()-random()*interval '50 year', md5(random()::text ||
-   * clock_timestamp()::text)::varchar from generate_series(1, 1000000) s(i);
+   * (random()*999999)::numeric, now()-random()*interval '500 year', (now()-random()*interval '500 year')::date,
+   * md5(random()::text || clock_timestamp()::text)::varchar,
+   * ('{"key": "' || md5(random()::text || clock_timestamp()::text)::varchar || '"}')::json
+   * from generate_series(1, 10000) s(i)) to stdout;
+   * EOM
+   * psql -f copy_all_types.sql > all_types_data.txt
    * </code> Example for streaming large amounts of random data from PostgreSQL to Cloud Spanner.
    * This must be run with the system property -Dcopy_in_insert_or_update=true set, or otherwise it
    * will eventually fail on a unique key constraint violation, as the primary key value is a random
@@ -552,7 +572,7 @@ public class ITJdbcTest implements IntegrationTest {
                       "copy all_types from stdin;",
                       new FileInputStream("./src/test/resources/all_types_data.txt")));
       assertEquals(
-          "ERROR: Record count: 2001 has exceeded the limit: 2000.\n"
+          "ERROR: Record count: 1819 has exceeded the limit: 1818.\n"
               + "\n"
               + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
               + "\n"
@@ -905,6 +925,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(Date.parseDate("2000-01-01"))
                 .set("col_varchar")
                 .to("bar")
+                .set("col_jsonb")
+                .to("{\"key\": \"value2\"}")
                 .build(),
             Mutation.newInsertBuilder("all_types")
                 .set("col_bigint")
@@ -924,6 +946,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .set("col_date")
                 .to((Date) null)
                 .set("col_varchar")
+                .to((String) null)
+                .set("col_jsonb")
                 .to((String) null)
                 .build(),
             Mutation.newInsertBuilder("all_types")
@@ -945,6 +969,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(Date.parseDate("0001-01-01"))
                 .set("col_varchar")
                 .to("")
+                .set("col_jsonb")
+                .to("[]")
                 .build(),
             Mutation.newInsertBuilder("all_types")
                 .set("col_bigint")
@@ -965,6 +991,8 @@ public class ITJdbcTest implements IntegrationTest {
                 .to(Date.parseDate("0001-01-01"))
                 .set("col_varchar")
                 .to("")
+                .set("col_jsonb")
+                .to("{}")
                 .build()));
   }
 }
