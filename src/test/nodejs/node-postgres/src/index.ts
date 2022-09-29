@@ -54,6 +54,46 @@ async function testInsert(client) {
   }
 }
 
+async function testInsertTwice(client) {
+  try {
+    await client.query('BEGIN');
+    const queryText = 'INSERT INTO users(name) VALUES($1)';
+    const res1 = await client.query(queryText, ['foo']);
+    console.log(`Inserted ${res1.rowCount} row(s)`);
+    const res2 = await client.query(queryText, ['bar']);
+    console.log(`Inserted ${res2.rowCount} row(s)`);
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    console.error(`Insert error: ${e}`);
+  }
+}
+
+async function testInsertAutoCommit(client) {
+  try {
+    const queryText = 'INSERT INTO users(name) VALUES($1)';
+    const res = await client.query(queryText, ['foo']);
+    console.log(`Inserted ${res.rowCount} row(s)`);
+  } catch (e) {
+    console.error(`Insert error: ${e}`);
+  }
+}
+
+async function testInsertAllTypes(client) {
+  try {
+    const queryText = 'INSERT INTO AllTypes ' +
+        '(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
+        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)';
+    const res = await client.query(queryText, [
+        1, true, Buffer.from('some random string', 'utf-8'),
+        3.14, 100, 234.54235, new Date(Date.UTC(2022, 6, 22, 18, 15, 42, 11)),
+        '2022-07-22', 'some-random-string', { my_key: "my-value" }]);
+    console.log(`Inserted ${res.rowCount} row(s)`);
+  } catch (e) {
+    console.error(`Insert error: ${e}`);
+  }
+}
+
 require('yargs')
 .demand(2)
 .command(
@@ -62,14 +102,30 @@ require('yargs')
     {},
     opts => runTest(opts.port, testSelect1)
 )
-.example('node $0 select1 5432')
 .command(
     'testInsert <port>',
     'Inserts a single row',
     {},
     opts => runTest(opts.port, testInsert)
 )
-.example('node $0 select1 5432')
+.command(
+    'testInsertTwice <port>',
+    'Executes the same parameterized insert statement twice',
+    {},
+    opts => runTest(opts.port, testInsertTwice)
+)
+.command(
+    'testInsertAutoCommit <port>',
+    'Inserts a single row using auto commit',
+    {},
+    opts => runTest(opts.port, testInsertAutoCommit)
+)
+.command(
+    'testInsertAllTypes <port>',
+    'Inserts a row using all supported types',
+    {},
+    opts => runTest(opts.port, testInsertAllTypes)
+)
 .wrap(120)
 .recommendCommands()
 .strict()

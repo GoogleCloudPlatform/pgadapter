@@ -50,6 +50,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   private final String name;
   protected int[] parameterDataTypes;
   protected Statement statement;
+  private boolean described;
 
   public IntermediatePreparedStatement(
       ConnectionHandler connectionHandler,
@@ -76,6 +77,14 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     } else {
       return Oid.UNSPECIFIED;
     }
+  }
+
+  public boolean isDescribed() {
+    return this.described;
+  }
+
+  public void setDescribed() {
+    this.described = true;
   }
 
   public int[] getParameterDataTypes() {
@@ -143,21 +152,50 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   @Override
   public DescribeMetadata<?> describe() {
-    Set<String> parameters = extractParameters(this.parsedStatement.getSqlWithoutComments());
-
     ResultSet columnsResultSet = null;
     if (this.parsedStatement.isQuery()) {
       Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
       columnsResultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
     }
+    boolean describeSucceeded = describeParameters(true);
+    if (columnsResultSet != null) {
+      return new DescribeStatementMetadata(this.parameterDataTypes, columnsResultSet);
+    }
 
-    boolean describeFailed = false;
+    if (this.parsedStatement.isUpdate()
+        && (!describeSucceeded || !Strings.isNullOrEmpty(this.name))) {
+      // Let the backend analyze the statement if it is a named prepared statement or if the query
+      // that was used to determine the parameter types failed, so we can return a reasonable
+      // error message if the statement is invalid. If it is the unnamed statement or getting the
+      // param types succeeded, we will let the following EXECUTE message handle that, instead of
+      // sending the statement twice to the backend.
+      connection.analyzeUpdate(
+          Statement.of(this.parsedStatement.getSqlWithoutComments()), QueryAnalyzeMode.PLAN);
+    }
+    return new DescribeStatementMetadata(this.parameterDataTypes, null);
+  }
+
+  /** Describe the parameters of this statement. */
+  public boolean describeParameters(boolean includeInTransaction) {
+    Set<String> parameters = extractParameters(this.parsedStatement.getSqlWithoutComments());
+    boolean describeSucceeded = true;
     if (parameters.isEmpty()) {
       ensureParameterLength(0);
     } else if (parameters.size() != this.parameterDataTypes.length
         || Arrays.stream(this.parameterDataTypes).anyMatch(p -> p == 0)) {
       // Note: We are only asking the backend to parse the types if there is at least one
       // parameter with unspecified type. Otherwise, we will rely on the types given in PARSE.
+
+      // If this describe-request is not part of the transaction, we can also safely try to look it
+      // up in a cache.
+      if (!includeInTransaction) {
+        int[] cachedParameterTypes =
+            getConnectionHandler().getAutoDescribedStatement(this.originalStatement.getSql());
+        if (cachedParameterTypes != null) {
+          this.parameterDataTypes = cachedParameterTypes;
+          return true;
+        }
+      }
 
       // We cannot describe statements with more than 50 parameters, as Cloud Spanner does not allow
       // queries that select from a sub-query to contain more than 50 columns in the select list.
@@ -173,33 +211,30 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
         // The transformation failed. Just rely on the types given in the PARSE message. If the
         // transformation failed because the statement was malformed, the backend will catch that
         // at a later stage.
-        describeFailed = true;
+        describeSucceeded = false;
         ensureParameterLength(parameters.size());
       } else {
         try (ResultSet paramsResultSet =
-            connection.analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)) {
+            includeInTransaction
+                ? connection.analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)
+                : connection
+                    .getDatabaseClient()
+                    .singleUse()
+                    .analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)) {
           extractParameterTypes(paramsResultSet);
+          if (!includeInTransaction) {
+            getConnectionHandler()
+                .registerAutoDescribedStatement(
+                    this.originalStatement.getSql(), this.parameterDataTypes);
+          }
         } catch (SpannerException exception) {
           // Ignore here and rely on the types given in PARSE.
-          describeFailed = true;
+          describeSucceeded = false;
           ensureParameterLength(parameters.size());
         }
       }
     }
-    if (columnsResultSet != null) {
-      return new DescribeStatementMetadata(this.parameterDataTypes, columnsResultSet);
-    }
-
-    if (this.parsedStatement.isUpdate() && (describeFailed || !Strings.isNullOrEmpty(this.name))) {
-      // Let the backend analyze the statement if it is a named prepared statement or if the query
-      // that was used to determine the parameter types failed, so we can return a reasonable
-      // error message if the statement is invalid. If it is the unnamed statement or getting the
-      // param types succeeded, we will let the following EXECUTE message handle that, instead of
-      // sending the statement twice to the backend.
-      connection.analyzeUpdate(
-          Statement.of(this.parsedStatement.getSqlWithoutComments()), QueryAnalyzeMode.PLAN);
-    }
-    return new DescribeStatementMetadata(this.parameterDataTypes, null);
+    return describeSucceeded;
   }
 
   /**
@@ -490,6 +525,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * OID.Unspecified for all other parameters.
    */
   private void extractParameterTypes(ResultSet paramsResultSet) {
+    paramsResultSet.next();
     ensureParameterLength(paramsResultSet.getColumnCount());
     for (int i = 0; i < paramsResultSet.getColumnCount(); i++) {
       // Only override parameter types that were not specified by the frontend.

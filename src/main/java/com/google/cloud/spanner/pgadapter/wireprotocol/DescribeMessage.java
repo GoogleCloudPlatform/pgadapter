@@ -80,6 +80,8 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
     if (this.type == PreparedType.Portal && this.statement.containsResultSet()) {
       describePortalMetadata =
           (Future<DescribePortalMetadata>) this.statement.describeAsync(backendConnection);
+    } else if (this.type == PreparedType.Statement) {
+      this.statement.setDescribed();
     }
   }
 
