@@ -75,7 +75,7 @@ jobs:
           python-version: '3.9'
       - run: python --version
       - run: pip install -r ./src/test/python/requirements.txt
-      - uses: actions/setup-dotnet@v2
+      - uses: actions/setup-dotnet@v3.0.0
         with:
           dotnet-version: '6.0.x'
       - uses: actions/setup-node@v3
