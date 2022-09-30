@@ -1,4 +1,4 @@
-# Google Cloud Spanner PGAdapter - pgx
+# PGAdapter - pgx Connection Options
 
 PGAdapter supports the [Go pgx driver](https://github.com/jackc/pgx) version 4.15.0 and higher. 
 

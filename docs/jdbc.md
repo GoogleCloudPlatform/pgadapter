@@ -1,4 +1,4 @@
-# Google Cloud Spanner PGAdapter - JDBC
+# PGAdapter - JDBC Connection Options
 
 PGAdapter supports the [PostgreSQL JDBC driver](https://github.com/pgjdbc/pgjdbc) version 42.0.0 and higher.
 
