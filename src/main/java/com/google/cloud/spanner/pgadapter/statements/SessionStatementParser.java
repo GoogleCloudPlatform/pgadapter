@@ -279,7 +279,14 @@ public class SessionStatementParser {
       // Ignore, this is the default.
       parser.eatKeyword("session");
     }
-    TableOrIndexName name = parser.readTableOrIndexName();
+    TableOrIndexName name = null;
+    boolean isSpacedTimeZone = false;
+    if (parser.eatKeyword("time", "zone")) {
+      name = new TableOrIndexName("TIMEZONE");
+      isSpacedTimeZone = true;
+    } else {
+      name = parser.readTableOrIndexName();
+    }
     if (name == null) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT,
@@ -287,20 +294,19 @@ public class SessionStatementParser {
     }
     
     builder.setName(name);
-
-    if (!(parser.eatKeyword("to") || parser.eatToken("="))) {
+    if (!isSpacedTimeZone && !(parser.eatKeyword("to") || parser.eatToken("="))) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT,
           "Invalid SET statement: " + parser.getSql() + ". Expected TO or =.");
     }
-
     String value = parser.parseExpression();
     if (value == null) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT,
           "Invalid SET statement: " + parser.getSql() + ". Expected value.");
     }
-    if ("default".equalsIgnoreCase(value)) {
+    if ("default".equalsIgnoreCase(value)
+        || (isSpacedTimeZone && "local".equalsIgnoreCase(value))) {
       builder.setValue(null);
     } else {
       builder.setValue(value);
@@ -362,7 +368,12 @@ public class SessionStatementParser {
       }
       return ShowStatement.createShowAll();
     }
-    TableOrIndexName name = parser.readTableOrIndexName();
+    TableOrIndexName name = null;
+    if (parser.eatKeyword("time", "zone")) {
+      name = new TableOrIndexName("TIMEZONE");
+    } else {
+      name = parser.readTableOrIndexName();
+    }
     if (name == null) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT,
