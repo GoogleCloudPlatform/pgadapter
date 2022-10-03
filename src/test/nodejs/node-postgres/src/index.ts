@@ -121,6 +121,31 @@ async function testInsertAllTypesNull(client) {
   }
 }
 
+async function testInsertAllTypesPreparedStatement(client) {
+  try {
+    const query = {
+      name: 'insert-all-types',
+      text: 'INSERT INTO AllTypes ' +
+          '(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
+          'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+      values: [
+        1, true, Buffer.from('some random string', 'utf-8'),
+        3.14, 100, 234.54235, new Date(Date.UTC(2022, 6, 22, 18, 15, 42, 11)),
+        '2022-07-22', 'some-random-string', { my_key: "my-value" }],
+    }
+    // Execute the statement twice.
+    const res1 = await client.query(query);
+    console.log(`Inserted ${res1.rowCount} row(s)`);
+    const res2 = await client.query({
+      name: 'insert-all-types',
+      values: [null, null, null, null, null, null, null, null, null, null],
+    });
+    console.log(`Inserted ${res2.rowCount} row(s)`);
+  } catch (e) {
+    console.error(`Insert error: ${e}`);
+  }
+}
+
 async function testSelectAllTypes(client) {
   const pg = require('pg')
   // Make sure that DATE data types are shown as string values, otherwise node-postgres will convert
@@ -159,6 +184,74 @@ async function testErrorInReadWriteTransaction(client) {
       const {rows} = await client.query('SELECT 1');
       console.log(`SELECT 1 returned: ${Object.values(rows[0])[0]}`);
     }
+  }
+}
+
+async function testReadOnlyTransaction(client) {
+  try {
+    await client.query('begin read only');
+    await client.query('SELECT 1');
+    await client.query('SELECT 2');
+    await client.query('commit');
+    console.log('executed read-only transaction');
+  } catch (e) {
+    console.error(`Select error: ${e}`);
+  }
+}
+
+async function testReadOnlyTransactionWithError(client) {
+  try {
+    await client.query('begin read only');
+    try {
+      await client.query('SELECT * FROM foo');
+      console.error('select statement unexpectedly succeeded');
+    } catch (e) {
+      // This is expected.
+    }
+    try {
+      // This should fail as the transaction is aborted.
+      await client.query('SELECT 1');
+      console.error('SELECT 1 unexpectedly succeeded');
+    } catch (e) {
+      console.log(e.message);
+    }
+    await client.query('rollback');
+    const res = await client.query('SELECT 2');
+    console.log(res.rows);
+  } catch (e) {
+    console.error(`Read-only transaction error: ${e}`);
+  }
+}
+
+async function testCopyTo(client) {
+  try {
+    const copyTo = require('pg-copy-streams').to;
+    const stream = client.query(copyTo('COPY AllTypes TO STDOUT'));
+    stream.pipe(process.stdout);
+    await new Promise<void>(function(resolve, reject) {
+      stream.on('end', () => resolve());
+      stream.on('error', reject);
+    });
+  } catch (e) {
+    console.error(`COPY error: ${e}`);
+  }
+}
+
+async function testCopyFrom(client) {
+  try {
+    const copyFrom = require('pg-copy-streams').from;
+    const fs = require('fs');
+    const stream = client.query(copyFrom('COPY all_types FROM STDIN'));
+    const fileStream = fs.createReadStream('../../resources/all_types_data_small.txt');
+    fileStream.pipe(stream);
+    await new Promise<void>(function(resolve, reject) {
+      stream.on('finish', () => resolve());
+      stream.on('error', reject);
+      fileStream.on('error', reject);
+    });
+    console.log('Finished copy operation');
+  } catch (e) {
+    console.error(`COPY error: ${e}`);
   }
 }
 
@@ -208,10 +301,40 @@ require('yargs')
     opts => runTest(opts.host, opts.port, opts.database, testSelectAllTypes)
 )
 .command(
+    'testInsertAllTypesPreparedStatement <host> <port> <database>',
+    'Inserts a row using all supported types with a prepared statement',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testInsertAllTypesPreparedStatement)
+)
+.command(
     'testErrorInReadWriteTransaction <host> <port> <database>',
     'Verifies that an error in a transactions renders the transaction unusable',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testErrorInReadWriteTransaction)
+)
+.command(
+    'testReadOnlyTransaction <host> <port> <database>',
+    'Tests a read-only transaction',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testReadOnlyTransaction)
+)
+.command(
+    'testReadOnlyTransactionWithError <host> <port> <database>',
+    'Tests a read-only transaction with a statement that returns an error',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testReadOnlyTransactionWithError)
+)
+.command(
+    'testCopyTo <host> <port> <database>',
+    'Tests COPY to stdout',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testCopyTo)
+)
+.command(
+    'testCopyFrom <host> <port> <database>',
+    'Tests COPY from stdin',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testCopyFrom)
 )
 .wrap(120)
 .recommendCommands()

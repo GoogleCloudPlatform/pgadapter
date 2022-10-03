@@ -25,8 +25,13 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
+import com.google.cloud.spanner.pgadapter.CopyInMockServerTest;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
+import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
+import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.RollbackRequest;
@@ -329,6 +334,123 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testInsertAllTypesPreparedStatement() throws IOException, InterruptedException {
+    String sql =
+        "INSERT INTO AllTypes "
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+    String describeParamsSql =
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from "
+            + "(select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from AllTypes) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeParamsSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING,
+                            TypeCode.JSON)))
+                .build()));
+    StatementResult updateResult =
+        StatementResult.update(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(true)
+                .bind("p3")
+                .to(ByteArray.copyFrom("some random string"))
+                .bind("p4")
+                .to(3.14d)
+                .bind("p5")
+                .to(100)
+                .bind("p6")
+                .to(Value.pgNumeric("234.54235"))
+                .bind("p7")
+                .to(Timestamp.parseTimestamp("2022-07-22T20:15:42.011+02:00"))
+                .bind("p8")
+                .to(Date.parseDate("2022-07-22"))
+                .bind("p9")
+                .to("some-random-string")
+                .bind("p10")
+                .to("{\"my_key\":\"my-value\"}")
+                .build(),
+            1L);
+    mockSpanner.putStatementResult(updateResult);
+    // The statement inserting null values will use the types that are returned by the automatically
+    // described statement from the first insert.
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to((Long) null)
+                .bind("p2")
+                .to((Boolean) null)
+                .bind("p3")
+                .to((ByteArray) null)
+                .bind("p4")
+                .to((Double) null)
+                .bind("p5")
+                .to((Long) null)
+                .bind("p6")
+                .to(Value.pgNumeric(null))
+                .bind("p7")
+                .to((Timestamp) null)
+                .bind("p8")
+                .to((Date) null)
+                .bind("p9")
+                .to((String) null)
+                .bind("p10")
+                .to((String) null)
+                .build(),
+            1L));
+
+    String output =
+        runTest("testInsertAllTypesPreparedStatement", getHost(), pgServer.getLocalPort());
+
+    assertEquals("\n\nInserted 1 row(s)\nInserted 1 row(s)\n", output);
+
+    // node-postgres will only send one parse message when using prepared statements. It never uses
+    // DescribeStatement. It will send a new DescribePortal for each time the prepared statement is
+    // executed.
+    List<ParseMessage> parseMessages = getWireMessagesOfType(ParseMessage.class);
+    assertEquals(1, parseMessages.size());
+    assertEquals("insert-all-types", parseMessages.get(0).getName());
+    List<DescribeMessage> describeMessages = getWireMessagesOfType(DescribeMessage.class);
+    assertEquals(2, describeMessages.size());
+    assertEquals("", describeMessages.get(0).getName());
+    assertEquals(PreparedType.Portal, describeMessages.get(0).getType());
+    assertEquals("", describeMessages.get(1).getName());
+    assertEquals(PreparedType.Portal, describeMessages.get(1).getType());
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(
+                request ->
+                    request.getSql().equals(sql) || request.getSql().equals(describeParamsSql))
+            .collect(Collectors.toList());
+    assertEquals(3, executeSqlRequests.size());
+    ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
+    assertEquals(describeParamsSql, describeRequest.getSql());
+    assertFalse(describeRequest.hasTransaction());
+    ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
+    assertEquals(sql, executeRequest.getSql());
+    assertEquals(10, executeRequest.getParamTypesCount());
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
   public void testSelectAllTypes() throws IOException, InterruptedException {
     String sql =
         "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
@@ -417,6 +539,63 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testReadOnlyTransaction() throws Exception {
+    String output = runTest("testReadOnlyTransaction", getHost(), pgServer.getLocalPort());
+
+    assertEquals("\n\nexecuted read-only transaction\n", output);
+
+    List<ExecuteSqlRequest> requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(
+                request ->
+                    request.getSql().equals("SELECT 1") || request.getSql().equals("SELECT 2"))
+            .collect(Collectors.toList());
+    assertEquals(2, requests.size());
+    assertTrue(requests.get(0).getTransaction().hasId());
+    assertTrue(requests.get(1).getTransaction().hasId());
+    assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+    BeginTransactionRequest beginRequest =
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class).get(0);
+    assertTrue(beginRequest.getOptions().hasReadOnly());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testReadOnlyTransactionWithError() throws Exception {
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of("SELECT * FROM foo"), Status.INVALID_ARGUMENT.asRuntimeException()));
+
+    String output = runTest("testReadOnlyTransactionWithError", getHost(), pgServer.getLocalPort());
+
+    assertEquals(
+        "\n\ncurrent transaction is aborted, commands ignored until end of transaction block\n"
+            + "[ { C: '2' } ]\n",
+        output);
+  }
+
+  @Test
+  public void testCopyTo() throws Exception {
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from alltypes"), createAllTypesResultSet("")));
+
+    String output = runTest("testCopyTo", getHost(), pgServer.getLocalPort());
+
+    assertEquals(
+        "\n\n1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+        output);
+  }
+
+  @Test
+  public void testCopyFrom() throws Exception {
+    CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, true);
+
+    String output = runTest("testCopyFrom", getHost(), pgServer.getLocalPort());
+
+    assertEquals("\n\nFinished copy operation\n", output);
   }
 
   static String runTest(String testName, String host, int port)
