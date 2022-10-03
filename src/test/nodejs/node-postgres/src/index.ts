@@ -13,19 +13,33 @@
 // limitations under the License.
 
 import "reflect-metadata"
+import * as Process from "process";
 const { Client } = require('pg')
 
-function runTest(port: number, test: (client) => Promise<void>) {
+function runTest(host: string, port: number, database: string, test: (client) => Promise<void>) {
   const client = new Client({
-    host: "localhost",
+    host,
+    port,
+    database,
+  })
+  runTestWithClient(client, test);
+}
+
+function runTestOnUnixDomainSocket(port: number, test: (client) => Promise<void>) {
+  const client = new Client({
+    host: "/tmp",
     port,
     database: "db",
   })
+  runTestWithClient(client, test);
+}
+
+function runTestWithClient(client, test: (client) => Promise<void>) {
   client.connect()
-    .then(() => {
-      test(client).then(() => client.end());
-    })
-    .catch((error) => console.log(error));
+  .then(() => {
+    test(client).then(() => client.end());
+  })
+  .catch((error) => console.log(error));
 }
 
 async function testSelect1(client) {
@@ -94,37 +108,104 @@ async function testInsertAllTypes(client) {
   }
 }
 
+async function testInsertAllTypesNull(client) {
+  try {
+    const queryText = 'INSERT INTO AllTypes ' +
+        '(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
+        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)';
+    const res = await client.query(queryText, [
+        null, null, null, null, null, null, null, null, null, null]);
+    console.log(`Inserted ${res.rowCount} row(s)`);
+  } catch (e) {
+    console.error(`Insert error: ${e}`);
+  }
+}
+
+async function testSelectAllTypes(client) {
+  try {
+    const queryText = 'SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb ' +
+        'FROM AllTypes';
+    const result = await client.query(queryText);
+    console.log(`Selected ${JSON.stringify(result.rows[0])}`);
+  } catch (e) {
+    console.error(`Select error: ${e}`);
+  }
+}
+
+async function testErrorInReadWriteTransaction(client) {
+  const queryText = 'INSERT INTO users(name) VALUES($1)';
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT 1');
+    await client.query(queryText, ['foo']);
+    console.error(`Insert unexpectedly succeeded.`);
+  } catch (e) {
+    // This is expected.
+    console.log(`Insert error: ${e}`);
+    // It should not be possible to use the connection until a ROLLBACK is executed.
+    try {
+      await client.query(queryText);
+      console.error('Second insert unexpectedly succeeded.')
+    } catch (innerError) {
+      console.log(`Second insert failed with error: ${innerError}`);
+      await client.query('ROLLBACK');
+      // The connection should now be usable.
+      const {rows} = await client.query('SELECT 1');
+      console.log(`SELECT 1 returned: ${Object.values(rows[0])[0]}`);
+    }
+  }
+}
+
+
 require('yargs')
-.demand(2)
+.demand(4)
 .command(
-    'testSelect1 <port>',
+    'testSelect1 <host> <port> <database>',
     'Executes SELECT 1',
     {},
-    opts => runTest(opts.port, testSelect1)
+    opts => runTest(opts.host, opts.port, opts.database, testSelect1)
 )
 .command(
-    'testInsert <port>',
+    'testInsert <host> <port> <database>',
     'Inserts a single row',
     {},
-    opts => runTest(opts.port, testInsert)
+    opts => runTest(opts.host, opts.port, opts.database, testInsert)
 )
 .command(
-    'testInsertTwice <port>',
+    'testInsertTwice <host> <port> <database>',
     'Executes the same parameterized insert statement twice',
     {},
-    opts => runTest(opts.port, testInsertTwice)
+    opts => runTest(opts.host, opts.port, opts.database, testInsertTwice)
 )
 .command(
-    'testInsertAutoCommit <port>',
+    'testInsertAutoCommit <host> <port> <database>',
     'Inserts a single row using auto commit',
     {},
-    opts => runTest(opts.port, testInsertAutoCommit)
+    opts => runTest(opts.host, opts.port, opts.database, testInsertAutoCommit)
 )
 .command(
-    'testInsertAllTypes <port>',
+    'testInsertAllTypes <host> <port> <database>',
     'Inserts a row using all supported types',
     {},
-    opts => runTest(opts.port, testInsertAllTypes)
+    opts => runTest(opts.host, opts.port, opts.database, testInsertAllTypes)
+)
+.command(
+    'testInsertAllTypesNull <host> <port> <database>',
+    'Inserts a row using all supported types with only null values',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testInsertAllTypesNull)
+)
+.command(
+    'testSelectAllTypes <host> <port> <database>',
+    'Selects a row with columns containing all supported types',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testSelectAllTypes)
+)
+.command(
+    'testErrorInReadWriteTransaction <host> <port> <database>',
+    'Verifies that an error in a transactions renders the transaction unusable',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testErrorInReadWriteTransaction)
 )
 .wrap(120)
 .recommendCommands()

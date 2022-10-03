@@ -39,12 +39,12 @@ public interface NodeJSTest {
     assertEquals(0, res);
   }
 
-  static String runTest(String directory, String testName, int port)
+  static String runTest(String directory, String testName, String host, int port, String database)
       throws IOException, InterruptedException {
     String currentPath = new java.io.File(".").getCanonicalPath();
     String testFilePath = String.format("%s/src/test/nodejs/%s", currentPath, directory);
     ProcessBuilder builder = new ProcessBuilder();
-    builder.command("npm", "start", testName, String.format("%d", port));
+    builder.command("npm", "start", testName, host, String.format("%d", port), database);
     builder.directory(new File(testFilePath));
 
     Process process = builder.start();

@@ -77,7 +77,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
       try {
         // Make sure all parameters have been described, so we always send typed parameters to Cloud
         // Spanner.
-        this.statement.describeParameters(false);
+        this.statement.describeParameters(this.parameters, true);
       } catch (Throwable ignore) {
         // Ignore any error messages while describing the parameters, and let the following
         // DescribePortal or execute message handle any errors that are caused by invalid

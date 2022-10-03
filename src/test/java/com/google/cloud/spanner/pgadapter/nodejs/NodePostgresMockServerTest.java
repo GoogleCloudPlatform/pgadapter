@@ -25,10 +25,13 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.Status;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -36,22 +39,38 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
 @Category(NodeJSTest.class)
-@RunWith(JUnit4.class)
+@RunWith(Parameterized.class)
 public class NodePostgresMockServerTest extends AbstractMockServerTest {
+  @Parameter public boolean useDomainSocket;
+
+  @Parameters(name = "useDomainSocket = {0}")
+  public static Object[] data() {
+    OptionsMetadata options = new OptionsMetadata(new String[] {"-p p", "-i i"});
+    return options.isDomainSocketEnabled() ? new Object[] {true, false} : new Object[] {false};
+  }
 
   @BeforeClass
   public static void installDependencies() throws IOException, InterruptedException {
     NodeJSTest.installDependencies("node-postgres");
   }
 
+  private String getHost() {
+    if (useDomainSocket) {
+      return "/tmp";
+    }
+    return "localhost";
+  }
+
   @Test
   public void testSelect1() throws Exception {
     String sql = "SELECT 1";
 
-    String output = runTest("testSelect1");
+    String output = runTest("testSelect1", getHost(), pgServer.getLocalPort(), "db");
 
     assertEquals("\n\nSELECT 1 returned: 1\n", output);
 
@@ -84,7 +103,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("foo").build(), 1L));
 
-    String output = runTest("testInsert");
+    String output = runTest("testInsert", getHost(), pgServer.getLocalPort(), "db");
 
     assertEquals("\n\nInserted 1 row(s)\n", output);
 
@@ -121,7 +140,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("bar").build(), 2L));
 
-    String output = runTest("testInsertTwice");
+    String output = runTest("testInsertTwice", getHost(), pgServer.getLocalPort(), "db");
 
     assertEquals("\n\nInserted 1 row(s)\nInserted 2 row(s)\n", output);
 
@@ -162,7 +181,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("foo").build(), 1L));
 
-    String output = runTest("testInsertAutoCommit");
+    String output = runTest("testInsertAutoCommit", getHost(), pgServer.getLocalPort(), "db");
 
     assertEquals("\n\nInserted 1 row(s)\n", output);
 
@@ -238,7 +257,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             1L);
     mockSpanner.putStatementResult(updateResult);
 
-    String output = runTest("testInsertAllTypes");
+    String output = runTest("testInsertAllTypes", getHost(), pgServer.getLocalPort(), "db");
 
     assertEquals("\n\nInserted 1 row(s)\n", output);
 
@@ -260,7 +279,149 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
-  static String runTest(String testName) throws IOException, InterruptedException {
-    return NodeJSTest.runTest("node-postgres", testName, pgServer.getLocalPort());
+  @Test
+  public void testInsertAllTypesNull() throws IOException, InterruptedException {
+    String sql =
+        "INSERT INTO AllTypes "
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to((Value) null)
+                .bind("p2")
+                .to((Value) null)
+                .bind("p3")
+                .to((Value) null)
+                .bind("p4")
+                .to((Value) null)
+                .bind("p5")
+                .to((Value) null)
+                .bind("p6")
+                .to((Value) null)
+                .bind("p7")
+                .to((Value) null)
+                .bind("p8")
+                .to((Value) null)
+                .bind("p9")
+                .to((Value) null)
+                .bind("p10")
+                .to((Value) null)
+                .build(),
+            1L));
+
+    String output = runTest("testInsertAllTypesNull", getHost(), pgServer.getLocalPort(), "db");
+
+    assertEquals("\n\nInserted 1 row(s)\n", output);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, executeSqlRequests.size());
+    ExecuteSqlRequest executeRequest = executeSqlRequests.get(0);
+    assertEquals(sql, executeRequest.getSql());
+    assertEquals(0, executeRequest.getParamTypesCount());
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testSelectAllTypes() throws IOException, InterruptedException {
+    String sql =
+        "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+            + "FROM AllTypes";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql), createAllTypesResultSet("")));
+
+    String output = runTest("testSelectAllTypes", getHost(), pgServer.getLocalPort(), "db");
+
+    assertEquals(
+        "\n\nSelected {"
+            + "\"col_bigint\":\"1\","
+            + "\"col_bool\":true,"
+            + "\"col_bytea\":{\"type\":\"Buffer\",\"data\":[116,101,115,116]},"
+            + "\"col_float8\":3.14,"
+            + "\"col_int\":\"100\","
+            + "\"col_numeric\":\"6.626\","
+            + "\"col_timestamptz\":\"2022-02-16T13:18:02.123Z\","
+            + "\"col_date\":\"2022-03-28T22:00:00.000Z\","
+            + "\"col_varchar\":\"test\","
+            + "\"col_jsonb\":{\"key\":\"value\"}"
+            + "}\n",
+        output);
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertTrue(request.hasTransaction());
+    assertTrue(request.getTransaction().hasSingleUse());
+    assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+  }
+
+  @Test
+  public void testSelectAllTypesNull() throws IOException, InterruptedException {
+    String sql =
+        "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+            + "FROM AllTypes";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql), createAllTypesNullResultSet("")));
+
+    String output = runTest("testSelectAllTypes", getHost(), pgServer.getLocalPort(), "db");
+
+    assertEquals(
+        "\n\nSelected {"
+            + "\"col_bigint\":null,"
+            + "\"col_bool\":null,"
+            + "\"col_bytea\":null,"
+            + "\"col_float8\":null,"
+            + "\"col_int\":null,"
+            + "\"col_numeric\":null,"
+            + "\"col_timestamptz\":null,"
+            + "\"col_date\":null,"
+            + "\"col_varchar\":null,"
+            + "\"col_jsonb\":null"
+            + "}\n",
+        output);
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertTrue(request.hasTransaction());
+    assertTrue(request.getTransaction().hasSingleUse());
+    assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+  }
+
+  @Test
+  public void testErrorInReadWriteTransaction() throws IOException, InterruptedException {
+    String sql = "INSERT INTO users(name) VALUES($1)";
+    String describeParamsSql = "select $1 from (select name=$1 from users) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeParamsSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.newBuilder(sql).bind("p1").to("foo").build(),
+            Status.ALREADY_EXISTS
+                .withDescription("Row with \"name\" 'foo' already exists")
+                .asRuntimeException()));
+
+    String output =
+        runTest("testErrorInReadWriteTransaction", getHost(), pgServer.getLocalPort(), "db");
+
+    assertEquals(
+        "\n\nInsert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row with \"name\" 'foo' already exists\n"
+            + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
+            + "SELECT 1 returned: 1\n",
+        output);
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  static String runTest(String testName, String host, int port, String database)
+      throws IOException, InterruptedException {
+    return NodeJSTest.runTest("node-postgres", testName, host, port, database);
   }
 }

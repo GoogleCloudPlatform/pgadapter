@@ -668,12 +668,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertFalse(resultSet.next());
       }
     }
-    // The insert statement will be sent twice to Cloud Spanner, because it contains a DATE
-    // parameter that is null. The PG JDBC driver will *always* send DATE parameters with type
-    // Oid.UNSPECIFIED to force the backend to parse the value. PGAdapter will not send any untyped
-    // parameters to the backend, and instead automatically do an extra roundtrip to describe the
-    // parameters when it sees a specific statement with an untyped parameter for the first time.
-    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test

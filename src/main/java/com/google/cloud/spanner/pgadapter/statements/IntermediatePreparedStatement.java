@@ -157,7 +157,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
       columnsResultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
     }
-    boolean describeSucceeded = describeParameters(true);
+    boolean describeSucceeded = describeParameters(null, false);
     if (columnsResultSet != null) {
       return new DescribeStatementMetadata(this.parameterDataTypes, columnsResultSet);
     }
@@ -176,7 +176,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   }
 
   /** Describe the parameters of this statement. */
-  public boolean describeParameters(boolean includeInTransaction) {
+  public boolean describeParameters(byte[][] parameterValues, boolean isAutoDescribe) {
     Set<String> parameters = extractParameters(this.parsedStatement.getSqlWithoutComments());
     boolean describeSucceeded = true;
     if (parameters.isEmpty()) {
@@ -186,13 +186,26 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       // Note: We are only asking the backend to parse the types if there is at least one
       // parameter with unspecified type. Otherwise, we will rely on the types given in PARSE.
 
-      // If this describe-request is not part of the transaction, we can also safely try to look it
-      // up in a cache.
-      if (!includeInTransaction) {
+      // If this describe-request is an auto-describe request, we can safely try to look it up in a
+      // cache. Also, we do not need to describe the parameter types if they are all null values.
+      if (isAutoDescribe) {
         int[] cachedParameterTypes =
             getConnectionHandler().getAutoDescribedStatement(this.originalStatement.getSql());
         if (cachedParameterTypes != null) {
           this.parameterDataTypes = cachedParameterTypes;
+          return true;
+        }
+        boolean onlyNullValuesWithoutType = true;
+        for (int paramIndex = 0; paramIndex < parameters.size(); paramIndex++) {
+          if (parseType(null, paramIndex) == Oid.UNSPECIFIED
+              && parameterValues != null
+              && parameterValues[paramIndex] != null) {
+            onlyNullValuesWithoutType = false;
+            break;
+          }
+        }
+        if (onlyNullValuesWithoutType) {
+          // Don't bother to describe null-valued parameter types.
           return true;
         }
       }
@@ -215,14 +228,14 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
         ensureParameterLength(parameters.size());
       } else {
         try (ResultSet paramsResultSet =
-            includeInTransaction
-                ? connection.analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)
-                : connection
+            isAutoDescribe
+                ? connection
                     .getDatabaseClient()
                     .singleUse()
-                    .analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)) {
+                    .analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)
+                : connection.analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)) {
           extractParameterTypes(paramsResultSet);
-          if (!includeInTransaction) {
+          if (isAutoDescribe) {
             getConnectionHandler()
                 .registerAutoDescribedStatement(
                     this.originalStatement.getSql(), this.parameterDataTypes);

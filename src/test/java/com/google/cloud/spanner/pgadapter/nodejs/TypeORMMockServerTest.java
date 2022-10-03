@@ -99,7 +99,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
                         .build())
                 .build()));
 
-    String output = runTest("findOneUser");
+    String output = runTest("findOneUser", pgServer.getLocalPort());
 
     assertEquals("\n\nFound user 1 with name Timber Saw\n", output);
 
@@ -162,7 +162,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
                         .build())
                 .build()));
 
-    String output = runTest("createUser");
+    String output = runTest("createUser", pgServer.getLocalPort());
 
     assertEquals("\n\nFound user 1 with name Timber Saw\n", output);
 
@@ -254,7 +254,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         "UPDATE \"user\" SET \"firstName\" = $1, \"lastName\" = $2, \"age\" = $3 WHERE \"id\" IN ($4)";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 1L));
 
-    String output = runTest("updateUser");
+    String output = runTest("updateUser", pgServer.getLocalPort());
 
     assertEquals("\n\nUpdated user 1\n", output);
 
@@ -345,7 +345,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     String deleteSql = "DELETE FROM \"user\" WHERE \"id\" = $1";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(deleteSql), 1L));
 
-    String output = runTest("deleteUser");
+    String output = runTest("deleteUser", pgServer.getLocalPort());
 
     assertEquals("\n\nDeleted user 1\n", output);
 
@@ -409,7 +409,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createAllTypesResultSet("AllTypes_")));
 
-    String output = runTest("findOneAllTypes");
+    String output = runTest("findOneAllTypes", pgServer.getLocalPort());
 
     assertEquals(
         "\n\nFound row 1\n"
@@ -467,7 +467,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 1L));
 
-    String output = runTest("createAllTypes");
+    String output = runTest("createAllTypes", pgServer.getLocalPort());
 
     assertEquals("\n\nCreated one record\n", output);
 
@@ -502,7 +502,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         "some random string", insertRequest.getParams().getFieldsMap().get("p9").getStringValue());
   }
 
-  static String runTest(String testName) throws IOException, InterruptedException {
-    return NodeJSTest.runTest("typeorm/data-test", testName, pgServer.getLocalPort());
+  static String runTest(String testName, int port) throws IOException, InterruptedException {
+    return NodeJSTest.runTest("typeorm/data-test", testName, "localhost", port, "db");
   }
 }
