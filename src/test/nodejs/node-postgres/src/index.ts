@@ -122,6 +122,12 @@ async function testInsertAllTypesNull(client) {
 }
 
 async function testSelectAllTypes(client) {
+  const pg = require('pg')
+  // Make sure that DATE data types are shown as string values, otherwise node-postgres will convert
+  // it to a Javascript date object using the local timezone.
+  pg.types.setTypeParser(1082, function(stringValue) {
+    return stringValue;
+  });
   try {
     const queryText = 'SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb ' +
         'FROM AllTypes';

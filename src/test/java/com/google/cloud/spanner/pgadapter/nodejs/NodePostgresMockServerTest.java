@@ -70,7 +70,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   public void testSelect1() throws Exception {
     String sql = "SELECT 1";
 
-    String output = runTest("testSelect1", getHost(), pgServer.getLocalPort(), "db");
+    String output = runTest("testSelect1", getHost(), pgServer.getLocalPort());
 
     assertEquals("\n\nSELECT 1 returned: 1\n", output);
 
@@ -103,7 +103,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("foo").build(), 1L));
 
-    String output = runTest("testInsert", getHost(), pgServer.getLocalPort(), "db");
+    String output = runTest("testInsert", getHost(), pgServer.getLocalPort());
 
     assertEquals("\n\nInserted 1 row(s)\n", output);
 
@@ -140,7 +140,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("bar").build(), 2L));
 
-    String output = runTest("testInsertTwice", getHost(), pgServer.getLocalPort(), "db");
+    String output = runTest("testInsertTwice", getHost(), pgServer.getLocalPort());
 
     assertEquals("\n\nInserted 1 row(s)\nInserted 2 row(s)\n", output);
 
@@ -181,7 +181,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("foo").build(), 1L));
 
-    String output = runTest("testInsertAutoCommit", getHost(), pgServer.getLocalPort(), "db");
+    String output = runTest("testInsertAutoCommit", getHost(), pgServer.getLocalPort());
 
     assertEquals("\n\nInserted 1 row(s)\n", output);
 
@@ -257,7 +257,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             1L);
     mockSpanner.putStatementResult(updateResult);
 
-    String output = runTest("testInsertAllTypes", getHost(), pgServer.getLocalPort(), "db");
+    String output = runTest("testInsertAllTypes", getHost(), pgServer.getLocalPort());
 
     assertEquals("\n\nInserted 1 row(s)\n", output);
 
@@ -311,7 +311,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .build(),
             1L));
 
-    String output = runTest("testInsertAllTypesNull", getHost(), pgServer.getLocalPort(), "db");
+    String output = runTest("testInsertAllTypesNull", getHost(), pgServer.getLocalPort());
 
     assertEquals("\n\nInserted 1 row(s)\n", output);
 
@@ -336,7 +336,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createAllTypesResultSet("")));
 
-    String output = runTest("testSelectAllTypes", getHost(), pgServer.getLocalPort(), "db");
+    String output = runTest("testSelectAllTypes", getHost(), pgServer.getLocalPort());
 
     assertEquals(
         "\n\nSelected {"
@@ -347,7 +347,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_int\":\"100\","
             + "\"col_numeric\":\"6.626\","
             + "\"col_timestamptz\":\"2022-02-16T13:18:02.123Z\","
-            + "\"col_date\":\"2022-03-28T22:00:00.000Z\","
+            + "\"col_date\":\"2022-03-29\","
             + "\"col_varchar\":\"test\","
             + "\"col_jsonb\":{\"key\":\"value\"}"
             + "}\n",
@@ -367,7 +367,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createAllTypesNullResultSet("")));
 
-    String output = runTest("testSelectAllTypes", getHost(), pgServer.getLocalPort(), "db");
+    String output = runTest("testSelectAllTypes", getHost(), pgServer.getLocalPort());
 
     assertEquals(
         "\n\nSelected {"
@@ -407,8 +407,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .withDescription("Row with \"name\" 'foo' already exists")
                 .asRuntimeException()));
 
-    String output =
-        runTest("testErrorInReadWriteTransaction", getHost(), pgServer.getLocalPort(), "db");
+    String output = runTest("testErrorInReadWriteTransaction", getHost(), pgServer.getLocalPort());
 
     assertEquals(
         "\n\nInsert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row with \"name\" 'foo' already exists\n"
@@ -420,8 +419,8 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
 
-  static String runTest(String testName, String host, int port, String database)
+  static String runTest(String testName, String host, int port)
       throws IOException, InterruptedException {
-    return NodeJSTest.runTest("node-postgres", testName, host, port, database);
+    return NodeJSTest.runTest("node-postgres", testName, host, port, "db");
   }
 }
