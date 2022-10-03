@@ -59,10 +59,5 @@ public interface GolangTest {
     return Native.load(
         String.format("%s/%s_test.so", directory.getAbsolutePath(), testFileNameWithoutExtension),
         testClass);
-    //    return Native.load(
-    //        String.format(
-    //            "%s/src/test/golang/%s/%s_test.so",
-    //            currentPath, directory.getName(), testFileNameWithoutExtension),
-    //        testClass);
   }
 }
