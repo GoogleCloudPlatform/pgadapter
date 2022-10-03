@@ -19,6 +19,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.ResultNotReadyBehavior;
 import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
@@ -61,7 +62,7 @@ public class CopyDataReceiver implements Callable<Void> {
     if (copyStatement.hasException()) {
       throw copyStatement.getException();
     } else {
-      this.connectionHandler.addActiveStatement(copyStatement);
+      this.connectionHandler.setActiveCopyStatement(copyStatement);
       new CopyInResponse(
               this.connectionHandler.getConnectionMetadata().getOutputStream(),
               copyStatement.getTableColumns().size(),
@@ -73,6 +74,9 @@ public class CopyDataReceiver implements Callable<Void> {
         // Loop here until COPY_IN mode has finished.
         while (this.connectionHandler.getStatus() == ConnectionStatus.COPY_IN) {
           this.connectionHandler.handleMessages();
+          if (Thread.interrupted()) {
+            throw PGExceptionFactory.newQueryCancelledException();
+          }
         }
         // Return CommandComplete if the COPY succeeded. This should not be cached until a flush.
         // Note that if an error occurred during the COPY, the message handler will automatically
@@ -96,7 +100,7 @@ public class CopyDataReceiver implements Callable<Void> {
           }
         }
       } finally {
-        this.connectionHandler.removeActiveStatement(copyStatement);
+        this.connectionHandler.clearActiveCopyStatement();
         this.copyStatement.close();
         this.connectionHandler.setStatus(initialConnectionStatus);
       }

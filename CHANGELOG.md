@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.8.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.7.0...v0.8.0) (2022-09-25)
+
+
+### Features
+
+* enable SSL connections ([#358](https://github.com/GoogleCloudPlatform/pgadapter/issues/358)) ([c856ce2](https://github.com/GoogleCloudPlatform/pgadapter/commit/c856ce2fa84c1ccb1f4ede31307f7914ea77e002))
+* JSONB support ([#328](https://github.com/GoogleCloudPlatform/pgadapter/issues/328)) ([0ec6c7c](https://github.com/GoogleCloudPlatform/pgadapter/commit/0ec6c7c57c9b557fc722c020b299c181aacb7cd0))
+* make guess types configurable ([#347](https://github.com/GoogleCloudPlatform/pgadapter/issues/347)) ([87415dd](https://github.com/GoogleCloudPlatform/pgadapter/commit/87415dd08de85ff7906a509e483772308a7c618d))
+* support OAuth2 token authentication ([#360](https://github.com/GoogleCloudPlatform/pgadapter/issues/360)) ([0cedf15](https://github.com/GoogleCloudPlatform/pgadapter/commit/0cedf15a95b154bfb2c0f493e932b70035e4738c))
+
+
+### Bug Fixes
+
+* cancel requests were ignored ([#356](https://github.com/GoogleCloudPlatform/pgadapter/issues/356)) ([2b5add0](https://github.com/GoogleCloudPlatform/pgadapter/commit/2b5add0f37abb8391df85150bb4ac70a82aaa1d9))
+
+
+### Documentation
+
+* document max 50 parameters limit ([#355](https://github.com/GoogleCloudPlatform/pgadapter/issues/355)) ([7e2fc78](https://github.com/GoogleCloudPlatform/pgadapter/commit/7e2fc78749b0da53da091e9d90003fbd373423d5))
+
 ## [0.7.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.6.1...v0.7.0) (2022-09-10)
 
 

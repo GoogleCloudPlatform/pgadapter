@@ -41,7 +41,7 @@ public class CopyDataMessage extends ControlMessage {
     int dataLength = this.length - 4;
     this.payload = new byte[dataLength];
     this.inputStream.readFully(this.payload);
-    this.statement = (CopyStatement) connection.getActiveStatement();
+    this.statement = connection.getActiveCopyStatement();
   }
 
   @Override

@@ -22,9 +22,11 @@ import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogS
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import org.postgresql.core.Oid;
 
 /**
  * Utility class that tries to automatically detect well-known clients and drivers that are
@@ -95,6 +97,12 @@ public class ClientAutoDetector {
         }
         return parameters.get("DateStyle").equals("ISO");
       }
+
+      @Override
+      public ImmutableMap<String, String> getDefaultParameters() {
+        return ImmutableMap.of(
+            "spanner.guess_types", String.format("%d,%d", Oid.TIMESTAMPTZ, Oid.DATE));
+      }
     },
     PGX {
       @Override
@@ -119,6 +127,10 @@ public class ClientAutoDetector {
         return DEFAULT_LOCAL_STATEMENTS;
       }
       return EMPTY_LOCAL_STATEMENTS;
+    }
+
+    public ImmutableMap<String, String> getDefaultParameters() {
+      return ImmutableMap.of();
     }
   }
 
