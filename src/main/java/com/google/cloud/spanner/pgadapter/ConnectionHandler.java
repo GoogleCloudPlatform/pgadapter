@@ -412,11 +412,13 @@ public class ConnectionHandler extends Thread {
 
   /** Called when a Terminate message is received. This closes this {@link ConnectionHandler}. */
   public void handleTerminate() {
-    closeAllPortals();
-    if (this.spannerConnection != null) {
-      this.spannerConnection.close();
+    synchronized (this) {
+      closeAllPortals();
+      if (this.spannerConnection != null) {
+        this.spannerConnection.close();
+      }
+      this.status = ConnectionStatus.TERMINATED;
     }
-    this.status = ConnectionStatus.TERMINATED;
   }
 
   /**
