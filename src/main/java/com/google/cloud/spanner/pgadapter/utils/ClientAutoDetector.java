@@ -45,6 +45,8 @@ public class ClientAutoDetector {
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
         // PSQL makes it easy for us, as it sends its own name in the application_name parameter.
+        System.out.println(orderedParameterKeys);
+        System.out.println(parameters);
         return parameters.containsKey("application_name")
             && parameters.get("application_name").equals("psql");
       }
