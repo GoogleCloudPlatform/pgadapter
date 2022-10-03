@@ -68,7 +68,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -529,7 +528,6 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
-  @Ignore("Enable when https://github.com/googleapis/java-spanner/pull/2010 has been released")
   @Test
   public void testTransactionAbortedWithPreparedStatements() throws SQLException {
     String sql = "SELECT 1";
