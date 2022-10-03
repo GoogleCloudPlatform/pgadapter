@@ -26,11 +26,11 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResu
 import com.google.common.collect.ImmutableList;
 
 @InternalApi
-public class TempTest implements LocalStatement {
-  public static final TempTest INSTANCE =
-      new TempTest();
+public class DjangoTest implements LocalStatement {
+  public static final DjangoTest INSTANCE =
+      new DjangoTest();
 
-  private TempTest() {}
+  private DjangoTest() {}
 
   @Override
   public String[] getSql() {
