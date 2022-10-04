@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.example</groupId>
+  <artifactId>hibernate</artifactId>
+  <version>1.0-SNAPSHOT</version>
+
+  <properties>
+    <java.version>1.8</java.version>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+    <hibernate.version>5.2.13.Final</hibernate.version>
+    <skipTests>false</skipTests>
+    <skipUnits>${skipTests}</skipUnits>
+    <skipITs>true</skipITs>
+    <it.forkCount>8</it.forkCount>
+    <clirr.skip>true</clirr.skip>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <excludedTests>
+      com.google.cloud.spanner.pgadapter.IntegrationTest,
+      com.google.cloud.spanner.pgadapter.golang.GolangTest,
+      com.google.cloud.spanner.pgadapter.csharp.DotnetTest,
+      com.google.cloud.spanner.pgadapter.python.PythonTest,
+      com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest
+    </excludedTests>
+
+    <spanner.version>6.31.1</spanner.version>
+    <junixsocket.version>2.5.1</junixsocket.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.hibernate</groupId>
+      <artifactId>hibernate-entitymanager</artifactId>
+      <version>${hibernate.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.hibernate</groupId>
+      <artifactId>hibernate-core</artifactId>
+      <version>${hibernate.version}</version>
+    </dependency>
+
+  </dependencies>
+
+</project>
