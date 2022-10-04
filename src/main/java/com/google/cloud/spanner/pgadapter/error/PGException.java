@@ -63,7 +63,7 @@ public class PGException extends RuntimeException {
   private final String hints;
 
   private PGException(Severity severity, SQLState sqlState, String message, String hints) {
-    super(Preconditions.checkNotNull(message));
+    super(message == null ? "" : message);
     this.severity = severity;
     this.sqlState = sqlState;
     this.hints = hints;

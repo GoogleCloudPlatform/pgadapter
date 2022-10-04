@@ -8,6 +8,8 @@ output.txt
 
 src/test/golang/**/*.h
 src/test/golang/**/*.so
+samples/golang/**/*.h
+samples/golang/**/*.so
 
 src/test/csharp/**/bin
 src/test/csharp/**/obj

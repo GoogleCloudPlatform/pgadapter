@@ -181,7 +181,7 @@ public class ProxyServer extends AbstractApiService {
             () -> String.format("Closing server socket %s failed: %s", serverSocket, exception));
       }
     }
-    for (ConnectionHandler handler : this.handlers) {
+    for (ConnectionHandler handler : getConnectionHandlers()) {
       handler.terminate();
     }
     notifyStopped();

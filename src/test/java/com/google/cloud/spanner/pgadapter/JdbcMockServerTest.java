@@ -18,6 +18,7 @@ import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TR
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -531,6 +532,66 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         }
       }
     }
+  }
+
+  @Test
+  public void testTransactionAbortedWithPreparedStatements() throws SQLException {
+    String sql = "SELECT 1";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Use a read/write transaction to execute two queries.
+      connection.setAutoCommit(false);
+      // Force the use of prepared statements.
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      assertEquals(1, connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql()));
+      mockSpanner.abortAllTransactions();
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      connection.commit();
+    }
+
+    assertEquals(11, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(SELECT1.getSql(), requests.get(0).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
+    assertEquals(SELECT1.getSql(), requests.get(1).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(1).getQueryMode());
+
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(2).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(2).getQueryMode());
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(3).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(3).getQueryMode());
+
+    // This returns Aborted and initiates a retry.
+    assertEquals(SELECT1.getSql(), requests.get(4).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(4).getQueryMode());
+
+    // Start of retry.
+    assertEquals(SELECT1.getSql(), requests.get(5).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(5).getQueryMode());
+    assertEquals(SELECT1.getSql(), requests.get(6).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(6).getQueryMode());
+
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(7).getSql());
+    // This should be QueryMode.PLAN. See https://github.com/googleapis/java-spanner/issues/2009.
+    assertEquals(QueryMode.PLAN, requests.get(7).getQueryMode());
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(8).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(8).getQueryMode());
+
+    assertEquals(SELECT1.getSql(), requests.get(9).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(9).getQueryMode());
+
+    // End of retry.
+    assertEquals(SELECT1.getSql(), requests.get(10).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(10).getQueryMode());
   }
 
   @Test
@@ -2227,6 +2288,62 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set application_name to ''");
       verifySettingValue(connection, "application_name", "");
+    }
+  }
+
+  @Test
+  public void testSetTimeZone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'IST'");
+      verifySettingValue(connection, "timezone", "IST");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneToDefault() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
+      connection.createStatement().execute("set time zone default");
+      verifySettingValue(connection, "timezone", "IST");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneToLocal() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
+      connection.createStatement().execute("set time zone local");
+      verifySettingValue(connection, "timezone", "IST");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneWithTransactionCommit() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      connection.createStatement().execute("set time zone 'UTC'");
+      verifySettingValue(connection, "timezone", "UTC");
+      connection.commit();
+      verifySettingValue(connection, "timezone", "UTC");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneWithTransactionRollback() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      String originalTimeZone = null;
+      try (ResultSet rs = connection.createStatement().executeQuery("SHOW TIMEZONE")) {
+        assertTrue(rs.next());
+        originalTimeZone = rs.getString(1);
+        assertFalse(rs.next());
+      }
+      assertNotNull(originalTimeZone);
+      connection.setAutoCommit(false);
+
+      connection.createStatement().execute("set time zone 'UTC'");
+      verifySettingValue(connection, "time zone", "UTC");
+      connection.rollback();
+      verifySettingValue(connection, "time zone", originalTimeZone);
     }
   }
 
