@@ -45,6 +45,12 @@
       <version>${hibernate.version}</version>
     </dependency>
 
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>42.4.2</version>
+    </dependency>
+
   </dependencies>
 
 </project>
