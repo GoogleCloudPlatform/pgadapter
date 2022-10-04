@@ -181,6 +181,110 @@ public class GormMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCreateBlogAndUser() {
+    String insertUserSql =
+        "INSERT INTO \"users\" (\"id\",\"name\",\"email\",\"age\",\"birthday\",\"member_number\",\"activated_at\",\"created_at\",\"updated_at\") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)";
+    String describeInsertUserSql =
+        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 from (select \"id\"=$1, \"name\"=$2, \"email\"=$3, \"age\"=$4, \"birthday\"=$5, \"member_number\"=$6, \"activated_at\"=$7, \"created_at\"=$8, \"updated_at\"=$9 from \"users\") p";
+    String insertBlogSql =
+        "INSERT INTO \"blogs\" (\"id\",\"name\",\"description\",\"user_id\",\"created_at\",\"updated_at\") VALUES ($1,$2,$3,$4,$5,$6)";
+    String describeInsertBlogSql =
+        "select $1, $2, $3, $4, $5, $6 from (select \"id\"=$1, \"name\"=$2, \"description\"=$3, \"user_id\"=$4, \"created_at\"=$5, \"updated_at\"=$6 from \"blogs\") p";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertUserSql), 0L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(insertUserSql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to("User Name")
+                .bind("p3")
+                .to((String) null)
+                .bind("p4")
+                .to(20L)
+                .bind("p5")
+                .to((Date) null)
+                .bind("p6")
+                .to((String) null)
+                .bind("p7")
+                .to((Timestamp) null)
+                .bind("p8")
+                .to(Timestamp.parseTimestamp("2022-09-09T12:00:00+01:00"))
+                .bind("p9")
+                .to(Timestamp.parseTimestamp("2022-09-09T12:00:00+01:00"))
+                .build(),
+            1L));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeInsertUserSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.STRING,
+                            TypeCode.STRING,
+                            TypeCode.INT64,
+                            TypeCode.DATE,
+                            TypeCode.STRING,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.TIMESTAMP)))
+                .build()));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertBlogSql), 0L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(insertBlogSql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to("My Blog")
+                .bind("p3")
+                .to((String) null)
+                .bind("p4")
+                .to(1L)
+                .bind("p5")
+                .to(Timestamp.parseTimestamp("2022-09-09T12:00:00+01:00"))
+                .bind("p6")
+                .to(Timestamp.parseTimestamp("2022-09-09T12:00:00+01:00"))
+                .build(),
+            1L));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeInsertBlogSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.STRING,
+                            TypeCode.STRING,
+                            TypeCode.INT64,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.TIMESTAMP)))
+                .build()));
+
+    String res = gormTest.TestCreateBlogAndUser(createConnString());
+
+    assertNull(res);
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+
+    assertEquals(describeInsertUserSql, requests.get(0).getSql());
+    assertEquals(insertUserSql, requests.get(1).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(1).getQueryMode());
+    assertEquals(insertUserSql, requests.get(2).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(2).getQueryMode());
+
+    assertEquals(describeInsertBlogSql, requests.get(3).getSql());
+    assertEquals(insertBlogSql, requests.get(4).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(4).getQueryMode());
+    assertEquals(insertBlogSql, requests.get(5).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(5).getQueryMode());
+  }
+
+  @Test
   public void testQueryAllDataTypes() {
     String sql = "SELECT * FROM \"all_types\" ORDER BY \"all_types\".\"col_varchar\" LIMIT 1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));

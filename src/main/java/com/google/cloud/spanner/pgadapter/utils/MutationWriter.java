@@ -31,6 +31,7 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
 import com.google.cloud.spanner.pgadapter.session.CopySettings;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
@@ -45,6 +46,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 import io.grpc.Context;
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.PipedOutputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -152,6 +154,12 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     }
     try {
       this.payload.write(payload);
+    } catch (InterruptedIOException interruptedIOException) {
+      // The IO operation was interrupted. This indicates that the user wants to cancel the COPY
+      // operation. Re-instate the interrupted flag on the current thread and throw an exception to
+      // indicate that the operation should be cancelled.
+      Thread.currentThread().interrupt();
+      throw PGExceptionFactory.newQueryCancelledException();
     } catch (IOException e) {
       // Ignore the exception if the executor has already been shutdown. That means that an error
       // occurred that ended the COPY operation while we were writing data to the buffer.
@@ -407,7 +415,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
           size += value.getString().length();
           break;
         case STRING:
-        case JSON:
+        case PG_JSONB:
           // Assume four bytes per character to be on the safe side.
           size += value.getString().length() * 4;
           break;
@@ -436,7 +444,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                 size += s.length();
               }
               break;
-            case JSON:
+            case PG_JSONB:
             case STRING:
               for (String s : value.getStringArray()) {
                 size += s.length() * 4;
@@ -455,11 +463,13 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
               break;
             case ARRAY:
             case NUMERIC:
+            case JSON:
             case STRUCT:
               break;
           }
           break;
         case NUMERIC:
+        case JSON:
         case STRUCT:
           break;
       }

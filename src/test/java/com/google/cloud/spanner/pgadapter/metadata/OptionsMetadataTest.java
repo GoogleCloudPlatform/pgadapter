@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.metadata;
 
+import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.parseSslMode;
 import static com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.toServerVersionNum;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -22,6 +23,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -251,5 +253,27 @@ public class OptionsMetadataTest {
     assertEquals("10000", toServerVersionNum("1.0.1"));
     assertEquals("10000", toServerVersionNum("1.0 custom build"));
     assertEquals("10010", toServerVersionNum("1.10 custom build"));
+  }
+
+  @Test
+  public void testParseSslMode() {
+    assertEquals(SslMode.Disable, parseSslMode(null));
+    assertEquals(SslMode.Disable, parseSslMode("Disable"));
+    assertEquals(SslMode.Disable, parseSslMode("disable"));
+    assertEquals(SslMode.Disable, parseSslMode("DISABLE"));
+    assertEquals(SslMode.Enable, parseSslMode("Enable"));
+    assertEquals(SslMode.Enable, parseSslMode("enable"));
+    assertEquals(SslMode.Enable, parseSslMode("ENABLE"));
+    assertEquals(SslMode.Require, parseSslMode("Require"));
+    assertEquals(SslMode.Require, parseSslMode("require"));
+    assertEquals(SslMode.Require, parseSslMode("REQUIRE"));
+    assertThrows(IllegalArgumentException.class, () -> parseSslMode("foo"));
+  }
+
+  @Test
+  public void testSslEnabled() {
+    assertFalse(SslMode.Disable.isSslEnabled());
+    assertTrue(SslMode.Enable.isSslEnabled());
+    assertTrue(SslMode.Require.isSslEnabled());
   }
 }

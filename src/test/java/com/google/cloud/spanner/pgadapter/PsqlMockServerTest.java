@@ -15,10 +15,12 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl;
+import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import java.io.BufferedReader;
@@ -105,5 +107,38 @@ public class PsqlMockServerTest extends AbstractMockServerTest {
     assertEquals(2, request.getStatementsCount());
     assertTrue(request.getStatements(0).startsWith("CREATE TABLE databasechangeloglock ("));
     assertTrue(request.getStatements(1).startsWith("CREATE TABLE databasechangelog ("));
+  }
+
+  @Test
+  public void testSSLRequire() throws Exception {
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand =
+        new String[] {
+          "psql",
+          String.format("sslmode=require host=localhost port=%d", pgServer.getLocalPort()),
+          "-c",
+          "SELECT 1;"
+        };
+    builder.command(psqlCommand);
+    Process process = builder.start();
+
+    String output;
+    String errors;
+
+    try (BufferedReader reader =
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
+        BufferedReader errorReader =
+            new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      output = reader.lines().collect(Collectors.joining("\n"));
+    }
+
+    assertTrue(errors.contains("server does not support SSL, but SSL was required"));
+    assertEquals("", output);
+    int res = process.waitFor();
+    assertNotEquals(0, res);
+
+    assertEquals(
+        1L, pgServer.getDebugMessages().stream().filter(m -> m instanceof SSLMessage).count());
   }
 }

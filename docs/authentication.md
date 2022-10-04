@@ -33,9 +33,10 @@ java -jar pgadapter.jar -p my-project -i my-instance
 PGAdapter will require all connections to supply credentials for each connection if it is started
 with the `-a` command line argument. The credentials are sent as a password message. The password
 message must contain one of the following:
-1. The password field can contain the JSON payload of a credentials file, for example the contents
+1. The password field can contain a valid OAuth2 token. The username must be `oauth2`.
+2. The password field can contain the JSON payload of a credentials file, for example the contents
    of a service account key file. The username will be ignored in this case.
-2. The username field can contain the email address of a service account and the password field can
+3. The username field can contain the email address of a service account and the password field can
    contain a private key for that service account. Note: The password must include the
    `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` header and footer.
 
@@ -44,6 +45,12 @@ message must contain one of the following:
 ```shell
 # The -a argument instructs PGAdapter to require authentication.
 java -jar pgadapter.jar -p my-project -i my-instance -a
+
+# Set the username to 'oauth2' and the password to a valid OAuth2 token.
+# Note that PGAdapter will not be able to refresh the OAuth2 token, which means that the connection
+# will expire when the token has expired.
+PGPASSWORD=$(gcloud auth application-default print-access-token --quiet) \
+   psql -U oauth2 -h /tmp -d my-database
 
 # Set the PG password to the contents of a credentials file. This can be both a service account or a
 # user account file. The username will be ignored by PGAdapter.
@@ -73,3 +80,13 @@ PGPASSWORD=$(cat /path/to/credentials.json) \
   psql -h /tmp -d "projects/my-project/instances/my-instance/databases/my-database"
 ```
 
+`psql` will by default show the name of the connected database on the prompt. You can shorten this
+by changing the default prompt of `psql` to for example show `'~'` when connected to the default
+database.
+
+```shell
+PGPASSWORD=$(gcloud auth application-default print-access-token --quiet) \
+PGDATABASE=projects/my-project/instances/my-instance/databases/my-database \
+   psql -U oauth2 -h /tmp \
+   -v "PROMPT1=%~%R%x%#" -v "PROMPT2=%~%R%x%#"
+```

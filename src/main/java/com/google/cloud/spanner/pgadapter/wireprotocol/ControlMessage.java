@@ -177,8 +177,7 @@ public abstract class ControlMessage extends WireMessage {
         if (connection.getInvalidMessageCount() > MAX_INVALID_MESSAGE_COUNT) {
           new ErrorResponse(
                   connection.getConnectionMetadata().getOutputStream(),
-                  PGException.newBuilder()
-                      .setMessage(
+                  PGException.newBuilder(
                           String.format(
                               "Received %d invalid/unexpected messages. Last received message: '%c'",
                               connection.getInvalidMessageCount(), nextMsg))
@@ -488,6 +487,9 @@ public abstract class ControlMessage extends WireMessage {
       prefixSent.get();
       long rows = 0L;
       while (hasData) {
+        if (Thread.interrupted()) {
+          throw PGExceptionFactory.newQueryCancelledException();
+        }
         WireOutput wireOutput = describedResult.createDataRowResponse(resultSet, mode);
         synchronized (describedResult) {
           wireOutput.send(false);

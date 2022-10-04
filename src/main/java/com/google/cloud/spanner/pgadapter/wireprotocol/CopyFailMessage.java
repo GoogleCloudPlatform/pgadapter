@@ -20,7 +20,6 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
-import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import java.text.MessageFormat;
 
@@ -40,12 +39,7 @@ public class CopyFailMessage extends ControlMessage {
   public CopyFailMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.errorMessage = this.readAll();
-    IntermediateStatement activeStatement = connection.getActiveStatement();
-    if (activeStatement instanceof CopyStatement) {
-      this.statement = (CopyStatement) activeStatement;
-    } else {
-      this.statement = null;
-    }
+    this.statement = connection.getActiveCopyStatement();
   }
 
   @Override

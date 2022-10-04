@@ -28,11 +28,23 @@ public class PGExceptionFactory {
    * SQLState#RaiseException}.
    */
   public static PGException newPGException(String message) {
-    return PGException.newBuilder()
+    return newPGException(message, SQLState.RaiseException);
+  }
+
+  /**
+   * Creates a basic {@link PGException} with {@link Severity#ERROR} and the specified {@link
+   * SQLState}.
+   */
+  public static PGException newPGException(String message, SQLState sqlState) {
+    return PGException.newBuilder(message)
         .setSeverity(Severity.ERROR)
-        .setSQLState(SQLState.RaiseException)
-        .setMessage(message)
+        .setSQLState(sqlState)
         .build();
+  }
+
+  /** Creates a new exception that indicates that the current query was cancelled by the client. */
+  public static PGException newQueryCancelledException() {
+    return newPGException("Query cancelled", SQLState.QueryCanceled);
   }
 
   /** Converts the given {@link SpannerException} to a {@link PGException}. */
@@ -55,27 +67,32 @@ public class PGExceptionFactory {
 
   /** Extracts the base error message from a {@link SpannerException}. */
   static String extractMessage(SpannerException spannerException) {
+    String result;
     if (spannerException.getMessage().startsWith(NOT_FOUND_PREFIX)) {
-      return spannerException.getMessage().substring(NOT_FOUND_PREFIX.length());
+      result = spannerException.getMessage().substring(NOT_FOUND_PREFIX.length());
+    } else if (spannerException.getMessage().startsWith(INVALID_ARGUMENT_PREFIX)) {
+      result = spannerException.getMessage().substring(INVALID_ARGUMENT_PREFIX.length());
+    } else {
+      String grpcPrefix =
+          spannerException.getErrorCode().name()
+              + ": "
+              + StatusRuntimeException.class.getName()
+              + ": "
+              + spannerException.getErrorCode().name()
+              + ": ";
+      if (spannerException.getMessage().startsWith(grpcPrefix)) {
+        result = spannerException.getMessage().substring(grpcPrefix.length());
+      } else {
+        String spannerPrefix = spannerException.getErrorCode().name() + ": ";
+        result =
+            spannerException.getMessage().startsWith(spannerPrefix)
+                ? spannerException.getMessage().substring(spannerPrefix.length())
+                : spannerException.getMessage();
+      }
     }
-    if (spannerException.getMessage().startsWith(INVALID_ARGUMENT_PREFIX)) {
-      return spannerException.getMessage().substring(INVALID_ARGUMENT_PREFIX.length());
+    if (result.startsWith("[ERROR] ")) {
+      result = result.substring("[ERROR] ".length());
     }
-
-    String grpcPrefix =
-        spannerException.getErrorCode().name()
-            + ": "
-            + StatusRuntimeException.class.getName()
-            + ": "
-            + spannerException.getErrorCode().name()
-            + ": ";
-    if (spannerException.getMessage().startsWith(grpcPrefix)) {
-      return spannerException.getMessage().substring(grpcPrefix.length());
-    }
-
-    String spannerPrefix = spannerException.getErrorCode().name() + ": ";
-    return spannerException.getMessage().startsWith(spannerPrefix)
-        ? spannerException.getMessage().substring(spannerPrefix.length())
-        : spannerException.getMessage();
+    return result;
   }
 }
