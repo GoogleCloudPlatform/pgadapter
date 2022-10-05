@@ -29,7 +29,7 @@ apps.populate(settings.INSTALLED_APPS)
 
 from data.models import Singer
 
-def index(request):
+def get_all_data():
   try:
     object = Singer.objects.all().values()
   except Exception as e:
@@ -37,9 +37,5 @@ def index(request):
     object = None
   for x in object:
     print(x)
-  '''singer = Singer(singer_id=2, first_name='hello', last_name='django')
-  singer.save()'''
-  #return HttpResponse("hello")
 
-
-index(None)
+get_all_data()

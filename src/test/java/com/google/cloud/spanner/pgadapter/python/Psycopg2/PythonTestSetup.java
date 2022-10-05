@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.google.cloud.spanner.pgadapter.python;
+package com.google.cloud.spanner.pgadapter.python.Psycopg2;
 
 import static org.junit.Assert.assertEquals;
 
@@ -55,7 +55,7 @@ public class PythonTestSetup extends AbstractMockServerTest {
         };
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
-    builder.directory(new File("./src/test/python"));
+    builder.directory(new File(PSYCOPG2_PATH));
     Process process = builder.start();
     Scanner scanner = new Scanner(process.getInputStream());
 

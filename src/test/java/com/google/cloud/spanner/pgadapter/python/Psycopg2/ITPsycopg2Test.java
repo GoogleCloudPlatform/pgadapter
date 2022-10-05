@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.google.cloud.spanner.pgadapter.python;
+package com.google.cloud.spanner.pgadapter.python.Psycopg2;
 
 import static org.junit.Assert.assertEquals;
 
