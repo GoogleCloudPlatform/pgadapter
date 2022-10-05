@@ -88,11 +88,13 @@ This option is only available for Java/JVM-based applications.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
 ```xml
+<!-- [START pgadapter_dependency] -->
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
   <version>0.8.0</version>
 </dependency>
+<!-- [END pgadapter_dependency] -->
 ```
 <!--- {x-version-update-end} -->
 
