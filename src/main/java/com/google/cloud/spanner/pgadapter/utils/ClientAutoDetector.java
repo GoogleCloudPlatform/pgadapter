@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.utils;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.statements.local.DjangoTest;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogStatement;
@@ -39,7 +40,8 @@ public class ClientAutoDetector {
       ImmutableList.of(
           SelectCurrentSchemaStatement.INSTANCE,
           SelectCurrentDatabaseStatement.INSTANCE,
-          SelectCurrentCatalogStatement.INSTANCE);
+          SelectCurrentCatalogStatement.INSTANCE,
+          DjangoTest.INSTANCE);
 
   public enum WellKnownClient {
     PSQL {

@@ -35,18 +35,20 @@ public class DjangoTest implements LocalStatement {
   @Override
   public String[] getSql() {
     return new String[] {
-        "select current_database()",
-        "SELECT current_database()",
-        "Select current_database()",
-        "select CURRENT_DATABASE()",
-        "SELECT CURRENT_DATABASE()",
-        "Select CURRENT_DATABASE()",
-        "select * from current_database()",
-        "SELECT * FROM current_database()",
-        "Select * FROM current_database()",
-        "select * from CURRENT_DATABASE()",
-        "SELECT * FROM CURRENT_DATABASE()",
-        "Select * FROM CURRENT_DATABASE()",
+        "\n"
+            + "            SELECT\n"
+            + "                c.relname,\n"
+            + "                CASE\n"
+            + "                    WHEN c.relispartition THEN 'p'\n"
+            + "                    WHEN c.relkind IN ('m', 'v') THEN 'v'\n"
+            + "                    ELSE 't'\n"
+            + "                END\n"
+            + "            FROM pg_catalog.pg_class c\n"
+            + "            LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace\n"
+            + "            WHERE c.relkind IN ('f', 'm', 'p', 'r', 'v')\n"
+            + "                AND n.nspname NOT IN ('pg_catalog', 'pg_toast')\n"
+            + "                AND pg_catalog.pg_table_is_visible(c.oid)\n"
+            + "        "
     };
   }
 
@@ -54,12 +56,9 @@ public class DjangoTest implements LocalStatement {
   public StatementResult execute(BackendConnection backendConnection) {
     ResultSet resultSet =
         ResultSets.forRows(
-            Type.struct(StructField.of("current_database", Type.string())),
-            ImmutableList.of(
-                Struct.newBuilder()
-                    .set("current_database")
-                    .to(backendConnection.getCurrentDatabase())
-                    .build()));
+            Type.struct(StructField.of("relname", Type.string())),
+            ImmutableList.of());
+
     return new QueryResult(resultSet);
   }
 }
