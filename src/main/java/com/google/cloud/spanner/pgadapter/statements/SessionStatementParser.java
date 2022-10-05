@@ -292,7 +292,6 @@ public class SessionStatementParser {
           ErrorCode.INVALID_ARGUMENT,
           "Invalid SET statement: " + parser.getSql() + ". Expected configuration parameter name.");
     }
-
     builder.setName(name);
     if (!isSpacedTimeZone && !(parser.eatKeyword("to") || parser.eatToken("="))) {
       throw SpannerExceptionFactory.newSpannerException(
