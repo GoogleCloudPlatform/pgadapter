@@ -6,7 +6,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Scanner;
 
@@ -28,14 +27,10 @@ public class DjangoTestSetup extends DjangoMockServerTest {
 
   private static String DJANGO_PATH = "./src/test/python/django";
 
-  public String executeBasicTests(int port, String host, List<String> options) throws IOException, InterruptedException {
-    List<String> runCommand = new ArrayList<>(
-        Arrays.asList(
-            "python3",
-            "basic_test.py",
-            host,
-            Integer.toString(port)
-            ));
+  public String executeBasicTests(int port, String host, List<String> options)
+      throws IOException, InterruptedException {
+    List<String> runCommand =
+        new ArrayList<>(Arrays.asList("python3", "basic_test.py", host, Integer.toString(port)));
     runCommand.addAll(options);
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
@@ -51,8 +46,5 @@ public class DjangoTestSetup extends DjangoMockServerTest {
     assertEquals(output.toString(), 0, result);
 
     return output.toString();
-
   }
-
-
 }

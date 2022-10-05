@@ -10,7 +10,6 @@ public class DjangoMockServerTest extends AbstractMockServerTest {
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
     doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl(), "d", Arrays.asList("--server-version","11.1"));
+        new MockSpannerServiceImpl(), "d", Arrays.asList("--server-version", "11.1"));
   }
-
 }
