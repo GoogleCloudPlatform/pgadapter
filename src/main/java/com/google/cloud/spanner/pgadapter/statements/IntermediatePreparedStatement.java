@@ -195,16 +195,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
           this.parameterDataTypes = cachedParameterTypes;
           return true;
         }
-        boolean onlyNullValuesWithoutType = true;
-        for (int paramIndex = 0; paramIndex < parameters.size(); paramIndex++) {
-          if (parseType(null, paramIndex) == Oid.UNSPECIFIED
-              && parameterValues != null
-              && parameterValues[paramIndex] != null) {
-            onlyNullValuesWithoutType = false;
-            break;
-          }
-        }
-        if (onlyNullValuesWithoutType) {
+        if (hasOnlyNullValues(parameters.size(), parameterValues)) {
           // Don't bother to describe null-valued parameter types.
           return true;
         }
@@ -248,6 +239,17 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       }
     }
     return describeSucceeded;
+  }
+
+  boolean hasOnlyNullValues(int numParameters, byte[][] parameterValues) {
+    for (int paramIndex = 0; paramIndex < numParameters; paramIndex++) {
+      if (parseType(null, paramIndex) == Oid.UNSPECIFIED
+          && parameterValues != null
+          && parameterValues[paramIndex] != null) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

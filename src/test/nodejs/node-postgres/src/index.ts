@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import "reflect-metadata"
-import * as Process from "process";
 const { Client } = require('pg')
 
 function runTest(host: string, port: number, database: string, test: (client) => Promise<void>) {
@@ -21,15 +20,6 @@ function runTest(host: string, port: number, database: string, test: (client) =>
     host,
     port,
     database,
-  })
-  runTestWithClient(client, test);
-}
-
-function runTestOnUnixDomainSocket(port: number, test: (client) => Promise<void>) {
-  const client = new Client({
-    host: "/tmp",
-    port,
-    database: "db",
   })
   runTestWithClient(client, test);
 }
