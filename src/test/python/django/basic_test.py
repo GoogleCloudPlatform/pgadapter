@@ -23,7 +23,6 @@ conf = {
             'PORT': '5431'
         }
     },
-    'SECRET_KEY' : 'django-insecure-vv+)1$_^gcd!*f!zf9^-z8wba2xo*f+azl6uy$20$6%5t*^0(0'
 }
 settings.configure(**conf)
 apps.populate(settings.INSTALLED_APPS)
