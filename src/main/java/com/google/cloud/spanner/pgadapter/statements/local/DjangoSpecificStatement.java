@@ -17,7 +17,6 @@ package com.google.cloud.spanner.pgadapter.statements.local;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.ResultSets;
-import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.StatementResult;
@@ -26,11 +25,11 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResu
 import com.google.common.collect.ImmutableList;
 
 @InternalApi
-public class DjangoTest implements LocalStatement {
-  public static final DjangoTest INSTANCE =
-      new DjangoTest();
+public class DjangoSpecificStatement implements LocalStatement {
+  public static final DjangoSpecificStatement INSTANCE =
+      new DjangoSpecificStatement();
 
-  private DjangoTest() {}
+  private DjangoSpecificStatement() {}
 
   @Override
   public String[] getSql() {

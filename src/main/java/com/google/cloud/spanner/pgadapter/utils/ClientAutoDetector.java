@@ -16,7 +16,7 @@ package com.google.cloud.spanner.pgadapter.utils;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.statements.local.DjangoTest;
+import com.google.cloud.spanner.pgadapter.statements.local.DjangoSpecificStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogStatement;
@@ -41,7 +41,7 @@ public class ClientAutoDetector {
           SelectCurrentSchemaStatement.INSTANCE,
           SelectCurrentDatabaseStatement.INSTANCE,
           SelectCurrentCatalogStatement.INSTANCE,
-          DjangoTest.INSTANCE);
+          DjangoSpecificStatement.INSTANCE);
 
   public enum WellKnownClient {
     PSQL {
@@ -49,8 +49,6 @@ public class ClientAutoDetector {
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
         // PSQL makes it easy for us, as it sends its own name in the application_name parameter.
-        System.out.println(orderedParameterKeys);
-        System.out.println(parameters);
         return parameters.containsKey("application_name")
             && parameters.get("application_name").equals("psql");
       }
