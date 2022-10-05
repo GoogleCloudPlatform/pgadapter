@@ -28,7 +28,7 @@ conf = {
 settings.configure(**conf)
 apps.populate(settings.INSTALLED_APPS)
 
-from data.models import Singer
+from django.data.models import Singer
 
 def index(request):
   try:
