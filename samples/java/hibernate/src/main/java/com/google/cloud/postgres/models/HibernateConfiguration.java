@@ -30,9 +30,6 @@ public class HibernateConfiguration {
     configuration.addAnnotatedClass(Tracks.class);
     configuration.addAnnotatedClass(TracksId.class);
 
-    // necessary for a known bug, to be fixed in 4.2.9.Final
-    configuration.setProperty(AvailableSettings.USE_NEW_ID_GENERATOR_MAPPINGS, "true");
-
     final SessionFactory sessionFactory = configuration.buildSessionFactory(
         new StandardServiceRegistryBuilder().build());
 

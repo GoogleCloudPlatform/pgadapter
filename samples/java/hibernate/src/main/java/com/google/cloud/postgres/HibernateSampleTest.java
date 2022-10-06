@@ -6,15 +6,19 @@ import com.google.cloud.postgres.models.HibernateConfiguration;
 import com.google.cloud.postgres.models.Singers;
 import com.google.cloud.postgres.models.Tracks;
 import com.google.cloud.postgres.models.Venues;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaDelete;
 import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.CriteriaUpdate;
 import javax.persistence.criteria.Root;
 import org.hibernate.Session;
+import org.hibernate.Transaction;
 import org.hibernate.query.Query;
 
 public class HibernateSampleTest {
@@ -34,6 +38,32 @@ public class HibernateSampleTest {
     this.hibernateConfiguration = hibernateConfiguration;
   }
 
+  public void testJPACriteriaDelete() {
+    Session s = hibernateConfiguration.openSession();
+
+    final Singers singers = Utils.createSingers();
+    final Albums albums = Utils.createAlbums(singers);
+    s.getTransaction().begin();
+    s.saveOrUpdate(singers);
+    s.saveOrUpdate(albums);
+    final Tracks tracks1 = Utils.createTracks(albums.getId());
+    s.saveOrUpdate(tracks1);
+    final Tracks tracks2 = Utils.createTracks(albums.getId());
+    s.saveOrUpdate(tracks2);
+    s.getTransaction().commit();
+    s.clear();
+
+    CriteriaBuilder cb = s.getCriteriaBuilder();
+    CriteriaDelete<Albums> albumsCriteriaDelete = cb.createCriteriaDelete(Albums.class);
+    Root<Albums> albumsRoot = albumsCriteriaDelete.from(Albums.class);
+    albumsCriteriaDelete.where(cb.equal(albumsRoot.get("id"), albums.getId()));
+    Transaction transaction = s.beginTransaction();
+    s.createQuery(albumsCriteriaDelete).executeUpdate();
+    transaction.commit();
+
+    s.close();
+  }
+
   public void testJPACriteria() {
     Session s = hibernateConfiguration.openSession();
     CriteriaBuilder cb = s.getCriteriaBuilder();
@@ -49,6 +79,15 @@ public class HibernateSampleTest {
     List<Singers> singers = singersQuery.getResultList();
 
     logger.log(Level.INFO, "Listed singer: {0}", singers.size());
+
+    CriteriaUpdate<Albums> albumsCriteriaUpdate = cb.createCriteriaUpdate(Albums.class);
+    Root<Albums> albumsRoot = singersCriteriaQuery.from(Albums.class);
+    albumsCriteriaUpdate.set("marketingBudget", new BigDecimal("5.0"));
+    albumsCriteriaUpdate.where(cb.equal(albumsRoot.get("id"), UUID.fromString(albumsId.get(0))));
+    Transaction transaction = s.beginTransaction();
+    s.createQuery(albumsCriteriaUpdate).executeUpdate();
+    transaction.commit();
+
     s.close();
   }
 
@@ -246,9 +285,13 @@ public class HibernateSampleTest {
     testHqlUpdate();
     logger.log(Level.INFO, "HQL Update Test Completed");
 
-    logger.log(Level.INFO, "Testing JPA List");
+    logger.log(Level.INFO, "Testing JPA List and Update");
     testJPACriteria();
-    logger.log(Level.INFO, "JPA List Test Completed");
+    logger.log(Level.INFO, "JPA List and Update Test Completed");
+
+    logger.log(Level.INFO, "Testing JPA Delete");
+    testJPACriteriaDelete();
+    logger.log(Level.INFO, "JPA Delete Test Completed");
   }
 
   public static void main(String[] args) {
