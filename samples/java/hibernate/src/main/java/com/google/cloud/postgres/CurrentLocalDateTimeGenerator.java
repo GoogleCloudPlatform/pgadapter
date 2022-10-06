@@ -27,7 +27,7 @@ import org.hibernate.tuple.ValueGenerator;
 /**
  * @author Brett Meyer
  */
-public class CustomValueGenerator implements ValueGenerator<LocalDateTime> {
+public class CurrentLocalDateTimeGenerator implements ValueGenerator<LocalDateTime> {
 
 	@Override
 	public LocalDateTime generateValue(Session session, Object entity) {

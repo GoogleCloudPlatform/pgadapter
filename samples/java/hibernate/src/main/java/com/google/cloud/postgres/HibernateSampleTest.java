@@ -81,7 +81,7 @@ public class HibernateSampleTest {
     logger.log(Level.INFO, "Listed singer: {0}", singers.size());
 
     CriteriaUpdate<Albums> albumsCriteriaUpdate = cb.createCriteriaUpdate(Albums.class);
-    Root<Albums> albumsRoot = singersCriteriaQuery.from(Albums.class);
+    Root<Albums> albumsRoot = albumsCriteriaUpdate.from(Albums.class);
     albumsCriteriaUpdate.set("marketingBudget", new BigDecimal("5.0"));
     albumsCriteriaUpdate.where(cb.equal(albumsRoot.get("id"), UUID.fromString(albumsId.get(0))));
     Transaction transaction = s.beginTransaction();
@@ -197,7 +197,6 @@ public class HibernateSampleTest {
     s.saveOrUpdate(tracks2);
     s.persist(concerts3);
     s.getTransaction().commit();
-    s.clear();
 
     singersId.add(singers.getId().toString());
     albumsId.add(albums.getId().toString());
@@ -225,7 +224,6 @@ public class HibernateSampleTest {
     s.getTransaction().begin();
     s.saveOrUpdate(singers);
     s.getTransaction().rollback();
-    s.clear();
 
     logger.log(Level.INFO, "Singers that was saved: ", singers.getId());
     Singers singersFromDb = s.get(Singers.class, singers.getId());
@@ -247,7 +245,6 @@ public class HibernateSampleTest {
     s.saveOrUpdate(singers);
     s.persist(albums);
     s.getTransaction().commit();
-    s.clear();
 
     singersId.add(singers.getId().toString());
     albumsId.add(albums.getId().toString());

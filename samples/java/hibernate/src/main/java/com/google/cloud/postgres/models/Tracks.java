@@ -1,6 +1,6 @@
 package com.google.cloud.postgres.models;
 
-import com.google.cloud.postgres.CustomValueGenerator;
+import com.google.cloud.postgres.CurrentLocalDateTimeGenerator;
 import java.time.LocalDateTime;
 import javax.persistence.Column;
 import javax.persistence.EmbeddedId;
@@ -23,7 +23,7 @@ public class Tracks {
   @Column(name = "created_at", columnDefinition = "timestamptz")
   private LocalDateTime createdAt;
 
-  @GeneratorType(type = CustomValueGenerator.class, when = GenerationTime.ALWAYS)
+  @GeneratorType(type = CurrentLocalDateTimeGenerator.class, when = GenerationTime.ALWAYS)
   @Column(name = "updated_at", columnDefinition = "timestamptz")
   private LocalDateTime updatedAt;
 

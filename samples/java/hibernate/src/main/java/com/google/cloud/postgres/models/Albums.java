@@ -1,6 +1,6 @@
 package com.google.cloud.postgres.models;
 
-import com.google.cloud.postgres.CustomValueGenerator;
+import com.google.cloud.postgres.CurrentLocalDateTimeGenerator;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -45,7 +45,7 @@ public class Albums {
   @Column(name = "created_at", columnDefinition = "timestamptz")
   private LocalDateTime createdAt;
 
-  @GeneratorType(type = CustomValueGenerator.class, when = GenerationTime.ALWAYS)
+  @GeneratorType(type = CurrentLocalDateTimeGenerator.class, when = GenerationTime.ALWAYS)
   @Column(name = "updated_at", columnDefinition = "timestamptz")
   private LocalDateTime updatedAt;
 
