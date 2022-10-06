@@ -39,218 +39,210 @@ public class HibernateSampleTest {
   }
 
   public void testJPACriteriaDelete() {
-    Session s = hibernateConfiguration.openSession();
+    try(Session s = hibernateConfiguration.openSession()) {
+      final Singers singers = Utils.createSingers();
+      final Albums albums = Utils.createAlbums(singers);
+      s.getTransaction().begin();
+      s.saveOrUpdate(singers);
+      s.saveOrUpdate(albums);
+      final Tracks tracks1 = Utils.createTracks(albums.getId());
+      s.saveOrUpdate(tracks1);
+      final Tracks tracks2 = Utils.createTracks(albums.getId());
+      s.saveOrUpdate(tracks2);
+      s.getTransaction().commit();
+      s.clear();
 
-    final Singers singers = Utils.createSingers();
-    final Albums albums = Utils.createAlbums(singers);
-    s.getTransaction().begin();
-    s.saveOrUpdate(singers);
-    s.saveOrUpdate(albums);
-    final Tracks tracks1 = Utils.createTracks(albums.getId());
-    s.saveOrUpdate(tracks1);
-    final Tracks tracks2 = Utils.createTracks(albums.getId());
-    s.saveOrUpdate(tracks2);
-    s.getTransaction().commit();
-    s.clear();
-
-    CriteriaBuilder cb = s.getCriteriaBuilder();
-    CriteriaDelete<Albums> albumsCriteriaDelete = cb.createCriteriaDelete(Albums.class);
-    Root<Albums> albumsRoot = albumsCriteriaDelete.from(Albums.class);
-    albumsCriteriaDelete.where(cb.equal(albumsRoot.get("id"), albums.getId()));
-    Transaction transaction = s.beginTransaction();
-    s.createQuery(albumsCriteriaDelete).executeUpdate();
-    transaction.commit();
-
-    s.close();
+      CriteriaBuilder cb = s.getCriteriaBuilder();
+      CriteriaDelete<Albums> albumsCriteriaDelete = cb.createCriteriaDelete(Albums.class);
+      Root<Albums> albumsRoot = albumsCriteriaDelete.from(Albums.class);
+      albumsCriteriaDelete.where(cb.equal(albumsRoot.get("id"), albums.getId()));
+      Transaction transaction = s.beginTransaction();
+      s.createQuery(albumsCriteriaDelete).executeUpdate();
+      transaction.commit();
+    }
   }
 
   public void testJPACriteria() {
-    Session s = hibernateConfiguration.openSession();
-    CriteriaBuilder cb = s.getCriteriaBuilder();
-    CriteriaQuery<Singers> singersCriteriaQuery = cb.createQuery(Singers.class);
-    Root<Singers> singersRoot = singersCriteriaQuery.from(Singers.class);
-    singersCriteriaQuery
-        .select(singersRoot)
-        .where(
-            cb.and(cb.equal(singersRoot.get("firstName"), "David"),
-            cb.equal(singersRoot.get("lastName"), "Lee")));
+    try(Session s = hibernateConfiguration.openSession()) {
+      CriteriaBuilder cb = s.getCriteriaBuilder();
+      CriteriaQuery<Singers> singersCriteriaQuery = cb.createQuery(Singers.class);
+      Root<Singers> singersRoot = singersCriteriaQuery.from(Singers.class);
+      singersCriteriaQuery
+          .select(singersRoot)
+          .where(
+              cb.and(cb.equal(singersRoot.get("firstName"), "David"),
+                  cb.equal(singersRoot.get("lastName"), "Lee")));
 
-    Query<Singers> singersQuery = s.createQuery(singersCriteriaQuery);
-    List<Singers> singers = singersQuery.getResultList();
+      Query<Singers> singersQuery = s.createQuery(singersCriteriaQuery);
+      List<Singers> singers = singersQuery.getResultList();
 
-    logger.log(Level.INFO, "Listed singer: {0}", singers.size());
+      logger.log(Level.INFO, "Listed singer: {0}", singers.size());
 
-    CriteriaUpdate<Albums> albumsCriteriaUpdate = cb.createCriteriaUpdate(Albums.class);
-    Root<Albums> albumsRoot = albumsCriteriaUpdate.from(Albums.class);
-    albumsCriteriaUpdate.set("marketingBudget", new BigDecimal("5.0"));
-    albumsCriteriaUpdate.where(cb.equal(albumsRoot.get("id"), UUID.fromString(albumsId.get(0))));
-    Transaction transaction = s.beginTransaction();
-    s.createQuery(albumsCriteriaUpdate).executeUpdate();
-    transaction.commit();
-
-    s.close();
+      CriteriaUpdate<Albums> albumsCriteriaUpdate = cb.createCriteriaUpdate(Albums.class);
+      Root<Albums> albumsRoot = albumsCriteriaUpdate.from(Albums.class);
+      albumsCriteriaUpdate.set("marketingBudget", new BigDecimal("5.0"));
+      albumsCriteriaUpdate.where(cb.equal(albumsRoot.get("id"), UUID.fromString(albumsId.get(0))));
+      Transaction transaction = s.beginTransaction();
+      s.createQuery(albumsCriteriaUpdate).executeUpdate();
+      transaction.commit();
+    }
   }
 
   public void testHqlUpdate() {
-    Session s = hibernateConfiguration.openSession();
+    try(Session s = hibernateConfiguration.openSession()) {
+      Singers singers = Utils.createSingers();
+      singers.setLastName("Cord");
+      s.getTransaction().begin();
+      s.saveOrUpdate(singers);
+      s.getTransaction().commit();
 
-    Singers singers = Utils.createSingers();
-    singers.setLastName("Cord");
-    s.getTransaction().begin();
-    s.saveOrUpdate(singers);
-    s.getTransaction().commit();
+      s.getTransaction().begin();
+      Query query = s.createQuery(
+          "update Singers set active=:active "
+              + "where lastName=:lastName and firstName=:firstName");
+      query.setParameter("active", false);
+      query.setParameter("lastName", "Cord");
+      query.setParameter("firstName", "David");
+      query.executeUpdate();
+      s.getTransaction().commit();
 
-    s.getTransaction().begin();
-    Query query = s.createQuery(
-        "update Singers set active=:active "
-            + "where lastName=:lastName and firstName=:firstName");
-    query.setParameter("active", false);
-    query.setParameter("lastName", "Cord");
-    query.setParameter("firstName", "David");
-    query.executeUpdate();
-    s.getTransaction().commit();
-
-    logger.log(Level.INFO, "Updated singer: {0}", s.get(Singers.class, singers.getId()));
-    s.close();
+      logger.log(Level.INFO, "Updated singer: {0}", s.get(Singers.class, singers.getId()));
+    }
   }
 
   public void testHqlList() {
-    Session s = hibernateConfiguration.openSession();
+    try(Session s = hibernateConfiguration.openSession()) {
+      Query query = s.createQuery("from Singers");
+      List<Singers> list = query.list();
+      logger.log(Level.INFO, "Singers list size: {0}", list.size());
 
-    Query query = s.createQuery("from Singers");
-    List<Singers> list = query.list();
-    logger.log(Level.INFO, "Singers list size: {0}", list.size());
+      query = s.createQuery("from Singers order by fullName");
+      query.setFirstResult(2);
+      list = query.list();
+      logger.log(Level.INFO, "Singers list size with first result: {0}", list.size());
 
-    query = s.createQuery("from Singers order by fullName");
-    query.setFirstResult(2);
-    list = query.list();
-    logger.log(Level.INFO, "Singers list size with first result: {0}", list.size());
+      /* Current Limit is not supported. */
+      // query = s.createQuery("from Singers");
+      // query.setMaxResults(2);
+      // list = query.list();
+      // logger.log(Level.INFO, "Singers list size with first result: {0}", list.size());
 
-    /* Current Limit is not supported. */
-    // query = s.createQuery("from Singers");
-    // query.setMaxResults(2);
-    // list = query.list();
-    // logger.log(Level.INFO, "Singers list size with first result: {0}", list.size());
-
-    query = s.createQuery("select  sum(sampleRate) from Tracks");
-    list = query.list();
-    logger.log(Level.INFO, "Sample rate sum: {0}", list);
-    s.close();
+      query = s.createQuery("select  sum(sampleRate) from Tracks");
+      list = query.list();
+      logger.log(Level.INFO, "Sample rate sum: {0}", list);
+    }
   }
 
   public void testOneToManyData() {
-    Session s = hibernateConfiguration.openSession();
+    try(Session s = hibernateConfiguration.openSession()) {
+      Venues venues = s.get(Venues.class, UUID.fromString(venuesId.get(0)));
+      if (venues == null) {
+        logger.log(Level.SEVERE, "Previously Added Venues Not Found.");
+      }
+      if (venues.getConcerts().size() <= 1) {
+        logger.log(Level.SEVERE, "Previously Added Concerts Not Found.");
+      }
 
-    Venues venues = s.get(Venues.class, UUID.fromString(venuesId.get(0)));
-    if (venues == null) {
-      logger.log(Level.SEVERE, "Previously Added Venues Not Found.");
+      logger.log(Level.INFO, "Venues fetched: {0}", venues);
     }
-    if (venues.getConcerts().size() <= 1) {
-      logger.log(Level.SEVERE, "Previously Added Concerts Not Found.");
-    }
-
-    logger.log(Level.INFO, "Venues fetched: {0}", venues);
-    s.close();
   }
 
   public void testDeletingData() {
-    Session s = hibernateConfiguration.openSession();
+    try(Session s = hibernateConfiguration.openSession()) {
+      Singers singers = Utils.createSingers();
+      s.getTransaction().begin();
+      s.saveOrUpdate(singers);
+      s.getTransaction().commit();
 
-    Singers singers = Utils.createSingers();
-    s.getTransaction().begin();
-    s.saveOrUpdate(singers);
-    s.getTransaction().commit();
+      singers = s.get(Singers.class, singers.getId());
+      if (singers == null) {
+        logger.log(Level.SEVERE, "Added singers not found.");
+      }
 
-    singers = s.get(Singers.class, singers.getId());
-    if (singers == null) {
-      logger.log(Level.SEVERE, "Added singers not found.");
+      s.getTransaction().begin();
+      s.delete(singers);
+      s.getTransaction().commit();
+
+      singers = s.get(Singers.class, singers.getId());
+      if (singers != null) {
+        logger.log(Level.SEVERE, "Deleted singers found.");
+      }
     }
-
-    s.getTransaction().begin();
-    s.delete(singers);
-    s.getTransaction().commit();
-
-    singers = s.get(Singers.class, singers.getId());
-    if (singers != null) {
-      logger.log(Level.SEVERE, "Deleted singers found.");
-    }
-    s.close();
   }
 
   public void testAddingData() {
-    Session s = hibernateConfiguration.openSession();
-    final Singers singers = Utils.createSingers();
-    final Albums albums = Utils.createAlbums(singers);
-    final Venues venues = Utils.createVenue();
-    final Concerts concerts1 = Utils.createConcerts(singers, venues);
-    final Concerts concerts2 = Utils.createConcerts(singers, venues);
-    final Concerts concerts3 = Utils.createConcerts(singers, venues);
-    s.getTransaction().begin();
-    s.saveOrUpdate(singers);
-    s.saveOrUpdate(albums);
-    s.saveOrUpdate(venues);
-    s.persist(concerts1);
-    s.persist(concerts2);
-    final Tracks tracks1 = Utils.createTracks(albums.getId());
-    s.saveOrUpdate(tracks1);
-    final Tracks tracks2 = Utils.createTracks(albums.getId());
-    s.saveOrUpdate(tracks2);
-    s.persist(concerts3);
-    s.getTransaction().commit();
+    try(Session s = hibernateConfiguration.openSession()) {
+      final Singers singers = Utils.createSingers();
+      final Albums albums = Utils.createAlbums(singers);
+      final Venues venues = Utils.createVenue();
+      final Concerts concerts1 = Utils.createConcerts(singers, venues);
+      final Concerts concerts2 = Utils.createConcerts(singers, venues);
+      final Concerts concerts3 = Utils.createConcerts(singers, venues);
+      s.getTransaction().begin();
+      s.saveOrUpdate(singers);
+      s.saveOrUpdate(albums);
+      s.saveOrUpdate(venues);
+      s.persist(concerts1);
+      s.persist(concerts2);
+      final Tracks tracks1 = Utils.createTracks(albums.getId());
+      s.saveOrUpdate(tracks1);
+      final Tracks tracks2 = Utils.createTracks(albums.getId());
+      s.saveOrUpdate(tracks2);
+      s.persist(concerts3);
+      s.getTransaction().commit();
 
-    singersId.add(singers.getId().toString());
-    albumsId.add(albums.getId().toString());
-    venuesId.add(venues.getId().toString());
-    concertsId.add(concerts1.getId().toString());
-    concertsId.add(concerts2.getId().toString());
-    concertsId.add(concerts3.getId().toString());
-    tracksId.add(tracks1.getId().getTrackNumber());
-    tracksId.add(tracks2.getId().getTrackNumber());
+      singersId.add(singers.getId().toString());
+      albumsId.add(albums.getId().toString());
+      venuesId.add(venues.getId().toString());
+      concertsId.add(concerts1.getId().toString());
+      concertsId.add(concerts2.getId().toString());
+      concertsId.add(concerts3.getId().toString());
+      tracksId.add(tracks1.getId().getTrackNumber());
+      tracksId.add(tracks2.getId().getTrackNumber());
 
-    logger.log(Level.INFO, "Created Singer: {0}", singers.getId());
-    logger.log(Level.INFO, "Created Albums: {0}", albums.getId());
-    logger.log(Level.INFO, "Created Venues: {0}", venues.getId());
-    logger.log(Level.INFO, "Created Concerts: {0}", concerts1.getId());
-    logger.log(Level.INFO, "Created Concerts: {0}", concerts2.getId());
-    logger.log(Level.INFO, "Created Concerts: {0}", concerts3.getId());
-    logger.log(Level.INFO, "Created Tracks: {0}", tracks1.getId());
-    logger.log(Level.INFO, "Created Tracks: {0}", tracks2.getId());
-    s.close();
+      logger.log(Level.INFO, "Created Singer: {0}", singers.getId());
+      logger.log(Level.INFO, "Created Albums: {0}", albums.getId());
+      logger.log(Level.INFO, "Created Venues: {0}", venues.getId());
+      logger.log(Level.INFO, "Created Concerts: {0}", concerts1.getId());
+      logger.log(Level.INFO, "Created Concerts: {0}", concerts2.getId());
+      logger.log(Level.INFO, "Created Concerts: {0}", concerts3.getId());
+      logger.log(Level.INFO, "Created Tracks: {0}", tracks1.getId());
+      logger.log(Level.INFO, "Created Tracks: {0}", tracks2.getId());
+    }
   }
 
   public void testSessionRollback() {
-    Session s = hibernateConfiguration.openSession();
-    final Singers singers = Utils.createSingers();
-    s.getTransaction().begin();
-    s.saveOrUpdate(singers);
-    s.getTransaction().rollback();
+    try(Session s = hibernateConfiguration.openSession()) {
+      final Singers singers = Utils.createSingers();
+      s.getTransaction().begin();
+      s.saveOrUpdate(singers);
+      s.getTransaction().rollback();
 
-    logger.log(Level.INFO, "Singers that was saved: ", singers.getId());
-    Singers singersFromDb = s.get(Singers.class, singers.getId());
-    if (singersFromDb == null) {
-      logger.log(Level.INFO, "Singers not found as expected.");
-    } else {
-      logger.log(Level.SEVERE, "Singers found. Lookout for the error.");
+      logger.log(Level.INFO, "Singers that was saved: ", singers.getId());
+      Singers singersFromDb = s.get(Singers.class, singers.getId());
+      if (singersFromDb == null) {
+        logger.log(Level.INFO, "Singers not found as expected.");
+      } else {
+        logger.log(Level.SEVERE, "Singers found. Lookout for the error.");
+      }
     }
-    s.close();
   }
 
   public void testForeignKey() {
-    Session s = hibernateConfiguration.openSession();
+    try(Session s = hibernateConfiguration.openSession()) {
+      final Singers singers = Utils.createSingers();
+      final Albums albums = Utils.createAlbums(singers);
 
-    final Singers singers = Utils.createSingers();
-    final Albums albums = Utils.createAlbums(singers);
+      s.getTransaction().begin();
+      s.saveOrUpdate(singers);
+      s.persist(albums);
+      s.getTransaction().commit();
 
-    s.getTransaction().begin();
-    s.saveOrUpdate(singers);
-    s.persist(albums);
-    s.getTransaction().commit();
-
-    singersId.add(singers.getId().toString());
-    albumsId.add(albums.getId().toString());
-    logger.log(Level.INFO, "Created Singer: {0}", singers.getId());
-    logger.log(Level.INFO, "Created Albums: {0}", albums.getId());
-    s.close();
+      singersId.add(singers.getId().toString());
+      albumsId.add(albums.getId().toString());
+      logger.log(Level.INFO, "Created Singer: {0}", singers.getId());
+      logger.log(Level.INFO, "Created Albums: {0}", albums.getId());
+    }
   }
 
   public void executeTest() {
