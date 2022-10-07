@@ -30,7 +30,7 @@ const client = new Client({
 });
 await client.connect();
 const res = await client.query("select 'Hello world!' as hello");
-console.log(res.rows[0]);
+console.log(res.rows[0].hello);
 await client.end();
 ```
 
@@ -60,7 +60,7 @@ const client = new Client({
 });
 await client.connect();
 const res = await client.query("select 'Hello world!' as hello");
-console.log(res.rows[0]);
+console.log(res.rows[0].hello);
 await client.end();
 ```
 
@@ -73,17 +73,18 @@ See [README](../README.md) for more possibilities on how to run PGAdapter.
 
 ## Performance Considerations
 
-The following will give you the best possible performance when using pgx with PGAdapter.
+The following will give you the best possible performance when using node-postgres with PGAdapter.
 
 ### Unix Domain Sockets
 Use Unix Domain Socket connections for the lowest possible latency when PGAdapter and the client
-application are running on the same host. See https://pkg.go.dev/github.com/jackc/pgx#ConnConfig
-for more information on connection options for pgx.
+application are running on the same host. See https://node-postgres.com/features/connecting
+for more information on connection options for node-postgres.
 
 ### Batching
-Use the pgx batching API when executing multiple DDL or DML statements. PGAdapter will combine
-DML and DDL statements that are executed in a batch into a single request on Cloud Spanner.
-This can significantly reduce the overhead of executing multiple DML or DDL statements.
+Use the batching options that are available as SQL commands in PGAdapter to batch DDL or DML
+statements. PGAdapter will combine DML and DDL statements that are executed in a batch into a single
+request on Cloud Spanner. This can significantly reduce the overhead of executing multiple DML or
+DDL statements.
 
 Example for DML statements:
 
