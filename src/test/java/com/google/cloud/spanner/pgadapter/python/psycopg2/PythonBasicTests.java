@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.google.cloud.spanner.pgadapter.python;
+package com.google.cloud.spanner.pgadapter.python.psycopg2;
 
 import static org.junit.Assert.assertEquals;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
