@@ -23,7 +23,7 @@ public class DjangoMockServerTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void startMockSpannerAndPgAdapterServers() throws Exception {
-    //Django needs postgres version to be greater than or equal to 11
+    // Django needs postgres version to be greater than or equal to 11
     doStartMockSpannerAndPgAdapterServers(
         new MockSpannerServiceImpl(), "d", Arrays.asList("--server-version", "11.1"));
   }
