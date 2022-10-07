@@ -16,9 +16,6 @@
 import sys
 from django.core.cache import cache
 
-def flush():
-  cache.clear()
-
 def create_django_setup(host, port):
   from django.conf import settings
   from django.apps import apps
@@ -95,7 +92,6 @@ if __name__ == '__main__':
 
   try:
     create_django_setup(host, port)
-    flush()
     from data.models import Singer
   except Exception as e:
     print(e)
