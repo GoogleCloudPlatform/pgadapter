@@ -247,7 +247,7 @@ async function testCopyFrom(client) {
   try {
     const copyFrom = require('pg-copy-streams').from;
     const fs = require('fs');
-    const stream = client.query(copyFrom('COPY all_types FROM STDIN'));
+    const stream = client.query(copyFrom('COPY alltypes FROM STDIN'));
     const fileStream = fs.createReadStream('../../resources/all_types_data_small.txt');
     fileStream.pipe(stream);
     await new Promise<void>(function(resolve, reject) {

@@ -348,6 +348,65 @@ public class ITNodePostgresTest implements IntegrationTest {
         output);
   }
 
+  @Test
+  public void testErrorInReadWriteTransaction() throws IOException, InterruptedException {
+    // Insert a row that will conflict with the new row that the test will try to insert.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(
+        databaseId,
+        ImmutableList.of(Mutation.newInsertBuilder("users").set("name").to("foo").build()));
+
+    String output =
+        runTest("testErrorInReadWriteTransaction", getHost(), testEnv.getServer().getLocalPort());
+    assertEquals(
+        "\n\nInsert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row [foo] in table users already exists\n"
+            + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
+            + "SELECT 1 returned: 1\n",
+        output);
+  }
+
+  @Test
+  public void testReadOnlyTransaction() throws Exception {
+    String output =
+        runTest("testReadOnlyTransaction", getHost(), testEnv.getServer().getLocalPort());
+
+    assertEquals("\n\nexecuted read-only transaction\n", output);
+  }
+
+  @Test
+  public void testReadOnlyTransactionWithError() throws Exception {
+    String output =
+        runTest("testReadOnlyTransactionWithError", getHost(), testEnv.getServer().getLocalPort());
+    assertEquals(
+        "\n\ncurrent transaction is aborted, commands ignored until end of transaction block\n"
+            + "[ { '?column?': '2' } ]\n",
+        output);
+  }
+
+  @Test
+  public void testCopyTo() throws Exception {
+    insertTestRow();
+
+    String output = runTest("testCopyTo", getHost(), testEnv.getServer().getLocalPort());
+    assertEquals(
+        "\n\n1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+        output);
+  }
+
+  @Test
+  public void testCopyFrom() throws Exception {
+    String output = runTest("testCopyFrom", getHost(), testEnv.getServer().getLocalPort());
+    assertEquals("\n\nFinished copy operation\n", output);
+
+    DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM alltypes"))) {
+      assertTrue(resultSet.next());
+      assertEquals(100L, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
+  }
+
   static String runTest(String testName, String host, int port)
       throws IOException, InterruptedException {
     return NodeJSTest.runTest(
