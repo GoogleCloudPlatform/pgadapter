@@ -316,7 +316,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .build(),
             1L));
 
-    String output = runTest("testInsertAllTypesNull", getHost(), pgServer.getLocalPort());
+    String output = runTest("testInsertAllTypesAllNull", getHost(), pgServer.getLocalPort());
 
     assertEquals("\n\nInserted 1 row(s)\n", output);
 
@@ -392,7 +392,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
         StatementResult.update(
             Statement.newBuilder(sql)
                 .bind("p1")
-                .to((Long) null)
+                .to(2L)
                 .bind("p2")
                 .to((Boolean) null)
                 .bind("p3")

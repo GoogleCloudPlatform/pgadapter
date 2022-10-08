@@ -29,7 +29,10 @@ function runTestWithClient(client, test: (client) => Promise<void>) {
   .then(() => {
     test(client).then(() => client.end());
   })
-  .catch((error) => console.log(error));
+  .catch((error) => {
+    console.error(error);
+    client.end();
+  });
 }
 
 async function testSelect1(client) {
@@ -104,7 +107,20 @@ async function testInsertAllTypesNull(client) {
         '(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
         'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)';
     const res = await client.query(queryText, [
-        null, null, null, null, null, null, null, null, null, null]);
+        1, null, null, null, null, null, null, null, null, null]);
+    console.log(`Inserted ${res.rowCount} row(s)`);
+  } catch (e) {
+    console.error(`Insert error: ${e}`);
+  }
+}
+
+async function testInsertAllTypesAllNull(client) {
+  try {
+    const queryText = 'INSERT INTO AllTypes ' +
+        '(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) ' +
+        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)';
+    const res = await client.query(queryText, [
+      null, null, null, null, null, null, null, null, null, null]);
     console.log(`Inserted ${res.rowCount} row(s)`);
   } catch (e) {
     console.error(`Insert error: ${e}`);
@@ -128,7 +144,7 @@ async function testInsertAllTypesPreparedStatement(client) {
     console.log(`Inserted ${res1.rowCount} row(s)`);
     const res2 = await client.query({
       name: 'insert-all-types',
-      values: [null, null, null, null, null, null, null, null, null, null],
+      values: [2, null, null, null, null, null, null, null, null, null],
     });
     console.log(`Inserted ${res2.rowCount} row(s)`);
   } catch (e) {
@@ -283,6 +299,12 @@ require('yargs')
     'Inserts a row using all supported types with only null values',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testInsertAllTypesNull)
+)
+.command(
+    'testInsertAllTypesAllNull <host> <port> <database>',
+    'Inserts a row using all supported types with only null values',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testInsertAllTypesAllNull)
 )
 .command(
     'testSelectAllTypes <host> <port> <database>',

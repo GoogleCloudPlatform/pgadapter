@@ -68,7 +68,7 @@ await client.end();
 ## Running PGAdapter
 
 This example uses the pre-built Docker image to run PGAdapter.
-See [README](../README.md) for more possibilities on how to run PGAdapter.
+See [README](../README.md) for more options for how to run PGAdapter.
 
 
 ## Performance Considerations
@@ -88,23 +88,32 @@ DDL statements.
 
 Example for DML statements:
 
-```go
-batch := &pgx.Batch{}
-batch.Queue("insert into my_table (key, value) values ($1, $2)", "k1", "value1")
-batch.Queue("insert into my_table (key, value) values ($1, $2)", "k2", "value2")
-res := conn.SendBatch(context.Background(), batch)
+```typescript
+  const sql = "insert into test (id, value) values ($1, $2)";
+// This will start a DML batch for this client. All subsequent
+// DML statements will be cached locally until RUN BATCH is executed.
+await client.query("start batch dml");
+await client.query({text: sql, values: [1, 'One']});
+await client.query({text: sql, values: [2, 'Two']});
+await client.query({text: sql, values: [3, 'Three']});
+// This will send the DML statements to Cloud Spanner as one batch.
+const res = await client.query("run batch");
+console.log(res);
 ```
 
 Example for DDL statements:
 
-```go
-batch := &pgx.Batch{}
-batch.Queue("create table singers (singerid varchar primary key, name varchar)")
-batch.Queue("create index idx_singers_name on singers (name)")
-res := conn.SendBatch(context.Background(), batch)
+```typescript
+// This will start a DDL batch for this client. All subsequent
+// DDL statements will be cached locally until RUN BATCH is executed.
+await client.query("start batch ddl");
+await client.query("create table my_table1 (key varchar primary key, value varchar)");
+await client.query("create table my_table2 (key varchar primary key, value varchar)");
+await client.query("create index my_index1 on my_table1 (value)");
+// This will send the DDL statements to Cloud Spanner as one batch.
+const res = await client.query("run batch");
+console.log(res);
 ```
 
 ## Limitations
-- Server side [prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are limited to at most 50 parameters.
-  `pgx` uses server side prepared statements for all parameterized statements in extended query mode.
-  You can use the [simple query protocol](https://pkg.go.dev/github.com/jackc/pgx/v4#QuerySimpleProtocol) to work around this limitation.
+- [Prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are limited to at most 50 parameters.
