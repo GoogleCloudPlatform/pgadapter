@@ -1395,11 +1395,11 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   private void setupCopyInformationSchemaResults(boolean tableFound) {
-    setupCopyInformationSchemaResults(mockSpanner, tableFound);
+    setupCopyInformationSchemaResults(mockSpanner, "all_types", tableFound);
   }
 
   public static void setupCopyInformationSchemaResults(
-      MockSpannerServiceImpl mockSpanner, boolean tableFound) {
+      MockSpannerServiceImpl mockSpanner, String allTypesTableName, boolean tableFound) {
     ResultSetMetadata metadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
@@ -1509,7 +1509,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             com.google.cloud.spanner.Statement.newBuilder(
                     "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1")
                 .bind("p1")
-                .to("all_types")
+                .to(allTypesTableName)
                 .build(),
             allTypesResultSet));
 
@@ -1573,7 +1573,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(allTypesIndexedColumnsCountSql)
                 .bind("p1")
-                .to("all_types")
+                .to(allTypesTableName)
                 .bind("p2")
                 .to("col_bigint")
                 .bind("p3")
