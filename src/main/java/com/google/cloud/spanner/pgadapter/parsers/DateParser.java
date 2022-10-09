@@ -20,8 +20,10 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.common.base.Preconditions;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
@@ -114,11 +116,26 @@ public class DateParser extends Parser<Date> {
     if (this.item == null) {
       return null;
     }
-    LocalDate localDate =
-        LocalDate.of(this.item.getYear(), this.item.getMonth(), this.item.getDayOfMonth());
+    return convertToPG(this.item);
+  }
+
+  static byte[] convertToPG(Date value) {
+    LocalDate localDate = LocalDate.of(value.getYear(), value.getMonth(), value.getDayOfMonth());
     long days = localDate.toEpochDay() - PG_EPOCH_DAYS;
     int daysAsInt = validateRange(days);
     return IntegerParser.binaryParse(daysAsInt);
+  }
+
+  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+    switch (format) {
+      case SPANNER:
+      case POSTGRESQL_TEXT:
+        return resultSet.getDate(position).toString().getBytes(StandardCharsets.UTF_8);
+      case POSTGRESQL_BINARY:
+        return convertToPG(resultSet.getDate(position));
+      default:
+        throw new IllegalArgumentException("unknown data format: " + format);
+    }
   }
 
   /**

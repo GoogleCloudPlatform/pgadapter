@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
@@ -76,13 +77,29 @@ public class JsonbParser extends Parser<String> {
     if (this.item == null) {
       return null;
     }
-    byte[] value = this.item.getBytes(StandardCharsets.UTF_8);
-    byte[] result = new byte[value.length + 1];
+    return convertToPG(this.item);
+  }
+
+  static byte[] convertToPG(String value) {
+    byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+    byte[] result = new byte[bytes.length + 1];
     // Set version = 1
     result[0] = 1;
-    System.arraycopy(value, 0, result, 1, value.length);
+    System.arraycopy(bytes, 0, result, 1, bytes.length);
 
     return result;
+  }
+
+  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+    switch (format) {
+      case SPANNER:
+      case POSTGRESQL_TEXT:
+        return resultSet.getPgJsonb(position).getBytes(StandardCharsets.UTF_8);
+      case POSTGRESQL_BINARY:
+        return convertToPG(resultSet.getPgJsonb(position));
+      default:
+        throw new IllegalArgumentException("unknown data format: " + format);
+    }
   }
 
   @Override

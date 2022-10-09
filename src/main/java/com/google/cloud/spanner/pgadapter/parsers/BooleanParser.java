@@ -19,8 +19,10 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.common.collect.ImmutableSet;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -34,6 +36,15 @@ import org.postgresql.util.ByteConverter;
 public class BooleanParser extends Parser<Boolean> {
   private static final String TRUE_VALUE = "t";
   private static final String FALSE_VALUE = "f";
+  private static final byte[] TRUE_VALUE_BYTES = new byte[] {'t'};
+  private static final byte[] FALSE_VALUE_BYTES = new byte[] {'f'};
+  private static final byte[] TRUE_VALUE_BYTES_BINARY = new byte[1];
+  private static final byte[] FALSE_VALUE_BYTES_BINARY = new byte[1];
+
+  static {
+    ByteConverter.bool(TRUE_VALUE_BYTES_BINARY, 0, true);
+    ByteConverter.bool(FALSE_VALUE_BYTES_BINARY, 0, true);
+  }
   // See https://www.postgresql.org/docs/current/datatype-boolean.html
   private static final Set<String> TRUE_VALUES =
       ImmutableSet.of("t", "tr", "tru", "true", "y", "ye", "yes", "on", "1");
@@ -102,9 +113,26 @@ public class BooleanParser extends Parser<Boolean> {
     if (this.item == null) {
       return null;
     }
+    return convertToPGBinary(this.item);
+  }
+
+  static byte[] convertToPGBinary(boolean value) {
     byte[] result = new byte[1];
-    ByteConverter.bool(result, 0, this.item);
+    ByteConverter.bool(result, 0, value);
     return result;
+  }
+
+  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+    switch (format) {
+      case SPANNER:
+        return Boolean.toString(resultSet.getBoolean(position)).getBytes(StandardCharsets.UTF_8);
+      case POSTGRESQL_TEXT:
+        return resultSet.getBoolean(position) ? TRUE_VALUE_BYTES : FALSE_VALUE_BYTES;
+      case POSTGRESQL_BINARY:
+        return resultSet.getBoolean(position) ? TRUE_VALUE_BYTES_BINARY : FALSE_VALUE_BYTES_BINARY;
+      default:
+        throw new IllegalArgumentException("unknown data format: " + format);
+    }
   }
 
   @Override
