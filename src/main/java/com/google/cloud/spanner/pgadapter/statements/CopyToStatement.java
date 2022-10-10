@@ -106,6 +106,10 @@ public class CopyToStatement extends IntermediatePortalStatement {
     return csvFormat;
   }
 
+  public boolean isBinary() {
+    return copyOptions.getFormat() == Format.BINARY;
+  }
+
   @Override
   public String getCommandTag() {
     return "COPY";
@@ -163,7 +167,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
   @Override
   public CopyDataResponse createDataRowResponse(Converter converter) {
     return copyOptions.getFormat() == Format.BINARY
-        ? createBinaryDataResponse(converter.getResultSet())
+        ? createBinaryDataResponse(converter)
         : createDataResponse(converter.getResultSet());
   }
 
@@ -191,21 +195,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
     return new CopyDataResponse(this.outputStream, row, csvFormat.getRecordSeparator().charAt(0));
   }
 
-  CopyDataResponse createBinaryDataResponse(ResultSet resultSet) {
-    // Multiply number of columns by 4, as each column has as 4-byte length value.
-    // In addition, each row has a 2-byte number of columns value.s
-    int length = 2 + resultSet.getColumnCount() * 4;
-    byte[][] data = new byte[resultSet.getColumnCount()][];
-    for (int col = 0; col < resultSet.getColumnCount(); col++) {
-      if (!resultSet.isNull(col)) {
-        Parser<?> parser = Parser.create(resultSet, resultSet.getColumnType(col), col);
-        data[col] = parser.parse(DataFormat.POSTGRESQL_BINARY);
-
-        if (data[col] != null) {
-          length += data[col].length;
-        }
-      }
-    }
-    return new CopyDataResponse(this.outputStream, length, data);
+  CopyDataResponse createBinaryDataResponse(Converter converter) {
+    return new CopyDataResponse(this.outputStream, converter);
   }
 }

@@ -29,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
+import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.common.base.Preconditions;
 import java.io.ByteArrayOutputStream;
@@ -64,6 +65,13 @@ public class Converter {
   }
 
   public int convertResultSetRowToDataRowResponse() throws IOException {
+    DataFormat fixedFormat = null;
+    if (statement instanceof CopyToStatement) {
+      fixedFormat =
+          ((CopyToStatement) statement).isBinary()
+              ? DataFormat.POSTGRESQL_BINARY
+              : DataFormat.POSTGRESQL_TEXT;
+    }
     buffer.reset();
     outputStream.writeShort(resultSet.getColumnCount());
     for (int column_index = 0; /* column indices start at 0 */
@@ -72,7 +80,10 @@ public class Converter {
       if (resultSet.isNull(column_index)) {
         outputStream.writeInt(-1);
       } else {
-        DataFormat format = DataFormat.getDataFormat(column_index, statement, mode, options);
+        DataFormat format =
+            fixedFormat == null
+                ? DataFormat.getDataFormat(column_index, statement, mode, options)
+                : fixedFormat;
         byte[] column = Converter.convertToPG(this.resultSet, column_index, format);
         outputStream.writeInt(column.length);
         outputStream.write(column);
