@@ -16,7 +16,9 @@ package com.google.cloud.spanner.pgadapter.utils;
 
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Type;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.ArrayParser;
 import com.google.cloud.spanner.pgadapter.parsers.BinaryParser;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
@@ -27,11 +29,62 @@ import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
+import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.common.base.Preconditions;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 
 /** Utility class for converting between generic PostgreSQL conversions. */
 public class Converter {
-  private Converter() {}
+  private final ByteArrayOutputStream buffer = new ByteArrayOutputStream(256);
+  private final DataOutputStream outputStream = new DataOutputStream(buffer);
+  private final IntermediateStatement statement;
+  private final QueryMode mode;
+  private final OptionsMetadata options;
+  private final ResultSet resultSet;
+
+  public Converter(
+      IntermediateStatement statement,
+      QueryMode mode,
+      OptionsMetadata options,
+      ResultSet resultSet) {
+    this.statement = statement;
+    this.mode = mode;
+    this.options = options;
+    this.resultSet = resultSet;
+  }
+
+  public int getColumnCount() {
+    return resultSet.getColumnCount();
+  }
+
+  public ResultSet getResultSet() {
+    return resultSet;
+  }
+
+  public int convertResultSetRowToDataRowResponse() throws IOException {
+    buffer.reset();
+    outputStream.writeShort(resultSet.getColumnCount());
+    for (int column_index = 0; /* column indices start at 0 */
+        column_index < resultSet.getColumnCount();
+        column_index++) {
+      if (resultSet.isNull(column_index)) {
+        outputStream.writeInt(-1);
+      } else {
+        DataFormat format = DataFormat.getDataFormat(column_index, statement, mode, options);
+        byte[] column = Converter.convertToPG(this.resultSet, column_index, format);
+        outputStream.writeInt(column.length);
+        outputStream.write(column);
+      }
+    }
+    return buffer.size();
+  }
+
+  public void writeBuffer(DataOutputStream outputStream) throws IOException {
+    buffer.writeTo(outputStream);
+  }
+
   /**
    * Return the data of the specified column of the {@link ResultSet} as a byte array. The column
    * may not contain a null value.

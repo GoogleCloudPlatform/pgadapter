@@ -20,13 +20,13 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
+import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyDoneResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyOutResponse;
@@ -161,10 +161,10 @@ public class CopyToStatement extends IntermediatePortalStatement {
   }
 
   @Override
-  public CopyDataResponse createDataRowResponse(ResultSet resultSet, QueryMode mode) {
+  public CopyDataResponse createDataRowResponse(Converter converter) {
     return copyOptions.getFormat() == Format.BINARY
-        ? createBinaryDataResponse(resultSet)
-        : createDataResponse(resultSet);
+        ? createBinaryDataResponse(converter.getResultSet())
+        : createDataResponse(converter.getResultSet());
   }
 
   @Override
@@ -200,6 +200,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
       if (!resultSet.isNull(col)) {
         Parser<?> parser = Parser.create(resultSet, resultSet.getColumnType(col), col);
         data[col] = parser.parse(DataFormat.POSTGRESQL_BINARY);
+
         if (data[col] != null) {
           length += data[col].length;
         }
