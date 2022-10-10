@@ -54,7 +54,7 @@ public class DjangoSpecificStatement implements LocalStatement {
   public StatementResult execute(BackendConnection backendConnection) {
     ResultSet resultSet =
         ResultSets.forRows(
-            Type.struct(StructField.of("relname", Type.string())), ImmutableList.of());
+            Type.struct(StructField.of("relname", Type.string()), StructField.of("case", Type.string())), ImmutableList.of());
 
     return new QueryResult(resultSet);
   }
