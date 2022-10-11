@@ -411,12 +411,14 @@ public class ParserTest {
   @Test
   public void testNumericParsingNaN() {
     String value = "NaN";
+    byte[] byteResult = new byte[8];
+    ByteConverter.int2(byteResult, 4, (short) 0xC000);
 
     byte[] stringResult = {'N', 'a', 'N'};
 
     NumericParser parser = new NumericParser(value);
 
-    validate(parser, stringResult, stringResult, stringResult);
+    validate(parser, byteResult, stringResult, stringResult);
     assertEquals(value, parser.getItem());
     validateCreateText(stringResult, Oid.NUMERIC, value);
   }
