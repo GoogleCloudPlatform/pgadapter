@@ -47,7 +47,7 @@ public class DjangoSpecificStatementTest {
 
   @Test
   public void testGetSql() {
-    DjangoSpecificStatement djangoSpecificStatement = DjangoSpecificStatement.INSTANCE;
+    DjangoGetTableNamesStatement djangoSpecificStatement = DjangoGetTableNamesStatement.INSTANCE;
     String djangoSpecificStatementList[] = djangoSpecificStatement.getSql();
     assertEquals(1, djangoSpecificStatementList.length);
     assertEquals(djangoSpecificSql, djangoSpecificStatementList[0].toString());
@@ -57,7 +57,7 @@ public class DjangoSpecificStatementTest {
   public void testExecute() {
     BackendConnection backendConnection = mock(BackendConnection.class);
 
-    DjangoSpecificStatement djangoSpecificStatement = DjangoSpecificStatement.INSTANCE;
+    DjangoGetTableNamesStatement djangoSpecificStatement = DjangoGetTableNamesStatement.INSTANCE;
     StatementResult statementResult = djangoSpecificStatement.execute(backendConnection);
     ResultSet resultSet = statementResult.getResultSet();
     assertFalse(resultSet.next());

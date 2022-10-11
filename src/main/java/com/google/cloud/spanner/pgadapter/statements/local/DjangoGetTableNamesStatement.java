@@ -25,10 +25,10 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResu
 import com.google.common.collect.ImmutableList;
 
 @InternalApi
-public class DjangoSpecificStatement implements LocalStatement {
-  public static final DjangoSpecificStatement INSTANCE = new DjangoSpecificStatement();
+public class DjangoGetTableNamesStatement implements LocalStatement {
+  public static final DjangoGetTableNamesStatement INSTANCE = new DjangoGetTableNamesStatement();
 
-  private DjangoSpecificStatement() {}
+  private DjangoGetTableNamesStatement() {}
 
   @Override
   public String[] getSql() {
