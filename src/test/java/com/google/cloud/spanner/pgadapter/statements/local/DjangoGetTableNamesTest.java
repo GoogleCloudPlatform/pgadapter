@@ -47,7 +47,8 @@ public class DjangoGetTableNamesTest {
 
   @Test
   public void testGetSql() {
-    DjangoGetTableNamesStatement djangoGetTableNamesStatement = DjangoGetTableNamesStatement.INSTANCE;
+    DjangoGetTableNamesStatement djangoGetTableNamesStatement =
+        DjangoGetTableNamesStatement.INSTANCE;
     String djangoGetTableNamesStatementsList[] = djangoGetTableNamesStatement.getSql();
     assertEquals(1, djangoGetTableNamesStatementsList.length);
     assertEquals(djangoGetTableNamesSql, djangoGetTableNamesStatementsList[0]);
@@ -57,7 +58,8 @@ public class DjangoGetTableNamesTest {
   public void testExecute() {
     BackendConnection backendConnection = mock(BackendConnection.class);
 
-    DjangoGetTableNamesStatement djangoGetTableNamesStatement = DjangoGetTableNamesStatement.INSTANCE;
+    DjangoGetTableNamesStatement djangoGetTableNamesStatement =
+        DjangoGetTableNamesStatement.INSTANCE;
     StatementResult statementResult = djangoGetTableNamesStatement.execute(backendConnection);
     ResultSet resultSet = statementResult.getResultSet();
     assertFalse(resultSet.next());
