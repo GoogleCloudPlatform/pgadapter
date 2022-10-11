@@ -29,7 +29,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class DjangoSpecificStatementTest {
 
-  private String djangoSpecificSql =
+  private String djangoGetTableNamesSql =
       "\n"
           + "            SELECT\n"
           + "                c.relname,\n"
@@ -47,18 +47,18 @@ public class DjangoSpecificStatementTest {
 
   @Test
   public void testGetSql() {
-    DjangoGetTableNamesStatement djangoSpecificStatement = DjangoGetTableNamesStatement.INSTANCE;
-    String djangoSpecificStatementList[] = djangoSpecificStatement.getSql();
-    assertEquals(1, djangoSpecificStatementList.length);
-    assertEquals(djangoSpecificSql, djangoSpecificStatementList[0].toString());
+    DjangoGetTableNamesStatement djangoGetTableNamesStatement = DjangoGetTableNamesStatement.INSTANCE;
+    String djangoGetTableNamesStatementsList[] = djangoGetTableNamesStatement.getSql();
+    assertEquals(1, djangoGetTableNamesStatementsList.length);
+    assertEquals(djangoGetTableNamesSql, djangoGetTableNamesStatementsList[0]);
   }
 
   @Test
   public void testExecute() {
     BackendConnection backendConnection = mock(BackendConnection.class);
 
-    DjangoGetTableNamesStatement djangoSpecificStatement = DjangoGetTableNamesStatement.INSTANCE;
-    StatementResult statementResult = djangoSpecificStatement.execute(backendConnection);
+    DjangoGetTableNamesStatement djangoGetTableNamesStatement = DjangoGetTableNamesStatement.INSTANCE;
+    StatementResult statementResult = djangoGetTableNamesStatement.execute(backendConnection);
     ResultSet resultSet = statementResult.getResultSet();
     assertFalse(resultSet.next());
     assertEquals(2, resultSet.getColumnCount());
