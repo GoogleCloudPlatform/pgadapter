@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.9.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.8.0...v0.9.0) (2022-10-11)
+
+
+### Features
+
+* added support for the set and show time zone ([#361](https://github.com/GoogleCloudPlatform/pgadapter/issues/361)) ([66e3788](https://github.com/GoogleCloudPlatform/pgadapter/commit/66e3788fa794b2200dca160214a8b2b3a998952e))
+
+
+### Bug Fixes
+
+* bind to all loopback addresses ([#375](https://github.com/GoogleCloudPlatform/pgadapter/issues/375)) ([82bc566](https://github.com/GoogleCloudPlatform/pgadapter/commit/82bc566bcd7a45c5679bdb33bae693055593edab))
+* exceptions without messages could cause NullPointerExceptions ([#381](https://github.com/GoogleCloudPlatform/pgadapter/issues/381)) ([3a9a55e](https://github.com/GoogleCloudPlatform/pgadapter/commit/3a9a55ea3d3f6f7297c4747c3dff3689e42d25fa))
+
+
+### Documentation
+
+* add docs tag for dependency ([#374](https://github.com/GoogleCloudPlatform/pgadapter/issues/374)) ([a619595](https://github.com/GoogleCloudPlatform/pgadapter/commit/a619595f91946a0c720867adfb4cc474ad6838fd))
+* add sample for gorm ([#351](https://github.com/GoogleCloudPlatform/pgadapter/issues/351)) ([840ab53](https://github.com/GoogleCloudPlatform/pgadapter/commit/840ab53b0160c182ddd33808c72a907d101cbaaf))
+* document support for JDBC and pgx ([#352](https://github.com/GoogleCloudPlatform/pgadapter/issues/352)) ([847a2e3](https://github.com/GoogleCloudPlatform/pgadapter/commit/847a2e3df2e9dcadbadf752cac0abdd73f91f4d8))
+
 ## [0.8.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.7.0...v0.8.0) (2022-09-25)
 
 
