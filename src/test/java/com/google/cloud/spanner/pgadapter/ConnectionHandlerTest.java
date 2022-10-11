@@ -353,6 +353,41 @@ public class ConnectionHandlerTest {
   }
 
   @Test
+  public void testRestartConnectionWithSsl_SslSocketCreationFailureIsConvertedToPGException() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          void createSSLSocket() throws IOException {
+            throw new IOException();
+          }
+        };
+    PGException exception = assertThrows(PGException.class, connection::restartConnectionWithSsl);
+    assertEquals("Failed to create SSL socket: java.io.IOException", exception.getMessage());
+  }
+
+  @Test
+  public void
+      testRestartConnectionWithSsl_SslSocketCreationFailureIsConvertedToPGExceptionWithMessage() {
+    ProxyServer server = mock(ProxyServer.class);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    ConnectionHandler connection =
+        new ConnectionHandler(server, socket) {
+          @Override
+          void createSSLSocket() throws IOException {
+            throw new IOException("test error");
+          }
+        };
+    PGException exception = assertThrows(PGException.class, connection::restartConnectionWithSsl);
+    assertEquals("Failed to create SSL socket: test error", exception.getMessage());
+  }
+
+  @Test
   public void testRestartConnectionWithSsl_SendsPGException() {
     ProxyServer server = mock(ProxyServer.class);
     Socket socket = mock(Socket.class);
