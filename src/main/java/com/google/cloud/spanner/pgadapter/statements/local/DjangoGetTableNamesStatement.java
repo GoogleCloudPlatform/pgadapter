@@ -24,6 +24,13 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
 import com.google.common.collect.ImmutableList;
 
+/*
+ * Django sends this statement to get the list of all the relations present in the database.
+ * After getting that list, Django searches for django_migrations table to check if it can perform migrations
+ * Since we will be returning an empty resultset, Django will not perform migrations as it won't find the django_migrations table.
+ * And this behavior shown by the Django is the intended behaviour because anyway we don't support migrations.
+ * */
+
 @InternalApi
 public class DjangoGetTableNamesStatement implements LocalStatement {
   public static final DjangoGetTableNamesStatement INSTANCE = new DjangoGetTableNamesStatement();
