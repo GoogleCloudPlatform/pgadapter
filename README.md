@@ -5,8 +5,8 @@ equivalent for Spanner databases [that use the PostgreSQL interface](https://clo
 
 PGAdapter can be used with the following clients:
 1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
-2. `JDBC`: Versions 42.x and higher have __experimental support__. See [JDBC support](docs/jdbc.md) for more details.
-3. `pgx`: Version 4.15 and higher have __experimental support__. See [pgx support](docs/pgx.md) for more details.
+2. `JDBC`: Versions 42.x and higher are supported. See [JDBC support](docs/jdbc.md) for more details.
+3. `pgx`: Version 4.15 and higher are supported. See [pgx support](docs/pgx.md) for more details.
 4. `psycopg2`: Version 2.9.3 and higher (but not `psycopg3`) have __experimental support__.
    See [psycopg2](docs/psycopg2.md) for more details. PGAdapter has not yet been tested with `psycopg3`.
 5. `node-postgres`: Version 8.8.0 and higher have __experimental support__.
@@ -57,9 +57,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.8.0` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.9.0` with the version you want to download):
 ```shell
-VERSION=v0.8.0
+VERSION=v0.9.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -94,7 +94,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```

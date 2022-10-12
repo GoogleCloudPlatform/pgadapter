@@ -55,7 +55,7 @@ public class DataRowResponse extends WireOutput {
         columns.add(null);
       } else {
         DataFormat format = DataFormat.getDataFormat(column_index, statement, mode, options);
-        byte[] column = Converter.parseData(this.resultSet, column_index, format);
+        byte[] column = Converter.convertToPG(this.resultSet, column_index, format);
         length += column.length;
         columns.add(column);
       }

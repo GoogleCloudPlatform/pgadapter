@@ -268,7 +268,11 @@ public class ConnectionHandler extends Thread {
       runConnection(true);
     } catch (IOException ioException) {
       PGException pgException =
-          PGException.newBuilder("Failed to create SSL socket: " + ioException.getMessage())
+          PGException.newBuilder(
+                  "Failed to create SSL socket: "
+                      + (ioException.getMessage() == null
+                          ? ioException.getClass().getName()
+                          : ioException.getMessage()))
               .setSeverity(Severity.FATAL)
               .setSQLState(SQLState.InternalError)
               .build();
@@ -331,7 +335,7 @@ public class ConnectionHandler extends Thread {
         this.handleError(pgException);
       } catch (Exception exception) {
         this.handleError(
-            PGException.newBuilder(exception.getMessage())
+            PGException.newBuilder(exception)
                 .setSeverity(Severity.FATAL)
                 .setSQLState(SQLState.InternalError)
                 .build());
@@ -405,7 +409,7 @@ public class ConnectionHandler extends Thread {
       message.send();
     } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
       this.handleError(
-          PGException.newBuilder(fatalException.getMessage())
+          PGException.newBuilder(fatalException)
               .setSeverity(Severity.FATAL)
               .setSQLState(SQLState.InternalError)
               .build());

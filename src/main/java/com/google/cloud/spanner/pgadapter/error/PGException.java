@@ -54,6 +54,12 @@ public class PGException extends RuntimeException {
     }
   }
 
+  public static Builder newBuilder(Exception cause) {
+    Preconditions.checkNotNull(cause);
+    return new Builder(
+        cause.getMessage() == null ? cause.getClass().getName() : cause.getMessage());
+  }
+
   public static Builder newBuilder(String message) {
     return new Builder(Preconditions.checkNotNull(message));
   }

@@ -20,6 +20,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
@@ -137,12 +138,30 @@ public class TimestampParser extends Parser<Timestamp> {
     if (this.item == null) {
       return null;
     }
+    return convertToPG(this.item);
+  }
+
+  static byte[] convertToPG(Timestamp value) {
     long microseconds =
-        ((this.item.getSeconds() - PG_EPOCH_SECONDS) * MICROSECONDS_IN_SECOND)
-            + (this.item.getNanos() / NANOSECONDS_IN_MICROSECONDS);
+        ((value.getSeconds() - PG_EPOCH_SECONDS) * MICROSECONDS_IN_SECOND)
+            + (value.getNanos() / NANOSECONDS_IN_MICROSECONDS);
     byte[] result = new byte[8];
     ByteConverter.int8(result, 0, microseconds);
     return result;
+  }
+
+  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+    switch (format) {
+      case SPANNER:
+        return resultSet.getTimestamp(position).toString().getBytes(StandardCharsets.UTF_8);
+      case POSTGRESQL_TEXT:
+        return toPGString(resultSet.getTimestamp(position).toString())
+            .getBytes(StandardCharsets.UTF_8);
+      case POSTGRESQL_BINARY:
+        return convertToPG(resultSet.getTimestamp(position));
+      default:
+        throw new IllegalArgumentException("unknown data format: " + format);
+    }
   }
 
   /**
