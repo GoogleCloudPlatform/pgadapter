@@ -9,6 +9,8 @@ PGAdapter can be used with the following clients:
 3. `pgx`: Version 4.15 and higher are supported. See [pgx support](docs/pgx.md) for more details.
 4. `psycopg2`: Version 2.9.3 and higher (but not `psycopg3`) have __experimental support__.
    See [psycopg2](docs/psycopg2.md) for more details. PGAdapter has not yet been tested with `psycopg3`.
+5. `node-postgres`: Version 8.8.0 and higher have __experimental support__.
+   See [node-postgres support](docs/node-postgres.md) for more details.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.

@@ -1011,7 +1011,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCopyIn() {
-    CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, true);
+    CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, "all_types", true);
 
     String sql =
         "select \"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\", \"col_jsonb\" "

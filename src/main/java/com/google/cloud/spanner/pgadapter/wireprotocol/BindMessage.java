@@ -71,9 +71,19 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.statement = connection.getStatement(statementName);
   }
 
-  /** Given the prepared statement, bind it and save it locally. */
   @Override
   void buffer(BackendConnection backendConnection) {
+    if (isExtendedProtocol() && !this.statement.isDescribed()) {
+      try {
+        // Make sure all parameters have been described, so we always send typed parameters to Cloud
+        // Spanner.
+        this.statement.describeParameters(this.parameters, true);
+      } catch (Throwable ignore) {
+        // Ignore any error messages while describing the parameters, and let the following
+        // DescribePortal or execute message handle any errors that are caused by invalid
+        // statements.
+      }
+    }
     this.connection.registerPortal(
         this.portalName,
         this.statement.bind(
@@ -82,8 +92,8 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   @Override
   public void flush() throws Exception {
-    // The simple query protocol does not expect a BindComplete response.
     if (isExtendedProtocol()) {
+      // The simple query protocol does not expect a BindComplete response.
       new BindCompleteResponse(this.outputStream).send(false);
     }
   }
