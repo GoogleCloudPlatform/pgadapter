@@ -20,6 +20,7 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
@@ -28,6 +29,12 @@ import org.postgresql.util.ByteConverter;
 /** Translate from wire protocol to {@link Number}. */
 @InternalApi
 public class NumericParser extends Parser<String> {
+  private static final byte[] NAN = new byte[8];
+
+  static {
+    ByteConverter.int2(NAN, 4, (short) 0xC000);
+  }
+
   NumericParser(ResultSet item, int position) {
     this.item = item.isNull(position) ? null : item.getString(position);
   }
@@ -73,14 +80,30 @@ public class NumericParser extends Parser<String> {
     if (this.item == null) {
       return null;
     }
-    if (this.item.equalsIgnoreCase("NaN")) {
-      return "NaN".getBytes(StandardCharsets.UTF_8);
+    return convertToPG(this.item);
+  }
+
+  static byte[] convertToPG(@Nonnull String value) {
+    if (value.equalsIgnoreCase("NaN")) {
+      return NAN;
     }
     try {
-      return ByteConverter.numeric(new BigDecimal(this.item));
+      return ByteConverter.numeric(new BigDecimal(value));
     } catch (NumberFormatException exception) {
       throw SpannerExceptionFactory.newSpannerException(
-          ErrorCode.INVALID_ARGUMENT, "Invalid numeric value: " + this.item);
+          ErrorCode.INVALID_ARGUMENT, "Invalid numeric value: " + value);
+    }
+  }
+
+  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+    switch (format) {
+      case SPANNER:
+      case POSTGRESQL_TEXT:
+        return resultSet.getString(position).getBytes(StandardCharsets.UTF_8);
+      case POSTGRESQL_BINARY:
+        return convertToPG(resultSet.getString(position));
+      default:
+        throw new IllegalArgumentException("unknown data format: " + format);
     }
   }
 
