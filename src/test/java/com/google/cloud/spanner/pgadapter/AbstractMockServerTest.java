@@ -268,7 +268,7 @@ public abstract class AbstractMockServerTest {
   protected static MockSpannerServiceImpl mockSpanner;
   protected static MockDatabaseAdminImpl mockDatabaseAdmin;
   protected static MockInstanceAdminImpl mockInstanceAdmin;
-  private static Server spannerServer;
+  protected static Server spannerServer;
   protected static ProxyServer pgServer;
 
   protected List<WireMessage> getWireMessages() {

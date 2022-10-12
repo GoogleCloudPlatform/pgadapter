@@ -15,12 +15,15 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
@@ -122,5 +125,22 @@ public class ExtendedQueryProtocolHandlerTest {
     verify(bindMessage).flush();
     verify(describeMessage).flush();
     verify(executeMessage).flush();
+  }
+
+  @Test
+  public void testInterrupted() {
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionMetadata.getOutputStream()).thenReturn(mock(DataOutputStream.class));
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    ParseMessage parseMessage = mock(ParseMessage.class);
+
+    ExtendedQueryProtocolHandler handler =
+        new ExtendedQueryProtocolHandler(connectionHandler, backendConnection);
+    handler.buffer(parseMessage);
+
+    Thread.currentThread().interrupt();
+    PGException exception = assertThrows(PGException.class, handler::sync);
+    assertEquals("Query cancelled", exception.getMessage());
+    assertEquals(SQLState.QueryCanceled, exception.getSQLState());
   }
 }
