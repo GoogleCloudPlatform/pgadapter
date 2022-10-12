@@ -29,6 +29,12 @@ import org.postgresql.util.ByteConverter;
 /** Translate from wire protocol to {@link Number}. */
 @InternalApi
 public class NumericParser extends Parser<String> {
+  private static final byte[] NAN = new byte[8];
+
+  static {
+    ByteConverter.int2(NAN, 4, (short) 0xC000);
+  }
+
   NumericParser(ResultSet item, int position) {
     this.item = item.isNull(position) ? null : item.getString(position);
   }
@@ -79,7 +85,7 @@ public class NumericParser extends Parser<String> {
 
   static byte[] convertToPG(@Nonnull String value) {
     if (value.equalsIgnoreCase("NaN")) {
-      return "NaN".getBytes(StandardCharsets.UTF_8);
+      return NAN;
     }
     try {
       return ByteConverter.numeric(new BigDecimal(value));
