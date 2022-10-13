@@ -472,20 +472,26 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         // However, the legacy date type will never use BINARY transfer and will always be sent with
         // unspecified type by the JDBC driver the first time. This means that we need 3 round trips
         // for a query that uses a prepared statement the first time.
+        int expectedRequestCount;
+        switch (preparedThreshold) {
+          case -1:
+          case 1:
+            expectedRequestCount = 3;
+            break;
+          default:
+            expectedRequestCount = 2;
+            break;
+        }
         assertEquals(
-            "Prepare threshold: " + preparedThreshold,
-            preparedThreshold == 1 || preparedThreshold < 0 ? 3 : 1,
-            requests.size());
+            "Prepare threshold: " + preparedThreshold, expectedRequestCount, requests.size());
 
         ExecuteSqlRequest executeRequest;
         if (preparedThreshold == 1) {
           // The order of statements here is a little strange. The execution of the statement is
           // executed first, and the describe statements are then executed afterwards. The reason
-          // for
-          // this is that JDBC does the following when it encounters a statement parameter that is
-          // 'unknown' (it considers the legacy date type as unknown, as it does not know if the
-          // user
-          // means date, timestamp or timestamptz):
+          // for this is that JDBC does the following when it encounters a statement parameter that
+          // is 'unknown' (it considers the legacy date type as unknown, as it does not know if the
+          // user means date, timestamp or timestamptz):
           // 1. It sends a DescribeStatement message, but without a flush or a sync, as it is not
           //    planning on using the information for this request.
           // 2. It then sends the Execute message followed by a sync. This causes PGAdapter to sync
@@ -597,15 +603,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testQueryWithNonExistingTable() throws SQLException {
-    String sql = "select * from non_existing_table where id=$1";
+    String sql = "select * from non_existing_table where id=?";
+    String pgSql = "select * from non_existing_table where id=$1";
     mockSpanner.putStatementResult(
         StatementResult.exception(
-            Statement.of(sql),
+            Statement.newBuilder(pgSql).bind("p1").to(1L).build(),
             Status.NOT_FOUND
                 .withDescription("Table non_existing_table not found")
                 .asRuntimeException()));
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        preparedStatement.setLong(1, 1L);
         SQLException exception = assertThrows(SQLException.class, preparedStatement::executeQuery);
         assertEquals(
             "ERROR: Table non_existing_table not found - Statement: 'select * from non_existing_table where id=$1'",
@@ -617,21 +625,24 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     // ExecuteSqlRequest in normal execute mode.
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     assertEquals(1, requests.size());
-    assertEquals(sql, requests.get(0).getSql());
+    assertEquals(pgSql, requests.get(0).getSql());
     assertEquals(QueryMode.NORMAL, requests.get(0).getQueryMode());
   }
 
   @Test
   public void testDmlWithNonExistingTable() throws SQLException {
-    String sql = "update non_existing_table set value=$2 where id=$1";
+    String sql = "update non_existing_table set value=? where id=?";
+    String pgSql = "update non_existing_table set value=$1 where id=$2";
     mockSpanner.putStatementResult(
         StatementResult.exception(
-            Statement.of(sql),
+            Statement.newBuilder(pgSql).bind("p1").to("foo").bind("p2").to(1L).build(),
             Status.NOT_FOUND
                 .withDescription("Table non_existing_table not found")
                 .asRuntimeException()));
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        preparedStatement.setString(1, "foo");
+        preparedStatement.setLong(2, 1L);
         SQLException exception = assertThrows(SQLException.class, preparedStatement::executeUpdate);
         assertEquals("ERROR: Table non_existing_table not found", exception.getMessage());
       }
@@ -639,7 +650,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     assertEquals(1, requests.size());
-    assertEquals(sql, requests.get(0).getSql());
+    assertEquals(pgSql, requests.get(0).getSql());
     assertEquals(QueryMode.NORMAL, requests.get(0).getQueryMode());
   }
 
