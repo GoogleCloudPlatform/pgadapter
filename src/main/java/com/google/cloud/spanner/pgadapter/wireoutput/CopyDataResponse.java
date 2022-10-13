@@ -18,6 +18,9 @@ import static com.google.cloud.spanner.pgadapter.statements.CopyToStatement.COPY
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.utils.Converter;
 import java.io.DataOutputStream;
 import java.nio.charset.StandardCharsets;
 
@@ -32,9 +35,9 @@ public class CopyDataResponse extends WireOutput {
 
   private final ResponseType responseType;
   private final DataFormat format;
-  private final byte[][] binaryData;
   private final String stringData;
   private final char rowTerminator;
+  private final Converter converter;
 
   /** Creates a {@link CopyDataResponse} message containing the fixed binary COPY header. */
   @InternalApi
@@ -52,9 +55,9 @@ public class CopyDataResponse extends WireOutput {
     super(output, length + 4);
     this.responseType = responseType;
     this.format = DataFormat.POSTGRESQL_BINARY;
-    this.binaryData = null;
     this.stringData = null;
     this.rowTerminator = 0;
+    this.converter = null;
   }
 
   public CopyDataResponse(DataOutputStream output, String data, char rowTerminator) {
@@ -63,16 +66,23 @@ public class CopyDataResponse extends WireOutput {
     this.format = DataFormat.POSTGRESQL_TEXT;
     this.stringData = data;
     this.rowTerminator = rowTerminator;
-    this.binaryData = null;
+    this.converter = null;
   }
 
-  public CopyDataResponse(DataOutputStream output, int length, byte[][] data) {
-    super(output, length + 4);
+  public CopyDataResponse(DataOutputStream output, Converter converter) {
+    super(output, 0);
     this.responseType = ResponseType.ROW;
     this.format = DataFormat.POSTGRESQL_BINARY;
     this.stringData = null;
     this.rowTerminator = 0;
-    this.binaryData = data;
+    this.converter = converter;
+  }
+
+  public void send(boolean flush) throws Exception {
+    if (converter != null) {
+      this.length = 4 + converter.convertResultSetRowToDataRowResponse();
+    }
+    super.send(flush);
   }
 
   @Override
@@ -87,16 +97,11 @@ public class CopyDataResponse extends WireOutput {
         this.outputStream.writeInt(0); // header extension area length
       } else if (this.responseType == ResponseType.TRAILER) {
         this.outputStream.writeShort(-1);
+      } else if (this.converter != null) {
+        this.converter.writeBuffer(this.outputStream);
       } else {
-        this.outputStream.writeShort(this.binaryData.length);
-        for (int col = 0; col < this.binaryData.length; col++) {
-          if (this.binaryData[col] == null) {
-            this.outputStream.writeInt(-1);
-          } else {
-            this.outputStream.writeInt(this.binaryData[col].length);
-            this.outputStream.write(this.binaryData[col]);
-          }
-        }
+        // This should not happen.
+        throw PGExceptionFactory.newPGException("Invalid CopyDataResponse", SQLState.InternalError);
       }
     }
   }
