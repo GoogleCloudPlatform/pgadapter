@@ -38,6 +38,7 @@ import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.SendResultSetState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.PartitionQueryResult;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.EmptyQueryResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
@@ -388,6 +389,7 @@ public abstract class ControlMessage extends WireMessage {
   static final class SendResultSetRunnable implements Callable<Long> {
     private final IntermediateStatement describedResult;
     private ResultSet resultSet;
+    private Converter converter;
     private final BatchReadOnlyTransaction batchReadOnlyTransaction;
     private final Partition partition;
     private final long maxRows;
@@ -428,6 +430,12 @@ public abstract class ControlMessage extends WireMessage {
         boolean hasData) {
       this.describedResult = describedResult;
       this.resultSet = resultSet;
+      this.converter =
+          new Converter(
+              describedResult,
+              mode,
+              describedResult.getConnectionHandler().getServer().getOptions(),
+              resultSet);
       this.batchReadOnlyTransaction = null;
       this.partition = null;
       this.maxRows = maxRows;
@@ -462,6 +470,12 @@ public abstract class ControlMessage extends WireMessage {
         // will be cleaned up at a later moment.
         try {
           resultSet = batchReadOnlyTransaction.execute(partition);
+          converter =
+              new Converter(
+                  describedResult,
+                  mode,
+                  describedResult.getConnectionHandler().getServer().getOptions(),
+                  resultSet);
           hasData = resultSet.next();
         } catch (Throwable t) {
           if (includePrefix) {
@@ -490,7 +504,7 @@ public abstract class ControlMessage extends WireMessage {
         if (Thread.interrupted()) {
           throw PGExceptionFactory.newQueryCancelledException();
         }
-        WireOutput wireOutput = describedResult.createDataRowResponse(resultSet, mode);
+        WireOutput wireOutput = describedResult.createDataRowResponse(converter);
         synchronized (describedResult) {
           wireOutput.send(false);
         }

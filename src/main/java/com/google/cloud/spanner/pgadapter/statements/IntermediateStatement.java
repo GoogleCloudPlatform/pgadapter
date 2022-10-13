@@ -30,11 +30,11 @@ import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
+import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import java.io.DataOutputStream;
@@ -333,8 +333,8 @@ public class IntermediateStatement {
     return EMPTY_WIRE_OUTPUT_ARRAY;
   }
 
-  public WireOutput createDataRowResponse(ResultSet resultSet, QueryMode mode) {
-    return new DataRowResponse(this.outputStream, this, resultSet, this.options, mode);
+  public WireOutput createDataRowResponse(Converter converter) {
+    return new DataRowResponse(this.outputStream, converter);
   }
 
   public WireOutput[] createResultSuffix() {
