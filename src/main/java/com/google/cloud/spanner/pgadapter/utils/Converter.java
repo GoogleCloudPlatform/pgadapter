@@ -55,10 +55,6 @@ public class Converter {
     this.resultSet = resultSet;
   }
 
-  public int getColumnCount() {
-    return resultSet.getColumnCount();
-  }
-
   public ResultSet getResultSet() {
     return resultSet;
   }
