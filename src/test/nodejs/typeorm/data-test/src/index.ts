@@ -17,12 +17,12 @@ import { DataSource } from "typeorm"
 import {AllTypes} from "./entity/AllTypes";
 import { User } from "./entity/User"
 
-function runTest(port: number, test: (dataSource: DataSource) => Promise<void>) {
+function runTest(host: string, port: number, database: string, test: (dataSource: DataSource) => Promise<void>) {
     const AppDataSource = new DataSource({
         type: "postgres",
-        host: "localhost",
+        host,
         port,
-        database: "db",
+        database,
         entities: [AllTypes, User],
         synchronize: false,
         logging: false,
@@ -118,47 +118,47 @@ async function testCreateAllTypes(dataSource: DataSource) {
 }
 
 require('yargs')
-    .demand(2)
+    .demand(4)
     .command(
-        'findOneUser <port>',
+        'findOneUser <host> <port> <database>',
         'Selects one user by id',
         {},
-        opts => runTest(opts.port, testFindOneUser)
+        opts => runTest(opts.host, opts.port, opts.database, testFindOneUser)
     )
     .example('node $0 findOneUser 5432')
     .command(
-        'createUser <port>',
+        'createUser <host> <port> <database>',
         'Creates one user',
         {},
-        opts => runTest(opts.port, testCreateUser)
+        opts => runTest(opts.host, opts.port, opts.database, testCreateUser)
     )
     .example('node $0 createUser 5432')
     .command(
-        'updateUser <port>',
+        'updateUser <host> <port> <database>',
         'Updates one user',
         {},
-        opts => runTest(opts.port, testUpdateUser)
+        opts => runTest(opts.host, opts.port, opts.database, testUpdateUser)
     )
     .example('node $0 updateUser 5432')
     .command(
-        'deleteUser <port>',
+        'deleteUser <host> <port> <database>',
         'Deletes one user',
         {},
-        opts => runTest(opts.port, testDeleteUser)
+        opts => runTest(opts.host, opts.port, opts.database, testDeleteUser)
     )
     .example('node $0 deleteUser 5432')
     .command(
-        'findOneAllTypes <port>',
+        'findOneAllTypes <host> <port> <database>',
         'Loads one row with all types',
         {},
-        opts => runTest(opts.port, testFindOneAllTypes)
+        opts => runTest(opts.host, opts.port, opts.database, testFindOneAllTypes)
     )
     .example('node $0 findOneAllTypes 5432')
     .command(
-        'createAllTypes <port>',
+        'createAllTypes <host> <port> <database>',
         'Creates one row with all types',
         {},
-        opts => runTest(opts.port, testCreateAllTypes)
+        opts => runTest(opts.host, opts.port, opts.database, testCreateAllTypes)
     )
     .example('node $0 createAllTypes 5432')
     .wrap(120)
