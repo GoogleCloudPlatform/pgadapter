@@ -235,7 +235,7 @@ public class BackendConnection {
           result.setException(spannerException);
         }
         throw spannerException;
-      } catch (Exception exception) {
+      } catch (Throwable exception) {
         result.setException(exception);
         throw exception;
       }
@@ -610,6 +610,10 @@ public class BackendConnection {
     }
     // If there are only DML statements left, those can be executed as an auto-commit dml batch.
     if (isSync && hasOnlyDmlStatementsAfter(index)) {
+      return;
+    }
+    // Do not start a transaction if a batch is already active.
+    if (spannerConnection.isDdlBatchActive() || spannerConnection.isDmlBatchActive()) {
       return;
     }
 

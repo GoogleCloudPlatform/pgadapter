@@ -218,10 +218,7 @@ public class IntermediateStatement {
     if (this.futureStatementResult != null) {
       if (resultNotReadyBehavior == ResultNotReadyBehavior.FAIL
           && !this.futureStatementResult.isDone()) {
-        IllegalStateException e =
-            new IllegalStateException("Statement result cannot be retrieved before flush/sync");
-        e.printStackTrace();
-        throw e;
+        throw new IllegalStateException("Statement result cannot be retrieved before flush/sync");
       }
       try {
         setStatementResult(this.futureStatementResult.get());
