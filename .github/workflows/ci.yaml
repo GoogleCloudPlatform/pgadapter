@@ -41,11 +41,10 @@ jobs:
       with:
         python-version: '3.9'
     - run: python --version
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
     - run: pip install -r ./src/test/python/requirements.txt
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 16
     - run: .ci/run-with-credentials.sh units
 
   lint:
