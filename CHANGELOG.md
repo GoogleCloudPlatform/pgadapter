@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.10.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.9.0...v0.10.0) (2022-10-14)
+
+
+### Features
+
+* add experimental support for node-postgres ([#362](https://github.com/GoogleCloudPlatform/pgadapter/issues/362)) ([9e3e952](https://github.com/GoogleCloudPlatform/pgadapter/commit/9e3e95284a34516967f2acdd2acfeb94ab50a2ea))
+* added support for Django specific statement ([#382](https://github.com/GoogleCloudPlatform/pgadapter/issues/382)) ([1137ed1](https://github.com/GoogleCloudPlatform/pgadapter/commit/1137ed16725e7735da72573124244e05503bb19e))
+
+
+### Performance Improvements
+
+* copy binary can write directly to a byte buffer ([#385](https://github.com/GoogleCloudPlatform/pgadapter/issues/385)) ([18ddbdd](https://github.com/GoogleCloudPlatform/pgadapter/commit/18ddbddcbf2e66f3719fdbb1a43b021c571444e1))
+* do not create a new parser for each column ([#383](https://github.com/GoogleCloudPlatform/pgadapter/issues/383)) ([5352f79](https://github.com/GoogleCloudPlatform/pgadapter/commit/5352f791f23689503d3b49c3ee300baa9622ab87))
+* write converted values directly to a byte buffer ([#384](https://github.com/GoogleCloudPlatform/pgadapter/issues/384)) ([bec1657](https://github.com/GoogleCloudPlatform/pgadapter/commit/bec1657a43500c1f61126c744ad5b95cdce4c2e7))
+
+
+### Documentation
+
+* document how to set a statement timeout ([#390](https://github.com/GoogleCloudPlatform/pgadapter/issues/390)) ([2db00f9](https://github.com/GoogleCloudPlatform/pgadapter/commit/2db00f9d1b0c92d7266cb75ad14d924bb42c6543))
+
 ## [0.9.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.8.0...v0.9.0) (2022-10-11)
 
 
