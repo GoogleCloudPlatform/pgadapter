@@ -87,3 +87,18 @@ You can solve this problem by either:
 PGAdapter supports `COPY table_name FROM STDIN [BINARY]` and `COPY table_name TO STDOUT [BINARY]`.
 These commands can be used to copy data between different Cloud Spanner databases, or between a
 Cloud Spanner database and a PostgreSQL database. See [copy support](copy.md) for more information.
+
+## How can I set a statement timeout?
+You can set the statement timeout that a connection should use by executing a
+`set statement_timeout=<timeout>` statement. The timeout is specified in milliseconds.
+
+Example:
+
+```sql
+-- Use a 10 second (10,000 milliseconds) timeout.
+set statement_timeout=10000;
+select *
+from large_table
+order by my_col;
+```
+
