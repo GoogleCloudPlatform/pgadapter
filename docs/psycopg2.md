@@ -1,7 +1,7 @@
-# Google Cloud Spanner PGAdapter - psycopg2 Experimental Support
+# PGAdapter - psycopg2 Connection Options
 
-PGAdapter has __experimental support__ for the [Python psycopg2 driver](https://www.psycopg.org/)
-version 2.9.3 and higher.
+PGAdapter supports the [Python psycopg2 driver](https://www.psycopg.org/) version 2.9.3 and higher.
+This does not include [psycopg3](https://www.psycopg.org/psycopg3/).
 
 ## Usage
 
