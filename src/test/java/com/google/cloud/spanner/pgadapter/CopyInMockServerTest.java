@@ -1444,8 +1444,10 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1")
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE schema_name = $1 AND table_name = $2")
                 .bind("p1")
+                .to("public")
+                .bind("p2")
                 .to("users")
                 .build(),
             resultSet));
@@ -1514,7 +1516,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             allTypesResultSet));
 
     String indexedColumnsCountSql =
-        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3, $4)";
+        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema=$1 and table_name=$2 and column_name in ($3, $4, $5)";
     ResultSetMetadata indexedColumnsCountMetadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
@@ -1538,12 +1540,14 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(indexedColumnsCountSql)
                 .bind("p1")
-                .to("users")
+                .to("public")
                 .bind("p2")
-                .to("id")
+                .to("users")
                 .bind("p3")
-                .to("age")
+                .to("id")
                 .bind("p4")
+                .to("age")
+                .bind("p5")
                 .to("name")
                 .build(),
             indexedColumnsCountResultSet));

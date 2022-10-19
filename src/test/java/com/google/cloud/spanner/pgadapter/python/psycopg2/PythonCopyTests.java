@@ -168,6 +168,49 @@ public class PythonCopyTests extends PythonTestSetup {
   }
 
   @Test
+  public void copySimpleFromTest() throws IOException, InterruptedException {
+    String sql = "COPY test from STDIN CSV DELIMITER ','";
+    String copyType = "SIMPLE_FROM";
+    String file = "1,hello\n2,world\n";
+    String sql1 =
+        "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1";
+    String sql2 =
+        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3)";
+    Statement s1 = Statement.newBuilder(sql1).bind("p1").to("test").build();
+
+    Statement s2 =
+        Statement.newBuilder(sql2)
+            .bind("p1")
+            .to("test")
+            .bind("p2")
+            .to("id")
+            .bind("p3")
+            .to("name")
+            .build();
+    mockSpanner.putStatementResult(StatementResult.query(s1, createResultSet()));
+    mockSpanner.putStatementResult(StatementResult.query(s2, createResultSetForIndexColumns()));
+    String actualOutput = executeCopy(pgServer.getLocalPort(), sql, file, copyType);
+
+    assertEquals("2\n", actualOutput);
+
+    List<QueryMessage> qm = getWireMessagesOfType(QueryMessage.class);
+    assertEquals(1, qm.size());
+    assertEquals(sql, qm.get(0).getStatement().getSql());
+
+    assertEquals(1, getWireMessagesOfType(CopyDataMessage.class).size());
+    assertEquals(1, getWireMessagesOfType(CopyDoneMessage.class).size());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.getRequestsOfType(CommitRequest.class).get(0).getMutationsCount());
+    Mutation mutation = mockSpanner.getRequestsOfType(CommitRequest.class).get(0).getMutations(0);
+
+    assertNotNull(mutation.getInsert());
+
+    assertEquals(2, mutation.getInsert().getColumnsCount());
+    assertEquals(2, mutation.getInsert().getValuesCount());
+  }
+
+  @Test
   public void copyToTest() throws IOException, InterruptedException {
     String sql = "COPY test TO STDOUT DELIMITER ','";
     String copyType = "TO";

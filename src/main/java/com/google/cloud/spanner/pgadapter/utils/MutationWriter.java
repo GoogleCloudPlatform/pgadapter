@@ -32,10 +32,10 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
 import com.google.cloud.spanner.pgadapter.session.CopySettings;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.FutureCallback;
@@ -92,7 +92,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final CopyTransactionMode transactionMode;
   private long rowCount;
   private final Connection connection;
-  private final String tableName;
+  private final String qualifiedTableName;
   private final Map<String, Type> tableColumns;
   private final int maxAtomicBatchSize;
   private final int nonAtomicBatchSize;
@@ -115,16 +115,16 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       SessionState sessionState,
       CopyTransactionMode transactionMode,
       Connection connection,
-      String tableName,
+      String qualifiedTableName,
       Map<String, Type> tableColumns,
       int indexedColumnsCount,
-      CopyOptions.Format copyFormat,
+      Format copyFormat,
       CSVFormat format,
       boolean hasHeader)
       throws IOException {
     this.transactionMode = transactionMode;
     this.connection = connection;
-    this.tableName = tableName;
+    this.qualifiedTableName = qualifiedTableName;
     this.tableColumns = tableColumns;
     this.copySettings = new CopySettings(sessionState);
     int atomicMutationLimit = copySettings.getMaxAtomicMutationsLimit();
@@ -485,9 +485,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     // fails halfway, it can easily be retried with InsertOrUpdate as it will just overwrite
     // existing records instead of failing on a UniqueKeyConstraint violation.
     if (copySettings.isCopyUpsert()) {
-      builder = Mutation.newInsertOrUpdateBuilder(this.tableName);
+      builder = Mutation.newInsertOrUpdateBuilder(this.qualifiedTableName);
     } else {
-      builder = Mutation.newInsertBuilder(this.tableName);
+      builder = Mutation.newInsertBuilder(this.qualifiedTableName);
     }
     // Iterate through all table column to copy into
     int index = 0;

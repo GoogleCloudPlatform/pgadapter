@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -28,6 +29,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.text.StringEscapeUtils;
 
 /** A very simple parser that can interpret SQL statements to find specific parts in the string. */
 @InternalApi
@@ -98,6 +100,62 @@ public class SimpleParser {
 
     String getNameAndArrayBrackets() {
       return array ? name + "[]" : name;
+    }
+  }
+
+  static class QuotedString {
+    final boolean escaped;
+    final char quote;
+    final String rawValue;
+    private String value;
+
+    QuotedString(boolean escaped, char quote, String rawValue) {
+      this.escaped = escaped;
+      this.quote = quote;
+      this.rawValue = rawValue;
+    }
+
+    String getValue() {
+      if (this.value == null) {
+        this.value =
+            this.escaped
+                ? unescapeQuotedStringValue(this.rawValue, this.quote)
+                : quotedStringValue(this.rawValue, this.quote);
+      }
+      return this.value;
+    }
+
+    static String quotedStringValue(String quotedString, char quoteChar) {
+      if (quotedString.length() < 2
+          || quotedString.charAt(0) != quoteChar
+          || quotedString.charAt(quotedString.length() - 1) != quoteChar) {
+        throw PGExceptionFactory.newPGException(
+            quotedString + " is not a valid string", SQLState.SyntaxError);
+      }
+      String doubleQuotes = String.valueOf(quoteChar) + quoteChar;
+      String singleQuote = String.valueOf(quoteChar);
+      return quotedString
+          .substring(1, quotedString.length() - 1)
+          .replace(doubleQuotes, singleQuote);
+    }
+
+    static String unescapeQuotedStringValue(String quotedString, char quoteChar) {
+      if (quotedString.length() < 2
+          || quotedString.charAt(0) != quoteChar
+          || quotedString.charAt(quotedString.length() - 1) != quoteChar) {
+        throw PGExceptionFactory.newPGException(
+            quotedString + " is not a valid string", SQLState.SyntaxError);
+      }
+      if (quotedString.startsWith(quoteChar + "\\x")) {
+        throw PGExceptionFactory.newPGException(
+            "PGAdapter does not support hexadecimal byte values in string literals",
+            SQLState.SyntaxError);
+      }
+      String result =
+          StringEscapeUtils.unescapeJava(quotedString.substring(1, quotedString.length() - 1));
+      String doubleQuotes = String.valueOf(quoteChar) + quoteChar;
+      String singleQuote = String.valueOf(quoteChar);
+      return result.replace(doubleQuotes, singleQuote);
     }
   }
 
@@ -300,6 +358,34 @@ public class SimpleParser {
     return sql.substring(start, pos).trim();
   }
 
+  List<TableOrIndexName> readColumnListInParentheses(String name) {
+    if (eatToken("(")) {
+      List<String> expressions = parseExpressionListUntilKeyword(")", true);
+      if (!eatToken(")")) {
+        throw PGExceptionFactory.newPGException(
+            String.format("missing closing parentheses for %s column list", name),
+            SQLState.SyntaxError);
+      }
+      if (expressions.isEmpty()) {
+        throw PGExceptionFactory.newPGException(
+            String.format("empty %s columns list", name), SQLState.SyntaxError);
+      }
+      List<TableOrIndexName> result = new ArrayList<>(expressions.size());
+      for (String expression : expressions) {
+        TableOrIndexName column = new SimpleParser(expression).readTableOrIndexName();
+        if (column == null) {
+          throw PGExceptionFactory.newPGException(
+              "Invalid column name: " + expression, SQLState.SyntaxError);
+        }
+        result.add(column);
+      }
+      return result;
+    } else {
+      throw PGExceptionFactory.newPGException(
+          String.format("missing opening parentheses for %s", name), SQLState.SyntaxError);
+    }
+  }
+
   @Nonnull
   String readKeyword() {
     skipWhitespaces();
@@ -355,7 +441,7 @@ public class SimpleParser {
     if (nameOrSchema == null) {
       return null;
     }
-    if (peekToken(".")) {
+    if (peek(false, false, ".")) {
       String name = "";
       if (eatDotOperator()) {
         name = readIdentifierPart();
@@ -421,7 +507,7 @@ public class SimpleParser {
   }
 
   boolean peekToken(String token) {
-    return peek(false, false, token);
+    return peek(true, false, token);
   }
 
   boolean peek(boolean skipWhitespaceBefore, boolean requireWhitespaceAfter, String keyword) {
@@ -575,6 +661,31 @@ public class SimpleParser {
     }
   }
 
+  QuotedString readSingleQuotedString() {
+    return readQuotedString(SINGLE_QUOTE);
+  }
+
+  QuotedString readDoubleQuotedString() {
+    return readQuotedString(DOUBLE_QUOTE);
+  }
+
+  QuotedString readQuotedString(char quote) {
+    skipWhitespaces();
+    if (pos >= sql.length()) {
+      throw PGExceptionFactory.newPGException("Unexpected end of expression", SQLState.SyntaxError);
+    }
+    boolean escaped = eatToken("e");
+    if (sql.charAt(pos) != quote) {
+      throw PGExceptionFactory.newPGException(
+          "Invalid quote character: " + sql.charAt(pos), SQLState.SyntaxError);
+    }
+    int startPos = pos;
+    if (skipQuotedString()) {
+      return new QuotedString(escaped, quote, sql.substring(startPos, pos));
+    }
+    throw PGExceptionFactory.newPGException("Missing end quote character", SQLState.SyntaxError);
+  }
+
   boolean skipQuotedString() {
     char quote = sql.charAt(pos);
     pos++;
@@ -678,6 +789,19 @@ public class SimpleParser {
       }
     }
     return false;
+  }
+
+  boolean hasMoreTokens() {
+    skipWhitespaces();
+    return getPos() < getSql().length();
+  }
+
+  void throwIfHasMoreTokens() {
+    skipWhitespaces();
+    if (getPos() < getSql().length()) {
+      throw PGExceptionFactory.newPGException(
+          "Syntax error. Unexpected tokens: " + getSql().substring(getPos()), SQLState.SyntaxError);
+    }
   }
 
   @Override

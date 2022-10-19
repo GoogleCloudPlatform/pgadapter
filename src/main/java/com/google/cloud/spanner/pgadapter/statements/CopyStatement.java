@@ -28,13 +28,19 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
-import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
+import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.ParsedCopyStatement.Direction;
+import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,10 +58,17 @@ import org.apache.commons.csv.CSVFormat;
  */
 @InternalApi
 public class CopyStatement extends IntermediatePortalStatement {
+  public enum Format {
+    CSV,
+    TEXT,
+    BINARY,
+  }
+
   private static final String COLUMN_NAME = "column_name";
   private static final String DATA_TYPE = "data_type";
 
-  private final CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+  // private final CopyTreeParser.CopyOptions options = new CopyTreeParser.CopyOptions();
+  private final ParsedCopyStatement parsedCopyStatement;
   private CSVFormat format;
 
   // Table columns read from information schema.
@@ -77,6 +90,7 @@ public class CopyStatement extends IntermediatePortalStatement {
       ParsedStatement parsedStatement,
       Statement originalStatement) {
     super(connectionHandler, options, name, parsedStatement, originalStatement);
+    this.parsedCopyStatement = parse(originalStatement.getSql());
   }
 
   @Override
@@ -119,22 +133,22 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   /** CSVFormat for parsing copy data based on COPY statement options specified. */
-  public void setParserFormat(CopyTreeParser.CopyOptions options) {
+  public void setParserFormat(ParsedCopyStatement parsedCopyStatement) {
     this.format = CSVFormat.POSTGRESQL_TEXT;
-    if (options.getFormat() == Format.CSV) {
+    if (parsedCopyStatement.format == Format.CSV) {
       this.format = CSVFormat.POSTGRESQL_CSV;
     }
-    if (!Strings.isNullOrEmpty(options.getNullString())) {
-      this.format = this.format.withNullString(options.getNullString());
+    if (!Strings.isNullOrEmpty(parsedCopyStatement.nullString)) {
+      this.format = this.format.withNullString(parsedCopyStatement.nullString);
     }
-    if (options.getDelimiter() != '\0') {
-      this.format = this.format.withDelimiter(options.getDelimiter());
+    if (parsedCopyStatement.delimiter != null) {
+      this.format = this.format.withDelimiter(parsedCopyStatement.delimiter);
     }
-    if (options.getEscape() != '\0') {
-      this.format = this.format.withEscape(options.getEscape());
+    if (parsedCopyStatement.escape != null) {
+      this.format = this.format.withEscape(parsedCopyStatement.escape);
     }
-    if (options.getQuote() != '\0') {
-      this.format = this.format.withQuote(options.getQuote());
+    if (parsedCopyStatement.quote != null) {
+      this.format = this.format.withQuote(parsedCopyStatement.quote);
     }
     this.format = this.format.withHeader(this.tableColumns.keySet().toArray(new String[0]));
   }
@@ -143,23 +157,25 @@ public class CopyStatement extends IntermediatePortalStatement {
     return this.format;
   }
 
-  public String getTableName() {
-    return options.getTableName();
+  public TableOrIndexName getTableName() {
+    return parsedCopyStatement.table;
   }
 
   /** @return List of column names specified in COPY statement, if provided. */
   public List<String> getCopyColumnNames() {
-    return options.getColumnNames();
+    return parsedCopyStatement.columns == null
+        ? ImmutableList.of()
+        : parsedCopyStatement.columns.stream().map(c -> c.name).collect(Collectors.toList());
   }
 
   /** @return Format type specified in COPY statement, if provided. */
   public String getFormatType() {
-    return options.getFormat().toString();
+    return parsedCopyStatement.format.toString();
   }
 
   /** @return True if copy data contains a header, false otherwise. */
   public boolean hasHeader() {
-    return options.hasHeader();
+    return parsedCopyStatement.header;
   }
 
   /** @return Null string specified in COPY statement, if provided. */
@@ -188,21 +204,21 @@ public class CopyStatement extends IntermediatePortalStatement {
 
   /** @return 0 for text/csv formatting and 1 for binary */
   public int getFormatCode() {
-    return (options.getFormat() == CopyTreeParser.CopyOptions.Format.BINARY) ? 1 : 0;
+    return (parsedCopyStatement.format == Format.BINARY) ? 1 : 0;
   }
 
   private void verifyCopyColumns() {
-    if (options.getColumnNames().size() == 0) {
+    if (getCopyColumnNames().isEmpty()) {
       // Use all columns if none were specified.
       return;
     }
-    if (options.getColumnNames().size() > this.tableColumns.size()) {
+    if (getCopyColumnNames().size() > this.tableColumns.size()) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT, "Number of copy columns provided exceed table column count");
     }
     LinkedHashMap<String, Type> tempTableColumns = new LinkedHashMap<>();
     // Verify that every copy column given is a valid table column name
-    for (String copyColumn : options.getColumnNames()) {
+    for (String copyColumn : getCopyColumnNames()) {
       if (!this.tableColumns.containsKey(copyColumn)) {
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT,
@@ -245,7 +261,7 @@ public class CopyStatement extends IntermediatePortalStatement {
     }
   }
 
-  private void queryInformationSchema() {
+  private void queryInformationSchema(BackendConnection backendConnection) {
     Map<String, Type> tableColumns = new LinkedHashMap<>();
     Statement statement =
         Statement.newBuilder(
@@ -253,9 +269,16 @@ public class CopyStatement extends IntermediatePortalStatement {
                     + COLUMN_NAME
                     + ", "
                     + DATA_TYPE
-                    + " FROM information_schema.columns WHERE table_name = $1")
+                    + " FROM information_schema.columns "
+                    + "WHERE schema_name = $1 "
+                    + "AND table_name = $2")
             .bind("p1")
-            .to(getTableName())
+            .to(
+                getTableName().schema == null
+                    ? backendConnection.getCurrentSchema()
+                    : getTableName().schema)
+            .bind("p2")
+            .to(getTableName().name)
             .build();
     try (ResultSet result = connection.getDatabaseClient().singleUse().executeQuery(statement)) {
       while (result.next()) {
@@ -273,24 +296,32 @@ public class CopyStatement extends IntermediatePortalStatement {
 
     this.tableColumns = tableColumns;
 
-    if (options.getColumnNames() != null) {
+    if (getCopyColumnNames() != null) {
       verifyCopyColumns();
     }
-    this.indexedColumnsCount = queryIndexedColumnsCount(tableColumns.keySet());
+    this.indexedColumnsCount = queryIndexedColumnsCount(backendConnection, tableColumns.keySet());
   }
 
-  private int queryIndexedColumnsCount(Set<String> columnNames) {
+  private int queryIndexedColumnsCount(
+      BackendConnection backendConnection, Set<String> columnNames) {
     String sql =
         "SELECT COUNT(*) FROM information_schema.index_columns "
-            + "WHERE table_schema='public' "
-            + "and table_name=$1 "
+            + "WHERE table_schema=$1 "
+            + "and table_name=$2 "
             + "and column_name in "
-            + IntStream.rangeClosed(2, columnNames.size() + 1)
+            + IntStream.rangeClosed(3, columnNames.size() + 2)
                 .mapToObj(i -> String.format("$%d", i))
                 .collect(Collectors.joining(", ", "(", ")"));
-    Statement.Builder builder = Statement.newBuilder(sql);
-    builder.bind("p1").to(getTableName());
-    int paramIndex = 2;
+    Statement.Builder builder =
+        Statement.newBuilder(sql)
+            .bind("p1")
+            .to(
+                getTableName().schema == null
+                    ? backendConnection.getCurrentSchema()
+                    : getTableName().schema)
+            .bind("p2")
+            .to(getTableName().name);
+    int paramIndex = 3;
     for (String columnName : columnNames) {
       builder.bind(String.format("p%d", paramIndex)).to(columnName);
       paramIndex++;
@@ -318,9 +349,8 @@ public class CopyStatement extends IntermediatePortalStatement {
   public void executeAsync(BackendConnection backendConnection) {
     this.executed = true;
     try {
-      parseCopyStatement();
-      queryInformationSchema();
-      setParserFormat(this.options);
+      queryInformationSchema(backendConnection);
+      setParserFormat(this.parsedCopyStatement);
       mutationWriter =
           new MutationWriter(
               connectionHandler
@@ -329,10 +359,10 @@ public class CopyStatement extends IntermediatePortalStatement {
                   .getSessionState(),
               getTransactionMode(),
               connection,
-              options.getTableName(),
+              getTableName().toString(),
               getTableColumns(),
               indexedColumnsCount,
-              this.options.getFormat(),
+              parsedCopyStatement.format,
               getParserFormat(),
               hasHeader());
       setFutureStatementResult(
@@ -359,12 +389,190 @@ public class CopyStatement extends IntermediatePortalStatement {
     }
   }
 
-  private void parseCopyStatement() {
-    try {
-      parse(parsedStatement.getSqlWithoutComments(), this.options);
-    } catch (Exception | TokenMgrError e) {
-      throw SpannerExceptionFactory.newSpannerException(
-          ErrorCode.INVALID_ARGUMENT, "Invalid COPY statement syntax: " + e);
+  static final class ParsedCopyStatement {
+    enum Direction {
+      FROM,
+      TO,
     }
+
+    Direction direction;
+    TableOrIndexName table;
+    String query;
+    List<TableOrIndexName> columns;
+    Format format = Format.TEXT;
+    boolean freeze;
+    Character delimiter;
+    String nullString;
+    boolean header;
+    boolean headerMatch;
+    Character quote;
+    Character escape;
+    List<TableOrIndexName> forceQuote;
+    List<TableOrIndexName> forceNotNull;
+    List<TableOrIndexName> forceNull;
+    String encoding;
   }
+
+  /** Parses `COPY my_table FROM STDIN` statements. */
+  static ParsedCopyStatement parse(String sql) {
+    Preconditions.checkNotNull(sql);
+
+    SimpleParser parser = new SimpleParser(sql);
+    if (!parser.eatKeyword("copy")) {
+      throw PGExceptionFactory.newPGException(
+          "not a valid COPY statement: " + sql, SQLState.SyntaxError);
+    }
+    ParsedCopyStatement parsedCopyStatement = new ParsedCopyStatement();
+    if (parser.eatToken("(")) {
+      parsedCopyStatement.query =
+          parser.parseExpressionUntilKeyword(ImmutableList.of(), true, true);
+      if (!parser.eatToken(")")) {
+        throw PGExceptionFactory.newPGException(
+            "missing closing parentheses after query", SQLState.SyntaxError);
+      }
+    } else {
+      parsedCopyStatement.table = parser.readTableOrIndexName();
+      if (parsedCopyStatement.table == null) {
+        throw PGExceptionFactory.newPGException(
+            "invalid or missing table name", SQLState.SyntaxError);
+      }
+      if (parser.peekToken("(")) {
+        parsedCopyStatement.columns = parser.readColumnListInParentheses("columns");
+      }
+    }
+
+    if (!(parser.peekKeyword("from") || parser.peekKeyword("to"))) {
+      throw PGExceptionFactory.newPGException(
+          "missing 'FROM' or 'TO' keyword: " + sql, SQLState.SyntaxError);
+    }
+    parsedCopyStatement.direction = Direction.valueOf(parser.readKeyword().toUpperCase());
+    if (parsedCopyStatement.direction == Direction.FROM) {
+      if (!parser.eatKeyword("stdin")) {
+        throw PGExceptionFactory.newPGException(
+            "missing 'STDIN' keyword. PGAdapter only supports COPY ... FROM STDIN: " + sql,
+            SQLState.SyntaxError);
+      }
+    } else {
+      if (!parser.eatKeyword("stdout")) {
+        throw PGExceptionFactory.newPGException(
+            "missing 'STDOUT' keyword. PGAdapter only supports COPY ... TO STDOUT: " + sql,
+            SQLState.SyntaxError);
+      }
+    }
+    parser.eatKeyword("with");
+    if (parser.eatToken("(")) {
+      List<String> optionExpressions = parser.parseExpressionListUntilKeyword(null, true);
+      if (!parser.eatToken(")")) {
+        throw PGExceptionFactory.newPGException(
+            "missing closing parentheses for options list", SQLState.SyntaxError);
+      }
+      if (optionExpressions.isEmpty()) {
+        throw PGExceptionFactory.newPGException("empty options list: " + sql, SQLState.SyntaxError);
+      }
+      for (String optionExpression : optionExpressions) {
+        SimpleParser optionParser = new SimpleParser(optionExpression);
+        if (optionParser.eatKeyword("format")) {
+          if (optionParser.peekKeyword("text")
+              || optionParser.peekKeyword("csv")
+              || optionParser.peekKeyword("binary")) {
+            parsedCopyStatement.format = Format.valueOf(optionParser.readKeyword().toUpperCase());
+          } else {
+            throw PGExceptionFactory.newPGException("Invalid format option: " + optionExpression);
+          }
+        } else if (optionParser.eatKeyword("freeze")) {
+          if (optionParser.hasMoreTokens()) {
+            String value = optionParser.readKeyword();
+            parsedCopyStatement.freeze = BooleanParser.toBoolean(value);
+          } else {
+            parsedCopyStatement.freeze = true;
+          }
+        } else if (optionParser.eatKeyword("delimiter")) {
+          String delimiter = optionParser.readSingleQuotedString().getValue();
+          if (delimiter.length() != 1) {
+            throw PGException.newBuilder("COPY delimiter must be a single one-byte character")
+                .setSQLState(SQLState.SyntaxError)
+                .setHints(
+                    "Use an escaped string to create a delimiter with a special character, like a tab.\nExample: copy my_table to stdout (delimiter e'\\t')")
+                .build();
+          }
+          parsedCopyStatement.delimiter = delimiter.charAt(0);
+        } else if (optionParser.eatKeyword("null")) {
+          parsedCopyStatement.nullString = optionParser.readSingleQuotedString().getValue();
+        } else if (optionParser.eatKeyword("header")) {
+          if (optionParser.eatKeyword("match")) {
+            parsedCopyStatement.headerMatch = true;
+            parsedCopyStatement.header = true;
+          } else if (optionParser.hasMoreTokens()) {
+            String value = optionParser.readKeyword();
+            parsedCopyStatement.header = BooleanParser.toBoolean(value);
+          } else {
+            parsedCopyStatement.header = true;
+          }
+        } else if (optionParser.eatKeyword("quote")) {
+          String quote = optionParser.readSingleQuotedString().getValue();
+          if (quote.length() != 1) {
+            throw PGException.newBuilder("COPY quote must be a single one-byte character")
+                .setSQLState(SQLState.SyntaxError)
+                .setHints(
+                    "Use an escaped string to specify a special quote character, for example using an octal value.\nExample: copy my_table to stdout (quote e'\\4', format csv)")
+                .build();
+          }
+          parsedCopyStatement.quote = quote.charAt(0);
+        } else if (optionParser.eatKeyword("escape")) {
+          String escape = optionParser.readSingleQuotedString().getValue();
+          if (escape.length() != 1) {
+            throw PGException.newBuilder("COPY escape must be a single one-byte character")
+                .setSQLState(SQLState.SyntaxError)
+                .setHints(
+                    "Use an escaped string to specify a special escape character, for example using an octal value.\nExample: copy my_table to stdout (escape e'\\4', format csv)")
+                .build();
+          }
+          parsedCopyStatement.escape = escape.charAt(0);
+        } else if (optionParser.eatKeyword("force_quote")) {
+          if (optionParser.eatToken("*")) {
+            parsedCopyStatement.forceQuote = ImmutableList.of();
+          } else {
+            parsedCopyStatement.forceQuote =
+                optionParser.readColumnListInParentheses("force_quote");
+          }
+        } else if (optionParser.eatKeyword("force_not_null")) {
+          parsedCopyStatement.forceNotNull =
+              optionParser.readColumnListInParentheses("force_not_null");
+        } else if (optionParser.eatKeyword("force_null")) {
+          parsedCopyStatement.forceNull = optionParser.readColumnListInParentheses("force_null");
+        } else if (optionParser.eatKeyword("encoding")) {
+          parsedCopyStatement.encoding = optionParser.readSingleQuotedString().getValue();
+        } else {
+          throw PGExceptionFactory.newPGException(
+              "Invalid or unknown option: " + optionExpression, SQLState.SyntaxError);
+        }
+        optionParser.throwIfHasMoreTokens();
+      }
+    } else if (parser.peekKeyword("binary")
+        || parser.peekKeyword("delimiter")
+        || parser.peekKeyword("null")
+        || parser.peekKeyword("csv")) {
+      parseLegacyOptions(parser, parsedCopyStatement);
+    }
+    if (parser.eatKeyword("where")) {
+      throw PGExceptionFactory.newPGException(
+          "PGAdapter does not support conditions in COPY ... FROM STDIN: " + sql,
+          SQLState.SyntaxError);
+    }
+    parser.eatToken(";");
+    parser.throwIfHasMoreTokens();
+
+    return parsedCopyStatement;
+  }
+
+  static void parseLegacyOptions(SimpleParser parser, ParsedCopyStatement parsedCopyStatement) {}
+
+  //  private void parseCopyStatement() {
+  //    try {
+  //      Copy.parse(parsedStatement.getSqlWithoutComments(), this.options);
+  //    } catch (Exception | TokenMgrError e) {
+  //      throw SpannerExceptionFactory.newSpannerException(
+  //          ErrorCode.INVALID_ARGUMENT, "Invalid COPY statement syntax: " + e);
+  //    }
+  //  }
 }

@@ -17,7 +17,7 @@ package com.google.cloud.spanner.pgadapter.utils;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import java.io.IOException;
 import java.io.PipedOutputStream;
 import java.util.Iterator;
@@ -32,7 +32,7 @@ public interface CopyInParser {
    * for non-binary formats.
    */
   static CopyInParser create(
-      CopyOptions.Format format,
+      Format format,
       @Nullable CSVFormat csvFormat,
       PipedOutputStream payload,
       int pipeBufferSize,

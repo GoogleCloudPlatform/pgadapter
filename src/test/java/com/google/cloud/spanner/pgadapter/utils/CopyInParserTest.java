@@ -16,7 +16,7 @@ package com.google.cloud.spanner.pgadapter.utils;
 
 import static org.junit.Assert.assertTrue;
 
-import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import java.io.IOException;
 import java.io.PipedOutputStream;
 import org.apache.commons.csv.CSVFormat;
