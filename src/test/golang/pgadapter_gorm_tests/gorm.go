@@ -519,6 +519,41 @@ func TestNestedTransaction(connString string) *C.char {
 	return nil
 }
 
+//export TestErrorInTransaction
+func TestErrorInTransaction(connString string) *C.char {
+	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	conn, err := db.DB()
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close()
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Omit(
+			"col_bigint",
+			"col_bool",
+			"col_bytea",
+			"col_float8",
+			"col_int",
+			"col_numeric",
+			"col_timestamptz",
+			"col_date",
+		).Create(AllTypes{ColVarchar: stringRef("1")}).Error; err != nil {
+			// Try to update instead of insert. This will also fail, as the transaction is in an
+			// aborted state.
+			return tx.Model(&AllTypes{ColVarchar: stringRef("1")}).UpdateColumn("ColInt", 100).Error
+		}
+		return nil
+	})
+	if err != nil {
+		return C.CString(fmt.Sprintf("failed to execute transaction: %v", err))
+	}
+
+	return nil
+}
+
 //export TestReadOnlyTransaction
 func TestReadOnlyTransaction(connString string) *C.char {
 	db, err := gorm.Open(postgres.Open(connString), &gorm.Config{})
