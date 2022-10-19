@@ -57,6 +57,24 @@ def execute_update(sql, parameters, version, host, port):
     cursor.close()
     connection.close()
 
+def execute_prepared(sql, parameters, version, host, port):
+  connection = create_connection(version, host, port)
+  if connection == None:
+    return
+  try:
+    cursor = connection.cursor()
+    cursor.execute('PREPARE my_statement AS ' + sql)
+    cursor.execute('EXECUTE my_statement (%s)', parameters)
+    print(cursor.rowcount)
+    cursor.execute('EXECUTE my_statement (%s)', parameters)
+    print(cursor.rowcount)
+    cursor.execute('DEALLOCATE my_statement')
+  except Exception as e:
+    print(e)
+  finally:
+    cursor.close()
+    connection.close()
+
 if __name__ == '__main__':
   version = sys.argv[1]
   host = sys.argv[2]
@@ -68,6 +86,8 @@ if __name__ == '__main__':
     execute_query(sql, parameters, version, host, port)
   elif statement_type == 'update':
     execute_update(sql, parameters, version, host, port)
+  elif statement_type == 'prepared':
+    execute_prepared(sql, parameters, version, host, port)
   else:
     print('Invalid Statement Type')
 

@@ -292,6 +292,10 @@ public abstract class AbstractMockServerTest {
     return TypeAnnotationCode.TYPE_ANNOTATION_CODE_UNSPECIFIED;
   }
 
+  protected static ResultSet createResultSetWithOnlyMetadata(ImmutableList<TypeCode> types) {
+    return ResultSet.newBuilder().setMetadata(createMetadata(types)).build();
+  }
+
   protected static ResultSetMetadata createMetadata(ImmutableList<TypeCode> types) {
     StructType.Builder builder = StructType.newBuilder();
     for (int index = 0; index < types.size(); index++) {

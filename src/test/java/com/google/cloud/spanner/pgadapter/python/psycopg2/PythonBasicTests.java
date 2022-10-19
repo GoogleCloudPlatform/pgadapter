@@ -23,8 +23,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
+import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.StructType;
@@ -208,6 +210,46 @@ public class PythonBasicTests extends PythonTestSetup {
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     assertEquals(sql2, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+  }
+
+  @Test
+  public void testPreparedInsertWithParameters() throws IOException, InterruptedException {
+    ArrayList<String> parameters = new ArrayList<>();
+    parameters.add("VALUE");
+
+    String sql = "INSERT INTO SOME_TABLE(COLUMN_NAME) VALUES ($1)";
+    String describeParametersSql = "select $1 from (select COLUMN_NAME=$1 from SOME_TABLE) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeParametersSql),
+            createResultSetWithOnlyMetadata(ImmutableList.of(TypeCode.STRING))));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("VALUE").build(), 1));
+
+    String actualOutput =
+        executeWithParameters(
+            pgVersion, host, pgServer.getLocalPort(), sql, "prepared", parameters);
+    String expectedOutput = "1\n1\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    // We receive 4 ExecuteSqlRequests:
+    // 1. Describe parameters.
+    // 2. Analyze the update statement.
+    // 3. Execute the update statement twice.
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(4, requests.size());
+    assertEquals(describeParametersSql, requests.get(0).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
+    assertEquals(sql, requests.get(1).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(1).getQueryMode());
+    assertEquals(sql, requests.get(2).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(2).getQueryMode());
+    assertEquals(sql, requests.get(3).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(3).getQueryMode());
+    // This is all executed in auto commit mode. That means that the analyzeUpdate call is also
+    // executed in auto commit mode, and is automatically committed.
+    assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test

@@ -70,6 +70,10 @@ This example uses the pre-built Docker image to run PGAdapter.
 See [README](../README.md) for more possibilities on how to run PGAdapter.
 
 ## Limitations and Known Bugs
+- `psycopg2` by design never uses server side query parameters. This means that SQL statements
+  that are syntactically equal and only differ in values will still be treated as different
+  statements by Cloud Spanner. This will add additional parsing and planning time to each statement
+  that is executed. See [Performance Considerations](#performance-considerations) for more information.
 - Only [copy_expert](https://www.psycopg.org/docs/cursor.html#cursor.copy_expert) is supported.
   [copy_from](https://www.psycopg.org/docs/cursor.html#cursor.copy_from) and [copy_to](https://www.psycopg.org/docs/cursor.html#cursor.copy_to) are NOT supported.
 - [copy_expert](https://www.psycopg.org/docs/cursor.html#cursor.copy_expert) has the following additional limitations:
@@ -88,6 +92,52 @@ See [README](../README.md) for more possibilities on how to run PGAdapter.
 ## Performance Considerations
 
 The following will give you the best possible performance when using psycopg2 with PGAdapter.
+
+### Server Side Parameters
+`psycopg2` does not use server side parameters. Instead, it will add all parameters as literals to
+the SQL string. This means that SQL statements that are syntactically equal and only differ in the
+values that are used in the query, will still be treated as different statements by Cloud Spanner.
+This will add additional parsing and planning time to each statement that is executed. This makes
+`psycopg2` less usable for applications that require low latency query round-trips.
+
+The following function call in `psycopg2` will for example be converted to a SQL string that
+contains literals instead of using actual query parameters.
+
+```python
+>>> cur.execute("""
+...     INSERT INTO some_table (an_int, a_date, a_string)
+...     VALUES (%s, %s, %s);
+...     """,
+...     (10, datetime.date(2005, 11, 18), "O'Reilly"))
+```
+
+Is translated to this SQL statement:
+
+```python
+INSERT INTO some_table (an_int, a_date, a_string)
+VALUES (10, '2005-11-18', 'O''Reilly');
+```
+
+#### Alternative: Prepared Statements
+A possible workaround for the lack of query parameter support in `psycopg2` is to use prepared
+statements. The above example can be re-written to the following that will use query parameters.
+The `my_insert_statement` can be reused multiple times to insert different rows.
+
+```python
+>>> cur.execute("""
+...     PREPARE my_insert_statement AS 
+...     INSERT INTO some_table (an_int, a_date, a_string)
+...     VALUES ($1, $2, $3);
+...     """)
+>>> cur.execute("""
+...     EXECUTE my_insert_statement (%s, %s, %s);
+...     """,
+...     (10, datetime.date(2005, 11, 18), "O'Reilly"))
+>>> cur.execute("""
+...     EXECUTE my_insert_statement (%s, %s, %s);
+...     """,
+...     (11, datetime.date(2005, 11, 19), "Shannon"))
+```
 
 ### Unix Domain Sockets
 Use Unix Domain Socket connections for the lowest possible latency when PGAdapter and the client
