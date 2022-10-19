@@ -104,16 +104,16 @@ The following function call in `psycopg2` will for example be converted to a SQL
 contains literals instead of using actual query parameters.
 
 ```python
->>> cur.execute("""
-...     INSERT INTO some_table (an_int, a_date, a_string)
-...     VALUES (%s, %s, %s);
-...     """,
-...     (10, datetime.date(2005, 11, 18), "O'Reilly"))
+cur.execute("""
+    INSERT INTO some_table (an_int, a_date, a_string)
+    VALUES (%s, %s, %s);
+    """,
+    (10, datetime.date(2005, 11, 18), "O'Reilly"))
 ```
 
 Is translated to this SQL statement:
 
-```python
+```sql
 INSERT INTO some_table (an_int, a_date, a_string)
 VALUES (10, '2005-11-18', 'O''Reilly');
 ```
@@ -124,19 +124,19 @@ statements. The above example can be re-written to the following that will use q
 The `my_insert_statement` can be reused multiple times to insert different rows.
 
 ```python
->>> cur.execute("""
-...     PREPARE my_insert_statement AS 
-...     INSERT INTO some_table (an_int, a_date, a_string)
-...     VALUES ($1, $2, $3);
-...     """)
->>> cur.execute("""
-...     EXECUTE my_insert_statement (%s, %s, %s);
-...     """,
-...     (10, datetime.date(2005, 11, 18), "O'Reilly"))
->>> cur.execute("""
-...     EXECUTE my_insert_statement (%s, %s, %s);
-...     """,
-...     (11, datetime.date(2005, 11, 19), "Shannon"))
+cur.execute("""
+    PREPARE my_insert_statement AS 
+    INSERT INTO some_table (an_int, a_date, a_string)
+    VALUES ($1, $2, $3);
+    """)
+cur.execute("""
+    EXECUTE my_insert_statement (%s, %s, %s);
+    """,
+    (10, datetime.date(2005, 11, 18), "O'Reilly"))
+cur.execute("""
+    EXECUTE my_insert_statement (%s, %s, %s);
+    """,
+    (11, datetime.date(2005, 11, 19), "Shannon"))
 ```
 
 ### Unix Domain Sockets
