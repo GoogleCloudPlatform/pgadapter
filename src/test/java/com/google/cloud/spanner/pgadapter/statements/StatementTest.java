@@ -467,8 +467,9 @@ public class StatementTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement statement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(
+                connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
     BackendConnection backendConnection =
         new BackendConnection(
@@ -557,8 +558,9 @@ public class StatementTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(
+                connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
     assertFalse(copyStatement.isExecuted());
     copyStatement.executeAsync(backendConnection);
@@ -605,8 +607,9 @@ public class StatementTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(
+                connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
     assertFalse(copyStatement.isExecuted());
     copyStatement.executeAsync(backendConnection);

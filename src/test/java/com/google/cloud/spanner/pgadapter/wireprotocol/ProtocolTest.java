@@ -1327,7 +1327,8 @@ public class ProtocolTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(connectionHandler, options, "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(connectionHandler, options, "", parse(sql), Statement.of(sql));
     copyStatement.executeAsync(mock(BackendConnection.class));
 
     when(connectionHandler.getActiveCopyStatement()).thenReturn(copyStatement);
@@ -1436,8 +1437,9 @@ public class ProtocolTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(
+                connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
     copyStatement.executeAsync(mock(BackendConnection.class));
 
     MutationWriter mw = copyStatement.getMutationWriter();

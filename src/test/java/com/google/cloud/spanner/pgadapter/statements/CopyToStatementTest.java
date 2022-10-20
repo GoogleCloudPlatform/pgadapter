@@ -21,6 +21,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.ParsedCopyStatement;
 import org.apache.commons.csv.QuoteMode;
 import org.junit.Rule;
 import org.junit.Test;
@@ -41,39 +42,44 @@ public class CopyToStatementTest {
   public void testDelimiter() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     CopyOptions copyOptions = new CopyOptions();
-    copyOptions.setDelimiter('~');
+    ParsedCopyStatement parsedCopyStatement = new ParsedCopyStatement();
+    parsedCopyStatement.delimiter = '~';
 
-    CopyToStatement statement = new CopyToStatement(connectionHandler, options, "", copyOptions);
+    CopyToStatement statement =
+        new CopyToStatement(connectionHandler, options, "", parsedCopyStatement);
     assertEquals('~', statement.getCsvFormat().getDelimiterString().charAt(0));
   }
 
   @Test
   public void testNullString() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    CopyOptions copyOptions = new CopyOptions();
-    copyOptions.setNullString("this-is-null");
+    ParsedCopyStatement parsedCopyStatement = new ParsedCopyStatement();
+    parsedCopyStatement.nullString = "this-is-null";
 
-    CopyToStatement statement = new CopyToStatement(connectionHandler, options, "", copyOptions);
+    CopyToStatement statement =
+        new CopyToStatement(connectionHandler, options, "", parsedCopyStatement);
     assertEquals("this-is-null", statement.getCsvFormat().getNullString());
   }
 
   @Test
   public void testEscape() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    CopyOptions copyOptions = new CopyOptions();
-    copyOptions.setEscape('&');
+    ParsedCopyStatement parsedCopyStatement = new ParsedCopyStatement();
+    parsedCopyStatement.escape = '&';
 
-    CopyToStatement statement = new CopyToStatement(connectionHandler, options, "", copyOptions);
+    CopyToStatement statement =
+        new CopyToStatement(connectionHandler, options, "", parsedCopyStatement);
     assertEquals('&', statement.getCsvFormat().getEscapeCharacter().charValue());
   }
 
   @Test
   public void testQuote() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    CopyOptions copyOptions = new CopyOptions();
-    copyOptions.setQuote('^');
+    ParsedCopyStatement parsedCopyStatement = new ParsedCopyStatement();
+    parsedCopyStatement.quote = '^';
 
-    CopyToStatement statement = new CopyToStatement(connectionHandler, options, "", copyOptions);
+    CopyToStatement statement =
+        new CopyToStatement(connectionHandler, options, "", parsedCopyStatement);
     assertEquals('^', statement.getCsvFormat().getQuoteCharacter().charValue());
     assertEquals(QuoteMode.NONE, statement.getCsvFormat().getQuoteMode());
   }
@@ -81,9 +87,10 @@ public class CopyToStatementTest {
   @Test
   public void testRecordSeparator() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    CopyOptions copyOptions = new CopyOptions();
+    ParsedCopyStatement parsedCopyStatement = new ParsedCopyStatement();
 
-    CopyToStatement statement = new CopyToStatement(connectionHandler, options, "", copyOptions);
+    CopyToStatement statement =
+        new CopyToStatement(connectionHandler, options, "", parsedCopyStatement);
     assertEquals("\n", statement.getCsvFormat().getRecordSeparator());
   }
 }

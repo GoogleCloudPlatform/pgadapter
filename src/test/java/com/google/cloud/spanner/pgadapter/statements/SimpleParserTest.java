@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.QuotedString.unescapeQuotedStringValue;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -40,7 +41,7 @@ public class SimpleParserTest {
   public static int skipQuotedString(String sql, int startIndex) {
     SimpleParser parser = new SimpleParser(sql);
     parser.setPos(startIndex);
-    parser.skipQuotedString();
+    parser.skipQuotedString(false);
     return parser.getPos();
   }
 
@@ -418,5 +419,10 @@ public class SimpleParserTest {
         "UPDATE", parseCommand("with my_cte as (select a * b from foo) update bar set col1='one'"));
     assertEquals(
         "UPDATE", parseCommand("with my_cte as (select a - b from foo) update bar set col1='one'"));
+  }
+
+  @Test
+  public void testUnescapeQuotedStringValue() {
+    assertEquals("'", unescapeQuotedStringValue("'\\''", '\''));
   }
 }

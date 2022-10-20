@@ -180,8 +180,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               () ->
                   copyManager.copyIn(
                       "COPY users (id, foo) FROM STDIN;", new StringReader("5\t5\n6\t6\n7\t7\n")));
-      assertEquals(
-          "ERROR: Column \"foo\" of relation \"users\" does not exist", sqlException.getMessage());
+      assertEquals("ERROR: Column foo of relation users does not exist", sqlException.getMessage());
     }
 
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -1509,8 +1508,10 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1")
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE schema_name = $1 AND table_name = $2")
                 .bind("p1")
+                .to("public")
+                .bind("p2")
                 .to(allTypesTableName)
                 .build(),
             allTypesResultSet));
@@ -1553,7 +1554,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
             indexedColumnsCountResultSet));
 
     String allTypesIndexedColumnsCountSql =
-        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
+        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema=$1 and table_name=$2 and column_name in ($3, $4, $5, $6, $7, $8, $9, $10, $11, $12)";
     ResultSetMetadata allTypesIndexedColumnsCountMetadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
@@ -1577,26 +1578,28 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(allTypesIndexedColumnsCountSql)
                 .bind("p1")
-                .to(allTypesTableName)
+                .to("public")
                 .bind("p2")
-                .to("col_bigint")
+                .to(allTypesTableName)
                 .bind("p3")
-                .to("col_bool")
+                .to("col_bigint")
                 .bind("p4")
-                .to("col_bytea")
+                .to("col_bool")
                 .bind("p5")
-                .to("col_float8")
+                .to("col_bytea")
                 .bind("p6")
-                .to("col_int")
+                .to("col_float8")
                 .bind("p7")
-                .to("col_numeric")
+                .to("col_int")
                 .bind("p8")
-                .to("col_timestamptz")
+                .to("col_numeric")
                 .bind("p9")
-                .to("col_date")
+                .to("col_timestamptz")
                 .bind("p10")
-                .to("col_varchar")
+                .to("col_date")
                 .bind("p11")
+                .to("col_varchar")
+                .bind("p12")
                 .to("col_jsonb")
                 .build(),
             allTypesIndexedColumnsCountResultSet));

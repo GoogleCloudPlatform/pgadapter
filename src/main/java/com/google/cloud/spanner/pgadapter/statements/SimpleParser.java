@@ -59,6 +59,21 @@ public class SimpleParser {
       this.name = name;
     }
 
+    public String getUnquotedSchema() {
+      return unquoteOrFoldIdentifier(this.schema);
+    }
+
+    public String getUnquotedName() {
+      return unquoteOrFoldIdentifier(this.name);
+    }
+
+    public String getUnquotedQualifiedName() {
+      if (schema == null) {
+        return getUnquotedName();
+      }
+      return getUnquotedSchema() + "." + getUnquotedName();
+    }
+
     @Override
     public String toString() {
       if (schema == null) {
@@ -358,6 +373,10 @@ public class SimpleParser {
     return sql.substring(start, pos).trim();
   }
 
+  List<TableOrIndexName> readColumnList(String name) {
+    return expressionListToColumnNames(name, parseExpressionListUntilKeyword(null, true));
+  }
+
   List<TableOrIndexName> readColumnListInParentheses(String name) {
     if (eatToken("(")) {
       List<String> expressions = parseExpressionListUntilKeyword(")", true);
@@ -366,24 +385,28 @@ public class SimpleParser {
             String.format("missing closing parentheses for %s column list", name),
             SQLState.SyntaxError);
       }
-      if (expressions.isEmpty()) {
-        throw PGExceptionFactory.newPGException(
-            String.format("empty %s columns list", name), SQLState.SyntaxError);
-      }
-      List<TableOrIndexName> result = new ArrayList<>(expressions.size());
-      for (String expression : expressions) {
-        TableOrIndexName column = new SimpleParser(expression).readTableOrIndexName();
-        if (column == null) {
-          throw PGExceptionFactory.newPGException(
-              "Invalid column name: " + expression, SQLState.SyntaxError);
-        }
-        result.add(column);
-      }
-      return result;
+      return expressionListToColumnNames(name, expressions);
     } else {
       throw PGExceptionFactory.newPGException(
           String.format("missing opening parentheses for %s", name), SQLState.SyntaxError);
     }
+  }
+
+  List<TableOrIndexName> expressionListToColumnNames(String name, List<String> expressions) {
+    if (expressions == null || expressions.isEmpty()) {
+      throw PGExceptionFactory.newPGException(
+          String.format("empty %s columns list", name), SQLState.SyntaxError);
+    }
+    List<TableOrIndexName> result = new ArrayList<>(expressions.size());
+    for (String expression : expressions) {
+      TableOrIndexName column = new SimpleParser(expression).readTableOrIndexName();
+      if (column == null) {
+        throw PGExceptionFactory.newPGException(
+            "Invalid column name: " + expression, SQLState.SyntaxError);
+      }
+      result.add(column);
+    }
+    return result;
   }
 
   @Nonnull
@@ -641,8 +664,13 @@ public class SimpleParser {
     if (pos >= sql.length()) {
       return true;
     }
-    if (sql.charAt(pos) == SINGLE_QUOTE || sql.charAt(pos) == DOUBLE_QUOTE) {
-      return skipQuotedString();
+    if ((sql.charAt(pos) == 'e' || sql.charAt(pos) == 'E')
+        && sql.length() > (pos + 1)
+        && sql.charAt(pos + 1) == '\'') {
+      pos++;
+      return skipQuotedString(true);
+    } else if (sql.charAt(pos) == SINGLE_QUOTE || sql.charAt(pos) == DOUBLE_QUOTE) {
+      return skipQuotedString(false);
     } else if (sql.charAt(pos) == HYPHEN
         && sql.length() > (pos + 1)
         && sql.charAt(pos + 1) == HYPHEN) {
@@ -680,13 +708,13 @@ public class SimpleParser {
           "Invalid quote character: " + sql.charAt(pos), SQLState.SyntaxError);
     }
     int startPos = pos;
-    if (skipQuotedString()) {
+    if (skipQuotedString(escaped)) {
       return new QuotedString(escaped, quote, sql.substring(startPos, pos));
     }
     throw PGExceptionFactory.newPGException("Missing end quote character", SQLState.SyntaxError);
   }
 
-  boolean skipQuotedString() {
+  boolean skipQuotedString(boolean escaped) {
     char quote = sql.charAt(pos);
     pos++;
     while (pos < sql.length()) {
@@ -698,6 +726,18 @@ public class SimpleParser {
           pos++;
           return true;
         }
+      } else if (escaped
+          && sql.charAt(pos) == '\\'
+          && sql.length() > (pos + 1)
+          && sql.charAt(pos + 1) == quote) {
+        // This is an escaped quote. Skip one ahead.
+        pos++;
+      } else if (escaped
+          && sql.charAt(pos) == '\\'
+          && sql.length() > (pos + 1)
+          && sql.charAt(pos + 1) == '\\') {
+        // This is an escaped backslash. Skip one ahead.
+        pos++;
       }
       pos++;
     }

@@ -50,6 +50,9 @@ public class CopyStatementTest {
     assertEquals(
         ImmutableList.of(new TableOrIndexName("col1"), new TableOrIndexName("col2")),
         statement.columns);
+    assertEquals(
+        ImmutableList.of(new TableOrIndexName("\"Col1\""), new TableOrIndexName("col2")),
+        parse("copy tbl (\"Col1\", COL2) from stdin").columns);
 
     PGException exception;
     exception = assertThrows(PGException.class, () -> parse("copy my_table col1, col2 from stdin"));
@@ -136,6 +139,24 @@ public class CopyStatementTest {
   }
 
   @Test
+  public void testParseNull() {
+    assertEquals("\\N", parse("copy my_table from stdin (null '\\N')").nullString);
+    assertEquals("\t", parse("copy my_table from stdin (null e'\\t')").nullString);
+    assertEquals(
+        "this_is_null", parse("copy my_table from stdin (null 'this_is_null')").nullString);
+
+    PGException exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin (null null)"));
+    assertEquals("Invalid quote character: n", exception.getMessage());
+
+    exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin (null e'\\x7')"));
+    assertEquals(
+        "PGAdapter does not support hexadecimal byte values in string literals",
+        exception.getMessage());
+  }
+
+  @Test
   public void testParseHeader() {
     assertTrue(parse("copy my_table from stdin (header)").header);
     assertTrue(parse("copy my_table from stdin (header true)").header);
@@ -161,6 +182,8 @@ public class CopyStatementTest {
   public void testParseQuote() {
     assertEquals(',', parse("copy my_table from stdin (quote ',')").quote.charValue());
     assertEquals('\t', parse("copy my_table from stdin (quote e'\\t')").quote.charValue());
+    assertEquals('\'', parse("copy my_table from stdin (quote e'\\'')").quote.charValue());
+    assertEquals('\'', parse("copy my_table from stdin (quote '''')").quote.charValue());
     assertEquals('\\', parse("copy my_table from stdin (quote e'\\\\')").quote.charValue());
     assertEquals('\b', parse("copy my_table from stdin (quote e'\\b')").quote.charValue());
     assertEquals('\f', parse("copy my_table from stdin (quote e'\\f')").quote.charValue());
@@ -295,5 +318,168 @@ public class CopyStatementTest {
     PGException exception =
         assertThrows(PGException.class, () -> parse("copy my_table from stdin (encoding foo)"));
     assertEquals("Invalid quote character: f", exception.getMessage());
+  }
+
+  @Test
+  public void testParseLegacyBinary() {
+    assertEquals(Format.BINARY, parse("copy my_table from stdin binary").format);
+    assertEquals(Format.BINARY, parse("copy my_table from stdin with binary").format);
+    assertEquals(
+        Format.BINARY,
+        parse(
+                "copy \"all_types\" ( \"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\", \"col_jsonb\" ) from stdin binary")
+            .format);
+  }
+
+  @Test
+  public void testParseLegacyDelimiter() {
+    assertEquals(',', parse("copy my_table from stdin delimiter ','").delimiter.charValue());
+    assertEquals('\t', parse("copy my_table from stdin delimiter e'\\t'").delimiter.charValue());
+    assertEquals('\\', parse("copy my_table from stdin delimiter e'\\\\'").delimiter.charValue());
+    assertEquals('\b', parse("copy my_table from stdin delimiter e'\\b'").delimiter.charValue());
+    assertEquals('\f', parse("copy my_table from stdin delimiter e'\\f'").delimiter.charValue());
+    assertEquals('\n', parse("copy my_table from stdin delimiter e'\\n'").delimiter.charValue());
+    assertEquals('\r', parse("copy my_table from stdin delimiter e'\\r'").delimiter.charValue());
+    assertEquals('\1', parse("copy my_table from stdin delimiter e'\\1'").delimiter.charValue());
+    assertEquals('\14', parse("copy my_table from stdin delimiter e'\\14'").delimiter.charValue());
+    assertEquals(
+        '\111', parse("copy my_table from stdin delimiter e'\\111'").delimiter.charValue());
+    assertEquals(
+        '\u0011', parse("copy my_table from stdin delimiter e'\\u0011'").delimiter.charValue());
+
+    PGException exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin delimiter '\\t'"));
+    assertEquals("COPY delimiter must be a single one-byte character", exception.getMessage());
+    assertEquals(
+        "Use an escaped string to create a delimiter with a special character, like a tab.\nExample: copy my_table to stdout (delimiter e'\\t')",
+        exception.getHints());
+
+    exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin delimiter e'\\x7'"));
+    assertEquals(
+        "PGAdapter does not support hexadecimal byte values in string literals",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testParseLegacyNull() {
+    assertEquals("\\N", parse("copy my_table from stdin null '\\N'").nullString);
+    assertEquals("\t", parse("copy my_table from stdin delimiter e'\t'\tnull e'\\t'").nullString);
+    assertEquals("this_is_null", parse("copy my_table from stdin null 'this_is_null'").nullString);
+
+    PGException exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin null null"));
+    assertEquals("Invalid quote character: n", exception.getMessage());
+
+    exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin null e'\\x7'"));
+    assertEquals(
+        "PGAdapter does not support hexadecimal byte values in string literals",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testParseLegacyQuote() {
+    assertEquals(',', parse("copy my_table from stdin csv header quote ','").quote.charValue());
+    assertEquals('\t', parse("copy my_table from stdin csv quote e'\\t'").quote.charValue());
+    assertEquals(
+        '\\', parse("copy my_table from stdin null '\\NULL' csv quote e'\\\\'").quote.charValue());
+    assertEquals(
+        '\b', parse("copy my_table from stdin delimiter '|' csv quote e'\\b'").quote.charValue());
+
+    PGException exception =
+        assertThrows(
+            PGException.class, () -> parse("copy my_table from stdin csv header quote '\\t'"));
+    assertEquals("COPY quote must be a single one-byte character", exception.getMessage());
+    assertEquals(
+        "Use an escaped string to specify a special quote character, for example using an octal value.\n"
+            + "Example: copy my_table to stdout (quote e'\\4', format csv)",
+        exception.getHints());
+
+    exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin csv quote e'\\x7'"));
+    assertEquals(
+        "PGAdapter does not support hexadecimal byte values in string literals",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testParseLegacyEscape() {
+    assertEquals(',', parse("copy my_table from stdin csv escape ','").escape.charValue());
+    assertEquals(
+        '\t', parse("copy my_table from stdin csv header escape e'\\t'").escape.charValue());
+    assertEquals(
+        '\\', parse("copy my_table from stdin csv quote '''' escape e'\\\\'").escape.charValue());
+    assertEquals('\b', parse("copy my_table from stdin csv escape e'\\b'").escape.charValue());
+    assertEquals(
+        '\f', parse("copy my_table from stdin null '\\NULL' csv escape e'\\f'").escape.charValue());
+    assertEquals(
+        '\n',
+        parse("copy my_table from stdin null '\\NULL' csv header quote e'\\'' escape e'\\n'")
+            .escape
+            .charValue());
+
+    PGException exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin csv escape '\\t'"));
+    assertEquals("COPY escape must be a single one-byte character", exception.getMessage());
+    assertEquals(
+        "Use an escaped string to specify a special escape character, for example using an octal value.\n"
+            + "Example: copy my_table to stdout (escape e'\\4', format csv)",
+        exception.getHints());
+
+    exception =
+        assertThrows(
+            PGException.class, () -> parse("copy my_table from stdin csv header escape e'\\x7'"));
+    assertEquals(
+        "PGAdapter does not support hexadecimal byte values in string literals",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testParseLegacyForceNotNull() {
+    assertEquals(
+        ImmutableList.of(new TableOrIndexName("col1")),
+        parse("copy my_table from stdin csv force not null col1").forceNotNull);
+    assertEquals(
+        ImmutableList.of(new TableOrIndexName("col1"), new TableOrIndexName("col2")),
+        parse("copy my_table from stdin csv force not null col1, col2").forceNotNull);
+
+    PGException exception;
+    exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin csv force not null"));
+    assertEquals("empty force not null columns list", exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class, () -> parse("copy my_table from stdin csv force not null * col1"));
+    assertEquals("Invalid column name: * col1", exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class,
+            () -> parse("copy my_table from stdin csv force not null col1, 'col2'"));
+    assertEquals("Invalid column name: 'col2'", exception.getMessage());
+  }
+
+  @Test
+  public void testParseLegacyForceQuote() {
+    assertEquals(ImmutableList.of(), parse("copy my_table to stdout csv force quote *").forceQuote);
+    assertEquals(
+        ImmutableList.of(new TableOrIndexName("col1")),
+        parse("copy my_table to stdout csv force quote col1").forceQuote);
+    assertEquals(
+        ImmutableList.of(new TableOrIndexName("col1"), new TableOrIndexName("col2")),
+        parse("copy my_table to stdout csv force quote col1, col2").forceQuote);
+
+    PGException exception;
+    exception =
+        assertThrows(PGException.class, () -> parse("copy my_table to stdout csv force quote"));
+    assertEquals("empty force quote columns list", exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class, () -> parse("copy my_table to stdout csv force quote * col1"));
+    assertEquals("Syntax error. Unexpected tokens: col1", exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class, () -> parse("copy my_table to stdout csv force quote col1, 'col2'"));
+    assertEquals("Invalid column name: 'col2'", exception.getMessage());
   }
 }
