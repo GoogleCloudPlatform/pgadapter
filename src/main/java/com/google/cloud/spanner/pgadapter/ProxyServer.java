@@ -233,6 +233,7 @@ public class ProxyServer extends AbstractApiService {
             this.localPort == 0 ? this.options.getProxyPort() : this.localPort,
             this.options.getMaxBacklog(),
             address);
+    tcpSocket.setPerformancePreferences(0, 2, 1);
     this.serverSockets.add(tcpSocket);
     this.localPort = tcpSocket.getLocalPort();
     tcpStartedLatch.countDown();
@@ -297,7 +298,9 @@ public class ProxyServer extends AbstractApiService {
    * @throws SpannerException if the {@link ConnectionHandler} is unable to connect to Cloud Spanner
    *     or if the dialect of the database is not PostgreSQL.
    */
-  void createConnectionHandler(Socket socket) {
+  void createConnectionHandler(Socket socket) throws SocketException {
+    socket.setPerformancePreferences(0, 2, 1);
+    socket.setTcpNoDelay(true);
     ConnectionHandler handler = new ConnectionHandler(this, socket);
     register(handler);
     handler.start();
