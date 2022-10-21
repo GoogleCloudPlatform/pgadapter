@@ -39,7 +39,6 @@ import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,6 +49,7 @@ import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVFormat.Builder;
 
 /**
  * {@link CopyStatement} models a `COPY table FROM STDIN` statement. The same class is used both as
@@ -158,23 +158,28 @@ public class CopyStatement extends IntermediatePortalStatement {
 
   /** CSVFormat for parsing copy data based on COPY statement options specified. */
   public void setParserFormat(ParsedCopyStatement parsedCopyStatement) {
-    this.format = CSVFormat.POSTGRESQL_TEXT;
+    Builder builder;
     if (parsedCopyStatement.format == Format.CSV) {
-      this.format = CSVFormat.POSTGRESQL_CSV;
+      builder = CSVFormat.POSTGRESQL_CSV.builder();
+    } else {
+      builder = CSVFormat.POSTGRESQL_TEXT.builder();
     }
-    if (!Strings.isNullOrEmpty(parsedCopyStatement.nullString)) {
-      this.format = this.format.withNullString(parsedCopyStatement.nullString);
+    if (parsedCopyStatement.nullString != null) {
+      builder.setNullString(parsedCopyStatement.nullString);
     }
     if (parsedCopyStatement.delimiter != null) {
-      this.format = this.format.withDelimiter(parsedCopyStatement.delimiter);
+      builder.setDelimiter(parsedCopyStatement.delimiter);
     }
     if (parsedCopyStatement.escape != null) {
-      this.format = this.format.withEscape(parsedCopyStatement.escape);
+      builder.setEscape(parsedCopyStatement.escape);
     }
     if (parsedCopyStatement.quote != null) {
-      this.format = this.format.withQuote(parsedCopyStatement.quote);
+      builder.setQuote(parsedCopyStatement.quote);
     }
-    this.format = this.format.withHeader(this.tableColumns.keySet().toArray(new String[0]));
+    if (parsedCopyStatement.header) {
+      builder.setHeader(this.tableColumns.keySet().toArray(new String[0]));
+    }
+    this.format = builder.build();
   }
 
   public CSVFormat getParserFormat() {
@@ -289,7 +294,7 @@ public class CopyStatement extends IntermediatePortalStatement {
                     + ", "
                     + DATA_TYPE
                     + " FROM information_schema.columns "
-                    + "WHERE schema_name = $1 "
+                    + "WHERE table_schema = $1 "
                     + "AND table_name = $2")
             .bind("p1")
             .to(
@@ -641,13 +646,4 @@ public class CopyStatement extends IntermediatePortalStatement {
     }
     parsedCopyStatement.escape = escape.charAt(0);
   }
-
-  //  private void parseCopyStatement() {
-  //    try {
-  //      Copy.parse(parsedStatement.getSqlWithoutComments(), this.options);
-  //    } catch (Exception | TokenMgrError e) {
-  //      throw SpannerExceptionFactory.newSpannerException(
-  //          ErrorCode.INVALID_ARGUMENT, "Invalid COPY statement syntax: " + e);
-  //    }
-  //  }
 }

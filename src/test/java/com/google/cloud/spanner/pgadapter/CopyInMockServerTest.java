@@ -1443,7 +1443,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, data_type FROM information_schema.columns WHERE schema_name = $1 AND table_name = $2")
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2")
                 .bind("p1")
                 .to("public")
                 .bind("p2")
@@ -1508,7 +1508,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, data_type FROM information_schema.columns WHERE schema_name = $1 AND table_name = $2")
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2")
                 .bind("p1")
                 .to("public")
                 .bind("p2")
