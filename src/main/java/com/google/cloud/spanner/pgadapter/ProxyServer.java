@@ -233,6 +233,8 @@ public class ProxyServer extends AbstractApiService {
             this.localPort == 0 ? this.options.getProxyPort() : this.localPort,
             this.options.getMaxBacklog(),
             address);
+    // Optimize for latency (2), then bandwidth (1) and then connection time (0).
+    tcpSocket.setPerformancePreferences(0, 2, 1);
     this.serverSockets.add(tcpSocket);
     this.localPort = tcpSocket.getLocalPort();
     tcpStartedLatch.countDown();
@@ -254,6 +256,8 @@ public class ProxyServer extends AbstractApiService {
       }
       AFUNIXServerSocket domainSocket = AFUNIXServerSocket.newInstance();
       domainSocket.bind(AFUNIXSocketAddress.of(tempDir), this.options.getMaxBacklog());
+      // Optimize for latency (2), then bandwidth (1) and then connection time (0).
+      domainSocket.setPerformancePreferences(0, 2, 1);
       this.serverSockets.add(domainSocket);
       runServer(domainSocket, startupLatch, stoppedLatch);
     } catch (SocketException socketException) {
@@ -297,7 +301,11 @@ public class ProxyServer extends AbstractApiService {
    * @throws SpannerException if the {@link ConnectionHandler} is unable to connect to Cloud Spanner
    *     or if the dialect of the database is not PostgreSQL.
    */
-  void createConnectionHandler(Socket socket) {
+  void createConnectionHandler(Socket socket) throws SocketException {
+    // Optimize for latency (2), then bandwidth (1) and then connection time (0).
+    socket.setPerformancePreferences(0, 2, 1);
+    // Turn on TCP_NODELAY to optimize for chatty protocol that prefers low latency.
+    socket.setTcpNoDelay(true);
     ConnectionHandler handler = new ConnectionHandler(this, socket);
     register(handler);
     handler.start();
