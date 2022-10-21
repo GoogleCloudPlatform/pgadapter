@@ -561,39 +561,47 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   static void parseLegacyOptions(SimpleParser parser, ParsedCopyStatement parsedCopyStatement) {
-    if (parser.eatKeyword("binary")) {
-      parsedCopyStatement.format = Format.BINARY;
-    }
-    if (parser.eatKeyword("delimiter")) {
-      parser.eatKeyword("as");
-      eatDelimiter(parser, parsedCopyStatement);
-    }
-    if (parser.eatKeyword("null")) {
-      parser.eatKeyword("as");
-      parsedCopyStatement.nullString = parser.readSingleQuotedString().getValue();
-    }
-    if (parser.eatKeyword("csv")) {
-      parser.eatKeyword("header");
-      if (parser.eatKeyword("quote")) {
+    while (true) {
+      if (parser.eatKeyword("binary")) {
+        parsedCopyStatement.format = Format.BINARY;
+      } else if (parser.eatKeyword("delimiter")) {
         parser.eatKeyword("as");
-        eatQuote(parser, parsedCopyStatement);
-      }
-      if (parser.eatKeyword("escape")) {
+        eatDelimiter(parser, parsedCopyStatement);
+      } else if (parser.eatKeyword("null")) {
         parser.eatKeyword("as");
-        eatEscape(parser, parsedCopyStatement);
-      }
-      if (parsedCopyStatement.direction == Direction.FROM) {
-        if (parser.eatKeyword("force", "not", "null")) {
-          parsedCopyStatement.forceNotNull = parser.readColumnList("force not null");
-        }
-      } else if (parsedCopyStatement.direction == Direction.TO) {
-        if (parser.eatKeyword("force", "quote")) {
-          if (parser.eatToken("*")) {
-            parsedCopyStatement.forceQuote = ImmutableList.of();
-          } else {
-            parsedCopyStatement.forceQuote = parser.readColumnList("force quote");
+        parsedCopyStatement.nullString = parser.readSingleQuotedString().getValue();
+      } else if (parser.eatKeyword("csv")) {
+        parsedCopyStatement.format = Format.CSV;
+        parser.eatKeyword("header");
+        boolean foundValid;
+        do {
+          foundValid = false;
+          if (parser.eatKeyword("quote")) {
+            parser.eatKeyword("as");
+            eatQuote(parser, parsedCopyStatement);
+            foundValid = true;
+          } else if (parser.eatKeyword("escape")) {
+            parser.eatKeyword("as");
+            eatEscape(parser, parsedCopyStatement);
+            foundValid = true;
+          } else if (parsedCopyStatement.direction == Direction.FROM) {
+            if (parser.eatKeyword("force", "not", "null")) {
+              parsedCopyStatement.forceNotNull = parser.readColumnList("force not null");
+              foundValid = true;
+            }
+          } else if (parsedCopyStatement.direction == Direction.TO) {
+            if (parser.eatKeyword("force", "quote")) {
+              foundValid = true;
+              if (parser.eatToken("*")) {
+                parsedCopyStatement.forceQuote = ImmutableList.of();
+              } else {
+                parsedCopyStatement.forceQuote = parser.readColumnList("force quote");
+              }
+            }
           }
-        }
+        } while (foundValid);
+      } else {
+        break;
       }
     }
   }

@@ -169,27 +169,30 @@ public class PythonCopyTests extends PythonTestSetup {
 
   @Test
   public void copySimpleFromTest() throws IOException, InterruptedException {
-    String sql = "COPY test from STDIN CSV DELIMITER ','";
+    // Python copy_from generates this statement:
+    String sql = "COPY \"test\" FROM stdin WITH DELIMITER AS '\t' NULL AS '\\N'";
     String copyType = "SIMPLE_FROM";
-    String file = "1,hello\n2,world\n";
+    String file = "1\thello\n2\tworld\n";
     String sql1 =
-        "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1";
+        "SELECT column_name, data_type FROM information_schema.columns WHERE schema_name = $1 AND table_name = $2";
     String sql2 =
-        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3)";
-    Statement s1 = Statement.newBuilder(sql1).bind("p1").to("test").build();
+        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema=$1 and table_name=$2 and column_name in ($3, $4)";
+    Statement s1 = Statement.newBuilder(sql1).bind("p1").to("public").bind("p2").to("test").build();
 
     Statement s2 =
         Statement.newBuilder(sql2)
             .bind("p1")
-            .to("test")
+            .to("public")
             .bind("p2")
-            .to("id")
+            .to("test")
             .bind("p3")
+            .to("id")
+            .bind("p4")
             .to("name")
             .build();
     mockSpanner.putStatementResult(StatementResult.query(s1, createResultSet()));
     mockSpanner.putStatementResult(StatementResult.query(s2, createResultSetForIndexColumns()));
-    String actualOutput = executeCopy(pgServer.getLocalPort(), sql, file, copyType);
+    String actualOutput = executeCopy(pgServer.getLocalPort(), "", file, copyType);
 
     assertEquals("2\n", actualOutput);
 
@@ -208,6 +211,43 @@ public class PythonCopyTests extends PythonTestSetup {
 
     assertEquals(2, mutation.getInsert().getColumnsCount());
     assertEquals(2, mutation.getInsert().getValuesCount());
+  }
+
+  @Test
+  public void copySimpleToTest() throws IOException, InterruptedException {
+    // Python copy_to generates this statement:
+    String sql = "COPY \"test\" TO stdout WITH DELIMITER AS '\t' NULL AS '\\N'";
+    String copyType = "SIMPLE_TO";
+    String file = "does not matter";
+    String sql1 =
+        "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1";
+    Statement s1 = Statement.newBuilder(sql1).bind("p1").to("test").build();
+    mockSpanner.putStatementResult(StatementResult.query(s1, createResultSet()));
+
+    String sql2 =
+        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3)";
+    Statement s2 =
+        Statement.newBuilder(sql2)
+            .bind("p1")
+            .to("test")
+            .bind("p2")
+            .to("id")
+            .bind("p3")
+            .to("name")
+            .build();
+    mockSpanner.putStatementResult(StatementResult.query(s2, createResultSetForIndexColumns()));
+
+    String sql3 = "select * from \"test\"";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql3), createResultSetForSelect()));
+    String actualOutput = executeCopy(pgServer.getLocalPort(), "", file, copyType);
+    String expectedOutput = "1\thello\n" + "2\tworld\n";
+
+    assertEquals(expectedOutput, actualOutput);
+
+    List<QueryMessage> qm = getWireMessagesOfType(QueryMessage.class);
+    assertEquals(1, qm.size());
+    assertEquals(sql, qm.get(0).getStatement().getSql());
   }
 
   @Test

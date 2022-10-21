@@ -482,4 +482,19 @@ public class CopyStatementTest {
             PGException.class, () -> parse("copy my_table to stdout csv force quote col1, 'col2'"));
     assertEquals("Invalid column name: 'col2'", exception.getMessage());
   }
+
+  @Test
+  public void testParseLegacyOutOfOrder() {
+    assertEquals(
+        ImmutableList.of(),
+        parse("copy my_table to stdout csv force quote * quote '\"'").forceQuote);
+    assertEquals('"', (char) parse("copy my_table to stdout csv force quote * quote '\"'").quote);
+    assertEquals(
+        "null",
+        parse("copy my_table to stdout csv force quote * quote '\"' null 'null'").nullString);
+
+    assertThrows(
+        PGException.class,
+        () -> parse("copy my_table to stdout csv force quote * quote '\"' null 'null' escape '['"));
+  }
 }

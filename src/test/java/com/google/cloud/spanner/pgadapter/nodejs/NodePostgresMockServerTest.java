@@ -580,7 +580,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   @Test
   public void testCopyTo() throws Exception {
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of("select * from alltypes"), createAllTypesResultSet("")));
+        StatementResult.query(Statement.of("select * from AllTypes"), createAllTypesResultSet("")));
 
     String output = runTest("testCopyTo", getHost(), pgServer.getLocalPort());
 

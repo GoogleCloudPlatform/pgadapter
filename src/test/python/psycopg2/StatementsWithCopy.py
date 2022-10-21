@@ -51,6 +51,12 @@ def execute_copy_to(sql, cursor):
   except Exception as e:
     print(e)
 
+def execute_simple_copy_to(cursor):
+  try:
+    cursor.copy_to(sys.stdout, 'test')
+  except Exception as e:
+    print(e)
+
 def execute_copy(sql, file, port, copy_type):
   connection = create_connection(port)
   if connection is None:
@@ -59,10 +65,12 @@ def execute_copy(sql, file, port, copy_type):
     cursor = connection.cursor()
     if copy_type == 'FROM':
       execute_copy_from(sql, file, cursor)
-    if copy_type == 'SIMPLE_FROM':
+    elif copy_type == 'SIMPLE_FROM':
       execute_simple_copy_from(file, cursor)
     elif copy_type == 'TO':
       execute_copy_to(sql, cursor)
+    elif copy_type == 'SIMPLE_TO':
+      execute_simple_copy_to(cursor)
     else:
       print('Invalid Copy Type')
       return
