@@ -24,6 +24,7 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.ParsedCopyStatement;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.ParsedCopyStatement.Direction;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
@@ -32,6 +33,13 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class CopyStatementTest {
+
+  @Test
+  public void testParseDirection() {
+    assertEquals(Direction.FROM, parse("copy my_table from stdin").direction);
+    assertEquals(Direction.TO, parse("copy my_table to stdout").direction);
+    assertThrows(PGException.class, () -> parse("copy my_table both stdin"));
+  }
 
   @Test
   public void testParseTableName() {
@@ -71,10 +79,10 @@ public class CopyStatementTest {
   public void testParseQuery() {
     assertEquals(
         "select * from my_table where my_column=1",
-        parse("copy (select * from my_table where my_column=1) from stdin").query);
+        parse("copy (select * from my_table where my_column=1) to stdout").query);
     assertEquals(
         "(select * from my_table where my_column in (select 1))",
-        parse("copy ((select * from my_table where my_column in (select 1))) from stdin").query);
+        parse("copy ((select * from my_table where my_column in (select 1))) to stdout").query);
 
     PGException exception;
     exception =
@@ -95,9 +103,9 @@ public class CopyStatementTest {
 
   @Test
   public void testParseFreeze() {
-    assertTrue(parse("copy my_table from stdin (freeze)").freeze);
-    assertTrue(parse("copy my_table from stdin (freeze true)").freeze);
-    assertTrue(parse("copy my_table from stdin (freeze on)").freeze);
+    assertThrows(PGException.class, () -> parse("copy my_table from stdin (freeze)"));
+    assertThrows(PGException.class, () -> parse("copy my_table from stdin (freeze true)"));
+    assertThrows(PGException.class, () -> parse("copy my_table from stdin (freeze on)"));
     assertFalse(parse("copy my_table from stdin (freeze f)").freeze);
     assertFalse(parse("copy my_table from stdin (freeze off)").freeze);
 
@@ -180,22 +188,36 @@ public class CopyStatementTest {
 
   @Test
   public void testParseQuote() {
-    assertEquals(',', parse("copy my_table from stdin (quote ',')").quote.charValue());
-    assertEquals('\t', parse("copy my_table from stdin (quote e'\\t')").quote.charValue());
-    assertEquals('\'', parse("copy my_table from stdin (quote e'\\'')").quote.charValue());
-    assertEquals('\'', parse("copy my_table from stdin (quote '''')").quote.charValue());
-    assertEquals('\\', parse("copy my_table from stdin (quote e'\\\\')").quote.charValue());
-    assertEquals('\b', parse("copy my_table from stdin (quote e'\\b')").quote.charValue());
-    assertEquals('\f', parse("copy my_table from stdin (quote e'\\f')").quote.charValue());
-    assertEquals('\n', parse("copy my_table from stdin (quote e'\\n')").quote.charValue());
-    assertEquals('\r', parse("copy my_table from stdin (quote e'\\r')").quote.charValue());
-    assertEquals('\1', parse("copy my_table from stdin (quote e'\\1')").quote.charValue());
-    assertEquals('\14', parse("copy my_table from stdin (quote e'\\14')").quote.charValue());
-    assertEquals('\111', parse("copy my_table from stdin (quote e'\\111')").quote.charValue());
-    assertEquals('\u0011', parse("copy my_table from stdin (quote e'\\u0011')").quote.charValue());
+    assertEquals(',', parse("copy my_table from stdin (format csv, quote ',')").quote.charValue());
+    assertEquals(
+        '\t', parse("copy my_table from stdin (format csv, quote e'\\t')").quote.charValue());
+    assertEquals(
+        '\'', parse("copy my_table from stdin (format csv, quote e'\\'')").quote.charValue());
+    assertEquals(
+        '\'', parse("copy my_table from stdin (format csv, quote '''')").quote.charValue());
+    assertEquals(
+        '\\', parse("copy my_table from stdin (format csv, quote e'\\\\')").quote.charValue());
+    assertEquals(
+        '\b', parse("copy my_table from stdin (format csv, quote e'\\b')").quote.charValue());
+    assertEquals(
+        '\f', parse("copy my_table from stdin (format csv, quote e'\\f')").quote.charValue());
+    assertEquals(
+        '\n', parse("copy my_table from stdin (format csv, quote e'\\n')").quote.charValue());
+    assertEquals(
+        '\r', parse("copy my_table from stdin (format csv, quote e'\\r')").quote.charValue());
+    assertEquals(
+        '\1', parse("copy my_table from stdin (format csv, quote e'\\1')").quote.charValue());
+    assertEquals(
+        '\14', parse("copy my_table from stdin (format csv, quote e'\\14')").quote.charValue());
+    assertEquals(
+        '\111', parse("copy my_table from stdin (format csv, quote e'\\111')").quote.charValue());
+    assertEquals(
+        '\u0011',
+        parse("copy my_table from stdin (format csv, quote e'\\u0011')").quote.charValue());
 
     PGException exception =
-        assertThrows(PGException.class, () -> parse("copy my_table from stdin (quote '\\t')"));
+        assertThrows(
+            PGException.class, () -> parse("copy my_table from stdin (format csv, quote '\\t')"));
     assertEquals("COPY quote must be a single one-byte character", exception.getMessage());
     assertEquals(
         "Use an escaped string to specify a special quote character, for example using an octal value.\n"
@@ -203,7 +225,8 @@ public class CopyStatementTest {
         exception.getHints());
 
     exception =
-        assertThrows(PGException.class, () -> parse("copy my_table from stdin (quote e'\\x7')"));
+        assertThrows(
+            PGException.class, () -> parse("copy my_table from stdin (format csv, quote e'\\x7')"));
     assertEquals(
         "PGAdapter does not support hexadecimal byte values in string literals",
         exception.getMessage());
@@ -211,21 +234,33 @@ public class CopyStatementTest {
 
   @Test
   public void testParseEscape() {
-    assertEquals(',', parse("copy my_table from stdin (escape ',')").escape.charValue());
-    assertEquals('\t', parse("copy my_table from stdin (escape e'\\t')").escape.charValue());
-    assertEquals('\\', parse("copy my_table from stdin (escape e'\\\\')").escape.charValue());
-    assertEquals('\b', parse("copy my_table from stdin (escape e'\\b')").escape.charValue());
-    assertEquals('\f', parse("copy my_table from stdin (escape e'\\f')").escape.charValue());
-    assertEquals('\n', parse("copy my_table from stdin (escape e'\\n')").escape.charValue());
-    assertEquals('\r', parse("copy my_table from stdin (escape e'\\r')").escape.charValue());
-    assertEquals('\1', parse("copy my_table from stdin (escape e'\\1')").escape.charValue());
-    assertEquals('\14', parse("copy my_table from stdin (escape e'\\14')").escape.charValue());
-    assertEquals('\111', parse("copy my_table from stdin (escape e'\\111')").escape.charValue());
     assertEquals(
-        '\u0011', parse("copy my_table from stdin (escape e'\\u0011')").escape.charValue());
+        ',', parse("copy my_table from stdin (escape ',', format csv)").escape.charValue());
+    assertEquals(
+        '\t', parse("copy my_table from stdin (format csv, escape e'\\t')").escape.charValue());
+    assertEquals(
+        '\\', parse("copy my_table from stdin (format csv, escape e'\\\\')").escape.charValue());
+    assertEquals(
+        '\b', parse("copy my_table from stdin (format csv, escape e'\\b')").escape.charValue());
+    assertEquals(
+        '\f', parse("copy my_table from stdin (format csv, escape e'\\f')").escape.charValue());
+    assertEquals(
+        '\n', parse("copy my_table from stdin (format csv, escape e'\\n')").escape.charValue());
+    assertEquals(
+        '\r', parse("copy my_table from stdin (format csv, escape e'\\r')").escape.charValue());
+    assertEquals(
+        '\1', parse("copy my_table from stdin (format csv, escape e'\\1')").escape.charValue());
+    assertEquals(
+        '\14', parse("copy my_table from stdin (format csv, escape e'\\14')").escape.charValue());
+    assertEquals(
+        '\111', parse("copy my_table from stdin (format csv, escape e'\\111')").escape.charValue());
+    assertEquals(
+        '\u0011',
+        parse("copy my_table from stdin (format csv, escape e'\\u0011')").escape.charValue());
 
     PGException exception =
-        assertThrows(PGException.class, () -> parse("copy my_table from stdin (escape '\\t')"));
+        assertThrows(
+            PGException.class, () -> parse("copy my_table from stdin (format csv, escape '\\t')"));
     assertEquals("COPY escape must be a single one-byte character", exception.getMessage());
     assertEquals(
         "Use an escaped string to specify a special escape character, for example using an octal value.\n"
@@ -233,7 +268,9 @@ public class CopyStatementTest {
         exception.getHints());
 
     exception =
-        assertThrows(PGException.class, () -> parse("copy my_table from stdin (escape e'\\x7')"));
+        assertThrows(
+            PGException.class,
+            () -> parse("copy my_table from stdin (format csv, escape e'\\x7')"));
     assertEquals(
         "PGAdapter does not support hexadecimal byte values in string literals",
         exception.getMessage());
@@ -241,26 +278,30 @@ public class CopyStatementTest {
 
   @Test
   public void testParseForceQuote() {
-    assertEquals(ImmutableList.of(), parse("copy my_table from stdin (force_quote *)").forceQuote);
+    assertEquals(
+        ImmutableList.of(),
+        parse("copy my_table to stdout (format csv, force_quote *)").forceQuote);
     assertEquals(
         ImmutableList.of(new TableOrIndexName("col1")),
-        parse("copy my_table from stdin (force_quote (col1))").forceQuote);
+        parse("copy my_table to stdout (format csv, force_quote (col1))").forceQuote);
     assertEquals(
         ImmutableList.of(new TableOrIndexName("col1"), new TableOrIndexName("col2")),
-        parse("copy my_table from stdin (force_quote (col1, col2))").forceQuote);
+        parse("copy my_table to stdout (format csv, force_quote (col1, col2))").forceQuote);
 
     PGException exception;
     exception =
-        assertThrows(PGException.class, () -> parse("copy my_table from stdin (force_quote)"));
+        assertThrows(
+            PGException.class, () -> parse("copy my_table to stdout (format csv, force_quote)"));
     assertEquals("missing opening parentheses for force_quote", exception.getMessage());
     exception =
         assertThrows(
-            PGException.class, () -> parse("copy my_table from stdin (force_quote * (col1))"));
+            PGException.class,
+            () -> parse("copy my_table to stdout (format csv, force_quote * (col1))"));
     assertEquals("Syntax error. Unexpected tokens: (col1)", exception.getMessage());
     exception =
         assertThrows(
             PGException.class,
-            () -> parse("copy my_table from stdin (force_quote (col1, 'col2'))"));
+            () -> parse("copy my_table to stdout (format csv, force_quote (col1, 'col2'))"));
     assertEquals("Invalid column name: 'col2'", exception.getMessage());
   }
 
@@ -268,23 +309,26 @@ public class CopyStatementTest {
   public void testParseForceNotNull() {
     assertEquals(
         ImmutableList.of(new TableOrIndexName("col1")),
-        parse("copy my_table from stdin (force_not_null (col1))").forceNotNull);
+        parse("copy my_table from stdin (format csv, force_not_null (col1))").forceNotNull);
     assertEquals(
         ImmutableList.of(new TableOrIndexName("col1"), new TableOrIndexName("col2")),
-        parse("copy my_table from stdin (force_not_null (col1, col2))").forceNotNull);
+        parse("copy my_table from stdin (format csv, force_not_null (col1, col2))").forceNotNull);
 
     PGException exception;
     exception =
-        assertThrows(PGException.class, () -> parse("copy my_table from stdin (force_not_null)"));
-    assertEquals("missing opening parentheses for force_not_null", exception.getMessage());
-    exception =
         assertThrows(
-            PGException.class, () -> parse("copy my_table from stdin (force_not_null * (col1))"));
+            PGException.class,
+            () -> parse("copy my_table from stdin (format csv, force_not_null)"));
     assertEquals("missing opening parentheses for force_not_null", exception.getMessage());
     exception =
         assertThrows(
             PGException.class,
-            () -> parse("copy my_table from stdin (force_not_null (col1, 'col2'))"));
+            () -> parse("copy my_table from stdin (format csv, force_not_null * (col1))"));
+    assertEquals("missing opening parentheses for force_not_null", exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class,
+            () -> parse("copy my_table from stdin (format csv, force_not_null (col1, 'col2'))"));
     assertEquals("Invalid column name: 'col2'", exception.getMessage());
   }
 
@@ -292,22 +336,25 @@ public class CopyStatementTest {
   public void testParseForceNull() {
     assertEquals(
         ImmutableList.of(new TableOrIndexName("col1")),
-        parse("copy my_table from stdin (force_null (col1))").forceNull);
+        parse("copy my_table from stdin (format csv, force_null (col1))").forceNull);
     assertEquals(
         ImmutableList.of(new TableOrIndexName("col1"), new TableOrIndexName("col2")),
-        parse("copy my_table from stdin (force_null (col1, col2))").forceNull);
+        parse("copy my_table from stdin (format csv, force_null (col1, col2))").forceNull);
 
     PGException exception;
     exception =
-        assertThrows(PGException.class, () -> parse("copy my_table from stdin (force_null)"));
+        assertThrows(
+            PGException.class, () -> parse("copy my_table from stdin (format csv, force_null)"));
     assertEquals("missing opening parentheses for force_null", exception.getMessage());
     exception =
         assertThrows(
-            PGException.class, () -> parse("copy my_table from stdin (force_null * (col1))"));
+            PGException.class,
+            () -> parse("copy my_table from stdin (format csv, force_null * (col1))"));
     assertEquals("missing opening parentheses for force_null", exception.getMessage());
     exception =
         assertThrows(
-            PGException.class, () -> parse("copy my_table from stdin (force_null (col1, 'col2'))"));
+            PGException.class,
+            () -> parse("copy my_table from stdin (format csv, force_null (col1, 'col2'))"));
     assertEquals("Invalid column name: 'col2'", exception.getMessage());
   }
 

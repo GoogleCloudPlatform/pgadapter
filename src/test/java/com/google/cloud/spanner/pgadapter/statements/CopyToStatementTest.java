@@ -20,7 +20,6 @@ import static org.mockito.Mockito.when;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.ParsedCopyStatement;
 import org.apache.commons.csv.QuoteMode;
 import org.junit.Rule;
@@ -41,9 +40,8 @@ public class CopyToStatementTest {
   @Test
   public void testDelimiter() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    CopyOptions copyOptions = new CopyOptions();
-    ParsedCopyStatement parsedCopyStatement = new ParsedCopyStatement();
-    parsedCopyStatement.delimiter = '~';
+    ParsedCopyStatement parsedCopyStatement =
+        CopyStatement.parse("copy t to stdout (delimiter '~')");
 
     CopyToStatement statement =
         new CopyToStatement(connectionHandler, options, "", parsedCopyStatement);
@@ -53,8 +51,8 @@ public class CopyToStatementTest {
   @Test
   public void testNullString() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    ParsedCopyStatement parsedCopyStatement = new ParsedCopyStatement();
-    parsedCopyStatement.nullString = "this-is-null";
+    ParsedCopyStatement parsedCopyStatement =
+        CopyStatement.parse("copy t to stdout null 'this-is-null'");
 
     CopyToStatement statement =
         new CopyToStatement(connectionHandler, options, "", parsedCopyStatement);
@@ -64,8 +62,8 @@ public class CopyToStatementTest {
   @Test
   public void testEscape() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    ParsedCopyStatement parsedCopyStatement = new ParsedCopyStatement();
-    parsedCopyStatement.escape = '&';
+    ParsedCopyStatement parsedCopyStatement =
+        CopyStatement.parse("copy t to stdout (format csv, escape '&')");
 
     CopyToStatement statement =
         new CopyToStatement(connectionHandler, options, "", parsedCopyStatement);
@@ -75,8 +73,8 @@ public class CopyToStatementTest {
   @Test
   public void testQuote() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    ParsedCopyStatement parsedCopyStatement = new ParsedCopyStatement();
-    parsedCopyStatement.quote = '^';
+    ParsedCopyStatement parsedCopyStatement =
+        CopyStatement.parse("copy t to stdout (format csv, quote '^')");
 
     CopyToStatement statement =
         new CopyToStatement(connectionHandler, options, "", parsedCopyStatement);
@@ -87,7 +85,7 @@ public class CopyToStatementTest {
   @Test
   public void testRecordSeparator() {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    ParsedCopyStatement parsedCopyStatement = new ParsedCopyStatement();
+    ParsedCopyStatement parsedCopyStatement = CopyStatement.parse("copy t to stdout");
 
     CopyToStatement statement =
         new CopyToStatement(connectionHandler, options, "", parsedCopyStatement);
