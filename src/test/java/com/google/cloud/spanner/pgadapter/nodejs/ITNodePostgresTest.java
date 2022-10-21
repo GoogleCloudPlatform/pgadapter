@@ -407,6 +407,22 @@ public class ITNodePostgresTest implements IntegrationTest {
     }
   }
 
+  @Test
+  public void testDmlBatch() throws Exception {
+    String output = runTest("testDmlBatch", getHost(), testEnv.getServer().getLocalPort());
+    assertEquals("\n\nexecuted dml batch\n", output);
+
+    DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT * FROM users ORDER BY name"))) {
+      assertTrue(resultSet.next());
+      assertEquals("bar", resultSet.getString("name"));
+      assertTrue(resultSet.next());
+      assertEquals("foo", resultSet.getString("name"));
+      assertFalse(resultSet.next());
+    }
+  }
+
   static String runTest(String testName, String host, int port)
       throws IOException, InterruptedException {
     return NodeJSTest.runTest(
