@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.10.0...v0.10.1) (2022-10-21)
+
+
+### Performance Improvements
+
+* use low latency TCP options ([#414](https://github.com/GoogleCloudPlatform/pgadapter/issues/414)) ([684506a](https://github.com/GoogleCloudPlatform/pgadapter/commit/684506a53a2747e843d7bbcb69a2f7e95f2413db))
+
+
+### Documentation
+
+* add FAQ entries for Docker ([#411](https://github.com/GoogleCloudPlatform/pgadapter/issues/411)) ([cdfb76a](https://github.com/GoogleCloudPlatform/pgadapter/commit/cdfb76ac0566141d2cf5c9a4d28df7edf7b25b26))
+
 ## [0.10.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.9.0...v0.10.0) (2022-10-14)
 
 
