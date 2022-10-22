@@ -14,9 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import static com.google.cloud.spanner.pgadapter.parsers.copy.Copy.parse;
-import static com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
-
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
@@ -505,7 +502,7 @@ public class CopyStatement extends IntermediatePortalStatement {
     final Direction direction;
     final TableOrIndexName table;
     final String query;
-    final List<TableOrIndexName> columns;
+    final ImmutableList<TableOrIndexName> columns;
     final Format format;
     final boolean freeze;
     final Character delimiter;
@@ -514,9 +511,9 @@ public class CopyStatement extends IntermediatePortalStatement {
     final boolean headerMatch;
     final Character quote;
     final Character escape;
-    final List<TableOrIndexName> forceQuote;
-    final List<TableOrIndexName> forceNotNull;
-    final List<TableOrIndexName> forceNull;
+    final ImmutableList<TableOrIndexName> forceQuote;
+    final ImmutableList<TableOrIndexName> forceNotNull;
+    final ImmutableList<TableOrIndexName> forceNull;
     final String encoding;
 
     private ParsedCopyStatement(Builder builder) {

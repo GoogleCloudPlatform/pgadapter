@@ -15,18 +15,24 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.statements.CopyStatement.parse;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.ParsedCopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.ParsedCopyStatement.Direction;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.collect.ImmutableList;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -543,5 +549,471 @@ public class CopyStatementTest {
     assertThrows(
         PGException.class,
         () -> parse("copy my_table to stdout csv force quote * quote '\"' null 'null' escape '['"));
+  }
+
+  private static final AbstractStatementParser PARSER =
+      AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
+
+  @Test
+  public void testCopyParser() {
+    {
+      String sql = "COPY users FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.name);
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertNull(parsedCopyStatement.columns);
+    }
+    {
+      String sql = "COPY users TO STDOUT;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.name);
+      assertEquals(Direction.TO, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertNull(parsedCopyStatement.columns);
+    }
+    {
+      String sql = "COPY Users FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertNull(parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY UsErS FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertNull(parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY USERS FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertNull(parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY \"Users\" FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("Users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertNull(parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY \"UsErS\" FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("UsErS", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertNull(parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY \"USERS\" FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("USERS", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertNull(parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY users (id) FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertEquals(identifierList("id"), parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY users (id, age) FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertEquals(identifierList("id", "age"), parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY users (id, age, name) FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertEquals(identifierList("id", "age", "name"), parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY users (ID, AGE, NAME) FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertEquals(identifierList("id", "age", "name"), parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY users (Id, Age, Name) FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertEquals(identifierList("id", "age", "name"), parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY users (iD, aGe, nAMe) FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertEquals(identifierList("id", "age", "name"), parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY users (\"ID\", \"AGE\", \"NAME\") FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertEquals(identifierList("\"ID\"", "\"AGE\"", "\"NAME\""), parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY users (\"Id\", \"Age\", \"Name\") FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertEquals(identifierList("\"Id\"", "\"Age\"", "\"Name\""), parsedCopyStatement.columns);
+    }
+
+    {
+      String sql = "COPY users (\"iD\", \"aGe\", \"nAMe\") FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertEquals(identifierList("\"iD\"", "\"aGe\"", "\"nAMe\""), parsedCopyStatement.columns);
+    }
+  }
+
+  @Test
+  public void testCopyParserOptions() {
+    {
+      String sql = "COPY users FROM STDIN WITH (FORMAT CSV);";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.CSV, parsedCopyStatement.format);
+    }
+
+    {
+      String sql = "COPY users FROM STDIN WITH (FORMAT BINARY);";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.BINARY, parsedCopyStatement.format);
+    }
+
+    {
+      String sql = "COPY users FROM STDIN WITH (FORMAT TEXT);";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+    }
+
+    {
+      String sql = "COPY users FROM STDIN CSV;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.CSV, parsedCopyStatement.format);
+    }
+
+    {
+      String sql = "COPY users FROM STDIN BINARY;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.BINARY, parsedCopyStatement.format);
+    }
+
+    {
+      String sql = "COPY users FROM STDIN (format TEXT);";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+    }
+
+    {
+      String sql = "COPY users FROM STDIN DELIMITER '*';";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertEquals('*', parsedCopyStatement.delimiter.charValue());
+    }
+
+    {
+      String sql = "COPY users FROM STDIN (format csv, ESCAPE '\\');";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.CSV, parsedCopyStatement.format);
+      assertEquals('\\', parsedCopyStatement.escape.charValue());
+    }
+
+    {
+      String sql = "COPY users FROM STDIN QUOTE ''';";
+      assertThrows(PGException.class, () -> parse(sql));
+    }
+
+    {
+      String sql = "COPY users FROM STDIN NULL 'null';";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals(parseCommand(PARSER.removeCommentsAndTrim(sql)), "COPY");
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+      assertEquals("null", parsedCopyStatement.nullString);
+    }
+
+    {
+      char value;
+      for (value = '!'; value <= '~'; value++) {
+        String sql = "COPY users FROM STDIN (format csv, QUOTE '" + value + "');";
+        if (value == '\'') {
+          assertThrows(PGException.class, () -> parse(sql));
+        } else {
+          ParsedCopyStatement parsedCopyStatement = parse(sql);
+          assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+          assertEquals(Direction.FROM, parsedCopyStatement.direction);
+          assertEquals(Format.CSV, parsedCopyStatement.format);
+          assertEquals(value, parsedCopyStatement.quote.charValue());
+        }
+      }
+    }
+
+    {
+      char value;
+      for (value = '!'; value <= '|'; value++) {
+        char value1 = (char) (value + 1);
+        char value2 = (char) (value + 2);
+        String sql =
+            "COPY users FROM STDIN (FORMAT CSV, DELIMITER '"
+                + value
+                + "', QUOTE '"
+                + value1
+                + "', ESCAPE '"
+                + value2
+                + "');";
+        if (value >= '%' && value <= '\'') {
+          assertThrows(PGException.class, () -> parse(sql));
+        } else {
+          ParsedCopyStatement parsedCopyStatement = parse(sql);
+          assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+          assertEquals(Direction.FROM, parsedCopyStatement.direction);
+          assertEquals(Format.CSV, parsedCopyStatement.format);
+          assertEquals(value, parsedCopyStatement.delimiter.charValue());
+          assertEquals(value1, parsedCopyStatement.quote.charValue());
+          assertEquals(value2, parsedCopyStatement.escape.charValue());
+        }
+      }
+    }
+  }
+
+  @Test
+  public void testCopyParserWithNamespace() {
+    {
+      String sql = "COPY public.users FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals("public.users", parsedCopyStatement.table.getUnquotedQualifiedName());
+      assertEquals("public", parsedCopyStatement.table.getUnquotedSchema());
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+    }
+
+    {
+      String sql = "COPY public.\"USERS\" FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals("public.USERS", parsedCopyStatement.table.getUnquotedQualifiedName());
+      assertEquals("public", parsedCopyStatement.table.getUnquotedSchema());
+      assertEquals("USERS", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+    }
+
+    {
+      String sql = "COPY PUBLIC.\"USERS\" FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals("public.USERS", parsedCopyStatement.table.getUnquotedQualifiedName());
+      assertEquals("public", parsedCopyStatement.table.getUnquotedSchema());
+      assertEquals("USERS", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+    }
+
+    {
+      String sql = "COPY \"public\".users FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals("public.users", parsedCopyStatement.table.getUnquotedQualifiedName());
+      assertEquals("public", parsedCopyStatement.table.getUnquotedSchema());
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+    }
+
+    {
+      String sql = "COPY \"public\".USERS FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals("public.users", parsedCopyStatement.table.getUnquotedQualifiedName());
+      assertEquals("public", parsedCopyStatement.table.getUnquotedSchema());
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+    }
+
+    {
+      String sql = "COPY public.\"users\" FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals("public.users", parsedCopyStatement.table.getUnquotedQualifiedName());
+      assertEquals("public", parsedCopyStatement.table.getUnquotedSchema());
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+    }
+
+    {
+      String sql = "COPY one.two.three.users FROM STDIN;";
+      assertThrows(PGException.class, () -> parse(sql));
+    }
+
+    {
+      String sql = "COPY public.'users\" FROM STDIN;";
+      assertThrows(PGException.class, () -> parse(sql));
+    }
+
+    {
+      String sql = "COPY \"public.users\" FROM STDIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals("public.users", parsedCopyStatement.table.getUnquotedQualifiedName());
+      assertNull(parsedCopyStatement.table.schema);
+      assertEquals("public.users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+    }
+  }
+
+  @Test
+  public void testCopyParserWithMixedCase() {
+    {
+      String sql = "CoPy UsErS fROm stdIN;";
+      ParsedCopyStatement parsedCopyStatement = parse(sql);
+
+      assertEquals("users", parsedCopyStatement.table.getUnquotedQualifiedName());
+      assertNull(parsedCopyStatement.table.schema);
+      assertEquals("users", parsedCopyStatement.table.getUnquotedName());
+      assertEquals(Direction.FROM, parsedCopyStatement.direction);
+      assertEquals(Format.TEXT, parsedCopyStatement.format);
+    }
+  }
+
+  @Test
+  public void testCopyParserWithUnicode() {
+    {
+      String text = new String("COPY ÀÚ§ýJ@ö¥ FROM STDIN;".getBytes(), StandardCharsets.UTF_8);
+      assertThrows(PGException.class, () -> parse(text));
+    }
+
+    {
+      String text =
+          new String(
+              "COPY U&\"\\0441\\043B\\043E\\043D\" FROM STDIN;".getBytes(), StandardCharsets.UTF_8);
+      assertThrows(PGException.class, () -> parse(text));
+    }
+
+    {
+      String text =
+          new String(
+              "COPY u&\"\\0441\\043B\\043E\\043D\" FROM STDIN;".getBytes(), StandardCharsets.UTF_8);
+      assertThrows(PGException.class, () -> parse(text));
+    }
+  }
+
+  static ImmutableList<TableOrIndexName> identifierList(String... identifiers) {
+    return ImmutableList.copyOf(
+        Arrays.stream(identifiers).map(TableOrIndexName::new).collect(Collectors.toList()));
   }
 }
