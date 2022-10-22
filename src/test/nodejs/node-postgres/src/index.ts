@@ -261,6 +261,30 @@ async function testCopyFrom(client) {
   }
 }
 
+async function testDmlBatch(client) {
+  try {
+    const queryText = 'INSERT INTO users(name) VALUES($1)';
+    await client.query('start batch dml');
+    await client.query(queryText, ['foo']);
+    await client.query(queryText, ['bar']);
+    await client.query('run batch');
+    console.log('executed dml batch');
+  } catch (e) {
+    console.error(`Dml batch error: ${e}`);
+  }
+}
+
+async function testDdlBatch(client) {
+  try {
+    await client.query('start batch ddl');
+    await client.query('create table my_table1 (id bigint primary key, value varchar)');
+    await client.query('create table my_table2 (id bigint primary key, value varchar)');
+    await client.query('run batch');
+    console.log('executed ddl batch');
+  } catch (e) {
+    console.error(`Dml batch error: ${e}`);
+  }
+}
 
 require('yargs')
 .demand(4)
@@ -347,6 +371,18 @@ require('yargs')
     'Tests COPY from stdin',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testCopyFrom)
+)
+.command(
+    'testDmlBatch <host> <port> <database>',
+    'Tests DML batch',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testDmlBatch)
+)
+.command(
+    'testDdlBatch <host> <port> <database>',
+    'Tests DDL batch',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testDdlBatch)
 )
 .wrap(120)
 .recommendCommands()
