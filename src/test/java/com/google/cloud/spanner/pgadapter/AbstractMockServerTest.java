@@ -255,7 +255,7 @@ public abstract class AbstractMockServerTest {
                         .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
                 .addFields(
                     Field.newBuilder()
-                        .setName("col_jsonb")
+                        .setName(columnPrefix + "col_jsonb")
                         .setType(
                             Type.newBuilder()
                                 .setCode(TypeCode.JSON)
