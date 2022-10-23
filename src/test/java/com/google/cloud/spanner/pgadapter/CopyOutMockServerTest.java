@@ -48,6 +48,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
@@ -385,8 +386,8 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       }
     }
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    CopyInParser copyParser =
-        CopyInParser.create(Format.BINARY, null, pipedOutputStream, 1 << 16, false);
+    PipedInputStream inputStream = new PipedInputStream(pipedOutputStream, 1 << 16);
+    CopyInParser copyParser = CopyInParser.create(Format.BINARY, null, inputStream, false);
     int b;
     while ((b = process.getInputStream().read()) != -1) {
       pipedOutputStream.write(b);
@@ -437,8 +438,8 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       }
     }
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    CopyInParser copyParser =
-        CopyInParser.create(Format.BINARY, null, pipedOutputStream, 1 << 16, false);
+    PipedInputStream inputStream = new PipedInputStream(pipedOutputStream, 1 << 16);
+    CopyInParser copyParser = CopyInParser.create(Format.BINARY, null, inputStream, false);
     int b;
     while ((b = process.getInputStream().read()) != -1) {
       pipedOutputStream.write(b);

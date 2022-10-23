@@ -28,7 +28,6 @@ import com.google.common.collect.Iterators;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeParseException;
@@ -45,19 +44,14 @@ class CsvCopyParser implements CopyInParser {
   private static final Logger logger = Logger.getLogger(CsvCopyParser.class.getName());
 
   private final CSVFormat format;
-  private final PipedOutputStream payload;
-  private final int pipeBufferSize;
   private final boolean hasHeader;
   private final CSVParser parser;
 
-  CsvCopyParser(
-      CSVFormat csvFormat, PipedOutputStream payload, int pipeBufferSize, boolean hasHeader)
+  CsvCopyParser(CSVFormat csvFormat, PipedInputStream inputStream, boolean hasHeader)
       throws IOException {
     this.format = csvFormat;
-    this.payload = payload;
-    this.pipeBufferSize = pipeBufferSize;
     this.hasHeader = hasHeader;
-    this.parser = createParser();
+    this.parser = createParser(inputStream);
   }
 
   @Override
@@ -71,20 +65,19 @@ class CsvCopyParser implements CopyInParser {
     parser.close();
   }
 
-  CSVParser createParser() throws IOException {
+  CSVParser createParser(PipedInputStream inputStream) throws IOException {
     // Construct the CSVParser directly on the stream of incoming CopyData messages, so we don't
     // store more data in memory than necessary. Loading all data into memory first before starting
     // to parse and write the CSVRecords could otherwise cause an out-of-memory exception for large
     // files.
-    Reader reader =
-        new InputStreamReader(
-            new PipedInputStream(this.payload, this.pipeBufferSize), StandardCharsets.UTF_8);
+    Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
     CSVParser parser;
-    if (this.hasHeader) {
-      parser = CSVParser.parse(reader, this.format.withFirstRecordAsHeader());
-    } else {
-      parser = CSVParser.parse(reader, this.format);
-    }
+    parser = CSVParser.parse(reader, this.format);
+    //    if (this.hasHeader) {
+    //      parser = CSVParser.parse(reader, this.format.withFirstRecordAsHeader());
+    //    } else {
+    //      parser = CSVParser.parse(reader, this.format);
+    //    }
     return parser;
   }
 

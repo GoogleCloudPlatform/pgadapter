@@ -476,9 +476,14 @@ public class StatementTest {
             DatabaseId.of("p", "i", "d"), connection, options, ImmutableList.of());
     statement.executeAsync(backendConnection);
 
-    byte[] payload = "2 3\n".getBytes();
-    MutationWriter mutationWriter = statement.getMutationWriter();
-    mutationWriter.addCopyData(payload);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    executor.submit(
+        () -> {
+          byte[] payload = "2 3\n".getBytes();
+          MutationWriter mutationWriter = statement.getMutationWriter();
+          mutationWriter.addCopyData(payload);
+        });
+    executor.shutdown();
 
     backendConnection.flush();
 

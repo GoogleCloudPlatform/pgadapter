@@ -29,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.utils.BinaryCopyParser.BinaryField;
 import com.google.cloud.spanner.pgadapter.utils.BinaryCopyParser.BinaryRecord;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
@@ -43,7 +44,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testValidHeader() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -54,7 +55,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testInvalidHeader() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(new byte[11]);
@@ -66,7 +67,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testGetIterator() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -79,7 +80,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testGetIterator_MissingData() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -91,7 +92,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testIteratorHasNext_Trailer() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -108,7 +109,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testIteratorHasNext() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -133,7 +134,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testIteratorHasNext_InvalidFieldCount() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -153,7 +154,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testIteratorHasNext_DifferentFieldCounts() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -179,7 +180,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testIteratorHasNext_EndOfFile() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -197,7 +198,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testIteratorNext_WithNoMoreElements() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -215,7 +216,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testIteratorNext_NullField() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -239,7 +240,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testIteratorNext_GetValue() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -264,7 +265,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testIteratorNext_NegativeFieldLength() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -283,7 +284,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testIteratorNext_EndOfFile() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -303,7 +304,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testIteratorNext_WithOid() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);
@@ -333,7 +334,7 @@ public class BinaryCopyParserTest {
   @Test
   public void testIteratorNext_InvalidOidLength() throws IOException {
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    BinaryCopyParser parser = new BinaryCopyParser(pipedOutputStream, 256);
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
     DataOutputStream data = new DataOutputStream(pipedOutputStream);
     data.write(COPY_BINARY_HEADER);

@@ -173,7 +173,7 @@ public class CopyStatement extends IntermediatePortalStatement {
       builder.setQuote(parsedCopyStatement.quote);
     }
     if (parsedCopyStatement.header) {
-      builder.setHeader(this.tableColumns.keySet().toArray(new String[0]));
+      builder.setHeader();
     }
     this.format = builder.build();
   }

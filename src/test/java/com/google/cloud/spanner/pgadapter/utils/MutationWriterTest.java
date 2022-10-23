@@ -60,12 +60,19 @@ import java.util.concurrent.Future;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.junit.AfterClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class MutationWriterTest {
+  private static final ExecutorService executor = Executors.newSingleThreadExecutor();
+
+  @AfterClass
+  public static void shutdownExecutor() {
+    executor.shutdown();
+  }
 
   @Test
   public void testParsePartialPayload() throws IOException {
@@ -135,11 +142,20 @@ public class MutationWriterTest {
             format,
             false);
 
-    mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
-    mutationWriter.commit();
-    mutationWriter.close();
+    Future<?> fut =
+        executor.submit(
+            () -> {
+              try {
+                mutationWriter.addCopyData(
+                    "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+                mutationWriter.commit();
+                mutationWriter.close();
+              } catch (IOException ignore) {
+              }
+            });
 
     StatementResult updateCount = mutationWriter.call();
+    fut.get();
 
     assertEquals(2L, updateCount.getUpdateCount().longValue());
     List<Mutation> expectedMutations =
@@ -179,8 +195,15 @@ public class MutationWriterTest {
               format,
               false);
 
-      mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
-      mutationWriter.close();
+      executor.submit(
+          () -> {
+            try {
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+              mutationWriter.close();
+            } catch (IOException ignore) {
+            }
+          });
 
       SpannerException exception = assertThrows(SpannerException.class, mutationWriter::call);
       assertEquals(
@@ -229,11 +252,17 @@ public class MutationWriterTest {
               format,
               false);
 
-      mutationWriter.addCopyData(
-          "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
-              .getBytes(StandardCharsets.UTF_8));
-      mutationWriter.commit();
-      mutationWriter.close();
+      executor.submit(
+          () -> {
+            try {
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
+                      .getBytes(StandardCharsets.UTF_8));
+              mutationWriter.commit();
+              mutationWriter.close();
+            } catch (IOException ignore) {
+            }
+          });
 
       StatementResult updateCount = mutationWriter.call();
 
@@ -273,8 +302,15 @@ public class MutationWriterTest {
       // 1. 8 bytes for the INT64
       // 2. 3 characters * 4 bytes per character = 12 bytes for STRING
       // 3. Total: 20 bytes per record, 40 bytes for the entire batch.
-      mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
-      mutationWriter.close();
+      executor.submit(
+          () -> {
+            try {
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+              mutationWriter.close();
+            } catch (IOException ignore) {
+            }
+          });
 
       SpannerException exception = assertThrows(SpannerException.class, mutationWriter::call);
       assertTrue(exception.getMessage().contains("Commit size: 40 has exceeded the limit: 30"));
@@ -313,11 +349,17 @@ public class MutationWriterTest {
               format,
               false);
 
-      mutationWriter.addCopyData(
-          "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
-              .getBytes(StandardCharsets.UTF_8));
-      mutationWriter.commit();
-      mutationWriter.close();
+      executor.submit(
+          () -> {
+            try {
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
+                      .getBytes(StandardCharsets.UTF_8));
+              mutationWriter.commit();
+              mutationWriter.close();
+            } catch (IOException ignore) {
+            }
+          });
 
       StatementResult updateCount = mutationWriter.call();
 

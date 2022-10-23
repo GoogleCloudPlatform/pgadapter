@@ -218,6 +218,62 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCopyInWithCsvOptions() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn(
+          "COPY users (id, name) FROM STDIN (format csv, header on, escape '~', quote '$');",
+          new StringReader("id,name\n5,$~$five$\n6,$~$six$\n7,$~$seven$\n"));
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsert().getValuesCount());
+    assertEquals(2, mutation.getInsert().getColumnsCount());
+    assertEquals("$five", mutation.getInsert().getValues(0).getValues(1).getStringValue());
+    assertEquals("$six", mutation.getInsert().getValues(1).getValues(1).getStringValue());
+    assertEquals("$seven", mutation.getInsert().getValues(2).getValues(1).getStringValue());
+  }
+
+  @Test
+  public void testCopyInWithHeaderOutOfOrder() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn(
+          "COPY users (id, name) FROM STDIN (format csv, header on, escape '~', quote '$');",
+          new StringReader("name,id\n$~$five$,5\n$~$six$,6\n$~$seven$,7\n"));
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsert().getValuesCount());
+    assertEquals(2, mutation.getInsert().getColumnsCount());
+    assertEquals("id", mutation.getInsert().getColumns(0));
+    assertEquals("name", mutation.getInsert().getColumns(1));
+
+    assertEquals("5", mutation.getInsert().getValues(0).getValues(0).getStringValue());
+    assertEquals("$five", mutation.getInsert().getValues(0).getValues(1).getStringValue());
+    assertEquals("6", mutation.getInsert().getValues(1).getValues(0).getStringValue());
+    assertEquals("$six", mutation.getInsert().getValues(1).getValues(1).getStringValue());
+    assertEquals("7", mutation.getInsert().getValues(2).getValues(0).getStringValue());
+    assertEquals("$seven", mutation.getInsert().getValues(2).getValues(1).getStringValue());
+  }
+
+  @Test
   public void testCopyInWithExplicitTransaction() throws SQLException, IOException {
     setupCopyInformationSchemaResults();
 
@@ -411,7 +467,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCopyInWithInvalidRow() throws SQLException, IOException {
+  public void testCopyInWithInvalidRow() throws SQLException {
     setupCopyInformationSchemaResults();
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {

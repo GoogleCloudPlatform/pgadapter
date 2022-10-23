@@ -18,6 +18,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import java.io.IOException;
+import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import org.apache.commons.csv.CSVFormat;
 import org.junit.Test;
@@ -31,7 +32,10 @@ public class CopyInParserTest {
   public void testCreateText() throws IOException {
     CopyInParser parser =
         CopyInParser.create(
-            Format.TEXT, CSVFormat.POSTGRESQL_TEXT, new PipedOutputStream(), 256, false);
+            Format.TEXT,
+            CSVFormat.POSTGRESQL_TEXT,
+            new PipedInputStream(new PipedOutputStream(), 256),
+            false);
     assertTrue(parser instanceof CsvCopyParser);
   }
 
@@ -39,14 +43,18 @@ public class CopyInParserTest {
   public void testCreateCsv() throws IOException {
     CopyInParser parser =
         CopyInParser.create(
-            Format.CSV, CSVFormat.POSTGRESQL_CSV, new PipedOutputStream(), 256, false);
+            Format.CSV,
+            CSVFormat.POSTGRESQL_CSV,
+            new PipedInputStream(new PipedOutputStream(), 256),
+            false);
     assertTrue(parser instanceof CsvCopyParser);
   }
 
   @Test
   public void testCreateBinary() throws IOException {
     CopyInParser parser =
-        CopyInParser.create(Format.BINARY, null, new PipedOutputStream(), 256, false);
+        CopyInParser.create(
+            Format.BINARY, null, new PipedInputStream(new PipedOutputStream(), 256), false);
     assertTrue(parser instanceof BinaryCopyParser);
   }
 }
