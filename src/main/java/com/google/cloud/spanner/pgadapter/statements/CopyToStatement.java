@@ -90,14 +90,18 @@ public class CopyToStatement extends IntermediatePortalStatement {
                   parsedCopyStatement.escape == null
                       ? CSVFormat.POSTGRESQL_TEXT.getEscapeCharacter()
                       : parsedCopyStatement.escape);
-      if (parsedCopyStatement.forceQuote == null) {
-        formatBuilder.setQuoteMode(QuoteMode.MINIMAL);
-      } else if (parsedCopyStatement.forceQuote.isEmpty()) {
-        formatBuilder.setQuoteMode(QuoteMode.ALL_NON_NULL);
+      if (parsedCopyStatement.format == Format.TEXT) {
+        formatBuilder.setQuoteMode(QuoteMode.NONE);
       } else {
-        // The CSV parser does not support different quote modes per column.
-        throw PGExceptionFactory.newPGException(
-            "PGAdapter does not support force_quote modes per column", SQLState.InternalError);
+        if (parsedCopyStatement.forceQuote == null) {
+          formatBuilder.setQuoteMode(QuoteMode.MINIMAL);
+        } else if (parsedCopyStatement.forceQuote.isEmpty()) {
+          formatBuilder.setQuoteMode(QuoteMode.ALL_NON_NULL);
+        } else {
+          // The CSV parser does not support different quote modes per column.
+          throw PGExceptionFactory.newPGException(
+              "PGAdapter does not support force_quote modes per column", SQLState.InternalError);
+        }
       }
       if (parsedCopyStatement.header) {
         if (parsedCopyStatement.columns == null) {
