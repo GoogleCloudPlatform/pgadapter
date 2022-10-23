@@ -79,7 +79,7 @@ public class CopyToStatementTest {
     CopyToStatement statement =
         new CopyToStatement(connectionHandler, options, "", parsedCopyStatement);
     assertEquals('^', statement.getCsvFormat().getQuoteCharacter().charValue());
-    assertEquals(QuoteMode.NONE, statement.getCsvFormat().getQuoteMode());
+    assertEquals(QuoteMode.MINIMAL, statement.getCsvFormat().getQuoteMode());
   }
 
   @Test

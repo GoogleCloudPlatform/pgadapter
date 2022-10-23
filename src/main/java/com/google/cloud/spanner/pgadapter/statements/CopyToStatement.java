@@ -15,12 +15,16 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
+import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
@@ -85,13 +89,31 @@ public class CopyToStatement extends IntermediatePortalStatement {
               .setEscape(
                   parsedCopyStatement.escape == null
                       ? CSVFormat.POSTGRESQL_TEXT.getEscapeCharacter()
-                      : parsedCopyStatement.escape)
-              .setQuoteMode(QuoteMode.NONE);
+                      : parsedCopyStatement.escape);
+      if (parsedCopyStatement.forceQuote == null) {
+        formatBuilder.setQuoteMode(QuoteMode.MINIMAL);
+      } else if (parsedCopyStatement.forceQuote.isEmpty()) {
+        formatBuilder.setQuoteMode(QuoteMode.ALL_NON_NULL);
+      } else {
+        // The CSV parser does not support different quote modes per column.
+        throw PGExceptionFactory.newPGException(
+            "PGAdapter does not support force_quote modes per column", SQLState.InternalError);
+      }
       if (parsedCopyStatement.header) {
-        formatBuilder.setHeader(
-            parsedCopyStatement.columns.stream()
-                .map(TableOrIndexName::getUnquotedName)
-                .toArray(String[]::new));
+        if (parsedCopyStatement.columns == null) {
+          formatBuilder.setHeader(
+              retrieveHeader(
+                  connectionHandler
+                      .getExtendedQueryProtocolHandler()
+                      .getBackendConnection()
+                      .getSpannerConnection(),
+                  parsedCopyStatement));
+        } else {
+          formatBuilder.setHeader(
+              parsedCopyStatement.columns.stream()
+                  .map(TableOrIndexName::getUnquotedName)
+                  .toArray(String[]::new));
+        }
       }
       this.csvFormat = formatBuilder.build();
     }
@@ -102,7 +124,29 @@ public class CopyToStatement extends IntermediatePortalStatement {
   }
 
   static Statement createSelectStatement(ParsedCopyStatement parsedCopyStatement) {
+    if (parsedCopyStatement.query != null) {
+      return Statement.of(parsedCopyStatement.query);
+    }
     return Statement.of("select * from " + parsedCopyStatement.table);
+  }
+
+  static String[] retrieveHeader(Connection connection, ParsedCopyStatement parsedCopyStatement) {
+    try (ResultSet resultSet =
+        connection
+            .getDatabaseClient()
+            .singleUse()
+            .analyzeQuery(createSelectStatement(parsedCopyStatement), QueryAnalyzeMode.PLAN)) {
+      resultSet.next();
+      return convertColumnNamesToStringArray(resultSet);
+    }
+  }
+
+  static String[] convertColumnNamesToStringArray(ResultSet resultSet) {
+    String[] result = new String[resultSet.getColumnCount()];
+    for (int index = 0; index < resultSet.getColumnCount(); index++) {
+      result[index] = resultSet.getType().getStructFields().get(index).getName();
+    }
+    return result;
   }
 
   @VisibleForTesting

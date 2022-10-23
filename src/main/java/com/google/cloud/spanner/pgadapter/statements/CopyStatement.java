@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVFormat.Builder;
+import org.apache.commons.csv.QuoteMode;
 
 /**
  * {@link CopyStatement} models a `COPY table FROM STDIN` statement. The same class is used both as
@@ -171,6 +172,11 @@ public class CopyStatement extends IntermediatePortalStatement {
     }
     if (parsedCopyStatement.quote != null) {
       builder.setQuote(parsedCopyStatement.quote);
+    }
+    if (parsedCopyStatement.forceQuote == null) {
+      builder.setQuoteMode(QuoteMode.MINIMAL);
+    } else if (parsedCopyStatement.forceQuote.isEmpty()) {
+      builder.setQuoteMode(QuoteMode.ALL_NON_NULL);
     }
     if (parsedCopyStatement.header) {
       builder.setHeader(this.tableColumns.keySet().toArray(new String[0]));
