@@ -231,6 +231,38 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCopyOutWithColumns() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select col_bigint, col_varchar from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut("COPY all_types (col_bigint, col_varchar) TO STDOUT", writer);
+
+      assertEquals(
+          "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+          writer.toString());
+
+      // Verify that we can use the connection for normal queries.
+      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    List<ExecuteSqlRequest> sqlRequests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(2, sqlRequests.size());
+    ExecuteSqlRequest request = sqlRequests.get(0);
+    assertEquals("select col_bigint, col_varchar from all_types", request.getSql());
+    assertTrue(request.getTransaction().hasSingleUse());
+    assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+  }
+
+  @Test
   public void testCopyOutCsv() throws SQLException, IOException {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));

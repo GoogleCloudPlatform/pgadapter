@@ -40,6 +40,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Futures;
 import java.util.List;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.QuoteMode;
 
@@ -130,6 +131,15 @@ public class CopyToStatement extends IntermediatePortalStatement {
   static Statement createSelectStatement(ParsedCopyStatement parsedCopyStatement) {
     if (parsedCopyStatement.query != null) {
       return Statement.of(parsedCopyStatement.query);
+    }
+    if (parsedCopyStatement.columns != null) {
+      return Statement.of(
+          String.format(
+              "select %s from %s",
+              parsedCopyStatement.columns.stream()
+                  .map(TableOrIndexName::toString)
+                  .collect(Collectors.joining(", ")),
+              parsedCopyStatement.table));
     }
     return Statement.of("select * from " + parsedCopyStatement.table);
   }
