@@ -271,6 +271,11 @@ public class SessionState {
     return null;
   }
 
+  String getStringSetting(String extension, String name, String defaultValue) {
+    PGSetting setting = internalGet(toKey(extension, name), false);
+    return setting != null ? setting.getSetting() : defaultValue;
+  }
+
   boolean getBoolSetting(String extension, String name, boolean defaultValue) {
     PGSetting setting = internalGet(toKey(extension, name), false);
     if (setting != null) {
