@@ -41,6 +41,11 @@ import org.junit.runners.JUnit4;
 public class CopyStatementTest {
 
   @Test
+  public void testParseNonCopy() {
+    assertThrows(PGException.class, () -> parse("/* copy */ set spanner.copy=true"));
+  }
+
+  @Test
   public void testParseDirection() {
     assertEquals(Direction.FROM, parse("copy my_table from stdin").direction);
     assertEquals(Direction.TO, parse("copy my_table to stdout").direction);
@@ -54,6 +59,9 @@ public class CopyStatementTest {
     assertEquals(new TableOrIndexName(null, "my_table"), statement.table);
     assertNull(statement.columns);
     assertNull(statement.query);
+
+    PGException exception = assertThrows(PGException.class, () -> parse("copy 'test' from stdin"));
+    assertEquals("invalid or missing table name", exception.getMessage());
   }
 
   @Test
@@ -94,6 +102,76 @@ public class CopyStatementTest {
     exception =
         assertThrows(PGException.class, () -> parse("copy (select foo col1, col2 from stdin"));
     assertEquals("missing closing parentheses after query", exception.getMessage());
+  }
+
+  @Test
+  public void testQueryFromStdin() {
+    PGException exception =
+        assertThrows(
+            PGException.class,
+            () -> parse("copy (select * from my_table where my_column=1) from stdin"));
+    assertEquals("cannot use query with COPY FROM", exception.getMessage());
+  }
+
+  @Test
+  public void testParseFromInvalid() {
+    PGException exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from program"));
+    assertEquals(
+        "missing 'STDIN' keyword. PGAdapter only supports COPY ... FROM STDIN: copy my_table from program",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testParseToInvalid() {
+    PGException exception =
+        assertThrows(PGException.class, () -> parse("copy my_table to program"));
+    assertEquals(
+        "missing 'STDOUT' keyword. PGAdapter only supports COPY ... TO STDOUT: copy my_table to program",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testParseEmptyOptions() {
+    PGException exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin ()"));
+    assertEquals("empty options list: copy my_table from stdin ()", exception.getMessage());
+  }
+
+  @Test
+  public void testParseUnknownOption() {
+    PGException exception =
+        assertThrows(
+            PGException.class, () -> parse("copy my_table from stdin (random_option true)"));
+    assertEquals("Invalid or unknown option: random_option true", exception.getMessage());
+  }
+
+  @Test
+  public void testParseWhere() {
+    PGException exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin where true"));
+    assertEquals(
+        "PGAdapter does not support conditions in COPY ... FROM STDIN: copy my_table from stdin where true",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testParseWhereAfterOptions() {
+    PGException exception =
+        assertThrows(
+            PGException.class, () -> parse("copy my_table from stdin (format binary) where true"));
+    assertEquals(
+        "PGAdapter does not support conditions in COPY ... FROM STDIN: copy my_table from stdin (format binary) where true",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testParseWhereAfterLegacyOptions() {
+    PGException exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin binary where true"));
+    assertEquals(
+        "PGAdapter does not support conditions in COPY ... FROM STDIN: copy my_table from stdin binary where true",
+        exception.getMessage());
   }
 
   @Test
@@ -150,6 +228,11 @@ public class CopyStatementTest {
     assertEquals(
         "PGAdapter does not support hexadecimal byte values in string literals",
         exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class,
+            () -> parse("copy my_table from stdin (format binary, delimiter '|')"));
+    assertEquals("cannot specify DELIMITER in BINARY mode", exception.getMessage());
   }
 
   @Test
@@ -168,6 +251,11 @@ public class CopyStatementTest {
     assertEquals(
         "PGAdapter does not support hexadecimal byte values in string literals",
         exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class,
+            () -> parse("copy my_table from stdin (format binary, null 'null')"));
+    assertEquals("cannot specify NULL in BINARY mode", exception.getMessage());
   }
 
   @Test
@@ -190,6 +278,14 @@ public class CopyStatementTest {
     exception =
         assertThrows(PGException.class, () -> parse("copy my_table from stdin (header t foo)"));
     assertEquals("Syntax error. Unexpected tokens: foo", exception.getMessage());
+    exception =
+        assertThrows(PGException.class, () -> parse("copy my_table to stdout (header match)"));
+    assertEquals("cannot specify HEADER MATCH in COPY TO mode", exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class,
+            () -> parse("copy my_table from stdin (format binary, header match)"));
+    assertEquals("cannot specify HEADER in BINARY mode", exception.getMessage());
   }
 
   @Test
@@ -236,6 +332,9 @@ public class CopyStatementTest {
     assertEquals(
         "PGAdapter does not support hexadecimal byte values in string literals",
         exception.getMessage());
+    exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin (quote '\"')"));
+    assertEquals("COPY quote available only in CSV mode", exception.getMessage());
   }
 
   @Test
@@ -280,6 +379,9 @@ public class CopyStatementTest {
     assertEquals(
         "PGAdapter does not support hexadecimal byte values in string literals",
         exception.getMessage());
+    exception =
+        assertThrows(PGException.class, () -> parse("copy my_table from stdin (escape '~')"));
+    assertEquals("COPY escape available only in CSV mode", exception.getMessage());
   }
 
   @Test
@@ -309,6 +411,15 @@ public class CopyStatementTest {
             PGException.class,
             () -> parse("copy my_table to stdout (format csv, force_quote (col1, 'col2'))"));
     assertEquals("Invalid column name: 'col2'", exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class,
+            () -> parse("copy my_table from stdin (format csv, force_quote (col1))"));
+    assertEquals("cannot use force quote in COPY FROM mode", exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class, () -> parse("copy my_table to stdout (force_quote (col1))"));
+    assertEquals("COPY force quote available only in CSV mode", exception.getMessage());
   }
 
   @Test
@@ -336,6 +447,10 @@ public class CopyStatementTest {
             PGException.class,
             () -> parse("copy my_table from stdin (format csv, force_not_null (col1, 'col2'))"));
     assertEquals("Invalid column name: 'col2'", exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class, () -> parse("copy my_table from stdin (force_not_null (col1))"));
+    assertEquals("COPY force not null available only in CSV mode", exception.getMessage());
   }
 
   @Test
@@ -362,6 +477,15 @@ public class CopyStatementTest {
             PGException.class,
             () -> parse("copy my_table from stdin (format csv, force_null (col1, 'col2'))"));
     assertEquals("Invalid column name: 'col2'", exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class,
+            () -> parse("copy my_table to stdout (format csv, force_null (col1))"));
+    assertEquals("cannot use force null in COPY TO mode", exception.getMessage());
+    exception =
+        assertThrows(
+            PGException.class, () -> parse("copy my_table from stdin (force_null (col1))"));
+    assertEquals("COPY force null available only in CSV mode", exception.getMessage());
   }
 
   @Test

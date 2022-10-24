@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
@@ -299,6 +300,26 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCopyOutCsvWithColumnsAndHeader() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select col_bigint from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut(
+          "COPY all_types (col_bigint) TO STDOUT (header, format csv, escape '~', delimiter '-')",
+          writer);
+
+      assertEquals(
+          "col_bigint\n"
+              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456789+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n",
+          writer.toString());
+    }
+  }
+
+  @Test
   public void testCopyOutCsvWithQueryAndHeader() throws SQLException, IOException {
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -332,6 +353,44 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       assertEquals(
           "1|t|\"\\\\x74657374\"|3.14|100|6.626|2022-02-16 13:18:02.123456789+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"\n",
           writer.toString());
+    }
+  }
+
+  @Test
+  public void testCopyOutCsvWithForceQuoteAll() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut(
+          "COPY all_types TO STDOUT (format csv, escape '\\', delimiter '|', quote '\"', force_quote *)",
+          writer);
+
+      assertEquals(
+          "\"1\"|\"t\"|\"\\\\x74657374\"|\"3.14\"|\"100\"|\"6.626\"|\"2022-02-16 13:18:02.123456789+00\"|\"2022-03-29\"|\"test\"|\"{\\\"key\\\": \\\"value\\\"}\"\n",
+          writer.toString());
+    }
+  }
+
+  @Test
+  public void testCopyOutCsvWithForceQuoteColumn() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  copyManager.copyOut(
+                      "COPY all_types TO STDOUT (format csv, escape '\\', delimiter '|', quote '\"', force_quote (col_bigint))",
+                      writer));
+      assertEquals(
+          "ERROR: PGAdapter does not support force_quote modes per column", exception.getMessage());
     }
   }
 

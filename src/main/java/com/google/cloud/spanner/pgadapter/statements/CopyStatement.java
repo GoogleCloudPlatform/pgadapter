@@ -590,7 +590,7 @@ public class CopyStatement extends IntermediatePortalStatement {
         throw PGExceptionFactory.newPGException(
             "missing closing parentheses for options list", SQLState.SyntaxError);
       }
-      if (optionExpressions.isEmpty()) {
+      if (optionExpressions == null || optionExpressions.isEmpty()) {
         throw PGExceptionFactory.newPGException("empty options list: " + sql, SQLState.SyntaxError);
       }
       for (String optionExpression : optionExpressions) {
@@ -646,16 +646,16 @@ public class CopyStatement extends IntermediatePortalStatement {
         }
         optionParser.throwIfHasMoreTokens();
       }
-      if (parser.eatKeyword("where")) {
-        throw PGExceptionFactory.newPGException(
-            "PGAdapter does not support conditions in COPY ... FROM STDIN: " + sql,
-            SQLState.SyntaxError);
-      }
     } else if (parser.peekKeyword("binary")
         || parser.peekKeyword("delimiter")
         || parser.peekKeyword("null")
         || parser.peekKeyword("csv")) {
       parseLegacyOptions(parser, builder);
+    }
+    if (parser.eatKeyword("where")) {
+      throw PGExceptionFactory.newPGException(
+          "PGAdapter does not support conditions in COPY ... FROM STDIN: " + sql,
+          SQLState.SyntaxError);
     }
     parser.eatToken(";");
     parser.throwIfHasMoreTokens();

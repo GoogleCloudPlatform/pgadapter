@@ -71,14 +71,7 @@ class CsvCopyParser implements CopyInParser {
     // to parse and write the CSVRecords could otherwise cause an out-of-memory exception for large
     // files.
     Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
-    CSVParser parser;
-    parser = CSVParser.parse(reader, this.format);
-    //    if (this.hasHeader) {
-    //      parser = CSVParser.parse(reader, this.format.withFirstRecordAsHeader());
-    //    } else {
-    //      parser = CSVParser.parse(reader, this.format);
-    //    }
-    return parser;
+    return CSVParser.parse(reader, this.format);
   }
 
   static class CsvCopyRecord implements CopyRecord {

@@ -595,7 +595,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCopyFrom() throws Exception {
-    CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, "alltypes", true);
+    CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, "public", "alltypes", true);
 
     String output = runTest("testCopyFrom", getHost(), pgServer.getLocalPort());
 

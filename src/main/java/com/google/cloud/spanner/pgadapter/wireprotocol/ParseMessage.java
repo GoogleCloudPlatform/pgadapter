@@ -144,17 +144,6 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
     }
   }
 
-  //  static CopyOptions parseCopyStatement(ParsedStatement parsedStatement) {
-  //    CopyTreeParser.CopyOptions copyOptions = new CopyOptions();
-  //    try {
-  //      parse(parsedStatement.getSqlWithoutComments(), copyOptions);
-  //      return copyOptions;
-  //    } catch (Exception | TokenMgrError e) {
-  //      throw SpannerExceptionFactory.newSpannerException(
-  //          ErrorCode.INVALID_ARGUMENT, "Invalid COPY statement syntax: " + e);
-  //    }
-  //  }
-
   @Override
   void buffer(BackendConnection backendConnection) {
     if (!Strings.isNullOrEmpty(this.name) && this.connection.hasStatement(this.name)) {
