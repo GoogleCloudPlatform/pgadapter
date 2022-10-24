@@ -403,7 +403,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "\"AllTypes\".\"col_bytea\" AS \"AllTypes_col_bytea\", \"AllTypes\".\"col_float8\" AS \"AllTypes_col_float8\", "
             + "\"AllTypes\".\"col_int\" AS \"AllTypes_col_int\", \"AllTypes\".\"col_numeric\" AS \"AllTypes_col_numeric\", "
             + "\"AllTypes\".\"col_timestamptz\" AS \"AllTypes_col_timestamptz\", \"AllTypes\".\"col_date\" AS \"AllTypes_col_date\", "
-            + "\"AllTypes\".\"col_varchar\" AS \"AllTypes_col_varchar\" "
+            + "\"AllTypes\".\"col_varchar\" AS \"AllTypes_col_varchar\", \"AllTypes\".\"col_jsonb\" AS \"AllTypes_col_jsonb\" "
             + "FROM \"all_types\" \"AllTypes\" "
             + "WHERE (\"AllTypes\".\"col_bigint\" = $1) LIMIT 1";
     mockSpanner.putStatementResult(
@@ -422,7 +422,8 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "  col_numeric: '6.626',\n"
             + "  col_timestamptz: 2022-02-16T13:18:02.123Z,\n"
             + "  col_date: '2022-03-29',\n"
-            + "  col_varchar: 'test'\n"
+            + "  col_varchar: 'test',\n"
+            + "  col_jsonb: { key: 'value' }\n"
             + "}\n",
         output);
 
@@ -451,7 +452,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "\"AllTypes\".\"col_bytea\" AS \"AllTypes_col_bytea\", \"AllTypes\".\"col_float8\" AS \"AllTypes_col_float8\", "
             + "\"AllTypes\".\"col_int\" AS \"AllTypes_col_int\", \"AllTypes\".\"col_numeric\" AS \"AllTypes_col_numeric\", "
             + "\"AllTypes\".\"col_timestamptz\" AS \"AllTypes_col_timestamptz\", \"AllTypes\".\"col_date\" AS \"AllTypes_col_date\", "
-            + "\"AllTypes\".\"col_varchar\" AS \"AllTypes_col_varchar\" "
+            + "\"AllTypes\".\"col_varchar\" AS \"AllTypes_col_varchar\", \"AllTypes\".\"col_jsonb\" AS \"AllTypes_col_jsonb\" "
             + "FROM \"all_types\" \"AllTypes\" "
             + "WHERE \"AllTypes\".\"col_bigint\" IN ($1)";
     mockSpanner.putStatementResult(
@@ -463,8 +464,8 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String insertSql =
         "INSERT INTO \"all_types\""
-            + "(\"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\") "
-            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+            + "(\"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\", \"col_jsonb\") "
+            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 1L));
 
     String output = runTest("createAllTypes", pgServer.getLocalPort());
@@ -483,7 +484,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     // The NodeJS PostgreSQL driver sends parameters without any type information to the backend.
     // This means that all parameters are sent as untyped string values.
     assertEquals(0, insertRequest.getParamTypesMap().size());
-    assertEquals(9, insertRequest.getParams().getFieldsCount());
+    assertEquals(10, insertRequest.getParams().getFieldsCount());
     assertEquals("2", insertRequest.getParams().getFieldsMap().get("p1").getStringValue());
     assertEquals("true", insertRequest.getParams().getFieldsMap().get("p2").getStringValue());
     assertEquals(
@@ -500,6 +501,8 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     assertEquals("2022-07-22", insertRequest.getParams().getFieldsMap().get("p8").getStringValue());
     assertEquals(
         "some random string", insertRequest.getParams().getFieldsMap().get("p9").getStringValue());
+    assertEquals(
+        "{\"key\":\"value\"}", insertRequest.getParams().getFieldsMap().get("p10").getStringValue());
   }
 
   static String runTest(String testName, int port) throws IOException, InterruptedException {

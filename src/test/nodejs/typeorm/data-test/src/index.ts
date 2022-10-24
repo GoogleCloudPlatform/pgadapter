@@ -87,13 +87,13 @@ async function testDeleteUser(dataSource: DataSource) {
 }
 
 async function testFindOneAllTypes(dataSource: DataSource) {
-    const repository = dataSource.getRepository(AllTypes)
-    const row = await repository.findOneBy({col_bigint: 1})
+    const repository = dataSource.getRepository(AllTypes);
+    const row = await repository.findOneBy({col_bigint: 1});
     if (row) {
-        console.log(`Found row ${row.col_bigint}`)
-        console.log(row)
+        console.log(`Found row ${row.col_bigint}`);
+        console.log(row);
     } else {
-        console.log('Row with id 1 not found')
+        console.log('Row with id 1 not found');
     }
 }
 
@@ -111,6 +111,7 @@ async function testCreateAllTypes(dataSource: DataSource) {
         col_timestamptz: new Date(Date.UTC(2022, 6, 22, 18, 15, 42, 11)),
         col_date: '2022-07-22',
         col_varchar: 'some random string',
+        col_jsonb: {key: 'value'},
     } as AllTypes
 
     await repository.save(allTypes)
