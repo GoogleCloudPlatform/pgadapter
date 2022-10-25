@@ -502,7 +502,8 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     assertEquals(
         "some random string", insertRequest.getParams().getFieldsMap().get("p9").getStringValue());
     assertEquals(
-        "{\"key\":\"value\"}", insertRequest.getParams().getFieldsMap().get("p10").getStringValue());
+        "{\"key\":\"value\"}",
+        insertRequest.getParams().getFieldsMap().get("p10").getStringValue());
   }
 
   static String runTest(String testName, int port) throws IOException, InterruptedException {
