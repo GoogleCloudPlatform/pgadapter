@@ -12,7 +12,8 @@ gcloud config set run/region $PGADAPTER_YCSB_REGION
 gcloud config set builds/region $PGADAPTER_YCSB_REGION
 
 gcloud auth configure-docker gcr.io --quiet
-docker build --platform=linux/amd64 . -t gcr.io/$(gcloud config get project --quiet)/$PGADAPTER_YCSB_RUNNER
+docker build --platform=linux/amd64 . -f benchmarks/ycsb/Dockerfile \
+  -t gcr.io/$(gcloud config get project --quiet)/$PGADAPTER_YCSB_RUNNER
 docker push gcr.io/$(gcloud config get project --quiet)/$PGADAPTER_YCSB_RUNNER
 
 gcloud beta run jobs delete $PGADAPTER_YCSB_JOB --quiet || true
@@ -24,6 +25,6 @@ gcloud beta run jobs create $PGADAPTER_YCSB_JOB \
     --set-env-vars SPANNER_DATABASE=$SPANNER_DATABASE \
     --max-retries 0 \
     --cpu 8 \
-    --memory 8Gi \
+    --memory 4Gi \
     --task-timeout 60m
 gcloud beta run jobs execute $PGADAPTER_YCSB_JOB
