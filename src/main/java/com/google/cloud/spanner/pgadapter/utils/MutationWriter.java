@@ -25,6 +25,7 @@ import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Mutation.WriteBuilder;
+import com.google.cloud.spanner.Options;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
@@ -383,7 +384,10 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                                       Duration.ofSeconds(copySettings.getCommitTimeoutSeconds()));
                             }
                           });
-              context.run(() -> dbClient.write(immutableMutations));
+              context.run(
+                  () ->
+                      dbClient.writeWithOptions(
+                          immutableMutations, Options.priority(copySettings.getCommitPriority())));
               return null;
             });
     Futures.addCallback(
