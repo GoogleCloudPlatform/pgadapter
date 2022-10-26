@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
@@ -56,9 +57,11 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -91,6 +94,8 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
         createMockSpannerServiceWithQueryPartitions(), "d", Collections.emptyList());
   }
 
+  private static final Set<Integer> PARTITIONS_WITH_ERRORS = new HashSet<>();
+
   private static MockSpannerServiceImpl createMockSpannerServiceWithQueryPartitions() {
     return new MockSpannerServiceImpl() {
       @Override
@@ -120,18 +125,26 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
                 }
                 int rowIndex = 0;
                 for (int i = 0; i < request.getPartitionOptions().getMaxPartitions(); i++) {
-                  com.google.spanner.v1.ResultSet.Builder builder =
-                      com.google.spanner.v1.ResultSet.newBuilder()
-                          .setMetadata(resultSet.getMetadata());
-                  long partitionRows = 0L;
-                  while (partitionRows < rowsPerPartition && rowIndex < resultSet.getRowsCount()) {
-                    builder.addRows(resultSet.getRows(rowIndex));
-                    rowIndex++;
-                    partitionRows++;
+                  if (PARTITIONS_WITH_ERRORS.contains(i)) {
+                    putStatementResult(
+                        StatementResult.exception(
+                            Statement.of(request.getSql() + " - partition " + i),
+                            Status.NOT_FOUND.asRuntimeException()));
+                  } else {
+                    com.google.spanner.v1.ResultSet.Builder builder =
+                        com.google.spanner.v1.ResultSet.newBuilder()
+                            .setMetadata(resultSet.getMetadata());
+                    long partitionRows = 0L;
+                    while (partitionRows < rowsPerPartition
+                        && rowIndex < resultSet.getRowsCount()) {
+                      builder.addRows(resultSet.getRows(rowIndex));
+                      rowIndex++;
+                      partitionRows++;
+                    }
+                    putStatementResult(
+                        StatementResult.query(
+                            Statement.of(request.getSql() + " - partition " + i), builder.build()));
                   }
-                  putStatementResult(
-                      StatementResult.query(
-                          Statement.of(request.getSql() + " - partition " + i), builder.build()));
                 }
               }
 
@@ -382,6 +395,33 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
         }
         assertEquals(expectedRowCount, lineCount);
       }
+    }
+  }
+
+  @Test
+  public void testCopyOutPartitionedWithError() throws SQLException {
+    final int expectedRowCount = 100;
+    RandomResultSetGenerator randomResultSetGenerator =
+        new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
+    com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from random"), resultSet));
+    PARTITIONS_WITH_ERRORS.add(1);
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (String mode : new String[] {"", " BINARY"}) {
+        CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+        StringWriter writer = new StringWriter();
+        SQLException exception =
+            assertThrows(
+                SQLException.class,
+                () -> copyManager.copyOut("COPY random TO STDOUT" + mode, writer));
+        assertEquals(
+            "ERROR: io.grpc.StatusRuntimeException: NOT_FOUND - Statement: 'select * from random'",
+            exception.getMessage());
+      }
+    } finally {
+      PARTITIONS_WITH_ERRORS.clear();
     }
   }
 
