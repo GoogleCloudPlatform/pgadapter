@@ -431,6 +431,7 @@ public class ConnectionHandler extends Thread {
         this.spannerConnection.close();
       }
       this.status = ConnectionStatus.TERMINATED;
+      CONNECTION_HANDLERS.remove(this.connectionId);
     }
   }
 
