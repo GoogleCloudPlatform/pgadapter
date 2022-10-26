@@ -5,8 +5,8 @@ PGADAPTER_YCSB_RUNNER=pgadapter-ycsb-runner
 PGADAPTER_YCSB_JOB=pgadapter-ycsb-job
 PGADAPTER_YCSB_REGION=europe-north1
 
-SPANNER_INSTANCE=knut-test-ycsb
-SPANNER_DATABASE=pgadapter_ycsb
+SPANNER_INSTANCE=pgadapter-ycsb-regional-test
+SPANNER_DATABASE=pgadapter-ycsb-test
 
 gcloud config set run/region $PGADAPTER_YCSB_REGION
 gcloud config set builds/region $PGADAPTER_YCSB_REGION

@@ -10,7 +10,7 @@ if [[ "$DATABASES" != *"$SPANNER_DATABASE"* ]]; then
 fi
 
 java -jar pgadapter.jar -p $(gcloud --quiet config get project) -i $SPANNER_INSTANCE &
-sleep 3
+sleep 6
 export PGDATABASE=$SPANNER_DATABASE
 psql -h localhost -c "CREATE TABLE IF NOT EXISTS usertable (
                    YCSB_KEY VARCHAR(255) PRIMARY KEY,
