@@ -3,9 +3,9 @@ set -euo pipefail
 
 PGADAPTER_YCSB_RUNNER=pgadapter-ycsb-runner
 PGADAPTER_YCSB_JOB=pgadapter-ycsb-job
-PGADAPTER_YCSB_REGION=europe-west3
+PGADAPTER_YCSB_REGION=europe-north1
 
-SPANNER_INSTANCE=test-instance
+SPANNER_INSTANCE=knut-test-ycsb
 SPANNER_DATABASE=pgadapter_ycsb
 
 gcloud config set run/region $PGADAPTER_YCSB_REGION
@@ -23,7 +23,7 @@ gcloud beta run jobs create $PGADAPTER_YCSB_JOB \
     --set-env-vars SPANNER_INSTANCE=$SPANNER_INSTANCE \
     --set-env-vars SPANNER_DATABASE=$SPANNER_DATABASE \
     --max-retries 0 \
-    --cpu 4 \
-    --memory 2Gi \
+    --cpu 8 \
+    --memory 8Gi \
     --task-timeout 60m
 gcloud beta run jobs execute $PGADAPTER_YCSB_JOB
