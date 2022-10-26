@@ -18,15 +18,18 @@ import com.google.api.core.ApiFuture;
 import com.google.api.core.ApiFutures;
 import com.google.api.core.InternalApi;
 import com.google.api.core.SettableApiFuture;
+import com.google.api.gax.grpc.GrpcCallContext;
+import com.google.api.gax.rpc.ApiCallContext;
 import com.google.cloud.ByteArray;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Mutation.WriteBuilder;
+import com.google.cloud.spanner.Options;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.SpannerOptions;
-import com.google.cloud.spanner.SpannerOptions.SpannerCallContextTimeoutConfigurator;
+import com.google.cloud.spanner.SpannerOptions.CallContextConfigurator;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
@@ -44,6 +47,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.grpc.Context;
+import io.grpc.MethodDescriptor;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -375,10 +379,23 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
                   Context.current()
                       .withValue(
                           SpannerOptions.CALL_CONTEXT_CONFIGURATOR_KEY,
-                          SpannerCallContextTimeoutConfigurator.create()
-                              .withCommitTimeout(
-                                  Duration.ofSeconds(copySettings.getCommitTimeoutSeconds())));
-              context.run(() -> dbClient.write(immutableMutations));
+                          new CallContextConfigurator() {
+                            @Override
+                            public <ReqT, RespT> ApiCallContext configure(
+                                ApiCallContext context,
+                                ReqT request,
+                                MethodDescriptor<ReqT, RespT> method) {
+                              // Use the same timeout for all RPCs that are executed for the commit.
+                              // This could also include BeginTransaction and BatchCreateSessions.
+                              return GrpcCallContext.createDefault()
+                                  .withTimeout(
+                                      Duration.ofSeconds(copySettings.getCommitTimeoutSeconds()));
+                            }
+                          });
+              context.run(
+                  () ->
+                      dbClient.writeWithOptions(
+                          immutableMutations, Options.priority(copySettings.getCommitPriority())));
               return null;
             });
     Futures.addCallback(

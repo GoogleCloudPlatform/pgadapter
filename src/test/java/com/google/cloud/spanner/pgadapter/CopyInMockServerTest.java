@@ -40,6 +40,7 @@ import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.Mutation;
 import com.google.spanner.v1.Mutation.OperationCase;
+import com.google.spanner.v1.RequestOptions.Priority;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
@@ -138,6 +139,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     assertEquals(1, commitRequests.size());
     CommitRequest commitRequest = commitRequests.get(0);
     assertEquals(1, commitRequest.getMutationsCount());
+    assertEquals(Priority.PRIORITY_MEDIUM, commitRequest.getRequestOptions().getPriority());
 
     Mutation mutation = commitRequest.getMutations(0);
     assertEquals(OperationCase.INSERT, mutation.getOperationCase());
@@ -159,11 +161,28 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     assertEquals(1, commitRequests.size());
     CommitRequest commitRequest = commitRequests.get(0);
     assertEquals(1, commitRequest.getMutationsCount());
+    assertEquals(1, commitRequest.getMutationsCount());
 
     Mutation mutation = commitRequest.getMutations(0);
     assertEquals(OperationCase.INSERT_OR_UPDATE, mutation.getOperationCase());
     assertEquals(3, mutation.getInsertOrUpdate().getValuesCount());
     assertEquals(3, mutation.getInsertOrUpdate().getColumnsCount());
+  }
+
+  @Test
+  public void testCopyInWithPriority() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set spanner.copy_commit_priority=low");
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\t5\t5\n"));
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(Priority.PRIORITY_LOW, commitRequest.getRequestOptions().getPriority());
   }
 
   @Test
