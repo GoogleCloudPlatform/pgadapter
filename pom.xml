@@ -35,7 +35,7 @@
     </excludedTests>
 
     <spanner.version>6.31.2</spanner.version>
-    <junixsocket.version>2.6.0</junixsocket.version>
+    <junixsocket.version>2.6.1</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
