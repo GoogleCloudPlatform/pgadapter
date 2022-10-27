@@ -465,59 +465,65 @@ public abstract class ControlMessage extends WireMessage {
 
     @Override
     public Long call() throws Exception {
-      if (resultSet == null && batchReadOnlyTransaction != null && partition != null) {
-        // Note: It is OK not to close this result set, as the underlying transaction and session
-        // will be cleaned up at a later moment.
-        try {
-          resultSet = batchReadOnlyTransaction.execute(partition);
-          converter =
-              new Converter(
-                  describedResult,
-                  mode,
-                  describedResult.getConnectionHandler().getServer().getOptions(),
-                  resultSet);
-          hasData = resultSet.next();
-        } catch (Throwable t) {
-          if (includePrefix) {
-            synchronized (describedResult) {
-              prefixSent.setException(t);
+      try {
+        if (resultSet == null && batchReadOnlyTransaction != null && partition != null) {
+          // Note: It is OK not to close this result set, as the underlying transaction and session
+          // will be cleaned up at a later moment.
+          try {
+            resultSet = batchReadOnlyTransaction.execute(partition);
+            converter =
+                new Converter(
+                    describedResult,
+                    mode,
+                    describedResult.getConnectionHandler().getServer().getOptions(),
+                    resultSet);
+            hasData = resultSet.next();
+          } catch (Throwable t) {
+            if (includePrefix) {
+              synchronized (describedResult) {
+                prefixSent.setException(t);
+              }
             }
+            throw t;
           }
-          throw t;
         }
-      }
-      if (includePrefix) {
-        try {
-          for (WireOutput prefix : describedResult.createResultPrefix(resultSet)) {
-            prefix.send(false);
+        if (includePrefix) {
+          try {
+            for (WireOutput prefix : describedResult.createResultPrefix(resultSet)) {
+              prefix.send(false);
+            }
+            prefixSent.set(true);
+          } catch (Throwable t) {
+            prefixSent.setException(t);
+            throw t;
           }
-          prefixSent.set(true);
-        } catch (Throwable t) {
-          prefixSent.setException(t);
-          throw t;
+        }
+        // Wait until the prefix (if any) has been sent.
+        prefixSent.get();
+        long rows = 0L;
+        while (hasData) {
+          if (Thread.interrupted()) {
+            throw PGExceptionFactory.newQueryCancelledException();
+          }
+          WireOutput wireOutput = describedResult.createDataRowResponse(converter);
+          synchronized (describedResult) {
+            wireOutput.send(false);
+          }
+          rows++;
+          hasData = resultSet.next();
+          if (rows % 1000 == 0) {
+            logger.log(Level.INFO, String.format("Sent %d rows", rows));
+          }
+          if (rows == maxRows) {
+            break;
+          }
+        }
+        return rows;
+      } finally {
+        if (converter != null) {
+          converter.close();
         }
       }
-      // Wait until the prefix (if any) has been sent.
-      prefixSent.get();
-      long rows = 0L;
-      while (hasData) {
-        if (Thread.interrupted()) {
-          throw PGExceptionFactory.newQueryCancelledException();
-        }
-        WireOutput wireOutput = describedResult.createDataRowResponse(converter);
-        synchronized (describedResult) {
-          wireOutput.send(false);
-        }
-        rows++;
-        hasData = resultSet.next();
-        if (rows % 1000 == 0) {
-          logger.log(Level.INFO, String.format("Sent %d rows", rows));
-        }
-        if (rows == maxRows) {
-          break;
-        }
-      }
-      return rows;
     }
   }
 }

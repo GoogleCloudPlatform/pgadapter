@@ -37,7 +37,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 /** Utility class for converting between generic PostgreSQL conversions. */
-public class Converter {
+public class Converter implements AutoCloseable {
   private final ByteArrayOutputStream buffer = new ByteArrayOutputStream(256);
   private final DataOutputStream outputStream = new DataOutputStream(buffer);
   private final IntermediateStatement statement;
@@ -54,6 +54,12 @@ public class Converter {
     this.mode = mode;
     this.options = options;
     this.resultSet = resultSet;
+  }
+
+  @Override
+  public void close() throws Exception {
+    buffer.close();
+    outputStream.close();
   }
 
   public ResultSet getResultSet() {
