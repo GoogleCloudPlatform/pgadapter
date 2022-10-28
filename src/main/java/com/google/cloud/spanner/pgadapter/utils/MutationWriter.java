@@ -222,6 +222,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       // returned.
       while (!rollback.get() && iterator.hasNext()) {
         CopyRecord record = iterator.next();
+        if (record.isTerminator()) {
+          break;
+        }
         if (record.numColumns() != this.tableColumns.keySet().size()) {
           throw SpannerExceptionFactory.newSpannerException(
               ErrorCode.INVALID_ARGUMENT,

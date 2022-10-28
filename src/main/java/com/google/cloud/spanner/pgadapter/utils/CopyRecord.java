@@ -48,4 +48,9 @@ public interface CopyRecord {
    * where it is being inserted. This method is supported for all types of {@link CopyRecord}.
    */
   Value getValue(Type type, int columnIndex);
+
+  /** Returns true if the record only contains a COPY terminator value (e.g. '\.') */
+  default boolean isTerminator() {
+    return false;
+  }
 }

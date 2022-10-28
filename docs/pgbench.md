@@ -36,3 +36,10 @@ DROP TABLE pgbench_tellers;
 DROP TABLE pgbench_branches;
 DROP TABLE pgbench_accounts;
 RUN BATCH;
+
+
+pgbench "host=localhost port=5433 dbname=knut-test-db options='-c spanner.ignore_transactions=on'" -i -Ig
+pgbench "host=localhost port=5433 dbname=knut-test-db"
+
+
+psql -h localhost -p 5433 -d knut-test-db -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'" -c "delete from pgbench_accounts"

@@ -17,12 +17,15 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
+import com.google.api.core.ApiFuture;
+import com.google.api.core.ApiFutures;
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
 import com.google.cloud.spanner.BatchClient;
 import com.google.cloud.spanner.BatchReadOnlyTransaction;
 import com.google.cloud.spanner.BatchTransactionId;
 import com.google.cloud.spanner.DatabaseId;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Partition;
 import com.google.cloud.spanner.PartitionOptions;
@@ -37,14 +40,17 @@ import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.TimestampBound;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
+import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.ResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
@@ -178,6 +184,8 @@ public class BackendConnection {
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
           result.set(ROLLBACK_RESULT);
+        } else if (isTransactionStatement(parsedStatement) && sessionState.isIgnoreTransactions()) {
+          result.set(NO_RESULT);
         } else if (isBegin(parsedStatement) && spannerConnection.isInTransaction()) {
           // Ignore the statement as it is a no-op to execute BEGIN when we are already in a
           // transaction. TODO: Return a warning.
@@ -374,6 +382,55 @@ public class BackendConnection {
     }
   }
 
+  private final class Truncate extends BufferedStatement<StatementResult> {
+    final TruncateStatement truncateStatement;
+
+    Truncate(TruncateStatement truncateStatement) {
+      super(truncateStatement.parsedStatement, truncateStatement.originalStatement);
+      this.truncateStatement = truncateStatement;
+    }
+
+    @Override
+    void execute() {
+      try {
+        checkConnectionState();
+        if (spannerConnection.isDdlBatchActive()) {
+          throw PGExceptionFactory.newPGException("Cannot execute TRUNCATE in a DDL batch");
+        }
+        if (spannerConnection.isDmlBatchActive()) {
+          throw PGExceptionFactory.newPGException("Cannot execute TRUNCATE in a DML batch");
+        }
+        AutocommitDmlMode originalAutocommitDmlMode = null;
+        if (!spannerConnection.isInTransaction()) {
+          originalAutocommitDmlMode = spannerConnection.getAutocommitDmlMode();
+          spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.PARTITIONED_NON_ATOMIC);
+        }
+        try {
+          List<Statement> deleteStatements = truncateStatement.getDeleteStatements();
+          List<ApiFuture<Long>> futures = new ArrayList<>(deleteStatements.size());
+          for (Statement statement : deleteStatements) {
+            futures.add(spannerConnection.executeUpdateAsync(statement));
+          }
+          ApiFutures.allAsList(futures).get();
+          result.set(NO_RESULT);
+        } finally {
+          if (originalAutocommitDmlMode != null) {
+            spannerConnection.setAutocommitDmlMode(originalAutocommitDmlMode);
+          }
+        }
+      } catch (ExecutionException executionException) {
+        result.setException(executionException.getCause());
+        throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
+      } catch (InterruptedException interruptedException) {
+        result.setException(PGExceptionFactory.newQueryCancelledException());
+        throw PGExceptionFactory.newQueryCancelledException();
+      } catch (Exception exception) {
+        result.setException(exception);
+        throw exception;
+      }
+    }
+  }
+
   private static final ImmutableMap<String, LocalStatement> EMPTY_LOCAL_STATEMENTS =
       ImmutableMap.of();
   private static final StatementResult NO_RESULT = new NoResult();
@@ -454,6 +511,12 @@ public class BackendConnection {
     return copyOut.result;
   }
 
+  public Future<StatementResult> executeTruncate(TruncateStatement truncateStatement) {
+    Truncate truncate = new Truncate(truncateStatement);
+    bufferedStatements.add(truncate);
+    return truncate.result;
+  }
+
   /** Flushes the buffered statements to Spanner. */
   void flush() {
     flush(false);
@@ -487,6 +550,13 @@ public class BackendConnection {
             continue;
           }
           this.sessionState.setConnectionStartupValue(key.schema, key.name, keyValue[1].trim());
+          if (key.schema != null && key.schema.equalsIgnoreCase("spanner")) {
+            Statement statement = Statement.of("SET " + command);
+            ParsedStatement parsedStatement = AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+            if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+              spannerConnection.execute(statement);
+            }
+          }
         }
       }
     } else {
@@ -738,6 +808,10 @@ public class BackendConnection {
       bufferedStatement.result.setException(exception);
       throw exception;
     }
+  }
+
+  private boolean isTransactionStatement(ParsedStatement parsedStatement) {
+    return isBegin(parsedStatement) || isCommit(parsedStatement) || isRollback(parsedStatement);
   }
 
   private boolean isBegin(int index) {

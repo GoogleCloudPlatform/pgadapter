@@ -108,6 +108,11 @@ class CsvCopyParser implements CopyInParser {
     }
 
     @Override
+    public boolean isTerminator() {
+      return record.size() == 1 && "\\.".equals(record.get(0));
+    }
+
+    @Override
     public Value getValue(Type type, String columnName) throws SpannerException {
       String recordValue = record.get(columnName);
       return getSpannerValue(type, recordValue);

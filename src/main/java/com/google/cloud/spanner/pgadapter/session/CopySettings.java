@@ -101,6 +101,10 @@ public class CopySettings {
     }
   }
 
+  public boolean isForceNonAtomic() {
+    return sessionState.getBoolSetting("spanner", "copy_force_non_atomic", false);
+  }
+
   /** Returns the batch size to use for non-atomic COPY operations. */
   public int getNonAtomicBatchSize() {
     return sessionState.getIntegerSetting("spanner", "copy_batch_size", 5000);
@@ -108,7 +112,7 @@ public class CopySettings {
 
   /** Returns the maximum number of mutations in a single commit request. */
   public int getMaxAtomicMutationsLimit() {
-    return sessionState.getIntegerSetting("spanner", "copy_max_atomic_mutations", 20_000);
+    return sessionState.getIntegerSetting("spanner", "copy_max_atomic_mutations", 40_000);
   }
 
   /** Returns the maximum number of bytes in a single commit request. */

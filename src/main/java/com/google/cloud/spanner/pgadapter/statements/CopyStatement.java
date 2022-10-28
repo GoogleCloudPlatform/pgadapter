@@ -31,6 +31,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser;
 import com.google.cloud.spanner.pgadapter.parsers.copy.TokenMgrError;
+import com.google.cloud.spanner.pgadapter.session.CopySettings;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
@@ -349,8 +350,13 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   private CopyTransactionMode getTransactionMode() {
-    if (connection.isInTransaction()) {
+    CopySettings copySettings = new CopySettings(getConnectionHandler().getExtendedQueryProtocolHandler().getBackendConnection().getSessionState());
+    if (copySettings.isForceNonAtomic()) {
+      return CopyTransactionMode.ImplicitNonAtomic;
+    } else if (connection.isInTransaction()) {
       return CopyTransactionMode.Explicit;
+    } else if (getConnectionHandler().getExtendedQueryProtocolHandler().getBackendConnection().getSessionState().isIgnoreTransactions()) {
+      return CopyTransactionMode.ImplicitNonAtomic;
     } else {
       if (connection.getAutocommitDmlMode() == AutocommitDmlMode.PARTITIONED_NON_ATOMIC) {
         return CopyTransactionMode.ImplicitNonAtomic;
