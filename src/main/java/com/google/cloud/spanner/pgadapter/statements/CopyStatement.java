@@ -350,13 +350,8 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   private CopyTransactionMode getTransactionMode() {
-    CopySettings copySettings = new CopySettings(getConnectionHandler().getExtendedQueryProtocolHandler().getBackendConnection().getSessionState());
-    if (copySettings.isForceNonAtomic()) {
-      return CopyTransactionMode.ImplicitNonAtomic;
-    } else if (connection.isInTransaction()) {
+    if (connection.isInTransaction()) {
       return CopyTransactionMode.Explicit;
-    } else if (getConnectionHandler().getExtendedQueryProtocolHandler().getBackendConnection().getSessionState().isIgnoreTransactions()) {
-      return CopyTransactionMode.ImplicitNonAtomic;
     } else {
       if (connection.getAutocommitDmlMode() == AutocommitDmlMode.PARTITIONED_NON_ATOMIC) {
         return CopyTransactionMode.ImplicitNonAtomic;

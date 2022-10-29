@@ -367,8 +367,8 @@ public class SessionState {
     this.transactionSettings = null;
   }
 
-  public boolean isIgnoreTransactions() {
-    return getBoolSetting("spanner", "ignore_transactions", false);
+  public boolean isForceAutocommit() {
+    return getBoolSetting("spanner", "force_autocommit", false);
   }
 
   /** Returns the current setting for replacing pg_catalog tables with common table expressions. */

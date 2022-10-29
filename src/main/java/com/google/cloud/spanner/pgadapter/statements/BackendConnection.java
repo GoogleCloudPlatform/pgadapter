@@ -50,7 +50,6 @@ import com.google.cloud.spanner.connection.ResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
@@ -184,7 +183,7 @@ public class BackendConnection {
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
           result.set(ROLLBACK_RESULT);
-        } else if (isTransactionStatement(parsedStatement) && sessionState.isIgnoreTransactions()) {
+        } else if (isTransactionStatement(parsedStatement) && sessionState.isForceAutocommit()) {
           result.set(NO_RESULT);
         } else if (isBegin(parsedStatement) && spannerConnection.isInTransaction()) {
           // Ignore the statement as it is a no-op to execute BEGIN when we are already in a
@@ -217,7 +216,7 @@ public class BackendConnection {
               sessionState.isReplacePgCatalogTables()
                   ? pgCatalog.replacePgCatalogTables(statement)
                   : statement;
-          result.set(spannerConnection.execute(updatedStatement));
+          result.set(executeOnSpanner(updatedStatement));
         }
       } catch (SpannerException spannerException) {
         // Executing queries against the information schema in a transaction is unsupported.
@@ -247,6 +246,20 @@ public class BackendConnection {
         result.setException(exception);
         throw exception;
       }
+    }
+
+    StatementResult executeOnSpanner(Statement statement) {
+      // Do not try to execute INSERT statements using Partitioned DML if we are in force_autocommit mode. We skip this because the user has (probably) set force_autocommit for compatibility reasons, so we do not want to throw an unnecessary error.
+      if (sessionState.isForceAutocommit() && !spannerConnection.isInTransaction() && spannerConnection.getAutocommitDmlMode() == AutocommitDmlMode.PARTITIONED_NON_ATOMIC
+        && new SimpleParser(statement.getSql()).peekKeyword("insert")) {
+        try {
+          spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.TRANSACTIONAL);
+          return spannerConnection.execute(statement);
+        } finally {
+          spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.PARTITIONED_NON_ATOMIC);
+        }
+      }
+      return spannerConnection.execute(statement);
     }
 
     /**
@@ -400,6 +413,7 @@ public class BackendConnection {
         if (spannerConnection.isDmlBatchActive()) {
           throw PGExceptionFactory.newPGException("Cannot execute TRUNCATE in a DML batch");
         }
+        // TODO: Implement transaction logic according to specs.
         AutocommitDmlMode originalAutocommitDmlMode = null;
         if (!spannerConnection.isInTransaction()) {
           originalAutocommitDmlMode = spannerConnection.getAutocommitDmlMode();
@@ -428,6 +442,21 @@ public class BackendConnection {
         result.setException(exception);
         throw exception;
       }
+    }
+  }
+
+  private final class Vacuum extends BufferedStatement<StatementResult> {
+    final VacuumStatement vacuumStatement;
+
+    Vacuum(VacuumStatement vacuumStatement) {
+      super(vacuumStatement.parsedStatement, vacuumStatement.originalStatement);
+      this.vacuumStatement = vacuumStatement;
+    }
+
+    @Override
+    void execute() {
+      // TODO: Verify that the given tables and columns exist.
+      result.set(NO_RESULT);
     }
   }
 
@@ -511,10 +540,16 @@ public class BackendConnection {
     return copyOut.result;
   }
 
-  public Future<StatementResult> executeTruncate(TruncateStatement truncateStatement) {
+  public Future<StatementResult> execute(TruncateStatement truncateStatement) {
     Truncate truncate = new Truncate(truncateStatement);
     bufferedStatements.add(truncate);
     return truncate.result;
+  }
+
+  public Future<StatementResult> execute(VacuumStatement vacuumStatement) {
+    Vacuum vacuum = new Vacuum(vacuumStatement);
+    bufferedStatements.add(vacuum);
+    return vacuum.result;
   }
 
   /** Flushes the buffered statements to Spanner. */

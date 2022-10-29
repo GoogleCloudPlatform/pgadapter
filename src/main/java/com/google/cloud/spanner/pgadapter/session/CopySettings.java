@@ -101,10 +101,6 @@ public class CopySettings {
     }
   }
 
-  public boolean isForceNonAtomic() {
-    return sessionState.getBoolSetting("spanner", "copy_force_non_atomic", false);
-  }
-
   /** Returns the batch size to use for non-atomic COPY operations. */
   public int getNonAtomicBatchSize() {
     return sessionState.getIntegerSetting("spanner", "copy_batch_size", 5000);
