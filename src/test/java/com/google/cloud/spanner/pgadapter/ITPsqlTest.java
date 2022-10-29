@@ -467,7 +467,7 @@ public class ITPsqlTest implements IntegrationTest {
         assertEquals(numRows, connection.createStatement().executeUpdate("delete from all_types"));
       }
 
-      // COPY the rows to Cloud Spanner.
+      // COPY the rows from Cloud Spanner to PostgreSQL.
       ProcessBuilder copyToPostgresBuilder = new ProcessBuilder();
       copyToPostgresBuilder.command(
           "bash",

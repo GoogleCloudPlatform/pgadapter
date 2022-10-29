@@ -15,17 +15,22 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
+import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
-import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
-import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.ParsedCopyStatement;
+import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyDoneResponse;
@@ -35,6 +40,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Futures;
 import java.util.List;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.QuoteMode;
 
@@ -48,57 +54,113 @@ public class CopyToStatement extends IntermediatePortalStatement {
   public static final byte[] COPY_BINARY_HEADER =
       new byte[] {'P', 'G', 'C', 'O', 'P', 'Y', '\n', -1, '\r', '\n', '\0'};
 
-  private final CopyOptions copyOptions;
+  private final ParsedCopyStatement parsedCopyStatement;
   private final CSVFormat csvFormat;
 
   public CopyToStatement(
       ConnectionHandler connectionHandler,
       OptionsMetadata options,
       String name,
-      CopyOptions copyOptions) {
+      ParsedCopyStatement parsedCopyStatement) {
     super(
         connectionHandler,
         options,
         name,
-        createParsedStatement(copyOptions),
-        createSelectStatement(copyOptions));
-    this.copyOptions = copyOptions;
-    if (copyOptions.getFormat() == Format.BINARY) {
+        createParsedStatement(parsedCopyStatement),
+        createSelectStatement(parsedCopyStatement));
+    this.parsedCopyStatement = parsedCopyStatement;
+    if (parsedCopyStatement.format == CopyStatement.Format.BINARY) {
       this.csvFormat = null;
     } else {
       CSVFormat.Builder formatBuilder =
           CSVFormat.Builder.create(CSVFormat.POSTGRESQL_TEXT)
               .setNullString(
-                  copyOptions.getNullString() == null
+                  parsedCopyStatement.nullString == null
                       ? CSVFormat.POSTGRESQL_TEXT.getNullString()
-                      : copyOptions.getNullString())
+                      : parsedCopyStatement.nullString)
               .setRecordSeparator('\n')
               .setDelimiter(
-                  copyOptions.getDelimiter() == 0
+                  parsedCopyStatement.delimiter == null
                       ? CSVFormat.POSTGRESQL_TEXT.getDelimiterString().charAt(0)
-                      : copyOptions.getDelimiter())
+                      : parsedCopyStatement.delimiter)
               .setQuote(
-                  copyOptions.getQuote() == 0
+                  parsedCopyStatement.quote == null
                       ? CSVFormat.POSTGRESQL_TEXT.getQuoteCharacter()
-                      : copyOptions.getQuote())
+                      : parsedCopyStatement.quote)
               .setEscape(
-                  copyOptions.getEscape() == 0
+                  parsedCopyStatement.escape == null
                       ? CSVFormat.POSTGRESQL_TEXT.getEscapeCharacter()
-                      : copyOptions.getEscape())
-              .setQuoteMode(QuoteMode.NONE);
-      if (copyOptions.hasHeader()) {
-        formatBuilder.setHeader(copyOptions.getColumnNames().toArray(new String[0]));
+                      : parsedCopyStatement.escape);
+      if (parsedCopyStatement.format == Format.TEXT) {
+        formatBuilder.setQuoteMode(QuoteMode.NONE);
+      } else {
+        if (parsedCopyStatement.forceQuote == null) {
+          formatBuilder.setQuoteMode(QuoteMode.MINIMAL);
+        } else if (parsedCopyStatement.forceQuote.isEmpty()) {
+          formatBuilder.setQuoteMode(QuoteMode.ALL_NON_NULL);
+        } else {
+          // The CSV parser does not support different quote modes per column.
+          throw PGExceptionFactory.newPGException(
+              "PGAdapter does not support force_quote modes per column", SQLState.InternalError);
+        }
+      }
+      if (parsedCopyStatement.header) {
+        if (parsedCopyStatement.columns == null) {
+          formatBuilder.setHeader(
+              retrieveHeader(
+                  connectionHandler
+                      .getExtendedQueryProtocolHandler()
+                      .getBackendConnection()
+                      .getSpannerConnection(),
+                  parsedCopyStatement));
+        } else {
+          formatBuilder.setHeader(
+              parsedCopyStatement.columns.stream()
+                  .map(TableOrIndexName::getUnquotedName)
+                  .toArray(String[]::new));
+        }
       }
       this.csvFormat = formatBuilder.build();
     }
   }
 
-  static ParsedStatement createParsedStatement(CopyOptions copyOptions) {
-    return PARSER.parse(createSelectStatement(copyOptions));
+  static ParsedStatement createParsedStatement(ParsedCopyStatement parsedCopyStatement) {
+    return PARSER.parse(createSelectStatement(parsedCopyStatement));
   }
 
-  static Statement createSelectStatement(CopyOptions copyOptions) {
-    return Statement.of("select * from " + copyOptions.getTableName());
+  static Statement createSelectStatement(ParsedCopyStatement parsedCopyStatement) {
+    if (parsedCopyStatement.query != null) {
+      return Statement.of(parsedCopyStatement.query);
+    }
+    if (parsedCopyStatement.columns != null) {
+      return Statement.of(
+          String.format(
+              "select %s from %s",
+              parsedCopyStatement.columns.stream()
+                  .map(TableOrIndexName::toString)
+                  .collect(Collectors.joining(", ")),
+              parsedCopyStatement.table));
+    }
+    return Statement.of("select * from " + parsedCopyStatement.table);
+  }
+
+  static String[] retrieveHeader(Connection connection, ParsedCopyStatement parsedCopyStatement) {
+    try (ResultSet resultSet =
+        connection
+            .getDatabaseClient()
+            .singleUse()
+            .analyzeQuery(createSelectStatement(parsedCopyStatement), QueryAnalyzeMode.PLAN)) {
+      resultSet.next();
+      return convertColumnNamesToStringArray(resultSet);
+    }
+  }
+
+  static String[] convertColumnNamesToStringArray(ResultSet resultSet) {
+    String[] result = new String[resultSet.getColumnCount()];
+    for (int index = 0; index < resultSet.getColumnCount(); index++) {
+      result[index] = resultSet.getType().getStructFields().get(index).getName();
+    }
+    return result;
   }
 
   @VisibleForTesting
@@ -107,7 +169,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
   }
 
   public boolean isBinary() {
-    return copyOptions.getFormat() == Format.BINARY;
+    return parsedCopyStatement.format == CopyStatement.Format.BINARY;
   }
 
   @Override
@@ -150,7 +212,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
 
   @Override
   public WireOutput[] createResultPrefix(ResultSet resultSet) {
-    return this.copyOptions.getFormat() == Format.BINARY
+    return this.parsedCopyStatement.format == CopyStatement.Format.BINARY
         ? new WireOutput[] {
           new CopyOutResponse(
               this.outputStream,
@@ -166,14 +228,14 @@ public class CopyToStatement extends IntermediatePortalStatement {
 
   @Override
   public CopyDataResponse createDataRowResponse(Converter converter) {
-    return copyOptions.getFormat() == Format.BINARY
+    return parsedCopyStatement.format == CopyStatement.Format.BINARY
         ? createBinaryDataResponse(converter)
         : createDataResponse(converter.getResultSet());
   }
 
   @Override
   public WireOutput[] createResultSuffix() {
-    return this.copyOptions.getFormat() == Format.BINARY
+    return this.parsedCopyStatement.format == Format.BINARY
         ? new WireOutput[] {
           CopyDataResponse.createBinaryTrailer(this.outputStream),
           new CopyDoneResponse(this.outputStream)

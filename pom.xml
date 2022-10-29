@@ -73,6 +73,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.google.auto.value</groupId>
+      <artifactId>auto-value-annotations</artifactId>
+      <version>1.10</version>
+    </dependency>
+    <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
       <version>${spanner.version}</version>
@@ -107,6 +112,11 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-csv</artifactId>
       <version>1.9.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-text</artifactId>
+      <version>1.10.0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.maven</groupId>
@@ -418,11 +428,6 @@
             </configuration>
           </execution>
         </executions>
-        <configuration>
-          <excludes>
-            <exclude>com/google/cloud/spanner/pgadapter/parsers/copy/**/*</exclude>
-          </excludes>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

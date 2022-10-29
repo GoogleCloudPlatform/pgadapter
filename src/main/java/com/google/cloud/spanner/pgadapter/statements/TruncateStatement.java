@@ -38,7 +38,8 @@ public class TruncateStatement extends IntermediatePortalStatement {
     final boolean cascade;
     final boolean restrict;
 
-    private ParsedTruncateStatement(List<TableOrIndexName> tables,
+    private ParsedTruncateStatement(
+        List<TableOrIndexName> tables,
         boolean only,
         boolean star,
         boolean restartIdentity,
@@ -80,7 +81,7 @@ public class TruncateStatement extends IntermediatePortalStatement {
   @Override
   public void executeAsync(BackendConnection backendConnection) {
     this.executed = true;
-    setFutureStatementResult(backendConnection.executeTruncate(this));
+    setFutureStatementResult(backendConnection.execute(this));
   }
 
   public List<Statement> getDeleteStatements() {
@@ -140,6 +141,7 @@ public class TruncateStatement extends IntermediatePortalStatement {
       throw PGExceptionFactory.newPGException(
           "Syntax error. Unexpected tokens: " + parser.getSql().substring(parser.getPos()));
     }
-    return new ParsedTruncateStatement(tables, only, star, restartIdentity, continueIdentity, cascade, restrict);
+    return new ParsedTruncateStatement(
+        tables, only, star, restartIdentity, continueIdentity, cascade, restrict);
   }
 }

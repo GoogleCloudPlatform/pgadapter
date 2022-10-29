@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
@@ -31,7 +32,7 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.cloud.spanner.pgadapter.utils.CopyInParser;
 import com.google.cloud.spanner.pgadapter.utils.CopyRecord;
 import com.google.protobuf.ByteString;
@@ -48,6 +49,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
@@ -231,6 +233,168 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCopyOutWithColumns() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select col_bigint, col_varchar from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut("COPY all_types (col_bigint, col_varchar) TO STDOUT", writer);
+
+      assertEquals(
+          "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+          writer.toString());
+
+      // Verify that we can use the connection for normal queries.
+      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    List<ExecuteSqlRequest> sqlRequests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(2, sqlRequests.size());
+    ExecuteSqlRequest request = sqlRequests.get(0);
+    assertEquals("select col_bigint, col_varchar from all_types", request.getSql());
+    assertTrue(request.getTransaction().hasSingleUse());
+    assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+  }
+
+  @Test
+  public void testCopyOutCsv() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut(
+          "COPY all_types TO STDOUT (format csv, escape '~', delimiter '-')", writer);
+
+      assertEquals(
+          "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456789+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n",
+          writer.toString());
+    }
+  }
+
+  @Test
+  public void testCopyOutCsvWithHeader() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut(
+          "COPY all_types TO STDOUT (header, format csv, escape '~', delimiter '-')", writer);
+
+      assertEquals(
+          "col_bigint-col_bool-col_bytea-col_float8-col_int-col_numeric-col_timestamptz-col_date-col_varchar-col_jsonb\n"
+              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456789+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n",
+          writer.toString());
+    }
+  }
+
+  @Test
+  public void testCopyOutCsvWithColumnsAndHeader() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select col_bigint from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut(
+          "COPY all_types (col_bigint) TO STDOUT (header, format csv, escape '~', delimiter '-')",
+          writer);
+
+      assertEquals(
+          "col_bigint\n"
+              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456789+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n",
+          writer.toString());
+    }
+  }
+
+  @Test
+  public void testCopyOutCsvWithQueryAndHeader() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from all_types order by col_bigint"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut(
+          "COPY (select * from all_types order by col_bigint) TO STDOUT (header, format csv, escape '\\', delimiter '|')",
+          writer);
+
+      assertEquals(
+          "col_bigint|col_bool|col_bytea|col_float8|col_int|col_numeric|col_timestamptz|col_date|col_varchar|col_jsonb\n"
+              + "1|t|\"\\\\x74657374\"|3.14|100|6.626|2022-02-16 13:18:02.123456789+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"\n",
+          writer.toString());
+    }
+  }
+
+  @Test
+  public void testCopyOutCsvWithQuote() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut(
+          "COPY all_types TO STDOUT (format csv, escape '\\', delimiter '|', quote '\"')", writer);
+
+      assertEquals(
+          "1|t|\"\\\\x74657374\"|3.14|100|6.626|2022-02-16 13:18:02.123456789+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"\n",
+          writer.toString());
+    }
+  }
+
+  @Test
+  public void testCopyOutCsvWithForceQuoteAll() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      copyManager.copyOut(
+          "COPY all_types TO STDOUT (format csv, escape '\\', delimiter '|', quote '\"', force_quote *)",
+          writer);
+
+      assertEquals(
+          "\"1\"|\"t\"|\"\\\\x74657374\"|\"3.14\"|\"100\"|\"6.626\"|\"2022-02-16 13:18:02.123456789+00\"|\"2022-03-29\"|\"test\"|\"{\\\"key\\\": \\\"value\\\"}\"\n",
+          writer.toString());
+    }
+  }
+
+  @Test
+  public void testCopyOutCsvWithForceQuoteColumn() throws SQLException, IOException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  copyManager.copyOut(
+                      "COPY all_types TO STDOUT (format csv, escape '\\', delimiter '|', quote '\"', force_quote (col_bigint))",
+                      writer));
+      assertEquals(
+          "ERROR: PGAdapter does not support force_quote modes per column", exception.getMessage());
+    }
+  }
+
+  @Test
   public void testCopyOutNulls() throws SQLException, IOException {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_NULLS_RESULTSET));
@@ -281,8 +445,8 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       }
     }
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    CopyInParser copyParser =
-        CopyInParser.create(Format.BINARY, null, pipedOutputStream, 1 << 16, false);
+    PipedInputStream inputStream = new PipedInputStream(pipedOutputStream, 1 << 16);
+    CopyInParser copyParser = CopyInParser.create(Format.BINARY, null, inputStream, false);
     int b;
     while ((b = process.getInputStream().read()) != -1) {
       pipedOutputStream.write(b);
@@ -333,8 +497,8 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       }
     }
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
-    CopyInParser copyParser =
-        CopyInParser.create(Format.BINARY, null, pipedOutputStream, 1 << 16, false);
+    PipedInputStream inputStream = new PipedInputStream(pipedOutputStream, 1 << 16);
+    CopyInParser copyParser = CopyInParser.create(Format.BINARY, null, inputStream, false);
     int b;
     while ((b = process.getInputStream().read()) != -1) {
       pipedOutputStream.write(b);

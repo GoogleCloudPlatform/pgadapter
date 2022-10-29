@@ -148,15 +148,35 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCopyInWithPriority() throws SQLException, IOException {
+  public void testCopyUpsert() throws SQLException, IOException {
     setupCopyInformationSchemaResults();
 
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set spanner.copy_upsert=true");
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\t5\t5\n6\t6\t6\n7\t7\t7\n"));
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT_OR_UPDATE, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsertOrUpdate().getValuesCount());
+    assertEquals(3, mutation.getInsertOrUpdate().getColumnsCount());
+  }
+
+  @Test
+  public void testCopyInWithPriority() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set spanner.copy_commit_priority=low");
       CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
       copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\t5\t5\n"));
     }
-
     List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
     assertEquals(1, commitRequests.size());
     CommitRequest commitRequest = commitRequests.get(0);
@@ -198,8 +218,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               () ->
                   copyManager.copyIn(
                       "COPY users (id, foo) FROM STDIN;", new StringReader("5\t5\n6\t6\n7\t7\n")));
-      assertEquals(
-          "ERROR: Column \"foo\" of relation \"users\" does not exist", sqlException.getMessage());
+      assertEquals("ERROR: Column foo of relation users does not exist", sqlException.getMessage());
     }
 
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -234,6 +253,62 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     assertEquals("5", mutation.getInsert().getValues(0).getValues(0).getStringValue());
     assertEquals(nullValue, mutation.getInsert().getValues(0).getValues(1));
     assertEquals(nullValue, mutation.getInsert().getValues(0).getValues(2));
+  }
+
+  @Test
+  public void testCopyInWithCsvOptions() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn(
+          "COPY users (id, name) FROM STDIN (format csv, header on, escape '~', quote '$');",
+          new StringReader("id,name\n5,$~$five$\n6,$~$six$\n7,$~$seven$\n"));
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsert().getValuesCount());
+    assertEquals(2, mutation.getInsert().getColumnsCount());
+    assertEquals("$five", mutation.getInsert().getValues(0).getValues(1).getStringValue());
+    assertEquals("$six", mutation.getInsert().getValues(1).getValues(1).getStringValue());
+    assertEquals("$seven", mutation.getInsert().getValues(2).getValues(1).getStringValue());
+  }
+
+  @Test
+  public void testCopyInWithHeaderOutOfOrder() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn(
+          "COPY users (id, name) FROM STDIN (format csv, header on, escape '~', quote '$');",
+          new StringReader("name,id\n$~$five$,5\n$~$six$,6\n$~$seven$,7\n"));
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsert().getValuesCount());
+    assertEquals(2, mutation.getInsert().getColumnsCount());
+    assertEquals("id", mutation.getInsert().getColumns(0));
+    assertEquals("name", mutation.getInsert().getColumns(1));
+
+    assertEquals("5", mutation.getInsert().getValues(0).getValues(0).getStringValue());
+    assertEquals("$five", mutation.getInsert().getValues(0).getValues(1).getStringValue());
+    assertEquals("6", mutation.getInsert().getValues(1).getValues(0).getStringValue());
+    assertEquals("$six", mutation.getInsert().getValues(1).getValues(1).getStringValue());
+    assertEquals("7", mutation.getInsert().getValues(2).getValues(0).getStringValue());
+    assertEquals("$seven", mutation.getInsert().getValues(2).getValues(1).getStringValue());
   }
 
   @Test
@@ -430,7 +505,62 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCopyInWithInvalidRow() throws SQLException, IOException {
+  public void testCopyIn_InvalidOptions() throws SQLException {
+    setupCopyInformationSchemaResults(true);
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  copyManager.copyIn(
+                      "COPY users FROM STDIN (format binary, delimiter '|');",
+                      new StringReader("5\t5\t5\n")));
+      assertEquals("ERROR: cannot specify DELIMITER in BINARY mode", exception.getMessage());
+
+      // Verify that we can use the connection for normal queries.
+      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testCopyIn_TableInOtherSchema() throws Exception {
+    setupCopyInformationSchemaResults(mockSpanner, "my_schema", "all_types", true);
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn(
+          "COPY \"my_schema\".\"users\" FROM STDIN;",
+          new StringReader("5\t5\t5\n6\t6\t6\n7\t7\t7\n"));
+
+      // Verify that we can use the connection for normal queries.
+      try (ResultSet resultSet = connection.createStatement().executeQuery("SELECT 1")) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(3, mutation.getInsert().getValuesCount());
+    assertEquals(3, mutation.getInsert().getColumnsCount());
+  }
+
+  @Test
+  public void testCopyInWithInvalidRow() throws SQLException {
     setupCopyInformationSchemaResults();
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
@@ -1413,11 +1543,14 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   private void setupCopyInformationSchemaResults(boolean tableFound) {
-    setupCopyInformationSchemaResults(mockSpanner, "all_types", tableFound);
+    setupCopyInformationSchemaResults(mockSpanner, "public", "all_types", tableFound);
   }
 
   public static void setupCopyInformationSchemaResults(
-      MockSpannerServiceImpl mockSpanner, String allTypesTableName, boolean tableFound) {
+      MockSpannerServiceImpl mockSpanner,
+      String usersSchema,
+      String allTypesTableName,
+      boolean tableFound) {
     ResultSetMetadata metadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
@@ -1462,8 +1595,10 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1")
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2")
                 .bind("p1")
+                .to(usersSchema)
+                .bind("p2")
                 .to("users")
                 .build(),
             resultSet));
@@ -1525,14 +1660,16 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1")
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2")
                 .bind("p1")
+                .to("public")
+                .bind("p2")
                 .to(allTypesTableName)
                 .build(),
             allTypesResultSet));
 
     String indexedColumnsCountSql =
-        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3, $4)";
+        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema=$1 and table_name=$2 and column_name in ($3, $4, $5)";
     ResultSetMetadata indexedColumnsCountMetadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
@@ -1556,18 +1693,20 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(indexedColumnsCountSql)
                 .bind("p1")
-                .to("users")
+                .to(usersSchema)
                 .bind("p2")
-                .to("id")
+                .to("users")
                 .bind("p3")
-                .to("age")
+                .to("id")
                 .bind("p4")
+                .to("age")
+                .bind("p5")
                 .to("name")
                 .build(),
             indexedColumnsCountResultSet));
 
     String allTypesIndexedColumnsCountSql =
-        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3, $4, $5, $6, $7, $8, $9, $10, $11)";
+        "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema=$1 and table_name=$2 and column_name in ($3, $4, $5, $6, $7, $8, $9, $10, $11, $12)";
     ResultSetMetadata allTypesIndexedColumnsCountMetadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
@@ -1591,26 +1730,28 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(allTypesIndexedColumnsCountSql)
                 .bind("p1")
-                .to(allTypesTableName)
+                .to("public")
                 .bind("p2")
-                .to("col_bigint")
+                .to(allTypesTableName)
                 .bind("p3")
-                .to("col_bool")
+                .to("col_bigint")
                 .bind("p4")
-                .to("col_bytea")
+                .to("col_bool")
                 .bind("p5")
-                .to("col_float8")
+                .to("col_bytea")
                 .bind("p6")
-                .to("col_int")
+                .to("col_float8")
                 .bind("p7")
-                .to("col_numeric")
+                .to("col_int")
                 .bind("p8")
-                .to("col_timestamptz")
+                .to("col_numeric")
                 .bind("p9")
-                .to("col_date")
+                .to("col_timestamptz")
                 .bind("p10")
-                .to("col_varchar")
+                .to("col_date")
                 .bind("p11")
+                .to("col_varchar")
+                .bind("p12")
                 .to("col_jsonb")
                 .build(),
             allTypesIndexedColumnsCountResultSet));

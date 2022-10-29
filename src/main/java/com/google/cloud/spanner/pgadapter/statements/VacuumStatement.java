@@ -23,7 +23,6 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
-import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.statements.VacuumStatement.ParsedVacuumStatement.Builder;
 import com.google.cloud.spanner.pgadapter.statements.VacuumStatement.ParsedVacuumStatement.IndexCleanup;
@@ -38,12 +37,15 @@ import java.util.concurrent.Future;
 public class VacuumStatement extends IntermediatePortalStatement {
   static final class ParsedVacuumStatement {
     enum IndexCleanup {
-      AUTO, ON, OFF;
+      AUTO,
+      ON,
+      OFF;
     }
 
     static final class Builder {
       final ImmutableList.Builder<TableOrIndexName> tables = ImmutableList.builder();
-      final ImmutableMap.Builder<TableOrIndexName, ImmutableList<TableOrIndexName>> columns = ImmutableMap.builder();
+      final ImmutableMap.Builder<TableOrIndexName, ImmutableList<TableOrIndexName>> columns =
+          ImmutableMap.builder();
       boolean full;
       boolean freeze;
       boolean verbose;
@@ -79,7 +81,8 @@ public class VacuumStatement extends IntermediatePortalStatement {
       this.disablePageSkipping = builder.disablePageSkipping;
       this.skipLocked = builder.skipLocked;
       this.indexCleanup = builder.indexCleanup;
-      this.processToast = builder.processToast;;
+      this.processToast = builder.processToast;
+      ;
       this.truncate = builder.truncate;
       this.parallel = builder.parallel;
     }
@@ -149,7 +152,8 @@ public class VacuumStatement extends IntermediatePortalStatement {
     if (parser.eatToken("(")) {
       List<String> options = parser.parseExpressionList();
       if (!parser.eatToken(")")) {
-        throw PGExceptionFactory.newPGException("missing closing parentheses for VACUUM options list");
+        throw PGExceptionFactory.newPGException(
+            "missing closing parentheses for VACUUM options list");
       }
       for (String option : options) {
         SimpleParser optionParser = new SimpleParser(option);
@@ -162,7 +166,8 @@ public class VacuumStatement extends IntermediatePortalStatement {
         } else if (optionParser.eatKeyword("analyze")) {
           builder.analyze = readOptionalBooleanValue("analyze", optionParser, true);
         } else if (optionParser.eatKeyword("disable_page_skipping")) {
-          builder.disablePageSkipping = readOptionalBooleanValue("disable_page_skipping", optionParser, true);
+          builder.disablePageSkipping =
+              readOptionalBooleanValue("disable_page_skipping", optionParser, true);
         } else if (optionParser.eatKeyword("skip_locked")) {
           builder.skipLocked = readOptionalBooleanValue("skip_locked", optionParser, true);
         } else if (optionParser.eatKeyword("index_cleanup")) {
@@ -195,9 +200,7 @@ public class VacuumStatement extends IntermediatePortalStatement {
       if (table == null) {
         throw PGExceptionFactory.newPGException("Invalid table name");
       }
-      if (parser.eatToken("(")) {
-
-      }
+      if (parser.eatToken("(")) {}
     }
     return new ParsedVacuumStatement(builder);
   }

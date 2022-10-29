@@ -249,9 +249,13 @@ public class BackendConnection {
     }
 
     StatementResult executeOnSpanner(Statement statement) {
-      // Do not try to execute INSERT statements using Partitioned DML if we are in force_autocommit mode. We skip this because the user has (probably) set force_autocommit for compatibility reasons, so we do not want to throw an unnecessary error.
-      if (sessionState.isForceAutocommit() && !spannerConnection.isInTransaction() && spannerConnection.getAutocommitDmlMode() == AutocommitDmlMode.PARTITIONED_NON_ATOMIC
-        && new SimpleParser(statement.getSql()).peekKeyword("insert")) {
+      // Do not try to execute INSERT statements using Partitioned DML if we are in force_autocommit
+      // mode. We skip this because the user has (probably) set force_autocommit for compatibility
+      // reasons, so we do not want to throw an unnecessary error.
+      if (sessionState.isForceAutocommit()
+          && !spannerConnection.isInTransaction()
+          && spannerConnection.getAutocommitDmlMode() == AutocommitDmlMode.PARTITIONED_NON_ATOMIC
+          && new SimpleParser(statement.getSql()).peekKeyword("insert")) {
         try {
           spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.TRANSACTIONAL);
           return spannerConnection.execute(statement);
@@ -587,7 +591,8 @@ public class BackendConnection {
           this.sessionState.setConnectionStartupValue(key.schema, key.name, keyValue[1].trim());
           if (key.schema != null && key.schema.equalsIgnoreCase("spanner")) {
             Statement statement = Statement.of("SET " + command);
-            ParsedStatement parsedStatement = AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+            ParsedStatement parsedStatement =
+                AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
             if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
               spannerConnection.execute(statement);
             }
