@@ -378,6 +378,10 @@ public class SimpleParser {
   }
 
   List<TableOrIndexName> readColumnListInParentheses(String name) {
+    return readColumnListInParentheses(name, true);
+  }
+
+  List<TableOrIndexName> readColumnListInParentheses(String name, boolean required) {
     if (eatToken("(")) {
       List<String> expressions = parseExpressionListUntilKeyword(")", true);
       if (!eatToken(")")) {
@@ -386,9 +390,11 @@ public class SimpleParser {
             SQLState.SyntaxError);
       }
       return expressionListToColumnNames(name, expressions);
-    } else {
+    } else if (required) {
       throw PGExceptionFactory.newPGException(
           String.format("missing opening parentheses for %s", name), SQLState.SyntaxError);
+    } else {
+      return null;
     }
   }
 

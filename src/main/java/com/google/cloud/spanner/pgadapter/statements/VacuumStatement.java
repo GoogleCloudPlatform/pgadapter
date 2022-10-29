@@ -200,7 +200,10 @@ public class VacuumStatement extends IntermediatePortalStatement {
       if (table == null) {
         throw PGExceptionFactory.newPGException("Invalid table name");
       }
-      if (parser.eatToken("(")) {}
+      List<TableOrIndexName> columns = parser.readColumnListInParentheses(table.toString(), false);
+      if (columns != null) {
+        builder.columns.put(table, ImmutableList.copyOf(columns));
+      }
     }
     return new ParsedVacuumStatement(builder);
   }
