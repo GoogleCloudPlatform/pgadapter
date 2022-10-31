@@ -14,8 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.error;
 
+import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.checkArgument;
 import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 
 import com.google.api.gax.grpc.GrpcStatusCode;
 import com.google.api.gax.rpc.ApiException;
@@ -50,5 +52,14 @@ public class PGExceptionFactoryTest {
                     /* cause= */ null,
                     GrpcStatusCode.of(Code.NOT_FOUND),
                     /* retryable= */ false))));
+  }
+
+  @Test
+  public void testCheckArgument() {
+    assertEquals(1L, checkArgument(1L, true, "test message").longValue());
+    PGException exception =
+        assertThrows(PGException.class, () -> checkArgument(1L, false, "test message"));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals("test message", exception.getMessage());
   }
 }
