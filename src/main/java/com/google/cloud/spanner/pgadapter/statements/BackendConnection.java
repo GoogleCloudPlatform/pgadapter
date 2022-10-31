@@ -17,8 +17,6 @@ package com.google.cloud.spanner.pgadapter.statements;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
-import com.google.api.core.ApiFuture;
-import com.google.api.core.ApiFutures;
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
 import com.google.cloud.spanner.BatchClient;
@@ -417,31 +415,18 @@ public class BackendConnection {
         if (spannerConnection.isDmlBatchActive()) {
           throw PGExceptionFactory.newPGException("Cannot execute TRUNCATE in a DML batch");
         }
-        // TODO: Implement transaction logic according to specs.
-        AutocommitDmlMode originalAutocommitDmlMode = null;
-        if (!spannerConnection.isInTransaction()) {
-          originalAutocommitDmlMode = spannerConnection.getAutocommitDmlMode();
-          spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.PARTITIONED_NON_ATOMIC);
-        }
-        try {
-          List<Statement> deleteStatements = truncateStatement.getDeleteStatements();
-          List<ApiFuture<Long>> futures = new ArrayList<>(deleteStatements.size());
-          for (Statement statement : deleteStatements) {
-            futures.add(spannerConnection.executeUpdateAsync(statement));
-          }
-          ApiFutures.allAsList(futures).get();
-          result.set(NO_RESULT);
-        } finally {
-          if (originalAutocommitDmlMode != null) {
-            spannerConnection.setAutocommitDmlMode(originalAutocommitDmlMode);
+        if (spannerConnection.isInTransaction()
+            || spannerConnection.getAutocommitDmlMode() == AutocommitDmlMode.TRANSACTIONAL) {
+          spannerConnection.executeBatchUpdate(truncateStatement.getDeleteStatements());
+        } else {
+          // BatchDML is not supported for PDML, so we have to loop over the statements.
+          // We do not execute the statements in parallel, as there might be dependencies between
+          // the tables that are being truncated.
+          for (Statement statement : truncateStatement.getDeleteStatements()) {
+            spannerConnection.executeUpdate(statement);
           }
         }
-      } catch (ExecutionException executionException) {
-        result.setException(executionException.getCause());
-        throw SpannerExceptionFactory.asSpannerException(executionException.getCause());
-      } catch (InterruptedException interruptedException) {
-        result.setException(PGExceptionFactory.newQueryCancelledException());
-        throw PGExceptionFactory.newQueryCancelledException();
+        result.set(NO_RESULT);
       } catch (Exception exception) {
         result.setException(exception);
         throw exception;

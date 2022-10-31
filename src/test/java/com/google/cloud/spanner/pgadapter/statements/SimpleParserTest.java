@@ -132,6 +132,7 @@ public class SimpleParserTest {
 
   @Test
   public void testReadTableOrIndexNamePart() {
+    assertEquals("public", new SimpleParser("public.\"foo\"").readIdentifierPart());
     assertEquals("\"foo\"", new SimpleParser("\"foo\"(id)").readIdentifierPart());
 
     assertEquals("foo", new SimpleParser("foo bar").readIdentifierPart());
@@ -165,6 +166,9 @@ public class SimpleParserTest {
 
   @Test
   public void testReadTableOrIndexName() {
+    assertEquals(
+        new TableOrIndexName("public", "\"foo\""),
+        new SimpleParser("public.\"foo\"").readTableOrIndexName());
     assertEquals(new TableOrIndexName("foo"), new SimpleParser("foo .bar").readTableOrIndexName());
     // The following is an invalid name, but the simple parser should just accept this and let the
     // backend return an error.

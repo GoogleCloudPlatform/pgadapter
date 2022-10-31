@@ -22,7 +22,9 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.cloud.spanner.pgadapter.statements.TruncateStatement.ParsedTruncateStatement.Builder;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,29 +32,26 @@ import java.util.concurrent.Future;
 
 public class TruncateStatement extends IntermediatePortalStatement {
   static final class ParsedTruncateStatement {
-    final List<TableOrIndexName> tables;
+    static final class Builder {
+      final ImmutableList.Builder<TableOrIndexName> tables = ImmutableList.builder();
+      boolean only;
+      boolean star;
+      boolean restartIdentity;
+      boolean cascade;
+    }
+
+    final ImmutableList<TableOrIndexName> tables;
     final boolean only;
     final boolean star;
     final boolean restartIdentity;
-    final boolean continueIdentity;
     final boolean cascade;
-    final boolean restrict;
 
-    private ParsedTruncateStatement(
-        List<TableOrIndexName> tables,
-        boolean only,
-        boolean star,
-        boolean restartIdentity,
-        boolean continueIdentity,
-        boolean cascade,
-        boolean restrict) {
-      this.tables = tables;
-      this.only = only;
-      this.star = star;
-      this.restartIdentity = restartIdentity;
-      this.continueIdentity = continueIdentity;
-      this.cascade = cascade;
-      this.restrict = restrict;
+    private ParsedTruncateStatement(Builder builder) {
+      this.tables = builder.tables.build();
+      this.only = builder.only;
+      this.star = builder.star;
+      this.restartIdentity = builder.restartIdentity;
+      this.cascade = builder.cascade;
     }
   }
 
@@ -113,35 +112,33 @@ public class TruncateStatement extends IntermediatePortalStatement {
     Preconditions.checkNotNull(sql);
 
     SimpleParser parser = new SimpleParser(sql);
+    ParsedTruncateStatement.Builder builder = new Builder();
     if (!parser.eatKeyword("truncate")) {
       throw PGExceptionFactory.newPGException("not a valid TRUNCATE statement: " + sql);
     }
     parser.eatKeyword("table");
-    boolean only = parser.eatKeyword("only");
-    List<TableOrIndexName> tables = new ArrayList<>();
+    builder.only = parser.eatKeyword("only");
     TableOrIndexName table = parser.readTableOrIndexName();
     if (table == null) {
       throw PGExceptionFactory.newPGException("invalid or missing table name");
     }
-    tables.add(table);
-    boolean star = parser.eatToken("*");
+    builder.tables.add(table);
+    builder.star = parser.eatToken("*");
     while (parser.eatToken(",")) {
       TableOrIndexName name = parser.readTableOrIndexName();
       if (name == null) {
         throw PGExceptionFactory.newPGException("invalid or missing table name");
       }
-      tables.add(name);
+      builder.tables.add(name);
     }
-    boolean restartIdentity = parser.eatKeyword("restart", "identity");
-    boolean continueIdentity = parser.eatKeyword("continue", "identity");
-    boolean cascade = parser.eatKeyword("cascade");
-    boolean restrict = parser.eatKeyword("restrict");
-    parser.skipWhitespaces();
-    if (parser.getPos() < parser.getSql().length()) {
-      throw PGExceptionFactory.newPGException(
-          "Syntax error. Unexpected tokens: " + parser.getSql().substring(parser.getPos()));
+    if (!parser.eatKeyword("continue", "identity")) {
+      builder.restartIdentity = parser.eatKeyword("restart", "identity");
     }
-    return new ParsedTruncateStatement(
-        tables, only, star, restartIdentity, continueIdentity, cascade, restrict);
+    if (!parser.eatKeyword("restrict")) {
+      builder.cascade = parser.eatKeyword("cascade");
+    }
+
+    parser.throwIfHasMoreTokens();
+    return new ParsedTruncateStatement(builder);
   }
 }

@@ -160,7 +160,7 @@ public class SessionStateTest {
   public void testGetAll() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(357, allSettings.size());
+    assertEquals(358, allSettings.size());
   }
 
   @Test
@@ -198,7 +198,7 @@ public class SessionStateTest {
     state.setLocal("spanner", "custom_local_setting", "value2");
 
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(359, allSettings.size());
+    assertEquals(360, allSettings.size());
 
     PGSetting applicationName =
         allSettings.stream()

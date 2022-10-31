@@ -49,6 +49,7 @@ import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
+import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
@@ -2359,7 +2360,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(358, count);
+        assertEquals(359, count);
       }
     }
   }
@@ -2679,6 +2680,133 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             sqlException.getMessage());
       }
     }
+  }
+
+  @Test
+  public void testTruncateTransactional() throws SQLException {
+    String sql = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      // TRUNCATE does not return the update count.
+      assertEquals(0, connection.createStatement().executeUpdate("truncate foo"));
+      connection.rollback();
+    }
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertEquals(1, request.getStatementsCount());
+    assertEquals(sql, request.getStatements(0).getSql());
+  }
+
+  @Test
+  public void testTruncateTransactional_multipleTables() throws SQLException {
+    String sql1 = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 10L));
+    String sql2 = "delete from bar";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 10L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      // TRUNCATE does not return the update count.
+      assertEquals(0, connection.createStatement().executeUpdate("truncate foo, bar"));
+      connection.commit();
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(sql1, request.getStatements(0).getSql());
+    assertEquals(sql2, request.getStatements(1).getSql());
+  }
+
+  @Test
+  public void testTruncateAutocommitAtomic() throws SQLException {
+    String sql = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(true);
+      // TRUNCATE does not return the update count.
+      assertEquals(0, connection.createStatement().executeUpdate("truncate foo"));
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertEquals(1, request.getStatementsCount());
+    assertEquals(sql, request.getStatements(0).getSql());
+  }
+
+  @Test
+  public void testTruncateAutocommitAtomic_multipleTables() throws SQLException {
+    String sql1 = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 10L));
+    String sql2 = "delete from bar";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql2),
+            Status.FAILED_PRECONDITION
+                .withDescription("foreign key constraint violation")
+                .asRuntimeException()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(true);
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().executeUpdate("truncate foo, bar"));
+      assertTrue(exception.getMessage().contains("foreign key constraint violation"));
+    }
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(sql1, request.getStatements(0).getSql());
+    assertEquals(sql2, request.getStatements(1).getSql());
+  }
+
+  @Test
+  public void testTruncateAutocommitNonAtomic() throws SQLException {
+    String sql = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(true);
+      connection
+          .createStatement()
+          .execute("set spanner.autocommit_dml_mode='partitioned_non_atomic'");
+      assertEquals(0, connection.createStatement().executeUpdate("truncate foo"));
+    }
+
+    // PDML transactions are not committed.
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class).stream()
+            .filter(request -> request.getOptions().hasPartitionedDml())
+            .count());
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .count());
   }
 
   private void verifySettingIsNull(Connection connection, String setting) throws SQLException {

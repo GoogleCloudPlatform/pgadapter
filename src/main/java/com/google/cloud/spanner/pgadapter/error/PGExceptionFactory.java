@@ -23,6 +23,14 @@ import io.grpc.StatusRuntimeException;
 public class PGExceptionFactory {
   private PGExceptionFactory() {}
 
+  public static <T> T checkArgument(T value, boolean valid, String message) {
+    if (!valid) {
+      // TODO: Find a better error code for this.
+      throw newPGException(message, SQLState.SyntaxError);
+    }
+    return value;
+  }
+
   /**
    * Creates a basic {@link PGException} with {@link Severity#ERROR} and {@link
    * SQLState#RaiseException}.

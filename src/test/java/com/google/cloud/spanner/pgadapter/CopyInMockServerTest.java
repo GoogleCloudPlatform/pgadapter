@@ -429,9 +429,9 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
 
       // TODO: Split this error message into a message and a hint.
       assertEquals(
-          "ERROR: Record count: 1819 has exceeded the limit: 1818.\n"
+          "ERROR: Record count: 3637 has exceeded the limit: 3636.\n"
               + "\n"
-              + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 20000.\n"
+              + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 40000.\n"
               + "\n"
               + "Execute `SET SPANNER.AUTOCOMMIT_DML_MODE='PARTITIONED_NON_ATOMIC'` before executing a large COPY operation to instruct PGAdapter to automatically break large transactions into multiple smaller. This will make the COPY operation non-atomic.\n\n",
           exception.getMessage());

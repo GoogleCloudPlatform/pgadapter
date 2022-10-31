@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.checkArgument;
+
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
@@ -52,10 +54,10 @@ public class VacuumStatement extends IntermediatePortalStatement {
       boolean analyze;
       boolean disablePageSkipping;
       boolean skipLocked;
-      IndexCleanup indexCleanup;
+      IndexCleanup indexCleanup = IndexCleanup.OFF;
       boolean processToast;
       boolean truncate;
-      int parallel;
+      Integer parallel;
     }
 
     final ImmutableList<TableOrIndexName> tables;
@@ -82,9 +84,12 @@ public class VacuumStatement extends IntermediatePortalStatement {
       this.skipLocked = builder.skipLocked;
       this.indexCleanup = builder.indexCleanup;
       this.processToast = builder.processToast;
-      ;
       this.truncate = builder.truncate;
-      this.parallel = builder.parallel;
+      this.parallel =
+          builder.parallel == null
+              ? 0
+              : checkArgument(
+                  builder.parallel, builder.parallel > 0, "parallel must be greater than 0");
     }
   }
 
@@ -200,11 +205,16 @@ public class VacuumStatement extends IntermediatePortalStatement {
       if (table == null) {
         throw PGExceptionFactory.newPGException("Invalid table name");
       }
+      builder.tables.add(table);
       List<TableOrIndexName> columns = parser.readColumnListInParentheses(table.toString(), false);
       if (columns != null) {
         builder.columns.put(table, ImmutableList.copyOf(columns));
       }
+      if (!parser.eatToken(",")) {
+        break;
+      }
     }
+    parser.throwIfHasMoreTokens();
     return new ParsedVacuumStatement(builder);
   }
 

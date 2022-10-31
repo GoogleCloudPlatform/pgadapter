@@ -78,7 +78,7 @@ public class CopySettingsTest {
     }
     SessionState sessionState = new SessionState(mock(OptionsMetadata.class));
     CopySettings copySettings = new CopySettings(sessionState);
-    assertEquals(20_000, copySettings.getMaxAtomicMutationsLimit());
+    assertEquals(40_000, copySettings.getMaxAtomicMutationsLimit());
     assertEquals(5000, copySettings.getNonAtomicBatchSize());
 
     assertThrows(
