@@ -34,7 +34,6 @@ import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -55,9 +54,8 @@ class BinaryCopyParser implements CopyInParser {
   private boolean calledIterator = false;
   private short firstRowFieldCount = -1;
 
-  BinaryCopyParser(PipedOutputStream payload, int pipeBufferSize) throws IOException {
-    this.dataInputStream =
-        new DataInputStream(new BufferedInputStream(new PipedInputStream(payload, pipeBufferSize)));
+  BinaryCopyParser(PipedInputStream inputStream) {
+    this.dataInputStream = new DataInputStream(new BufferedInputStream(inputStream));
   }
 
   @Override

@@ -91,8 +91,11 @@
     <to>void connectToSpanner(java.lang.String, com.google.auth.Credentials)</to>
   </difference>
 
-  7006: com.google.cloud.spanner.pgadapter.ConnectionHandler: Return type of method 'public void cancelActiveStatement(int, int)' has been changed to boolean
   <!-- Add ignores for all sub packages, as these are considered internal. -->
+  <difference>
+    <differenceType>8001</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/parsers/copy/*</className>
+  </difference>
   <difference>
     <differenceType>1001</differenceType>
     <className>com/google/cloud/spanner/pgadapter/*/*</className>

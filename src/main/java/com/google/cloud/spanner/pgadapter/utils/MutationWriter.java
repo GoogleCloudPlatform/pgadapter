@@ -35,10 +35,10 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
 import com.google.cloud.spanner.pgadapter.session.CopySettings;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.FutureCallback;
@@ -51,6 +51,7 @@ import io.grpc.MethodDescriptor;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -96,13 +97,16 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final CopyTransactionMode transactionMode;
   private long rowCount;
   private final Connection connection;
-  private final String tableName;
+  private final String qualifiedTableName;
   private final Map<String, Type> tableColumns;
   private final int maxAtomicBatchSize;
   private final int nonAtomicBatchSize;
   private final long commitSizeLimitForBatching;
   private final CopySettings copySettings;
-  private final CopyInParser parser;
+  private final Format copyFormat;
+  private final CSVFormat csvFormat;
+  private final boolean hasHeader;
+  private final CountDownLatch parserCreatedLatch = new CountDownLatch(1);
   private final PipedOutputStream payload = new PipedOutputStream();
   private final AtomicBoolean commit = new AtomicBoolean(false);
   private final AtomicBoolean rollback = new AtomicBoolean(false);
@@ -119,16 +123,16 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       SessionState sessionState,
       CopyTransactionMode transactionMode,
       Connection connection,
-      String tableName,
+      String qualifiedTableName,
       Map<String, Type> tableColumns,
       int indexedColumnsCount,
-      CopyOptions.Format copyFormat,
+      Format copyFormat,
       CSVFormat format,
       boolean hasHeader)
       throws IOException {
     this.transactionMode = transactionMode;
     this.connection = connection;
-    this.tableName = tableName;
+    this.qualifiedTableName = qualifiedTableName;
     this.tableColumns = tableColumns;
     this.copySettings = new CopySettings(sessionState);
     int atomicMutationLimit = copySettings.getMaxAtomicMutationsLimit();
@@ -140,9 +144,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     this.commitSizeLimitForBatching =
         Math.round(
             (float) copySettings.getMaxAtomicCommitSize() / copySettings.getCommitSizeMultiplier());
-    this.parser =
-        CopyInParser.create(
-            copyFormat, format, payload, copySettings.getPipeBufferSize(), hasHeader);
+    this.copyFormat = copyFormat;
+    this.csvFormat = format;
+    this.hasHeader = hasHeader;
   }
 
   /** @return number of rows copied into Spanner */
@@ -157,8 +161,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       }
     }
     try {
+      parserCreatedLatch.await();
       this.payload.write(payload);
-    } catch (InterruptedIOException interruptedIOException) {
+    } catch (InterruptedException | InterruptedIOException interruptedIOException) {
       // The IO operation was interrupted. This indicates that the user wants to cancel the COPY
       // operation. Re-instate the interrupted flag on the current thread and throw an exception to
       // indicate that the operation should be cancelled.
@@ -199,6 +204,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
 
   @Override
   public StatementResult call() throws Exception {
+    PipedInputStream inputStream = new PipedInputStream(payload, copySettings.getPipeBufferSize());
+    parserCreatedLatch.countDown();
+    final CopyInParser parser = CopyInParser.create(copyFormat, csvFormat, inputStream, hasHeader);
     // This LinkedBlockingDeque holds a reference to all transactions that are currently active. The
     // max capacity of this deque is what ensures that we never have more than maxParallelism
     // transactions running at the same time. We could also achieve that by using a thread pool with
@@ -214,7 +222,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     // before finishing, to ensure that all data has been written before we signal that we are done.
     List<ApiFuture<Void>> allCommitFutures = new ArrayList<>();
     try {
-      Iterator<CopyRecord> iterator = this.parser.iterator();
+      Iterator<CopyRecord> iterator = parser.iterator();
       List<Mutation> mutations = new ArrayList<>();
       long currentBufferByteSize = 0L;
       // Note: iterator.hasNext() blocks if there is not enough data in the pipeline to construct a
@@ -319,7 +327,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
         logger.log(Level.WARNING, "Timeout while waiting for MutationWriter executor to shutdown.");
       }
       this.payload.close();
-      this.parser.close();
+      parser.close();
     }
     return new UpdateCount(rowCount);
   }
@@ -502,9 +510,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     // fails halfway, it can easily be retried with InsertOrUpdate as it will just overwrite
     // existing records instead of failing on a UniqueKeyConstraint violation.
     if (copySettings.isCopyUpsert()) {
-      builder = Mutation.newInsertOrUpdateBuilder(this.tableName);
+      builder = Mutation.newInsertOrUpdateBuilder(this.qualifiedTableName);
     } else {
-      builder = Mutation.newInsertBuilder(this.tableName);
+      builder = Mutation.newInsertBuilder(this.qualifiedTableName);
     }
     // Iterate through all table column to copy into
     int index = 0;

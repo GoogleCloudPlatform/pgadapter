@@ -582,18 +582,20 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   @Test
   public void testCopyTo() throws Exception {
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of("select * from alltypes"), createAllTypesResultSet("")));
+        StatementResult.query(Statement.of("select * from AllTypes"), createAllTypesResultSet("")));
 
     String output = runTest("testCopyTo", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "\n\n1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+        "\n"
+            + "\n"
+            + "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
         output);
   }
 
   @Test
   public void testCopyFrom() throws Exception {
-    CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, "alltypes", true);
+    CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, "public", "alltypes", true);
 
     String output = runTest("testCopyFrom", getHost(), pgServer.getLocalPort());
 

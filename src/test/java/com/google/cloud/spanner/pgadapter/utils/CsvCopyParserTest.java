@@ -28,6 +28,7 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.utils.CsvCopyParser.CsvCopyRecord;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.csv.CSVFormat;
@@ -40,8 +41,10 @@ public class CsvCopyParserTest {
 
   @Test
   public void testCanCreateIterator() throws IOException {
+
     CsvCopyParser parser =
-        new CsvCopyParser(CSVFormat.POSTGRESQL_TEXT, new PipedOutputStream(), 256, false);
+        new CsvCopyParser(
+            CSVFormat.POSTGRESQL_TEXT, new PipedInputStream(new PipedOutputStream(), 256), false);
     assertNotNull(parser.iterator());
     parser.close();
   }
@@ -66,7 +69,8 @@ public class CsvCopyParserTest {
               }
             })
         .start();
-    CsvCopyParser parser = new CsvCopyParser(CSVFormat.POSTGRESQL_TEXT, outputStream, 256, true);
+    CsvCopyParser parser =
+        new CsvCopyParser(CSVFormat.POSTGRESQL_TEXT, new PipedInputStream(outputStream, 256), true);
     assertNotNull(parser.iterator());
     parser.close();
   }

@@ -17,9 +17,9 @@ package com.google.cloud.spanner.pgadapter.utils;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
-import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import java.io.IOException;
-import java.io.PipedOutputStream;
+import java.io.PipedInputStream;
 import java.util.Iterator;
 import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVFormat;
@@ -32,18 +32,14 @@ public interface CopyInParser {
    * for non-binary formats.
    */
   static CopyInParser create(
-      CopyOptions.Format format,
-      @Nullable CSVFormat csvFormat,
-      PipedOutputStream payload,
-      int pipeBufferSize,
-      boolean hasHeader)
+      Format format, @Nullable CSVFormat csvFormat, PipedInputStream inputStream, boolean hasHeader)
       throws IOException {
     switch (format) {
       case TEXT:
       case CSV:
-        return new CsvCopyParser(csvFormat, payload, pipeBufferSize, hasHeader);
+        return new CsvCopyParser(csvFormat, inputStream, hasHeader);
       case BINARY:
-        return new BinaryCopyParser(payload, pipeBufferSize);
+        return new BinaryCopyParser(inputStream);
       default:
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, "Unsupported COPY format: " + format);
