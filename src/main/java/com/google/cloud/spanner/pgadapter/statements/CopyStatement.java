@@ -17,7 +17,6 @@ package com.google.cloud.spanner.pgadapter.statements;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
@@ -119,7 +118,7 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   @Override
-  public SpannerException getException() {
+  public PGException getException() {
     // Do not clear exceptions on a CopyStatement.
     return this.exception;
   }
@@ -393,8 +392,8 @@ public class CopyStatement extends IntermediatePortalStatement {
               mutationWriter,
               executor));
     } catch (Exception e) {
-      SpannerException spannerException = SpannerExceptionFactory.asSpannerException(e);
-      handleExecutionException(spannerException);
+      PGException pgException = PGExceptionFactory.toPGException(e);
+      handleExecutionException(pgException);
     }
   }
 

@@ -64,7 +64,10 @@ public class PGExceptionFactory {
   }
 
   /** Converts the given {@link Exception} to a {@link PGException}. */
-  public static PGException toPGException(Exception exception) {
+  public static PGException toPGException(Throwable exception) {
+    if (exception instanceof PGException) {
+      return (PGException) exception;
+    }
     if (exception instanceof SpannerException) {
       return toPGException((SpannerException) exception);
     }

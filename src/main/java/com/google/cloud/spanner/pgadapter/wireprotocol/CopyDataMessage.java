@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import java.text.MessageFormat;
@@ -58,7 +59,7 @@ public class CopyDataMessage extends ControlMessage {
       try {
         mutationWriter.addCopyData(this.payload);
       } catch (SpannerException exception) {
-        statement.handleExecutionException(exception);
+        statement.handleExecutionException(PGExceptionFactory.toPGException(exception));
         throw exception;
       }
     }

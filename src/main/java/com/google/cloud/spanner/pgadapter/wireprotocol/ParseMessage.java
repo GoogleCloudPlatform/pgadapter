@@ -19,6 +19,7 @@ import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.DEALLOCATE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.EXECUTE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.PREPARE;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.VACUUM;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
@@ -33,6 +34,7 @@ import com.google.cloud.spanner.pgadapter.statements.ExecuteStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.InvalidStatement;
 import com.google.cloud.spanner.pgadapter.statements.PrepareStatement;
+import com.google.cloud.spanner.pgadapter.statements.VacuumStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
 import com.google.common.base.Strings;
 import java.text.MessageFormat;
@@ -117,6 +119,13 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
             originalStatement);
       } else if (isCommand(DEALLOCATE, originalStatement.getSql())) {
         return new DeallocateStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(VACUUM, originalStatement.getSql())) {
+        return new VacuumStatement(
             connectionHandler,
             connectionHandler.getServer().getOptions(),
             name,

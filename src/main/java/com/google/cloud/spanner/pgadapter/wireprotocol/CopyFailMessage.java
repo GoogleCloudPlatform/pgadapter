@@ -15,10 +15,10 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.ErrorCode;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import java.text.MessageFormat;
@@ -49,7 +49,7 @@ public class CopyFailMessage extends ControlMessage {
       mutationWriter.rollback();
       statement.close();
       this.statement.handleExecutionException(
-          SpannerExceptionFactory.newSpannerException(ErrorCode.CANCELLED, this.errorMessage));
+          PGExceptionFactory.newPGException(this.errorMessage, SQLState.QueryCanceled));
     }
     // Clear the COPY_IN status to indicate that we finished unsuccessfully. This will cause the
     // inline handling of incoming (copy) messages to stop and the server to return an error message
