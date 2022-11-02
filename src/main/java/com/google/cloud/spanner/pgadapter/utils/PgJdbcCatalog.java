@@ -961,5 +961,5 @@ public class PgJdbcCatalog {
   public static final String PG_JDBC_GET_SEQUENCES =
       "select relname from pg_class where relkind='S'";
   public static final String PG_JDBC_GET_SEQUENCES_REPLACEMENT =
-      "select 1 as relname LIMIT 0";
+      "select ''::varchar as relname LIMIT 0";
 }
