@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.11.0...v0.12.0) (2022-11-02)
+
+
+### Features
+
+* reimplement COPY parser to support more options and legacy syntax ([#410](https://github.com/GoogleCloudPlatform/pgadapter/issues/410)) ([b8a38dd](https://github.com/GoogleCloudPlatform/pgadapter/commit/b8a38ddf5236222c458b24658dc4d1c75bcc9c19))
+* replace sequences query with empty table ([#366](https://github.com/GoogleCloudPlatform/pgadapter/issues/366)) ([170dc7c](https://github.com/GoogleCloudPlatform/pgadapter/commit/170dc7ced61d355fa8ae50e40608f271be056ae7))
+
+
+### Bug Fixes
+
+* DDL batch errors halfway were not propagated ([#444](https://github.com/GoogleCloudPlatform/pgadapter/issues/444)) ([fc6efa4](https://github.com/GoogleCloudPlatform/pgadapter/commit/fc6efa409e9060a66a6e6fd099c4add92ef3a968)), closes [#443](https://github.com/GoogleCloudPlatform/pgadapter/issues/443)
+
 ## [0.11.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.10.1...v0.11.0) (2022-10-28)
 
 
