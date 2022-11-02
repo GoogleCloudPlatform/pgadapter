@@ -32,12 +32,8 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.List;
-import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -77,15 +73,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void installDependencies() throws IOException, InterruptedException {
-    String currentPath = new java.io.File(".").getCanonicalPath();
-    String testFilePath = String.format("%s/src/test/nodejs/typeorm/data-test", currentPath);
-    ProcessBuilder builder = new ProcessBuilder();
-    builder.command("npm", "install");
-    builder.directory(new File(testFilePath));
-
-    Process process = builder.start();
-    int res = process.waitFor();
-    assertEquals(0, res);
+    NodeJSTest.installDependencies("typeorm/data-test");
   }
 
   @Test
@@ -111,7 +99,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
                         .build())
                 .build()));
 
-    String output = runTest("findOneUser");
+    String output = runTest("findOneUser", pgServer.getLocalPort());
 
     assertEquals("\n\nFound user 1 with name Timber Saw\n", output);
 
@@ -174,7 +162,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
                         .build())
                 .build()));
 
-    String output = runTest("createUser");
+    String output = runTest("createUser", pgServer.getLocalPort());
 
     assertEquals("\n\nFound user 1 with name Timber Saw\n", output);
 
@@ -266,7 +254,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         "UPDATE \"user\" SET \"firstName\" = $1, \"lastName\" = $2, \"age\" = $3 WHERE \"id\" IN ($4)";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 1L));
 
-    String output = runTest("updateUser");
+    String output = runTest("updateUser", pgServer.getLocalPort());
 
     assertEquals("\n\nUpdated user 1\n", output);
 
@@ -357,7 +345,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     String deleteSql = "DELETE FROM \"user\" WHERE \"id\" = $1";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(deleteSql), 1L));
 
-    String output = runTest("deleteUser");
+    String output = runTest("deleteUser", pgServer.getLocalPort());
 
     assertEquals("\n\nDeleted user 1\n", output);
 
@@ -415,13 +403,13 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "\"AllTypes\".\"col_bytea\" AS \"AllTypes_col_bytea\", \"AllTypes\".\"col_float8\" AS \"AllTypes_col_float8\", "
             + "\"AllTypes\".\"col_int\" AS \"AllTypes_col_int\", \"AllTypes\".\"col_numeric\" AS \"AllTypes_col_numeric\", "
             + "\"AllTypes\".\"col_timestamptz\" AS \"AllTypes_col_timestamptz\", \"AllTypes\".\"col_date\" AS \"AllTypes_col_date\", "
-            + "\"AllTypes\".\"col_varchar\" AS \"AllTypes_col_varchar\" "
+            + "\"AllTypes\".\"col_varchar\" AS \"AllTypes_col_varchar\", \"AllTypes\".\"col_jsonb\" AS \"AllTypes_col_jsonb\" "
             + "FROM \"all_types\" \"AllTypes\" "
             + "WHERE (\"AllTypes\".\"col_bigint\" = $1) LIMIT 1";
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createAllTypesResultSet("AllTypes_")));
 
-    String output = runTest("findOneAllTypes");
+    String output = runTest("findOneAllTypes", pgServer.getLocalPort());
 
     assertEquals(
         "\n\nFound row 1\n"
@@ -434,7 +422,8 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "  col_numeric: '6.626',\n"
             + "  col_timestamptz: 2022-02-16T13:18:02.123Z,\n"
             + "  col_date: '2022-03-29',\n"
-            + "  col_varchar: 'test'\n"
+            + "  col_varchar: 'test',\n"
+            + "  col_jsonb: { key: 'value' }\n"
             + "}\n",
         output);
 
@@ -463,7 +452,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "\"AllTypes\".\"col_bytea\" AS \"AllTypes_col_bytea\", \"AllTypes\".\"col_float8\" AS \"AllTypes_col_float8\", "
             + "\"AllTypes\".\"col_int\" AS \"AllTypes_col_int\", \"AllTypes\".\"col_numeric\" AS \"AllTypes_col_numeric\", "
             + "\"AllTypes\".\"col_timestamptz\" AS \"AllTypes_col_timestamptz\", \"AllTypes\".\"col_date\" AS \"AllTypes_col_date\", "
-            + "\"AllTypes\".\"col_varchar\" AS \"AllTypes_col_varchar\" "
+            + "\"AllTypes\".\"col_varchar\" AS \"AllTypes_col_varchar\", \"AllTypes\".\"col_jsonb\" AS \"AllTypes_col_jsonb\" "
             + "FROM \"all_types\" \"AllTypes\" "
             + "WHERE \"AllTypes\".\"col_bigint\" IN ($1)";
     mockSpanner.putStatementResult(
@@ -475,11 +464,11 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String insertSql =
         "INSERT INTO \"all_types\""
-            + "(\"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\") "
-            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+            + "(\"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\", \"col_jsonb\") "
+            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 1L));
 
-    String output = runTest("createAllTypes");
+    String output = runTest("createAllTypes", pgServer.getLocalPort());
 
     assertEquals("\n\nCreated one record\n", output);
 
@@ -495,7 +484,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     // The NodeJS PostgreSQL driver sends parameters without any type information to the backend.
     // This means that all parameters are sent as untyped string values.
     assertEquals(0, insertRequest.getParamTypesMap().size());
-    assertEquals(9, insertRequest.getParams().getFieldsCount());
+    assertEquals(10, insertRequest.getParams().getFieldsCount());
     assertEquals("2", insertRequest.getParams().getFieldsMap().get("p1").getStringValue());
     assertEquals("true", insertRequest.getParams().getFieldsMap().get("p2").getStringValue());
     assertEquals(
@@ -512,39 +501,12 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     assertEquals("2022-07-22", insertRequest.getParams().getFieldsMap().get("p8").getStringValue());
     assertEquals(
         "some random string", insertRequest.getParams().getFieldsMap().get("p9").getStringValue());
+    assertEquals(
+        "{\"key\":\"value\"}",
+        insertRequest.getParams().getFieldsMap().get("p10").getStringValue());
   }
 
-  static String runTest(String testName) throws IOException, InterruptedException {
-    String currentPath = new java.io.File(".").getCanonicalPath();
-    String testFilePath = String.format("%s/src/test/nodejs/typeorm/data-test", currentPath);
-    ProcessBuilder builder = new ProcessBuilder();
-    builder.command("npm", "start", testName, String.format("%d", pgServer.getLocalPort()));
-    builder.directory(new File(testFilePath));
-
-    Process process = builder.start();
-    InputStream inputStream = process.getInputStream();
-    InputStream errorStream = process.getErrorStream();
-    int res = process.waitFor();
-
-    String output = readAll(inputStream);
-    String errors = readAll(errorStream);
-    assertEquals("", errors);
-    assertEquals(0, res);
-
-    return output;
-  }
-
-  static String readAll(InputStream inputStream) {
-    StringBuilder result = new StringBuilder();
-    try (Scanner scanner = new Scanner(new InputStreamReader(inputStream))) {
-      while (scanner.hasNextLine()) {
-        String line = scanner.nextLine();
-        // Skip lines that are generated by npm / node.
-        if (!line.startsWith(">")) {
-          result.append(line).append("\n");
-        }
-      }
-    }
-    return result.toString();
+  static String runTest(String testName, int port) throws IOException, InterruptedException {
+    return NodeJSTest.runTest("typeorm/data-test", testName, "localhost", port, "db");
   }
 }

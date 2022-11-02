@@ -467,17 +467,23 @@ public class StatementTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement statement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(
+                connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
     BackendConnection backendConnection =
         new BackendConnection(
             DatabaseId.of("p", "i", "d"), connection, options, ImmutableList.of());
     statement.executeAsync(backendConnection);
 
-    byte[] payload = "2 3\n".getBytes();
-    MutationWriter mutationWriter = statement.getMutationWriter();
-    mutationWriter.addCopyData(payload);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    executor.submit(
+        () -> {
+          byte[] payload = "2 3\n".getBytes();
+          MutationWriter mutationWriter = statement.getMutationWriter();
+          mutationWriter.addCopyData(payload);
+        });
+    executor.shutdown();
 
     backendConnection.flush();
 
@@ -557,8 +563,9 @@ public class StatementTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(
+                connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
     assertFalse(copyStatement.isExecuted());
     copyStatement.executeAsync(backendConnection);
@@ -605,8 +612,9 @@ public class StatementTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(
+                connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
     assertFalse(copyStatement.isExecuted());
     copyStatement.executeAsync(backendConnection);

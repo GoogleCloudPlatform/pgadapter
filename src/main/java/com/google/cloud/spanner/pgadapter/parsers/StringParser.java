@@ -53,6 +53,16 @@ public class StringParser extends Parser<String> {
     return this.item == null ? null : this.item.getBytes(StandardCharsets.UTF_8);
   }
 
+  public static byte[] convertToPG(ResultSet resultSet, int position) {
+    return resultSet.getString(position).getBytes(StandardCharsets.UTF_8);
+  }
+
+  public static byte[] binaryParse(ResultSet resultSet, int position) {
+    return resultSet.isNull(position)
+        ? null
+        : resultSet.getString(position).getBytes(StandardCharsets.UTF_8);
+  }
+
   @Override
   public void bind(Statement.Builder statementBuilder, String name) {
     statementBuilder.bind(name).to(this.item);

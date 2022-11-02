@@ -484,4 +484,26 @@ public class BackendConnectionTest {
 
     verify(connection).execute(statement);
   }
+
+  @Test
+  public void testDoNotStartTransactionInBatch() {
+    Connection connection = mock(Connection.class);
+    when(connection.isDmlBatchActive()).thenReturn(true);
+    Statement statement = Statement.of("insert into foo values (1)");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            mock(OptionsMetadata.class),
+            EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(parsedStatement, statement);
+    backendConnection.flush();
+
+    verify(connection).execute(statement);
+    verify(connection, never()).beginTransaction();
+  }
 }

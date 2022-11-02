@@ -5,6 +5,7 @@ target/
 *.class
 *.lst
 output.txt
+__pycache__
 
 src/test/golang/**/*.h
 src/test/golang/**/*.so
@@ -16,3 +17,4 @@ src/test/csharp/**/obj
 
 src/test/nodejs/**/node_modules
 src/test/nodejs/**/package-lock.json
+src/test/nodejs/**/.DS_Store

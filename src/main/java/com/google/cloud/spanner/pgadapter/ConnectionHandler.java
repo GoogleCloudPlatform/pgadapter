@@ -52,6 +52,8 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
 import java.io.DataOutputStream;
@@ -60,6 +62,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.security.SecureRandom;
 import java.text.MessageFormat;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -92,6 +95,12 @@ public class ConnectionHandler extends Thread {
   private final ProxyServer server;
   private Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
+  private final Cache<String, int[]> autoDescribedStatementsCache =
+      CacheBuilder.newBuilder()
+          .expireAfterWrite(Duration.ofMinutes(30L))
+          .maximumSize(5000L)
+          .concurrencyLevel(1)
+          .build();
   private final Map<String, IntermediatePortalStatement> portalsMap = new HashMap<>();
   private static final Map<Integer, ConnectionHandler> CONNECTION_HANDLERS =
       new ConcurrentHashMap<>();
@@ -259,7 +268,11 @@ public class ConnectionHandler extends Thread {
       runConnection(true);
     } catch (IOException ioException) {
       PGException pgException =
-          PGException.newBuilder("Failed to create SSL socket: " + ioException.getMessage())
+          PGException.newBuilder(
+                  "Failed to create SSL socket: "
+                      + (ioException.getMessage() == null
+                          ? ioException.getClass().getName()
+                          : ioException.getMessage()))
               .setSeverity(Severity.FATAL)
               .setSQLState(SQLState.InternalError)
               .build();
@@ -322,7 +335,7 @@ public class ConnectionHandler extends Thread {
         this.handleError(pgException);
       } catch (Exception exception) {
         this.handleError(
-            PGException.newBuilder(exception.getMessage())
+            PGException.newBuilder(exception)
                 .setSeverity(Severity.FATAL)
                 .setSQLState(SQLState.InternalError)
                 .build());
@@ -396,7 +409,7 @@ public class ConnectionHandler extends Thread {
       message.send();
     } catch (IllegalArgumentException | IllegalStateException | EOFException fatalException) {
       this.handleError(
-          PGException.newBuilder(fatalException.getMessage())
+          PGException.newBuilder(fatalException)
               .setSeverity(Severity.FATAL)
               .setSQLState(SQLState.InternalError)
               .build());
@@ -418,6 +431,7 @@ public class ConnectionHandler extends Thread {
         this.spannerConnection.close();
       }
       this.status = ConnectionStatus.TERMINATED;
+      CONNECTION_HANDLERS.remove(this.connectionId);
     }
   }
 
@@ -567,6 +581,19 @@ public class ConnectionHandler extends Thread {
 
   public void registerStatement(String statementName, IntermediatePreparedStatement statement) {
     this.statementsMap.put(statementName, statement);
+  }
+
+  /**
+   * Returns the parameter types of a cached auto-described statement, or null if none is available
+   * in the cache.
+   */
+  public int[] getAutoDescribedStatement(String sql) {
+    return this.autoDescribedStatementsCache.getIfPresent(sql);
+  }
+
+  /** Stores the parameter types of an auto-described statement in the cache. */
+  public void registerAutoDescribedStatement(String sql, int[] parameterTypes) {
+    this.autoDescribedStatementsCache.put(sql, parameterTypes);
   }
 
   public void closeStatement(String statementName) {

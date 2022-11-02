@@ -50,6 +50,34 @@ java -jar pgadapter.jar -p my-project -i my-instance -d my-database \
      -r="minSessions=200;maxSessions=1600;numChannels=16"
 ```
 
+## Docker
+
+### Why am I getting the error 'server closed the connection unexpectedly'?
+Why am I getting the error `error: connection to server at "localhost" (::1), port 5432 failed: server closed the connection unexpectedly`?
+
+You need to start PGAdapter with the command line argument `-x` to allow connections from other hosts
+than localhost. Example:
+
+```shell
+docker run -p 5432:5432 \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter \
+  -p my-project -i my-instance -x
+```
+
+PGAdapter will by default only allow connections from the same host as where PGAdapter is running.
+This is to prevent accidentally giving access to unauthorized users to a Cloud Spanner database when
+you start PGAdapter on a host without a firewall, or without a firewall rule that blocks incoming
+traffic on port 5432. A connection from the host machine to a Docker container is not seen as a
+connection coming from localhost.
+
+### Why am I getting the error 'There is insufficient memory for the Java Runtime Environment to continue.'?
+This error is caused by a change in the base image that is used for the Docker image for PGAdapter
+that is incompatible with Docker versions prior to version [20.10.10](https://github.com/moby/moby/releases/tag/v20.10.10).
+The added support for the clone3 syscall that is included in version 20.10.10 is required.
+
+Upgrading your Docker engine to at least version 20.10.10 should fix this problem.
+
+See also https://github.com/adoptium/containers/issues/215#issuecomment-1142046045 for more details.
 
 ## DDL
 See [DDL options with PGAdapter](./ddl.md) for background information on the DDL options when starting
@@ -87,3 +115,18 @@ You can solve this problem by either:
 PGAdapter supports `COPY table_name FROM STDIN [BINARY]` and `COPY table_name TO STDOUT [BINARY]`.
 These commands can be used to copy data between different Cloud Spanner databases, or between a
 Cloud Spanner database and a PostgreSQL database. See [copy support](copy.md) for more information.
+
+## How can I set a statement timeout?
+You can set the statement timeout that a connection should use by executing a
+`set statement_timeout=<timeout>` statement. The timeout is specified in milliseconds.
+
+Example:
+
+```sql
+-- Use a 10 second (10,000 milliseconds) timeout.
+set statement_timeout=10000;
+select *
+from large_table
+order by my_col;
+```
+

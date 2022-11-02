@@ -34,10 +34,12 @@ import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.Status;
 import java.io.IOException;
 import java.util.List;
 import org.junit.BeforeClass;
@@ -805,6 +807,49 @@ public class GormMockServerTest extends AbstractMockServerTest {
         "failed to execute nested transaction: ERROR: current transaction is aborted, commands ignored until end of transaction block (SQLSTATE P0001)",
         res);
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testErrorInTransaction() {
+    String insertSql = "INSERT INTO \"all_types\" (\"col_varchar\") VALUES ($1)";
+    String describeInsertSql = "select $1 from (select \"col_varchar\"=$1 from \"all_types\") p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeInsertSql),
+            ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .build()));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 0L));
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.newBuilder(insertSql).bind("p1").to("1").build(),
+            Status.ALREADY_EXISTS.withDescription("Row [1] already exists").asRuntimeException()));
+    String updateSql = "UPDATE \"all_types\" SET \"col_int\"=$1 WHERE \"col_varchar\" = $2";
+    String describeUpdateSql =
+        "select $1, $2 from (select \"col_int\"=$1 from \"all_types\" WHERE \"col_varchar\" = $2) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeUpdateSql),
+            ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
+                .build()));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 0L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(updateSql).bind("p1").to(100L).bind("p2").to("1").build(), 1L));
+
+    String res = gormTest.TestErrorInTransaction(createConnString());
+    assertEquals(
+        "failed to execute transaction: ERROR: current transaction is aborted, commands ignored until end of transaction block (SQLSTATE P0001)",
+        res);
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    // This test also leads to 1 commit request. The reason for this is that the update statement is
+    // also described when gorm tries to execute it. At that point, there is no read/write
+    // transaction anymore on the underlying Spanner connection, as that transaction was rolled back
+    // when the insert statement failed. It is therefore executed using auto-commit, which again
+    // automatically leads to a commit. This is not a problem, as it is just an analyze of an update
+    // statement.
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test

@@ -125,43 +125,61 @@ public class ProxyServer extends AbstractApiService {
 
   @Override
   protected void doStart() {
-    ImmutableList<ServerRunnable> serverRunnables;
-    if (options.isDomainSocketEnabled()) {
-      serverRunnables = ImmutableList.of(this::runTcpServer, this::runDomainSocketServer);
-    } else {
-      serverRunnables = ImmutableList.of(this::runTcpServer);
-    }
-    CountDownLatch startupLatch = new CountDownLatch(serverRunnables.size());
-    CountDownLatch stoppedLatch = new CountDownLatch(serverRunnables.size());
-    for (ServerRunnable server : serverRunnables) {
-      Thread listenerThread =
-          new Thread("spanner-postgres-adapter-proxy-listener") {
-            @Override
-            public void run() {
-              try {
-                server.run(startupLatch, stoppedLatch);
-              } catch (Exception exception) {
-                logger.log(
-                    Level.WARNING,
-                    exception,
-                    () ->
-                        String.format(
-                            "Server on port %s stopped by exception: %s",
-                            getLocalPort(), exception));
-              }
-            }
-          };
-      listenerThread.start();
-    }
     try {
-      if (startupLatch.await(30L, TimeUnit.SECONDS)) {
-        notifyStarted();
+      ImmutableList.Builder<ServerRunnable> serverSocketsBuilder = ImmutableList.builder();
+      boolean allowRemoteConnections =
+          options.disableLocalhostCheck() || options.getSslMode().isSslEnabled();
+      if (allowRemoteConnections) {
+        serverSocketsBuilder.add(
+            (startupLatch, stoppedLatch) -> runTcpServer(false, null, startupLatch, stoppedLatch));
       } else {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.DEADLINE_EXCEEDED, "The server did not start in a timely fashion.");
+        boolean first = true;
+        for (InetAddress address : InetAddress.getAllByName("localhost")) {
+          final boolean waitForTcpLatch = !first;
+          serverSocketsBuilder.add(
+              (startupLatch, stoppedLatch) ->
+                  runTcpServer(waitForTcpLatch, address, startupLatch, stoppedLatch));
+          first = false;
+        }
       }
-    } catch (InterruptedException interruptedException) {
-      throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+      if (options.isDomainSocketEnabled()) {
+        serverSocketsBuilder.add(this::runDomainSocketServer);
+      }
+      ImmutableList<ServerRunnable> serverRunnables = serverSocketsBuilder.build();
+      CountDownLatch startupLatch = new CountDownLatch(serverRunnables.size());
+      CountDownLatch stoppedLatch = new CountDownLatch(serverRunnables.size());
+      for (ServerRunnable server : serverRunnables) {
+        Thread listenerThread =
+            new Thread("spanner-postgres-adapter-proxy-listener") {
+              @Override
+              public void run() {
+                try {
+                  server.run(startupLatch, stoppedLatch);
+                } catch (Exception exception) {
+                  logger.log(
+                      Level.WARNING,
+                      exception,
+                      () ->
+                          String.format(
+                              "Server on port %s stopped by exception: %s",
+                              getLocalPort(), exception));
+                }
+              }
+            };
+        listenerThread.start();
+      }
+      try {
+        if (startupLatch.await(30L, TimeUnit.SECONDS)) {
+          notifyStarted();
+        } else {
+          throw SpannerExceptionFactory.newSpannerException(
+              ErrorCode.DEADLINE_EXCEEDED, "The server did not start in a timely fashion.");
+        }
+      } catch (InterruptedException interruptedException) {
+        throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+      }
+    } catch (Throwable error) {
+      notifyFailed(error);
     }
   }
 
@@ -198,14 +216,25 @@ public class ProxyServer extends AbstractApiService {
    *
    * @throws IOException if ServerSocket cannot start.
    */
-  void runTcpServer(CountDownLatch startupLatch, CountDownLatch stoppedLatch) throws IOException {
+  void runTcpServer(
+      boolean waitForTcpLatch,
+      InetAddress address,
+      CountDownLatch startupLatch,
+      CountDownLatch stoppedLatch)
+      throws IOException, InterruptedException {
+    if (waitForTcpLatch
+        && options.getProxyPort() == 0
+        && !tcpStartedLatch.await(30L, TimeUnit.SECONDS)) {
+      throw SpannerExceptionFactory.newSpannerException(
+          ErrorCode.DEADLINE_EXCEEDED, "Timeout while waiting for TCP server to start");
+    }
     ServerSocket tcpSocket =
-        options.disableLocalhostCheck() || options.getSslMode().isSslEnabled()
-            ? new ServerSocket(this.options.getProxyPort(), this.options.getMaxBacklog())
-            : new ServerSocket(
-                this.options.getProxyPort(),
-                this.options.getMaxBacklog(),
-                InetAddress.getLoopbackAddress());
+        new ServerSocket(
+            this.localPort == 0 ? this.options.getProxyPort() : this.localPort,
+            this.options.getMaxBacklog(),
+            address);
+    // Optimize for latency (2), then bandwidth (1) and then connection time (0).
+    tcpSocket.setPerformancePreferences(0, 2, 1);
     this.serverSockets.add(tcpSocket);
     this.localPort = tcpSocket.getLocalPort();
     tcpStartedLatch.countDown();
@@ -227,6 +256,8 @@ public class ProxyServer extends AbstractApiService {
       }
       AFUNIXServerSocket domainSocket = AFUNIXServerSocket.newInstance();
       domainSocket.bind(AFUNIXSocketAddress.of(tempDir), this.options.getMaxBacklog());
+      // Optimize for latency (2), then bandwidth (1) and then connection time (0).
+      domainSocket.setPerformancePreferences(0, 2, 1);
       this.serverSockets.add(domainSocket);
       runServer(domainSocket, startupLatch, stoppedLatch);
     } catch (SocketException socketException) {
@@ -270,7 +301,11 @@ public class ProxyServer extends AbstractApiService {
    * @throws SpannerException if the {@link ConnectionHandler} is unable to connect to Cloud Spanner
    *     or if the dialect of the database is not PostgreSQL.
    */
-  void createConnectionHandler(Socket socket) {
+  void createConnectionHandler(Socket socket) throws SocketException {
+    // Optimize for latency (2), then bandwidth (1) and then connection time (0).
+    socket.setPerformancePreferences(0, 2, 1);
+    // Turn on TCP_NODELAY to optimize for chatty protocol that prefers low latency.
+    socket.setTcpNoDelay(true);
     ConnectionHandler handler = new ConnectionHandler(this, socket);
     register(handler);
     handler.start();

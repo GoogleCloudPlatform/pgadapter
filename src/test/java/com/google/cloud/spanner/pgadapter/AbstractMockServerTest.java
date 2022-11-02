@@ -255,7 +255,7 @@ public abstract class AbstractMockServerTest {
                         .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
                 .addFields(
                     Field.newBuilder()
-                        .setName("col_jsonb")
+                        .setName(columnPrefix + "col_jsonb")
                         .setType(
                             Type.newBuilder()
                                 .setCode(TypeCode.JSON)
@@ -268,7 +268,7 @@ public abstract class AbstractMockServerTest {
   protected static MockSpannerServiceImpl mockSpanner;
   protected static MockDatabaseAdminImpl mockDatabaseAdmin;
   protected static MockInstanceAdminImpl mockInstanceAdmin;
-  private static Server spannerServer;
+  protected static Server spannerServer;
   protected static ProxyServer pgServer;
 
   protected List<WireMessage> getWireMessages() {
@@ -282,6 +282,20 @@ public abstract class AbstractMockServerTest {
         .collect(Collectors.toList());
   }
 
+  private static TypeAnnotationCode getTypeAnnotationCode(TypeCode type) {
+    switch (type) {
+      case NUMERIC:
+        return TypeAnnotationCode.PG_NUMERIC;
+      case JSON:
+        return TypeAnnotationCode.PG_JSONB;
+    }
+    return TypeAnnotationCode.TYPE_ANNOTATION_CODE_UNSPECIFIED;
+  }
+
+  protected static ResultSet createResultSetWithOnlyMetadata(ImmutableList<TypeCode> types) {
+    return ResultSet.newBuilder().setMetadata(createMetadata(types)).build();
+  }
+
   protected static ResultSetMetadata createMetadata(ImmutableList<TypeCode> types) {
     StructType.Builder builder = StructType.newBuilder();
     for (int index = 0; index < types.size(); index++) {
@@ -290,10 +304,7 @@ public abstract class AbstractMockServerTest {
               .setType(
                   Type.newBuilder()
                       .setCode(types.get(index))
-                      .setTypeAnnotation(
-                          types.get(index) == TypeCode.NUMERIC
-                              ? TypeAnnotationCode.PG_NUMERIC
-                              : TypeAnnotationCode.TYPE_ANNOTATION_CODE_UNSPECIFIED)
+                      .setTypeAnnotation(getTypeAnnotationCode(types.get(index)))
                       .build())
               .setName("")
               .build());
@@ -312,10 +323,7 @@ public abstract class AbstractMockServerTest {
               .setType(
                   Type.newBuilder()
                       .setCode(types.get(index))
-                      .setTypeAnnotation(
-                          types.get(index) == TypeCode.NUMERIC
-                              ? TypeAnnotationCode.PG_NUMERIC
-                              : TypeAnnotationCode.TYPE_ANNOTATION_CODE_UNSPECIFIED)
+                      .setTypeAnnotation(getTypeAnnotationCode(types.get(index)))
                       .build())
               .setName(names.get(index))
               .build());

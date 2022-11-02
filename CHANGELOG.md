@@ -1,5 +1,76 @@
 # Changelog
 
+## [0.11.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.10.1...v0.11.0) (2022-10-28)
+
+
+### Features
+
+* add setting for copy_commit_priority ([#426](https://github.com/GoogleCloudPlatform/pgadapter/issues/426)) ([6d23184](https://github.com/GoogleCloudPlatform/pgadapter/commit/6d231847491895b1c5261eff97e810faa68c4e47))
+
+
+### Bug Fixes
+
+* close buffers used by Converter after use ([#434](https://github.com/GoogleCloudPlatform/pgadapter/issues/434)) ([4b0b500](https://github.com/GoogleCloudPlatform/pgadapter/commit/4b0b500e977aefa28e30a2b3bf2b9dba5729b757))
+* memory leak caused by ConnectionHandler not removed from map ([#437](https://github.com/GoogleCloudPlatform/pgadapter/issues/437)) ([6ef7240](https://github.com/GoogleCloudPlatform/pgadapter/commit/6ef7240017e7fee9786132c92ac32b3aecc6f63c))
+* use copy commit timeout for all RPCs ([#427](https://github.com/GoogleCloudPlatform/pgadapter/issues/427)) ([0381a0c](https://github.com/GoogleCloudPlatform/pgadapter/commit/0381a0c03aa8b2791ac7dc55c7b34e6b759b8192))
+
+
+### Documentation
+
+* document support for psycopg2 ([#395](https://github.com/GoogleCloudPlatform/pgadapter/issues/395)) ([676ddcd](https://github.com/GoogleCloudPlatform/pgadapter/commit/676ddcd05cd1f3cefca08dfec252d7c2771baa67))
+
+## [0.10.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.10.0...v0.10.1) (2022-10-21)
+
+
+### Performance Improvements
+
+* use low latency TCP options ([#414](https://github.com/GoogleCloudPlatform/pgadapter/issues/414)) ([684506a](https://github.com/GoogleCloudPlatform/pgadapter/commit/684506a53a2747e843d7bbcb69a2f7e95f2413db))
+
+
+### Documentation
+
+* add FAQ entries for Docker ([#411](https://github.com/GoogleCloudPlatform/pgadapter/issues/411)) ([cdfb76a](https://github.com/GoogleCloudPlatform/pgadapter/commit/cdfb76ac0566141d2cf5c9a4d28df7edf7b25b26))
+
+## [0.10.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.9.0...v0.10.0) (2022-10-14)
+
+
+### Features
+
+* add experimental support for node-postgres ([#362](https://github.com/GoogleCloudPlatform/pgadapter/issues/362)) ([9e3e952](https://github.com/GoogleCloudPlatform/pgadapter/commit/9e3e95284a34516967f2acdd2acfeb94ab50a2ea))
+* added support for Django specific statement ([#382](https://github.com/GoogleCloudPlatform/pgadapter/issues/382)) ([1137ed1](https://github.com/GoogleCloudPlatform/pgadapter/commit/1137ed16725e7735da72573124244e05503bb19e))
+
+
+### Performance Improvements
+
+* copy binary can write directly to a byte buffer ([#385](https://github.com/GoogleCloudPlatform/pgadapter/issues/385)) ([18ddbdd](https://github.com/GoogleCloudPlatform/pgadapter/commit/18ddbddcbf2e66f3719fdbb1a43b021c571444e1))
+* do not create a new parser for each column ([#383](https://github.com/GoogleCloudPlatform/pgadapter/issues/383)) ([5352f79](https://github.com/GoogleCloudPlatform/pgadapter/commit/5352f791f23689503d3b49c3ee300baa9622ab87))
+* write converted values directly to a byte buffer ([#384](https://github.com/GoogleCloudPlatform/pgadapter/issues/384)) ([bec1657](https://github.com/GoogleCloudPlatform/pgadapter/commit/bec1657a43500c1f61126c744ad5b95cdce4c2e7))
+
+
+### Documentation
+
+* document how to set a statement timeout ([#390](https://github.com/GoogleCloudPlatform/pgadapter/issues/390)) ([2db00f9](https://github.com/GoogleCloudPlatform/pgadapter/commit/2db00f9d1b0c92d7266cb75ad14d924bb42c6543))
+
+## [0.9.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.8.0...v0.9.0) (2022-10-11)
+
+
+### Features
+
+* added support for the set and show time zone ([#361](https://github.com/GoogleCloudPlatform/pgadapter/issues/361)) ([66e3788](https://github.com/GoogleCloudPlatform/pgadapter/commit/66e3788fa794b2200dca160214a8b2b3a998952e))
+
+
+### Bug Fixes
+
+* bind to all loopback addresses ([#375](https://github.com/GoogleCloudPlatform/pgadapter/issues/375)) ([82bc566](https://github.com/GoogleCloudPlatform/pgadapter/commit/82bc566bcd7a45c5679bdb33bae693055593edab))
+* exceptions without messages could cause NullPointerExceptions ([#381](https://github.com/GoogleCloudPlatform/pgadapter/issues/381)) ([3a9a55e](https://github.com/GoogleCloudPlatform/pgadapter/commit/3a9a55ea3d3f6f7297c4747c3dff3689e42d25fa))
+
+
+### Documentation
+
+* add docs tag for dependency ([#374](https://github.com/GoogleCloudPlatform/pgadapter/issues/374)) ([a619595](https://github.com/GoogleCloudPlatform/pgadapter/commit/a619595f91946a0c720867adfb4cc474ad6838fd))
+* add sample for gorm ([#351](https://github.com/GoogleCloudPlatform/pgadapter/issues/351)) ([840ab53](https://github.com/GoogleCloudPlatform/pgadapter/commit/840ab53b0160c182ddd33808c72a907d101cbaaf))
+* document support for JDBC and pgx ([#352](https://github.com/GoogleCloudPlatform/pgadapter/issues/352)) ([847a2e3](https://github.com/GoogleCloudPlatform/pgadapter/commit/847a2e3df2e9dcadbadf752cac0abdd73f91f4d8))
+
 ## [0.8.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.7.0...v0.8.0) (2022-09-25)
 
 
