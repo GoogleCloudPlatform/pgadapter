@@ -24,6 +24,17 @@ public class PGExceptionFactory {
   private PGExceptionFactory() {}
 
   /**
+   * Throws a {@link PGException} with the given message and {@link SQLState#InvalidParameterValue}
+   * if valid is false. Otherwise, returns the given value.
+   */
+  public static <T> T checkArgument(T value, boolean valid, String message) {
+    if (!valid) {
+      throw newPGException(message, SQLState.InvalidParameterValue);
+    }
+    return value;
+  }
+
+  /**
    * Creates a basic {@link PGException} with {@link Severity#ERROR} and {@link
    * SQLState#RaiseException}.
    */
