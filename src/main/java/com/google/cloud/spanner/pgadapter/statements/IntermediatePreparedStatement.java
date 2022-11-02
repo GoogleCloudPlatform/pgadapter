@@ -23,6 +23,7 @@ import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -49,6 +50,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   private final String name;
   protected int[] parameterDataTypes;
   protected Statement statement;
+  private boolean described;
 
   public IntermediatePreparedStatement(
       ConnectionHandler connectionHandler,
@@ -75,6 +77,14 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     } else {
       return Oid.UNSPECIFIED;
     }
+  }
+
+  public boolean isDescribed() {
+    return this.described;
+  }
+
+  public void setDescribed() {
+    this.described = true;
   }
 
   public int[] getParameterDataTypes() {
@@ -122,7 +132,16 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     for (int index = 0; index < parameters.length; index++) {
       short formatCode = portal.getParameterFormatCode(index);
       int type = this.parseType(parameters, index);
-      Parser<?> parser = Parser.create(parameters[index], type, FormatCode.of(formatCode));
+      Parser<?> parser =
+          Parser.create(
+              connectionHandler
+                  .getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getSessionState()
+                  .getGuessTypes(),
+              parameters[index],
+              type,
+              FormatCode.of(formatCode));
       parser.bind(builder, "p" + (index + 1));
     }
     this.statement = builder.build();
@@ -133,47 +152,18 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   @Override
   public DescribeMetadata<?> describe() {
-    Set<String> parameters = extractParameters(this.parsedStatement.getSqlWithoutComments());
-
     ResultSet columnsResultSet = null;
     if (this.parsedStatement.isQuery()) {
       Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
       columnsResultSet = connection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
     }
-
-    boolean describeFailed = false;
-    if (parameters.isEmpty()) {
-      ensureParameterLength(0);
-    } else if (parameters.size() != this.parameterDataTypes.length
-        || Arrays.stream(this.parameterDataTypes).anyMatch(p -> p == 0)) {
-      // Note: We are only asking the backend to parse the types if there is at least one
-      // parameter with unspecified type. Otherwise, we will rely on the types given in PARSE.
-
-      // Transform the statement into a select statement that selects the parameters, and then
-      // extract the types from the result set metadata.
-      Statement selectParamsStatement = transformToSelectParams(parameters);
-      if (selectParamsStatement == null) {
-        // The transformation failed. Just rely on the types given in the PARSE message. If the
-        // transformation failed because the statement was malformed, the backend will catch that
-        // at a later stage.
-        describeFailed = true;
-        ensureParameterLength(parameters.size());
-      } else {
-        try (ResultSet paramsResultSet =
-            connection.analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)) {
-          extractParameterTypes(paramsResultSet);
-        } catch (SpannerException exception) {
-          // Ignore here and rely on the types given in PARSE.
-          describeFailed = true;
-          ensureParameterLength(parameters.size());
-        }
-      }
-    }
+    boolean describeSucceeded = describeParameters(null, false);
     if (columnsResultSet != null) {
       return new DescribeStatementMetadata(this.parameterDataTypes, columnsResultSet);
     }
 
-    if (this.parsedStatement.isUpdate() && (describeFailed || !Strings.isNullOrEmpty(this.name))) {
+    if (this.parsedStatement.isUpdate()
+        && (!describeSucceeded || !Strings.isNullOrEmpty(this.name))) {
       // Let the backend analyze the statement if it is a named prepared statement or if the query
       // that was used to determine the parameter types failed, so we can return a reasonable
       // error message if the statement is invalid. If it is the unnamed statement or getting the
@@ -183,6 +173,83 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
           Statement.of(this.parsedStatement.getSqlWithoutComments()), QueryAnalyzeMode.PLAN);
     }
     return new DescribeStatementMetadata(this.parameterDataTypes, null);
+  }
+
+  /** Describe the parameters of this statement. */
+  public boolean describeParameters(byte[][] parameterValues, boolean isAutoDescribe) {
+    Set<String> parameters = extractParameters(this.parsedStatement.getSqlWithoutComments());
+    boolean describeSucceeded = true;
+    if (parameters.isEmpty()) {
+      ensureParameterLength(0);
+    } else if (parameters.size() != this.parameterDataTypes.length
+        || Arrays.stream(this.parameterDataTypes).anyMatch(p -> p == 0)) {
+      // Note: We are only asking the backend to parse the types if there is at least one
+      // parameter with unspecified type. Otherwise, we will rely on the types given in PARSE.
+
+      // If this describe-request is an auto-describe request, we can safely try to look it up in a
+      // cache. Also, we do not need to describe the parameter types if they are all null values.
+      if (isAutoDescribe) {
+        int[] cachedParameterTypes =
+            getConnectionHandler().getAutoDescribedStatement(this.originalStatement.getSql());
+        if (cachedParameterTypes != null) {
+          this.parameterDataTypes = cachedParameterTypes;
+          return true;
+        }
+        if (hasOnlyNullValues(parameters.size(), parameterValues)) {
+          // Don't bother to describe null-valued parameter types.
+          return true;
+        }
+      }
+
+      // We cannot describe statements with more than 50 parameters, as Cloud Spanner does not allow
+      // queries that select from a sub-query to contain more than 50 columns in the select list.
+      if (parameters.size() > 50) {
+        throw PGExceptionFactory.newPGException(
+            "Cannot describe statements with more than 50 parameters");
+      }
+
+      // Transform the statement into a select statement that selects the parameters, and then
+      // extract the types from the result set metadata.
+      Statement selectParamsStatement = transformToSelectParams(parameters);
+      if (selectParamsStatement == null) {
+        // The transformation failed. Just rely on the types given in the PARSE message. If the
+        // transformation failed because the statement was malformed, the backend will catch that
+        // at a later stage.
+        describeSucceeded = false;
+        ensureParameterLength(parameters.size());
+      } else {
+        try (ResultSet paramsResultSet =
+            isAutoDescribe
+                ? connection
+                    .getDatabaseClient()
+                    .singleUse()
+                    .analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)
+                : connection.analyzeQuery(selectParamsStatement, QueryAnalyzeMode.PLAN)) {
+          extractParameterTypes(paramsResultSet);
+          if (isAutoDescribe) {
+            getConnectionHandler()
+                .registerAutoDescribedStatement(
+                    this.originalStatement.getSql(), this.parameterDataTypes);
+          }
+        } catch (SpannerException exception) {
+          // Ignore here and rely on the types given in PARSE.
+          describeSucceeded = false;
+          ensureParameterLength(parameters.size());
+        }
+      }
+    }
+    return describeSucceeded;
+  }
+
+  boolean hasOnlyNullValues(int numParameters, byte[][] parameterValues) {
+    for (int paramIndex = 0; paramIndex < numParameters; paramIndex++) {
+      if (parseType(null, paramIndex) == Oid.UNSPECIFIED
+          && parameterValues != null
+          && parameterValues[paramIndex] != null) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -473,6 +540,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
    * OID.Unspecified for all other parameters.
    */
   private void extractParameterTypes(ResultSet paramsResultSet) {
+    paramsResultSet.next();
     ensureParameterLength(paramsResultSet.getColumnCount());
     for (int i = 0; i < paramsResultSet.getColumnCount(); i++) {
       // Only override parameter types that were not specified by the frontend.

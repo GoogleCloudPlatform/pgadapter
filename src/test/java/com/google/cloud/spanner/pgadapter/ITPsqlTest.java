@@ -341,7 +341,7 @@ public class ITPsqlTest implements IntegrationTest {
         runUsingPsql(
             ImmutableList.of(
                 "prepare insert_row as "
-                    + "insert into all_types values ($1, $2, $3, $4, $5, $6, $7, $8, $9);\n",
+                    + "insert into all_types values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);\n",
                 "prepare find_row as "
                     + "select * from all_types "
                     + "where col_bigint=$1 "
@@ -352,13 +352,14 @@ public class ITPsqlTest implements IntegrationTest {
                     + "and col_numeric=$6 "
                     + "and col_timestamptz=$7 "
                     + "and col_date=$8 "
-                    + "and col_varchar=$9;\n",
+                    + "and col_varchar=$9 "
+                    + "and col_jsonb=$10;\n",
                 "execute find_row (1, true, '\\xaabbcc', 3.14, 100, 6.626, "
-                    + "'2022-09-06 17:14:49+02', '2022-09-06', 'hello world');\n",
+                    + "'2022-09-06 17:14:49+02', '2022-09-06', 'hello world', '{\"key\": \"value\"}');\n",
                 "execute insert_row (1, true, '\\xaabbcc', 3.14, 100, 6.626, "
-                    + "'2022-09-06 17:14:49+02', '2022-09-06', 'hello world');\n",
+                    + "'2022-09-06 17:14:49+02', '2022-09-06', 'hello world', '{\"key\": \"value\"}');\n",
                 "execute find_row (1, true, '\\xaabbcc', 3.14, 100, 6.626, "
-                    + "'2022-09-06 17:14:49+02', '2022-09-06', 'hello world');\n",
+                    + "'2022-09-06 17:14:49+02', '2022-09-06', 'hello world', '{\"key\": \"value\"}');\n",
                 "deallocate find_row;\n",
                 "deallocate insert_row;\n"));
     String output = result.x(), errors = result.y();
@@ -366,14 +367,14 @@ public class ITPsqlTest implements IntegrationTest {
     assertEquals(
         "PREPARE\n"
             + "PREPARE\n"
-            + " col_bigint | col_bool | col_bytea | col_float8 | col_int | col_numeric | col_timestamptz | col_date | col_varchar \n"
-            + "------------+----------+-----------+------------+---------+-------------+-----------------+----------+-------------\n"
+            + " col_bigint | col_bool | col_bytea | col_float8 | col_int | col_numeric | col_timestamptz | col_date | col_varchar | col_jsonb \n"
+            + "------------+----------+-----------+------------+---------+-------------+-----------------+----------+-------------+-----------\n"
             + "(0 rows)\n"
             + "\n"
             + "INSERT 0 1\n"
-            + " col_bigint | col_bool | col_bytea | col_float8 | col_int | col_numeric |    col_timestamptz     |  col_date  | col_varchar \n"
-            + "------------+----------+-----------+------------+---------+-------------+------------------------+------------+-------------\n"
-            + "          1 | t        | \\xaabbcc  |       3.14 |     100 |       6.626 | 2022-09-06 15:14:49+00 | 2022-09-06 | hello world\n"
+            + " col_bigint | col_bool | col_bytea | col_float8 | col_int | col_numeric |    col_timestamptz     |  col_date  | col_varchar |    col_jsonb     \n"
+            + "------------+----------+-----------+------------+---------+-------------+------------------------+------------+-------------+------------------\n"
+            + "          1 | t        | \\xaabbcc  |       3.14 |     100 |       6.626 | 2022-09-06 15:14:49+00 | 2022-09-06 | hello world | {\"key\": \"value\"}\n"
             + "(1 row)\n"
             + "\n"
             + "DEALLOCATE\n"
@@ -466,7 +467,7 @@ public class ITPsqlTest implements IntegrationTest {
         assertEquals(numRows, connection.createStatement().executeUpdate("delete from all_types"));
       }
 
-      // COPY the rows to Cloud Spanner.
+      // COPY the rows from Cloud Spanner to PostgreSQL.
       ProcessBuilder copyToPostgresBuilder = new ProcessBuilder();
       copyToPostgresBuilder.command(
           "bash",
@@ -588,7 +589,8 @@ public class ITPsqlTest implements IntegrationTest {
             + " -c \"copy (select (random()*9223372036854775807)::bigint, "
             + "  random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, "
             + "  (random()*999999)::int, (random()*999999999999)::numeric, now()-random()*interval '250 year', "
-            + "  (current_date-random()*interval '400 year')::date, md5(random()::text || clock_timestamp()::text)::varchar "
+            + "  (current_date-random()*interval '400 year')::date, md5(random()::text || clock_timestamp()::text)::varchar,"
+            + "  ('{\\\"key\\\": \\\"' || md5(random()::text || clock_timestamp()::text)::varchar || '\\\"}')::json "
             + String.format("  from generate_series(1, %d) s(i)) to stdout\" ", numRows)
             + "  | psql "
             + " -h "

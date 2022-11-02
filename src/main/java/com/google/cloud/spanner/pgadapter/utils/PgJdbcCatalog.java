@@ -39,6 +39,14 @@ public class PgJdbcCatalog {
           + "statistics,stdin,stdout,storage,strict,sysid,tablespace,temp,template,truncate,trusted,"
           + "unencrypted,unlisten,until,vacuum,valid,validator,verbose,volatile'";
 
+  public static final String PG_JDBC_GET_TYPE_NAME =
+      "SELECT n.nspname = ANY(current_schemas(true)), n.nspname, t.typname "
+          + "FROM pg_catalog.pg_type t "
+          + "JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = $1";
+  public static final String PG_JDBC_GET_TYPE_NAME_REPLACEMENT =
+      "SELECT true, n.nspname, t.typname "
+          + "FROM pg_catalog.pg_type t "
+          + "JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = $1";
   public static final String PG_JDBC_GET_TYPE_INFO_PREFIX_42_2_22 =
       "SELECT typinput='array_in'::regproc as is_array, typtype, typname "
           + "  FROM pg_catalog.pg_type "

@@ -18,16 +18,23 @@ import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TR
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
+import com.google.cloud.NoCredentials;
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.DatabaseClient;
+import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.Spanner;
+import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
@@ -45,6 +52,7 @@ import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -61,9 +69,11 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -72,6 +82,7 @@ import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
+import org.postgresql.core.Oid;
 import org.postgresql.jdbc.PgStatement;
 import org.postgresql.util.PSQLException;
 
@@ -289,7 +300,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   @Test
   public void testQueryWithParameters() throws SQLException {
     String jdbcSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
@@ -299,9 +310,10 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_numeric=? "
             + "and col_timestamptz=? "
             + "and col_date=? "
-            + "and col_varchar=?";
+            + "and col_varchar=? "
+            + "and col_jsonb=?";
     String pgSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=$1 "
             + "and col_bool=$2 "
@@ -311,7 +323,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             + "and col_numeric=$6 "
             + "and col_timestamptz=$7 "
             + "and col_date=$8 "
-            + "and col_varchar=$9";
+            + "and col_varchar=$9 "
+            + "and col_jsonb=$10";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -334,6 +347,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .to(Date.parseDate("2022-03-29"))
                 .bind("p9")
                 .to("test")
+                .bind("p10")
+                .to("{\"key\": \"value\"}")
                 .build(),
             ALL_TYPES_RESULTSET));
 
@@ -360,6 +375,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           preparedStatement.setObject(++index, offsetDateTime);
           preparedStatement.setObject(++index, LocalDate.of(2022, 3, 29));
           preparedStatement.setString(++index, "test");
+          preparedStatement.setString(++index, "{\"key\": \"value\"}");
           try (ResultSet resultSet = preparedStatement.executeQuery()) {
             assertTrue(resultSet.next());
             index = 0;
@@ -378,6 +394,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             }
             assertEquals(LocalDate.of(2022, 3, 29), resultSet.getObject(++index, LocalDate.class));
             assertEquals("test", resultSet.getString(++index));
+            assertEquals("{\"key\": \"value\"}", resultSet.getString(++index));
             assertFalse(resultSet.next());
           }
         }
@@ -415,8 +432,91 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals("2022-03-29", params.get("p8").getStringValue());
       assertEquals(TypeCode.STRING, types.get("p9").getCode());
       assertEquals("test", params.get("p9").getStringValue());
+      assertEquals("{\"key\": \"value\"}", params.get("p10").getStringValue());
 
       mockSpanner.clearRequests();
+    }
+  }
+
+  @Test
+  public void testQueryWithLegacyDateParameter() throws SQLException {
+    String jdbcSql = "select col_date from all_types where col_date=?";
+    String pgSql = "select col_date from all_types where col_date=$1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(pgSql).bind("p1").to(Date.parseDate("2022-03-29")).build(),
+            ALL_TYPES_RESULTSET));
+
+    // Threshold 5 is the default. Use a named prepared statement if it is executed 5 times or more.
+    // Threshold 1 means always use a named prepared statement.
+    // Threshold 0 means never use a named prepared statement.
+    // Threshold -1 means use binary transfer of values and use DESCRIBE statement.
+    // (10 points to you if you guessed the last one up front!).
+    for (int preparedThreshold : new int[] {5, 1, 0, -1}) {
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (PreparedStatement preparedStatement = connection.prepareStatement(jdbcSql)) {
+          preparedStatement.unwrap(PgStatement.class).setPrepareThreshold(preparedThreshold);
+          int index = 0;
+          preparedStatement.setDate(++index, new java.sql.Date(2022 - 1900, Calendar.MARCH, 29));
+          try (ResultSet resultSet = preparedStatement.executeQuery()) {
+            assertTrue(resultSet.next());
+            assertEquals(
+                new java.sql.Date(2022 - 1900, Calendar.MARCH, 29), resultSet.getDate("col_date"));
+            assertFalse(resultSet.next());
+          }
+        }
+
+        List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+        // Prepare threshold less than 0 means use binary transfer + DESCRIBE statement.
+        // However, the legacy date type will never use BINARY transfer and will always be sent with
+        // unspecified type by the JDBC driver the first time. This means that we need 3 round trips
+        // for a query that uses a prepared statement the first time.
+        int expectedRequestCount;
+        switch (preparedThreshold) {
+          case -1:
+          case 1:
+            expectedRequestCount = 3;
+            break;
+          default:
+            expectedRequestCount = 2;
+            break;
+        }
+        assertEquals(
+            "Prepare threshold: " + preparedThreshold, expectedRequestCount, requests.size());
+
+        ExecuteSqlRequest executeRequest;
+        if (preparedThreshold == 1) {
+          // The order of statements here is a little strange. The execution of the statement is
+          // executed first, and the describe statements are then executed afterwards. The reason
+          // for this is that JDBC does the following when it encounters a statement parameter that
+          // is 'unknown' (it considers the legacy date type as unknown, as it does not know if the
+          // user means date, timestamp or timestamptz):
+          // 1. It sends a DescribeStatement message, but without a flush or a sync, as it is not
+          //    planning on using the information for this request.
+          // 2. It then sends the Execute message followed by a sync. This causes PGAdapter to sync
+          //    the backend connection and execute everything in the actual execution pipeline.
+          // 3. PGAdapter then executes anything left in the message queue. The DescribeMessage is
+          //    still there, and is therefore executed after the Execute message.
+          // All the above still works as intended, as the responses are sent in the expected order.
+          executeRequest = requests.get(0);
+          for (int i = 1; i < requests.size(); i++) {
+            assertEquals(QueryMode.PLAN, requests.get(i).getQueryMode());
+          }
+        } else {
+          executeRequest = requests.get(requests.size() - 1);
+        }
+        assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+        assertEquals(pgSql, executeRequest.getSql());
+
+        Map<String, Value> params = executeRequest.getParams().getFieldsMap();
+        Map<String, Type> types = executeRequest.getParamTypesMap();
+
+        assertEquals(TypeCode.DATE, types.get("p1").getCode());
+        assertEquals("2022-03-29", params.get("p1").getStringValue());
+
+        mockSpanner.clearRequests();
+      }
     }
   }
 
@@ -442,16 +542,78 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testTransactionAbortedWithPreparedStatements() throws SQLException {
+    String sql = "SELECT 1";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Use a read/write transaction to execute two queries.
+      connection.setAutoCommit(false);
+      // Force the use of prepared statements.
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      assertEquals(1, connection.createStatement().executeUpdate(INSERT_STATEMENT.getSql()));
+      mockSpanner.abortAllTransactions();
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      connection.commit();
+    }
+
+    assertEquals(11, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(SELECT1.getSql(), requests.get(0).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
+    assertEquals(SELECT1.getSql(), requests.get(1).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(1).getQueryMode());
+
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(2).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(2).getQueryMode());
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(3).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(3).getQueryMode());
+
+    // This returns Aborted and initiates a retry.
+    assertEquals(SELECT1.getSql(), requests.get(4).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(4).getQueryMode());
+
+    // Start of retry.
+    assertEquals(SELECT1.getSql(), requests.get(5).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(5).getQueryMode());
+    assertEquals(SELECT1.getSql(), requests.get(6).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(6).getQueryMode());
+
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(7).getSql());
+    // This should be QueryMode.PLAN. See https://github.com/googleapis/java-spanner/issues/2009.
+    assertEquals(QueryMode.PLAN, requests.get(7).getQueryMode());
+    assertEquals(INSERT_STATEMENT.getSql(), requests.get(8).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(8).getQueryMode());
+
+    assertEquals(SELECT1.getSql(), requests.get(9).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(9).getQueryMode());
+
+    // End of retry.
+    assertEquals(SELECT1.getSql(), requests.get(10).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(10).getQueryMode());
+  }
+
+  @Test
   public void testQueryWithNonExistingTable() throws SQLException {
-    String sql = "select * from non_existing_table where id=$1";
+    String sql = "select * from non_existing_table where id=?";
+    String pgSql = "select * from non_existing_table where id=$1";
     mockSpanner.putStatementResult(
         StatementResult.exception(
-            Statement.of(sql),
+            Statement.newBuilder(pgSql).bind("p1").to(1L).build(),
             Status.NOT_FOUND
                 .withDescription("Table non_existing_table not found")
                 .asRuntimeException()));
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        preparedStatement.setLong(1, 1L);
         SQLException exception = assertThrows(SQLException.class, preparedStatement::executeQuery);
         assertEquals(
             "ERROR: Table non_existing_table not found - Statement: 'select * from non_existing_table where id=$1'",
@@ -463,21 +625,24 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     // ExecuteSqlRequest in normal execute mode.
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     assertEquals(1, requests.size());
-    assertEquals(sql, requests.get(0).getSql());
+    assertEquals(pgSql, requests.get(0).getSql());
     assertEquals(QueryMode.NORMAL, requests.get(0).getQueryMode());
   }
 
   @Test
   public void testDmlWithNonExistingTable() throws SQLException {
-    String sql = "update non_existing_table set value=$2 where id=$1";
+    String sql = "update non_existing_table set value=? where id=?";
+    String pgSql = "update non_existing_table set value=$1 where id=$2";
     mockSpanner.putStatementResult(
         StatementResult.exception(
-            Statement.of(sql),
+            Statement.newBuilder(pgSql).bind("p1").to("foo").bind("p2").to(1L).build(),
             Status.NOT_FOUND
                 .withDescription("Table non_existing_table not found")
                 .asRuntimeException()));
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        preparedStatement.setString(1, "foo");
+        preparedStatement.setLong(2, 1L);
         SQLException exception = assertThrows(SQLException.class, preparedStatement::executeUpdate);
         assertEquals("ERROR: Table non_existing_table not found", exception.getMessage());
       }
@@ -485,7 +650,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     assertEquals(1, requests.size());
-    assertEquals(sql, requests.get(0).getSql());
+    assertEquals(pgSql, requests.get(0).getSql());
     assertEquals(QueryMode.NORMAL, requests.get(0).getQueryMode());
   }
 
@@ -1416,67 +1581,179 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testRandomResults() throws SQLException {
-    final int fetchSize = 3;
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      connection.setAutoCommit(false);
-      try (PreparedStatement statement = connection.prepareStatement(SELECT_RANDOM.getSql())) {
-        statement.setFetchSize(fetchSize);
-        try (ResultSet resultSet = statement.executeQuery()) {
-          int rowCount = 0;
-          while (resultSet.next()) {
-            for (int col = 0; col < resultSet.getMetaData().getColumnCount(); col++) {
-              resultSet.getObject(col + 1);
+    for (boolean binary : new boolean[] {false, true}) {
+      // Also get the random results using the normal Spanner client to compare the results with
+      // what is returned by PGAdapter.
+      Spanner spanner =
+          SpannerOptions.newBuilder()
+              .setProjectId("p")
+              .setHost(String.format("http://localhost:%d", spannerServer.getPort()))
+              .setCredentials(NoCredentials.getInstance())
+              .setChannelConfigurator(ManagedChannelBuilder::usePlaintext)
+              .setClientLibToken("pg-adapter")
+              .build()
+              .getService();
+      DatabaseClient client = spanner.getDatabaseClient(DatabaseId.of("p", "i", "d"));
+      com.google.cloud.spanner.ResultSet spannerResult =
+          client.singleUse().executeQuery(SELECT_RANDOM);
+
+      String binaryTransferEnable =
+          "&binaryTransferEnable="
+              + ImmutableList.of(
+                      Oid.BOOL,
+                      Oid.BYTEA,
+                      Oid.VARCHAR,
+                      Oid.NUMERIC,
+                      Oid.FLOAT8,
+                      Oid.INT8,
+                      Oid.DATE,
+                      Oid.TIMESTAMPTZ)
+                  .stream()
+                  .map(String::valueOf)
+                  .collect(Collectors.joining(","));
+
+      final int fetchSize = 3;
+      try (Connection connection =
+          DriverManager.getConnection(createUrl() + binaryTransferEnable)) {
+        connection.setAutoCommit(false);
+        connection.unwrap(PGConnection.class).setPrepareThreshold(binary ? -1 : 5);
+        try (PreparedStatement statement = connection.prepareStatement(SELECT_RANDOM.getSql())) {
+          statement.setFetchSize(fetchSize);
+          try (ResultSet resultSet = statement.executeQuery()) {
+            int rowCount = 0;
+            while (resultSet.next()) {
+              assertTrue(spannerResult.next());
+              for (int col = 0; col < resultSet.getMetaData().getColumnCount(); col++) {
+                // TODO: Remove once we have a replacement for pg_type, as the JDBC driver will try
+                // to read type information from the backend when it hits an 'unknown' type (jsonb
+                // is not one of the types that the JDBC driver will load automatically).
+                if (col == 5 || col == 14) {
+                  resultSet.getString(col + 1);
+                } else {
+                  resultSet.getObject(col + 1);
+                }
+              }
+              assertEqual(spannerResult, resultSet, binary);
+              rowCount++;
             }
-            rowCount++;
+            assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
           }
-          assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
         }
+        connection.commit();
       }
-      connection.commit();
+
+      // Close the resources used by the normal Spanner client.
+      spannerResult.close();
+      spanner.close();
+
+      // The ExecuteSql request should only be sent once to Cloud Spanner by PGAdapter.
+      // The normal Spanner client will also send it once to Spanner.
+      assertEquals(binary ? 3 : 2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+      ExecuteSqlRequest executeRequest =
+          mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(binary ? 2 : 1);
+      assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+      assertEquals(SELECT_RANDOM.getSql(), executeRequest.getSql());
+
+      // PGAdapter should receive 5 Execute messages:
+      // 1. BEGIN
+      // 2. Execute - fetch rows 1, 2
+      // 3. Execute - fetch rows 3, 4
+      // 4. Execute - fetch rows 5
+      // 5. COMMIT
+      if (pgServer != null) {
+        List<DescribeMessage> describeMessages = getWireMessagesOfType(DescribeMessage.class);
+        assertEquals(1, describeMessages.size());
+        DescribeMessage describeMessage = describeMessages.get(0);
+        assertEquals(
+            binary ? PreparedType.Statement : PreparedType.Portal, describeMessage.getType());
+
+        List<ExecuteMessage> executeMessages =
+            getWireMessagesOfType(ExecuteMessage.class).stream()
+                .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
+                .collect(Collectors.toList());
+        int expectedExecuteMessageCount =
+            RANDOM_RESULTS_ROW_COUNT / fetchSize
+                + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0)
+                + 2;
+        assertEquals(expectedExecuteMessageCount, executeMessages.size());
+        assertEquals("", executeMessages.get(0).getName());
+        for (ExecuteMessage executeMessage :
+            executeMessages.subList(1, executeMessages.size() - 1)) {
+          assertEquals(fetchSize, executeMessage.getMaxRows());
+        }
+        assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
+
+        List<ParseMessage> parseMessages =
+            getWireMessagesOfType(ParseMessage.class).stream()
+                .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
+                .collect(Collectors.toList());
+        assertEquals(3, parseMessages.size());
+        assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
+        assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(1).getStatement().getSql());
+        assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
+      }
+      mockSpanner.clearRequests();
+      pgServer.clearDebugMessages();
     }
-    // The ExecuteSql request should only be sent once to Cloud Spanner.
-    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    ExecuteSqlRequest executeRequest =
-        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
-    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
-    assertEquals(SELECT_RANDOM.getSql(), executeRequest.getSql());
+  }
 
-    // PGAdapter should receive 5 Execute messages:
-    // 1. BEGIN
-    // 2. Execute - fetch rows 1, 2
-    // 3. Execute - fetch rows 3, 4
-    // 4. Execute - fetch rows 5
-    // 5. COMMIT
-    if (pgServer != null) {
-      List<DescribeMessage> describeMessages = getWireMessagesOfType(DescribeMessage.class);
-      assertEquals(1, describeMessages.size());
-      DescribeMessage describeMessage = describeMessages.get(0);
-      assertEquals(PreparedType.Portal, describeMessage.getType());
-
-      List<ExecuteMessage> executeMessages =
-          getWireMessagesOfType(ExecuteMessage.class).stream()
-              .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
-              .collect(Collectors.toList());
-      int expectedExecuteMessageCount =
-          RANDOM_RESULTS_ROW_COUNT / fetchSize
-              + ((RANDOM_RESULTS_ROW_COUNT % fetchSize) > 0 ? 1 : 0)
-              + 2;
-      assertEquals(expectedExecuteMessageCount, executeMessages.size());
-      assertEquals("", executeMessages.get(0).getName());
-      for (ExecuteMessage executeMessage : executeMessages.subList(1, executeMessages.size() - 1)) {
-        assertEquals(describeMessage.getName(), executeMessage.getName());
-        assertEquals(fetchSize, executeMessage.getMaxRows());
+  private void assertEqual(
+      com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult, boolean binary)
+      throws SQLException {
+    assertEquals(spannerResult.getColumnCount(), pgResult.getMetaData().getColumnCount());
+    for (int col = 0; col < spannerResult.getColumnCount(); col++) {
+      if (spannerResult.isNull(col)) {
+        assertNull(pgResult.getObject(col + 1));
+        assertTrue(pgResult.wasNull());
+        continue;
       }
-      assertEquals("", executeMessages.get(executeMessages.size() - 1).getName());
 
-      List<ParseMessage> parseMessages =
-          getWireMessagesOfType(ParseMessage.class).stream()
-              .filter(message -> !JDBC_STARTUP_STATEMENTS.contains(message.getSql()))
-              .collect(Collectors.toList());
-      assertEquals(3, parseMessages.size());
-      assertEquals("BEGIN", parseMessages.get(0).getStatement().getSql());
-      assertEquals(SELECT_RANDOM.getSql(), parseMessages.get(1).getStatement().getSql());
-      assertEquals("COMMIT", parseMessages.get(2).getStatement().getSql());
+      switch (spannerResult.getColumnType(col).getCode()) {
+        case BOOL:
+          if (!binary) {
+            // Skip for binary for now, as there is a bug in the PG JDBC driver for decoding binary
+            // bool values.
+            assertEquals(spannerResult.getBoolean(col), pgResult.getBoolean(col + 1));
+          }
+          break;
+        case INT64:
+          assertEquals(spannerResult.getLong(col), pgResult.getLong(col + 1));
+          break;
+        case FLOAT64:
+          assertEquals(spannerResult.getDouble(col), pgResult.getDouble(col + 1), 0.0d);
+          break;
+        case PG_NUMERIC:
+        case STRING:
+          assertEquals(spannerResult.getString(col), pgResult.getString(col + 1));
+          break;
+        case BYTES:
+          assertArrayEquals(spannerResult.getBytes(col).toByteArray(), pgResult.getBytes(col + 1));
+          break;
+        case TIMESTAMP:
+          // Compare milliseconds, as PostgreSQL does not natively support nanosecond precision, and
+          // this is lost when using binary encoding.
+          assertEquals(
+              spannerResult.getTimestamp(col).toSqlTimestamp().getTime(),
+              pgResult.getTimestamp(col + 1).getTime());
+          break;
+        case DATE:
+          assertEquals(
+              LocalDate.of(
+                  spannerResult.getDate(col).getYear(),
+                  spannerResult.getDate(col).getMonth(),
+                  spannerResult.getDate(col).getDayOfMonth()),
+              pgResult.getDate(col + 1).toLocalDate());
+          break;
+        case PG_JSONB:
+          assertEquals(spannerResult.getPgJsonb(col), pgResult.getString(col + 1));
+          break;
+        case ARRAY:
+          break;
+        case NUMERIC:
+        case JSON:
+        case STRUCT:
+          fail("unsupported PG type: " + spannerResult.getColumnType(col));
+      }
     }
   }
 
@@ -1685,6 +1962,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     //    aborted state.
     assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testShowGuessTypes() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.guess_types")) {
+        assertTrue(resultSet.next());
+        assertEquals(String.format("%d,%d", Oid.TIMESTAMPTZ, Oid.DATE), resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testShowGuessTypesOverwritten() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20spanner.guess_types=0")) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show spanner.guess_types")) {
+        assertTrue(resultSet.next());
+        assertEquals("0", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
   }
 
   @Test
@@ -2057,7 +2359,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(356, count);
+        assertEquals(358, count);
       }
     }
   }
@@ -2098,6 +2400,62 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set application_name to ''");
       verifySettingValue(connection, "application_name", "");
+    }
+  }
+
+  @Test
+  public void testSetTimeZone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'IST'");
+      verifySettingValue(connection, "timezone", "IST");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneToDefault() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
+      connection.createStatement().execute("set time zone default");
+      verifySettingValue(connection, "timezone", "IST");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneToLocal() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
+      connection.createStatement().execute("set time zone local");
+      verifySettingValue(connection, "timezone", "IST");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneWithTransactionCommit() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      connection.createStatement().execute("set time zone 'UTC'");
+      verifySettingValue(connection, "timezone", "UTC");
+      connection.commit();
+      verifySettingValue(connection, "timezone", "UTC");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneWithTransactionRollback() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      String originalTimeZone = null;
+      try (ResultSet rs = connection.createStatement().executeQuery("SHOW TIMEZONE")) {
+        assertTrue(rs.next());
+        originalTimeZone = rs.getString(1);
+        assertFalse(rs.next());
+      }
+      assertNotNull(originalTimeZone);
+      connection.setAutoCommit(false);
+
+      connection.createStatement().execute("set time zone 'UTC'");
+      verifySettingValue(connection, "time zone", "UTC");
+      connection.rollback();
+      verifySettingValue(connection, "time zone", originalTimeZone);
     }
   }
 
@@ -2289,6 +2647,36 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           connection.createStatement().executeQuery("select * from pg_catalog.pg_namespace")) {
         //noinspection StatementWithEmptyBody
         while (resultSet.next()) {}
+      }
+    }
+  }
+
+  @Test
+  public void testDescribeStatementWithMoreThan50Parameters() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Force binary transfer + usage of server-side prepared statements.
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      String sql =
+          String.format(
+              "insert into foo values (%s)",
+              IntStream.rangeClosed(1, 51).mapToObj(i -> "?").collect(Collectors.joining(",")));
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        SQLException sqlException =
+            assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
+        assertEquals(
+            "ERROR: Cannot describe statements with more than 50 parameters",
+            sqlException.getMessage());
+      }
+
+      try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+        for (int i = 0; i < 51; i++) {
+          preparedStatement.setNull(i + 1, Types.NULL);
+        }
+        SQLException sqlException =
+            assertThrows(SQLException.class, preparedStatement::executeUpdate);
+        assertEquals(
+            "ERROR: Cannot describe statements with more than 50 parameters",
+            sqlException.getMessage());
       }
     }
   }

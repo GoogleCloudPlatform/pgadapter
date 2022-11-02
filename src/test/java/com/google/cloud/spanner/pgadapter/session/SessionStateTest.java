@@ -25,16 +25,20 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.Options.RpcPriority;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.core.Oid;
 
 @RunWith(JUnit4.class)
 public class SessionStateTest {
@@ -156,7 +160,7 @@ public class SessionStateTest {
   public void testGetAll() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(356, allSettings.size());
+    assertEquals(357, allSettings.size());
   }
 
   @Test
@@ -194,7 +198,7 @@ public class SessionStateTest {
     state.setLocal("spanner", "custom_local_setting", "value2");
 
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(358, allSettings.size());
+    assertEquals(359, allSettings.size());
 
     PGSetting applicationName =
         allSettings.stream()
@@ -342,11 +346,11 @@ public class SessionStateTest {
   @Test
   public void testSetInvalidEnumValue() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
-    SpannerException exception =
-        assertThrows(SpannerException.class, () -> state.set(null, "bytea_output", "random_value"));
+    PGException exception =
+        assertThrows(PGException.class, () -> state.set(null, "bytea_output", "random_value"));
     assertEquals(
-        "INVALID_ARGUMENT: invalid value for parameter \"bytea_output\": \"random_value\"",
-        exception.getMessage());
+        "invalid value for parameter \"bytea_output\": \"random_value\"", exception.getMessage());
+    assertEquals("Available values: escape, hex.", exception.getHints());
   }
 
   @Test
@@ -712,6 +716,26 @@ public class SessionStateTest {
   }
 
   @Test
+  public void testCopyCommitPriority() {
+    SessionState state = new SessionState(ImmutableMap.of(), mock(OptionsMetadata.class));
+    CopySettings copySettings = new CopySettings(state);
+
+    assertEquals(RpcPriority.MEDIUM, copySettings.getCommitPriority());
+
+    state.set("spanner", "copy_commit_priority", "high");
+    assertEquals(RpcPriority.HIGH, copySettings.getCommitPriority());
+    state.set("spanner", "copy_commit_priority", "Low");
+    assertEquals(RpcPriority.LOW, copySettings.getCommitPriority());
+
+    PGException exception =
+        assertThrows(PGException.class, () -> state.set("spanner", "copy_commit_priority", "foo"));
+    assertEquals(
+        "invalid value for parameter \"spanner.copy_commit_priority\": \"foo\"",
+        exception.getMessage());
+    assertEquals("Available values: low, medium, high.", exception.getHints());
+  }
+
+  @Test
   public void testDdlTransactionMode_noDefault() {
     SessionState state = new SessionState(ImmutableMap.of(), mock(OptionsMetadata.class));
     assertEquals(DdlTransactionMode.Batch, state.getDdlTransactionMode());
@@ -800,5 +824,28 @@ public class SessionStateTest {
     state.set("spanner", "ddl_transaction_mode", null);
 
     assertEquals(DdlTransactionMode.Single, state.getDdlTransactionMode());
+  }
+
+  @Test
+  public void testGuessTypes_defaultNonJdbc() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
+    assertEquals(ImmutableSet.of(), state.getGuessTypes());
+  }
+
+  @Test
+  public void testGuessTypes_defaultJdbc() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
+    state.set("spanner", "guess_types", String.format("%d,%d", Oid.TIMESTAMPTZ, Oid.DATE));
+    assertEquals(ImmutableSet.of(Oid.TIMESTAMPTZ, Oid.DATE), state.getGuessTypes());
+  }
+
+  @Test
+  public void testGuessTypes_invalidOids() {
+    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+    SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
+    state.set("spanner", "guess_types", String.format("%d,%d,foo", Oid.TIMESTAMPTZ, Oid.DATE));
+    assertEquals(ImmutableSet.of(Oid.TIMESTAMPTZ, Oid.DATE), state.getGuessTypes());
   }
 }

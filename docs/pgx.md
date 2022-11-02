@@ -1,7 +1,6 @@
-# Google Cloud Spanner PGAdapter - pgx Experimental Support
+# PGAdapter - pgx Connection Options
 
-PGAdapter has __experimental support__ for the [Go pgx driver](https://github.com/jackc/pgx)
-version 4.15.0 and higher. 
+PGAdapter supports the [Go pgx driver](https://github.com/jackc/pgx) version 4.15.0 and higher. 
 
 ## Usage
 
@@ -103,3 +102,8 @@ batch.Queue("create table singers (singerid varchar primary key, name varchar)")
 batch.Queue("create index idx_singers_name on singers (name)")
 res := conn.SendBatch(context.Background(), batch)
 ```
+
+## Limitations
+- Server side [prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are limited to at most 50 parameters.
+  `pgx` uses server side prepared statements for all parameterized statements in extended query mode.
+  You can use the [simple query protocol](https://pkg.go.dev/github.com/jackc/pgx/v4#QuerySimpleProtocol) to work around this limitation.

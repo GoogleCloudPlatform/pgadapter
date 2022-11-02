@@ -42,5 +42,8 @@ export class AllTypes {
   col_date: string
 
   @Column({type: 'varchar', length: 100})
-  col_varchar: string
+  col_varchar: string;
+
+  @Column({ type: "jsonb" })
+  col_jsonb: any
 }

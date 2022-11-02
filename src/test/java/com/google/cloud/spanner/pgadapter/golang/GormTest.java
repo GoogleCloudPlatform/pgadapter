@@ -21,6 +21,8 @@ public interface GormTest extends Library {
 
   String TestFirst(GoString connString);
 
+  String TestCreateBlogAndUser(GoString connString);
+
   String TestQueryAllDataTypes(GoString connString);
 
   String TestQueryNullsAllDataTypes(GoString connString);
@@ -38,6 +40,8 @@ public interface GormTest extends Library {
   String TestTransaction(GoString connString);
 
   String TestNestedTransaction(GoString connString);
+
+  String TestErrorInTransaction(GoString connString);
 
   String TestReadOnlyTransaction(GoString connString);
 }

@@ -30,10 +30,11 @@ import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
+import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import java.io.DataOutputStream;
@@ -205,6 +206,10 @@ public class IntermediateStatement {
     return this.connection;
   }
 
+  public ConnectionHandler getConnectionHandler() {
+    return this.connectionHandler;
+  }
+
   public String getStatement() {
     return this.parsedStatement.getSqlWithoutComments();
   }
@@ -220,7 +225,10 @@ public class IntermediateStatement {
       } catch (ExecutionException executionException) {
         setException(SpannerExceptionFactory.asSpannerException(executionException.getCause()));
       } catch (InterruptedException interruptedException) {
-        setException(SpannerExceptionFactory.propagateInterrupt(interruptedException));
+        // TODO(b/246193644): Switch to PGException
+        setException(
+            SpannerExceptionFactory.asSpannerException(
+                PGExceptionFactory.newQueryCancelledException()));
       } finally {
         this.futureStatementResult = null;
       }
@@ -325,8 +333,8 @@ public class IntermediateStatement {
     return EMPTY_WIRE_OUTPUT_ARRAY;
   }
 
-  public WireOutput createDataRowResponse(ResultSet resultSet, QueryMode mode) {
-    return new DataRowResponse(this.outputStream, this, resultSet, this.options, mode);
+  public WireOutput createDataRowResponse(Converter converter) {
+    return new DataRowResponse(this.outputStream, converter);
   }
 
   public WireOutput[] createResultSuffix() {

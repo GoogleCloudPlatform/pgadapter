@@ -19,7 +19,9 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
@@ -81,9 +83,25 @@ public class LongParser extends Parser<Long> {
     if (this.item == null) {
       return null;
     }
+    return convertToPG(this.item);
+  }
+
+  static byte[] convertToPG(long value) {
     byte[] result = new byte[8];
-    ByteConverter.int8(result, 0, this.item);
+    ByteConverter.int8(result, 0, value);
     return result;
+  }
+
+  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+    switch (format) {
+      case SPANNER:
+      case POSTGRESQL_TEXT:
+        return Long.toString(resultSet.getLong(position)).getBytes(StandardCharsets.UTF_8);
+      case POSTGRESQL_BINARY:
+        return convertToPG(resultSet.getLong(position));
+      default:
+        throw new IllegalArgumentException("unknown data format: " + format);
+    }
   }
 
   @Override

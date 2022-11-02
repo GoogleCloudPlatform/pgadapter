@@ -1,7 +1,6 @@
-# Google Cloud Spanner PGAdapter - JDBC Experimental Support
+# PGAdapter - JDBC Connection Options
 
-PGAdapter has __experimental support__ for the [PostgreSQL JDBC driver](https://github.com/pgjdbc/pgjdbc)
-version 42.0.0 and higher.
+PGAdapter supports the [PostgreSQL JDBC driver](https://github.com/pgjdbc/pgjdbc) version 42.0.0 and higher.
 
 ## Usage
 
@@ -105,3 +104,9 @@ try (java.sql.Statement statement = connection.createStatement()) {
   int[] updateCounts = statement.executeBatch();
 }
 ```
+
+## Limitations
+- Server side [prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are limited to at most 50 parameters.
+  Note: This is not the same as `java.sql.PreparedStatement`. A `java.sql.PreparedStatement` will only use
+  a server side prepared statement if it has been executed more at least `prepareThreshold` times.
+  See https://jdbc.postgresql.org/documentation/server-prepare/#activation for more information.

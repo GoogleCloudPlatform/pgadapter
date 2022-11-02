@@ -48,6 +48,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import com.google.cloud.spanner.pgadapter.session.PGSetting;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
@@ -57,6 +58,7 @@ import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandler;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
@@ -68,8 +70,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1263,7 +1263,7 @@ public class ProtocolTest {
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
     CopyStatement copyStatement = mock(CopyStatement.class);
-    when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
+    when(connectionHandler.getActiveCopyStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1291,7 +1291,7 @@ public class ProtocolTest {
 
     DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
 
-    when(connectionHandler.getActiveStatement()).thenReturn(null);
+    when(connectionHandler.getActiveCopyStatement()).thenReturn(null);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1325,10 +1325,11 @@ public class ProtocolTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(connectionHandler, options, "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(connectionHandler, options, "", parse(sql), Statement.of(sql));
     copyStatement.executeAsync(mock(BackendConnection.class));
 
-    when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
+    when(connectionHandler.getActiveCopyStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
@@ -1371,7 +1372,7 @@ public class ProtocolTest {
     CopyStatement copyStatement = mock(CopyStatement.class);
     MutationWriter mutationWriter = mock(MutationWriter.class);
     when(copyStatement.getMutationWriter()).thenReturn(mutationWriter);
-    when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
+    when(connectionHandler.getActiveCopyStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1403,7 +1404,7 @@ public class ProtocolTest {
     CopyStatement copyStatement = mock(CopyStatement.class);
     MutationWriter mutationWriter = mock(MutationWriter.class);
     when(copyStatement.getMutationWriter()).thenReturn(mutationWriter);
-    when(connectionHandler.getActiveStatement()).thenReturn(copyStatement);
+    when(connectionHandler.getActiveCopyStatement()).thenReturn(copyStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.COPY_IN);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1416,36 +1417,6 @@ public class ProtocolTest {
     message.send();
 
     verify(mutationWriter).rollback();
-  }
-
-  @Test
-  public void testCopyFromFilePipe() throws Exception {
-    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
-        mock(ExtendedQueryProtocolHandler.class);
-    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
-    when(connectionHandler.getExtendedQueryProtocolHandler())
-        .thenReturn(extendedQueryProtocolHandler);
-    SessionState sessionState = new SessionState(options);
-    when(backendConnection.getSessionState()).thenReturn(sessionState);
-    setupQueryInformationSchemaResults();
-
-    byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));
-
-    String sql = "COPY keyvalue FROM STDIN;";
-    CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
-    copyStatement.executeAsync(mock(BackendConnection.class));
-
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(payload);
-
-    assertEquals("TEXT", copyStatement.getFormatType());
-    assertEquals('\t', copyStatement.getDelimiterChar());
-
-    copyStatement.close();
-    verify(resultSet, never()).close();
   }
 
   @Test
@@ -1535,6 +1506,7 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionId()).thenReturn(1);
     when(connectionHandler.getExtendedQueryProtocolHandler())
         .thenReturn(extendedQueryProtocolHandler);
+    when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
     SessionState sessionState = mock(SessionState.class);
     PGSetting serverVersionSetting = mock(PGSetting.class);
@@ -1664,18 +1636,22 @@ public class ProtocolTest {
     DataOutputStream outputStream = new DataOutputStream(result);
 
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
+    when(options.getSslMode()).thenReturn(SslMode.Enable);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 
     WireMessage message = BootstrapMessage.create(connectionHandler);
     assertEquals(SSLMessage.class, message.getClass());
+    assertEquals("SSLMessage, Length: 8", message.getPayloadString());
 
     message.send();
 
     DataInputStream outputResult = inputStreamFromOutputStream(result);
 
-    // DeclineSSLResponse
-    assertEquals('N', outputResult.readByte());
+    // AcceptSSLResponse
+    assertEquals('S', outputResult.readByte());
   }
 
   @Test
@@ -1690,6 +1666,9 @@ public class ProtocolTest {
     DataOutputStream outputStream = new DataOutputStream(result);
 
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
+    when(options.getSslMode()).thenReturn(SslMode.Disable);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
 

@@ -30,6 +30,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -88,7 +89,7 @@ class DdlExecutor {
         }
         return Boolean.TRUE;
       } catch (InterruptedException interruptedException) {
-        throw SpannerExceptionFactory.propagateInterrupt(interruptedException);
+        throw PGExceptionFactory.newQueryCancelledException();
       }
     }
   }

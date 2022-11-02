@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
  * Translate wire protocol to array. Since arrays house any other specified types (including
  * potentially arrays), we use all parser types to parse each item within.
  */
-class ArrayParser extends Parser<List<?>> {
+public class ArrayParser extends Parser<List<?>> {
   private static final String STRING_TOGGLE = "\"";
   private static final String ARRAY_DELIMITER = ",";
   private static final String PG_ARRAY_OPEN = "{", PG_ARRAY_CLOSE = "}";
@@ -40,7 +40,7 @@ class ArrayParser extends Parser<List<?>> {
   private final Type arrayElementType;
   private final boolean isStringEquivalent;
 
-  ArrayParser(ResultSet item, int position) {
+  public ArrayParser(ResultSet item, int position) {
     if (item != null) {
       this.arrayElementType = item.getColumnType(position).getArrayElementType();
       if (this.arrayElementType.getCode() == Code.ARRAY) {
@@ -62,8 +62,8 @@ class ArrayParser extends Parser<List<?>> {
         return value.getBoolArray();
       case DATE:
         return value.getDateArray();
-      case JSON:
-        return value.getJsonArray();
+      case PG_JSONB:
+        return value.getPgJsonbArray();
       case BYTES:
         return value.getBytesArray();
       case INT64:

@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
@@ -77,6 +78,19 @@ public class BinaryParser extends Parser<ByteArray> {
   @Override
   protected byte[] binaryParse() {
     return this.item == null ? null : this.item.toByteArray();
+  }
+
+  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+    switch (format) {
+      case SPANNER:
+      case POSTGRESQL_BINARY:
+        return resultSet.getBytes(position).toByteArray();
+      case POSTGRESQL_TEXT:
+        return ("\\x" + Utils.toHexString(resultSet.getBytes(position).toByteArray()))
+            .getBytes(StandardCharsets.UTF_8);
+      default:
+        throw new IllegalArgumentException("unknown data format: " + format);
+    }
   }
 
   @Override

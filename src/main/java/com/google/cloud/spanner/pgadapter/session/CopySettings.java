@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.session;
 
+import com.google.cloud.spanner.Options.RpcPriority;
+import java.util.Locale;
 import java.util.Map;
 
 public class CopySettings {
@@ -84,6 +86,19 @@ public class CopySettings {
   /** Returns the commit timeout for COPY operations in seconds. */
   public int getCommitTimeoutSeconds() {
     return sessionState.getIntegerSetting("spanner", "copy_commit_timeout", 300);
+  }
+
+  /** Returns the request priority for commits executed by COPY operations. */
+  public RpcPriority getCommitPriority() {
+    String setting =
+        sessionState
+            .getStringSetting("spanner", "copy_commit_priority", "medium")
+            .toUpperCase(Locale.ENGLISH);
+    try {
+      return RpcPriority.valueOf(setting);
+    } catch (IllegalArgumentException e) {
+      return RpcPriority.MEDIUM;
+    }
   }
 
   /** Returns the batch size to use for non-atomic COPY operations. */
