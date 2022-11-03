@@ -43,6 +43,8 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
@@ -422,8 +424,9 @@ public class StatementTest {
     backendConnection.flush();
 
     assertTrue(intermediateStatement.hasException());
-    SpannerException exception = intermediateStatement.getException();
-    assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
+    PGException exception = intermediateStatement.getException();
+    assertEquals(SQLState.RaiseException, exception.getSQLState());
+    assertEquals("ERROR:  test error", exception.getMessage());
   }
 
   @Test

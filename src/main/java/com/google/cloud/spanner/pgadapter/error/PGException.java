@@ -29,6 +29,7 @@ public class PGException extends RuntimeException {
     private Severity severity;
     private SQLState sqlState;
     private String hints;
+    private Throwable cause;
 
     private Builder(String message) {
       this.message = message;
@@ -49,15 +50,20 @@ public class PGException extends RuntimeException {
       return this;
     }
 
+    public Builder setCause(Throwable cause) {
+      this.cause = cause;
+      return this;
+    }
+
     public PGException build() {
-      return new PGException(severity, sqlState, message, hints);
+      return new PGException(cause, severity, sqlState, message, hints);
     }
   }
 
   public static Builder newBuilder(Exception cause) {
     Preconditions.checkNotNull(cause);
-    return new Builder(
-        cause.getMessage() == null ? cause.getClass().getName() : cause.getMessage());
+    return new Builder(cause.getMessage() == null ? cause.getClass().getName() : cause.getMessage())
+        .setCause(cause);
   }
 
   public static Builder newBuilder(String message) {
@@ -68,8 +74,9 @@ public class PGException extends RuntimeException {
   private final SQLState sqlState;
   private final String hints;
 
-  private PGException(Severity severity, SQLState sqlState, String message, String hints) {
-    super(message == null ? "" : message);
+  private PGException(
+      Throwable cause, Severity severity, SQLState sqlState, String message, String hints) {
+    super(message == null ? "" : message, cause);
     this.severity = severity;
     this.sqlState = sqlState;
     this.hints = hints;

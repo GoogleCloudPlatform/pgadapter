@@ -34,7 +34,9 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.CopySettings;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
@@ -117,7 +119,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final Object lock = new Object();
 
   @GuardedBy("lock")
-  private SpannerException exception;
+  private PGException exception;
 
   public MutationWriter(
       SessionState sessionState,
@@ -173,11 +175,13 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       // Ignore the exception if the executor has already been shutdown. That means that an error
       // occurred that ended the COPY operation while we were writing data to the buffer.
       if (!executorService.isShutdown()) {
-        SpannerException spannerException =
-            SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INTERNAL, "Could not write copy data to buffer", e);
-        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
-        throw spannerException;
+        PGException pgException =
+            PGException.newBuilder("Could not write copy data to buffer")
+                .setSQLState(SQLState.InternalError)
+                .setCause(e)
+                .build();
+        logger.log(Level.SEVERE, pgException.getMessage(), pgException);
+        throw pgException;
       }
     }
   }
@@ -308,17 +312,17 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       ApiFutures.allAsList(allCommitFutures).get();
     } catch (SpannerException e) {
       synchronized (lock) {
-        this.exception = e;
+        this.exception = PGExceptionFactory.toPGException(e);
         throw this.exception;
       }
     } catch (ExecutionException e) {
       synchronized (lock) {
-        this.exception = SpannerExceptionFactory.asSpannerException(e.getCause());
+        this.exception = PGExceptionFactory.toPGException(e.getCause());
         throw this.exception;
       }
     } catch (Exception e) {
       synchronized (lock) {
-        this.exception = SpannerExceptionFactory.asSpannerException(e);
+        this.exception = PGExceptionFactory.toPGException(e);
         throw this.exception;
       }
     } finally {

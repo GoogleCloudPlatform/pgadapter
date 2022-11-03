@@ -22,9 +22,11 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
 import java.io.ByteArrayOutputStream;
@@ -38,18 +40,17 @@ public class CopyDataReceiverTest {
 
   @Test
   public void testCopyStatementWithException() {
-    SpannerException exception =
-        SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT, "Invalid copy statement");
+    PGException exception =
+        PGExceptionFactory.newPGException("Invalid copy statement", SQLState.SyntaxError);
     CopyStatement statement = mock(CopyStatement.class);
     when(statement.hasException()).thenReturn(true);
     when(statement.getException()).thenReturn(exception);
     ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
 
     CopyDataReceiver receiver = new CopyDataReceiver(statement, connectionHandler);
-    SpannerException spannerException = assertThrows(SpannerException.class, receiver::handleCopy);
+    PGException pgException = assertThrows(PGException.class, receiver::handleCopy);
 
-    assertSame(exception, spannerException);
+    assertSame(exception, pgException);
   }
 
   @Test
