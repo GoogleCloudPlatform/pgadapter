@@ -110,14 +110,22 @@ public class Concerts {
 
   @Override
   public String toString() {
-    return "Concerts{" +
-        "id=" + id +
-        ", name='" + name + '\'' +
-        ", startTime=" + startTime +
-        ", endTime=" + endTime +
-        ", singers=" + singers +
-        ", createdAt=" + createdAt +
-        ", updatedAt=" + updatedAt +
-        '}';
+    return "Concerts{"
+        + "id="
+        + id
+        + ", name='"
+        + name
+        + '\''
+        + ", startTime="
+        + startTime
+        + ", endTime="
+        + endTime
+        + ", singers="
+        + singers
+        + ", createdAt="
+        + createdAt
+        + ", updatedAt="
+        + updatedAt
+        + '}';
   }
 }

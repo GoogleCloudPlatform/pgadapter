@@ -115,15 +115,25 @@ public class Albums {
 
   @Override
   public String toString() {
-    return "Albums{" +
-        "id='" + id + '\'' +
-        ", title='" + title + '\'' +
-        ", marketingBudget=" + marketingBudget +
-        ", releaseDate=" + releaseDate +
-        ", coverPicture=" + Arrays.toString(coverPicture) +
-        ", singers=" + singers +
-        ", createdAt=" + createdAt +
-        ", updatedAt=" + updatedAt +
-        '}';
+    return "Albums{"
+        + "id='"
+        + id
+        + '\''
+        + ", title='"
+        + title
+        + '\''
+        + ", marketingBudget="
+        + marketingBudget
+        + ", releaseDate="
+        + releaseDate
+        + ", coverPicture="
+        + Arrays.toString(coverPicture)
+        + ", singers="
+        + singers
+        + ", createdAt="
+        + createdAt
+        + ", updatedAt="
+        + updatedAt
+        + '}';
   }
 }

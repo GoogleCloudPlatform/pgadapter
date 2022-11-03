@@ -33,13 +33,12 @@ public class HibernateSampleTest {
   private List<String> venuesId = new ArrayList<>();
   private List<String> concertsId = new ArrayList<>();
 
-  public HibernateSampleTest(
-      HibernateConfiguration hibernateConfiguration) {
+  public HibernateSampleTest(HibernateConfiguration hibernateConfiguration) {
     this.hibernateConfiguration = hibernateConfiguration;
   }
 
   public void testJPACriteriaDelete() {
-    try(Session s = hibernateConfiguration.openSession()) {
+    try (Session s = hibernateConfiguration.openSession()) {
       final Singers singers = Utils.createSingers();
       final Albums albums = Utils.createAlbums(singers);
       s.getTransaction().begin();
@@ -63,20 +62,21 @@ public class HibernateSampleTest {
   }
 
   public void testJPACriteria() {
-    try(Session s = hibernateConfiguration.openSession()) {
+    try (Session s = hibernateConfiguration.openSession()) {
       CriteriaBuilder cb = s.getCriteriaBuilder();
       CriteriaQuery<Singers> singersCriteriaQuery = cb.createQuery(Singers.class);
       Root<Singers> singersRoot = singersCriteriaQuery.from(Singers.class);
       singersCriteriaQuery
           .select(singersRoot)
           .where(
-              cb.and(cb.equal(singersRoot.get("firstName"), "David"),
+              cb.and(
+                  cb.equal(singersRoot.get("firstName"), "David"),
                   cb.equal(singersRoot.get("lastName"), "Lee")));
 
       Query<Singers> singersQuery = s.createQuery(singersCriteriaQuery);
       List<Singers> singers = singersQuery.getResultList();
 
-      logger.log(Level.INFO, "Listed singer: {0}", singers.size());
+      System.out.println("Listed singer: " + singers.size());
 
       CriteriaUpdate<Albums> albumsCriteriaUpdate = cb.createCriteriaUpdate(Albums.class);
       Root<Albums> albumsRoot = albumsCriteriaUpdate.from(Albums.class);
@@ -89,7 +89,7 @@ public class HibernateSampleTest {
   }
 
   public void testHqlUpdate() {
-    try(Session s = hibernateConfiguration.openSession()) {
+    try (Session s = hibernateConfiguration.openSession()) {
       Singers singers = Utils.createSingers();
       singers.setLastName("Cord");
       s.getTransaction().begin();
@@ -97,44 +97,45 @@ public class HibernateSampleTest {
       s.getTransaction().commit();
 
       s.getTransaction().begin();
-      Query query = s.createQuery(
-          "update Singers set active=:active "
-              + "where lastName=:lastName and firstName=:firstName");
+      Query query =
+          s.createQuery(
+              "update Singers set active=:active "
+                  + "where lastName=:lastName and firstName=:firstName");
       query.setParameter("active", false);
       query.setParameter("lastName", "Cord");
       query.setParameter("firstName", "David");
       query.executeUpdate();
       s.getTransaction().commit();
 
-      logger.log(Level.INFO, "Updated singer: {0}", s.get(Singers.class, singers.getId()));
+      System.out.println("Updated singer: " + s.get(Singers.class, singers.getId()));
     }
   }
 
   public void testHqlList() {
-    try(Session s = hibernateConfiguration.openSession()) {
+    try (Session s = hibernateConfiguration.openSession()) {
       Query query = s.createQuery("from Singers");
       List<Singers> list = query.list();
-      logger.log(Level.INFO, "Singers list size: {0}", list.size());
+      System.out.println("Singers list size: " + list.size());
 
       query = s.createQuery("from Singers order by fullName");
       query.setFirstResult(2);
       list = query.list();
-      logger.log(Level.INFO, "Singers list size with first result: {0}", list.size());
+      System.out.println("Singers list size with first result: " + list.size());
 
       /* Current Limit is not supported. */
       // query = s.createQuery("from Singers");
       // query.setMaxResults(2);
       // list = query.list();
-      // logger.log(Level.INFO, "Singers list size with first result: {0}", list.size());
+      // System.out.println("Singers list size with first result: " + list.size());
 
       query = s.createQuery("select  sum(sampleRate) from Tracks");
       list = query.list();
-      logger.log(Level.INFO, "Sample rate sum: {0}", list);
+      System.out.println("Sample rate sum: " + list);
     }
   }
 
   public void testOneToManyData() {
-    try(Session s = hibernateConfiguration.openSession()) {
+    try (Session s = hibernateConfiguration.openSession()) {
       Venues venues = s.get(Venues.class, UUID.fromString(venuesId.get(0)));
       if (venues == null) {
         logger.log(Level.SEVERE, "Previously Added Venues Not Found.");
@@ -143,12 +144,12 @@ public class HibernateSampleTest {
         logger.log(Level.SEVERE, "Previously Added Concerts Not Found.");
       }
 
-      logger.log(Level.INFO, "Venues fetched: {0}", venues);
+      System.out.println("Venues fetched: " + venues);
     }
   }
 
   public void testDeletingData() {
-    try(Session s = hibernateConfiguration.openSession()) {
+    try (Session s = hibernateConfiguration.openSession()) {
       Singers singers = Utils.createSingers();
       s.getTransaction().begin();
       s.saveOrUpdate(singers);
@@ -171,7 +172,7 @@ public class HibernateSampleTest {
   }
 
   public void testAddingData() {
-    try(Session s = hibernateConfiguration.openSession()) {
+    try (Session s = hibernateConfiguration.openSession()) {
       final Singers singers = Utils.createSingers();
       final Albums albums = Utils.createAlbums(singers);
       final Venues venues = Utils.createVenue();
@@ -200,28 +201,28 @@ public class HibernateSampleTest {
       tracksId.add(tracks1.getId().getTrackNumber());
       tracksId.add(tracks2.getId().getTrackNumber());
 
-      logger.log(Level.INFO, "Created Singer: {0}", singers.getId());
-      logger.log(Level.INFO, "Created Albums: {0}", albums.getId());
-      logger.log(Level.INFO, "Created Venues: {0}", venues.getId());
-      logger.log(Level.INFO, "Created Concerts: {0}", concerts1.getId());
-      logger.log(Level.INFO, "Created Concerts: {0}", concerts2.getId());
-      logger.log(Level.INFO, "Created Concerts: {0}", concerts3.getId());
-      logger.log(Level.INFO, "Created Tracks: {0}", tracks1.getId());
-      logger.log(Level.INFO, "Created Tracks: {0}", tracks2.getId());
+      System.out.println("Created Singer: " + singers.getId());
+      System.out.println("Created Albums: " + albums.getId());
+      System.out.println("Created Venues: " + venues.getId());
+      System.out.println("Created Concerts: " + concerts1.getId());
+      System.out.println("Created Concerts: " + concerts2.getId());
+      System.out.println("Created Concerts: " + concerts3.getId());
+      System.out.println("Created Tracks: " + tracks1.getId());
+      System.out.println("Created Tracks: " + tracks2.getId());
     }
   }
 
   public void testSessionRollback() {
-    try(Session s = hibernateConfiguration.openSession()) {
+    try (Session s = hibernateConfiguration.openSession()) {
       final Singers singers = Utils.createSingers();
       s.getTransaction().begin();
       s.saveOrUpdate(singers);
       s.getTransaction().rollback();
 
-      logger.log(Level.INFO, "Singers that was saved: ", singers.getId());
+      System.out.println("Singers that was saved: " + singers.getId());
       Singers singersFromDb = s.get(Singers.class, singers.getId());
       if (singersFromDb == null) {
-        logger.log(Level.INFO, "Singers not found as expected.");
+        System.out.println("Singers not found as expected.");
       } else {
         logger.log(Level.SEVERE, "Singers found. Lookout for the error.");
       }
@@ -229,7 +230,7 @@ public class HibernateSampleTest {
   }
 
   public void testForeignKey() {
-    try(Session s = hibernateConfiguration.openSession()) {
+    try (Session s = hibernateConfiguration.openSession()) {
       final Singers singers = Utils.createSingers();
       final Albums albums = Utils.createAlbums(singers);
 
@@ -240,47 +241,49 @@ public class HibernateSampleTest {
 
       singersId.add(singers.getId().toString());
       albumsId.add(albums.getId().toString());
-      logger.log(Level.INFO, "Created Singer: {0}", singers.getId());
-      logger.log(Level.INFO, "Created Albums: {0}", albums.getId());
+      System.out.println("Created Singer: " + singers.getId());
+      System.out.println("Created Albums: " + albums.getId());
     }
   }
 
   public void executeTest() {
-    logger.log(Level.INFO, "Testing Foreign Key");
+    System.out.println("Testing Foreign Key");
     testForeignKey();
-    logger.log(Level.INFO, "Foreign Key Test Completed");
+    System.out.println("Foreign Key Test Completed");
 
-    logger.log(Level.INFO, "Testing Session Rollback");
+    System.out.println("Testing Session Rollback");
     testSessionRollback();
-    logger.log(Level.INFO, "Session Rollback Test Completed");
+    System.out.println("Session Rollback Test Completed");
 
-    logger.log(Level.INFO, "Testing Data Insert");
+    System.out.println("Testing Data Insert");
     testAddingData();
-    logger.log(Level.INFO, "Data Insert Test Completed");
+    System.out.println("Data Insert Test Completed");
 
-    logger.log(Level.INFO, "Testing Data Delete");
+    System.out.println("Testing Data Delete");
     testDeletingData();
-    logger.log(Level.INFO, "Data Delete Test Completed");
+    System.out.println("Data Delete Test Completed");
 
-    logger.log(Level.INFO, "Testing One to Many Fetch");
+    System.out.println("Testing One to Many Fetch");
     testOneToManyData();
-    logger.log(Level.INFO, "One To Many Fetch Test Completed");
+    System.out.println("One To Many Fetch Test Completed");
 
-    logger.log(Level.INFO, "Testing HQL List");
+    System.out.println("Testing HQL List");
     testHqlList();
-    logger.log(Level.INFO, "HQL List Test Completed");
+    System.out.println("HQL List Test Completed");
 
-    logger.log(Level.INFO, "Testing HQL Update");
+    System.out.println("Testing HQL Update");
     testHqlUpdate();
-    logger.log(Level.INFO, "HQL Update Test Completed");
+    System.out.println("HQL Update Test Completed");
 
-    logger.log(Level.INFO, "Testing JPA List and Update");
+    System.out.println("Testing JPA List and Update");
     testJPACriteria();
-    logger.log(Level.INFO, "JPA List and Update Test Completed");
+    System.out.println("JPA List and Update Test Completed");
 
-    logger.log(Level.INFO, "Testing JPA Delete");
+    System.out.println("Testing JPA Delete");
     testJPACriteriaDelete();
-    logger.log(Level.INFO, "JPA Delete Test Completed");
+    System.out.println("JPA Delete Test Completed");
+
+    hibernateConfiguration.closeSessionFactory();
   }
 
   public static void main(String[] args) {
@@ -288,5 +291,4 @@ public class HibernateSampleTest {
         new HibernateSampleTest(HibernateConfiguration.createHibernateConfiguration());
     hibernateSampleTest.executeTest();
   }
-
 }

@@ -35,9 +35,8 @@ public class Venues {
   @Column(name = "updated_at", columnDefinition = "timestamptz")
   private LocalDateTime updatedAt;
 
-
   @OneToMany(cascade = CascadeType.ALL)
-  @JoinColumn(name="venue_id")
+  @JoinColumn(name = "venue_id")
   private List<Concerts> concerts;
 
   public UUID getId() {
@@ -90,13 +89,21 @@ public class Venues {
 
   @Override
   public String toString() {
-    return "Venues{" +
-        "id=" + id +
-        ", name='" + name + '\'' +
-        ", description='" + description + '\'' +
-        ", createdAt=" + createdAt +
-        ", updatedAt=" + updatedAt +
-        ", concerts=" + concerts +
-        '}';
+    return "Venues{"
+        + "id="
+        + id
+        + ", name='"
+        + name
+        + '\''
+        + ", description='"
+        + description
+        + '\''
+        + ", createdAt="
+        + createdAt
+        + ", updatedAt="
+        + updatedAt
+        + ", concerts="
+        + concerts
+        + '}';
   }
 }

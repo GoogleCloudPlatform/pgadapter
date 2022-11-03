@@ -63,7 +63,7 @@ The following limitations are currently known:
 ### Migrations
 Migrations are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect. It is recommended to
 create the schema manually. Note that PGAdapter does support `create table if not exists` / `drop table if exists`.
-See [sample-schema.sql](sample-schema.sql) for the data model for this example.
+See [sample-schema.sql](src/main/resources/sample-schema-sql) for the data model for this example.
 
 ### Generated Primary Keys
 `Sequences` are not supported. Hence, auto increment primary key is not supported and should be replaced with primary key definitions that

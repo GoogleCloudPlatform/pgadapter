@@ -38,7 +38,6 @@ public class Singers {
   @Column(name = "updated_at", columnDefinition = "timestamptz")
   private LocalDateTime updatedAt;
 
-
   public UUID getId() {
     return id;
   }
@@ -93,14 +92,25 @@ public class Singers {
 
   @Override
   public String toString() {
-    return "Singers{" +
-        "id='" + id + '\'' +
-        ", firstName='" + firstName + '\'' +
-        ", lastName='" + lastName + '\'' +
-        ", fullName='" + fullName + '\'' +
-        ", active=" + active +
-        ", createdAt=" + createdAt +
-        ", updatedAt=" + updatedAt +
-        '}';
+    return "Singers{"
+        + "id='"
+        + id
+        + '\''
+        + ", firstName='"
+        + firstName
+        + '\''
+        + ", lastName='"
+        + lastName
+        + '\''
+        + ", fullName='"
+        + fullName
+        + '\''
+        + ", active="
+        + active
+        + ", createdAt="
+        + createdAt
+        + ", updatedAt="
+        + updatedAt
+        + '}';
   }
 }

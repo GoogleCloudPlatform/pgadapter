@@ -11,8 +11,7 @@ import org.hibernate.annotations.GeneratorType;
 @Entity
 public class Tracks {
 
-  @EmbeddedId
-  private TracksId id;
+  @EmbeddedId private TracksId id;
 
   @Column(name = "title", nullable = false)
   private String title;
@@ -69,12 +68,18 @@ public class Tracks {
 
   @Override
   public String toString() {
-    return "Tracks{" +
-        "id=" + id +
-        ", title='" + title + '\'' +
-        ", sampleRate=" + sampleRate +
-        ", createdAt=" + createdAt +
-        ", updatedAt=" + updatedAt +
-        '}';
+    return "Tracks{"
+        + "id="
+        + id
+        + ", title='"
+        + title
+        + '\''
+        + ", sampleRate="
+        + sampleRate
+        + ", createdAt="
+        + createdAt
+        + ", updatedAt="
+        + updatedAt
+        + '}';
   }
 }

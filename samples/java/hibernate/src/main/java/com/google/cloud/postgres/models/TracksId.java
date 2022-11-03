@@ -14,8 +14,7 @@ public class TracksId implements Serializable {
   @Column(name = "track_number", nullable = false)
   private long trackNumber;
 
-  public TracksId() {
-  }
+  public TracksId() {}
 
   public TracksId(UUID id, long trackNumber) {
     this.id = id;
@@ -40,9 +39,6 @@ public class TracksId implements Serializable {
 
   @Override
   public String toString() {
-    return "TracksId{" +
-        "id=" + id +
-        ", trackNumber=" + trackNumber +
-        '}';
+    return "TracksId{" + "id=" + id + ", trackNumber=" + trackNumber + '}';
   }
 }
