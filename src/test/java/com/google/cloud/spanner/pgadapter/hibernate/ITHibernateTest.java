@@ -15,9 +15,6 @@
 package com.google.cloud.spanner.pgadapter.hibernate;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
@@ -49,7 +46,7 @@ public class ITHibernateTest {
       HIBERNATE_SAMPLE_DIRECTORY + "/src/main/resources/hibernate.properties";
   private static final String HIBERNATE_DB_CHANGELOG_DDL_FILE =
       HIBERNATE_SAMPLE_DIRECTORY + "/src/main/resources/sample-schema-sql";
-  private static final String  HIBERNATE_DEFAULT_URL =
+  private static final String HIBERNATE_DEFAULT_URL =
       "jdbc:postgresql://localhost:5433/test-database";
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
@@ -115,7 +112,8 @@ public class ITHibernateTest {
   public void testLiquibaseUpdate() throws IOException, InterruptedException, SQLException {
     ImmutableList<String> hibernateCommand =
         ImmutableList.<String>builder()
-            .add("mvn",
+            .add(
+                "mvn",
                 "exec:java",
                 "-Dexec.mainClass=com.google.cloud.postgres.HibernateSampleTest")
             .build();
@@ -124,9 +122,7 @@ public class ITHibernateTest {
 
   static void buildHibernateSample() throws IOException, InterruptedException {
     ImmutableList<String> hibernateCommand =
-        ImmutableList.<String>builder()
-            .add("mvn", "clean", "package", "-P", "assembly")
-            .build();
+        ImmutableList.<String>builder().add("mvn", "clean", "package", "-P", "assembly").build();
     runCommand(hibernateCommand);
   }
 
@@ -140,7 +136,7 @@ public class ITHibernateTest {
     String output;
 
     try (BufferedReader reader =
-        new BufferedReader(new InputStreamReader(process.getInputStream()));
+            new BufferedReader(new InputStreamReader(process.getInputStream()));
         BufferedReader errorReader =
             new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
       errors = errorReader.lines().collect(Collectors.joining("\n"));
@@ -152,6 +148,5 @@ public class ITHibernateTest {
 
     int res = process.waitFor();
     assertEquals(errors, 0, res);
-
   }
 }
