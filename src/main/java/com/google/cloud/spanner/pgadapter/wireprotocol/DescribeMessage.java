@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
@@ -93,7 +92,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
       } else {
         this.handleDescribeStatement();
       }
-    } catch (SpannerException e) {
+    } catch (Exception e) {
       handleError(e);
     }
   }
@@ -153,7 +152,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
                     this.connection.getServer().getOptions(),
                     this.queryMode)
                 .send(false);
-          } catch (SpannerException exception) {
+          } catch (Exception exception) {
             this.handleError(exception);
           }
         }
@@ -203,7 +202,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
           new NoDataResponse(this.outputStream).send(false);
         }
       }
-    } catch (SpannerException exception) {
+    } catch (Exception exception) {
       this.handleError(exception);
     }
   }

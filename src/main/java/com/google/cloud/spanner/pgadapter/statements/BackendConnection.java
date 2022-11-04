@@ -704,19 +704,22 @@ public class BackendConnection {
       switch (ddlTransactionMode) {
         case Single:
           throw PGExceptionFactory.newPGException(
-              "DDL statements are only allowed outside batches and transactions.", SQLState.InvalidTransactionState);
+              "DDL statements are only allowed outside batches and transactions.",
+              SQLState.InvalidTransactionState);
         case Batch:
           if (spannerConnection.isInTransaction()
               || bufferedStatements.stream()
                   .anyMatch(statement -> !statement.parsedStatement.isDdl())) {
             throw PGExceptionFactory.newPGException(
-                "DDL statements are not allowed in mixed batches or transactions.", SQLState.InvalidTransactionState);
+                "DDL statements are not allowed in mixed batches or transactions.",
+                SQLState.InvalidTransactionState);
           }
           break;
         case AutocommitImplicitTransaction:
           if (spannerConnection.isInTransaction() && transactionMode != TransactionMode.IMPLICIT) {
             throw PGExceptionFactory.newPGException(
-                "DDL statements are only allowed outside explicit transactions.", SQLState.InvalidTransactionState);
+                "DDL statements are only allowed outside explicit transactions.",
+                SQLState.InvalidTransactionState);
           }
           // Fallthrough to commit the transaction if necessary.
         case AutocommitExplicitTransaction:

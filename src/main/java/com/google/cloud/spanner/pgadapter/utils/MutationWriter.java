@@ -235,12 +235,12 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       while (!rollback.get() && iterator.hasNext()) {
         CopyRecord record = iterator.next();
         if (record.numColumns() != this.tableColumns.keySet().size()) {
-          throw SpannerExceptionFactory.newSpannerException(
-              ErrorCode.INVALID_ARGUMENT,
+          throw PGExceptionFactory.newPGException(
               "Invalid COPY data: Row length mismatched. Expected "
                   + this.tableColumns.keySet().size()
                   + " columns, but only found "
-                  + record.numColumns());
+                  + record.numColumns(),
+              SQLState.DataException);
         }
 
         Mutation mutation = buildMutation(record);

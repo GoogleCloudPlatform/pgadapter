@@ -33,11 +33,11 @@ import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Mutation;
-import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
@@ -207,9 +207,9 @@ public class MutationWriterTest {
             }
           });
 
-      SpannerException exception = assertThrows(SpannerException.class, mutationWriter::call);
+      PGException exception = assertThrows(PGException.class, mutationWriter::call);
       assertEquals(
-          "FAILED_PRECONDITION: Record count: 2 has exceeded the limit: 1.\n"
+          "Record count: 2 has exceeded the limit: 1.\n"
               + "\n"
               + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 1.\n"
               + "\n"
@@ -314,7 +314,7 @@ public class MutationWriterTest {
             }
           });
 
-      SpannerException exception = assertThrows(SpannerException.class, mutationWriter::call);
+      PGException exception = assertThrows(PGException.class, mutationWriter::call);
       assertTrue(exception.getMessage().contains("Commit size: 40 has exceeded the limit: 30"));
 
       verify(connection, never()).write(anyIterable());

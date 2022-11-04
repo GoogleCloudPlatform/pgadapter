@@ -26,7 +26,7 @@ import java.util.Objects;
 public class PGException extends RuntimeException {
   public static class Builder {
     private final String message;
-    private Severity severity;
+    private Severity severity = Severity.ERROR;
     private SQLState sqlState;
     private String hints;
     private Throwable cause;

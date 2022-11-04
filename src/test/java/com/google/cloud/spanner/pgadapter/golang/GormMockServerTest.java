@@ -804,7 +804,7 @@ public class GormMockServerTest extends AbstractMockServerTest {
     // Nested transactions are not supported, as we don't support savepoints.
     String res = gormTest.TestNestedTransaction(createConnString());
     assertEquals(
-        "failed to execute nested transaction: ERROR: current transaction is aborted, commands ignored until end of transaction block (SQLSTATE P0001)",
+        "failed to execute nested transaction: ERROR: current transaction is aborted, commands ignored until end of transaction block (SQLSTATE 25P02)",
         res);
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
@@ -840,7 +840,7 @@ public class GormMockServerTest extends AbstractMockServerTest {
 
     String res = gormTest.TestErrorInTransaction(createConnString());
     assertEquals(
-        "failed to execute transaction: ERROR: current transaction is aborted, commands ignored until end of transaction block (SQLSTATE P0001)",
+        "failed to execute transaction: ERROR: current transaction is aborted, commands ignored until end of transaction block (SQLSTATE 25P02)",
         res);
     assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
     // This test also leads to 1 commit request. The reason for this is that the update statement is

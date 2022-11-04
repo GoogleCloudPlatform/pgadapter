@@ -60,7 +60,9 @@ public class PGExceptionFactory {
     return newPGException("Query cancelled", SQLState.QueryCanceled);
   }
 
-  /** Creates a new exception that indicates that the current transaction is in the aborted state. */
+  /**
+   * Creates a new exception that indicates that the current transaction is in the aborted state.
+   */
   public static PGException newTransactionAbortedException() {
     return newPGException(TRANSACTION_ABORTED_ERROR, SQLState.InFailedSqlTransaction);
   }
@@ -78,7 +80,8 @@ public class PGExceptionFactory {
     if (throwable instanceof PGException) {
       return (PGException) throwable;
     }
-    return newPGException(throwable.getMessage());
+    return newPGException(
+        throwable.getMessage() == null ? throwable.getClass().getName() : throwable.getMessage());
   }
 
   private static final String NOT_FOUND_PREFIX =
@@ -94,15 +97,17 @@ public class PGExceptionFactory {
     } else if (spannerException.getMessage().startsWith(INVALID_ARGUMENT_PREFIX)) {
       result = spannerException.getMessage().substring(INVALID_ARGUMENT_PREFIX.length());
     } else {
-      String grpcPrefix =
+      String fullGrpcPrefix =
           spannerException.getErrorCode().name()
               + ": "
               + StatusRuntimeException.class.getName()
               + ": "
               + spannerException.getErrorCode().name()
               + ": ";
-      if (spannerException.getMessage().startsWith(grpcPrefix)) {
-        result = spannerException.getMessage().substring(grpcPrefix.length());
+      String grpcPrefix =
+          StatusRuntimeException.class.getName() + ": " + spannerException.getErrorCode().name();
+      if (spannerException.getMessage().startsWith(fullGrpcPrefix)) {
+        result = spannerException.getMessage().substring(fullGrpcPrefix.length());
       } else {
         String spannerPrefix = spannerException.getErrorCode().name() + ": ";
         result =
