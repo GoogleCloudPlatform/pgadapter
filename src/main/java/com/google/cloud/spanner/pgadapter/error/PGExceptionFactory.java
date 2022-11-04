@@ -97,17 +97,15 @@ public class PGExceptionFactory {
     } else if (spannerException.getMessage().startsWith(INVALID_ARGUMENT_PREFIX)) {
       result = spannerException.getMessage().substring(INVALID_ARGUMENT_PREFIX.length());
     } else {
-      String fullGrpcPrefix =
+      String grpcPrefix =
           spannerException.getErrorCode().name()
               + ": "
               + StatusRuntimeException.class.getName()
               + ": "
               + spannerException.getErrorCode().name()
               + ": ";
-      String grpcPrefix =
-          StatusRuntimeException.class.getName() + ": " + spannerException.getErrorCode().name();
-      if (spannerException.getMessage().startsWith(fullGrpcPrefix)) {
-        result = spannerException.getMessage().substring(fullGrpcPrefix.length());
+      if (spannerException.getMessage().startsWith(grpcPrefix)) {
+        result = spannerException.getMessage().substring(grpcPrefix.length());
       } else {
         String spannerPrefix = spannerException.getErrorCode().name() + ": ";
         result =
