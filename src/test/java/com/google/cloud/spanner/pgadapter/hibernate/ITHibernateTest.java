@@ -19,7 +19,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
 import com.google.common.collect.ImmutableList;
@@ -31,7 +30,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Scanner;
@@ -44,8 +42,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class HibernateTest {
-  private static final Logger LOGGER = Logger.getLogger(HibernateTest.class.getName());
+public class ITHibernateTest {
+  private static final Logger LOGGER = Logger.getLogger(ITHibernateTest.class.getName());
   private static final String HIBERNATE_SAMPLE_DIRECTORY = "samples/java/hibernate";
   private static final String HIBERNATE_PROPERTIES_FILE =
       HIBERNATE_SAMPLE_DIRECTORY + "/src/main/resources/hibernate.properties";
