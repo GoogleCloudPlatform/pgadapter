@@ -38,6 +38,7 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
@@ -56,6 +57,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -604,5 +606,45 @@ public class MutationWriterTest {
 
       assertEquals(String.format("Type: %s", type), 1, mutation.asMap().size());
     }
+  }
+
+  @Test
+  public void testWriteAfterClose() throws Exception {
+    Map<String, Type> tableColumns = ImmutableMap.of("number", Type.int64(), "name", Type.string());
+    CSVFormat format =
+        CSVFormat.POSTGRESQL_TEXT
+            .builder()
+            .setHeader(tableColumns.keySet().toArray(new String[0]))
+            .build();
+    SessionState sessionState = new SessionState(mock(OptionsMetadata.class));
+    Connection connection = mock(Connection.class);
+    DatabaseClient databaseClient = mock(DatabaseClient.class);
+    when(connection.getDatabaseClient()).thenReturn(databaseClient);
+    MutationWriter mutationWriter =
+        new MutationWriter(
+            sessionState,
+            CopyTransactionMode.ImplicitAtomic,
+            connection,
+            "numbers",
+            tableColumns,
+            /* indexedColumnsCount = */ 1,
+            Format.TEXT,
+            format,
+            false);
+
+    Future<?> fut =
+        executor.submit(
+            () -> {
+              mutationWriter.close();
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+              return null;
+            });
+
+    mutationWriter.call();
+    ExecutionException executionException = assertThrows(ExecutionException.class, fut::get);
+    assertEquals(PGException.class, executionException.getCause().getClass());
+    PGException pgException = (PGException) executionException.getCause();
+    assertEquals(SQLState.InternalError, pgException.getSQLState());
   }
 }

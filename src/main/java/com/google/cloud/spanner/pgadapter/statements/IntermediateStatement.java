@@ -36,6 +36,7 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.DataOutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -213,7 +214,8 @@ public class IntermediateStatement {
     return this.parsedStatement.getSqlWithoutComments();
   }
 
-  private void initFutureResult(ResultNotReadyBehavior resultNotReadyBehavior) {
+  @VisibleForTesting
+  void initFutureResult(ResultNotReadyBehavior resultNotReadyBehavior) {
     if (this.futureStatementResult != null) {
       if (resultNotReadyBehavior == ResultNotReadyBehavior.FAIL
           && !this.futureStatementResult.isDone()) {

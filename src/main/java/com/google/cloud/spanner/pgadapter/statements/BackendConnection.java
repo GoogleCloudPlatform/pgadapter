@@ -821,16 +821,10 @@ public class BackendConnection {
     Preconditions.checkArgument(
         canBeBatchedTogether(getStatementType(fromIndex), getStatementType(fromIndex + 1)));
     StatementType batchType = getStatementType(fromIndex);
-    switch (batchType) {
-      case UPDATE:
-        spannerConnection.startBatchDml();
-        break;
-      case DDL:
-        spannerConnection.startBatchDdl();
-        break;
-      default:
-        throw PGExceptionFactory.newPGException(
-            "Statement type is not supported for batching", SQLState.InternalError);
+    if (batchType == StatementType.UPDATE) {
+      spannerConnection.startBatchDml();
+    } else if (batchType == StatementType.DDL) {
+      spannerConnection.startBatchDdl();
     }
     List<StatementResult> statementResults = new ArrayList<>(getStatementCount());
     int index = fromIndex;
