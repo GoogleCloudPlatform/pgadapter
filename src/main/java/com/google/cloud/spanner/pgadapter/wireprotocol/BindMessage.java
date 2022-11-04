@@ -71,9 +71,13 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.statement = connection.getStatement(statementName);
   }
 
+  private boolean hasParameterValues() {
+    return this.parameters != null && this.parameters.length > 0;
+  }
+
   @Override
   void buffer(BackendConnection backendConnection) {
-    if (isExtendedProtocol() && !this.statement.isDescribed()) {
+    if (isExtendedProtocol() && hasParameterValues() && !this.statement.isDescribed()) {
       try {
         // Make sure all parameters have been described, so we always send typed parameters to Cloud
         // Spanner.
