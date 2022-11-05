@@ -37,7 +37,7 @@ psql -h localhost -p 5432 -d my-database -f drop-data-model.sql
 ```
 
 ## Data Types
-Cloud Spanner supports the following data types in combination with `gorm`.
+Cloud Spanner supports the following data types in combination with `Hibernate`.
 
 | PostgreSQL Type                        | Hibernate or Java |
 |----------------------------------------|-------------------|
