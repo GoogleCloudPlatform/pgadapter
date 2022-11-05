@@ -47,7 +47,7 @@ public class ITHibernateTest {
   private static final String HIBERNATE_DB_CHANGELOG_DDL_FILE =
       HIBERNATE_SAMPLE_DIRECTORY + "/src/main/resources/sample-schema-sql";
   private static final String HIBERNATE_DEFAULT_URL =
-      "jdbc:postgresql://localhost:5433/test-database";
+      "jdbc:postgresql://localhost:5432/test-database";
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
   private static String originalHibernateProperties;
