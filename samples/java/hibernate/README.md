@@ -56,7 +56,7 @@ The following limitations are currently known:
 
 | Limitation                           | Workaround                                                                                                                                         |
 |--------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
-| Migrations                           | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated migrations using `hibernate` are therefore not supported.                |
+| Schema updates                           | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated schema updates using `hibernate` are therefore not supported. It is recommended to set the option `hibernate.hbm2ddl.auto=none` (or `spring.jpa.hibernate.ddl-auto=none` if you are using Spring).               |
 | Generated primary keys               | Cloud Spanner does not support `sequences`. Auto-increment primary key is not supported. Remove auto increment annotation for primary key columns. |
 
 
