@@ -60,7 +60,7 @@ The following limitations are currently known:
 | Generated primary keys               | Cloud Spanner does not support `sequences`. Auto-increment primary key is not supported. Remove auto increment annotation for primary key columns. The recommended type of primary key is a client side generated `UUID` stored as a string. |
 
 
-### Migrations
+### Schema Updates
 Migrations are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect. It is recommended to
 create the schema manually. Note that PGAdapter does support `create table if not exists` / `drop table if exists`.
 See [sample-schema.sql](src/main/resources/sample-schema-sql) for the data model for this example.
