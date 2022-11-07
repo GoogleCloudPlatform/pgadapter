@@ -37,7 +37,7 @@ psql -h localhost -p 5432 -d my-database -f drop-data-model.sql
 ```
 
 ## Data Types
-Cloud Spanner supports the following data types in combination with `gorm`.
+Cloud Spanner supports the following data types in combination with `Hibernate`.
 
 | PostgreSQL Type                        | Hibernate or Java |
 |----------------------------------------|-------------------|
@@ -56,12 +56,12 @@ The following limitations are currently known:
 
 | Limitation                           | Workaround                                                                                                                                         |
 |--------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
-| Migrations                           | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated migrations using `hibernate` are therefore not supported.                |
-| Generated primary keys               | Cloud Spanner does not support `sequences`. Auto-increment primary key is not supported. Remove auto increment annotation for primary key columns. |
+| Schema updates                           | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated schema updates using `hibernate` are therefore not supported. It is recommended to set the option `hibernate.hbm2ddl.auto=none` (or `spring.jpa.hibernate.ddl-auto=none` if you are using Spring).               |
+| Generated primary keys               | Cloud Spanner does not support `sequences`. Auto-increment primary key is not supported. Remove auto increment annotation for primary key columns. The recommended type of primary key is a client side generated `UUID` stored as a string. |
 
 
-### Migrations
-Migrations are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect. It is recommended to
+### Schema Updates
+Schema updates are not supported as Cloud Spanner does not support the full PostgreSQL DDL dialect. It is recommended to
 create the schema manually. Note that PGAdapter does support `create table if not exists` / `drop table if exists`.
 See [sample-schema.sql](src/main/resources/sample-schema-sql) for the data model for this example.
 
