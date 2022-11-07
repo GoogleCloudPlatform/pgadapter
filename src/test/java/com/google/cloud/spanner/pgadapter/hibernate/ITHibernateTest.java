@@ -83,7 +83,7 @@ public class ITHibernateTest {
       }
     }
 
-    // Write liquibase.properties
+    // Write hibernate.properties
     StringBuilder original = new StringBuilder();
     try (Scanner scanner = new Scanner(new FileReader(HIBERNATE_PROPERTIES_FILE))) {
       while (scanner.hasNextLine()) {
@@ -109,7 +109,7 @@ public class ITHibernateTest {
   }
 
   @Test
-  public void testLiquibaseUpdate() throws IOException, InterruptedException, SQLException {
+  public void testHibernateUpdate() throws IOException, InterruptedException, SQLException {
     ImmutableList<String> hibernateCommand =
         ImmutableList.<String>builder()
             .add(
