@@ -61,4 +61,26 @@ public class DjangoTestSetup extends DjangoMockServerTest {
 
     return output.toString();
   }
+
+  public String executeTransactionTests(int port, String host, List<String> options)
+      throws IOException, InterruptedException {
+    List<String> runCommand =
+        new ArrayList<>(Arrays.asList("python3", "transaction_test.py", host, Integer.toString(port)));
+    runCommand.addAll(options);
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(runCommand);
+    builder.directory(new File(DJANGO_PATH));
+    Process process = builder.start();
+    Scanner scanner = new Scanner(process.getInputStream());
+
+    StringBuilder output = new StringBuilder();
+    while (scanner.hasNextLine()) {
+      output.append(scanner.nextLine()).append("\n");
+    }
+    int result = process.waitFor();
+    assertEquals(output.toString(), 0, result);
+
+    return output.toString();
+  }
+
 }

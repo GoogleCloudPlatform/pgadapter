@@ -12,7 +12,7 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 '''
-
+from django.db import transaction
 import sys
 
 def create_django_setup(host, port):
@@ -38,49 +38,38 @@ def create_django_setup(host, port):
   settings.configure(**conf)
   apps.populate(settings.INSTALLED_APPS)
 
-def get_all_data():
-  try:
-    result = Singer.objects.all().values()
-  except Exception as e:
-    print(e)
-    result = None
-  for rows in result:
-    print(rows)
 
-def insert_data(data):
-  if len(data) == 0 or len(data) % 3:
-    print('Invalid Size of Data')
-    return
-  i = 0
-  while i < len(data):
-    singerid,firstname, lastname = data[i], data[i+1], data[i+2]
-    singer = Singer(singerid=singerid, firstname=firstname, lastname=lastname)
+def test_commit_transaction():
+  transaction.set_autocommit(False)
+  singer = Singer(singerid=1, firstname='hello', lastname='world')
+  singer2 = Singer(singerid=2, firstname='hello', lastname='python')
+
+  singer.save()
+  singer2.save()
+
+  transaction.commit()
+  print('Transaction Committed')
+
+def test_rollback_transaction():
+  transaction.set_autocommit(False)
+
+  singer = Singer(singerid=1, firstname='hello', lastname='world')
+  singer2 = Singer(singerid=2, firstname='hello', lastname='python')
+
+  singer.save()
+  singer2.save()
+
+  transaction.rollback()
+  print('Transaction Rollbacked')
+
+def test_atomic():
+  with transaction.atomic():
+    singer = Singer(singerid=1, firstname='hello', lastname='world')
+    singer2 = Singer(singerid=2, firstname='hello', lastname='python')
+
     singer.save()
-    print('Save Successful For', singerid, firstname, lastname)
-    i += 3
-
-def get_filtered_data(filters):
-  if len(filters) == 0:
-    print('No Filter Found')
-    return
-  function_string = 'Singer.objects'
-
-  for filter in filters:
-    function_string += '.filter('+filter+')'
-  result = eval(function_string)
-  for rows in result.values():
-    print(rows)
-
-def execute(option):
-  type = option[0]
-  if type == 'all':
-    get_all_data()
-  elif type == 'insert':
-    insert_data(option[1:])
-  elif type == 'filter':
-    get_filtered_data(option[1:])
-  else:
-    print('Invalid Option Type')
+    singer2.save()
+  print('Atomic Successful')
 
 if __name__ == '__main__':
   if len(sys.argv) < 4:
@@ -97,6 +86,17 @@ if __name__ == '__main__':
     sys.exit()
 
   try:
-    execute(sys.argv[3:])
+    option = sys.argv[3]
+
+    if option == 'commit':
+      test_commit_transaction()
+    elif option == 'rollback':
+      test_rollback_transaction()
+    elif option == 'atomic':
+      test_atomic()
+    else:
+      print('Invalid Option')
   except Exception as e:
     print(e)
+
+
