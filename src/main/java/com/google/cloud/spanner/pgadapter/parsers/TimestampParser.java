@@ -64,7 +64,7 @@ public class TimestampParser extends Parser<Timestamp> {
           .parseCaseInsensitive()
           .appendPattern("yyyy-MM-dd HH:mm:ss")
           .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
-          .appendOffset("+HH:mm:ss", "+00")
+          .appendOffset("+HH:mm", "+00")
           .toFormatter();
 
   private static final DateTimeFormatter TIMESTAMP_INPUT_FORMATTER =
@@ -73,7 +73,7 @@ public class TimestampParser extends Parser<Timestamp> {
           .parseCaseInsensitive()
           .appendPattern("yyyy-MM-dd HH:mm:ss")
           .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
-          .appendOffset("+HH:mm:ss", "+00:00:00")
+          .appendOffset("+HH:mm", "+00:00:00")
           .toFormatter();
 
   private final SessionState sessionState;
