@@ -31,8 +31,10 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedTy
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
@@ -580,22 +582,90 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   @Test
   public void testCopyTo() throws Exception {
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of("select * from alltypes"), createAllTypesResultSet("")));
+        StatementResult.query(Statement.of("select * from AllTypes"), createAllTypesResultSet("")));
 
     String output = runTest("testCopyTo", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "\n\n1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+        "\n"
+            + "\n"
+            + "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
         output);
   }
 
   @Test
   public void testCopyFrom() throws Exception {
-    CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, "alltypes", true);
+    CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, "public", "alltypes", true);
 
     String output = runTest("testCopyFrom", getHost(), pgServer.getLocalPort());
 
     assertEquals("\n\nFinished copy operation\n", output);
+  }
+
+  @Test
+  public void testDmlBatch() throws Exception {
+    String sql = "INSERT INTO users(name) VALUES($1)";
+    String describeParamsSql = "select $1 from (select name=$1 from users) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeParamsSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("foo").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("bar").build(), 1L));
+
+    String output = runTest("testDmlBatch", getHost(), pgServer.getLocalPort());
+
+    assertEquals("\n\nexecuted dml batch\n", output);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(
+                request ->
+                    request.getSql().equals(sql) || request.getSql().equals(describeParamsSql))
+            .collect(Collectors.toList());
+    assertEquals(1, executeSqlRequests.size());
+    ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
+    assertEquals(describeParamsSql, describeRequest.getSql());
+    assertFalse(describeRequest.hasTransaction());
+
+    List<ExecuteBatchDmlRequest> batchDmlRequests =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class);
+    assertEquals(1, batchDmlRequests.size());
+    ExecuteBatchDmlRequest request = batchDmlRequests.get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, request.getStatementsCount());
+    String[] expectedValues = new String[] {"foo", "bar"};
+    for (int i = 0; i < request.getStatementsCount(); i++) {
+      assertEquals(sql, request.getStatements(i).getSql());
+      assertEquals(1, request.getStatements(i).getParamTypesCount());
+      assertEquals(
+          expectedValues[i],
+          request.getStatements(i).getParams().getFieldsMap().get("p1").getStringValue());
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testDdlBatch() throws Exception {
+    addDdlResponseToSpannerAdmin();
+
+    String output = runTest("testDdlBatch", getHost(), pgServer.getLocalPort());
+
+    assertEquals("\n\nexecuted ddl batch\n", output);
+    assertEquals(1, mockDatabaseAdmin.getRequests().size());
+    assertEquals(UpdateDatabaseDdlRequest.class, mockDatabaseAdmin.getRequests().get(0).getClass());
+    UpdateDatabaseDdlRequest request =
+        (UpdateDatabaseDdlRequest) mockDatabaseAdmin.getRequests().get(0);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(
+        "create table my_table1 (id bigint primary key, value varchar)", request.getStatements(0));
+    assertEquals(
+        "create table my_table2 (id bigint primary key, value varchar)", request.getStatements(1));
   }
 
   static String runTest(String testName, String host, int port)

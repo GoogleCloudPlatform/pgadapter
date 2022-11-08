@@ -70,8 +70,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1327,7 +1325,8 @@ public class ProtocolTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(connectionHandler, options, "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(connectionHandler, options, "", parse(sql), Statement.of(sql));
     copyStatement.executeAsync(mock(BackendConnection.class));
 
     when(connectionHandler.getActiveCopyStatement()).thenReturn(copyStatement);
@@ -1418,36 +1417,6 @@ public class ProtocolTest {
     message.send();
 
     verify(mutationWriter).rollback();
-  }
-
-  @Test
-  public void testCopyFromFilePipe() throws Exception {
-    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
-        mock(ExtendedQueryProtocolHandler.class);
-    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
-    when(connectionHandler.getExtendedQueryProtocolHandler())
-        .thenReturn(extendedQueryProtocolHandler);
-    SessionState sessionState = new SessionState(options);
-    when(backendConnection.getSessionState()).thenReturn(sessionState);
-    setupQueryInformationSchemaResults();
-
-    byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));
-
-    String sql = "COPY keyvalue FROM STDIN;";
-    CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
-    copyStatement.executeAsync(mock(BackendConnection.class));
-
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(payload);
-
-    assertEquals("TEXT", copyStatement.getFormatType());
-    assertEquals('\t', copyStatement.getDelimiterChar());
-
-    copyStatement.close();
-    verify(resultSet, never()).close();
   }
 
   @Test

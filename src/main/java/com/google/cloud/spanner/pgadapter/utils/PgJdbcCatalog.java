@@ -965,4 +965,9 @@ public class PgJdbcCatalog {
           + "inner join pg_catalog.pg_class rel on a.attrelid=rel.oid\n"
           + "inner join pg_catalog.pg_namespace n on rel.relnamespace=n.oid\n"
           + "inner join information_schema.columns c on n.nspname=c.table_schema and rel.relname=c.table_name and a.attname=c.column_name\n";
+
+  public static final String PG_JDBC_GET_SEQUENCES =
+      "select relname from pg_class where relkind='S'";
+  public static final String PG_JDBC_GET_SEQUENCES_REPLACEMENT =
+      "select ''::varchar as relname LIMIT 0";
 }

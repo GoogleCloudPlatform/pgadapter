@@ -22,10 +22,11 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Scanner;
 import java.util.stream.Collectors;
@@ -96,6 +97,7 @@ public class PGSetting {
   private final String minVal;
   private final String maxVal;
   private final String[] enumVals;
+  private final ImmutableList upperCaseEnumVals;
 
   private String setting;
   private String unit;
@@ -175,6 +177,7 @@ public class PGSetting {
     this.minVal = null;
     this.maxVal = null;
     this.enumVals = null;
+    this.upperCaseEnumVals = null;
   }
 
   @VisibleForTesting
@@ -207,6 +210,13 @@ public class PGSetting {
     this.minVal = minVal;
     this.maxVal = maxVal;
     this.enumVals = enumVals;
+    this.upperCaseEnumVals =
+        enumVals == null
+            ? null
+            : ImmutableList.copyOf(
+                Arrays.stream(enumVals)
+                    .map(v -> v.toUpperCase(Locale.ENGLISH))
+                    .collect(Collectors.toList()));
     this.setting = setting;
     this.unit = unit;
     this.source = source;
@@ -431,8 +441,10 @@ public class PGSetting {
       } catch (NumberFormatException exception) {
         throw invalidValueError(getCasePreservingKey(), value);
       }
-    } else if (enumVals != null && !Iterables.contains(Arrays.asList(this.enumVals), value)) {
-      throw invalidValueError(getCasePreservingKey(), value);
+    } else if (upperCaseEnumVals != null
+        && !upperCaseEnumVals.contains(
+            MoreObjects.firstNonNull(value, "").toUpperCase(Locale.ENGLISH))) {
+      throw invalidEnumError(getCasePreservingKey(), value, enumVals);
     }
   }
 
@@ -446,6 +458,13 @@ public class PGSetting {
     return SpannerExceptionFactory.newSpannerException(
         ErrorCode.INVALID_ARGUMENT,
         String.format("invalid value for parameter \"%s\": \"%s\"", key, value));
+  }
+
+  static PGException invalidEnumError(String key, String value, String[] enumVals) {
+    return PGException.newBuilder(
+            String.format("invalid value for parameter \"%s\": \"%s\"", key, value))
+        .setHints(String.format("Available values: %s.", String.join(", ", enumVals)))
+        .build();
   }
 
   public String getCategory() {

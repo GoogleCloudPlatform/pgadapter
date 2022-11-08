@@ -255,7 +255,7 @@ public abstract class AbstractMockServerTest {
                         .setType(Type.newBuilder().setCode(TypeCode.STRING).build()))
                 .addFields(
                     Field.newBuilder()
-                        .setName("col_jsonb")
+                        .setName(columnPrefix + "col_jsonb")
                         .setType(
                             Type.newBuilder()
                                 .setCode(TypeCode.JSON)
@@ -290,6 +290,10 @@ public abstract class AbstractMockServerTest {
         return TypeAnnotationCode.PG_JSONB;
     }
     return TypeAnnotationCode.TYPE_ANNOTATION_CODE_UNSPECIFIED;
+  }
+
+  protected static ResultSet createResultSetWithOnlyMetadata(ImmutableList<TypeCode> types) {
+    return ResultSet.newBuilder().setMetadata(createMetadata(types)).build();
   }
 
   protected static ResultSetMetadata createMetadata(ImmutableList<TypeCode> types) {

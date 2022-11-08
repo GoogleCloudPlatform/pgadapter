@@ -33,6 +33,7 @@ import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerBatchUpdateException;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
@@ -117,6 +118,34 @@ public class BackendConnectionTest {
         new long[] {1L, 1L, 1L},
         extractDdlUpdateCounts(
             ImmutableList.of(NOT_EXECUTED, NOT_EXECUTED, NOT_EXECUTED), new long[] {}));
+  }
+
+  @Test
+  public void testExecuteStatementsInBatch() {
+    Connection spannerConnection = mock(Connection.class);
+    SpannerBatchUpdateException expectedException = mock(SpannerBatchUpdateException.class);
+    when(expectedException.getMessage()).thenReturn("Invalid statement");
+    when(expectedException.getErrorCode()).thenReturn(ErrorCode.INVALID_ARGUMENT);
+    when(expectedException.getUpdateCounts()).thenReturn(new long[] {1L, 0L});
+    when(spannerConnection.runBatch()).thenThrow(expectedException);
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            spannerConnection,
+            mock(OptionsMetadata.class),
+            ImmutableList.of());
+
+    backendConnection.execute(
+        PARSER.parse(Statement.of("CREATE TABLE \"Foo\" (id bigint primary key)")),
+        Statement.of("CREATE TABLE \"Foo\" (id bigint primary key)"));
+    backendConnection.execute(
+        PARSER.parse(Statement.of("CREATE TABLE bar (id bigint primary key, value text)")),
+        Statement.of("CREATE TABLE bar (id bigint primary key, value text)"));
+
+    SpannerBatchUpdateException batchUpdateException =
+        assertThrows(
+            SpannerBatchUpdateException.class, () -> backendConnection.executeStatementsInBatch(0));
+    assertSame(expectedException, batchUpdateException);
   }
 
   @Test
@@ -483,5 +512,27 @@ public class BackendConnectionTest {
     backendConnection.flush();
 
     verify(connection).execute(statement);
+  }
+
+  @Test
+  public void testDoNotStartTransactionInBatch() {
+    Connection connection = mock(Connection.class);
+    when(connection.isDmlBatchActive()).thenReturn(true);
+    Statement statement = Statement.of("insert into foo values (1)");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            mock(OptionsMetadata.class),
+            EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(parsedStatement, statement);
+    backendConnection.flush();
+
+    verify(connection).execute(statement);
+    verify(connection, never()).beginTransaction();
   }
 }

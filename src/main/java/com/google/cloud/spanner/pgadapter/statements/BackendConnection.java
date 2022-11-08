@@ -235,7 +235,7 @@ public class BackendConnection {
           result.setException(spannerException);
         }
         throw spannerException;
-      } catch (Exception exception) {
+      } catch (Throwable exception) {
         result.setException(exception);
         throw exception;
       }
@@ -612,6 +612,10 @@ public class BackendConnection {
     if (isSync && hasOnlyDmlStatementsAfter(index)) {
       return;
     }
+    // Do not start a transaction if a batch is already active.
+    if (spannerConnection.isDdlBatchActive() || spannerConnection.isDmlBatchActive()) {
+      return;
+    }
 
     // We need to start an implicit transaction.
     // Check if a read-only transaction suffices.
@@ -809,7 +813,8 @@ public class BackendConnection {
    * @param fromIndex The index of the statements array where the batch should start
    * @return The number of statements included in the batch.
    */
-  private int executeStatementsInBatch(int fromIndex) {
+  @VisibleForTesting
+  int executeStatementsInBatch(int fromIndex) {
     Preconditions.checkArgument(fromIndex < getStatementCount() - 1);
     Preconditions.checkArgument(
         canBeBatchedTogether(getStatementType(fromIndex), getStatementType(fromIndex + 1)));
@@ -833,8 +838,7 @@ public class BackendConnection {
         if (canBeBatchedTogether(batchType, statementType)) {
           // Send DDL statements to the DdlExecutor instead of executing them directly on the
           // connection, so we can support certain DDL constructs that are currently not supported
-          // by
-          // the backend, such as IF [NOT] EXISTS.
+          // by the backend, such as IF [NOT] EXISTS.
           if (batchType == StatementType.DDL) {
             statementResults.add(
                 ddlExecutor.execute(
@@ -846,8 +850,7 @@ public class BackendConnection {
           index++;
         } else {
           // End the batch here, as the statement type on this index can not be batched together
-          // with
-          // the other statements in the batch.
+          // with the other statements in the batch.
           break;
         }
       }
@@ -890,6 +893,7 @@ public class BackendConnection {
     int index = 0;
     int successfullyExecutedCount = 0;
     while (index < returnedUpdateCounts.length
+        && returnedUpdateCounts[index] == 1
         && successfullyExecutedCount < statementResults.size()) {
       if (!(statementResults.get(successfullyExecutedCount) instanceof NotExecuted)) {
         index++;
