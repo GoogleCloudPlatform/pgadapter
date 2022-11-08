@@ -32,6 +32,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSet.Builder;
 import com.google.common.collect.Sets;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -391,6 +392,27 @@ public class SessionState {
         () -> DdlTransactionMode.valueOf(setting.getSetting()),
         () -> DdlTransactionMode.valueOf(setting.getResetVal()),
         () -> DdlTransactionMode.valueOf(setting.getBootVal()));
+  }
+
+  /** Returns the {@link ZoneId} of the current timezone for this session. */
+  public ZoneId getTimezone() {
+    PGSetting setting = internalGet(toKey(null, "timezone"), false);
+    if (setting == null) {
+      return ZoneId.systemDefault();
+    }
+    return tryGetFirstNonNull(
+        ZoneId.systemDefault(),
+        () -> zoneIdFromString(setting.getSetting()),
+        () -> zoneIdFromString(setting.getResetVal()),
+        () -> zoneIdFromString(setting.getBootVal()));
+  }
+
+  private ZoneId zoneIdFromString(String value) {
+    try {
+      return ZoneId.of(value);
+    } catch (Throwable ignore) {
+      return ZoneId.systemDefault();
+    }
   }
 
   /**

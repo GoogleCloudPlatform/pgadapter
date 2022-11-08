@@ -22,8 +22,12 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
@@ -54,24 +58,38 @@ public class TimestampParser extends Parser<Timestamp> {
 
   private static final Pattern TIMESTAMP_PATTERN = Pattern.compile(TIMESTAMP_REGEX);
 
-  private static final DateTimeFormatter TIMESTAMP_FORMATTER =
+  private static final DateTimeFormatter TIMESTAMP_OUTPUT_FORMATTER =
       new DateTimeFormatterBuilder()
           .parseLenient()
           .parseCaseInsensitive()
           .appendPattern("yyyy-MM-dd HH:mm:ss")
           .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
-          .appendOffset("+HH:mm", "Z")
+          .appendOffset("+HH:mm:ss", "+00")
           .toFormatter();
 
-  TimestampParser(ResultSet item, int position) {
+  private static final DateTimeFormatter TIMESTAMP_INPUT_FORMATTER =
+      new DateTimeFormatterBuilder()
+          .parseLenient()
+          .parseCaseInsensitive()
+          .appendPattern("yyyy-MM-dd HH:mm:ss")
+          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+          .appendOffset("+HH:mm:ss", "+00:00:00")
+          .toFormatter();
+
+  private final SessionState sessionState;
+
+  TimestampParser(ResultSet item, int position, SessionState sessionState) {
     this.item = item.getTimestamp(position);
+    this.sessionState = sessionState;
   }
 
-  TimestampParser(Object item) {
+  TimestampParser(Object item, SessionState sessionState) {
     this.item = (Timestamp) item;
+    this.sessionState = sessionState;
   }
 
-  TimestampParser(byte[] item, FormatCode formatCode) {
+  TimestampParser(byte[] item, FormatCode formatCode, SessionState sessionState) {
+    this.sessionState = sessionState;
     if (item != null) {
       switch (formatCode) {
         case TEXT:
@@ -103,7 +121,7 @@ public class TimestampParser extends Parser<Timestamp> {
   public static Timestamp toTimestamp(String value) {
     try {
       String stringValue = toPGString(value);
-      TemporalAccessor temporalAccessor = TIMESTAMP_FORMATTER.parse(stringValue);
+      TemporalAccessor temporalAccessor = TIMESTAMP_INPUT_FORMATTER.parse(stringValue);
       return Timestamp.ofTimeSecondsAndNanos(
           temporalAccessor.getLong(ChronoField.INSTANT_SECONDS),
           temporalAccessor.get(ChronoField.NANO_OF_SECOND));
@@ -125,7 +143,7 @@ public class TimestampParser extends Parser<Timestamp> {
 
   @Override
   public String stringParse() {
-    return this.item == null ? null : toPGString(this.item.toString());
+    return this.item == null ? null : toPGString(this.item, sessionState.getTimezone());
   }
 
   @Override
@@ -150,12 +168,13 @@ public class TimestampParser extends Parser<Timestamp> {
     return result;
   }
 
-  public static byte[] convertToPG(ResultSet resultSet, int position, DataFormat format) {
+  public static byte[] convertToPG(
+      ResultSet resultSet, int position, DataFormat format, ZoneId zoneId) {
     switch (format) {
       case SPANNER:
         return resultSet.getTimestamp(position).toString().getBytes(StandardCharsets.UTF_8);
       case POSTGRESQL_TEXT:
-        return toPGString(resultSet.getTimestamp(position).toString())
+        return toPGString(resultSet.getTimestamp(position), zoneId)
             .getBytes(StandardCharsets.UTF_8);
       case POSTGRESQL_BINARY:
         return convertToPG(resultSet.getTimestamp(position));
@@ -172,6 +191,13 @@ public class TimestampParser extends Parser<Timestamp> {
    */
   private static String toPGString(String value) {
     return value.replace(TIMESTAMP_SEPARATOR, EMPTY_SPACE).replace(ZERO_TIMEZONE, PG_ZERO_TIMEZONE);
+  }
+
+  private static String toPGString(Timestamp value, ZoneId zoneId) {
+    OffsetDateTime offsetDateTime =
+        OffsetDateTime.ofInstant(
+            Instant.ofEpochSecond(value.getSeconds(), value.getNanos()), zoneId);
+    return TIMESTAMP_OUTPUT_FORMATTER.format(offsetDateTime);
   }
 
   @Override
