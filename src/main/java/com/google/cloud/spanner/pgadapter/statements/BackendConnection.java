@@ -26,6 +26,7 @@ import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Partition;
 import com.google.cloud.spanner.PartitionOptions;
+import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.ResultSets;
 import com.google.cloud.spanner.Spanner;
@@ -154,8 +155,15 @@ public class BackendConnection {
   }
 
   private final class Execute extends BufferedStatement<StatementResult> {
-    Execute(ParsedStatement parsedStatement, Statement statement) {
+    private final boolean analyze;
+
+      Execute(ParsedStatement parsedStatement, Statement statement) {
+        this(parsedStatement, statement, false);
+      }
+
+      Execute(ParsedStatement parsedStatement, Statement statement, boolean analyze) {
       super(parsedStatement, statement);
+      this.analyze = analyze;
     }
 
     @Override
@@ -209,7 +217,11 @@ public class BackendConnection {
               sessionState.isReplacePgCatalogTables()
                   ? pgCatalog.replacePgCatalogTables(statement)
                   : statement;
-          result.set(spannerConnection.execute(updatedStatement));
+          if (analyze) {
+            result.set(analyze(parsedStatement, updatedStatement));
+          } else {
+            result.set(spannerConnection.execute(updatedStatement));
+          }
         }
       } catch (SpannerException spannerException) {
         // Executing queries against the information schema in a transaction is unsupported.
@@ -239,6 +251,16 @@ public class BackendConnection {
         result.setException(exception);
         throw exception;
       }
+    }
+
+    StatementResult analyze(ParsedStatement parsedStatement, Statement statement) {
+        ResultSet resultSet;
+        if (parsedStatement.isUpdate()) {
+          resultSet = spannerConnection.analyzeUpdateStatement(statement, QueryAnalyzeMode.PLAN);
+        } else {
+          resultSet = spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
+        }
+        return new QueryResult(resultSet);
     }
 
     /**
@@ -426,6 +448,12 @@ public class BackendConnection {
    * execution has finished.
    */
   public Future<StatementResult> execute(ParsedStatement parsedStatement, Statement statement) {
+    Execute execute = new Execute(parsedStatement, statement);
+    bufferedStatements.add(execute);
+    return execute.result;
+  }
+
+  public Future<StatementResult> analyze(ParsedStatement parsedStatement, Statement statement) {
     Execute execute = new Execute(parsedStatement, statement);
     bufferedStatements.add(execute);
     return execute.result;

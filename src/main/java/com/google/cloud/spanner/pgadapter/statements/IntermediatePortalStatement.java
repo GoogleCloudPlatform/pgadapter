@@ -19,7 +19,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.util.concurrent.Futures;
 import java.util.ArrayList;
@@ -81,7 +81,7 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
   }
 
   @Override
-  public Future<DescribePortalMetadata> describeAsync(BackendConnection backendConnection) {
+  public Future<DescribeResult> describeAsync(BackendConnection backendConnection) {
     // Pre-emptively execute the statement, even though it is only asked to be described. This is
     // a lot more efficient than taking two round trips to the server, and getting a
     // DescribePortal message without a following Execute message is extremely rare, as that would
@@ -92,6 +92,6 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
     setFutureStatementResult(statementResultFuture);
     return Futures.lazyTransform(
         statementResultFuture,
-        statementResult -> new DescribePortalMetadata(statementResult.getResultSet()));
+        statementResult -> new DescribeResult(statementResult.getResultSet()));
   }
 }

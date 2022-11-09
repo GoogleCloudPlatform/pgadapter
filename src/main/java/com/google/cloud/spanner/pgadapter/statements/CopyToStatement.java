@@ -25,7 +25,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
-import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
@@ -194,7 +194,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
   }
 
   @Override
-  public Future<DescribePortalMetadata> describeAsync(BackendConnection backendConnection) {
+  public Future<DescribeResult> describeAsync(BackendConnection backendConnection) {
     // Return null to indicate that this COPY TO STDOUT statement does not return any
     // RowDescriptionResponse.
     return Futures.immediateFuture(null);

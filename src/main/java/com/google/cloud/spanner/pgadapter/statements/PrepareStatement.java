@@ -22,7 +22,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -149,7 +149,7 @@ public class PrepareStatement extends IntermediatePortalStatement {
   }
 
   @Override
-  public Future<DescribePortalMetadata> describeAsync(BackendConnection backendConnection) {
+  public Future<DescribeResult> describeAsync(BackendConnection backendConnection) {
     // Return null to indicate that this PREPARE statement does not return any
     // RowDescriptionResponse.
     return Futures.immediateFuture(null);

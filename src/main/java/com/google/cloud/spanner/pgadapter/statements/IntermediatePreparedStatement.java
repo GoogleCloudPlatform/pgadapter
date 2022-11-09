@@ -22,10 +22,10 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
@@ -33,11 +33,13 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.util.concurrent.Futures;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.postgresql.core.Oid;
@@ -50,7 +52,6 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   private final String name;
   protected int[] parameterDataTypes;
   protected Statement statement;
-  private boolean described;
 
   public IntermediatePreparedStatement(
       ConnectionHandler connectionHandler,
@@ -77,14 +78,6 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     } else {
       return Oid.UNSPECIFIED;
     }
-  }
-
-  public boolean isDescribed() {
-    return this.described;
-  }
-
-  public void setDescribed() {
-    this.described = true;
   }
 
   public int[] getParameterDataTypes() {
@@ -151,7 +144,16 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   }
 
   @Override
-  public DescribeMetadata<?> describe() {
+  public Future<DescribeResult> describeAsync(BackendConnection backendConnection) {
+    Future<StatementResult> statementResultFuture = backendConnection.analyze(this.parsedStatement, this.statement);
+    setFutureStatementResult(statementResultFuture);
+    return Futures.lazyTransform(
+        statementResultFuture,
+        statementResult -> new DescribeResult(this.parameterDataTypes, statementResult.getResultSet()));
+  }
+
+  @Override
+  public DescribeResult describe() {
     ResultSet columnsResultSet = null;
     if (this.parsedStatement.isQuery()) {
       Statement statement = Statement.of(this.parsedStatement.getSqlWithoutComments());
@@ -159,7 +161,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     }
     boolean describeSucceeded = describeParameters(null, false);
     if (columnsResultSet != null) {
-      return new DescribeStatementMetadata(this.parameterDataTypes, columnsResultSet);
+      return new DescribeResult(this.parameterDataTypes, columnsResultSet);
     }
 
     if (this.parsedStatement.isUpdate()
@@ -172,7 +174,7 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
       connection.analyzeUpdate(
           Statement.of(this.parsedStatement.getSqlWithoutComments()), QueryAnalyzeMode.PLAN);
     }
-    return new DescribeStatementMetadata(this.parameterDataTypes, null);
+    return new DescribeResult(this.parameterDataTypes, null);
   }
 
   /** Describe the parameters of this statement. */

@@ -31,7 +31,7 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
@@ -49,6 +49,7 @@ import java.util.concurrent.Future;
 @InternalApi
 public class IntermediateStatement {
   private static final WireOutput[] EMPTY_WIRE_OUTPUT_ARRAY = new WireOutput[0];
+  private boolean described;
 
   /**
    * Indicates whether an attempt to get the result of a statement should block or fail if the
@@ -292,6 +293,14 @@ public class IntermediateStatement {
     this.hasMoreData = false;
   }
 
+  public boolean isDescribed() {
+    return this.described;
+  }
+
+  public void setDescribed() {
+    this.described = true;
+  }
+
   public void executeAsync(BackendConnection backendConnection) {
     throw new UnsupportedOperationException();
   }
@@ -300,12 +309,12 @@ public class IntermediateStatement {
    * Moreso meant for inherited classes, allows one to call describe on a statement. Since raw
    * statements cannot be described, throw an error.
    */
-  public DescribeMetadata<?> describe() {
+  public DescribeResult describe() {
     throw new IllegalStateException(
         "Cannot describe a simple statement " + "(only prepared statements and portals)");
   }
 
-  public Future<? extends DescribeMetadata<?>> describeAsync(BackendConnection backendConnection) {
+  public Future<DescribeResult> describeAsync(BackendConnection backendConnection) {
     throw new UnsupportedOperationException();
   }
 
