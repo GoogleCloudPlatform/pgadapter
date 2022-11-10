@@ -145,7 +145,7 @@ public class ITHibernateTest {
         BufferedReader errorReader =
             new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
       System.out.println("Printing hibernate loadings");
-      reader.lines().forEach(System.out::println);
+      reader.lines().forEach(s -> System.out.println("Hibernate: " + s));
       // errors = errorReader.lines().collect(Collectors.joining("\n"));
       // output = reader.lines().collect(Collectors.joining("\n"));
       // System.out.println("Hibernate Command. Output: " + output + ". Error: " + errors);
