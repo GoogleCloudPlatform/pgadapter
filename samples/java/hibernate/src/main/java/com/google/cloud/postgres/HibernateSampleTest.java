@@ -301,8 +301,10 @@ public class HibernateSampleTest {
   }
 
   public static void main(String[] args) {
+    System.out.println("Starting Hibrnate Test");
     HibernateSampleTest hibernateSampleTest =
         new HibernateSampleTest(HibernateConfiguration.createHibernateConfiguration());
     hibernateSampleTest.executeTest();
+    System.out.println("Hibernate Test Ended Successfully");
   }
 }
