@@ -63,8 +63,8 @@ public class PGExceptionFactory {
     return newPGException(extractMessage(spannerException));
   }
 
-  /** Converts the given {@link Exception} to a {@link PGException}. */
-  public static PGException toPGException(Exception exception) {
+  /** Converts the given {@link Throwable} to a {@link PGException}. */
+  public static PGException toPGException(Throwable exception) {
     if (exception instanceof SpannerException) {
       return toPGException((SpannerException) exception);
     }

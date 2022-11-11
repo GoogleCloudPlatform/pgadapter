@@ -256,7 +256,7 @@ public class ProtocolTest {
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
     assertArrayEquals(
         expectedParameterDataTypes,
-        ((ParseMessage) message).getStatement().getParameterDataTypes());
+        ((ParseMessage) message).getStatement().getGivenParameterDataTypes());
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
@@ -320,7 +320,7 @@ public class ProtocolTest {
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
     assertArrayEquals(
         expectedParameterDataTypes,
-        ((ParseMessage) message).getStatement().getParameterDataTypes());
+        ((ParseMessage) message).getStatement().getGivenParameterDataTypes());
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
@@ -385,7 +385,7 @@ public class ProtocolTest {
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
     assertArrayEquals(
         expectedParameterDataTypes,
-        ((ParseMessage) message).getStatement().getParameterDataTypes());
+        ((ParseMessage) message).getStatement().getGivenParameterDataTypes());
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
@@ -435,7 +435,7 @@ public class ProtocolTest {
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
     assertArrayEquals(
         expectedParameterDataTypes,
-        ((ParseMessage) message).getStatement().getParameterDataTypes());
+        ((ParseMessage) message).getStatement().getGivenParameterDataTypes());
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
@@ -623,7 +623,11 @@ public class ProtocolTest {
             resultCodesCount);
 
     when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
-    when(intermediatePreparedStatement.getSql()).thenReturn("select * from foo");
+    when(intermediatePreparedStatement.createPortal(anyString(), any(), any(), any()))
+        .thenReturn(intermediatePortalStatement);
+    when(intermediatePortalStatement.getSql()).thenReturn("select * from foo");
+    when(intermediatePortalStatement.getPreparedStatement())
+        .thenReturn(intermediatePreparedStatement);
 
     byte[][] expectedParameters = {parameter};
     List<Short> expectedFormatCodes = new ArrayList<>();
@@ -648,13 +652,6 @@ public class ProtocolTest {
     assertEquals(expectedFormatCodes, ((BindMessage) message).getFormatCodes());
     assertEquals(expectedFormatCodes, ((BindMessage) message).getResultFormatCodes());
     assertEquals("select * from foo", ((BindMessage) message).getSql());
-
-    when(intermediatePreparedStatement.bind(
-            ArgumentMatchers.anyString(),
-            ArgumentMatchers.any(),
-            ArgumentMatchers.any(),
-            ArgumentMatchers.any()))
-        .thenReturn(intermediatePortalStatement);
 
     message.send();
     ((BindMessage) message).flush();
@@ -726,6 +723,9 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
+    when(intermediatePreparedStatement.createPortal(anyString(), any(), any(), any()))
+        .thenReturn(intermediatePortalStatement);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(BindMessage.class, message.getClass());
@@ -796,6 +796,9 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
+    when(intermediatePreparedStatement.createPortal(anyString(), any(), any(), any()))
+        .thenReturn(intermediatePortalStatement);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(BindMessage.class, message.getClass());

@@ -21,11 +21,11 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
@@ -37,6 +37,7 @@ import com.google.cloud.spanner.pgadapter.wireoutput.CopyDoneResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyOutResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import java.util.List;
 import java.util.concurrent.Future;
@@ -63,11 +64,17 @@ public class CopyToStatement extends IntermediatePortalStatement {
       String name,
       ParsedCopyStatement parsedCopyStatement) {
     super(
-        connectionHandler,
-        options,
         name,
-        createParsedStatement(parsedCopyStatement),
-        createSelectStatement(parsedCopyStatement));
+        new IntermediatePreparedStatement(
+            connectionHandler,
+            options,
+            name,
+            NO_PARAMETER_TYPES,
+            createParsedStatement(parsedCopyStatement),
+            createSelectStatement(parsedCopyStatement)),
+        NO_PARAMS,
+        ImmutableList.of(),
+        ImmutableList.of());
     this.parsedCopyStatement = parsedCopyStatement;
     if (parsedCopyStatement.format == CopyStatement.Format.BINARY) {
       this.csvFormat = null;
@@ -194,14 +201,14 @@ public class CopyToStatement extends IntermediatePortalStatement {
   }
 
   @Override
-  public Future<DescribeResult> describeAsync(BackendConnection backendConnection) {
+  public Future<StatementResult> describeAsync(BackendConnection backendConnection) {
     // Return null to indicate that this COPY TO STDOUT statement does not return any
     // RowDescriptionResponse.
     return Futures.immediateFuture(null);
   }
 
   @Override
-  public IntermediatePortalStatement bind(
+  public IntermediatePortalStatement createPortal(
       String name,
       byte[][] parameters,
       List<Short> parameterFormatCodes,

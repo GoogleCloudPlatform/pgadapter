@@ -58,6 +58,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Function;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -137,10 +138,12 @@ public class BackendConnectionTest {
 
     backendConnection.execute(
         PARSER.parse(Statement.of("CREATE TABLE \"Foo\" (id bigint primary key)")),
-        Statement.of("CREATE TABLE \"Foo\" (id bigint primary key)"));
+        Statement.of("CREATE TABLE \"Foo\" (id bigint primary key)"),
+        Function.identity());
     backendConnection.execute(
         PARSER.parse(Statement.of("CREATE TABLE bar (id bigint primary key, value text)")),
-        Statement.of("CREATE TABLE bar (id bigint primary key, value text)"));
+        Statement.of("CREATE TABLE bar (id bigint primary key, value text)"),
+        Function.identity());
 
     SpannerBatchUpdateException batchUpdateException =
         assertThrows(
@@ -203,8 +206,8 @@ public class BackendConnectionTest {
             spannerConnection,
             mock(OptionsMetadata.class),
             ImmutableList.of());
-    onlyDmlStatements.execute(parsedUpdateStatement, updateStatement);
-    onlyDmlStatements.execute(parsedUpdateStatement, updateStatement);
+    onlyDmlStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
+    onlyDmlStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
     assertTrue(onlyDmlStatements.hasDmlOrCopyStatementsAfter(0));
     assertTrue(onlyDmlStatements.hasDmlOrCopyStatementsAfter(1));
 
@@ -225,7 +228,7 @@ public class BackendConnectionTest {
             spannerConnection,
             mock(OptionsMetadata.class),
             ImmutableList.of());
-    dmlAndCopyStatements.execute(parsedUpdateStatement, updateStatement);
+    dmlAndCopyStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
     dmlAndCopyStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
     assertTrue(dmlAndCopyStatements.hasDmlOrCopyStatementsAfter(0));
@@ -237,8 +240,8 @@ public class BackendConnectionTest {
             spannerConnection,
             mock(OptionsMetadata.class),
             ImmutableList.of());
-    onlySelectStatements.execute(parsedSelectStatement, selectStatement);
-    onlySelectStatements.execute(parsedSelectStatement, selectStatement);
+    onlySelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
+    onlySelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
     assertFalse(onlySelectStatements.hasDmlOrCopyStatementsAfter(0));
     assertFalse(onlySelectStatements.hasDmlOrCopyStatementsAfter(1));
 
@@ -248,8 +251,10 @@ public class BackendConnectionTest {
             spannerConnection,
             mock(OptionsMetadata.class),
             ImmutableList.of());
-    onlyClientSideStatements.execute(parsedClientSideStatement, clientSideStatement);
-    onlyClientSideStatements.execute(parsedClientSideStatement, clientSideStatement);
+    onlyClientSideStatements.execute(
+        parsedClientSideStatement, clientSideStatement, Function.identity());
+    onlyClientSideStatements.execute(
+        parsedClientSideStatement, clientSideStatement, Function.identity());
     assertFalse(onlyClientSideStatements.hasDmlOrCopyStatementsAfter(0));
     assertFalse(onlyClientSideStatements.hasDmlOrCopyStatementsAfter(1));
 
@@ -259,8 +264,8 @@ public class BackendConnectionTest {
             spannerConnection,
             mock(OptionsMetadata.class),
             ImmutableList.of());
-    onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement);
-    onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement);
+    onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
+    onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
     assertFalse(onlyUnknownStatements.hasDmlOrCopyStatementsAfter(0));
     assertFalse(onlyUnknownStatements.hasDmlOrCopyStatementsAfter(1));
 
@@ -270,8 +275,8 @@ public class BackendConnectionTest {
             spannerConnection,
             mock(OptionsMetadata.class),
             ImmutableList.of());
-    dmlAndSelectStatements.execute(parsedUpdateStatement, updateStatement);
-    dmlAndSelectStatements.execute(parsedSelectStatement, selectStatement);
+    dmlAndSelectStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
+    dmlAndSelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
     assertTrue(dmlAndSelectStatements.hasDmlOrCopyStatementsAfter(0));
     assertFalse(dmlAndSelectStatements.hasDmlOrCopyStatementsAfter(1));
 
@@ -283,7 +288,7 @@ public class BackendConnectionTest {
             ImmutableList.of());
     copyAndSelectStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
-    copyAndSelectStatements.execute(parsedSelectStatement, selectStatement);
+    copyAndSelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
     assertTrue(copyAndSelectStatements.hasDmlOrCopyStatementsAfter(0));
     assertFalse(copyAndSelectStatements.hasDmlOrCopyStatementsAfter(1));
 
@@ -295,7 +300,7 @@ public class BackendConnectionTest {
             ImmutableList.of());
     copyAndUnknownStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
-    copyAndUnknownStatements.execute(parsedUnknownStatement, unknownStatement);
+    copyAndUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
     assertTrue(copyAndUnknownStatements.hasDmlOrCopyStatementsAfter(0));
     assertFalse(copyAndUnknownStatements.hasDmlOrCopyStatementsAfter(1));
   }
@@ -320,7 +325,9 @@ public class BackendConnectionTest {
             DatabaseId.of("p", "i", "d"), connection, mock(OptionsMetadata.class), localStatements);
     Future<StatementResult> resultFuture =
         backendConnection.execute(
-            parsedListDatabasesStatement, Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL));
+            parsedListDatabasesStatement,
+            Statement.of(ListDatabasesStatement.LIST_DATABASES_SQL),
+            Function.identity());
     backendConnection.flush();
 
     verify(listDatabasesStatement).execute(backendConnection);
@@ -348,7 +355,8 @@ public class BackendConnectionTest {
     BackendConnection backendConnection =
         new BackendConnection(
             DatabaseId.of("p", "i", "d"), connection, mock(OptionsMetadata.class), localStatements);
-    Future<StatementResult> resultFuture = backendConnection.execute(parsedStatement, statement);
+    Future<StatementResult> resultFuture =
+        backendConnection.execute(parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
     verify(listDatabasesStatement, never()).execute(backendConnection);
@@ -381,7 +389,8 @@ public class BackendConnectionTest {
             connection,
             mock(OptionsMetadata.class),
             EMPTY_LOCAL_STATEMENTS);
-    Future<StatementResult> resultFuture = backendConnection.execute(parsedStatement, statement);
+    Future<StatementResult> resultFuture =
+        backendConnection.execute(parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
     ExecutionException executionException =
@@ -404,7 +413,8 @@ public class BackendConnectionTest {
             connection,
             mock(OptionsMetadata.class),
             EMPTY_LOCAL_STATEMENTS);
-    Future<StatementResult> resultFuture = backendConnection.execute(parsedStatement, statement);
+    Future<StatementResult> resultFuture =
+        backendConnection.execute(parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
     ExecutionException executionException =
@@ -441,8 +451,9 @@ public class BackendConnectionTest {
             connection,
             mock(OptionsMetadata.class),
             EMPTY_LOCAL_STATEMENTS);
-    Future<StatementResult> resultFuture1 = backendConnection.execute(parsedStatement1, statement1);
-    backendConnection.execute(parsedStatement2, statement2);
+    Future<StatementResult> resultFuture1 =
+        backendConnection.execute(parsedStatement1, statement1, Function.identity());
+    backendConnection.execute(parsedStatement2, statement2, Function.identity());
     backendConnection.flush();
 
     // The error will be set on the first statement in the batch, as the error occurs before
@@ -465,7 +476,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"), connection, options, EMPTY_LOCAL_STATEMENTS);
 
-    backendConnection.execute(parsedStatement, statement);
+    backendConnection.execute(parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
     verify(connection)
@@ -508,7 +519,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"), connection, options, EMPTY_LOCAL_STATEMENTS);
 
-    backendConnection.execute(parsedStatement, statement);
+    backendConnection.execute(parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
     verify(connection).execute(statement);
@@ -529,7 +540,7 @@ public class BackendConnectionTest {
             mock(OptionsMetadata.class),
             EMPTY_LOCAL_STATEMENTS);
 
-    backendConnection.execute(parsedStatement, statement);
+    backendConnection.execute(parsedStatement, statement, Function.identity());
     backendConnection.flush();
 
     verify(connection).execute(statement);

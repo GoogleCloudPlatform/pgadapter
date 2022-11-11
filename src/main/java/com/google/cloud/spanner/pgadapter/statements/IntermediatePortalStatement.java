@@ -16,13 +16,9 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
-import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.StatementResult;
-import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
-import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.common.util.concurrent.Futures;
-import java.util.ArrayList;
+import com.google.cloud.spanner.pgadapter.parsers.Parser;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import java.util.List;
 import java.util.concurrent.Future;
 
@@ -32,23 +28,34 @@ import java.util.concurrent.Future;
  */
 @InternalApi
 public class IntermediatePortalStatement extends IntermediatePreparedStatement {
-  protected List<Short> parameterFormatCodes;
-  protected List<Short> resultFormatCodes;
+  static final byte[][] NO_PARAMS = new byte[0][];
+
+  private final IntermediatePreparedStatement preparedStatement;
+  private final byte[][] parameters;
+  protected final List<Short> parameterFormatCodes;
+  protected final List<Short> resultFormatCodes;
 
   public IntermediatePortalStatement(
-      ConnectionHandler connectionHandler,
-      OptionsMetadata options,
       String name,
-      ParsedStatement parsedStatement,
-      Statement originalStatement) {
-    super(connectionHandler, options, name, parsedStatement, originalStatement);
-    this.statement = originalStatement;
-    this.parameterFormatCodes = new ArrayList<>();
-    this.resultFormatCodes = new ArrayList<>();
+      IntermediatePreparedStatement preparedStatement,
+      byte[][] parameters,
+      List<Short> parameterFormatCodes,
+      List<Short> resultFormatCodes) {
+    super(
+        preparedStatement.connectionHandler,
+        preparedStatement.options,
+        name,
+        preparedStatement.givenParameterDataTypes,
+        preparedStatement.parsedStatement,
+        preparedStatement.originalStatement);
+    this.preparedStatement = preparedStatement;
+    this.parameters = parameters;
+    this.parameterFormatCodes = parameterFormatCodes;
+    this.resultFormatCodes = resultFormatCodes;
   }
 
-  void setBoundStatement(Statement statement) {
-    this.statement = statement;
+  public IntermediatePreparedStatement getPreparedStatement() {
+    return this.preparedStatement;
   }
 
   public short getParameterFormatCode(int index) {
@@ -72,26 +79,51 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
     }
   }
 
-  public void setParameterFormatCodes(List<Short> parameterFormatCodes) {
-    this.parameterFormatCodes = parameterFormatCodes;
+  @Override
+  public void executeAsync(BackendConnection backendConnection) {
+    // If the portal has already been described, the statement has already been executed, and we
+    // don't need to do that once more.
+    if (futureStatementResult == null && getStatementResult() == null) {
+      this.executed = true;
+      setFutureStatementResult(backendConnection.execute(parsedStatement, statement, this::bind));
+    }
   }
 
-  public void setResultFormatCodes(List<Short> resultFormatCodes) {
-    this.resultFormatCodes = resultFormatCodes;
+  /** Binds this portal to a set of parameter values. */
+  public Statement bind(Statement statement) {
+    // Make sure the results from any Describe message are propagated to the prepared statement
+    // before using it to bind the parameter values.
+    preparedStatement.describe();
+    Statement.Builder builder = statement.toBuilder();
+    for (int index = 0; index < parameters.length; index++) {
+      short formatCode = getParameterFormatCode(index);
+      int type = preparedStatement.getParameterDataType(index);
+      Parser<?> parser =
+          Parser.create(
+              connectionHandler
+                  .getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getSessionState()
+                  .getGuessTypes(),
+              parameters[index],
+              type,
+              FormatCode.of(formatCode));
+      parser.bind(builder, "p" + (index + 1));
+    }
+    return builder.build();
   }
 
   @Override
-  public Future<DescribeResult> describeAsync(BackendConnection backendConnection) {
+  public Future<StatementResult> describeAsync(BackendConnection backendConnection) {
     // Pre-emptively execute the statement, even though it is only asked to be described. This is
     // a lot more efficient than taking two round trips to the server, and getting a
     // DescribePortal message without a following Execute message is extremely rare, as that would
     // only happen if the client is ill-behaved, or if the client crashes between the
     // DescribePortal and Execute.
     Future<StatementResult> statementResultFuture =
-        backendConnection.execute(this.parsedStatement, this.statement);
+        backendConnection.execute(this.parsedStatement, this.statement, this::bind);
     setFutureStatementResult(statementResultFuture);
-    return Futures.lazyTransform(
-        statementResultFuture,
-        statementResult -> new DescribeResult(statementResult.getResultSet()));
+    this.executed = true;
+    return statementResultFuture;
   }
 }

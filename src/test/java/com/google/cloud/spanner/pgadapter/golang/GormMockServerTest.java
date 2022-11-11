@@ -34,6 +34,7 @@ import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
@@ -186,13 +187,8 @@ public class GormMockServerTest extends AbstractMockServerTest {
   public void testCreateBlogAndUser() {
     String insertUserSql =
         "INSERT INTO \"users\" (\"id\",\"name\",\"email\",\"age\",\"birthday\",\"member_number\",\"activated_at\",\"created_at\",\"updated_at\") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)";
-    String describeInsertUserSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 from (select \"id\"=$1, \"name\"=$2, \"email\"=$3, \"age\"=$4, \"birthday\"=$5, \"member_number\"=$6, \"activated_at\"=$7, \"created_at\"=$8, \"updated_at\"=$9 from \"users\") p";
     String insertBlogSql =
         "INSERT INTO \"blogs\" (\"id\",\"name\",\"description\",\"user_id\",\"created_at\",\"updated_at\") VALUES ($1,$2,$3,$4,$5,$6)";
-    String describeInsertBlogSql =
-        "select $1, $2, $3, $4, $5, $6 from (select \"id\"=$1, \"name\"=$2, \"description\"=$3, \"user_id\"=$4, \"created_at\"=$5, \"updated_at\"=$6 from \"blogs\") p";
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertUserSql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(insertUserSql)
@@ -218,10 +214,10 @@ public class GormMockServerTest extends AbstractMockServerTest {
             1L));
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeInsertUserSql),
+            Statement.of(insertUserSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.STRING,
@@ -232,8 +228,8 @@ public class GormMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.TIMESTAMP,
                             TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertBlogSql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(insertBlogSql)
@@ -253,10 +249,10 @@ public class GormMockServerTest extends AbstractMockServerTest {
             1L));
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeInsertBlogSql),
+            Statement.of(insertBlogSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.STRING,
@@ -264,26 +260,25 @@ public class GormMockServerTest extends AbstractMockServerTest {
                             TypeCode.INT64,
                             TypeCode.TIMESTAMP,
                             TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
 
     String res = gormTest.TestCreateBlogAndUser(createConnString());
 
     assertNull(res);
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-    assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
 
-    assertEquals(describeInsertUserSql, requests.get(0).getSql());
+    assertEquals(insertUserSql, requests.get(0).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
     assertEquals(insertUserSql, requests.get(1).getSql());
-    assertEquals(QueryMode.PLAN, requests.get(1).getQueryMode());
-    assertEquals(insertUserSql, requests.get(2).getSql());
-    assertEquals(QueryMode.NORMAL, requests.get(2).getQueryMode());
+    assertEquals(QueryMode.NORMAL, requests.get(1).getQueryMode());
 
-    assertEquals(describeInsertBlogSql, requests.get(3).getSql());
-    assertEquals(insertBlogSql, requests.get(4).getSql());
-    assertEquals(QueryMode.PLAN, requests.get(4).getQueryMode());
-    assertEquals(insertBlogSql, requests.get(5).getSql());
-    assertEquals(QueryMode.NORMAL, requests.get(5).getQueryMode());
+    assertEquals(insertBlogSql, requests.get(2).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(2).getQueryMode());
+    assertEquals(insertBlogSql, requests.get(3).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(3).getQueryMode());
   }
 
   @Test
@@ -295,9 +290,7 @@ public class GormMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. As this statement does not contain any
-    // parameters, we don't need to describe the parameter types, so it is 'only' sent twice to the
-    // backend.
+    // pgx by default always uses prepared statements.
     assertEquals(2, requests.size());
     ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
@@ -320,9 +313,7 @@ public class GormMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. As this statement does not contain any
-    // parameters, we don't need to describe the parameter types, so it is 'only' sent twice to the
-    // backend.
+    // pgx by default always uses prepared statements.
     assertEquals(2, requests.size());
     ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
@@ -341,15 +332,12 @@ public class GormMockServerTest extends AbstractMockServerTest {
         "INSERT INTO \"all_types\" "
             + "(\"col_bigint\",\"col_bool\",\"col_bytea\",\"col_float8\",\"col_int\",\"col_numeric\",\"col_timestamptz\",\"col_date\",\"col_varchar\") "
             + "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)";
-    String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 "
-            + "from (select \"col_bigint\"=$1, \"col_bool\"=$2, \"col_bytea\"=$3, \"col_float8\"=$4, \"col_int\"=$5, \"col_numeric\"=$6, \"col_timestamptz\"=$7, \"col_date\"=$8, \"col_varchar\"=$9 from \"all_types\") p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -360,8 +348,8 @@ public class GormMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -390,31 +378,23 @@ public class GormMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent three
+    // pgx by default always uses prepared statements. That means that each request is sent two
     // times to the backend the first time it is executed:
-    // 1. DescribeStatement (parameters)
-    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
-    // 3. Execute
-    assertEquals(3, requests.size());
-    ExecuteSqlRequest describeParamsRequest = requests.get(0);
-    assertEquals(describeSql, describeParamsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    assertTrue(describeParamsRequest.hasTransaction());
-    assertTrue(describeParamsRequest.getTransaction().hasBegin());
-    assertTrue(describeParamsRequest.getTransaction().getBegin().hasReadWrite());
-
-    ExecuteSqlRequest describeRequest = requests.get(1);
+    // 1. DescribeStatement
+    // 2. Execute
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
     assertTrue(describeRequest.hasTransaction());
-    assertTrue(describeRequest.getTransaction().hasId());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
 
-    ExecuteSqlRequest executeRequest = requests.get(2);
+    ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
     assertTrue(executeRequest.hasTransaction());
     assertTrue(executeRequest.getTransaction().hasId());
-    assertEquals(describeRequest.getTransaction().getId(), executeRequest.getTransaction().getId());
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
     CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
@@ -427,15 +407,12 @@ public class GormMockServerTest extends AbstractMockServerTest {
         "INSERT INTO \"all_types\" "
             + "(\"col_bigint\",\"col_bool\",\"col_bytea\",\"col_float8\",\"col_int\",\"col_numeric\",\"col_timestamptz\",\"col_date\",\"col_varchar\") "
             + "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)";
-    String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9 "
-            + "from (select \"col_bigint\"=$1, \"col_bool\"=$2, \"col_bytea\"=$3, \"col_float8\"=$4, \"col_int\"=$5, \"col_numeric\"=$6, \"col_timestamptz\"=$7, \"col_date\"=$8, \"col_varchar\"=$9 from \"all_types\") p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -446,8 +423,8 @@ public class GormMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -476,19 +453,15 @@ public class GormMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent three
+    // pgx by default always uses prepared statements. That means that each request is sent two
     // times to the backend the first time it is executed:
-    // 1. DescribeStatement (parameters)
-    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
-    // 3. Execute
-    assertEquals(3, requests.size());
-    ExecuteSqlRequest describeParamsRequest = requests.get(0);
-    assertEquals(describeSql, describeParamsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    ExecuteSqlRequest describeRequest = requests.get(1);
+    // 1. DescribeStatement
+    // 2. Execute
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(2);
+    ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }
@@ -497,15 +470,12 @@ public class GormMockServerTest extends AbstractMockServerTest {
   public void testUpdateAllDataTypes() {
     String sql =
         "UPDATE \"all_types\" SET \"col_bigint\"=$1,\"col_bool\"=$2,\"col_bytea\"=$3,\"col_float8\"=$4,\"col_int\"=$5,\"col_numeric\"=$6,\"col_timestamptz\"=$7,\"col_date\"=$8,\"col_varchar\"=$9 WHERE \"col_varchar\" = $10";
-    String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from "
-            + "(select \"col_bigint\"=$1, \"col_bool\"=$2, \"col_bytea\"=$3, \"col_float8\"=$4, \"col_int\"=$5, \"col_numeric\"=$6, \"col_timestamptz\"=$7, \"col_date\"=$8, \"col_varchar\"=$9 from \"all_types\" WHERE \"col_varchar\" = $10) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -517,8 +487,8 @@ public class GormMockServerTest extends AbstractMockServerTest {
                             TypeCode.DATE,
                             TypeCode.STRING,
                             TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -549,19 +519,15 @@ public class GormMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent three
+    // pgx by default always uses prepared statements. That means that each request is sent two
     // times to the backend the first time it is executed:
-    // 1. DescribeStatement (parameters)
-    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
-    // 3. Execute
-    assertEquals(3, requests.size());
-    ExecuteSqlRequest describeParamsRequest = requests.get(0);
-    assertEquals(describeSql, describeParamsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    ExecuteSqlRequest describeRequest = requests.get(1);
+    // 1. DescribeStatement
+    // 2. Execute
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(2);
+    ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }
@@ -569,15 +535,13 @@ public class GormMockServerTest extends AbstractMockServerTest {
   @Test
   public void testDelete() {
     String sql = "DELETE FROM \"all_types\" WHERE \"all_types\".\"col_varchar\" = $1";
-    String describeSql =
-        "select $1 from (select 1 from \"all_types\" WHERE \"all_types\".\"col_varchar\" = $1) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("test_string").build(), 1L));
 
@@ -587,17 +551,13 @@ public class GormMockServerTest extends AbstractMockServerTest {
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     // pgx by default always uses prepared statements. That means that each request is sent three
     // times to the backend the first time it is executed:
-    // 1. DescribeStatement (parameters)
-    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
-    // 3. Execute
-    assertEquals(3, requests.size());
-    ExecuteSqlRequest describeParamsRequest = requests.get(0);
-    assertEquals(describeSql, describeParamsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    ExecuteSqlRequest describeRequest = requests.get(1);
+    // 1. DescribeStatement
+    // 2. Execute
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(2);
+    ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }
@@ -610,15 +570,12 @@ public class GormMockServerTest extends AbstractMockServerTest {
             + "($1,$2,$3,$4,$5,$6,$7,$8,$9),"
             + "($10,$11,$12,$13,$14,$15,$16,$17,$18),"
             + "($19,$20,$21,$22,$23,$24,$25,$26,$27)";
-    String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27 from "
-            + "(select \"col_bigint\"=$1, \"col_bool\"=$2, \"col_bytea\"=$3, \"col_float8\"=$4, \"col_int\"=$5, \"col_numeric\"=$6, \"col_timestamptz\"=$7, \"col_date\"=$8, \"col_varchar\"=$9, \"col_bigint\"=$10, \"col_bool\"=$11, \"col_bytea\"=$12, \"col_float8\"=$13, \"col_int\"=$14, \"col_numeric\"=$15, \"col_timestamptz\"=$16, \"col_date\"=$17, \"col_varchar\"=$18, \"col_bigint\"=$19, \"col_bool\"=$20, \"col_bytea\"=$21, \"col_float8\"=$22, \"col_int\"=$23, \"col_numeric\"=$24, \"col_timestamptz\"=$25, \"col_date\"=$26, \"col_varchar\"=$27 from \"all_types\") p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -647,8 +604,8 @@ public class GormMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -713,19 +670,15 @@ public class GormMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent three
+    // pgx by default always uses prepared statements. That means that each request is sent two
     // times to the backend the first time it is executed:
-    // 1. DescribeStatement (parameters)
-    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
-    // 3. Execute
-    assertEquals(3, requests.size());
-    ExecuteSqlRequest describeParamsRequest = requests.get(0);
-    assertEquals(describeSql, describeParamsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    ExecuteSqlRequest describeRequest = requests.get(1);
+    // 1. DescribeStatement
+    // 2. Execute
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(2);
+    ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }
@@ -733,14 +686,13 @@ public class GormMockServerTest extends AbstractMockServerTest {
   @Test
   public void testTransaction() {
     String sql = "INSERT INTO \"all_types\" (\"col_varchar\") VALUES ($1)";
-    String describeSql = "select $1 from (select \"col_varchar\"=$1 from \"all_types\") p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("1").build(), 1L));
     mockSpanner.putStatementResult(
@@ -750,35 +702,25 @@ public class GormMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(4, requests.size());
-    ExecuteSqlRequest describeParamsRequest = requests.get(0);
-    assertEquals(describeSql, describeParamsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    assertTrue(describeParamsRequest.hasTransaction());
-    assertTrue(describeParamsRequest.getTransaction().hasBegin());
-    assertTrue(describeParamsRequest.getTransaction().getBegin().hasReadWrite());
-
-    ExecuteSqlRequest describeRequest = requests.get(1);
+    assertEquals(3, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
     assertTrue(describeRequest.hasTransaction());
-    assertTrue(describeRequest.getTransaction().hasId());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
 
-    ExecuteSqlRequest executeRequest1 = requests.get(2);
+    ExecuteSqlRequest executeRequest1 = requests.get(1);
     assertEquals(sql, executeRequest1.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest1.getQueryMode());
     assertTrue(executeRequest1.hasTransaction());
     assertTrue(executeRequest1.getTransaction().hasId());
-    assertEquals(
-        describeRequest.getTransaction().getId(), executeRequest1.getTransaction().getId());
 
     ExecuteSqlRequest executeRequest2 = requests.get(2);
     assertEquals(sql, executeRequest2.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest2.getQueryMode());
     assertTrue(executeRequest2.hasTransaction());
     assertTrue(executeRequest2.getTransaction().hasId());
-    assertEquals(
-        describeRequest.getTransaction().getId(), executeRequest2.getTransaction().getId());
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
     CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
@@ -788,14 +730,13 @@ public class GormMockServerTest extends AbstractMockServerTest {
   @Test
   public void testNestedTransaction() {
     String sql = "INSERT INTO \"all_types\" (\"col_varchar\") VALUES ($1)";
-    String describeSql = "select $1 from (select \"col_varchar\"=$1 from \"all_types\") p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("1").build(), 1L));
     mockSpanner.putStatementResult(
@@ -812,28 +753,26 @@ public class GormMockServerTest extends AbstractMockServerTest {
   @Test
   public void testErrorInTransaction() {
     String insertSql = "INSERT INTO \"all_types\" (\"col_varchar\") VALUES ($1)";
-    String describeInsertSql = "select $1 from (select \"col_varchar\"=$1 from \"all_types\") p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeInsertSql),
+            Statement.of(insertSql),
             ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.exception(
             Statement.newBuilder(insertSql).bind("p1").to("1").build(),
             Status.ALREADY_EXISTS.withDescription("Row [1] already exists").asRuntimeException()));
     String updateSql = "UPDATE \"all_types\" SET \"col_int\"=$1 WHERE \"col_varchar\" = $2";
-    String describeUpdateSql =
-        "select $1, $2 from (select \"col_int\"=$1 from \"all_types\" WHERE \"col_varchar\" = $2) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeUpdateSql),
+            Statement.of(updateSql),
             ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(updateSql).bind("p1").to(100L).bind("p2").to("1").build(), 1L));
@@ -843,27 +782,30 @@ public class GormMockServerTest extends AbstractMockServerTest {
         "failed to execute transaction: ERROR: current transaction is aborted, commands ignored until end of transaction block (SQLSTATE P0001)",
         res);
     assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    // This test also leads to 1 commit request. The reason for this is that the update statement is
-    // also described when gorm tries to execute it. At that point, there is no read/write
-    // transaction anymore on the underlying Spanner connection, as that transaction was rolled back
-    // when the insert statement failed. It is therefore executed using auto-commit, which again
-    // automatically leads to a commit. This is not a problem, as it is just an analyze of an update
-    // statement.
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
   public void testReadOnlyTransaction() {
     String sql = "SELECT * FROM \"all_types\" WHERE \"all_types\".\"col_varchar\" = $1";
-    String describeSql =
-        "select $1 from (SELECT * FROM \"all_types\" WHERE \"all_types\".\"col_varchar\" = $1) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setMetadata(
+                    ALL_TYPES_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .build())
+                        .build())
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(sql).bind("p1").to("1").build(), ALL_TYPES_RESULTSET));
@@ -880,24 +822,17 @@ public class GormMockServerTest extends AbstractMockServerTest {
     assertTrue(beginRequest.getOptions().hasReadOnly());
 
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(4, requests.size());
+    assertEquals(3, requests.size());
 
     ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
     assertTrue(describeRequest.getTransaction().hasId());
 
-    ExecuteSqlRequest describeParamsRequest = requests.get(1);
-    assertEquals(describeSql, describeParamsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    assertEquals(
-        describeParamsRequest.getTransaction().getId(), describeRequest.getTransaction().getId());
-
-    ExecuteSqlRequest executeRequest = requests.get(2);
+    ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
-    assertEquals(
-        describeParamsRequest.getTransaction().getId(), executeRequest.getTransaction().getId());
+    assertEquals(describeRequest.getTransaction().getId(), executeRequest.getTransaction().getId());
 
     // The read-only transaction is 'committed', but that does not cause a CommitRequest to be sent
     // to Cloud Spanner.

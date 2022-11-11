@@ -49,7 +49,6 @@ import java.util.concurrent.Future;
 @InternalApi
 public class IntermediateStatement {
   private static final WireOutput[] EMPTY_WIRE_OUTPUT_ARRAY = new WireOutput[0];
-  private boolean described;
 
   /**
    * Indicates whether an attempt to get the result of a statement should block or fail if the
@@ -76,6 +75,7 @@ public class IntermediateStatement {
   protected final Statement originalStatement;
   protected final String command;
   protected String commandTag;
+  protected boolean described;
   protected boolean executed;
   protected final Connection connection;
   protected final ConnectionHandler connectionHandler;
@@ -314,7 +314,7 @@ public class IntermediateStatement {
         "Cannot describe a simple statement " + "(only prepared statements and portals)");
   }
 
-  public Future<DescribeResult> describeAsync(BackendConnection backendConnection) {
+  public Future<StatementResult> describeAsync(BackendConnection backendConnection) {
     throw new UnsupportedOperationException();
   }
 

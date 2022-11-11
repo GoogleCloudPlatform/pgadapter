@@ -109,7 +109,18 @@ public class CopyStatement extends IntermediatePortalStatement {
       ParsedStatement parsedStatement,
       Statement originalStatement,
       ParsedCopyStatement parsedCopyStatement) {
-    super(connectionHandler, options, name, parsedStatement, originalStatement);
+    super(
+        name,
+        new IntermediatePreparedStatement(
+            connectionHandler,
+            options,
+            name,
+            NO_PARAMETER_TYPES,
+            parsedStatement,
+            originalStatement),
+        NO_PARAMS,
+        ImmutableList.of(),
+        ImmutableList.of());
     this.parsedCopyStatement = parsedCopyStatement;
   }
 
@@ -356,7 +367,7 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   @Override
-  public IntermediatePortalStatement bind(
+  public IntermediatePortalStatement createPortal(
       String name,
       byte[][] parameters,
       List<Short> parameterFormatCodes,

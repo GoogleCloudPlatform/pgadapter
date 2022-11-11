@@ -20,9 +20,9 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
+import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
@@ -31,6 +31,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedTy
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -58,7 +59,18 @@ public class ExecuteStatement extends IntermediatePortalStatement {
       String name,
       ParsedStatement parsedStatement,
       Statement originalStatement) {
-    super(connectionHandler, options, name, parsedStatement, originalStatement);
+    super(
+        name,
+        new IntermediatePreparedStatement(
+            connectionHandler,
+            options,
+            name,
+            NO_PARAMETER_TYPES,
+            parsedStatement,
+            originalStatement),
+        NO_PARAMS,
+        ImmutableList.of(),
+        ImmutableList.of());
     this.executeStatement = parse(originalStatement.getSql());
   }
 
@@ -98,14 +110,14 @@ public class ExecuteStatement extends IntermediatePortalStatement {
   }
 
   @Override
-  public Future<DescribeResult> describeAsync(BackendConnection backendConnection) {
+  public Future<StatementResult> describeAsync(BackendConnection backendConnection) {
     // Return null to indicate that this EXECUTE statement does not return any
     // RowDescriptionResponse.
     return Futures.immediateFuture(null);
   }
 
   @Override
-  public IntermediatePortalStatement bind(
+  public IntermediatePortalStatement createPortal(
       String name,
       byte[][] parameters,
       List<Short> parameterFormatCodes,
