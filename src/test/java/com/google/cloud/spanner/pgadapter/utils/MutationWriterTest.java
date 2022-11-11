@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.utils;
 import static com.google.cloud.spanner.pgadapter.utils.MutationWriter.calculateSize;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,11 +34,11 @@ import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Mutation;
-import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
@@ -56,6 +57,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -73,7 +75,7 @@ public class MutationWriterTest {
 
   @AfterClass
   public static void shutdownExecutor() {
-    executor.shutdown();
+    //    executor.shutdown();
   }
 
   @Test
@@ -207,9 +209,9 @@ public class MutationWriterTest {
             }
           });
 
-      SpannerException exception = assertThrows(SpannerException.class, mutationWriter::call);
+      PGException exception = assertThrows(PGException.class, mutationWriter::call);
       assertEquals(
-          "FAILED_PRECONDITION: Record count: 2 has exceeded the limit: 1.\n"
+          "Record count: 2 has exceeded the limit: 1.\n"
               + "\n"
               + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 1.\n"
               + "\n"
@@ -314,7 +316,7 @@ public class MutationWriterTest {
             }
           });
 
-      SpannerException exception = assertThrows(SpannerException.class, mutationWriter::call);
+      PGException exception = assertThrows(PGException.class, mutationWriter::call);
       assertTrue(exception.getMessage().contains("Commit size: 40 has exceeded the limit: 30"));
 
       verify(connection, never()).write(anyIterable());
@@ -604,5 +606,47 @@ public class MutationWriterTest {
 
       assertEquals(String.format("Type: %s", type), 1, mutation.asMap().size());
     }
+  }
+
+  @Test
+  public void testWriteAfterClose() throws Exception {
+    Map<String, Type> tableColumns = ImmutableMap.of("number", Type.int64(), "name", Type.string());
+    CSVFormat format =
+        CSVFormat.POSTGRESQL_TEXT
+            .builder()
+            .setHeader(tableColumns.keySet().toArray(new String[0]))
+            .build();
+    SessionState sessionState = new SessionState(mock(OptionsMetadata.class));
+    Connection connection = mock(Connection.class);
+    DatabaseClient databaseClient = mock(DatabaseClient.class);
+    when(connection.getDatabaseClient()).thenReturn(databaseClient);
+    MutationWriter mutationWriter =
+        new MutationWriter(
+            sessionState,
+            CopyTransactionMode.ImplicitAtomic,
+            connection,
+            "numbers",
+            tableColumns,
+            /* indexedColumnsCount = */ 1,
+            Format.TEXT,
+            format,
+            false);
+
+    CountDownLatch latch = new CountDownLatch(1);
+    Future<?> fut =
+        executor.submit(
+            () -> {
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+              mutationWriter.close();
+              latch.await();
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+              return null;
+            });
+
+    mutationWriter.call();
+    latch.countDown();
+    assertNull(fut.get());
   }
 }

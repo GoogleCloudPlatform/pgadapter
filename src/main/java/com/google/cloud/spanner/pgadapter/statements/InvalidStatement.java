@@ -14,10 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 
 public class InvalidStatement extends IntermediatePortalStatement {
@@ -30,6 +30,6 @@ public class InvalidStatement extends IntermediatePortalStatement {
       Statement originalStatement,
       Exception exception) {
     super(connectionHandler, options, name, parsedStatement, originalStatement);
-    setException(SpannerExceptionFactory.asSpannerException(exception));
+    setException(PGExceptionFactory.toPGException(exception));
   }
 }
