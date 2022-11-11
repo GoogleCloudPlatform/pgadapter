@@ -19,6 +19,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -648,6 +649,7 @@ public class ProtocolTest {
     assertEquals(expectedFormatCodes, ((BindMessage) message).getFormatCodes());
     assertEquals(expectedFormatCodes, ((BindMessage) message).getResultFormatCodes());
     assertEquals("select * from foo", ((BindMessage) message).getSql());
+    assertTrue(((BindMessage) message).hasParameterValues());
 
     when(intermediatePreparedStatement.bind(
             ArgumentMatchers.anyString(),
