@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.utils;
 import static com.google.cloud.spanner.pgadapter.utils.MutationWriter.calculateSize;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,7 +39,6 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.error.PGException;
-import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
@@ -57,7 +57,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -75,7 +75,7 @@ public class MutationWriterTest {
 
   @AfterClass
   public static void shutdownExecutor() {
-    executor.shutdown();
+    //    executor.shutdown();
   }
 
   @Test
@@ -632,19 +632,21 @@ public class MutationWriterTest {
             format,
             false);
 
+    CountDownLatch latch = new CountDownLatch(1);
     Future<?> fut =
         executor.submit(
             () -> {
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
               mutationWriter.close();
+              latch.await();
               mutationWriter.addCopyData(
                   "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
               return null;
             });
 
     mutationWriter.call();
-    ExecutionException executionException = assertThrows(ExecutionException.class, fut::get);
-    assertEquals(PGException.class, executionException.getCause().getClass());
-    PGException pgException = (PGException) executionException.getCause();
-    assertEquals(SQLState.InternalError, pgException.getSQLState());
+    latch.countDown();
+    assertNull(fut.get());
   }
 }

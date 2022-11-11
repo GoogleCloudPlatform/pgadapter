@@ -108,7 +108,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final Format copyFormat;
   private final CSVFormat csvFormat;
   private final boolean hasHeader;
-  private final CountDownLatch parserCreatedLatch = new CountDownLatch(1);
+  private final CountDownLatch pipeCreatedLatch = new CountDownLatch(1);
   private final PipedOutputStream payload = new PipedOutputStream();
   private final AtomicBoolean commit = new AtomicBoolean(false);
   private final AtomicBoolean rollback = new AtomicBoolean(false);
@@ -163,7 +163,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       }
     }
     try {
-      parserCreatedLatch.await();
+      pipeCreatedLatch.await();
       this.payload.write(payload);
     } catch (InterruptedException | InterruptedIOException interruptedIOException) {
       // The IO operation was interrupted. This indicates that the user wants to cancel the COPY
@@ -209,7 +209,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   @Override
   public StatementResult call() throws Exception {
     PipedInputStream inputStream = new PipedInputStream(payload, copySettings.getPipeBufferSize());
-    parserCreatedLatch.countDown();
+    pipeCreatedLatch.countDown();
     final CopyInParser parser = CopyInParser.create(copyFormat, csvFormat, inputStream, hasHeader);
     // This LinkedBlockingDeque holds a reference to all transactions that are currently active. The
     // max capacity of this deque is what ensures that we never have more than maxParallelism
