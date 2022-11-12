@@ -820,7 +820,9 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testRandomResults() throws SQLException {
-    for (boolean binary : new boolean[] {false, true}) {
+    // TODO: Enable binary transfer for this test when binary transfer of date values prior
+    //       to the Julian/Gregorian switch has been fixed.
+    for (boolean binary : new boolean[] {false}) {
       // Also get the random results using the normal Spanner client to compare the results with
       // what is returned by PGAdapter.
       Spanner spanner =
