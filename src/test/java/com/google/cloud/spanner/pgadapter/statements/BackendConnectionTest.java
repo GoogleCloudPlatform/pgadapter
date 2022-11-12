@@ -33,6 +33,7 @@ import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.SpannerBatchUpdateException;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
@@ -43,6 +44,7 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
@@ -117,6 +119,34 @@ public class BackendConnectionTest {
         new long[] {1L, 1L, 1L},
         extractDdlUpdateCounts(
             ImmutableList.of(NOT_EXECUTED, NOT_EXECUTED, NOT_EXECUTED), new long[] {}));
+  }
+
+  @Test
+  public void testExecuteStatementsInBatch() {
+    Connection spannerConnection = mock(Connection.class);
+    SpannerBatchUpdateException expectedException = mock(SpannerBatchUpdateException.class);
+    when(expectedException.getMessage()).thenReturn("Invalid statement");
+    when(expectedException.getErrorCode()).thenReturn(ErrorCode.INVALID_ARGUMENT);
+    when(expectedException.getUpdateCounts()).thenReturn(new long[] {1L, 0L});
+    when(spannerConnection.runBatch()).thenThrow(expectedException);
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            spannerConnection,
+            mock(OptionsMetadata.class),
+            ImmutableList.of());
+
+    backendConnection.execute(
+        PARSER.parse(Statement.of("CREATE TABLE \"Foo\" (id bigint primary key)")),
+        Statement.of("CREATE TABLE \"Foo\" (id bigint primary key)"));
+    backendConnection.execute(
+        PARSER.parse(Statement.of("CREATE TABLE bar (id bigint primary key, value text)")),
+        Statement.of("CREATE TABLE bar (id bigint primary key, value text)"));
+
+    SpannerBatchUpdateException batchUpdateException =
+        assertThrows(
+            SpannerBatchUpdateException.class, () -> backendConnection.executeStatementsInBatch(0));
+    assertSame(expectedException, batchUpdateException);
   }
 
   @Test
@@ -357,7 +387,7 @@ public class BackendConnectionTest {
 
     ExecutionException executionException =
         assertThrows(ExecutionException.class, resultFuture::get);
-    assertSame(executionException.getCause(), error);
+    assertEquals(executionException.getCause(), PGExceptionFactory.toPGException(error));
   }
 
   @Test

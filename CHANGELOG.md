@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.12.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.11.0...v0.12.0) (2022-11-02)
+
+
+### Features
+
+* reimplement COPY parser to support more options and legacy syntax ([#410](https://github.com/GoogleCloudPlatform/pgadapter/issues/410)) ([b8a38dd](https://github.com/GoogleCloudPlatform/pgadapter/commit/b8a38ddf5236222c458b24658dc4d1c75bcc9c19))
+* replace sequences query with empty table ([#366](https://github.com/GoogleCloudPlatform/pgadapter/issues/366)) ([170dc7c](https://github.com/GoogleCloudPlatform/pgadapter/commit/170dc7ced61d355fa8ae50e40608f271be056ae7))
+
+
+### Bug Fixes
+
+* DDL batch errors halfway were not propagated ([#444](https://github.com/GoogleCloudPlatform/pgadapter/issues/444)) ([fc6efa4](https://github.com/GoogleCloudPlatform/pgadapter/commit/fc6efa409e9060a66a6e6fd099c4add92ef3a968)), closes [#443](https://github.com/GoogleCloudPlatform/pgadapter/issues/443)
+
+## [0.11.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.10.1...v0.11.0) (2022-10-28)
+
+
+### Features
+
+* add setting for copy_commit_priority ([#426](https://github.com/GoogleCloudPlatform/pgadapter/issues/426)) ([6d23184](https://github.com/GoogleCloudPlatform/pgadapter/commit/6d231847491895b1c5261eff97e810faa68c4e47))
+
+
+### Bug Fixes
+
+* close buffers used by Converter after use ([#434](https://github.com/GoogleCloudPlatform/pgadapter/issues/434)) ([4b0b500](https://github.com/GoogleCloudPlatform/pgadapter/commit/4b0b500e977aefa28e30a2b3bf2b9dba5729b757))
+* memory leak caused by ConnectionHandler not removed from map ([#437](https://github.com/GoogleCloudPlatform/pgadapter/issues/437)) ([6ef7240](https://github.com/GoogleCloudPlatform/pgadapter/commit/6ef7240017e7fee9786132c92ac32b3aecc6f63c))
+* use copy commit timeout for all RPCs ([#427](https://github.com/GoogleCloudPlatform/pgadapter/issues/427)) ([0381a0c](https://github.com/GoogleCloudPlatform/pgadapter/commit/0381a0c03aa8b2791ac7dc55c7b34e6b759b8192))
+
+
+### Documentation
+
+* document support for psycopg2 ([#395](https://github.com/GoogleCloudPlatform/pgadapter/issues/395)) ([676ddcd](https://github.com/GoogleCloudPlatform/pgadapter/commit/676ddcd05cd1f3cefca08dfec252d7c2771baa67))
+
 ## [0.10.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.10.0...v0.10.1) (2022-10-21)
 
 

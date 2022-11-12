@@ -44,7 +44,8 @@ public interface NodeJSTest {
     String currentPath = new java.io.File(".").getCanonicalPath();
     String testFilePath = String.format("%s/src/test/nodejs/%s", currentPath, directory);
     ProcessBuilder builder = new ProcessBuilder();
-    builder.command("npm", "start", testName, host, String.format("%d", port), database);
+    builder.command(
+        "npm", "--silent", "start", testName, host, String.format("%d", port), database);
     builder.directory(new File(testFilePath));
 
     Process process = builder.start();
