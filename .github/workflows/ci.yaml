@@ -84,7 +84,7 @@ jobs:
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
         sudo apt-get update
         sudo apt-get install postgresql-client-11
-    - uses: google-github-actions/setup-gcloud@v1
+    - uses: google-github-actions/setup-gcloud@v0
       with:
         project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
         service_account_key: ${{ env.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
@@ -110,7 +110,7 @@ jobs:
           wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
           sudo apt-get update
           sudo apt-get install postgresql-client-11
-      - uses: google-github-actions/setup-gcloud@v1
+      - uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
           service_account_key: ${{ env.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
@@ -136,7 +136,7 @@ jobs:
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
         sudo apt-get update
         sudo apt-get install postgresql-client-12
-    - uses: google-github-actions/setup-gcloud@v1
+    - uses: google-github-actions/setup-gcloud@v0
       with:
         project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
         service_account_key: ${{ env.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
@@ -162,7 +162,7 @@ jobs:
           wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
           sudo apt-get update
           sudo apt-get install postgresql-client-12
-      - uses: google-github-actions/setup-gcloud@v1
+      - uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
           service_account_key: ${{ env.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
@@ -188,7 +188,7 @@ jobs:
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
         sudo apt-get update
         sudo apt-get install postgresql-client-13
-    - uses: google-github-actions/setup-gcloud@v1
+    - uses: google-github-actions/setup-gcloud@v0
       with:
         project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
         service_account_key: ${{ env.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
@@ -214,7 +214,7 @@ jobs:
           wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
           sudo apt-get update
           sudo apt-get install postgresql-client-13
-      - uses: google-github-actions/setup-gcloud@v1
+      - uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
           service_account_key: ${{ env.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
@@ -240,7 +240,7 @@ jobs:
         wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
         sudo apt-get update
         sudo apt-get install postgresql-client-14
-    - uses: google-github-actions/setup-gcloud@v1
+    - uses: google-github-actions/setup-gcloud@v0
       with:
         project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
         service_account_key: ${{ env.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
@@ -266,7 +266,7 @@ jobs:
           wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
           sudo apt-get update
           sudo apt-get install postgresql-client-14
-      - uses: google-github-actions/setup-gcloud@v1
+      - uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: ${{ env.GOOGLE_CLOUD_PROJECT }}
           service_account_key: ${{ env.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
