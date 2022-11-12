@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.error;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -23,6 +24,24 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class PGExceptionTest {
+
+  @Test
+  public void testHints() {
+    assertNull(
+        PGException.newBuilder("test message")
+            .setSQLState(SQLState.InternalError)
+            .setSeverity(Severity.ERROR)
+            .build()
+            .getHints());
+    assertEquals(
+        "test hint\nsecond line",
+        PGException.newBuilder("test message")
+            .setSQLState(SQLState.InternalError)
+            .setSeverity(Severity.ERROR)
+            .setHints("test hint\nsecond line")
+            .build()
+            .getHints());
+  }
 
   @Test
   public void testEquals() {
