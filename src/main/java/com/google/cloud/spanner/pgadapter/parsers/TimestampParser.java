@@ -22,6 +22,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
@@ -64,7 +65,8 @@ public class TimestampParser extends Parser<Timestamp> {
           .parseCaseInsensitive()
           .appendPattern("yyyy-MM-dd HH:mm:ss")
           .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
-          .appendOffset("+HH:mm", "+00")
+          // Java 8 does not support seconds in timezone offset.
+          .appendOffset(OptionsMetadata.isJava8() ? "+HH:mm" : "+HH:mm:ss", "+00")
           .toFormatter();
 
   private static final DateTimeFormatter TIMESTAMP_INPUT_FORMATTER =
@@ -73,7 +75,8 @@ public class TimestampParser extends Parser<Timestamp> {
           .parseCaseInsensitive()
           .appendPattern("yyyy-MM-dd HH:mm:ss")
           .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
-          .appendOffset("+HH:mm", "+00:00:00")
+          // Java 8 does not support seconds in timezone offset.
+          .appendOffset(OptionsMetadata.isJava8() ? "+HH:mm" : "+HH:mm:ss", "+00:00:00")
           .toFormatter();
 
   private final SessionState sessionState;
