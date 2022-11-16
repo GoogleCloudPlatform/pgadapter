@@ -1364,7 +1364,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   public void testSetTimeZone() throws SQLException {
     try (Connection connection = createConnection()) {
       connection.createStatement().execute("set time zone 'IST'");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 
@@ -1372,7 +1372,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   public void testSetTimeZoneToDefault() throws SQLException {
     try (Connection connection = createConnection("?options=-c%%20timezone=IST")) {
       connection.createStatement().execute("set time zone default");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 
@@ -1380,7 +1380,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   public void testSetTimeZoneToLocal() throws SQLException {
     try (Connection connection = createConnection("?options=-c%%20timezone=IST")) {
       connection.createStatement().execute("set time zone local");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 
