@@ -404,11 +404,14 @@ public class SessionState {
     if (setting == null) {
       return ZoneId.systemDefault();
     }
-    return tryGetFirstNonNull(
-        ZoneId.systemDefault(),
-        () -> zoneIdFromString(setting.getSetting()),
-        () -> zoneIdFromString(setting.getResetVal()),
-        () -> zoneIdFromString(setting.getBootVal()));
+    String id =
+        tryGetFirstNonNull(
+            ZoneId.systemDefault().getId(),
+            setting::getSetting,
+            setting::getResetVal,
+            setting::getBootVal);
+
+    return zoneIdFromString(id);
   }
 
   private ZoneId zoneIdFromString(String value) {
