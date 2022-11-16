@@ -1,4 +1,4 @@
-# Google Cloud Spanner PGAdapter - node-postgres Experimental Support
+# PGAdapter - node-postgres Connection Options
 
 PGAdapter supports the [node-postgres driver](https://node-postgres.com/) version 8.8.0 and higher.
 
