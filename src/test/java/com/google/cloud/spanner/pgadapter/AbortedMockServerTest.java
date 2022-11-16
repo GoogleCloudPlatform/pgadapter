@@ -855,6 +855,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
 
       final int fetchSize = 3;
       try (Connection connection = createConnection(binaryTransferEnable)) {
+        connection.createStatement().execute("set time zone utc");
         connection.setAutoCommit(false);
         connection.unwrap(PGConnection.class).setPrepareThreshold(binary ? -1 : 5);
         try (PreparedStatement statement = connection.prepareStatement(SELECT_RANDOM.getSql())) {
