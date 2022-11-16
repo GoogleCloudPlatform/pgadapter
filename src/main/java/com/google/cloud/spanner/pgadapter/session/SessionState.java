@@ -167,6 +167,10 @@ public class SessionState {
   }
 
   private static String toKey(String extension, String name) {
+    if (extension == null && "timezone".equalsIgnoreCase(name)) {
+      // TimeZone is the only special setting that uses CamelCase.
+      return "TimeZone";
+    }
     return extension == null
         ? name.toLowerCase(Locale.ROOT)
         : extension.toLowerCase(Locale.ROOT) + "." + name.toLowerCase(Locale.ROOT);

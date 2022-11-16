@@ -23,10 +23,14 @@ import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ListValue;
+import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.RollbackRequest;
+import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -528,6 +532,68 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
       try (java.sql.Statement statement = connection.createStatement()) {
         assertThrows(SQLException.class, () -> statement.execute("execute my_statement"));
       }
+    }
+  }
+
+  @Test
+  public void testGetTimezoneStringUtc() throws SQLException {
+    String sql = "select '2022-01-01 10:00:00+01'::timestamptz";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.TIMESTAMP)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder().setStringValue("2022-01-01T09:00:00Z").build())
+                        .build())
+                .build()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone utc");
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals("2022-01-01 09:00:00+00", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testGetTimezoneStringEuropeAmsterdam() throws SQLException {
+    String sql = "select '2022-01-01 10:00:00Z'::timestamptz";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.TIMESTAMP)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder().setStringValue("2022-01-01T10:00:00Z").build())
+                        .build())
+                .build()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'Europe/Amsterdam'");
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals("2022-01-01 11:00:00+01", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testSetInvalidTimezone() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().execute("set time zone 'foo'"));
+      assertEquals(
+          "ERROR: invalid value for parameter \"TimeZone\": \"foo\"", exception.getMessage());
     }
   }
 }
