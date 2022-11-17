@@ -19,8 +19,6 @@ import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCo
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.SpannerException;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -30,6 +28,7 @@ import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -37,6 +36,7 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.DataOutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -70,7 +70,7 @@ public class IntermediateStatement {
   protected StatementResult statementResult;
   protected boolean hasMoreData;
   protected Future<StatementResult> futureStatementResult;
-  protected SpannerException exception;
+  protected PGException exception;
   protected final ParsedStatement parsedStatement;
   protected final Statement originalStatement;
   protected final String command;
@@ -214,7 +214,8 @@ public class IntermediateStatement {
     return this.parsedStatement.getSqlWithoutComments();
   }
 
-  private void initFutureResult(ResultNotReadyBehavior resultNotReadyBehavior) {
+  @VisibleForTesting
+  void initFutureResult(ResultNotReadyBehavior resultNotReadyBehavior) {
     if (this.futureStatementResult != null) {
       if (resultNotReadyBehavior == ResultNotReadyBehavior.FAIL
           && !this.futureStatementResult.isDone()) {
@@ -223,12 +224,9 @@ public class IntermediateStatement {
       try {
         setStatementResult(this.futureStatementResult.get());
       } catch (ExecutionException executionException) {
-        setException(SpannerExceptionFactory.asSpannerException(executionException.getCause()));
+        setException(PGExceptionFactory.toPGException(executionException.getCause()));
       } catch (InterruptedException interruptedException) {
-        // TODO(b/246193644): Switch to PGException
-        setException(
-            SpannerExceptionFactory.asSpannerException(
-                PGExceptionFactory.newQueryCancelledException()));
+        setException(PGExceptionFactory.newQueryCancelledException());
       } finally {
         this.futureStatementResult = null;
       }
@@ -269,11 +267,11 @@ public class IntermediateStatement {
   }
 
   /** Returns any execution exception registered for this statement. */
-  public SpannerException getException() {
+  public PGException getException() {
     return this.exception;
   }
 
-  void setException(SpannerException exception) {
+  void setException(PGException exception) {
     // Do not override any exception that has already been registered. COPY statements can receive
     // multiple errors as they execute asynchronously while receiving a stream of data from the
     // client. We always return the first exception that we encounter.
@@ -287,7 +285,7 @@ public class IntermediateStatement {
    *
    * @param exception The exception to store.
    */
-  public void handleExecutionException(SpannerException exception) {
+  public void handleExecutionException(PGException exception) {
     setException(exception);
     this.hasMoreData = false;
   }

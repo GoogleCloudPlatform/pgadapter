@@ -26,6 +26,7 @@ import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
+import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
@@ -546,6 +547,26 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
         }
         assertEquals(expectedRowCount, lineCount);
       }
+    }
+  }
+
+  @Test
+  public void testCopyOutPartitioned_NonExistingTable() throws SQLException {
+    StatusRuntimeException exception =
+        Status.NOT_FOUND.withDescription("Table my_table not found").asRuntimeException();
+    mockSpanner.putStatementResult(
+        StatementResult.exception(Statement.of("select * from my_table"), exception));
+    mockSpanner.setPartitionQueryExecutionTime(SimulatedExecutionTime.ofException(exception));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      SQLException sqlException =
+          assertThrows(
+              SQLException.class, () -> copyManager.copyOut("COPY my_table TO STDOUT", writer));
+      assertEquals(
+          "ERROR: Table my_table not found - Statement: 'select * from my_table'",
+          sqlException.getMessage());
     }
   }
 

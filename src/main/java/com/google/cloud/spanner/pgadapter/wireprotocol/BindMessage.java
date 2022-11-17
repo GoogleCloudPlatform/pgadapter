@@ -19,6 +19,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.text.MessageFormat;
 import java.util.Arrays;
@@ -67,13 +68,17 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.statementName = statementName;
     this.formatCodes = ImmutableList.of();
     this.resultFormatCodes = ImmutableList.of();
-    this.parameters = parameters;
+    this.parameters = Preconditions.checkNotNull(parameters);
     this.statement = connection.getStatement(statementName);
+  }
+
+  boolean hasParameterValues() {
+    return this.parameters.length > 0;
   }
 
   @Override
   void buffer(BackendConnection backendConnection) {
-    if (isExtendedProtocol() && !this.statement.isDescribed()) {
+    if (isExtendedProtocol() && hasParameterValues() && !this.statement.isDescribed()) {
       try {
         // Make sure all parameters have been described, so we always send typed parameters to Cloud
         // Spanner.

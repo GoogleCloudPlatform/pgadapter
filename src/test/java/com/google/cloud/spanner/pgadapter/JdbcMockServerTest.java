@@ -49,6 +49,7 @@ import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
+import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
@@ -891,6 +892,48 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(2, request.getStatementsCount());
     assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
+  }
+
+  @Test
+  public void testTwoDmlStatements_withError() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        SQLException exception =
+            assertThrows(
+                SQLException.class,
+                () -> statement.execute(String.format("%s;%s;", INSERT_STATEMENT, INVALID_DML)));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
+      }
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
+    assertEquals(INVALID_DML.getSql(), request.getStatements(1).getSql());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testTwoDmlStatements_randomlyAborted() throws SQLException {
+    mockSpanner.setAbortProbability(0.5);
+    for (int run = 0; run < 50; run++) {
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (java.sql.Statement statement = connection.createStatement()) {
+          assertFalse(
+              statement.execute(String.format("%s;%s;", INSERT_STATEMENT, UPDATE_STATEMENT)));
+          assertEquals(1, statement.getUpdateCount());
+          assertFalse(statement.getMoreResults());
+          assertEquals(2, statement.getUpdateCount());
+          assertFalse(statement.getMoreResults());
+          assertEquals(-1, statement.getUpdateCount());
+        }
+      } finally {
+        mockSpanner.setAbortProbability(0.0);
+      }
+    }
   }
 
   @Test
