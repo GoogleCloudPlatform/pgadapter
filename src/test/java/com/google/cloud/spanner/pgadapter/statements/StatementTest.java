@@ -43,6 +43,9 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
@@ -257,7 +260,8 @@ public class StatementTest {
     backendConnection.flush();
 
     assertTrue(intermediateStatement.hasException());
-    assertEquals(thrownException, intermediateStatement.getException());
+    assertEquals(
+        PGExceptionFactory.newPGException("test error"), intermediateStatement.getException());
   }
 
   @Test
@@ -422,8 +426,9 @@ public class StatementTest {
     backendConnection.flush();
 
     assertTrue(intermediateStatement.hasException());
-    SpannerException exception = intermediateStatement.getException();
-    assertEquals(ErrorCode.INVALID_ARGUMENT, exception.getErrorCode());
+    PGException exception = intermediateStatement.getException();
+    assertEquals(SQLState.RaiseException, exception.getSQLState());
+    assertEquals("test error", exception.getMessage());
   }
 
   @Test
@@ -467,24 +472,30 @@ public class StatementTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement statement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(
+                connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
     BackendConnection backendConnection =
         new BackendConnection(
             DatabaseId.of("p", "i", "d"), connection, options, ImmutableList.of());
     statement.executeAsync(backendConnection);
 
-    byte[] payload = "2 3\n".getBytes();
-    MutationWriter mutationWriter = statement.getMutationWriter();
-    mutationWriter.addCopyData(payload);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    executor.submit(
+        () -> {
+          byte[] payload = "2 3\n".getBytes();
+          MutationWriter mutationWriter = statement.getMutationWriter();
+          mutationWriter.addCopyData(payload);
+        });
+    executor.shutdown();
 
     backendConnection.flush();
 
-    SpannerException thrown = assertThrows(SpannerException.class, statement::getUpdateCount);
-    assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
+    PGException thrown = assertThrows(PGException.class, statement::getUpdateCount);
+    assertEquals(SQLState.DataException, thrown.getSQLState());
     assertEquals(
-        "INVALID_ARGUMENT: Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
+        "Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
         thrown.getMessage());
 
     statement.close();
@@ -557,8 +568,9 @@ public class StatementTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(
+                connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
     assertFalse(copyStatement.isExecuted());
     copyStatement.executeAsync(backendConnection);
@@ -605,8 +617,9 @@ public class StatementTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(
+                connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
 
     assertFalse(copyStatement.isExecuted());
     copyStatement.executeAsync(backendConnection);
@@ -626,10 +639,10 @@ public class StatementTest {
 
     backendConnection.flush();
 
-    SpannerException thrown = assertThrows(SpannerException.class, copyStatement::getUpdateCount);
-    assertEquals(ErrorCode.INVALID_ARGUMENT, thrown.getErrorCode());
+    PGException thrown = assertThrows(PGException.class, copyStatement::getUpdateCount);
+    assertEquals(SQLState.DataException, thrown.getSQLState());
     assertEquals(
-        "INVALID_ARGUMENT: Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
+        "Invalid COPY data: Row length mismatched. Expected 2 columns, but only found 1",
         thrown.getMessage());
 
     copyStatement.close();

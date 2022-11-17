@@ -17,9 +17,12 @@ package com.google.cloud.spanner.pgadapter.utils;
 import static com.google.cloud.spanner.pgadapter.utils.MutationWriter.calculateSize;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyIterable;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -31,14 +34,14 @@ import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Mutation;
-import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.cloud.spanner.pgadapter.parsers.copy.CopyTreeParser.CopyOptions.Format;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.cloud.spanner.pgadapter.utils.CsvCopyParser.CsvCopyRecord;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter.CopyTransactionMode;
 import com.google.common.collect.ImmutableList;
@@ -54,18 +57,26 @@ import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.junit.AfterClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class MutationWriterTest {
+  private static final ExecutorService executor = Executors.newSingleThreadExecutor();
+
+  @AfterClass
+  public static void shutdownExecutor() {
+    //    executor.shutdown();
+  }
 
   @Test
   public void testParsePartialPayload() throws IOException {
@@ -135,11 +146,20 @@ public class MutationWriterTest {
             format,
             false);
 
-    mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
-    mutationWriter.commit();
-    mutationWriter.close();
+    Future<?> fut =
+        executor.submit(
+            () -> {
+              try {
+                mutationWriter.addCopyData(
+                    "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+                mutationWriter.commit();
+                mutationWriter.close();
+              } catch (IOException ignore) {
+              }
+            });
 
     StatementResult updateCount = mutationWriter.call();
+    fut.get();
 
     assertEquals(2L, updateCount.getUpdateCount().longValue());
     List<Mutation> expectedMutations =
@@ -151,7 +171,7 @@ public class MutationWriterTest {
                 .set("name")
                 .to("Two")
                 .build());
-    verify(databaseClient).write(expectedMutations);
+    verify(databaseClient).writeWithOptions(eq(expectedMutations), any());
   }
 
   @Test
@@ -179,12 +199,19 @@ public class MutationWriterTest {
               format,
               false);
 
-      mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
-      mutationWriter.close();
+      executor.submit(
+          () -> {
+            try {
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+              mutationWriter.close();
+            } catch (IOException ignore) {
+            }
+          });
 
-      SpannerException exception = assertThrows(SpannerException.class, mutationWriter::call);
+      PGException exception = assertThrows(PGException.class, mutationWriter::call);
       assertEquals(
-          "FAILED_PRECONDITION: Record count: 2 has exceeded the limit: 1.\n"
+          "Record count: 2 has exceeded the limit: 1.\n"
               + "\n"
               + "The number of mutations per record is equal to the number of columns in the record plus the number of indexed columns in the record. The maximum number of mutations in one transaction is 1.\n"
               + "\n"
@@ -229,16 +256,22 @@ public class MutationWriterTest {
               format,
               false);
 
-      mutationWriter.addCopyData(
-          "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
-              .getBytes(StandardCharsets.UTF_8));
-      mutationWriter.commit();
-      mutationWriter.close();
+      executor.submit(
+          () -> {
+            try {
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
+                      .getBytes(StandardCharsets.UTF_8));
+              mutationWriter.commit();
+              mutationWriter.close();
+            } catch (IOException ignore) {
+            }
+          });
 
       StatementResult updateCount = mutationWriter.call();
 
       assertEquals(5L, updateCount.getUpdateCount().longValue());
-      verify(databaseClient, times(3)).write(anyIterable());
+      verify(databaseClient, times(3)).writeWithOptions(anyIterable(), any());
     } finally {
       System.getProperties().remove("copy_in_mutation_limit");
     }
@@ -273,10 +306,17 @@ public class MutationWriterTest {
       // 1. 8 bytes for the INT64
       // 2. 3 characters * 4 bytes per character = 12 bytes for STRING
       // 3. Total: 20 bytes per record, 40 bytes for the entire batch.
-      mutationWriter.addCopyData("1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
-      mutationWriter.close();
+      executor.submit(
+          () -> {
+            try {
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+              mutationWriter.close();
+            } catch (IOException ignore) {
+            }
+          });
 
-      SpannerException exception = assertThrows(SpannerException.class, mutationWriter::call);
+      PGException exception = assertThrows(PGException.class, mutationWriter::call);
       assertTrue(exception.getMessage().contains("Commit size: 40 has exceeded the limit: 30"));
 
       verify(connection, never()).write(anyIterable());
@@ -313,11 +353,17 @@ public class MutationWriterTest {
               format,
               false);
 
-      mutationWriter.addCopyData(
-          "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
-              .getBytes(StandardCharsets.UTF_8));
-      mutationWriter.commit();
-      mutationWriter.close();
+      executor.submit(
+          () -> {
+            try {
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
+                      .getBytes(StandardCharsets.UTF_8));
+              mutationWriter.commit();
+              mutationWriter.close();
+            } catch (IOException ignore) {
+            }
+          });
 
       StatementResult updateCount = mutationWriter.call();
 
@@ -329,7 +375,7 @@ public class MutationWriterTest {
       // 4. The second batch contains 28 bytes. (3 - 'Three')
       // 5. The third batch contains 24 bytes. (4 - 'Four')
       // 6. the fourth batch contains 24 bytes. (5 - 'Five')
-      verify(databaseClient, times(4)).write(anyIterable());
+      verify(databaseClient, times(4)).writeWithOptions(anyIterable(), any());
     } finally {
       System.getProperties().remove("copy_in_commit_limit");
     }
@@ -399,7 +445,7 @@ public class MutationWriterTest {
                 .set("name")
                 .to("Five")
                 .build());
-    verify(databaseClient).write(expectedMutations);
+    verify(databaseClient).writeWithOptions(eq(expectedMutations), any());
 
     executor.shutdown();
   }
@@ -560,5 +606,47 @@ public class MutationWriterTest {
 
       assertEquals(String.format("Type: %s", type), 1, mutation.asMap().size());
     }
+  }
+
+  @Test
+  public void testWriteAfterClose() throws Exception {
+    Map<String, Type> tableColumns = ImmutableMap.of("number", Type.int64(), "name", Type.string());
+    CSVFormat format =
+        CSVFormat.POSTGRESQL_TEXT
+            .builder()
+            .setHeader(tableColumns.keySet().toArray(new String[0]))
+            .build();
+    SessionState sessionState = new SessionState(mock(OptionsMetadata.class));
+    Connection connection = mock(Connection.class);
+    DatabaseClient databaseClient = mock(DatabaseClient.class);
+    when(connection.getDatabaseClient()).thenReturn(databaseClient);
+    MutationWriter mutationWriter =
+        new MutationWriter(
+            sessionState,
+            CopyTransactionMode.ImplicitAtomic,
+            connection,
+            "numbers",
+            tableColumns,
+            /* indexedColumnsCount = */ 1,
+            Format.TEXT,
+            format,
+            false);
+
+    CountDownLatch latch = new CountDownLatch(1);
+    Future<?> fut =
+        executor.submit(
+            () -> {
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+              mutationWriter.close();
+              latch.await();
+              mutationWriter.addCopyData(
+                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+              return null;
+            });
+
+    mutationWriter.call();
+    latch.countDown();
+    assertNull(fut.get());
   }
 }

@@ -166,13 +166,13 @@ public class ITNodePostgresTest implements IntegrationTest {
   @Test
   public void testSelect1() throws Exception {
     String output = runTest("testSelect1", getHost(), testEnv.getServer().getLocalPort());
-    assertEquals("\n\nSELECT 1 returned: 1\n", output);
+    assertEquals("SELECT 1 returned: 1\n", output);
   }
 
   @Test
   public void testInsert() throws Exception {
     String output = runTest("testInsert", getHost(), testEnv.getServer().getLocalPort());
-    assertEquals("\n\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\n", output);
 
     DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
     try (ResultSet resultSet =
@@ -186,7 +186,7 @@ public class ITNodePostgresTest implements IntegrationTest {
   @Test
   public void testInsertExecutedTwice() throws Exception {
     String output = runTest("testInsertTwice", getHost(), testEnv.getServer().getLocalPort());
-    assertEquals("\n\nInserted 1 row(s)\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\nInserted 1 row(s)\n", output);
 
     DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
     try (ResultSet resultSet =
@@ -202,7 +202,7 @@ public class ITNodePostgresTest implements IntegrationTest {
   @Test
   public void testInsertAutoCommit() throws IOException, InterruptedException {
     String output = runTest("testInsertAutoCommit", getHost(), testEnv.getServer().getLocalPort());
-    assertEquals("\n\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\n", output);
 
     DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
     try (ResultSet resultSet =
@@ -216,7 +216,7 @@ public class ITNodePostgresTest implements IntegrationTest {
   @Test
   public void testInsertAllTypes() throws IOException, InterruptedException {
     String output = runTest("testInsertAllTypes", getHost(), testEnv.getServer().getLocalPort());
-    assertEquals("\n\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\n", output);
 
     DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
     try (ResultSet resultSet =
@@ -244,7 +244,7 @@ public class ITNodePostgresTest implements IntegrationTest {
   public void testInsertAllTypesNull() throws IOException, InterruptedException {
     String output =
         runTest("testInsertAllTypesNull", getHost(), testEnv.getServer().getLocalPort());
-    assertEquals("\n\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\n", output);
 
     DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
     try (ResultSet resultSet =
@@ -269,7 +269,7 @@ public class ITNodePostgresTest implements IntegrationTest {
     String output =
         runTest(
             "testInsertAllTypesPreparedStatement", getHost(), testEnv.getServer().getLocalPort());
-    assertEquals("\n\nInserted 1 row(s)\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\nInserted 1 row(s)\n", output);
 
     DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
     try (ResultSet resultSet =
@@ -312,7 +312,7 @@ public class ITNodePostgresTest implements IntegrationTest {
 
     String output = runTest("testSelectAllTypes", getHost(), testEnv.getServer().getLocalPort());
     assertEquals(
-        "\n\nSelected {"
+        "Selected {"
             + "\"col_bigint\":\"1\","
             + "\"col_bool\":true,"
             + "\"col_bytea\":{\"type\":\"Buffer\",\"data\":[116,101,115,116]},"
@@ -333,7 +333,7 @@ public class ITNodePostgresTest implements IntegrationTest {
 
     String output = runTest("testSelectAllTypes", getHost(), testEnv.getServer().getLocalPort());
     assertEquals(
-        "\n\nSelected {"
+        "Selected {"
             + "\"col_bigint\":\"1\","
             + "\"col_bool\":null,"
             + "\"col_bytea\":null,"
@@ -359,7 +359,7 @@ public class ITNodePostgresTest implements IntegrationTest {
     String output =
         runTest("testErrorInReadWriteTransaction", getHost(), testEnv.getServer().getLocalPort());
     assertEquals(
-        "\n\nInsert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row [foo] in table users already exists\n"
+        "Insert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row [foo] in table users already exists\n"
             + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
             + "SELECT 1 returned: 1\n",
         output);
@@ -370,7 +370,7 @@ public class ITNodePostgresTest implements IntegrationTest {
     String output =
         runTest("testReadOnlyTransaction", getHost(), testEnv.getServer().getLocalPort());
 
-    assertEquals("\n\nexecuted read-only transaction\n", output);
+    assertEquals("executed read-only transaction\n", output);
   }
 
   @Test
@@ -378,7 +378,7 @@ public class ITNodePostgresTest implements IntegrationTest {
     String output =
         runTest("testReadOnlyTransactionWithError", getHost(), testEnv.getServer().getLocalPort());
     assertEquals(
-        "\n\ncurrent transaction is aborted, commands ignored until end of transaction block\n"
+        "current transaction is aborted, commands ignored until end of transaction block\n"
             + "[ { '?column?': '2' } ]\n",
         output);
   }
@@ -389,20 +389,36 @@ public class ITNodePostgresTest implements IntegrationTest {
 
     String output = runTest("testCopyTo", getHost(), testEnv.getServer().getLocalPort());
     assertEquals(
-        "\n\n1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
         output);
   }
 
   @Test
   public void testCopyFrom() throws Exception {
     String output = runTest("testCopyFrom", getHost(), testEnv.getServer().getLocalPort());
-    assertEquals("\n\nFinished copy operation\n", output);
+    assertEquals("Finished copy operation\n", output);
 
     DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
     try (ResultSet resultSet =
         client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM alltypes"))) {
       assertTrue(resultSet.next());
       assertEquals(100L, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
+  }
+
+  @Test
+  public void testDmlBatch() throws Exception {
+    String output = runTest("testDmlBatch", getHost(), testEnv.getServer().getLocalPort());
+    assertEquals("executed dml batch\n", output);
+
+    DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT * FROM users ORDER BY name"))) {
+      assertTrue(resultSet.next());
+      assertEquals("bar", resultSet.getString("name"));
+      assertTrue(resultSet.next());
+      assertEquals("foo", resultSet.getString("name"));
       assertFalse(resultSet.next());
     }
   }

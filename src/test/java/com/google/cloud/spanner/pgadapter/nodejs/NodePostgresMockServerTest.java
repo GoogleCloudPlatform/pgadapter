@@ -31,8 +31,10 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedTy
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
@@ -77,7 +79,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testSelect1", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nSELECT 1 returned: 1\n", output);
+    assertEquals("SELECT 1 returned: 1\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -110,7 +112,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testInsert", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -147,7 +149,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testInsertTwice", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nInserted 1 row(s)\nInserted 2 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\nInserted 2 row(s)\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -188,7 +190,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testInsertAutoCommit", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -264,7 +266,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testInsertAllTypes", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -318,7 +320,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testInsertAllTypesAllNull", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -417,7 +419,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output =
         runTest("testInsertAllTypesPreparedStatement", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nInserted 1 row(s)\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\nInserted 1 row(s)\n", output);
 
     // node-postgres will only send one parse message when using prepared statements. It never uses
     // DescribeStatement. It will send a new DescribePortal for each time the prepared statement is
@@ -461,7 +463,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testSelectAllTypes", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "\n\nSelected {"
+        "Selected {"
             + "\"col_bigint\":\"1\","
             + "\"col_bool\":true,"
             + "\"col_bytea\":{\"type\":\"Buffer\",\"data\":[116,101,115,116]},"
@@ -492,7 +494,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testSelectAllTypes", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "\n\nSelected {"
+        "Selected {"
             + "\"col_bigint\":null,"
             + "\"col_bool\":null,"
             + "\"col_bytea\":null,"
@@ -532,7 +534,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testErrorInReadWriteTransaction", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "\n\nInsert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row with \"name\" 'foo' already exists\n"
+        "Insert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row with \"name\" 'foo' already exists\n"
             + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
             + "SELECT 1 returned: 1\n",
         output);
@@ -545,7 +547,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   public void testReadOnlyTransaction() throws Exception {
     String output = runTest("testReadOnlyTransaction", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nexecuted read-only transaction\n", output);
+    assertEquals("executed read-only transaction\n", output);
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -572,7 +574,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testReadOnlyTransactionWithError", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "\n\ncurrent transaction is aborted, commands ignored until end of transaction block\n"
+        "current transaction is aborted, commands ignored until end of transaction block\n"
             + "[ { C: '2' } ]\n",
         output);
   }
@@ -580,22 +582,88 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   @Test
   public void testCopyTo() throws Exception {
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of("select * from alltypes"), createAllTypesResultSet("")));
+        StatementResult.query(Statement.of("select * from AllTypes"), createAllTypesResultSet("")));
 
     String output = runTest("testCopyTo", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "\n\n1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
         output);
   }
 
   @Test
   public void testCopyFrom() throws Exception {
-    CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, "alltypes", true);
+    CopyInMockServerTest.setupCopyInformationSchemaResults(mockSpanner, "public", "alltypes", true);
 
     String output = runTest("testCopyFrom", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nFinished copy operation\n", output);
+    assertEquals("Finished copy operation\n", output);
+  }
+
+  @Test
+  public void testDmlBatch() throws Exception {
+    String sql = "INSERT INTO users(name) VALUES($1)";
+    String describeParamsSql = "select $1 from (select name=$1 from users) p";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(describeParamsSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("foo").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(sql).bind("p1").to("bar").build(), 1L));
+
+    String output = runTest("testDmlBatch", getHost(), pgServer.getLocalPort());
+
+    assertEquals("executed dml batch\n", output);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(
+                request ->
+                    request.getSql().equals(sql) || request.getSql().equals(describeParamsSql))
+            .collect(Collectors.toList());
+    assertEquals(1, executeSqlRequests.size());
+    ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
+    assertEquals(describeParamsSql, describeRequest.getSql());
+    assertFalse(describeRequest.hasTransaction());
+
+    List<ExecuteBatchDmlRequest> batchDmlRequests =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class);
+    assertEquals(1, batchDmlRequests.size());
+    ExecuteBatchDmlRequest request = batchDmlRequests.get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, request.getStatementsCount());
+    String[] expectedValues = new String[] {"foo", "bar"};
+    for (int i = 0; i < request.getStatementsCount(); i++) {
+      assertEquals(sql, request.getStatements(i).getSql());
+      assertEquals(1, request.getStatements(i).getParamTypesCount());
+      assertEquals(
+          expectedValues[i],
+          request.getStatements(i).getParams().getFieldsMap().get("p1").getStringValue());
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testDdlBatch() throws Exception {
+    addDdlResponseToSpannerAdmin();
+
+    String output = runTest("testDdlBatch", getHost(), pgServer.getLocalPort());
+
+    assertEquals("executed ddl batch\n", output);
+    assertEquals(1, mockDatabaseAdmin.getRequests().size());
+    assertEquals(UpdateDatabaseDdlRequest.class, mockDatabaseAdmin.getRequests().get(0).getClass());
+    UpdateDatabaseDdlRequest request =
+        (UpdateDatabaseDdlRequest) mockDatabaseAdmin.getRequests().get(0);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(
+        "create table my_table1 (id bigint primary key, value varchar)", request.getStatements(0));
+    assertEquals(
+        "create table my_table2 (id bigint primary key, value varchar)", request.getStatements(1));
   }
 
   static String runTest(String testName, String host, int port)

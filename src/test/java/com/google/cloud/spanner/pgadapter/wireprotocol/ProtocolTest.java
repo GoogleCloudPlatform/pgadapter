@@ -19,6 +19,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -32,11 +33,8 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
-import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ReadContext;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.SpannerException;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -46,6 +44,9 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
@@ -70,8 +71,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -650,6 +649,7 @@ public class ProtocolTest {
     assertEquals(expectedFormatCodes, ((BindMessage) message).getFormatCodes());
     assertEquals(expectedFormatCodes, ((BindMessage) message).getResultFormatCodes());
     assertEquals("select * from foo", ((BindMessage) message).getSql());
+    assertTrue(((BindMessage) message).hasParameterValues());
 
     when(intermediatePreparedStatement.bind(
             ArgumentMatchers.anyString(),
@@ -945,8 +945,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    SpannerException testException =
-        SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT, "test error");
+    PGException testException =
+        PGExceptionFactory.newPGException("test error", SQLState.SyntaxError);
     when(intermediatePortalStatement.hasException()).thenReturn(true);
     when(intermediatePortalStatement.getException()).thenReturn(testException);
     when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
@@ -1327,7 +1327,8 @@ public class ProtocolTest {
 
     String sql = "COPY keyvalue FROM STDIN;";
     CopyStatement copyStatement =
-        new CopyStatement(connectionHandler, options, "", parse(sql), Statement.of(sql));
+        (CopyStatement)
+            CopyStatement.create(connectionHandler, options, "", parse(sql), Statement.of(sql));
     copyStatement.executeAsync(mock(BackendConnection.class));
 
     when(connectionHandler.getActiveCopyStatement()).thenReturn(copyStatement);
@@ -1418,36 +1419,6 @@ public class ProtocolTest {
     message.send();
 
     verify(mutationWriter).rollback();
-  }
-
-  @Test
-  public void testCopyFromFilePipe() throws Exception {
-    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
-        mock(ExtendedQueryProtocolHandler.class);
-    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
-    when(connectionHandler.getExtendedQueryProtocolHandler())
-        .thenReturn(extendedQueryProtocolHandler);
-    SessionState sessionState = new SessionState(options);
-    when(backendConnection.getSessionState()).thenReturn(sessionState);
-    setupQueryInformationSchemaResults();
-
-    byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/small-file-test.txt"));
-
-    String sql = "COPY keyvalue FROM STDIN;";
-    CopyStatement copyStatement =
-        new CopyStatement(
-            connectionHandler, mock(OptionsMetadata.class), "", parse(sql), Statement.of(sql));
-    copyStatement.executeAsync(mock(BackendConnection.class));
-
-    MutationWriter mw = copyStatement.getMutationWriter();
-    mw.addCopyData(payload);
-
-    assertEquals("TEXT", copyStatement.getFormatType());
-    assertEquals('\t', copyStatement.getDelimiterChar());
-
-    copyStatement.close();
-    verify(resultSet, never()).close();
   }
 
   @Test
