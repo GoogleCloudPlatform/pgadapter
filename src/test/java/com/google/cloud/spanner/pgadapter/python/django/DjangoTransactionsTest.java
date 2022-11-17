@@ -20,7 +20,6 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
-import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
@@ -88,17 +87,20 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
     return resultSetBuilder.build();
   }
 
-
   @Test
   public void transactionCommitTest() throws IOException, InterruptedException {
 
-    String updateSQL1 = "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
-    String insertSQL1 = "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (1, 'hello', 'world')";
+    String updateSQL1 =
+        "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
+    String insertSQL1 =
+        "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (1, 'hello', 'world')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSQL1), 0));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSQL1), 1));
 
-    String updateSQL2 = "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'python' WHERE \"singers\".\"singerid\" = 2";
-    String insertSQL2 = "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (2, 'hello', 'python')";
+    String updateSQL2 =
+        "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'python' WHERE \"singers\".\"singerid\" = 2";
+    String insertSQL2 =
+        "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (2, 'hello', 'python')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSQL2), 0));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSQL2), 1));
 
@@ -110,19 +112,22 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
 
     assertEquals(expectedOutput, actualOutput);
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-
   }
 
   @Test
   public void transactionRollbackTest() throws IOException, InterruptedException {
 
-    String updateSQL1 = "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
-    String insertSQL1 = "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (1, 'hello', 'world')";
+    String updateSQL1 =
+        "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
+    String insertSQL1 =
+        "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (1, 'hello', 'world')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSQL1), 0));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSQL1), 1));
 
-    String updateSQL2 = "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'python' WHERE \"singers\".\"singerid\" = 2";
-    String insertSQL2 = "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (2, 'hello', 'python')";
+    String updateSQL2 =
+        "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'python' WHERE \"singers\".\"singerid\" = 2";
+    String insertSQL2 =
+        "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (2, 'hello', 'python')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSQL2), 0));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSQL2), 1));
 
@@ -134,19 +139,23 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
 
     assertEquals(expectedOutput, actualOutput);
     assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
-
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
   public void transactionAtomicTest() throws IOException, InterruptedException {
 
-    String updateSQL1 = "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
-    String insertSQL1 = "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (1, 'hello', 'world')";
+    String updateSQL1 =
+        "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
+    String insertSQL1 =
+        "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (1, 'hello', 'world')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSQL1), 0));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSQL1), 1));
 
-    String updateSQL2 = "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'python' WHERE \"singers\".\"singerid\" = 2";
-    String insertSQL2 = "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (2, 'hello', 'python')";
+    String updateSQL2 =
+        "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'python' WHERE \"singers\".\"singerid\" = 2";
+    String insertSQL2 =
+        "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (2, 'hello', 'python')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSQL2), 0));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSQL2), 1));
 
@@ -158,9 +167,32 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
 
     assertEquals(expectedOutput, actualOutput);
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
-
   }
 
+  @Test
+  public void transactionNestedAtomicTest() throws IOException, InterruptedException {
 
+    String updateSQL1 =
+        "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
+    String insertSQL1 =
+        "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (1, 'hello', 'world')";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSQL1), 0));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSQL1), 1));
 
+    String updateSQL2 =
+        "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'python' WHERE \"singers\".\"singerid\" = 2";
+    String insertSQL2 =
+        "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (2, 'hello', 'python')";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSQL2), 0));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSQL2), 1));
+
+    List<String> options = new ArrayList<String>();
+    options.add("nested_atomic");
+
+    String actualOutput = executeTransactionTests(pgServer.getLocalPort(), host, options);
+    String expectedOutput = "Atomic Successful\n";
+
+    assertEquals(expectedOutput, actualOutput);
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
 }

@@ -71,6 +71,16 @@ def test_atomic():
     singer2.save()
   print('Atomic Successful')
 
+def test_nested_atomic():
+  with transaction.atomic(savepoint=False):
+    singer2 = Singer(singerid=2, firstname='hello', lastname='python')
+    with transaction.atomic(savepoint=False):
+      singer = Singer(singerid=1, firstname='hello', lastname='world')
+      singer.save()
+    singer2.save()
+  print('Atomic Successful')
+
+
 if __name__ == '__main__':
   if len(sys.argv) < 4:
     print('Invalid command line arguments')
@@ -94,6 +104,8 @@ if __name__ == '__main__':
       test_rollback_transaction()
     elif option == 'atomic':
       test_atomic()
+    elif option == 'nested_atomic':
+      test_nested_atomic()
     else:
       print('Invalid Option')
   except Exception as e:
