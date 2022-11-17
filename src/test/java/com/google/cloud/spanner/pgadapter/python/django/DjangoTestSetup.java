@@ -41,10 +41,10 @@ public class DjangoTestSetup extends DjangoMockServerTest {
 
   private static String DJANGO_PATH = "./src/test/python/django";
 
-  public String executeBasicTests(int port, String host, List<String> options)
+  private static String execute(int port, String host, List<String> options, String testFileName)
       throws IOException, InterruptedException {
     List<String> runCommand =
-        new ArrayList<>(Arrays.asList("python3", "basic_test.py", host, Integer.toString(port)));
+        new ArrayList<>(Arrays.asList("python3", testFileName, host, Integer.toString(port)));
     runCommand.addAll(options);
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
@@ -60,5 +60,15 @@ public class DjangoTestSetup extends DjangoMockServerTest {
     assertEquals(output.toString(), 0, result);
 
     return output.toString();
+  }
+
+  public String executeBasicTests(int port, String host, List<String> options)
+      throws IOException, InterruptedException {
+    return execute(port, host, options, "basic_test.py");
+  }
+
+  public String executeTransactionTests(int port, String host, List<String> options)
+      throws IOException, InterruptedException {
+    return execute(port, host, options, "transaction_test.py");
   }
 }
