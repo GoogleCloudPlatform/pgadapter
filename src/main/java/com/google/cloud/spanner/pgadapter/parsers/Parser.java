@@ -304,7 +304,7 @@ public abstract class Parser<T> {
           case BYTES:
             return Oid.BYTEA_ARRAY;
           case TIMESTAMP:
-            return Oid.TIMESTAMP_ARRAY;
+            return Oid.TIMESTAMPTZ_ARRAY;
           case DATE:
             return Oid.DATE_ARRAY;
           case ARRAY:

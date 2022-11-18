@@ -295,10 +295,6 @@ public class IntermediateStatement {
     return this.described;
   }
 
-  public void setDescribed() {
-    this.described = true;
-  }
-
   public void executeAsync(BackendConnection backendConnection) {
     throw new UnsupportedOperationException();
   }
