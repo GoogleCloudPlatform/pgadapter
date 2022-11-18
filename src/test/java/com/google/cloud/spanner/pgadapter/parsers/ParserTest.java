@@ -32,6 +32,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.common.collect.ImmutableSet;
 import com.google.spanner.v1.TypeCode;
@@ -433,6 +434,10 @@ public class ParserTest {
     assertEquals(Oid.DATE_ARRAY, toOid(createArrayType(TypeCode.DATE)));
     assertEquals(Oid.NUMERIC_ARRAY, toOid(createArrayType(TypeCode.NUMERIC)));
     assertEquals(Oid.BYTEA_ARRAY, toOid(createArrayType(TypeCode.BYTES)));
+
+    assertThrows(PGException.class, () -> toOid(createType(TypeCode.STRUCT)));
+    assertThrows(PGException.class, () -> toOid(createArrayType(TypeCode.ARRAY)));
+    assertThrows(PGException.class, () -> toOid(createArrayType(TypeCode.STRUCT)));
   }
 
   static com.google.spanner.v1.Type createType(TypeCode code) {

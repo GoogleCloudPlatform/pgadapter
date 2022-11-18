@@ -22,6 +22,8 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
@@ -310,13 +312,13 @@ public abstract class Parser<T> {
           case ARRAY:
           case STRUCT:
           default:
-            throw SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown array type: " + type);
+            throw PGExceptionFactory.newPGException(
+                "Unsupported or unknown array type: " + type, SQLState.InternalError);
         }
       case STRUCT:
       default:
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown type: " + type);
+        throw PGExceptionFactory.newPGException(
+            "Unsupported or unknown type: " + type, SQLState.InternalError);
     }
   }
 

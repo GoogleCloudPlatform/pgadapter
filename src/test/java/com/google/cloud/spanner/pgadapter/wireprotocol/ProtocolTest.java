@@ -888,6 +888,39 @@ public class ProtocolTest {
   }
 
   @Test
+  public void testDescribeMessageWithException() throws Exception {
+    byte[] messageMetadata = {'D'};
+    byte[] statementType = {'S'};
+    String statementName = "some statement\0";
+
+    byte[] length = intToBytes(4 + 1 + statementName.length());
+
+    byte[] value = Bytes.concat(messageMetadata, length, statementType, statementName.getBytes());
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(intermediatePreparedStatement.hasException()).thenReturn(true);
+    when(intermediatePreparedStatement.getException())
+        .thenReturn(PGExceptionFactory.newPGException("test error", SQLState.InternalError));
+
+    WireMessage message = ControlMessage.create(connectionHandler);
+    assertEquals(DescribeMessage.class, message.getClass());
+    DescribeMessage describeMessage = (DescribeMessage) message;
+
+    PGException exception =
+        assertThrows(PGException.class, describeMessage::handleDescribeStatement);
+    assertEquals("test error", exception.getMessage());
+  }
+
+  @Test
   public void testExecuteMessage() throws Exception {
     byte[] messageMetadata = {'E'};
     String statementName = "some portal\0";

@@ -90,6 +90,20 @@
     <method>void connectToSpanner(java.lang.String, com.google.auth.oauth2.GoogleCredentials)</method>
     <to>void connectToSpanner(java.lang.String, com.google.auth.Credentials)</to>
   </difference>
+  <!-- Use backend parsing of statements for describing parameters. -->
+  <difference>
+    <differenceType>7005</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/ConnectionHandler</className>
+    <method>void registerAutoDescribedStatement(java.lang.String, int[])</method>
+    <to>void registerAutoDescribedStatement(java.lang.String, java.util.concurrent.Future)</to>
+  </difference>
+  <difference>
+    <differenceType>7006</differenceType>
+    <className>com/google/cloud/spanner/pgadapter/ConnectionHandler</className>
+    <method>int[] getAutoDescribedStatement(java.lang.String)</method>
+    <from>int[]</from>
+    <to>java.util.concurrent.Future</to>
+  </difference>
 
   <!-- Add ignores for all sub packages, as these are considered internal. -->
   <difference>
