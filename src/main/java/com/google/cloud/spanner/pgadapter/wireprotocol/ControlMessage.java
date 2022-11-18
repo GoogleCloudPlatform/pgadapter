@@ -301,10 +301,11 @@ public abstract class ControlMessage extends WireMessage {
    */
   public SendResultSetState sendResultSet(
       IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
-    Preconditions.checkArgument(
-        describedResult.containsResultSet(), "The statement result must be a result set");
-    long rows;
     StatementResult statementResult = describedResult.getStatementResult();
+    Preconditions.checkArgument(
+        statementResult.getResultType() == ResultType.RESULT_SET,
+        "The statement result must be a result set");
+    long rows;
     boolean hasData;
     if (statementResult instanceof PartitionQueryResult) {
       hasData = false;
