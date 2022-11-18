@@ -322,7 +322,7 @@ public abstract class AbstractMockServerTest {
                       .setCode(types.get(index))
                       .setTypeAnnotation(getTypeAnnotationCode(types.get(index)))
                       .build())
-              .setName("")
+              .setName("p" + (index + 1))
               .build());
     }
     return ResultSetMetadata.newBuilder().setUndeclaredParameters(builder.build()).build();

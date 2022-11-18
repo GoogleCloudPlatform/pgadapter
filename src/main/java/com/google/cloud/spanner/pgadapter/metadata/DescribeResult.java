@@ -16,10 +16,11 @@ package com.google.cloud.spanner.pgadapter.metadata;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
-import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.StructType;
 import java.util.Arrays;
-import java.util.List;
 
 @InternalApi
 public class DescribeResult implements AutoCloseable {
@@ -36,23 +37,42 @@ public class DescribeResult implements AutoCloseable {
       return givenParameterTypes;
     }
     return extractParameterTypes(
-        givenParameterTypes, resultSet.getMetadata().getUndeclaredParameters().getFieldsList());
+        givenParameterTypes, resultSet.getMetadata().getUndeclaredParameters());
   }
 
-  static int[] extractParameterTypes(int[] givenParameterTypes, List<Field> parameters) {
+  static int[] extractParameterTypes(int[] givenParameterTypes, StructType parameters) {
     int[] result;
-    if (parameters.size() == givenParameterTypes.length) {
+    int maxParamIndex = maxParamNumber(parameters);
+    if (maxParamIndex == givenParameterTypes.length) {
       result = givenParameterTypes;
     } else {
-      result = Arrays.copyOf(givenParameterTypes, parameters.size());
+      result =
+          Arrays.copyOf(givenParameterTypes, Math.max(givenParameterTypes.length, maxParamIndex));
     }
-    for (int i = 0; i < parameters.size(); i++) {
+    for (int i = 0; i < parameters.getFieldsCount(); i++) {
       // Only override parameter types that were not specified by the frontend.
-      if (i >= givenParameterTypes.length || givenParameterTypes[i] == 0) {
-        result[i] = Parser.toOid(parameters.get(i).getType());
+      int paramIndex = Integer.parseInt(parameters.getFields(i).getName().substring(1)) - 1;
+      if (paramIndex >= givenParameterTypes.length || givenParameterTypes[paramIndex] == 0) {
+        result[paramIndex] = Parser.toOid(parameters.getFields(i).getType());
       }
     }
     return result;
+  }
+
+  static int maxParamNumber(StructType parameters) {
+    int max = 0;
+    for (int i = 0; i < parameters.getFieldsCount(); i++) {
+      try {
+        int paramIndex = Integer.parseInt(parameters.getFields(i).getName().substring(1));
+        if (paramIndex > max) {
+          max = paramIndex;
+        }
+      } catch (NumberFormatException numberFormatException) {
+        throw PGExceptionFactory.newPGException(
+            "Invalid parameter name: " + parameters.getFields(i).getName(), SQLState.InternalError);
+      }
+    }
+    return max;
   }
 
   public int[] getParameters() {
