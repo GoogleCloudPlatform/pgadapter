@@ -45,7 +45,9 @@ import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.ResultSetHelper;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
@@ -128,6 +130,12 @@ public class BackendConnection {
     DDL_BATCH,
   }
 
+  static <T> PGException setAndReturn(SettableFuture<T> future, Throwable throwable) {
+    PGException pgException = PGExceptionFactory.toPGException(throwable);
+    future.setException(pgException);
+    return pgException;
+  }
+
   /**
    * Buffered statements are kept in memory until a flush or sync message is received. This makes it
    * possible to batch multiple statements together when sending them to Cloud Spanner.
@@ -153,8 +161,7 @@ public class BackendConnection {
       // Only COMMIT or ROLLBACK is allowed if we are in an ABORTED transaction.
       if (connectionState == ConnectionState.ABORTED
           && !(isCommit(parsedStatement) || isRollback(parsedStatement))) {
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT, TRANSACTION_ABORTED_ERROR);
+        throw PGExceptionFactory.newTransactionAbortedException();
       }
     }
   }
@@ -252,19 +259,16 @@ public class BackendConnection {
                             .executeQuery(statement))));
             return;
           } catch (Exception exception) {
-            result.setException(exception);
-            throw exception;
+            throw setAndReturn(result, exception);
           }
         }
         if (spannerException.getErrorCode() == ErrorCode.CANCELLED || Thread.interrupted()) {
-          result.setException(PGExceptionFactory.newQueryCancelledException());
+          throw setAndReturn(result, PGExceptionFactory.newQueryCancelledException());
         } else {
-          result.setException(spannerException);
+          throw setAndReturn(result, spannerException);
         }
-        throw spannerException;
       } catch (Throwable exception) {
-        result.setException(exception);
-        throw exception;
+        throw setAndReturn(result, exception);
       }
     }
 
@@ -371,8 +375,7 @@ public class BackendConnection {
           }
         }
       } catch (Exception exception) {
-        result.setException(exception);
-        throw exception;
+        throw setAndReturn(result, exception);
       }
     }
   }
@@ -747,9 +750,9 @@ public class BackendConnection {
             // Single DDL statements outside explicit transactions are always allowed. For a single
             // statement, there can also not be an implicit transaction that needs to be committed.
             if (transactionMode == TransactionMode.EXPLICIT) {
-              throw SpannerExceptionFactory.newSpannerException(
-                  ErrorCode.FAILED_PRECONDITION,
-                  "DDL statements are only allowed outside explicit transactions.");
+              throw PGExceptionFactory.newPGException(
+                  "DDL statements are only allowed outside explicit transactions.",
+                  SQLState.InvalidTransactionState);
             }
             // Fall-through to commit the transaction if necessary.
           case AutocommitExplicitTransaction:
@@ -773,23 +776,23 @@ public class BackendConnection {
       // We are in a batch of statements.
       switch (ddlTransactionMode) {
         case Single:
-          throw SpannerExceptionFactory.newSpannerException(
-              ErrorCode.FAILED_PRECONDITION,
-              "DDL statements are only allowed outside batches and transactions.");
+          throw PGExceptionFactory.newPGException(
+              "DDL statements are only allowed outside batches and transactions.",
+              SQLState.InvalidTransactionState);
         case Batch:
           if (spannerConnection.isInTransaction()
               || bufferedStatements.stream()
                   .anyMatch(statement -> !statement.parsedStatement.isDdl())) {
-            throw SpannerExceptionFactory.newSpannerException(
-                ErrorCode.FAILED_PRECONDITION,
-                "DDL statements are not allowed in mixed batches or transactions.");
+            throw PGExceptionFactory.newPGException(
+                "DDL statements are not allowed in mixed batches or transactions.",
+                SQLState.InvalidTransactionState);
           }
           break;
         case AutocommitImplicitTransaction:
           if (spannerConnection.isInTransaction() && transactionMode != TransactionMode.IMPLICIT) {
-            throw SpannerExceptionFactory.newSpannerException(
-                ErrorCode.FAILED_PRECONDITION,
-                "DDL statements are only allowed outside explicit transactions.");
+            throw PGExceptionFactory.newPGException(
+                "DDL statements are only allowed outside explicit transactions.",
+                SQLState.InvalidTransactionState);
           }
           // Fallthrough to commit the transaction if necessary.
         case AutocommitExplicitTransaction:
@@ -807,9 +810,8 @@ public class BackendConnection {
             }
           }
       }
-    } catch (SpannerException exception) {
-      bufferedStatement.result.setException(exception);
-      throw exception;
+    } catch (Throwable throwable) {
+      throw setAndReturn(bufferedStatement.result, throwable);
     }
   }
 
@@ -892,16 +894,10 @@ public class BackendConnection {
     Preconditions.checkArgument(
         canBeBatchedTogether(getStatementType(fromIndex), getStatementType(fromIndex + 1)));
     StatementType batchType = getStatementType(fromIndex);
-    switch (batchType) {
-      case UPDATE:
-        spannerConnection.startBatchDml();
-        break;
-      case DDL:
-        spannerConnection.startBatchDdl();
-        break;
-      default:
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT, "Statement type is not supported for batching");
+    if (batchType == StatementType.UPDATE) {
+      spannerConnection.startBatchDml();
+    } else if (batchType == StatementType.DDL) {
+      spannerConnection.startBatchDdl();
     }
     List<StatementResult> statementResults = new ArrayList<>(getStatementCount());
     int index = fromIndex;

@@ -44,6 +44,7 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
@@ -395,7 +396,7 @@ public class BackendConnectionTest {
 
     ExecutionException executionException =
         assertThrows(ExecutionException.class, resultFuture::get);
-    assertSame(executionException.getCause(), error);
+    assertEquals(executionException.getCause(), PGExceptionFactory.toPGException(error));
   }
 
   @Test

@@ -80,7 +80,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testSelect1", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nSELECT 1 returned: 1\n", output);
+    assertEquals("SELECT 1 returned: 1\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -113,7 +113,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testInsert", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -150,7 +150,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testInsertTwice", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nInserted 1 row(s)\nInserted 2 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\nInserted 2 row(s)\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -190,7 +190,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testInsertAutoCommit", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -265,7 +265,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testInsertAllTypes", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -320,7 +320,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testInsertAllTypesAllNull", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -417,7 +417,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output =
         runTest("testInsertAllTypesPreparedStatement", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nInserted 1 row(s)\nInserted 1 row(s)\n", output);
+    assertEquals("Inserted 1 row(s)\nInserted 1 row(s)\n", output);
 
     // node-postgres will only send one parse message when using prepared statements. It never uses
     // DescribeStatement. It will send a new DescribePortal for each time the prepared statement is
@@ -462,7 +462,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testSelectAllTypes", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "\n\nSelected {"
+        "Selected {"
             + "\"col_bigint\":\"1\","
             + "\"col_bool\":true,"
             + "\"col_bytea\":{\"type\":\"Buffer\",\"data\":[116,101,115,116]},"
@@ -493,7 +493,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testSelectAllTypes", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "\n\nSelected {"
+        "Selected {"
             + "\"col_bigint\":null,"
             + "\"col_bool\":null,"
             + "\"col_bytea\":null,"
@@ -533,7 +533,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testErrorInReadWriteTransaction", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "\n\nInsert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row with \"name\" 'foo' already exists\n"
+        "Insert error: error: com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row with \"name\" 'foo' already exists\n"
             + "Second insert failed with error: error: current transaction is aborted, commands ignored until end of transaction block\n"
             + "SELECT 1 returned: 1\n",
         output);
@@ -546,7 +546,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   public void testReadOnlyTransaction() throws Exception {
     String output = runTest("testReadOnlyTransaction", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nexecuted read-only transaction\n", output);
+    assertEquals("executed read-only transaction\n", output);
 
     List<ExecuteSqlRequest> requests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -573,7 +573,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testReadOnlyTransactionWithError", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "\n\ncurrent transaction is aborted, commands ignored until end of transaction block\n"
+        "current transaction is aborted, commands ignored until end of transaction block\n"
             + "[ { C: '2' } ]\n",
         output);
   }
@@ -586,9 +586,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testCopyTo", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "\n"
-            + "\n"
-            + "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
         output);
   }
 
@@ -598,7 +596,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testCopyFrom", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nFinished copy operation\n", output);
+    assertEquals("Finished copy operation\n", output);
   }
 
   @Test
@@ -618,7 +616,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testDmlBatch", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nexecuted dml batch\n", output);
+    assertEquals("executed dml batch\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -657,7 +655,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("testDdlBatch", getHost(), pgServer.getLocalPort());
 
-    assertEquals("\n\nexecuted ddl batch\n", output);
+    assertEquals("executed ddl batch\n", output);
     assertEquals(1, mockDatabaseAdmin.getRequests().size());
     assertEquals(UpdateDatabaseDdlRequest.class, mockDatabaseAdmin.getRequests().get(0).getClass());
     UpdateDatabaseDdlRequest request =

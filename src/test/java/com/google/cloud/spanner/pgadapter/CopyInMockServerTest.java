@@ -30,6 +30,7 @@ import static org.junit.Assume.assumeTrue;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.base.Strings;
 import com.google.common.hash.Hashing;
@@ -765,7 +766,8 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               + "XX000\n"
               + "Expected CopyData ('d'), CopyDone ('c') or CopyFail ('f') messages, got: 'Q'\n"
               + "ERROR\n"
-              + "P0001\n"
+              + SQLState.QueryCanceled
+              + "\n"
               + "Error\n",
           errorMessage.toString());
 
@@ -1152,7 +1154,8 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
         }
       }
       assertTrue(receivedErrorMessage);
-      assertEquals("ERROR\n" + "P0001\n" + "Changed my mind\n", errorMessage.toString());
+      assertEquals(
+          "ERROR\n" + SQLState.QueryCanceled + "\n" + "Changed my mind\n", errorMessage.toString());
     }
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }

@@ -123,7 +123,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("findOneUser", pgServer.getLocalPort());
 
-    assertEquals("\n\nFound user 1 with name Timber Saw\n", output);
+    assertEquals("Found user 1 with name Timber Saw\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -256,7 +256,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("createUser", pgServer.getLocalPort());
 
-    assertEquals("\n\nFound user 1 with name Timber Saw\n", output);
+    assertEquals("Found user 1 with name Timber Saw\n", output);
 
     // Creating the user will use a read/write transaction. The query that checks whether the record
     // already exists will however not use that transaction, as each statement is executed in
@@ -405,7 +405,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("updateUser", pgServer.getLocalPort());
 
-    assertEquals("\n\nUpdated user 1\n", output);
+    assertEquals("Updated user 1\n", output);
 
     // Updating the user will use a read/write transaction. The query that checks whether the record
     // already exists will however not use that transaction, as each statement is executed in
@@ -535,7 +535,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("deleteUser", pgServer.getLocalPort());
 
-    assertEquals("\n\nDeleted user 1\n", output);
+    assertEquals("Deleted user 1\n", output);
 
     // Deleting the user will use a read/write transaction. The query that checks whether the record
     // already exists will however not use that transaction, as each statement is executed in
@@ -618,7 +618,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     String output = runTest("findOneAllTypes", pgServer.getLocalPort());
 
     assertEquals(
-        "\n\nFound row 1\n"
+        "Found row 1\n"
             + "AllTypes {\n"
             + "  col_bigint: '1',\n"
             + "  col_bool: true,\n"
@@ -735,7 +735,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("createAllTypes", pgServer.getLocalPort());
 
-    assertEquals("\n\nCreated one record\n", output);
+    assertEquals("Created one record\n", output);
 
     List<ExecuteSqlRequest> insertRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()

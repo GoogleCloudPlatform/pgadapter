@@ -20,6 +20,7 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.text.MessageFormat;
 import java.util.Arrays;
@@ -72,12 +73,16 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.statementName = statementName;
     this.formatCodes = ImmutableList.of();
     this.resultFormatCodes = ImmutableList.of();
-    this.parameters = parameters;
+    this.parameters = Preconditions.checkNotNull(parameters);
     IntermediatePreparedStatement statement = connection.getStatement(statementName);
     this.statement =
         statement.createPortal(
             this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
     this.connection.registerPortal(this.portalName, this.statement);
+  }
+
+  boolean hasParameterValues() {
+    return this.parameters.length > 0;
   }
 
   @Override

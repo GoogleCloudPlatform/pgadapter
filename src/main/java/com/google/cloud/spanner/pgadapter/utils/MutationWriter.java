@@ -34,7 +34,9 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.CopySettings;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
@@ -106,7 +108,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final Format copyFormat;
   private final CSVFormat csvFormat;
   private final boolean hasHeader;
-  private final CountDownLatch parserCreatedLatch = new CountDownLatch(1);
+  private final CountDownLatch pipeCreatedLatch = new CountDownLatch(1);
   private final PipedOutputStream payload = new PipedOutputStream();
   private final AtomicBoolean commit = new AtomicBoolean(false);
   private final AtomicBoolean rollback = new AtomicBoolean(false);
@@ -117,7 +119,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final Object lock = new Object();
 
   @GuardedBy("lock")
-  private SpannerException exception;
+  private PGException exception;
 
   public MutationWriter(
       SessionState sessionState,
@@ -161,7 +163,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       }
     }
     try {
-      parserCreatedLatch.await();
+      pipeCreatedLatch.await();
       this.payload.write(payload);
     } catch (InterruptedException | InterruptedIOException interruptedIOException) {
       // The IO operation was interrupted. This indicates that the user wants to cancel the COPY
@@ -173,11 +175,13 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       // Ignore the exception if the executor has already been shutdown. That means that an error
       // occurred that ended the COPY operation while we were writing data to the buffer.
       if (!executorService.isShutdown()) {
-        SpannerException spannerException =
-            SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INTERNAL, "Could not write copy data to buffer", e);
-        logger.log(Level.SEVERE, spannerException.getMessage(), spannerException);
-        throw spannerException;
+        PGException pgException =
+            PGException.newBuilder("Could not write copy data to buffer")
+                .setSQLState(SQLState.InternalError)
+                .setCause(e)
+                .build();
+        logger.log(Level.SEVERE, pgException.getMessage(), pgException);
+        throw pgException;
       }
     }
   }
@@ -205,7 +209,7 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   @Override
   public StatementResult call() throws Exception {
     PipedInputStream inputStream = new PipedInputStream(payload, copySettings.getPipeBufferSize());
-    parserCreatedLatch.countDown();
+    pipeCreatedLatch.countDown();
     final CopyInParser parser = CopyInParser.create(copyFormat, csvFormat, inputStream, hasHeader);
     // This LinkedBlockingDeque holds a reference to all transactions that are currently active. The
     // max capacity of this deque is what ensures that we never have more than maxParallelism
@@ -231,12 +235,12 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       while (!rollback.get() && iterator.hasNext()) {
         CopyRecord record = iterator.next();
         if (record.numColumns() != this.tableColumns.keySet().size()) {
-          throw SpannerExceptionFactory.newSpannerException(
-              ErrorCode.INVALID_ARGUMENT,
+          throw PGExceptionFactory.newPGException(
               "Invalid COPY data: Row length mismatched. Expected "
                   + this.tableColumns.keySet().size()
                   + " columns, but only found "
-                  + record.numColumns());
+                  + record.numColumns(),
+              SQLState.DataException);
         }
 
         Mutation mutation = buildMutation(record);
@@ -308,17 +312,17 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       ApiFutures.allAsList(allCommitFutures).get();
     } catch (SpannerException e) {
       synchronized (lock) {
-        this.exception = e;
+        this.exception = PGExceptionFactory.toPGException(e);
         throw this.exception;
       }
     } catch (ExecutionException e) {
       synchronized (lock) {
-        this.exception = SpannerExceptionFactory.asSpannerException(e.getCause());
+        this.exception = PGExceptionFactory.toPGException(e.getCause());
         throw this.exception;
       }
     } catch (Exception e) {
       synchronized (lock) {
-        this.exception = SpannerExceptionFactory.asSpannerException(e);
+        this.exception = PGExceptionFactory.toPGException(e);
         throw this.exception;
       }
     } finally {

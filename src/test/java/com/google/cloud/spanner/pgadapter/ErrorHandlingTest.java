@@ -26,6 +26,7 @@ import com.google.spanner.v1.RollbackRequest;
 import io.grpc.Status;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -33,6 +34,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+import org.postgresql.PGConnection;
 
 @RunWith(Parameterized.class)
 public class ErrorHandlingTest extends AbstractMockServerTest {
@@ -55,7 +57,10 @@ public class ErrorHandlingTest extends AbstractMockServerTest {
   public static void setupErrorResults() {
     mockSpanner.putStatementResult(
         StatementResult.exception(
-            Statement.of(INVALID_SELECT), Status.NOT_FOUND.asRuntimeException()));
+            Statement.of(INVALID_SELECT),
+            Status.NOT_FOUND
+                .withDescription("Table unknown_table not found")
+                .asRuntimeException()));
   }
 
   private String createUrl() {
@@ -70,7 +75,9 @@ public class ErrorHandlingTest extends AbstractMockServerTest {
       SQLException exception =
           assertThrows(
               SQLException.class, () -> connection.createStatement().executeQuery(INVALID_SELECT));
-      assertTrue(exception.getMessage(), exception.getMessage().contains("NOT_FOUND"));
+      assertEquals(
+          "ERROR: Table unknown_table not found - Statement: 'SELECT * FROM unknown_table'",
+          exception.getMessage());
 
       // The connection should be usable, as there was no transaction.
       assertTrue(connection.createStatement().execute("SELECT 1"));
@@ -85,7 +92,9 @@ public class ErrorHandlingTest extends AbstractMockServerTest {
       SQLException exception =
           assertThrows(
               SQLException.class, () -> connection.createStatement().executeQuery(INVALID_SELECT));
-      assertTrue(exception.getMessage(), exception.getMessage().contains("NOT_FOUND"));
+      assertEquals(
+          "ERROR: Table unknown_table not found - Statement: 'SELECT * FROM unknown_table'",
+          exception.getMessage());
 
       // The connection should be in the aborted state.
       exception =
@@ -108,7 +117,9 @@ public class ErrorHandlingTest extends AbstractMockServerTest {
       SQLException exception =
           assertThrows(
               SQLException.class, () -> connection.createStatement().executeQuery(INVALID_SELECT));
-      assertTrue(exception.getMessage(), exception.getMessage().contains("NOT_FOUND"));
+      assertEquals(
+          "ERROR: Table unknown_table not found - Statement: 'SELECT * FROM unknown_table'",
+          exception.getMessage());
 
       // The connection should be in the aborted state.
       exception =
@@ -125,5 +136,23 @@ public class ErrorHandlingTest extends AbstractMockServerTest {
     // Check that we only received a rollback and no commit.
     assertTrue(mockSpanner.countRequestsOfType(RollbackRequest.class) > 0);
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testInvalidPreparedQuery() throws SQLException {
+    for (int prepareThreshold : new int[] {-1, 0, 1, 5}) {
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        PGConnection pgConnection = connection.unwrap(PGConnection.class);
+        pgConnection.setPrepareThreshold(prepareThreshold);
+        try (PreparedStatement preparedStatement = connection.prepareStatement(INVALID_SELECT)) {
+          SQLException exception =
+              assertThrows(SQLException.class, preparedStatement::executeQuery);
+          assertEquals(
+              "Prepare threshold: " + prepareThreshold,
+              "ERROR: Table unknown_table not found - Statement: 'SELECT * FROM unknown_table'",
+              exception.getMessage());
+        }
+      }
+    }
   }
 }
