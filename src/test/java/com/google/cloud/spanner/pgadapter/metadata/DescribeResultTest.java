@@ -18,13 +18,8 @@ import static com.google.cloud.spanner.pgadapter.metadata.DescribeResult.extract
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.pgadapter.error.PGException;
-import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
@@ -114,16 +109,5 @@ public class DescribeResultTest {
                                 .build())
                         .build()));
     assertEquals("Invalid parameter name: foo", exception.getMessage());
-  }
-
-  @Test
-  public void testClose() {
-    ResultSet resultSet = mock(ResultSet.class);
-    when(resultSet.getMetadata()).thenReturn(ResultSetMetadata.newBuilder().build());
-    DescribeResult result = new DescribeResult(new int[] {}, resultSet);
-    result.close();
-
-    verify(resultSet).close();
-    result.close();
   }
 }

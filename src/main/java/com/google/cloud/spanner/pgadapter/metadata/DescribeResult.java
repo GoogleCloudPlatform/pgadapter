@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import com.google.spanner.v1.StructType;
 import java.util.Arrays;
 
 @InternalApi
-public class DescribeResult implements AutoCloseable {
+public class DescribeResult {
   private final ResultSet resultSet;
   private final int[] parameters;
 
@@ -81,12 +81,5 @@ public class DescribeResult implements AutoCloseable {
 
   public ResultSet getResultSet() {
     return resultSet;
-  }
-
-  @Override
-  public void close() {
-    if (getResultSet() != null) {
-      getResultSet().close();
-    }
   }
 }
