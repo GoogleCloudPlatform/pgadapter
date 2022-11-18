@@ -28,6 +28,7 @@ import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -256,10 +257,15 @@ public abstract class ControlMessage extends WireMessage {
 
     switch (statement.getStatementType()) {
       case DDL:
-      case CLIENT_SIDE:
       case UNKNOWN:
         new CommandCompleteResponse(this.outputStream, command).send(false);
         break;
+      case CLIENT_SIDE:
+        if (statement.getStatementResult().getResultType() != ResultType.RESULT_SET) {
+          new CommandCompleteResponse(this.outputStream, command).send(false);
+          break;
+        }
+        // fallthrough to QUERY
       case QUERY:
         SendResultSetState state = sendResultSet(statement, mode, maxRows);
         statement.setHasMoreData(state.hasMoreRows());
