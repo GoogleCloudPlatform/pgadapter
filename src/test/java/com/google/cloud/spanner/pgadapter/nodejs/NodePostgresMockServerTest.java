@@ -209,7 +209,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     // TODO: Enable when node-postgres 8.9 has been released.
     //    assertTrue(executeRequest.getTransaction().hasBegin());
     //    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
-    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    //    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
