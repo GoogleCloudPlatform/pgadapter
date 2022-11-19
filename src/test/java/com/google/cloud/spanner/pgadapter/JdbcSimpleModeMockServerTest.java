@@ -586,6 +586,36 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testGetTimezoneStringAmericaLosAngeles() throws SQLException {
+    String sql = "select '1883-11-18 00:00:00Z'::timestamptz";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.TIMESTAMP)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder().setStringValue("1883-11-18T00:00:00Z").build())
+                        .build())
+                .build()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'America/Los_Angeles'");
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        if (OptionsMetadata.isJava8()) {
+          // Java8 does not support timezone offsets with second precision.
+          assertEquals("1883-11-17 16:07:02-07:52", resultSet.getString(1));
+        } else {
+          assertEquals("1883-11-17 16:07:02-07:52:58", resultSet.getString(1));
+        }
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testSetInvalidTimezone() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       SQLException exception =
