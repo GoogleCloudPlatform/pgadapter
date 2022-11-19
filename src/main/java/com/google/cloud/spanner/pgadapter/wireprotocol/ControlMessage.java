@@ -244,7 +244,7 @@ public abstract class ControlMessage extends WireMessage {
    *
    * <p>NOTE: This method does not flush the output stream.
    */
-  public void sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
+  void sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
     String command = statement.getCommandTag();
     if (Strings.isNullOrEmpty(command)) {
@@ -299,7 +299,7 @@ public abstract class ControlMessage extends WireMessage {
    * @return An adapted representation with specific metadata which PG wire requires.
    * @throws com.google.cloud.spanner.SpannerException if traversing the {@link ResultSet} fails.
    */
-  public SendResultSetState sendResultSet(
+  SendResultSetState sendResultSet(
       IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
     StatementResult statementResult = describedResult.getStatementResult();
     Preconditions.checkArgument(
