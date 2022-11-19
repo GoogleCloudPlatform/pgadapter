@@ -793,13 +793,61 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         StatementResult.query(Statement.of(sql), createAllTypesResultSet("AllTypes_")));
     String updateSql =
         "UPDATE \"all_types\" SET \"col_bigint\" = $1, \"col_bool\" = $2, \"col_bytea\" = $3, \"col_float8\" = $4, \"col_int\" = $5, \"col_numeric\" = $6, \"col_timestamptz\" = $7, \"col_date\" = $8, \"col_varchar\" = $9, \"col_jsonb\" = $10 WHERE \"col_bigint\" IN ($11)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(updateSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING,
+                            TypeCode.JSON)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(updateSql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(false)
+                .bind("p3")
+                .to(ByteArray.copyFrom("updated string"))
+                .bind("p4")
+                .to(1.23456789)
+                .bind("p5")
+                .to(987654321L)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .bind("p7")
+                .to(Timestamp.parseTimestamp("2022-11-16T10:03:42.999Z"))
+                .bind("p8")
+                .to(Date.parseDate("2022-11-16"))
+                .bind("p9")
+                .to("some updated string")
+                // TODO: Change to JSONB
+                .bind("p10")
+                .to("{\"key\":\"updated-value\"}")
+                .build(),
+            1L));
+
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 1L));
 
     String output = runTest("updateAllTypes", pgServer.getLocalPort());
 
     assertEquals("Updated one record\n", output);
 
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    // We get two commit requests, because the statement is auto-described the first time the update
+    // is executed. The auto-describe also runs in autocommit mode.
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest updateRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(3);
     assertEquals(updateSql, updateRequest.getSql());
