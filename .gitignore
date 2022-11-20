@@ -6,6 +6,7 @@ target/
 *.lst
 output.txt
 __pycache__
+venv
 
 src/test/golang/**/*.h
 src/test/golang/**/*.so
