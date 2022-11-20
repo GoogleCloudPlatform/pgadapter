@@ -28,6 +28,7 @@ import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -243,7 +244,7 @@ public abstract class ControlMessage extends WireMessage {
    *
    * <p>NOTE: This method does not flush the output stream.
    */
-  public void sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
+  void sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
     String command = statement.getCommandTag();
     if (Strings.isNullOrEmpty(command)) {
@@ -256,10 +257,15 @@ public abstract class ControlMessage extends WireMessage {
 
     switch (statement.getStatementType()) {
       case DDL:
-      case CLIENT_SIDE:
       case UNKNOWN:
         new CommandCompleteResponse(this.outputStream, command).send(false);
         break;
+      case CLIENT_SIDE:
+        if (statement.getStatementResult().getResultType() != ResultType.RESULT_SET) {
+          new CommandCompleteResponse(this.outputStream, command).send(false);
+          break;
+        }
+        // fallthrough to QUERY
       case QUERY:
         SendResultSetState state = sendResultSet(statement, mode, maxRows);
         statement.setHasMoreData(state.hasMoreRows());
@@ -293,12 +299,13 @@ public abstract class ControlMessage extends WireMessage {
    * @return An adapted representation with specific metadata which PG wire requires.
    * @throws com.google.cloud.spanner.SpannerException if traversing the {@link ResultSet} fails.
    */
-  public SendResultSetState sendResultSet(
+  SendResultSetState sendResultSet(
       IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
-    Preconditions.checkArgument(
-        describedResult.containsResultSet(), "The statement result must be a result set");
-    long rows;
     StatementResult statementResult = describedResult.getStatementResult();
+    Preconditions.checkArgument(
+        statementResult.getResultType() == ResultType.RESULT_SET,
+        "The statement result must be a result set");
+    long rows;
     boolean hasData;
     if (statementResult instanceof PartitionQueryResult) {
       hasData = false;

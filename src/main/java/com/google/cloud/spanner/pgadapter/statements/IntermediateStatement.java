@@ -26,6 +26,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
@@ -137,7 +138,10 @@ public class IntermediateStatement {
 
   /** @return True if this is a select statement, false otherwise. */
   public boolean containsResultSet() {
-    return this.parsedStatement.isQuery();
+    return this.parsedStatement.isQuery()
+        || (this.parsedStatement.getType() == StatementType.CLIENT_SIDE
+            && this.parsedStatement.getClientSideStatementType()
+                == ClientSideStatementType.RUN_BATCH);
   }
 
   /** @return True if this statement was executed, False otherwise. */
@@ -168,7 +172,8 @@ public class IntermediateStatement {
       case QUERY:
         return -1L;
       case UPDATE:
-        return this.statementResult.getUpdateCount();
+        long res = this.statementResult.getUpdateCount();
+        return Math.max(res, 0L);
       case CLIENT_SIDE:
       case DDL:
       case UNKNOWN:
