@@ -92,7 +92,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   }
 
   private String getExpectedInitialApplicationName() {
-    return null;
+    return "PostgreSQL JDBC Driver";
   }
 
   /**
