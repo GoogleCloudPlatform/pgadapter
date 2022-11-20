@@ -34,7 +34,6 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
-import com.google.common.collect.ImmutableSet;
 import com.google.spanner.v1.TypeCode;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -64,13 +63,13 @@ public class ParserTest {
   }
 
   private void validateCreateBinary(byte[] item, int oid, Object value) {
-    Parser<?> binary = Parser.create(ImmutableSet.of(), item, oid, FormatCode.BINARY);
+    Parser<?> binary = Parser.create(item, oid, FormatCode.BINARY);
 
     assertParserValueEqual(binary, value);
   }
 
   private void validateCreateText(byte[] item, int oid, Object value) {
-    Parser<?> text = Parser.create(ImmutableSet.of(), item, oid, FormatCode.TEXT);
+    Parser<?> text = Parser.create(item, oid, FormatCode.TEXT);
 
     assertParserValueEqual(text, value);
   }
