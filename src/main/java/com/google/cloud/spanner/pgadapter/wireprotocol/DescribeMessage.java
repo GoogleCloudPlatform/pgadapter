@@ -191,8 +191,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
       if (isExtendedProtocol()) {
         DescribeResult metadata = this.statement.describe();
         new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send(false);
-        if (metadata.getResultSet() != null
-            && metadata.getResultSet().getMetadata().getRowType().getFieldsCount() > 0) {
+        if (metadata.getResultSet() != null && metadata.getResultSet().getColumnCount() > 0) {
           new RowDescriptionResponse(
                   this.outputStream,
                   this.statement,
