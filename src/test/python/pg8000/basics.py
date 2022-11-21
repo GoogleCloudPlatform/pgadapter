@@ -17,4 +17,18 @@ for row in results:
   print("id = %s, value = %s" % (id, value))
 
 conn.commit()
+
+cursor.execute("SELECT TO_CHAR(TIMESTAMP '2021-10-10', 'YYYY BC')")
+cursor.fetchone()
+
 conn.close()
+
+pg8000.dbapi.paramstyle = "numeric"
+conn = pg8000.dbapi.connect(host="localhost",
+                            port=5433,
+                            database="knut-test-db",
+                            user="test",
+                            password="test")
+cursor = conn.cursor()
+cursor.execute("SELECT * FROM test WHERE id=:1", (1,))
+cursor.fetchone()

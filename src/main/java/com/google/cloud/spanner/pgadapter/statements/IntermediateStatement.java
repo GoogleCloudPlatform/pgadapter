@@ -141,7 +141,8 @@ public class IntermediateStatement {
     return this.parsedStatement.isQuery()
         || (this.parsedStatement.getType() == StatementType.CLIENT_SIDE
             && this.parsedStatement.getClientSideStatementType()
-                == ClientSideStatementType.RUN_BATCH);
+                == ClientSideStatementType.RUN_BATCH)
+        || (this.parsedStatement.isUpdate() && this.parsedStatement.hasReturningClause());
   }
 
   /** @return True if this statement was executed, False otherwise. */
