@@ -301,8 +301,10 @@ public class BackendConnection {
           } else {
             resultSet = spannerConnection.analyzeUpdateStatement(statement, QueryAnalyzeMode.PLAN);
           }
-        } else {
+        } else if (parsedStatement.isQuery() || parsedStatement.hasReturningClause()) {
           resultSet = spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
+        } else {
+          return NO_RESULT;
         }
         return new QueryResult(resultSet);
       }
