@@ -29,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -129,19 +130,16 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     portal.setParameterFormatCodes(parameterFormatCodes);
     portal.setResultFormatCodes(resultFormatCodes);
     Statement.Builder builder = this.originalStatement.toBuilder();
+    SessionState sessionState =
+        connectionHandler
+            .getExtendedQueryProtocolHandler()
+            .getBackendConnection()
+            .getSessionState();
     for (int index = 0; index < parameters.length; index++) {
       short formatCode = portal.getParameterFormatCode(index);
       int type = this.parseType(parameters, index);
       Parser<?> parser =
-          Parser.create(
-              connectionHandler
-                  .getExtendedQueryProtocolHandler()
-                  .getBackendConnection()
-                  .getSessionState()
-                  .getGuessTypes(),
-              parameters[index],
-              type,
-              FormatCode.of(formatCode));
+          Parser.create(sessionState, parameters[index], type, FormatCode.of(formatCode));
       parser.bind(builder, "p" + (index + 1));
     }
     this.statement = builder.build();

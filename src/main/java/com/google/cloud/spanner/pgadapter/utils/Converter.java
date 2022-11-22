@@ -29,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.common.base.Preconditions;
@@ -44,6 +45,7 @@ public class Converter implements AutoCloseable {
   private final QueryMode mode;
   private final OptionsMetadata options;
   private final ResultSet resultSet;
+  private final SessionState sessionState;
 
   public Converter(
       IntermediateStatement statement,
@@ -54,6 +56,12 @@ public class Converter implements AutoCloseable {
     this.mode = mode;
     this.options = options;
     this.resultSet = resultSet;
+    this.sessionState =
+        statement
+            .getConnectionHandler()
+            .getExtendedQueryProtocolHandler()
+            .getBackendConnection()
+            .getSessionState();
   }
 
   @Override
@@ -86,7 +94,7 @@ public class Converter implements AutoCloseable {
             fixedFormat == null
                 ? DataFormat.getDataFormat(column_index, statement, mode, options)
                 : fixedFormat;
-        byte[] column = Converter.convertToPG(this.resultSet, column_index, format);
+        byte[] column = Converter.convertToPG(this.resultSet, column_index, format, sessionState);
         outputStream.writeInt(column.length);
         outputStream.write(column);
       }
@@ -107,7 +115,8 @@ public class Converter implements AutoCloseable {
    * @param format The {@link DataFormat} format to use to encode the data.
    * @return a byte array containing the data in the specified format.
    */
-  public static byte[] convertToPG(ResultSet result, int position, DataFormat format) {
+  public static byte[] convertToPG(
+      ResultSet result, int position, DataFormat format, SessionState sessionState) {
     Preconditions.checkArgument(!result.isNull(position), "Column may not contain a null value");
     Type type = result.getColumnType(position);
     switch (type.getCode()) {
@@ -126,11 +135,11 @@ public class Converter implements AutoCloseable {
       case STRING:
         return StringParser.convertToPG(result, position);
       case TIMESTAMP:
-        return TimestampParser.convertToPG(result, position, format);
+        return TimestampParser.convertToPG(result, position, format, sessionState.getTimezone());
       case PG_JSONB:
         return JsonbParser.convertToPG(result, position, format);
       case ARRAY:
-        ArrayParser arrayParser = new ArrayParser(result, position);
+        ArrayParser arrayParser = new ArrayParser(result, position, sessionState);
         return arrayParser.parse(format);
       case NUMERIC:
       case JSON:
