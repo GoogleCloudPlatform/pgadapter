@@ -25,10 +25,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import java.util.Arrays;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Scanner;
+import java.time.ZoneId;
+import java.util.*;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 
@@ -380,7 +378,7 @@ public class PGSetting {
     }
     if (this.vartype != null) {
       // Check validity of the value.
-      checkValidValue(value);
+      value = checkValidValue(value);
     }
     this.setting = value;
   }
@@ -420,7 +418,7 @@ public class PGSetting {
     }
   }
 
-  private void checkValidValue(String value) {
+  private String checkValidValue(String value) {
     if ("bool".equals(this.vartype)) {
       // Just verify that it is a valid boolean. This will throw an IllegalArgumentException if
       // setting is not a valid boolean value.
@@ -445,7 +443,32 @@ public class PGSetting {
         && !upperCaseEnumVals.contains(
             MoreObjects.firstNonNull(value, "").toUpperCase(Locale.ENGLISH))) {
       throw invalidEnumError(getCasePreservingKey(), value, enumVals);
+    } else if ("TimeZone".equals(this.name)) {
+      try {
+        value = convertToValidZoneId(value);
+        ZoneId.of(value);
+      } catch (Exception ignore) {
+        throw invalidValueError(this.name, value);
+      }
     }
+    return value;
+  }
+
+  static String convertToValidZoneId(String value) {
+    if ("utc".equalsIgnoreCase(value)) {
+      return "UTC";
+    }
+    for (String zoneId : ZoneId.getAvailableZoneIds()) {
+      if (zoneId.equalsIgnoreCase(value)) {
+        return zoneId;
+      }
+    }
+    for (Map.Entry<String, String> shortId : ZoneId.SHORT_IDS.entrySet()) {
+      if (shortId.getKey().equalsIgnoreCase(value)) {
+        return shortId.getValue();
+      }
+    }
+    return value;
   }
 
   static SpannerException invalidBoolError(String key) {
