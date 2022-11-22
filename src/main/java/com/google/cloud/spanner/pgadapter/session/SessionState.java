@@ -32,6 +32,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSet.Builder;
 import com.google.common.collect.Sets;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -166,6 +167,10 @@ public class SessionState {
   }
 
   private static String toKey(String extension, String name) {
+    if (extension == null && "timezone".equalsIgnoreCase(name)) {
+      // TimeZone is the only special setting that uses CamelCase.
+      return "TimeZone";
+    }
     return extension == null
         ? name.toLowerCase(Locale.ROOT)
         : extension.toLowerCase(Locale.ROOT) + "." + name.toLowerCase(Locale.ROOT);
@@ -391,6 +396,30 @@ public class SessionState {
         () -> DdlTransactionMode.valueOf(setting.getSetting()),
         () -> DdlTransactionMode.valueOf(setting.getResetVal()),
         () -> DdlTransactionMode.valueOf(setting.getBootVal()));
+  }
+
+  /** Returns the {@link ZoneId} of the current timezone for this session. */
+  public ZoneId getTimezone() {
+    PGSetting setting = internalGet(toKey(null, "timezone"), false);
+    if (setting == null) {
+      return ZoneId.systemDefault();
+    }
+    String id =
+        tryGetFirstNonNull(
+            ZoneId.systemDefault().getId(),
+            setting::getSetting,
+            setting::getResetVal,
+            setting::getBootVal);
+
+    return zoneIdFromString(id);
+  }
+
+  private ZoneId zoneIdFromString(String value) {
+    try {
+      return ZoneId.of(value);
+    } catch (Throwable ignore) {
+      return ZoneId.systemDefault();
+    }
   }
 
   /**
