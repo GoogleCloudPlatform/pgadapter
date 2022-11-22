@@ -23,11 +23,12 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ParameterStatusResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import java.io.DataOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 
 /**
  * This represents all messages which occur before {@link ControlMessage} type messages. Those
@@ -108,30 +109,63 @@ public abstract class BootstrapMessage extends WireMessage {
   public static void sendStartupMessage(
       DataOutputStream output, int connectionId, int secret, SessionState sessionState)
       throws Exception {
-    new AuthenticationOkResponse(output).send();
-    new KeyDataResponse(output, connectionId, secret).send();
+    new AuthenticationOkResponse(output).send(false);
+    new KeyDataResponse(output, connectionId, secret).send(false);
     new ParameterStatusResponse(
             output,
-            "server_version".getBytes(),
-            sessionState.get(null, "server_version").getSetting().getBytes())
-        .send();
-    new ParameterStatusResponse(output, "application_name".getBytes(), "PGAdapter".getBytes())
-        .send();
-    new ParameterStatusResponse(output, "is_superuser".getBytes(), "false".getBytes()).send();
-    new ParameterStatusResponse(output, "session_authorization".getBytes(), "PGAdapter".getBytes())
-        .send();
-    new ParameterStatusResponse(output, "integer_datetimes".getBytes(), "on".getBytes()).send();
-    new ParameterStatusResponse(output, "server_encoding".getBytes(), "UTF8".getBytes()).send();
-    new ParameterStatusResponse(output, "client_encoding".getBytes(), "UTF8".getBytes()).send();
-    new ParameterStatusResponse(output, "DateStyle".getBytes(), "ISO,YMD".getBytes()).send();
-    new ParameterStatusResponse(output, "IntervalStyle".getBytes(), "iso_8601".getBytes()).send();
-    new ParameterStatusResponse(output, "standard_conforming_strings".getBytes(), "on".getBytes())
-        .send();
+            "server_version".getBytes(StandardCharsets.UTF_8),
+            sessionState.get(null, "server_version").getSetting().getBytes(StandardCharsets.UTF_8))
+        .send(false);
     new ParameterStatusResponse(
             output,
-            "TimeZone".getBytes(),
-            TimeZone.getDefault().getDisplayName(false, TimeZone.SHORT).getBytes())
-        .send();
+            "application_name".getBytes(StandardCharsets.UTF_8),
+            "PGAdapter".getBytes(StandardCharsets.UTF_8))
+        .send(false);
+    new ParameterStatusResponse(
+            output,
+            "is_superuser".getBytes(StandardCharsets.UTF_8),
+            "false".getBytes(StandardCharsets.UTF_8))
+        .send(false);
+    new ParameterStatusResponse(
+            output,
+            "session_authorization".getBytes(StandardCharsets.UTF_8),
+            "PGAdapter".getBytes(StandardCharsets.UTF_8))
+        .send(false);
+    new ParameterStatusResponse(
+            output,
+            "integer_datetimes".getBytes(StandardCharsets.UTF_8),
+            "on".getBytes(StandardCharsets.UTF_8))
+        .send(false);
+    new ParameterStatusResponse(
+            output,
+            "server_encoding".getBytes(StandardCharsets.UTF_8),
+            "UTF8".getBytes(StandardCharsets.UTF_8))
+        .send(false);
+    new ParameterStatusResponse(
+            output,
+            "client_encoding".getBytes(StandardCharsets.UTF_8),
+            "UTF8".getBytes(StandardCharsets.UTF_8))
+        .send(false);
+    new ParameterStatusResponse(
+            output,
+            "DateStyle".getBytes(StandardCharsets.UTF_8),
+            "ISO,YMD".getBytes(StandardCharsets.UTF_8))
+        .send(false);
+    new ParameterStatusResponse(
+            output,
+            "IntervalStyle".getBytes(StandardCharsets.UTF_8),
+            "iso_8601".getBytes(StandardCharsets.UTF_8))
+        .send(false);
+    new ParameterStatusResponse(
+            output,
+            "standard_conforming_strings".getBytes(StandardCharsets.UTF_8),
+            "on".getBytes(StandardCharsets.UTF_8))
+        .send(false);
+    new ParameterStatusResponse(
+            output,
+            "TimeZone".getBytes(StandardCharsets.UTF_8),
+            ZoneId.systemDefault().getId().getBytes(StandardCharsets.UTF_8))
+        .send(false);
     new ReadyResponse(output, Status.IDLE).send();
   }
 }
