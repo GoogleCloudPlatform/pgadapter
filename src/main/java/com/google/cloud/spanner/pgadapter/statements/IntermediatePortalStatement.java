@@ -103,8 +103,7 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
               connectionHandler
                   .getExtendedQueryProtocolHandler()
                   .getBackendConnection()
-                  .getSessionState()
-                  .getGuessTypes(),
+                  .getSessionState(),
               parameters[index],
               type,
               FormatCode.of(formatCode));

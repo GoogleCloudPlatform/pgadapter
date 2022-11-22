@@ -21,6 +21,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.ByteArray;
@@ -34,14 +35,13 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
-import com.google.common.collect.ImmutableSet;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.spanner.v1.TypeCode;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.Mockito;
 import org.postgresql.core.Oid;
 import org.postgresql.util.ByteConverter;
 
@@ -64,13 +64,13 @@ public class ParserTest {
   }
 
   private void validateCreateBinary(byte[] item, int oid, Object value) {
-    Parser<?> binary = Parser.create(ImmutableSet.of(), item, oid, FormatCode.BINARY);
+    Parser<?> binary = Parser.create(mock(SessionState.class), item, oid, FormatCode.BINARY);
 
     assertParserValueEqual(binary, value);
   }
 
   private void validateCreateText(byte[] item, int oid, Object value) {
-    Parser<?> text = Parser.create(ImmutableSet.of(), item, oid, FormatCode.TEXT);
+    Parser<?> text = Parser.create(mock(SessionState.class), item, oid, FormatCode.TEXT);
 
     assertParserValueEqual(text, value);
   }
@@ -248,7 +248,7 @@ public class ParserTest {
 
     byte[] byteResult = {-1, -1, -38, 1, -93, -70, 48, 0};
 
-    TimestampParser parsedValue = new TimestampParser(value);
+    TimestampParser parsedValue = new TimestampParser(value, mock(SessionState.class));
 
     assertArrayEquals(byteResult, parsedValue.parse(DataFormat.POSTGRESQL_BINARY));
     validateCreateBinary(byteResult, Oid.TIMESTAMP, value);
@@ -316,11 +316,11 @@ public class ParserTest {
       '[', '"', 'a', 'b', 'c', '"', ',', '"', 'd', 'e', 'f', '"', ',', '"', 'j', 'h', 'i', '"', ']'
     };
 
-    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    ResultSet resultSet = mock(ResultSet.class);
     when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.string()));
     when(resultSet.getValue(0)).thenReturn(Value.stringArray(Arrays.asList(value)));
 
-    ArrayParser parser = new ArrayParser(resultSet, 0);
+    ArrayParser parser = new ArrayParser(resultSet, 0, mock(SessionState.class));
 
     validate(parser, byteResult, stringResult, spannerResult);
   }
@@ -342,21 +342,21 @@ public class ParserTest {
     byte[] stringResult = {'{', '1', ',', '2', ',', '3', '}'};
     byte[] spannerResult = {'[', '1', ',', '2', ',', '3', ']'};
 
-    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    ResultSet resultSet = mock(ResultSet.class);
     when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.int64()));
     when(resultSet.getValue(0)).thenReturn(Value.int64Array(Arrays.asList(value)));
 
-    ArrayParser parser = new ArrayParser(resultSet, 0);
+    ArrayParser parser = new ArrayParser(resultSet, 0, mock(SessionState.class));
 
     validate(parser, byteResult, stringResult, spannerResult);
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testArrayArrayParsingFails() {
-    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    ResultSet resultSet = mock(ResultSet.class);
     when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.array(Type.int64())));
 
-    new ArrayParser(resultSet, 0);
+    new ArrayParser(resultSet, 0, mock(SessionState.class));
   }
 
   @Test

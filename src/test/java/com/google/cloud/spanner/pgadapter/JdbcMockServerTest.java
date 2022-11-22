@@ -73,10 +73,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.BeforeClass;
@@ -2516,7 +2513,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testSetTimeZone() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set time zone 'IST'");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneToServerDefault() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'atlantic/faeroe'");
+      verifySettingValue(connection, "timezone", "Atlantic/Faeroe");
+      connection.createStatement().execute("set time zone default");
+      verifySettingValue(connection, "timezone", TimeZone.getDefault().getID());
     }
   }
 
@@ -2525,7 +2532,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection =
         DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
       connection.createStatement().execute("set time zone default");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 
@@ -2534,7 +2541,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection =
         DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
       connection.createStatement().execute("set time zone local");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 

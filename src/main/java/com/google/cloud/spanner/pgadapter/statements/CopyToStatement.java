@@ -28,6 +28,7 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.ParsedCopyStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -252,11 +253,17 @@ public class CopyToStatement extends IntermediatePortalStatement {
 
   CopyDataResponse createDataResponse(ResultSet resultSet) {
     String[] data = new String[resultSet.getColumnCount()];
+    SessionState sessionState =
+        getConnectionHandler()
+            .getExtendedQueryProtocolHandler()
+            .getBackendConnection()
+            .getSessionState();
     for (int col = 0; col < resultSet.getColumnCount(); col++) {
       if (resultSet.isNull(col)) {
         data[col] = null;
       } else {
-        Parser<?> parser = Parser.create(resultSet, resultSet.getColumnType(col), col);
+        Parser<?> parser =
+            Parser.create(resultSet, resultSet.getColumnType(col), col, sessionState);
         data[col] = parser.stringParse();
       }
     }
