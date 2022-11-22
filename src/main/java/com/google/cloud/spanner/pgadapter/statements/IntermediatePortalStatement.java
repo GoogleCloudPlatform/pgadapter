@@ -98,7 +98,15 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
     for (int index = 0; index < parameters.length; index++) {
       short formatCode = getParameterFormatCode(index);
       int type = preparedStatement.getParameterDataType(index);
-      Parser<?> parser = Parser.create(parameters[index], type, FormatCode.of(formatCode));
+      Parser<?> parser =
+          Parser.create(
+              connectionHandler
+                  .getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getSessionState(),
+              parameters[index],
+              type,
+              FormatCode.of(formatCode));
       parser.bind(builder, "p" + (index + 1));
     }
     return builder.build();
