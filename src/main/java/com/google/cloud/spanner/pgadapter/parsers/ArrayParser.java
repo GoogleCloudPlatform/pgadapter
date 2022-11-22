@@ -21,6 +21,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.LinkedList;
@@ -39,8 +40,10 @@ public class ArrayParser extends Parser<List<?>> {
 
   private final Type arrayElementType;
   private final boolean isStringEquivalent;
+  private final SessionState sessionState;
 
-  public ArrayParser(ResultSet item, int position) {
+  public ArrayParser(ResultSet item, int position, SessionState sessionState) {
+    this.sessionState = sessionState;
     if (item != null) {
       this.arrayElementType = item.getColumnType(position).getArrayElementType();
       if (this.arrayElementType.getCode() == Code.ARRAY) {
@@ -133,7 +136,9 @@ public class ArrayParser extends Parser<List<?>> {
     List<String> results = new LinkedList<>();
     for (Object currentItem : this.item) {
       results.add(
-          stringify(Parser.create(currentItem, this.arrayElementType.getCode()).stringParse()));
+          stringify(
+              Parser.create(currentItem, this.arrayElementType.getCode(), sessionState)
+                  .stringParse()));
     }
     return results.stream()
         .collect(Collectors.joining(ARRAY_DELIMITER, PG_ARRAY_OPEN, PG_ARRAY_CLOSE));
@@ -147,7 +152,9 @@ public class ArrayParser extends Parser<List<?>> {
     List<String> results = new LinkedList<>();
     for (Object currentItem : this.item) {
       results.add(
-          stringify(Parser.create(currentItem, this.arrayElementType.getCode()).spannerParse()));
+          stringify(
+              Parser.create(currentItem, this.arrayElementType.getCode(), sessionState)
+                  .spannerParse()));
     }
     return results.stream()
         .collect(Collectors.joining(ARRAY_DELIMITER, SPANNER_ARRAY_OPEN, SPANNER_ARRAY_CLOSE));
@@ -169,7 +176,9 @@ public class ArrayParser extends Parser<List<?>> {
         if (currentItem == null) {
           arrayStream.write(IntegerParser.binaryParse(-1));
         } else {
-          byte[] data = Parser.create(currentItem, this.arrayElementType.getCode()).binaryParse();
+          byte[] data =
+              Parser.create(currentItem, this.arrayElementType.getCode(), sessionState)
+                  .binaryParse();
           arrayStream.write(IntegerParser.binaryParse(data.length));
           arrayStream.write(data);
         }
