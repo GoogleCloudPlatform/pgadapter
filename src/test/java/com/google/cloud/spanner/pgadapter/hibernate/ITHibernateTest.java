@@ -29,6 +29,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Scanner;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -144,11 +145,11 @@ public class ITHibernateTest {
         BufferedReader errorReader =
             new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
       System.out.println("Printing hibernate loadings");
-      reader.lines().forEach(s -> System.out.println("Hibernate Out: " + s));
-      errorReader.lines().forEach(s -> System.out.println("Hibernate Error: " + s));
-      // errors = errorReader.lines().collect(Collectors.joining("\n"));
-      // output = reader.lines().collect(Collectors.joining("\n"));
-      // System.out.println("Hibernate Command. Output: " + output + ". Error: " + errors);
+      // reader.lines().forEach(s -> System.out.println("Hibernate Out: " + s));
+      // errorReader.lines().forEach(s -> System.out.println("Hibernate Error: " + s));
+      output = reader.lines().collect(Collectors.joining("\n"));
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+      System.out.println("Hibernate Command. Output: " + output + ". Error: " + errors);
     }
 
     // LOGGER.warning(errors);
