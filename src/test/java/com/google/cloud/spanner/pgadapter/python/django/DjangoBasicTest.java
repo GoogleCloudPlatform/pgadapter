@@ -188,4 +188,30 @@ public class DjangoBasicTest extends DjangoTestSetup {
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     assertEquals(sqlSelect, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
+
+  @Test
+  public void testInsertAllTypes() throws IOException, InterruptedException {
+    String sqlSelectAll =
+        "SELECT \"singers\".\"singerid\", \"singers\".\"firstname\", \"singers\".\"lastname\" FROM \"singers\"";
+
+    List<String> result =
+        new ArrayList<>(Arrays.asList("1", "hello", "world", "2", "hello", "django"));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sqlSelectAll), createResultSet(result)));
+    String expectedOutput =
+        "{'singerid': 1, 'firstname': 'hello', 'lastname': 'world'}\n"
+            + "{'singerid': 2, 'firstname': 'hello', 'lastname': 'django'}\n";
+    List<String> options = new ArrayList<>(Arrays.asList("insert"));
+    String actualOutput = executeAllTypeTests(pgServer.getLocalPort(), host, options);
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(
+        sqlSelectAll, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+
+  }
+
+
+
 }

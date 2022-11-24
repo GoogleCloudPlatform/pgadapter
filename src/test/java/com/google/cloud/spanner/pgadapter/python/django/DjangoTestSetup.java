@@ -71,4 +71,9 @@ public class DjangoTestSetup extends DjangoMockServerTest {
       throws IOException, InterruptedException {
     return execute(port, host, options, "transaction_test.py");
   }
+
+  public String executeAllTypeTests(int port, String host, List<String> options)
+      throws IOException, InterruptedException {
+    return execute(port, host, options, "all_types_tests.py");
+  }
 }
