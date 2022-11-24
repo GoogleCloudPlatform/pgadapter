@@ -281,6 +281,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSelectVersion() throws SQLException {
+    for (String sql :
+        new String[] {"SELECT version()", "select version()", "select * from version()"}) {
+
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        String version = null;
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("show server_version")) {
+          assertTrue(resultSet.next());
+          version = resultSet.getString(1);
+          assertFalse(resultSet.next());
+        }
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("PostgreSQL " + version, resultSet.getString("version"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
   public void testShowSearchPath() throws SQLException {
     String sql = "show search_path";
 
