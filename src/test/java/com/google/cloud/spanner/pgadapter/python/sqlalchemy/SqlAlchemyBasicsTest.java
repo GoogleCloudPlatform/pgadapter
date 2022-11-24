@@ -24,6 +24,7 @@ import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
@@ -32,6 +33,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -203,5 +205,136 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
     assertEquals(sql2, request2.getSql());
     assertTrue(request2.getTransaction().hasId());
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testSimpleMetadata() throws Exception {
+    String checkTableExistsSql =
+        "with pg_class as (\n"
+            + "  select\n"
+            + "  -1 as oid,\n"
+            + "  table_name as relname,\n"
+            + "  case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
+            + "  0 as reltype,\n"
+            + "  0 as reloftype,\n"
+            + "  0 as relowner,\n"
+            + "  1 as relam,\n"
+            + "  0 as relfilenode,\n"
+            + "  0 as reltablespace,\n"
+            + "  0 as relpages,\n"
+            + "  0.0::float8 as reltuples,\n"
+            + "  0 as relallvisible,\n"
+            + "  0 as reltoastrelid,\n"
+            + "  false as relhasindex,\n"
+            + "  false as relisshared,\n"
+            + "  'p' as relpersistence,\n"
+            + "  'r' as relkind,\n"
+            + "  count(*) as relnatts,\n"
+            + "  0 as relchecks,\n"
+            + "  false as relhasrules,\n"
+            + "  false as relhastriggers,\n"
+            + "  false as relhassubclass,\n"
+            + "  false as relrowsecurity,\n"
+            + "  false as relforcerowsecurity,\n"
+            + "  true as relispopulated,\n"
+            + "  'n' as relreplident,\n"
+            + "  false as relispartition,\n"
+            + "  0 as relrewrite,\n"
+            + "  0 as relfrozenxid,\n"
+            + "  0 as relminmxid,\n"
+            + "  '{}'::bigint[] as relacl,\n"
+            + "  '{}'::text[] as reloptions,\n"
+            + "  0 as relpartbound\n"
+            + "from information_schema.tables t\n"
+            + "inner join information_schema.columns using (table_catalog, table_schema, table_name)\n"
+            + "group by t.table_name, t.table_schema\n"
+            + "union all\n"
+            + "select\n"
+            + "    -1 as oid,\n"
+            + "    i.index_name as relname,\n"
+            + "    case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
+            + "    0 as reltype,\n"
+            + "    0 as reloftype,\n"
+            + "    0 as relowner,\n"
+            + "    1 as relam,\n"
+            + "    0 as relfilenode,\n"
+            + "    0 as reltablespace,\n"
+            + "    0 as relpages,\n"
+            + "    0.0::float8 as reltuples,\n"
+            + "    0 as relallvisible,\n"
+            + "    0 as reltoastrelid,\n"
+            + "    false as relhasindex,\n"
+            + "    false as relisshared,\n"
+            + "    'p' as relpersistence,\n"
+            + "    'r' as relkind,\n"
+            + "    count(*) as relnatts,\n"
+            + "    0 as relchecks,\n"
+            + "    false as relhasrules,\n"
+            + "    false as relhastriggers,\n"
+            + "    false as relhassubclass,\n"
+            + "    false as relrowsecurity,\n"
+            + "    false as relforcerowsecurity,\n"
+            + "    true as relispopulated,\n"
+            + "    'n' as relreplident,\n"
+            + "    false as relispartition,\n"
+            + "    0 as relrewrite,\n"
+            + "    0 as relfrozenxid,\n"
+            + "    0 as relminmxid,\n"
+            + "    '{}'::bigint[] as relacl,\n"
+            + "    '{}'::text[] as reloptions,\n"
+            + "    0 as relpartbound\n"
+            + "from information_schema.indexes i\n"
+            + "inner join information_schema.index_columns using (table_catalog, table_schema, table_name)\n"
+            + "group by i.index_name, i.table_schema\n"
+            + "),\n"
+            + "pg_namespace as (\n"
+            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+            + "  from information_schema.schemata\n"
+            + ")\n"
+            + "select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where true and relname='%s'";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(String.format(checkTableExistsSql, "user_account")),
+            ResultSet.newBuilder().setMetadata(SELECT1_RESULTSET.getMetadata()).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(String.format(checkTableExistsSql, "address")),
+            ResultSet.newBuilder().setMetadata(SELECT1_RESULTSET.getMetadata()).build()));
+    addDdlResponseToSpannerAdmin();
+
+    String actualOutput = execute("simple_metadata.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "user_account.name\n"
+            + "['id', 'name', 'fullname']\n"
+            + "PrimaryKeyConstraint(Column('id', Integer(), table=<user_account>, primary_key=True, nullable=False))\n"
+            + "user_account\n"
+            + "address\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    List<UpdateDatabaseDdlRequest> requests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(req -> req instanceof UpdateDatabaseDdlRequest)
+            .map(req -> (UpdateDatabaseDdlRequest) req)
+            .collect(Collectors.toList());
+    assertEquals(1, requests.size());
+    assertEquals(2, requests.get(0).getStatementsCount());
+    assertEquals(
+        "CREATE TABLE user_account (\n"
+            + "\tid SERIAL NOT NULL, \n"
+            + "\tname VARCHAR(30), \n"
+            + "\tfullname VARCHAR, \n"
+            + "\tPRIMARY KEY (id)\n"
+            + ")",
+        requests.get(0).getStatements(0));
+    assertEquals(
+        "CREATE TABLE address (\n"
+            + "\tid SERIAL NOT NULL, \n"
+            + "\temail_address VARCHAR NOT NULL, \n"
+            + "\tuser_id INTEGER, \n"
+            + "\tPRIMARY KEY (id), \n"
+            + "\tFOREIGN KEY(user_id) REFERENCES user_account (id)\n"
+            + ")",
+        requests.get(0).getStatements(1));
   }
 }

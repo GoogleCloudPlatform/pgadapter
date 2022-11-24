@@ -17,12 +17,12 @@ from sqlalchemy import create_engine
 import sys
 
 
-def create_test_engine(autocommit=False):
+def create_test_engine(autocommit=False, options=""):
   host = sys.argv[1]
   port = sys.argv[2]
   conn = create_engine(
-    "postgresql+psycopg2://user:password@{host}:{port}/d"
-    .format(host=host, port=port), future=True)
+    "postgresql+psycopg2://user:password@{host}:{port}/d{options}"
+    .format(host=host, port=port, options=options), future=True)
   if autocommit:
     return conn.execution_options(isolation_level="AUTOCOMMIT")
   return conn
