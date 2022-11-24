@@ -2071,6 +2071,82 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testInformationSchemaQueryInTransactionWithReplacedPgCatalogTables()
+      throws SQLException {
+    String sql = "SELECT 1 FROM pg_namespace";
+    String replacedSql =
+        "with pg_namespace as (\n"
+            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+            + "  from information_schema.schemata\n"
+            + ")\n"
+            + "SELECT 1 FROM pg_namespace";
+    // Register a result for the query. Note that we don't really care what the result is, just that
+    // there is a result.
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(replacedSql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Make sure that we start a transaction.
+      connection.setAutoCommit(false);
+
+      // Execute a query to start the transaction.
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT1.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+
+      // This ensures that the following query returns an error the first time it is executed, and
+      // then succeeds the second time. This happens because the exception is 'popped' from the
+      // response queue when it is returned. The next time the query is executed, it will return the
+      // actual result that we set.
+      mockSpanner.setExecuteStreamingSqlExecutionTime(
+          SimulatedExecutionTime.ofException(
+              Status.INVALID_ARGUMENT
+                  .withDescription(
+                      "Unsupported concurrency mode in query using INFORMATION_SCHEMA.")
+                  .asRuntimeException()));
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Make sure that the connection is still usable.
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT2.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(2L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      connection.commit();
+    }
+
+    // We should receive the INFORMATION_SCHEMA statement twice on Cloud Spanner:
+    // 1. The first time it returns an error because it is using the wrong concurrency mode.
+    // 2. The specific error will cause the connection to retry the statement using a single-use
+    //    read-only transaction.
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // The first statement should start a transaction
+    assertTrue(requests.get(0).getTransaction().hasBegin());
+    // The second statement (the initial attempt of the INFORMATION_SCHEMA query) should try to use
+    // the transaction.
+    assertTrue(requests.get(1).getTransaction().hasId());
+    assertEquals(replacedSql, requests.get(1).getSql());
+    // The INFORMATION_SCHEMA query is then retried using a single-use read-only transaction.
+    assertFalse(requests.get(2).hasTransaction());
+    assertEquals(replacedSql, requests.get(2).getSql());
+    // The last statement should use the transaction.
+    assertTrue(requests.get(3).getTransaction().hasId());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(commitRequest.getTransactionId(), requests.get(1).getTransaction().getId());
+    assertEquals(commitRequest.getTransactionId(), requests.get(3).getTransaction().getId());
+  }
+
+  @Test
   public void testShowGuessTypes() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet =
