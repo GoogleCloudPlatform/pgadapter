@@ -28,6 +28,8 @@ import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
+import com.google.spanner.v1.ResultSetStats;
+import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
 import java.io.File;
 import java.io.IOException;
@@ -336,5 +338,158 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
             + "\tFOREIGN KEY(user_id) REFERENCES user_account (id)\n"
             + ")",
         requests.get(0).getStatements(1));
+  }
+
+  @Test
+  public void testCoreInsert() throws IOException, InterruptedException {
+    String sql =
+        "INSERT INTO user_account (name, fullname) VALUES "
+            + "('spongebob', 'Spongebob Squarepants') RETURNING user_account.id";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+    String sqlMultiple =
+        "INSERT INTO user_account (name, fullname) VALUES "
+            + "('sandy', 'Sandy Cheeks'),('patrick', 'Patrick Star')";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlMultiple), 2L));
+
+    String actualOutput = execute("core_insert.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "INSERT INTO user_account (name, fullname) VALUES (:name, :fullname)\n"
+            + "{'name': 'spongebob', 'fullname': 'Spongebob Squarepants'}\n"
+            + "Result: []\n"
+            + "Row count: 1\n"
+            + "Inserted primary key: (1,)\n"
+            + "Row count: 2\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql, request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    ExecuteSqlRequest multipleRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
+    assertTrue(multipleRequest.getTransaction().hasId());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testCoreInsertFromSelect() throws IOException, InterruptedException {
+    String sql =
+        "INSERT INTO address (user_id, email_address) "
+            + "SELECT user_account.id, user_account.name || '@aol.com' AS anon_1 \n"
+            + "FROM user_account RETURNING address.id, address.email_address";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(2L).build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("test1@aol.com"))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("2").build())
+                        .addValues(Value.newBuilder().setStringValue("test2@aol.com"))
+                        .build())
+                .build()));
+
+    String actualOutput = execute("core_insert_from_select.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "INSERT INTO address (user_id, email_address) "
+            + "SELECT user_account.id, user_account.name || :name_1 AS anon_1 \n"
+            + "FROM user_account\n"
+            + "Inserted rows: 2\n"
+            + "Returned rows: [(1, 'test1@aol.com'), (2, 'test2@aol.com')]\n";
+    assertEquals(expectedOutput, actualOutput);
+  }
+
+  @Test
+  public void testCoreSelect() throws IOException, InterruptedException {
+    String sql =
+        "SELECT user_account.id, user_account.name, user_account.fullname \n"
+            + "FROM user_account \n"
+            + "WHERE user_account.name = 'spongebob'";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.INT64, TypeCode.STRING, TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(2L).build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("test1@aol.com"))
+                        .addValues(Value.newBuilder().setStringValue("Bob Test1"))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("2").build())
+                        .addValues(Value.newBuilder().setStringValue("test2@aol.com"))
+                        .addValues(Value.newBuilder().setStringValue("Bob Test2"))
+                        .build())
+                .build()));
+
+    String actualOutput = execute("core_select.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "SELECT user_account.id, user_account.name, user_account.fullname \n"
+            + "FROM user_account \n"
+            + "WHERE user_account.name = :name_1\n"
+            + "(1, 'test1@aol.com', 'Bob Test1')\n"
+            + "(2, 'test2@aol.com', 'Bob Test2')\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testAutoCommit() throws IOException, InterruptedException {
+    String sql =
+        "SELECT user_account.id, user_account.name, user_account.fullname \n"
+            + "FROM user_account \n"
+            + "WHERE user_account.name = 'spongebob'";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.INT64, TypeCode.STRING, TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(2L).build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("test1@aol.com"))
+                        .addValues(Value.newBuilder().setStringValue("Bob Test1"))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("2").build())
+                        .addValues(Value.newBuilder().setStringValue("test2@aol.com"))
+                        .addValues(Value.newBuilder().setStringValue("Bob Test2"))
+                        .build())
+                .build()));
+
+    String actualOutput = execute("autocommit.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "SERIALIZABLE\n"
+            + "(1, 'test1@aol.com', 'Bob Test1')\n"
+            + "(2, 'test2@aol.com', 'Bob Test2')\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertTrue(request.getTransaction().hasSingleUse());
+    assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 }
