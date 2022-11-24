@@ -138,24 +138,14 @@ public class ITHibernateTest {
 
     String errors;
     String output;
-    InputStreamReader inputStreamReader = new InputStreamReader(process.getInputStream());
-    System.out.println();
     try (BufferedReader reader =
             new BufferedReader(new InputStreamReader(process.getInputStream()));
         BufferedReader errorReader =
             new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
       System.out.println("Printing hibernate loadings");
-      // reader.lines().forEach(s -> System.out.println("Hibernate Out: " + s));
-      // errorReader.lines().forEach(s -> System.out.println("Hibernate Error: " + s));
       output = reader.lines().collect(Collectors.joining("\n"));
       errors = errorReader.lines().collect(Collectors.joining("\n"));
       System.out.println("Hibernate Command. Output: " + output + ". Error: " + errors);
     }
-
-    // LOGGER.warning(errors);
-    // LOGGER.info(output);
-
-    // int res = process.waitFor();
-    // assertEquals(errors, 0, res);
   }
 }
