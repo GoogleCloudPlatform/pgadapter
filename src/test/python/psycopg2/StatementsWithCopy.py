@@ -22,7 +22,8 @@ def create_connection(port):
     connection = pg.connect(user="postgres",
                             database="postgres",
                             host="localhost",
-                            port=port)
+                            port=port,
+                            options="-c timezone=UTC")
     connection.autocommit = True
     return connection
   except Exception as e:

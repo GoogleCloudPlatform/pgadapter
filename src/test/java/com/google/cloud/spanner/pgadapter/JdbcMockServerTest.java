@@ -49,6 +49,7 @@ import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
+import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
@@ -68,10 +69,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.BeforeClass;
@@ -891,6 +889,48 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(2, request.getStatementsCount());
     assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
+  }
+
+  @Test
+  public void testTwoDmlStatements_withError() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        SQLException exception =
+            assertThrows(
+                SQLException.class,
+                () -> statement.execute(String.format("%s;%s;", INSERT_STATEMENT, INVALID_DML)));
+        assertEquals("ERROR: Statement is invalid.", exception.getMessage());
+      }
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
+    assertEquals(INVALID_DML.getSql(), request.getStatements(1).getSql());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testTwoDmlStatements_randomlyAborted() throws SQLException {
+    mockSpanner.setAbortProbability(0.5);
+    for (int run = 0; run < 50; run++) {
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (java.sql.Statement statement = connection.createStatement()) {
+          assertFalse(
+              statement.execute(String.format("%s;%s;", INSERT_STATEMENT, UPDATE_STATEMENT)));
+          assertEquals(1, statement.getUpdateCount());
+          assertFalse(statement.getMoreResults());
+          assertEquals(2, statement.getUpdateCount());
+          assertFalse(statement.getMoreResults());
+          assertEquals(-1, statement.getUpdateCount());
+        }
+      } finally {
+        mockSpanner.setAbortProbability(0.0);
+      }
+    }
   }
 
   @Test
@@ -2407,7 +2447,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testSetTimeZone() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set time zone 'IST'");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneToServerDefault() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'atlantic/faeroe'");
+      verifySettingValue(connection, "timezone", "Atlantic/Faeroe");
+      connection.createStatement().execute("set time zone default");
+      verifySettingValue(connection, "timezone", TimeZone.getDefault().getID());
     }
   }
 
@@ -2416,7 +2466,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection =
         DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
       connection.createStatement().execute("set time zone default");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 
@@ -2425,7 +2475,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection =
         DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
       connection.createStatement().execute("set time zone local");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 

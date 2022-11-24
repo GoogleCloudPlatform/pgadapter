@@ -38,9 +38,13 @@ import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement.ResultNotReadyBehavior;
 import com.google.common.collect.ImmutableList;
+import java.util.concurrent.Future;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -314,6 +318,24 @@ public class IntermediateStatementTest {
     assertNull(transformDelete("delete from foo"));
     assertNull(transformDelete("dlete from foo where id=$1"));
     assertNull(transformDelete("delete from foo hwere col1=2"));
+  }
+
+  @Test
+  public void testInterruptedWhileWaitingForResult() throws Exception {
+    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    Future<StatementResult> future = mock(Future.class);
+    when(future.get()).thenThrow(new InterruptedException());
+
+    String sql = "update bar set foo=1";
+    IntermediateStatement statement =
+        new IntermediateStatement(
+            mock(OptionsMetadata.class), parse(sql), Statement.of(sql), connectionHandler);
+    statement.setFutureStatementResult(future);
+    statement.initFutureResult(ResultNotReadyBehavior.BLOCK);
+
+    PGException pgException = statement.getException();
+    assertEquals(SQLState.QueryCanceled, pgException.getSQLState());
   }
 
   private static Statement transformInsert(String sql) {

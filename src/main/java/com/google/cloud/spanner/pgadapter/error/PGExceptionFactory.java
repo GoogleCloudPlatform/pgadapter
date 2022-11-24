@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.error;
 
+import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.SpannerException;
 import io.grpc.StatusRuntimeException;
@@ -58,17 +60,28 @@ public class PGExceptionFactory {
     return newPGException("Query cancelled", SQLState.QueryCanceled);
   }
 
+  /**
+   * Creates a new exception that indicates that the current transaction is in the aborted state.
+   */
+  public static PGException newTransactionAbortedException() {
+    return newPGException(TRANSACTION_ABORTED_ERROR, SQLState.InFailedSqlTransaction);
+  }
+
   /** Converts the given {@link SpannerException} to a {@link PGException}. */
   public static PGException toPGException(SpannerException spannerException) {
     return newPGException(extractMessage(spannerException));
   }
 
   /** Converts the given {@link Exception} to a {@link PGException}. */
-  public static PGException toPGException(Exception exception) {
-    if (exception instanceof SpannerException) {
-      return toPGException((SpannerException) exception);
+  public static PGException toPGException(Throwable throwable) {
+    if (throwable instanceof SpannerException) {
+      return toPGException((SpannerException) throwable);
     }
-    return newPGException(exception.getMessage());
+    if (throwable instanceof PGException) {
+      return (PGException) throwable;
+    }
+    return newPGException(
+        throwable.getMessage() == null ? throwable.getClass().getName() : throwable.getMessage());
   }
 
   private static final String NOT_FOUND_PREFIX =

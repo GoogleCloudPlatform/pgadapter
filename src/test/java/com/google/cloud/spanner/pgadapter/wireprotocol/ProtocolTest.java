@@ -19,6 +19,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -32,11 +33,8 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.Dialect;
-import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ReadContext;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.SpannerException;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
@@ -46,6 +44,9 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
@@ -70,6 +71,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -648,6 +650,7 @@ public class ProtocolTest {
     assertEquals(expectedFormatCodes, ((BindMessage) message).getFormatCodes());
     assertEquals(expectedFormatCodes, ((BindMessage) message).getResultFormatCodes());
     assertEquals("select * from foo", ((BindMessage) message).getSql());
+    assertTrue(((BindMessage) message).hasParameterValues());
 
     when(intermediatePreparedStatement.bind(
             ArgumentMatchers.anyString(),
@@ -943,8 +946,8 @@ public class ProtocolTest {
     ByteArrayOutputStream result = new ByteArrayOutputStream();
     DataOutputStream outputStream = new DataOutputStream(result);
 
-    SpannerException testException =
-        SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT, "test error");
+    PGException testException =
+        PGExceptionFactory.newPGException("test error", SQLState.SyntaxError);
     when(intermediatePortalStatement.hasException()).thenReturn(true);
     when(intermediatePortalStatement.getException()).thenReturn(testException);
     when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
@@ -1584,9 +1587,12 @@ public class ProtocolTest {
         readUntil(outputResult, "standard_conforming_strings\0".length()));
     assertEquals("on\0", readUntil(outputResult, "on\0".length()));
     assertEquals('S', outputResult.readByte());
-    assertEquals(17, outputResult.readInt());
-    assertEquals("TimeZone\0", readUntil(outputResult, "TimeZone\0".length()));
+
     // Timezone will vary depending on the default location of the JVM that is running.
+    String timezoneIdentifier = ZoneId.systemDefault().getId();
+    int expectedLength = timezoneIdentifier.getBytes(StandardCharsets.UTF_8).length + 10 + 4;
+    assertEquals(expectedLength, outputResult.readInt());
+    assertEquals("TimeZone\0", readUntil(outputResult, "TimeZone\0".length()));
     readUntilNullTerminator(outputResult);
 
     // ReadyResponse

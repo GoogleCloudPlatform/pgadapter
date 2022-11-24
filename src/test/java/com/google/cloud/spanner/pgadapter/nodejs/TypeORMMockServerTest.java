@@ -101,7 +101,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("findOneUser", pgServer.getLocalPort());
 
-    assertEquals("\n\nFound user 1 with name Timber Saw\n", output);
+    assertEquals("Found user 1 with name Timber Saw\n", output);
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -164,7 +164,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("createUser", pgServer.getLocalPort());
 
-    assertEquals("\n\nFound user 1 with name Timber Saw\n", output);
+    assertEquals("Found user 1 with name Timber Saw\n", output);
 
     // Creating the user will use a read/write transaction. The query that checks whether the record
     // already exists will however not use that transaction, as each statement is executed in
@@ -256,7 +256,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("updateUser", pgServer.getLocalPort());
 
-    assertEquals("\n\nUpdated user 1\n", output);
+    assertEquals("Updated user 1\n", output);
 
     // Updating the user will use a read/write transaction. The query that checks whether the record
     // already exists will however not use that transaction, as each statement is executed in
@@ -347,7 +347,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("deleteUser", pgServer.getLocalPort());
 
-    assertEquals("\n\nDeleted user 1\n", output);
+    assertEquals("Deleted user 1\n", output);
 
     // Deleting the user will use a read/write transaction. The query that checks whether the record
     // already exists will however not use that transaction, as each statement is executed in
@@ -412,7 +412,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     String output = runTest("findOneAllTypes", pgServer.getLocalPort());
 
     assertEquals(
-        "\n\nFound row 1\n"
+        "Found row 1\n"
             + "AllTypes {\n"
             + "  col_bigint: '1',\n"
             + "  col_bool: true,\n"
@@ -470,7 +470,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String output = runTest("createAllTypes", pgServer.getLocalPort());
 
-    assertEquals("\n\nCreated one record\n", output);
+    assertEquals("Created one record\n", output);
 
     List<ExecuteSqlRequest> insertRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -504,6 +504,32 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     assertEquals(
         "{\"key\":\"value\"}",
         insertRequest.getParams().getFieldsMap().get("p10").getStringValue());
+  }
+
+  @Test
+  public void testUpdateAllTypes() throws Exception {
+    String sql =
+        "SELECT \"AllTypes\".\"col_bigint\" AS \"AllTypes_col_bigint\", \"AllTypes\".\"col_bool\" AS \"AllTypes_col_bool\", "
+            + "\"AllTypes\".\"col_bytea\" AS \"AllTypes_col_bytea\", \"AllTypes\".\"col_float8\" AS \"AllTypes_col_float8\", "
+            + "\"AllTypes\".\"col_int\" AS \"AllTypes_col_int\", \"AllTypes\".\"col_numeric\" AS \"AllTypes_col_numeric\", "
+            + "\"AllTypes\".\"col_timestamptz\" AS \"AllTypes_col_timestamptz\", \"AllTypes\".\"col_date\" AS \"AllTypes_col_date\", "
+            + "\"AllTypes\".\"col_varchar\" AS \"AllTypes_col_varchar\", \"AllTypes\".\"col_jsonb\" AS \"AllTypes_col_jsonb\" "
+            + "FROM \"all_types\" \"AllTypes\" "
+            + "WHERE (\"AllTypes\".\"col_bigint\" = $1) LIMIT 1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql), createAllTypesResultSet("AllTypes_")));
+    String updateSql =
+        "UPDATE \"all_types\" SET \"col_bigint\" = $1, \"col_bool\" = $2, \"col_bytea\" = $3, \"col_float8\" = $4, \"col_int\" = $5, \"col_numeric\" = $6, \"col_timestamptz\" = $7, \"col_date\" = $8, \"col_varchar\" = $9, \"col_jsonb\" = $10 WHERE \"col_bigint\" IN ($11)";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 1L));
+
+    String output = runTest("updateAllTypes", pgServer.getLocalPort());
+
+    assertEquals("Updated one record\n", output);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest updateRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(3);
+    assertEquals(updateSql, updateRequest.getSql());
   }
 
   static String runTest(String testName, int port) throws IOException, InterruptedException {

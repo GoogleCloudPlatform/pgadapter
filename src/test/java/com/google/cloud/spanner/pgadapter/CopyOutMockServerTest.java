@@ -26,6 +26,7 @@ import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.MockSpannerServiceImpl;
+import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
@@ -207,6 +208,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
         StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'UTC'");
       CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
       StringWriter writer = new StringWriter();
       copyManager.copyOut("COPY all_types TO STDOUT", writer);
@@ -239,6 +241,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
             Statement.of("select col_bigint, col_varchar from all_types"), ALL_TYPES_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'UTC'");
       CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
       StringWriter writer = new StringWriter();
       copyManager.copyOut("COPY all_types (col_bigint, col_varchar) TO STDOUT", writer);
@@ -270,6 +273,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
         StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'UTC'");
       CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
       StringWriter writer = new StringWriter();
       copyManager.copyOut(
@@ -287,6 +291,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
         StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'UTC'");
       CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
       StringWriter writer = new StringWriter();
       copyManager.copyOut(
@@ -306,6 +311,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
             Statement.of("select col_bigint from all_types"), ALL_TYPES_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'UTC'");
       CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
       StringWriter writer = new StringWriter();
       copyManager.copyOut(
@@ -326,6 +332,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
             Statement.of("select * from all_types order by col_bigint"), ALL_TYPES_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'UTC'");
       CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
       StringWriter writer = new StringWriter();
       copyManager.copyOut(
@@ -345,6 +352,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
         StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'UTC'");
       CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
       StringWriter writer = new StringWriter();
       copyManager.copyOut(
@@ -362,6 +370,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
         StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'UTC'");
       CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
       StringWriter writer = new StringWriter();
       copyManager.copyOut(
@@ -546,6 +555,26 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
         }
         assertEquals(expectedRowCount, lineCount);
       }
+    }
+  }
+
+  @Test
+  public void testCopyOutPartitioned_NonExistingTable() throws SQLException {
+    StatusRuntimeException exception =
+        Status.NOT_FOUND.withDescription("Table my_table not found").asRuntimeException();
+    mockSpanner.putStatementResult(
+        StatementResult.exception(Statement.of("select * from my_table"), exception));
+    mockSpanner.setPartitionQueryExecutionTime(SimulatedExecutionTime.ofException(exception));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      StringWriter writer = new StringWriter();
+      SQLException sqlException =
+          assertThrows(
+              SQLException.class, () -> copyManager.copyOut("COPY my_table TO STDOUT", writer));
+      assertEquals(
+          "ERROR: Table my_table not found - Statement: 'select * from my_table'",
+          sqlException.getMessage());
     }
   }
 

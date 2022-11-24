@@ -135,6 +135,20 @@ public enum SQLState {
   SqlJsonScalarRequired("2203F"),
   SqlJsonItemCannotBeCastToTargetType("2203G"),
 
+  // Class 25 - Invalid Transaction State
+  InvalidTransactionState("25000"),
+  ActiveSqlTransaction("25001"),
+  BranchTransactionAlreadyActive("25002"),
+  HeldCursorRequiresSameIsolationLevel("25008"),
+  InappropriateAccessModeForBranchTransaction("25003"),
+  InappropriateIsolationLevelForBranchTransaction("25004"),
+  NoActiveSqlTransactionForBranchTransaction("25005"),
+  ReadOnlySqlTransaction("25006"),
+  SchemaAndDataStatementMixingNotSupported("25007"),
+  NoActiveSqlTransaction("25P01"),
+  InFailedSqlTransaction("25P02"),
+  IdleInTransactionSessionTimeout("25P03"),
+
   // Class 42 — Syntax Error or Access Rule Violation
   SyntaxErrorOrAccessRuleViolation("42000"),
   SyntaxError("42601"),
