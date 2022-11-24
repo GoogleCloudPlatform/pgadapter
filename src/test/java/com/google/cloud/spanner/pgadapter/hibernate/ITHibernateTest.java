@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.hibernate;
 
-
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
 import com.google.common.collect.ImmutableList;
@@ -145,7 +144,8 @@ public class ITHibernateTest {
         BufferedReader errorReader =
             new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
       System.out.println("Printing hibernate loadings");
-      reader.lines().forEach(s -> System.out.println("Hibernate: " + s));
+      reader.lines().forEach(s -> System.out.println("Hibernate Out: " + s));
+      errorReader.lines().forEach(s -> System.out.println("Hibernate Error: " + s));
       // errors = errorReader.lines().collect(Collectors.joining("\n"));
       // output = reader.lines().collect(Collectors.joining("\n"));
       // System.out.println("Hibernate Command. Output: " + output + ". Error: " + errors);
