@@ -12,7 +12,7 @@
     <java.version>1.8</java.version>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <hibernate.version>5.2.13.Final</hibernate.version>
+    <hibernate.version>5.3.20.Final</hibernate.version>
     <skipTests>false</skipTests>
     <skipUnits>${skipTests}</skipUnits>
     <skipITs>true</skipITs>
@@ -39,7 +39,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.4.2</version>
+      <version>42.4.3</version>
     </dependency>
     <dependency>
       <groupId>javax.xml.bind</groupId>
