@@ -10,6 +10,7 @@ PGAdapter can be used with the following clients:
 4. `psycopg2`: Version 2.9.3 and higher (but not `psycopg3`) are supported. See [psycopg2](docs/psycopg2.md) for more details.
 5. `node-postgres`: Version 8.8.0 and higher have __experimental support__.
    See [node-postgres support](docs/node-postgres.md) for more details.
+6. `hibernate`: Version 5.3.20. Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
