@@ -277,7 +277,7 @@ public class BackendConnection {
       statement = statementBinder.apply(statement);
       if (analyze) {
         ResultSet resultSet;
-        if (parsedStatement.isUpdate()) {
+        if (parsedStatement.isUpdate() && !parsedStatement.hasReturningClause()) {
           // TODO(#477): Single analyzeUpdate statements that are executed in an implicit
           //     transaction could use a single-use read/write transaction. Replays are not
           //     dangerous for those.

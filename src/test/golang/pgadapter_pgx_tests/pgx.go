@@ -249,6 +249,95 @@ func TestInsertNullsAllDataTypes(connString string) *C.char {
 	return nil
 }
 
+//export TestInsertAllDataTypesReturning
+func TestInsertAllDataTypesReturning(connString string) *C.char {
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		return C.CString(err.Error())
+	}
+	defer conn.Close(ctx)
+
+	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
+		"values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *"
+	numeric := pgtype.Numeric{}
+	_ = numeric.Set("6.626")
+	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T07:39:10.123456789+01:00")
+	date := pgtype.Date{}
+	_ = date.Set("2022-04-02")
+	var row pgx.Row
+	if strings.Contains(connString, "prefer_simple_protocol=true") {
+		// Simple mode will format the date as '2022-04-02 00:00:00Z', which is not supported by the
+		// backend yet.
+		row = conn.QueryRow(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string", "{\"key\": \"value\"}")
+	} else {
+		row = conn.QueryRow(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}")
+	}
+	var bigintValue int64
+	var boolValue bool
+	var byteaValue []byte
+	var float8Value float64
+	var intValue int
+	var numericValue pgtype.Numeric // pgx by default maps numeric to string
+	var timestamptzValue time.Time
+	var dateValue time.Time
+	var varcharValue string
+	var jsonbValue string
+
+	err = row.Scan(
+		&bigintValue,
+		&boolValue,
+		&byteaValue,
+		&float8Value,
+		&intValue,
+		&numericValue,
+		&timestamptzValue,
+		&dateValue,
+		&varcharValue,
+		&jsonbValue,
+	)
+	if err != nil {
+		return C.CString(fmt.Sprintf("Failed to execute insert: %v", err.Error()))
+	}
+	if g, w := bigintValue, int64(1); g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := boolValue, true; g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := byteaValue, []byte("test"); !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := float8Value, 3.14; g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := intValue, 100; g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	var wantNumericValue pgtype.Numeric
+	_ = wantNumericValue.Scan("6.626")
+	if g, w := numericValue, wantNumericValue; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	wantDateValue, _ := time.Parse("2006-01-02", "2022-03-29")
+	if g, w := dateValue, wantDateValue; !reflect.DeepEqual(g, w) {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	// Encoding the timestamp values as a parameter will truncate it to microsecond precision.
+	wantTimestamptzValue, _ := time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456+00:00")
+	if g, w := timestamptzValue.UTC().String(), wantTimestamptzValue.UTC().String(); g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := varcharValue, "test"; g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+	if g, w := jsonbValue, "{\"key\": \"value\"}"; g != w {
+		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
+	}
+
+	return nil
+}
+
 //export TestUpdateAllDataTypes
 func TestUpdateAllDataTypes(connString string) *C.char {
 	ctx := context.Background()
