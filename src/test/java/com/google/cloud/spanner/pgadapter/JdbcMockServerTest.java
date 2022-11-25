@@ -75,10 +75,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.BeforeClass;
@@ -276,6 +273,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
           assertTrue(resultSet.next());
           assertEquals("d", resultSet.getString("current_catalog"));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testSelectVersion() throws SQLException {
+    for (String sql :
+        new String[] {"SELECT version()", "select version()", "select * from version()"}) {
+
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        String version = null;
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("show server_version")) {
+          assertTrue(resultSet.next());
+          version = resultSet.getString(1);
+          assertFalse(resultSet.next());
+        }
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals("PostgreSQL " + version, resultSet.getString("version"));
           assertFalse(resultSet.next());
         }
       }
@@ -2221,6 +2243,82 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testInformationSchemaQueryInTransactionWithReplacedPgCatalogTables()
+      throws SQLException {
+    String sql = "SELECT 1 FROM pg_namespace";
+    String replacedSql =
+        "with pg_namespace as (\n"
+            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+            + "  from information_schema.schemata\n"
+            + ")\n"
+            + "SELECT 1 FROM pg_namespace";
+    // Register a result for the query. Note that we don't really care what the result is, just that
+    // there is a result.
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(replacedSql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Make sure that we start a transaction.
+      connection.setAutoCommit(false);
+
+      // Execute a query to start the transaction.
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT1.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+
+      // This ensures that the following query returns an error the first time it is executed, and
+      // then succeeds the second time. This happens because the exception is 'popped' from the
+      // response queue when it is returned. The next time the query is executed, it will return the
+      // actual result that we set.
+      mockSpanner.setExecuteStreamingSqlExecutionTime(
+          SimulatedExecutionTime.ofException(
+              Status.INVALID_ARGUMENT
+                  .withDescription(
+                      "Unsupported concurrency mode in query using INFORMATION_SCHEMA.")
+                  .asRuntimeException()));
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(1L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+
+      // Make sure that the connection is still usable.
+      try (ResultSet resultSet = connection.createStatement().executeQuery(SELECT2.getSql())) {
+        assertTrue(resultSet.next());
+        assertEquals(2L, resultSet.getLong(1));
+        assertFalse(resultSet.next());
+      }
+      connection.commit();
+    }
+
+    // We should receive the INFORMATION_SCHEMA statement twice on Cloud Spanner:
+    // 1. The first time it returns an error because it is using the wrong concurrency mode.
+    // 2. The specific error will cause the connection to retry the statement using a single-use
+    //    read-only transaction.
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // The first statement should start a transaction
+    assertTrue(requests.get(0).getTransaction().hasBegin());
+    // The second statement (the initial attempt of the INFORMATION_SCHEMA query) should try to use
+    // the transaction.
+    assertTrue(requests.get(1).getTransaction().hasId());
+    assertEquals(replacedSql, requests.get(1).getSql());
+    // The INFORMATION_SCHEMA query is then retried using a single-use read-only transaction.
+    assertFalse(requests.get(2).hasTransaction());
+    assertEquals(replacedSql, requests.get(2).getSql());
+    // The last statement should use the transaction.
+    assertTrue(requests.get(3).getTransaction().hasId());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(commitRequest.getTransactionId(), requests.get(1).getTransaction().getId());
+    assertEquals(commitRequest.getTransactionId(), requests.get(3).getTransaction().getId());
+  }
+
+  @Test
   public void testShowGuessTypes() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet =
@@ -2663,7 +2761,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testSetTimeZone() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set time zone 'IST'");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneToServerDefault() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'atlantic/faeroe'");
+      verifySettingValue(connection, "timezone", "Atlantic/Faeroe");
+      connection.createStatement().execute("set time zone default");
+      verifySettingValue(connection, "timezone", TimeZone.getDefault().getID());
     }
   }
 
@@ -2672,7 +2780,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection =
         DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
       connection.createStatement().execute("set time zone default");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 
@@ -2681,7 +2789,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection =
         DriverManager.getConnection(createUrl() + "?options=-c%20timezone=IST")) {
       connection.createStatement().execute("set time zone local");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 

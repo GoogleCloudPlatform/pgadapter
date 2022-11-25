@@ -24,6 +24,7 @@ import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import org.postgresql.core.Oid;
@@ -59,9 +60,11 @@ public abstract class Parser<T> {
    * @param item The data to be parsed
    * @param oidType The type of the designated data
    * @param formatCode The format of the data to be parsed
+   * @param sessionState The session state to use when parsing and converting
    * @return The parser object for the designated data type.
    */
-  public static Parser<?> create(byte[] item, int oidType, FormatCode formatCode) {
+  public static Parser<?> create(
+      SessionState sessionState, byte[] item, int oidType, FormatCode formatCode) {
     switch (oidType) {
       case Oid.BOOL:
       case Oid.BIT:
@@ -88,7 +91,7 @@ public abstract class Parser<T> {
         return new StringParser(item, formatCode);
       case Oid.TIMESTAMP:
       case Oid.TIMESTAMPTZ:
-        return new TimestampParser(item, formatCode);
+        return new TimestampParser(item, formatCode, sessionState);
       case Oid.JSONB:
         return new JsonbParser(item, formatCode);
       case Oid.UNSPECIFIED:
@@ -106,7 +109,8 @@ public abstract class Parser<T> {
    * @param columnarPosition Column from the result to be parsed.
    * @return The parser object for the designated data type.
    */
-  public static Parser<?> create(ResultSet result, Type type, int columnarPosition) {
+  public static Parser<?> create(
+      ResultSet result, Type type, int columnarPosition, SessionState sessionState) {
     switch (type.getCode()) {
       case BOOL:
         return new BooleanParser(result, columnarPosition);
@@ -123,11 +127,11 @@ public abstract class Parser<T> {
       case STRING:
         return new StringParser(result, columnarPosition);
       case TIMESTAMP:
-        return new TimestampParser(result, columnarPosition);
+        return new TimestampParser(result, columnarPosition, sessionState);
       case PG_JSONB:
         return new JsonbParser(result, columnarPosition);
       case ARRAY:
-        return new ArrayParser(result, columnarPosition);
+        return new ArrayParser(result, columnarPosition, sessionState);
       case NUMERIC:
       case JSON:
       case STRUCT:
@@ -143,7 +147,7 @@ public abstract class Parser<T> {
    * @param typeCode The type of the object to be parsed.
    * @return The parser object for the designated data type.
    */
-  protected static Parser<?> create(Object result, Code typeCode) {
+  protected static Parser<?> create(Object result, Code typeCode, SessionState sessionState) {
     switch (typeCode) {
       case BOOL:
         return new BooleanParser(result);
@@ -160,7 +164,7 @@ public abstract class Parser<T> {
       case STRING:
         return new StringParser(result);
       case TIMESTAMP:
-        return new TimestampParser(result);
+        return new TimestampParser(result, sessionState);
       case PG_JSONB:
         return new JsonbParser(result);
       case NUMERIC:
