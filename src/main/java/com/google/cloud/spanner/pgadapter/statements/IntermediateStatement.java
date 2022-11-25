@@ -137,7 +137,8 @@ public class IntermediateStatement {
 
   /** @return True if this is a select statement, false otherwise. */
   public boolean containsResultSet() {
-    return this.parsedStatement.isQuery();
+    return this.parsedStatement.isQuery()
+        || (this.parsedStatement.isUpdate() && this.parsedStatement.hasReturningClause());
   }
 
   /** @return True if this statement was executed, False otherwise. */
