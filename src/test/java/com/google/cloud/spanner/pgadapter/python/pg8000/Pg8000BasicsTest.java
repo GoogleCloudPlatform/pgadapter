@@ -37,7 +37,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Scanner;
-import java.util.TimeZone;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -112,7 +111,7 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
         "row: [1, True, b'test', 3.14, 100, Decimal('6.626'), "
             + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=tzutc()), datetime.date(2022, 3, 29), "
             + "'test', {'key': 'value'}]\n";
-    assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput.replace("tzlocal()", "tzutc()"));
   }
 
   @Test
@@ -128,10 +127,7 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
             + "second execution: [1, True, b'test', 3.14, 100, Decimal('6.626'), "
             + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=tzutc()), datetime.date(2022, 3, 29), "
             + "'test', {'key': 'value'}]\n";
-    if (TimeZone.getDefault().equals(TimeZone.getTimeZone("GMT"))) {
-      expectedOutput = expectedOutput.replace("tzutc", "tzlocal");
-    }
-    assertEquals(expectedOutput, actualOutput);
+    assertEquals(expectedOutput, actualOutput.replace("tzlocal()", "tzutc()"));
 
     List<WireMessage> messages = getWireMessages();
     assertEquals(25, messages.size());
