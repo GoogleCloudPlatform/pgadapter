@@ -22,6 +22,8 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -261,6 +263,64 @@ public abstract class Parser<T> {
       default:
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown type: " + type);
+    }
+  }
+  /**
+   * Translates the given Cloud Spanner {@link Type} to a PostgreSQL OID constant.
+   *
+   * @param type the type to translate
+   * @return The OID constant value for the type
+   */
+  public static int toOid(com.google.spanner.v1.Type type) {
+    switch (type.getCode()) {
+      case BOOL:
+        return Oid.BOOL;
+      case INT64:
+        return Oid.INT8;
+      case NUMERIC:
+        return Oid.NUMERIC;
+      case FLOAT64:
+        return Oid.FLOAT8;
+      case STRING:
+        return Oid.VARCHAR;
+      case JSON:
+        return Oid.JSONB;
+      case BYTES:
+        return Oid.BYTEA;
+      case TIMESTAMP:
+        return Oid.TIMESTAMPTZ;
+      case DATE:
+        return Oid.DATE;
+      case ARRAY:
+        switch (type.getArrayElementType().getCode()) {
+          case BOOL:
+            return Oid.BOOL_ARRAY;
+          case INT64:
+            return Oid.INT8_ARRAY;
+          case NUMERIC:
+            return Oid.NUMERIC_ARRAY;
+          case FLOAT64:
+            return Oid.FLOAT8_ARRAY;
+          case STRING:
+            return Oid.VARCHAR_ARRAY;
+          case JSON:
+            return Oid.JSONB_ARRAY;
+          case BYTES:
+            return Oid.BYTEA_ARRAY;
+          case TIMESTAMP:
+            return Oid.TIMESTAMPTZ_ARRAY;
+          case DATE:
+            return Oid.DATE_ARRAY;
+          case ARRAY:
+          case STRUCT:
+          default:
+            throw PGExceptionFactory.newPGException(
+                "Unsupported or unknown array type: " + type, SQLState.InternalError);
+        }
+      case STRUCT:
+      default:
+        throw PGExceptionFactory.newPGException(
+            "Unsupported or unknown type: " + type, SQLState.InternalError);
     }
   }
 

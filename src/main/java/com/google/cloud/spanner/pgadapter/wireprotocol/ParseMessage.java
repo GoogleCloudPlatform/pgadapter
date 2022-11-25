@@ -123,15 +123,13 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
             parsedStatement,
             originalStatement);
       } else {
-        IntermediatePreparedStatement statement =
-            new IntermediatePreparedStatement(
-                connectionHandler,
-                connectionHandler.getServer().getOptions(),
-                name,
-                parsedStatement,
-                originalStatement);
-        statement.setParameterDataTypes(parameterDataTypes);
-        return statement;
+        return new IntermediatePreparedStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parameterDataTypes,
+            parsedStatement,
+            originalStatement);
       }
     } catch (Exception exception) {
       return new InvalidStatement(

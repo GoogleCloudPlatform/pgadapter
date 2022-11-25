@@ -32,16 +32,6 @@ jobs:
         distribution: 'zulu'
     - run: java -version
     - run: .ci/run-with-credentials.sh lint
-  clirr:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-java@v3
-        with:
-          java-version: 8
-          distribution: 'zulu'
-      - run: java -version
-      - run: .ci/run-with-credentials.sh clirr
   e2e-psql-v11-v1:
     needs: [check-env]
     if: needs.check-env.outputs.has-key == 'true'
