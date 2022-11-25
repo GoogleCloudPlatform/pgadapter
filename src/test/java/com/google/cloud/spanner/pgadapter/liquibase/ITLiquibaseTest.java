@@ -102,6 +102,7 @@ public class ITLiquibaseTest {
               testEnv.getPGAdapterPort(), database.getId().getDatabase());
       LOGGER.info("Using Liquibase properties:\n" + properties);
       writer.write(properties);
+      writer.flush();
     }
   }
 
