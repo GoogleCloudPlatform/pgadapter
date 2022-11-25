@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement.NO_PARAMS;
+import static com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement.NO_PARAMETER_TYPES;
 import static com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.EMPTY_LOCAL_STATEMENTS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -21,6 +23,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -54,7 +58,6 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Bytes;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -65,7 +68,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -121,14 +123,19 @@ public class StatementTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
-            connectionHandler, options, "", parse(sql), Statement.of(sql));
+            "",
+            new IntermediatePreparedStatement(
+                connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql)),
+            NO_PARAMS,
+            ImmutableList.of(),
+            ImmutableList.of());
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("SELECT", intermediateStatement.getCommand());
 
     intermediateStatement.executeAsync(backendConnection);
 
-    verify(backendConnection).execute(parse(sql), Statement.of(sql));
+    verify(backendConnection).execute(eq(parse(sql)), eq(Statement.of(sql)), any());
     assertTrue(intermediateStatement.containsResultSet());
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(StatementType.QUERY, intermediateStatement.getStatementType());
@@ -145,14 +152,19 @@ public class StatementTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
-            connectionHandler, options, "", parse(sql), Statement.of(sql));
+            "",
+            new IntermediatePreparedStatement(
+                connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql)),
+            NO_PARAMS,
+            ImmutableList.of(),
+            ImmutableList.of());
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("UPDATE", intermediateStatement.getCommand());
 
     intermediateStatement.executeAsync(backendConnection);
 
-    verify(backendConnection).execute(parse(sql), Statement.of(sql));
+    verify(backendConnection).execute(eq(parse(sql)), eq(Statement.of(sql)), any());
     assertFalse(intermediateStatement.containsResultSet());
     assertTrue(intermediateStatement.isExecuted());
     assertEquals(StatementType.UPDATE, intermediateStatement.getStatementType());
@@ -175,7 +187,12 @@ public class StatementTest {
     when(connection.execute(Statement.of(sql))).thenReturn(statementResult);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
-            connectionHandler, options, "", parse(sql), Statement.of(sql));
+            "",
+            new IntermediatePreparedStatement(
+                connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql)),
+            NO_PARAMS,
+            ImmutableList.of(),
+            ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
             connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
@@ -208,14 +225,19 @@ public class StatementTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
-            connectionHandler, options, "", parse(sql), Statement.of(sql));
+            "",
+            new IntermediatePreparedStatement(
+                connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql)),
+            NO_PARAMS,
+            ImmutableList.of(),
+            ImmutableList.of());
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("CREATE", intermediateStatement.getCommand());
 
     intermediateStatement.executeAsync(backendConnection);
 
-    verify(backendConnection).execute(parse(sql), Statement.of(sql));
+    verify(backendConnection).execute(eq(parse(sql)), eq(Statement.of(sql)), any());
     assertFalse(intermediateStatement.containsResultSet());
     assertEquals(0, intermediateStatement.getUpdateCount());
     assertTrue(intermediateStatement.isExecuted());
@@ -251,7 +273,12 @@ public class StatementTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
-            connectionHandler, options, "", parse(sql), Statement.of(sql));
+            "",
+            new IntermediatePreparedStatement(
+                connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql)),
+            NO_PARAMS,
+            ImmutableList.of(),
+            ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
             connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
@@ -275,7 +302,6 @@ public class StatementTest {
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
     SessionState sessionState = mock(SessionState.class);
     when(backendConnection.getSessionState()).thenReturn(sessionState);
-    when(sessionState.getGuessTypes()).thenReturn(ImmutableSet.of());
     String sqlStatement = "SELECT * FROM users WHERE age > $2 AND age < $3 AND name = $1";
     int[] parameterDataTypes = new int[] {Oid.VARCHAR, Oid.INT8, Oid.INT4};
 
@@ -294,23 +320,28 @@ public class StatementTest {
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(
-            connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
-    intermediateStatement.setParameterDataTypes(parameterDataTypes);
+            connectionHandler,
+            options,
+            "",
+            parameterDataTypes,
+            parse(sqlStatement),
+            Statement.of(sqlStatement));
 
     assertEquals(sqlStatement, intermediateStatement.getSql());
 
     byte[][] parameters = {"userName".getBytes(), "20".getBytes(), "30".getBytes()};
     IntermediatePortalStatement intermediatePortalStatement =
-        intermediateStatement.bind(
+        intermediateStatement.createPortal(
             "", parameters, Arrays.asList((short) 0, (short) 0, (short) 0), new ArrayList<>());
-    intermediateStatement.executeAsync(backendConnection);
+    intermediatePortalStatement.bind(Statement.of(sqlStatement));
+    intermediatePortalStatement.executeAsync(backendConnection);
     backendConnection.flush();
 
     verify(connection).execute(statement);
 
     assertEquals(sqlStatement, intermediatePortalStatement.getSql());
     assertEquals("SELECT", intermediatePortalStatement.getCommand());
-    assertFalse(intermediatePortalStatement.isExecuted());
+    assertTrue(intermediatePortalStatement.isExecuted());
     assertTrue(intermediateStatement.isBound());
   }
 
@@ -324,21 +355,25 @@ public class StatementTest {
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
     SessionState sessionState = mock(SessionState.class);
     when(backendConnection.getSessionState()).thenReturn(sessionState);
-    when(sessionState.getGuessTypes()).thenReturn(ImmutableSet.of());
 
     String sqlStatement = "SELECT * FROM users WHERE metadata = $1";
     int[] parameterDataTypes = new int[] {Oid.JSON};
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(
-            connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
-    intermediateStatement.setParameterDataTypes(parameterDataTypes);
+            connectionHandler,
+            options,
+            "",
+            parameterDataTypes,
+            parse(sqlStatement),
+            Statement.of(sqlStatement));
 
     byte[][] parameters = {"{}".getBytes()};
 
+    IntermediatePortalStatement portalStatement =
+        intermediateStatement.createPortal("", parameters, new ArrayList<>(), new ArrayList<>());
     assertThrows(
-        IllegalArgumentException.class,
-        () -> intermediateStatement.bind("", parameters, new ArrayList<>(), new ArrayList<>()));
+        IllegalArgumentException.class, () -> portalStatement.bind(Statement.of(sqlStatement)));
   }
 
   @Test
@@ -349,60 +384,18 @@ public class StatementTest {
     when(connection.analyzeQuery(Statement.of(sqlStatement), QueryAnalyzeMode.PLAN))
         .thenReturn(resultSet);
 
-    IntermediatePreparedStatement intermediateStatement =
-        new IntermediatePreparedStatement(
-            connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
     int[] parameters = new int[3];
     Arrays.fill(parameters, Oid.INT8);
-    intermediateStatement.setParameterDataTypes(parameters);
+    IntermediatePreparedStatement intermediateStatement =
+        new IntermediatePreparedStatement(
+            connectionHandler,
+            options,
+            "",
+            parameters,
+            parse(sqlStatement),
+            Statement.of(sqlStatement));
 
     intermediateStatement.describe();
-  }
-
-  @Test
-  public void testPortalStatement() {
-    when(connectionHandler.getSpannerConnection()).thenReturn(connection);
-    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
-    String sqlStatement = "SELECT * FROM users WHERE age > $1 AND age < $2 AND name = $3";
-
-    IntermediatePortalStatement intermediateStatement =
-        new IntermediatePortalStatement(
-            connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
-    BackendConnection backendConnection =
-        new BackendConnection(
-            connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
-
-    intermediateStatement.describeAsync(backendConnection);
-    backendConnection.flush();
-
-    verify(connection).execute(Statement.of(sqlStatement));
-
-    assertEquals(0, intermediateStatement.getParameterFormatCode(0));
-    assertEquals(0, intermediateStatement.getParameterFormatCode(1));
-    assertEquals(0, intermediateStatement.getParameterFormatCode(2));
-    assertEquals(0, intermediateStatement.getResultFormatCode(0));
-    assertEquals(0, intermediateStatement.getResultFormatCode(1));
-    assertEquals(0, intermediateStatement.getResultFormatCode(2));
-
-    intermediateStatement.setParameterFormatCodes(Collections.singletonList((short) 1));
-    intermediateStatement.setResultFormatCodes(Collections.singletonList((short) 1));
-
-    assertEquals(1, intermediateStatement.getParameterFormatCode(0));
-    assertEquals(1, intermediateStatement.getParameterFormatCode(1));
-    assertEquals(1, intermediateStatement.getParameterFormatCode(2));
-    assertEquals(1, intermediateStatement.getResultFormatCode(0));
-    assertEquals(1, intermediateStatement.getResultFormatCode(1));
-    assertEquals(1, intermediateStatement.getResultFormatCode(2));
-
-    intermediateStatement.setParameterFormatCodes(Arrays.asList((short) 0, (short) 1, (short) 0));
-    intermediateStatement.setResultFormatCodes(Arrays.asList((short) 0, (short) 1, (short) 0));
-
-    assertEquals(0, intermediateStatement.getParameterFormatCode(0));
-    assertEquals(1, intermediateStatement.getParameterFormatCode(1));
-    assertEquals(0, intermediateStatement.getParameterFormatCode(2));
-    assertEquals(0, intermediateStatement.getResultFormatCode(0));
-    assertEquals(1, intermediateStatement.getResultFormatCode(1));
-    assertEquals(0, intermediateStatement.getResultFormatCode(2));
   }
 
   @Test
@@ -413,7 +406,17 @@ public class StatementTest {
 
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
-            connectionHandler, options, "", parse(sqlStatement), Statement.of(sqlStatement));
+            "",
+            new IntermediatePreparedStatement(
+                connectionHandler,
+                options,
+                "",
+                NO_PARAMETER_TYPES,
+                parse(sqlStatement),
+                Statement.of(sqlStatement)),
+            NO_PARAMS,
+            ImmutableList.of(),
+            ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
             connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
@@ -538,7 +541,12 @@ public class StatementTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     IntermediatePortalStatement intermediateStatement =
         new IntermediatePortalStatement(
-            connectionHandler, options, "", parse(sql), Statement.of(sql));
+            "",
+            new IntermediatePreparedStatement(
+                connectionHandler, options, "", NO_PARAMETER_TYPES, parse(sql), Statement.of(sql)),
+            NO_PARAMS,
+            ImmutableList.of(),
+            ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
             connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);

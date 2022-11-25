@@ -18,7 +18,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.protobuf.NullValue;
+import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -42,5 +44,9 @@ public class UnspecifiedParserTest {
                         .build()))
             .stringParse());
     assertNull(new UnspecifiedParser(null).stringParse());
+    assertEquals(
+        "test",
+        new UnspecifiedParser("test".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .stringParse());
   }
 }
