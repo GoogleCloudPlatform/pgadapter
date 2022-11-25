@@ -859,6 +859,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
 
       final int fetchSize = 3;
       try (Connection connection = createConnection(binaryTransferEnable)) {
+        connection.createStatement().execute("set time zone utc");
         connection.setAutoCommit(false);
         connection.unwrap(PGConnection.class).setPrepareThreshold(binary ? -1 : 5);
         try (PreparedStatement statement = connection.prepareStatement(SELECT_RANDOM.getSql())) {
@@ -1368,7 +1369,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   public void testSetTimeZone() throws SQLException {
     try (Connection connection = createConnection()) {
       connection.createStatement().execute("set time zone 'IST'");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 
@@ -1376,7 +1377,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   public void testSetTimeZoneToDefault() throws SQLException {
     try (Connection connection = createConnection("?options=-c%%20timezone=IST")) {
       connection.createStatement().execute("set time zone default");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 
@@ -1384,7 +1385,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   public void testSetTimeZoneToLocal() throws SQLException {
     try (Connection connection = createConnection("?options=-c%%20timezone=IST")) {
       connection.createStatement().execute("set time zone local");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 

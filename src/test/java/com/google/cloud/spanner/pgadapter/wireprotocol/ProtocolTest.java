@@ -71,6 +71,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1622,9 +1623,12 @@ public class ProtocolTest {
         readUntil(outputResult, "standard_conforming_strings\0".length()));
     assertEquals("on\0", readUntil(outputResult, "on\0".length()));
     assertEquals('S', outputResult.readByte());
-    assertEquals(17, outputResult.readInt());
-    assertEquals("TimeZone\0", readUntil(outputResult, "TimeZone\0".length()));
+
     // Timezone will vary depending on the default location of the JVM that is running.
+    String timezoneIdentifier = ZoneId.systemDefault().getId();
+    int expectedLength = timezoneIdentifier.getBytes(StandardCharsets.UTF_8).length + 10 + 4;
+    assertEquals(expectedLength, outputResult.readInt());
+    assertEquals("TimeZone\0", readUntil(outputResult, "TimeZone\0".length()));
     readUntilNullTerminator(outputResult);
 
     // ReadyResponse

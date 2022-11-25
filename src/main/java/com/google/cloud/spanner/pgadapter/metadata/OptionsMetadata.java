@@ -42,6 +42,11 @@ import org.json.simple.JSONObject;
 /** Metadata extractor for CLI. */
 public class OptionsMetadata {
 
+  /** Returns true if the current JVM is Java 8. */
+  public static boolean isJava8() {
+    return System.getProperty("java.version").startsWith("1.8");
+  }
+
   public enum SslMode {
     /** Disables SSL connections. This is the default. */
     Disable {

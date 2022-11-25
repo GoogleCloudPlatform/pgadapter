@@ -340,6 +340,7 @@ public class ITPsqlTest implements IntegrationTest {
     Tuple<String, String> result =
         runUsingPsql(
             ImmutableList.of(
+                "set time zone 'UTC';\n",
                 "prepare insert_row as "
                     + "insert into all_types values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);\n",
                 "prepare find_row as "
@@ -365,7 +366,8 @@ public class ITPsqlTest implements IntegrationTest {
     String output = result.x(), errors = result.y();
     assertEquals("", errors);
     assertEquals(
-        "PREPARE\n"
+        "SET\n"
+            + "PREPARE\n"
             + "PREPARE\n"
             + " col_bigint | col_bool | col_bytea | col_float8 | col_int | col_numeric | col_timestamptz | col_date | col_varchar | col_jsonb \n"
             + "------------+----------+-----------+------------+---------+-------------+-----------------+----------+-------------+-----------\n"
