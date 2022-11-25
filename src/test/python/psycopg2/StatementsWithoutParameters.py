@@ -22,7 +22,7 @@ def create_connection(version, host, port):
     connection = pg.connect(database="my-database",
                             host=host,
                             port=port,
-                            options="-c server_version=" + version)
+                            options="-c timezone=UTC -c server_version=" + version)
     connection.autocommit = True
     return connection
   except Exception as e:

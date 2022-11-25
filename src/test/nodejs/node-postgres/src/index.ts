@@ -231,6 +231,7 @@ async function testReadOnlyTransactionWithError(client) {
 
 async function testCopyTo(client) {
   try {
+    await client.query("set time zone 'UTC'");
     const copyTo = require('pg-copy-streams').to;
     const stream = client.query(copyTo('COPY AllTypes TO STDOUT'));
     stream.pipe(process.stdout);

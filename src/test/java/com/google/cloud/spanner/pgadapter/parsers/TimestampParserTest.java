@@ -19,6 +19,8 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
@@ -31,8 +33,10 @@ import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableList;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
 import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -58,8 +62,11 @@ public class TimestampParserTest {
         assertThrows(SpannerException.class, () -> TimestampParser.toTimestamp(new byte[4]));
     assertEquals(ErrorCode.INVALID_ARGUMENT, spannerException.getErrorCode());
 
-    assertArrayEquals(data, new TimestampParser(TimestampParser.toTimestamp(data)).binaryParse());
-    assertNull(new TimestampParser(null).binaryParse());
+    assertArrayEquals(
+        data,
+        new TimestampParser(TimestampParser.toTimestamp(data), mock(SessionState.class))
+            .binaryParse());
+    assertNull(new TimestampParser(null, mock(SessionState.class)).binaryParse());
   }
 
   @Test
@@ -68,9 +75,10 @@ public class TimestampParserTest {
         "2022-07-08T07:22:59.123456789Z",
         new TimestampParser(
                 "2022-07-08 07:22:59.123456789+00".getBytes(StandardCharsets.UTF_8),
-                FormatCode.TEXT)
+                FormatCode.TEXT,
+                mock(SessionState.class))
             .spannerParse());
-    assertNull(new TimestampParser(null).spannerParse());
+    assertNull(new TimestampParser(null, mock(SessionState.class)).spannerParse());
 
     ResultSet resultSet =
         ResultSets.forRows(
@@ -83,18 +91,23 @@ public class TimestampParserTest {
     resultSet.next();
     assertArrayEquals(
         "2022-07-08T07:22:59.123456789Z".getBytes(StandardCharsets.UTF_8),
-        TimestampParser.convertToPG(resultSet, 0, DataFormat.SPANNER));
+        TimestampParser.convertToPG(resultSet, 0, DataFormat.SPANNER, ZoneId.of("UTC")));
   }
 
   @Test
   public void testStringParse() {
+    SessionState sessionState = mock(SessionState.class);
+    when(sessionState.getTimezone()).thenReturn(ZoneId.of("+00"));
     assertEquals(
         "2022-07-08 07:22:59.123456789+00",
-        new TimestampParser(Timestamp.parseTimestamp("2022-07-08T07:22:59.123456789Z"))
+        new TimestampParser(
+                Timestamp.parseTimestamp("2022-07-08T07:22:59.123456789Z"), sessionState)
             .stringParse());
-    assertNull(new TimestampParser(null).stringParse());
+    assertNull(new TimestampParser(null, sessionState).stringParse());
     assertThrows(
         PGException.class,
-        () -> new TimestampParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
+        () ->
+            new TimestampParser(
+                "foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT, sessionState));
   }
 }

@@ -194,6 +194,7 @@ public class BackendConnection {
 
     @Override
     void execute() {
+      Statement updatedStatement = statement;
       try {
         checkConnectionState();
         // TODO(b/235719478): If the statement is a BEGIN statement and there is a COMMIT statement
@@ -239,7 +240,7 @@ public class BackendConnection {
           result.set(ddlExecutor.execute(parsedStatement, statement));
         } else {
           // Potentially replace pg_catalog table references with common table expressions.
-          Statement updatedStatement =
+          updatedStatement =
               sessionState.isReplacePgCatalogTables()
                   ? pgCatalog.replacePgCatalogTables(statement)
                   : statement;
@@ -256,7 +257,7 @@ public class BackendConnection {
                         spannerConnection
                             .getDatabaseClient()
                             .singleUse()
-                            .executeQuery(statement))));
+                            .executeQuery(updatedStatement))));
             return;
           } catch (Exception exception) {
             throw setAndReturn(result, exception);

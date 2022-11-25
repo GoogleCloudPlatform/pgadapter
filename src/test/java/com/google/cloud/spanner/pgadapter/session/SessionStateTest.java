@@ -34,6 +34,8 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactio
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -822,5 +824,117 @@ public class SessionStateTest {
     state.set("spanner", "ddl_transaction_mode", null);
 
     assertEquals(DdlTransactionMode.Single, state.getDdlTransactionMode());
+  }
+
+  @Test
+  public void testGetDefaultTimeZone() {
+    Map<String, PGSetting> originalSettings = ImmutableMap.copyOf(SessionState.SERVER_SETTINGS);
+    SessionState.SERVER_SETTINGS.remove("TimeZone");
+    try {
+      OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+      SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
+      assertEquals(TimeZone.getDefault().toZoneId(), state.getTimezone());
+    } finally {
+      SessionState.SERVER_SETTINGS.putAll(originalSettings);
+    }
+  }
+
+  @Test
+  public void testTimeZoneResetVal() {
+    Map<String, PGSetting> originalSettings = ImmutableMap.copyOf(SessionState.SERVER_SETTINGS);
+    SessionState.SERVER_SETTINGS.put(
+        "TimeZone",
+        new PGSetting(
+            null,
+            "TimeZone",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "Europe/Oslo",
+            "America/New_York",
+            null,
+            null,
+            false));
+    try {
+      OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+      SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
+      assertEquals("America/New_York", state.getTimezone().getId());
+    } finally {
+      SessionState.SERVER_SETTINGS.putAll(originalSettings);
+    }
+  }
+
+  @Test
+  public void testTimeZoneBootVal() {
+    Map<String, PGSetting> originalSettings = ImmutableMap.copyOf(SessionState.SERVER_SETTINGS);
+    SessionState.SERVER_SETTINGS.put(
+        "TimeZone",
+        new PGSetting(
+            null,
+            "TimeZone",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "Europe/Oslo",
+            null,
+            null,
+            null,
+            false));
+    try {
+      OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+      SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
+      assertEquals("Europe/Oslo", state.getTimezone().getId());
+    } finally {
+      SessionState.SERVER_SETTINGS.putAll(originalSettings);
+    }
+  }
+
+  @Test
+  public void testGetInvalidTimeZone() {
+    Map<String, PGSetting> originalSettings = ImmutableMap.copyOf(SessionState.SERVER_SETTINGS);
+    SessionState.SERVER_SETTINGS.put(
+        "TimeZone",
+        new PGSetting(
+            null,
+            "TimeZone",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "foo/bar",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false));
+    try {
+      OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
+      SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
+      assertEquals(TimeZone.getDefault().toZoneId(), state.getTimezone());
+    } finally {
+      SessionState.SERVER_SETTINGS.putAll(originalSettings);
+    }
   }
 }
