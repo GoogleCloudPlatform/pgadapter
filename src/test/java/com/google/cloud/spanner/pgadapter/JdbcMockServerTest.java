@@ -518,7 +518,21 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testQueryWithLegacyDateParameter() throws SQLException {
     String jdbcSql = "select col_date from all_types where col_date=?";
     String pgSql = "select col_date from all_types where col_date=$1";
-    mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
+    ResultSetMetadata metadata =
+        ALL_TYPES_METADATA
+            .toBuilder()
+            .setUndeclaredParameters(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p1")
+                            .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                            .build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgSql), ALL_TYPES_RESULTSET.toBuilder().setMetadata(metadata).build()));
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(pgSql).bind("p1").to(Date.parseDate("2022-03-29")).build(),
@@ -572,7 +586,21 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testAutoDescribedStatementsAreReused() throws SQLException {
     String jdbcSql = "select col_date from all_types where col_date=?";
     String pgSql = "select col_date from all_types where col_date=$1";
-    mockSpanner.putStatementResult(StatementResult.query(Statement.of(pgSql), ALL_TYPES_RESULTSET));
+    ResultSetMetadata metadata =
+        ALL_TYPES_METADATA
+            .toBuilder()
+            .setUndeclaredParameters(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p1")
+                            .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                            .build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgSql), ALL_TYPES_RESULTSET.toBuilder().setMetadata(metadata).build()));
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(pgSql).bind("p1").to(Date.parseDate("2022-03-29")).build(),
