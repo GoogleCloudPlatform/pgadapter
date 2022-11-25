@@ -31,7 +31,9 @@ public class SendResultSetState {
   }
 
   public String getCommandAndNumRows() {
-    return getCommandTag() + " " + getNumberOfRowsSent();
+    String command = getCommandTag();
+    command += ("INSERT".equals(command) ? " 0 " : " ") + getNumberOfRowsSent();
+    return command;
   }
 
   public String getCommandTag() {
