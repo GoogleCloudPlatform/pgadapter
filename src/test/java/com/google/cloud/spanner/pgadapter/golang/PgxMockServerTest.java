@@ -45,6 +45,7 @@ import com.google.spanner.v1.Mutation;
 import com.google.spanner.v1.Mutation.OperationCase;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
@@ -56,7 +57,6 @@ import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -76,7 +76,7 @@ import org.postgresql.core.Oid;
 public class PgxMockServerTest extends AbstractMockServerTest {
   private static PgxTest pgxTest;
 
-  @Rule public Timeout globalTimeout = Timeout.seconds(30L);
+  @Rule public Timeout globalTimeout = Timeout.seconds(300L);
 
   @Parameter public boolean useDomainSocket;
 
@@ -176,19 +176,23 @@ public class PgxMockServerTest extends AbstractMockServerTest {
             .build();
 
     // Add a query result for the statement parameter types.
-    String selectParamsSql = "select $1 from (SELECT * FROM FOO WHERE BAR=$1) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(selectParamsSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setMetadata(
+                    metadata
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .build()))
                 .build()));
-
-    // Add a query result with only the metadata for the query without parameter values.
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.of(sql), ResultSet.newBuilder().setMetadata(metadata).build()));
-    // Also add a query result with both metadata and rows for the statement with parameter values.
+    // Add a query result with both metadata and rows for the statement with parameter values.
     mockSpanner.putStatementResult(
         StatementResult.query(
             statement,
@@ -204,19 +208,15 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent three
+    // pgx by default always uses prepared statements. That means that each request is sent two
     // times to the backend:
-    // 1. DescribeStatement (results)
-    // 2. DescribeStatement (parameters)
-    // 3. Execute (including DescribePortal)
-    assertEquals(3, requests.size());
+    // 1. DescribeStatement (parameters + results)
+    // 2. Execute (including DescribePortal)
+    assertEquals(2, requests.size());
     ExecuteSqlRequest describeStatementRequest = requests.get(0);
     assertEquals(sql, describeStatementRequest.getSql());
     assertEquals(QueryMode.PLAN, describeStatementRequest.getQueryMode());
-    ExecuteSqlRequest describeParametersRequest = requests.get(1);
-    assertEquals(selectParamsSql, describeParametersRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeParametersRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(2);
+    ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }
@@ -268,15 +268,12 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   public void testUpdateAllDataTypes() {
     String sql =
         "UPDATE \"all_types\" SET \"col_bigint\"=$1,\"col_bool\"=$2,\"col_bytea\"=$3,\"col_float8\"=$4,\"col_int\"=$5,\"col_numeric\"=$6,\"col_timestamptz\"=$7,\"col_date\"=$8,\"col_varchar\"=$9,\"col_jsonb\"=$10 WHERE \"col_varchar\" = $11";
-    String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11 from "
-            + "(select \"col_bigint\"=$1, \"col_bool\"=$2, \"col_bytea\"=$3, \"col_float8\"=$4, \"col_int\"=$5, \"col_numeric\"=$6, \"col_timestamptz\"=$7, \"col_date\"=$8, \"col_varchar\"=$9, \"col_jsonb\"=$10 from \"all_types\" WHERE \"col_varchar\" = $11) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -289,8 +286,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.STRING,
                             TypeCode.STRING,
                             TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -323,19 +320,15 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent three
+    // pgx by default always uses prepared statements. That means that each request is sent two
     // times to the backend the first time it is executed:
     // 1. DescribeStatement (parameters)
-    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
-    // 3. Execute
-    assertEquals(3, requests.size());
+    // 2. Execute
+    assertEquals(2, requests.size());
     ExecuteSqlRequest describeParamsRequest = requests.get(0);
-    assertEquals(describeSql, describeParamsRequest.getSql());
+    assertEquals(sql, describeParamsRequest.getSql());
     assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    ExecuteSqlRequest describeRequest = requests.get(1);
-    assertEquals(sql, describeRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(2);
+    ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }
@@ -346,14 +339,12 @@ public class PgxMockServerTest extends AbstractMockServerTest {
         "INSERT INTO all_types "
             + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
-    String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -365,8 +356,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.DATE,
                             TypeCode.STRING,
                             TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -397,19 +388,15 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent three
+    // pgx by default always uses prepared statements. That means that each request is sent two
     // times to the backend the first time it is executed:
     // 1. DescribeStatement (parameters)
-    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
-    // 3. Execute
-    assertEquals(3, requests.size());
+    // 2. Execute
+    assertEquals(2, requests.size());
     ExecuteSqlRequest describeParamsRequest = requests.get(0);
-    assertEquals(describeSql, describeParamsRequest.getSql());
+    assertEquals(sql, describeParamsRequest.getSql());
     assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    ExecuteSqlRequest describeRequest = requests.get(1);
-    assertEquals(sql, describeRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(2);
+    ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }
@@ -420,14 +407,12 @@ public class PgxMockServerTest extends AbstractMockServerTest {
         "INSERT INTO all_types "
             + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
-    String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -439,8 +424,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.DATE,
                             TypeCode.STRING,
                             TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     int batchSize = 10;
     for (int i = 0; i < batchSize; i++) {
       mockSpanner.putStatementResult(
@@ -476,24 +461,17 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent 2 times
-    // to the backend to be described, and then `batchSize` times to be executed.
+    // pgx by default always uses prepared statements. That means that each request is sent once
+    // to the backend to be described, and then `batchSize` times to be executed (which is sent as
+    // one BatchDML request).
     // 1. DescribeStatement (parameters)
-    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
-    // 3. Execute 10 times.
-    assertEquals(2, requests.size());
+    // 2. Execute 10 times.
+    assertEquals(1, requests.size());
     ExecuteSqlRequest describeParamsRequest = requests.get(0);
-    assertEquals(describeSql, describeParamsRequest.getSql());
+    assertEquals(sql, describeParamsRequest.getSql());
     assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    // The 'describe' query for the parameters will be executed as a single use transaction.
-    assertTrue(describeParamsRequest.getTransaction().hasSingleUse());
-
-    // The analyzeUpdate that is executed to verify the validity of the DML statement is executed as
-    // a separate transaction.
-    ExecuteSqlRequest describeRequest = requests.get(1);
-    assertEquals(sql, describeRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeParamsRequest.getTransaction().hasBegin());
+    assertTrue(describeParamsRequest.getTransaction().getBegin().hasReadWrite());
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
     ExecuteBatchDmlRequest batchDmlRequest =
@@ -501,10 +479,10 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     assertEquals(batchSize, batchDmlRequest.getStatementsCount());
     assertTrue(batchDmlRequest.getTransaction().hasBegin());
 
-    // There are two commit requests, as the 'Describe statement' message is executed as a separate
-    // transaction.
-    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
-    assertEquals(2, commitRequests.size());
+    // There are two commit requests:
+    // 1. One for the analyzeUpdate to describe the insert statement.
+    // 2. One for the actual batch.
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -513,14 +491,12 @@ public class PgxMockServerTest extends AbstractMockServerTest {
         "INSERT INTO all_types "
             + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
-    String describeInsertSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeInsertSql),
+            Statement.of(insertSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -532,54 +508,60 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.DATE,
                             TypeCode.STRING,
                             TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 0L));
 
     String selectSql = "select count(*) from all_types where col_bool=$1";
-    ResultSet resultSet =
-        ResultSet.newBuilder()
-            .setMetadata(
-                ResultSetMetadata.newBuilder()
-                    .setRowType(
-                        StructType.newBuilder()
-                            .addFields(
-                                Field.newBuilder()
-                                    .setName("c")
-                                    .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
-                                    .build())
+    ResultSetMetadata metadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("c")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
                             .build())
                     .build())
+            .build();
+    ResultSet resultSet =
+        ResultSet.newBuilder()
+            .setMetadata(metadata)
             .addRows(
                 ListValue.newBuilder()
                     .addValues(Value.newBuilder().setStringValue("3").build())
                     .build())
             .build();
-    mockSpanner.putStatementResult(StatementResult.query(Statement.of(selectSql), resultSet));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(selectSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    metadata
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                        .build())
+                                .build())
+                        .build())
+                .build()));
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(selectSql).bind("p1").to(true).build(), resultSet));
 
-    String describeParamsSelectSql =
-        "select $1 from (select count(*) from all_types where col_bool=$1) p";
+    String updateSql = "update all_types set col_bool=false where col_bool=$1";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeParamsSelectSql),
+            Statement.of(updateSql),
             ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.BOOL)))
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.BOOL)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-
-    String updateSql = "update all_types set col_bool=false where col_bool=$1";
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(updateSql).bind("p1").to(true).build(), 3L));
-    String describeUpdateSql =
-        "select $1 from (select col_bool=false from all_types where col_bool=$1) p";
-    mockSpanner.putStatementResult(
-        StatementResult.query(
-            Statement.of(describeUpdateSql),
-            ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.BOOL)))
-                .build()));
 
     int batchSize = 5;
     for (int i = 0; i < batchSize; i++) {
@@ -616,91 +598,62 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that we get the following list of
-    // statements:
+    // pgx by default always uses prepared statements. In addition, pgx first describes all
+    // statements in a batch before it executes the batch. The describe-messages that it sends do
+    // not use the current transaction.
+    // That means that we get the following list of statements:
     // 1. Describe parameters of insert statement in PLAN mode.
-    // 2. Parse insert statement in PLAN mode.
-    // 3. Describe columns of select statement in PLAN mode.
-    // 4. Describe parameters of select statement in PLAN mode.
-    // 5. Describe parameters of update statement in PLAN mode.
-    // 6. Parse update statement in PLAN mode.
-    // 7. Execute select statement.
-    // 8. Execute update statement.
-    assertEquals(8, requests.size());
+    // 2. Describe parameters and columns of select statement in PLAN mode.
+    // 3. Describe parameters of update statement in PLAN mode.
+    // 4. Execute select statement.
+    // 5. Execute update statement.
+    // In addition, we get one ExecuteBatchDml request for the insert statements.
+    assertEquals(5, requests.size());
 
     // NOTE: pgx will first create prepared statements for sql strings that it does not yet know.
     // All those describe statement messages will be executed in separate (single-use) transactions.
     // The order in which the describe statements are executed is random.
 
-    ExecuteSqlRequest describeInsertParamsRequest =
-        requests.stream()
-            .filter(request -> request.getSql().equals(describeInsertSql))
-            .findFirst()
-            .orElse(ExecuteSqlRequest.getDefaultInstance());
-    assertEquals(describeInsertSql, describeInsertParamsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeInsertParamsRequest.getQueryMode());
-    // The 'describe' query for the parameters will be executed as a single use transaction.
-    assertTrue(describeInsertParamsRequest.getTransaction().hasSingleUse());
-
-    ExecuteSqlRequest parseInsertRequest =
+    List<ExecuteSqlRequest> describeInsertRequests =
         requests.stream()
             .filter(
                 request ->
-                    request.getSql().equals(insertSql) && request.getQueryMode() == QueryMode.PLAN)
-            .findFirst()
-            .orElse(ExecuteSqlRequest.getDefaultInstance());
-    assertEquals(insertSql, parseInsertRequest.getSql());
-    assertEquals(QueryMode.PLAN, parseInsertRequest.getQueryMode());
-    assertTrue(parseInsertRequest.getTransaction().hasBegin());
+                    request.getSql().equals(insertSql)
+                        && request.getQueryMode().equals(QueryMode.PLAN))
+            .collect(Collectors.toList());
+    assertEquals(1, describeInsertRequests.size());
+    // TODO(#477): These Describe-message flows could use single-use read/write transactions.
+    assertTrue(describeInsertRequests.get(0).getTransaction().hasBegin());
+    assertTrue(describeInsertRequests.get(0).getTransaction().getBegin().hasReadWrite());
 
-    ExecuteSqlRequest describeSelectColumnsRequest =
+    List<ExecuteSqlRequest> describeSelectRequests =
         requests.stream()
             .filter(
                 request ->
                     request.getSql().equals(selectSql) && request.getQueryMode() == QueryMode.PLAN)
-            .findFirst()
-            .orElse(ExecuteSqlRequest.getDefaultInstance());
-    assertEquals(selectSql, describeSelectColumnsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeSelectColumnsRequest.getQueryMode());
-    assertTrue(describeSelectColumnsRequest.getTransaction().hasSingleUse());
+            .collect(Collectors.toList());
+    assertEquals(1, describeSelectRequests.size());
+    assertTrue(describeSelectRequests.get(0).getTransaction().hasSingleUse());
+    assertTrue(describeSelectRequests.get(0).getTransaction().getSingleUse().hasReadOnly());
 
-    ExecuteSqlRequest describeSelectParamsRequest =
-        requests.stream()
-            .filter(request -> request.getSql().equals(describeParamsSelectSql))
-            .findFirst()
-            .orElse(ExecuteSqlRequest.getDefaultInstance());
-    assertEquals(describeParamsSelectSql, describeSelectParamsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeSelectParamsRequest.getQueryMode());
-    assertTrue(describeSelectParamsRequest.getTransaction().hasSingleUse());
-
-    ExecuteSqlRequest describeUpdateParamsRequest =
-        requests.stream()
-            .filter(request -> request.getSql().equals(describeUpdateSql))
-            .findFirst()
-            .orElse(ExecuteSqlRequest.getDefaultInstance());
-    assertEquals(describeUpdateSql, describeUpdateParamsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeUpdateParamsRequest.getQueryMode());
-    assertTrue(describeUpdateParamsRequest.getTransaction().hasSingleUse());
-
-    ExecuteSqlRequest parseUpdateRequest =
+    List<ExecuteSqlRequest> describeUpdateRequests =
         requests.stream()
             .filter(
                 request ->
                     request.getSql().equals(updateSql) && request.getQueryMode() == QueryMode.PLAN)
-            .findFirst()
-            .orElse(ExecuteSqlRequest.getDefaultInstance());
-    assertEquals(updateSql, parseUpdateRequest.getSql());
-    assertEquals(QueryMode.PLAN, parseUpdateRequest.getQueryMode());
-    assertTrue(parseUpdateRequest.getTransaction().hasBegin());
+            .collect(Collectors.toList());
+    assertEquals(1, describeUpdateRequests.size());
+    assertTrue(describeUpdateRequests.get(0).getTransaction().hasBegin());
+    assertTrue(describeUpdateRequests.get(0).getTransaction().getBegin().hasReadWrite());
 
     // From here we start with the actual statement execution.
-    ExecuteSqlRequest executeSelectRequest = requests.get(6);
+    ExecuteSqlRequest executeSelectRequest = requests.get(3);
     assertEquals(selectSql, executeSelectRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeSelectRequest.getQueryMode());
     // The SELECT statement should use the transaction that was started by the BatchDml request.
     assertTrue(executeSelectRequest.getTransaction().hasId());
 
-    ExecuteSqlRequest executeUpdateRequest = requests.get(7);
+    ExecuteSqlRequest executeUpdateRequest = requests.get(4);
     assertEquals(updateSql, executeUpdateRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeUpdateRequest.getQueryMode());
     assertTrue(executeUpdateRequest.getTransaction().hasId());
@@ -710,6 +663,9 @@ public class PgxMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
     assertEquals(batchSize, batchDmlRequest.getStatementsCount());
     assertTrue(batchDmlRequest.getTransaction().hasBegin());
+    for (int i = 0; i < batchSize; i++) {
+      assertEquals(insertSql, batchDmlRequest.getStatements(i).getSql());
+    }
 
     // There are three commit requests:
     // 1. Describe insert statement.
@@ -728,48 +684,45 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                         || request instanceof ExecuteBatchDmlRequest
                         || request instanceof CommitRequest)
             .collect(Collectors.toList());
-    // 12 == 3 Commit + 1 Batch DML + 8 ExecuteSql.
-    assertEquals(12, allRequests.size());
+    // 9 == 3 Commit + 1 Batch DML + 5 ExecuteSql.
+    assertEquals(9, allRequests.size());
 
     // We don't know the exact order of the DESCRIBE requests.
     // The order of EXECUTE requests is known and fixed.
 
     // The (theoretical) order of DESCRIBE requests is:
     // 1. Describe parameters of insert statement in PLAN mode.
-    // 2. Parse insert statement in PLAN mode.
-    // 3. Commit.
-    // 4. Describe columns of select statement in PLAN mode.
-    // 5. Describe parameters of select statement in PLAN mode.
-    // 6. Describe parameters of update statement in PLAN mode.
-    // 7. Parse update statement in PLAN mode.
-    // 8. Commit.
+    // 2. Commit.
+    // 3. Describe parameters and columns of select statement in PLAN mode.
+    // 4. Describe parameters of update statement in PLAN mode.
+    // 5. Commit.
 
     // The fixed order of EXECUTE requests is:
-    // 9. Execute insert batch (ExecuteBatchDml).
-    // 10. Execute select statement.
-    // 11. Execute update statement.
-    // 12. Commit transaction.
+    // 6. Execute insert batch (ExecuteBatchDml).
+    // 7. Execute select statement.
+    // 8. Execute update statement.
+    // 9. Commit transaction.
     assertEquals(
         2,
-        allRequests.subList(0, 8).stream()
+        allRequests.subList(0, 5).stream()
             .filter(request -> request instanceof CommitRequest)
             .count());
     assertEquals(
-        6,
-        allRequests.subList(0, 8).stream()
+        3,
+        allRequests.subList(0, 5).stream()
             .filter(
                 request ->
                     request instanceof ExecuteSqlRequest
                         && ((ExecuteSqlRequest) request).getQueryMode() == QueryMode.PLAN)
             .count());
-    assertEquals(ExecuteBatchDmlRequest.class, allRequests.get(8).getClass());
-    assertEquals(ExecuteSqlRequest.class, allRequests.get(9).getClass());
-    assertEquals(ExecuteSqlRequest.class, allRequests.get(10).getClass());
-    assertEquals(CommitRequest.class, allRequests.get(11).getClass());
+    assertEquals(ExecuteBatchDmlRequest.class, allRequests.get(5).getClass());
+    assertEquals(ExecuteSqlRequest.class, allRequests.get(6).getClass());
+    assertEquals(ExecuteSqlRequest.class, allRequests.get(7).getClass());
+    assertEquals(CommitRequest.class, allRequests.get(8).getClass());
 
-    ByteString transactionId = ((CommitRequest) allRequests.get(11)).getTransactionId();
-    assertEquals(transactionId, ((ExecuteSqlRequest) allRequests.get(9)).getTransaction().getId());
-    assertEquals(transactionId, ((ExecuteSqlRequest) allRequests.get(10)).getTransaction().getId());
+    ByteString transactionId = ((CommitRequest) allRequests.get(8)).getTransactionId();
+    assertEquals(transactionId, ((ExecuteSqlRequest) allRequests.get(6)).getTransaction().getId());
+    assertEquals(transactionId, ((ExecuteSqlRequest) allRequests.get(7)).getTransaction().getId());
   }
 
   @Test
@@ -778,15 +731,12 @@ public class PgxMockServerTest extends AbstractMockServerTest {
         "INSERT INTO all_types "
             + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 0L));
-    String describeInsertSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeInsertSql),
+            Statement.of(insertSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -798,6 +748,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.DATE,
                             TypeCode.STRING,
                             TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     // This select statement will fail during the PREPARE phase that pgx executes for all statements
     // before actually executing the batch.
@@ -840,14 +791,12 @@ public class PgxMockServerTest extends AbstractMockServerTest {
         "INSERT INTO all_types "
             + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
-    String describeInsertSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeInsertSql),
+            Statement.of(insertSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -859,8 +808,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.DATE,
                             TypeCode.STRING,
                             TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 0L));
     int batchSize = 3;
     for (int i = 0; i < batchSize; i++) {
       Statement statement =
@@ -920,14 +869,12 @@ public class PgxMockServerTest extends AbstractMockServerTest {
         "INSERT INTO all_types "
             + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
-    String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -939,8 +886,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.DATE,
                             TypeCode.STRING,
                             TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -971,19 +918,15 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    // pgx by default always uses prepared statements. That means that each request is sent three
+    // pgx by default always uses prepared statements. That means that each request is sent two
     // times to the backend the first time it is executed:
     // 1. DescribeStatement (parameters)
-    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
-    // 3. Execute
-    assertEquals(3, requests.size());
-    ExecuteSqlRequest describeParamsRequest = requests.get(0);
-    assertEquals(describeSql, describeParamsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    ExecuteSqlRequest describeRequest = requests.get(1);
+    // 2. Execute
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
-    ExecuteSqlRequest executeRequest = requests.get(2);
+    ExecuteSqlRequest executeRequest = requests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
   }
@@ -1073,14 +1016,12 @@ public class PgxMockServerTest extends AbstractMockServerTest {
         "INSERT INTO all_types "
             + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
-    String describeSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from (select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from all_types) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeSql),
+            Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -1092,8 +1033,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.DATE,
                             TypeCode.STRING,
                             TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0L));
     for (long id : new Long[] {10L, 20L}) {
       mockSpanner.putStatementResult(
           StatementResult.update(
@@ -1127,14 +1068,12 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     assertNull(res);
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
     // pgx by default always uses prepared statements. That means that the first time a SQL
-    // statement is executed, it will be sent three times to the backend (twice for statements
-    // without any query parameters):
-    // 1. DescribeStatement (parameters)
-    // 2. DescribeStatement (verify validity / PARSE) -- This step could be skipped.
-    // 3. Execute
+    // statement is executed, it will be sent two times to the backend:
+    // 1. DescribeStatement
+    // 2. Execute
     // The second time the same statement is executed, it is only sent once.
 
-    assertEquals(6, requests.size());
+    assertEquals(5, requests.size());
     ExecuteSqlRequest describeSelect1Request = requests.get(0);
     // The first statement should begin the transaction.
     assertTrue(describeSelect1Request.getTransaction().hasBegin());
@@ -1144,21 +1083,17 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     assertTrue(executeSelect1Request.getTransaction().hasId());
     assertEquals(QueryMode.NORMAL, executeSelect1Request.getQueryMode());
 
-    ExecuteSqlRequest describeParamsRequest = requests.get(2);
-    assertEquals(describeSql, describeParamsRequest.getSql());
-    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
-    assertTrue(describeParamsRequest.getTransaction().hasId());
-
-    ExecuteSqlRequest describeRequest = requests.get(3);
+    ExecuteSqlRequest describeRequest = requests.get(2);
     assertEquals(sql, describeRequest.getSql());
     assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
     assertTrue(describeRequest.getTransaction().hasId());
 
-    ExecuteSqlRequest executeRequest = requests.get(4);
-    assertEquals(sql, executeRequest.getSql());
-    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
-    assertTrue(executeRequest.getTransaction().hasId());
-    assertTrue(requests.get(3).getTransaction().hasId());
+    for (int i = 3; i < 5; i++) {
+      ExecuteSqlRequest executeRequest = requests.get(i);
+      assertEquals(sql, executeRequest.getSql());
+      assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+      assertTrue(executeRequest.getTransaction().hasId());
+    }
 
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
     CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
@@ -1222,7 +1157,6 @@ public class PgxMockServerTest extends AbstractMockServerTest {
     assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
-  @Ignore("Requires Spanner client library 6.26.0")
   @Test
   public void testReadOnlySerializableTransaction() {
     String res = pgxTest.TestReadOnlySerializableTransaction(createConnString());

@@ -34,7 +34,7 @@
       com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest
     </excludedTests>
 
-    <spanner.version>6.31.2</spanner.version>
+    <spanner.version>6.33.0</spanner.version>
     <junixsocket.version>2.6.1</junixsocket.version>
   </properties>
 
@@ -72,6 +72,11 @@
   </licenses>
 
   <dependencies>
+    <dependency>
+      <groupId>com.google.auto.value</groupId>
+      <artifactId>auto-value-annotations</artifactId>
+      <version>1.10</version>
+    </dependency>
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>

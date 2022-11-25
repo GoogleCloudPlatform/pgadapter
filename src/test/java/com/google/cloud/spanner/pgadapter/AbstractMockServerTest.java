@@ -312,6 +312,22 @@ public abstract class AbstractMockServerTest {
     return ResultSetMetadata.newBuilder().setRowType(builder.build()).build();
   }
 
+  protected static ResultSetMetadata createParameterTypesMetadata(ImmutableList<TypeCode> types) {
+    StructType.Builder builder = StructType.newBuilder();
+    for (int index = 0; index < types.size(); index++) {
+      builder.addFields(
+          Field.newBuilder()
+              .setType(
+                  Type.newBuilder()
+                      .setCode(types.get(index))
+                      .setTypeAnnotation(getTypeAnnotationCode(types.get(index)))
+                      .build())
+              .setName("p" + (index + 1))
+              .build());
+    }
+    return ResultSetMetadata.newBuilder().setUndeclaredParameters(builder.build()).build();
+  }
+
   protected static ResultSetMetadata createMetadata(
       ImmutableList<TypeCode> types, ImmutableList<String> names) {
     Preconditions.checkArgument(
