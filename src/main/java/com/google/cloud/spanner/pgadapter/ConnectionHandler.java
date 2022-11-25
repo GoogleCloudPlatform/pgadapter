@@ -37,6 +37,7 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement;
@@ -70,6 +71,7 @@ import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -95,7 +97,7 @@ public class ConnectionHandler extends Thread {
   private final ProxyServer server;
   private Socket socket;
   private final Map<String, IntermediatePreparedStatement> statementsMap = new HashMap<>();
-  private final Cache<String, int[]> autoDescribedStatementsCache =
+  private final Cache<String, Future<DescribeResult>> autoDescribedStatementsCache =
       CacheBuilder.newBuilder()
           .expireAfterWrite(Duration.ofMinutes(30L))
           .maximumSize(5000L)
@@ -587,13 +589,13 @@ public class ConnectionHandler extends Thread {
    * Returns the parameter types of a cached auto-described statement, or null if none is available
    * in the cache.
    */
-  public int[] getAutoDescribedStatement(String sql) {
+  public Future<DescribeResult> getAutoDescribedStatement(String sql) {
     return this.autoDescribedStatementsCache.getIfPresent(sql);
   }
 
   /** Stores the parameter types of an auto-described statement in the cache. */
-  public void registerAutoDescribedStatement(String sql, int[] parameterTypes) {
-    this.autoDescribedStatementsCache.put(sql, parameterTypes);
+  public void registerAutoDescribedStatement(String sql, Future<DescribeResult> describeResult) {
+    this.autoDescribedStatementsCache.put(sql, describeResult);
   }
 
   public void closeStatement(String statementName) {
