@@ -166,6 +166,10 @@ public abstract class AbstractMockServerTest {
       Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException();
 
   protected static ResultSet createAllTypesResultSet(String columnPrefix) {
+    return createAllTypesResultSet(columnPrefix, false);
+  }
+
+  protected static ResultSet createAllTypesResultSet(String columnPrefix, boolean microsTimestamp) {
     return com.google.spanner.v1.ResultSet.newBuilder()
         .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
         .addRows(
@@ -182,7 +186,12 @@ public abstract class AbstractMockServerTest {
                 .addValues(Value.newBuilder().setStringValue("100").build())
                 .addValues(Value.newBuilder().setStringValue("6.626").build())
                 .addValues(
-                    Value.newBuilder().setStringValue("2022-02-16T13:18:02.123456789Z").build())
+                    Value.newBuilder()
+                        .setStringValue(
+                            microsTimestamp
+                                ? "2022-02-16T13:18:02.123456Z"
+                                : "2022-02-16T13:18:02.123456789Z")
+                        .build())
                 .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
                 .addValues(Value.newBuilder().setStringValue("test").build())
                 .addValues(Value.newBuilder().setStringValue("{\"key\": \"value\"}").build())

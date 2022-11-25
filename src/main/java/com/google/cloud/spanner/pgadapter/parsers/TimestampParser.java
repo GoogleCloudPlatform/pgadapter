@@ -14,6 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import static java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
+import static java.time.format.DateTimeFormatter.ISO_LOCAL_TIME;
+
 import com.google.api.core.InternalApi;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
@@ -24,6 +27,8 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
@@ -155,8 +160,7 @@ public class TimestampParser extends Parser<Timestamp> {
       case SPANNER:
         return resultSet.getTimestamp(position).toString().getBytes(StandardCharsets.UTF_8);
       case POSTGRESQL_TEXT:
-        return toPGString(resultSet.getTimestamp(position).toString())
-            .getBytes(StandardCharsets.UTF_8);
+        return toPGString(resultSet.getTimestamp(position)).getBytes(StandardCharsets.UTF_8);
       case POSTGRESQL_BINARY:
         return convertToPG(resultSet.getTimestamp(position));
       default:
@@ -172,6 +176,24 @@ public class TimestampParser extends Parser<Timestamp> {
    */
   private static String toPGString(String value) {
     return value.replace(TIMESTAMP_SEPARATOR, EMPTY_SPACE).replace(ZERO_TIMEZONE, PG_ZERO_TIMEZONE);
+  }
+
+  private static final DateTimeFormatter FORMAT =
+      new DateTimeFormatterBuilder()
+          .parseCaseInsensitive()
+          .append(ISO_LOCAL_DATE)
+          .appendLiteral(' ')
+          .append(ISO_LOCAL_TIME)
+          .toFormatter();
+
+  private static String toPGString(Timestamp timestamp) {
+    StringBuilder b = new StringBuilder();
+    FORMAT.formatTo(LocalDateTime.ofEpochSecond(timestamp.getSeconds(), 0, ZoneOffset.UTC), b);
+    if (timestamp.getNanos() != 0) {
+      b.append(String.format(".%06d", timestamp.getNanos() / 1000));
+    }
+    b.append("+00:00");
+    return b.toString();
   }
 
   @Override

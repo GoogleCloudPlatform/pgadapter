@@ -18,6 +18,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.RandomResultSetGenerator;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -52,10 +54,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
 
   @Parameters(name = "host = {0}")
   public static List<Object[]> data() {
-    return ImmutableList.of(
-        new Object[] {"localhost"}
-        //        , new Object[] {"/tmp"}
-        );
+    return ImmutableList.of(new Object[] {"localhost"}, new Object[] {""});
   }
 
   static String execute(String script, String host, int port)
@@ -463,7 +462,6 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
                 .setMetadata(
                     createMetadata(
                         ImmutableList.of(TypeCode.INT64, TypeCode.STRING, TypeCode.STRING)))
-                .setStats(ResultSetStats.newBuilder().setRowCountExact(2L).build())
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(Value.newBuilder().setStringValue("1").build())
@@ -477,19 +475,64 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("Bob Test2"))
                         .build())
                 .build()));
+    String insertSql1 =
+        "INSERT INTO user_account (name, fullname) VALUES "
+            + "('sandy', 'Sandy Cheeks') RETURNING user_account.id";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertSql1),
+            ResultSet.newBuilder()
+                .setMetadata(SELECT1_RESULTSET.getMetadata())
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+                .addRows(SELECT1_RESULTSET.getRows(0))
+                .build()));
+    String insertSql2 =
+        "INSERT INTO user_account (name, fullname) VALUES "
+            + "('patrick', 'Patrick Star') RETURNING user_account.id";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertSql2),
+            ResultSet.newBuilder()
+                .setMetadata(SELECT2_RESULTSET.getMetadata())
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+                .addRows(SELECT2_RESULTSET.getRows(0))
+                .build()));
 
     String actualOutput = execute("autocommit.py", host, pgServer.getLocalPort());
     String expectedOutput =
         "SERIALIZABLE\n"
             + "(1, 'test1@aol.com', 'Bob Test1')\n"
-            + "(2, 'test2@aol.com', 'Bob Test2')\n";
+            + "(2, 'test2@aol.com', 'Bob Test2')\n"
+            + "Row count: 1\n"
+            + "Row count: 1\n";
     assertEquals(expectedOutput, actualOutput);
 
-    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
-    assertTrue(request.getTransaction().hasSingleUse());
-    assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
-    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
-    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest selectRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertTrue(selectRequest.getTransaction().hasSingleUse());
+    assertTrue(selectRequest.getTransaction().getSingleUse().hasReadOnly());
+
+    ExecuteSqlRequest insertRequest1 =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
+    assertTrue(insertRequest1.getTransaction().hasBegin());
+    assertTrue(insertRequest1.getTransaction().getBegin().hasReadWrite());
+    ExecuteSqlRequest insertRequest2 =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
+    assertTrue(insertRequest2.getTransaction().hasBegin());
+    assertTrue(insertRequest2.getTransaction().getBegin().hasReadWrite());
+
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Ignore("requires DECLARE support, https://github.com/GoogleCloudPlatform/pgadapter/issues/510")
+  @Test
+  public void testServerSideCursors() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from random"), new RandomResultSetGenerator(100).generate()));
+
+    String actualOutput = execute("server_side_cursor.py", host, pgServer.getLocalPort());
+    String expectedOutput = "";
+    assertEquals(expectedOutput, actualOutput);
   }
 }
