@@ -1,5 +1,6 @@
 target/
 /target
+.DS_STORE
 .idea/
 *.iml
 *.class
