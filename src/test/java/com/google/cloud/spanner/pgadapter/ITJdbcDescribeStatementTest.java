@@ -189,7 +189,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_date=? "
               + "and col_varchar=? "
               + "and col_jsonb=?",
-          "update all_types set col_bigint=?, "
+          "update all_types set "
               + "col_bool=?, "
               + "col_bytea=?, "
               + "col_float8=?, "
@@ -199,7 +199,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "col_date=?, "
               + "col_varchar=?, "
               + "col_jsonb=?",
-          "update all_types set col_bigint=null, "
+          "update all_types set "
               + "col_bool=null, "
               + "col_bytea=null, "
               + "col_float8=null, "
@@ -235,22 +235,28 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
       try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
           ParameterMetaData metadata = statement.getParameterMetaData();
-          assertEquals(10, metadata.getParameterCount());
+          if (sql.startsWith("update all_types set col_bool=?,")) {
+            assertEquals(sql, 9, metadata.getParameterCount());
+          } else {
+            assertEquals(sql, 10, metadata.getParameterCount());
+          }
           for (int index = 1; index <= metadata.getParameterCount(); index++) {
             assertEquals(ParameterMetaData.parameterModeIn, metadata.getParameterMode(index));
             assertEquals(ParameterMetaData.parameterNullableUnknown, metadata.isNullable(index));
           }
           int index = 0;
+          if (metadata.getParameterCount() == 10) {
+            assertEquals(sql, Types.BIGINT, metadata.getParameterType(++index));
+          }
+          assertEquals(sql, Types.BIT, metadata.getParameterType(++index));
+          assertEquals(sql, Types.BINARY, metadata.getParameterType(++index));
+          assertEquals(sql, Types.DOUBLE, metadata.getParameterType(++index));
           assertEquals(sql, Types.BIGINT, metadata.getParameterType(++index));
-          assertEquals(Types.BIT, metadata.getParameterType(++index));
-          assertEquals(Types.BINARY, metadata.getParameterType(++index));
-          assertEquals(Types.DOUBLE, metadata.getParameterType(++index));
-          assertEquals(Types.BIGINT, metadata.getParameterType(++index));
-          assertEquals(Types.NUMERIC, metadata.getParameterType(++index));
-          assertEquals(Types.TIMESTAMP, metadata.getParameterType(++index));
-          assertEquals(Types.DATE, metadata.getParameterType(++index));
-          assertEquals(Types.VARCHAR, metadata.getParameterType(++index));
-          assertEquals(Types.VARCHAR, metadata.getParameterType(++index));
+          assertEquals(sql, Types.NUMERIC, metadata.getParameterType(++index));
+          assertEquals(sql, Types.TIMESTAMP, metadata.getParameterType(++index));
+          assertEquals(sql, Types.DATE, metadata.getParameterType(++index));
+          assertEquals(sql, Types.VARCHAR, metadata.getParameterType(++index));
+          assertEquals(sql, Types.VARCHAR, metadata.getParameterType(++index));
         }
       }
     }
