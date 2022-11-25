@@ -318,13 +318,8 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
             assertEquals(3.14d, resultSet.getDouble(++index), 0.0d);
             assertEquals(100, resultSet.getInt(++index));
             assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(++index));
-            if (preparedThreshold < 0) {
-              // The binary format will truncate the timestamp value to microseconds.
-              assertEquals(
-                  truncatedOffsetDateTime, resultSet.getObject(++index, OffsetDateTime.class));
-            } else {
-              assertEquals(offsetDateTime, resultSet.getObject(++index, OffsetDateTime.class));
-            }
+            assertEquals(
+                truncatedOffsetDateTime, resultSet.getObject(++index, OffsetDateTime.class));
             assertEquals(LocalDate.of(2022, 3, 29), resultSet.getObject(++index, LocalDate.class));
             assertEquals("test", resultSet.getString(++index));
             assertEquals("{\"key\": \"value\"}", resultSet.getString(++index));
