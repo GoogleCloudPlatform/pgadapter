@@ -25,6 +25,8 @@ import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.ResultSet;
+import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import java.io.IOException;
 import java.util.List;
@@ -212,5 +214,59 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
 
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(3, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testCreateRelationships() throws IOException, InterruptedException {
+    String insertUserSql =
+        "INSERT INTO user_account (name, fullname) "
+            + "VALUES ('pkrabs', 'Pearl Krabs') "
+            + "RETURNING user_account.id";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertUserSql),
+            SELECT1_RESULTSET
+                .toBuilder()
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+                .build()));
+    String insertAddressesSql =
+        "INSERT INTO address (email_address, user_id) "
+            + "VALUES ('pearl.krabs@gmail.com', 1),('pearl@aol.com', 1) "
+            + "RETURNING address.id";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertAddressesSql),
+            ResultSet.newBuilder()
+                .setMetadata(SELECT1_RESULTSET.getMetadata())
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(2L).build())
+                .addRows(SELECT1_RESULTSET.getRows(0))
+                .addRows(SELECT2_RESULTSET.getRows(0))
+                .build()));
+
+    String actualOutput = execute("orm_create_relationships.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "[]\n"
+            + "[Address(id=None, email_address='pearl.krabs@gmail.com')]\n"
+            + "User(id=None, name='pkrabs', fullname='Pearl Krabs')\n"
+            + "[Address(id=None, email_address='pearl.krabs@gmail.com'), Address(id=None, email_address='pearl@aol.com')]\n"
+            + "True\n"
+            + "True\n"
+            + "True\n"
+            + "None\n"
+            + "None\n"
+            + "None\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest insertUserRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(insertUserSql, insertUserRequest.getSql());
+    assertTrue(insertUserRequest.getTransaction().hasBegin());
+    assertTrue(insertUserRequest.getTransaction().getBegin().hasReadWrite());
+    ExecuteSqlRequest insertAddressesRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
+    assertEquals(insertAddressesSql, insertAddressesRequest.getSql());
+    assertTrue(insertAddressesRequest.getTransaction().hasId());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 }
