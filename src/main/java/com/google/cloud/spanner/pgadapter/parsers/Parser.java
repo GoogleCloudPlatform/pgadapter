@@ -89,6 +89,8 @@ public abstract class Parser<T> {
       case Oid.TEXT:
       case Oid.VARCHAR:
         return new StringParser(item, formatCode);
+      case Oid.UUID:
+        return new UuidParser(item, formatCode);
       case Oid.TIMESTAMP:
       case Oid.TIMESTAMPTZ:
         return new TimestampParser(item, formatCode, sessionState);
