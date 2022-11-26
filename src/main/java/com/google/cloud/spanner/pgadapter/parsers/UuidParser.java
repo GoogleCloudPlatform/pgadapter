@@ -21,6 +21,7 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
 /**
@@ -40,8 +41,15 @@ public class UuidParser extends Parser<String> {
         this.item = verifyBinaryValue(item);
         break;
       default:
-        throw new IllegalArgumentException("Unsupported format: " + formatCode);
+        handleInvalidFormat(formatCode);
     }
+  }
+
+  static void handleInvalidFormat(FormatCode formatCode) {
+    throw PGException.newBuilder("Unsupported format: " + formatCode.name())
+        .setSQLState(SQLState.InternalError)
+        .setSeverity(Severity.ERROR)
+        .build();
   }
 
   @Override
@@ -57,10 +65,7 @@ public class UuidParser extends Parser<String> {
     return binaryEncode(this.item);
   }
 
-  static String verifyStringValue(String value) {
-    if (value == null) {
-      return null;
-    }
+  static String verifyStringValue(@Nonnull String value) {
     try {
       //noinspection ResultOfMethodCallIgnored
       UUID.fromString(value);

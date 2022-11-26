@@ -130,4 +130,20 @@ public class UuidParserTest {
     assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
     assertEquals(Severity.ERROR, exception.getSeverity());
   }
+
+  @Test
+  public void testInvalidTextValueForBinaryEncode() {
+    PGException exception = assertThrows(PGException.class, () -> UuidParser.binaryEncode("bar"));
+    assertEquals(SQLState.InvalidParameterValue, exception.getSQLState());
+    assertEquals(Severity.ERROR, exception.getSeverity());
+  }
+
+  @Test
+  public void testHandleInvalidFormatCode() {
+    PGException exception =
+        assertThrows(PGException.class, () -> UuidParser.handleInvalidFormat(FormatCode.TEXT));
+    assertEquals(SQLState.InternalError, exception.getSQLState());
+    assertEquals(Severity.ERROR, exception.getSeverity());
+    assertEquals("Unsupported format: TEXT", exception.getMessage());
+  }
 }
