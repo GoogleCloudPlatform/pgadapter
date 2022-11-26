@@ -648,6 +648,43 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testDescribeDdlStatement() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("create table foo (id bigint primary key, value varchar)")) {
+        ParameterMetaData parameterMetaData = preparedStatement.getParameterMetaData();
+        assertEquals(0, parameterMetaData.getParameterCount());
+        assertNull(preparedStatement.getMetaData());
+      }
+    }
+  }
+
+  @Test
+  public void testDescribeClientSideNoResultStatement() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement("start batch dml")) {
+        ParameterMetaData parameterMetaData = preparedStatement.getParameterMetaData();
+        assertEquals(0, parameterMetaData.getParameterCount());
+        assertNull(preparedStatement.getMetaData());
+      }
+    }
+  }
+
+  @Test
+  public void testDescribeClientSideResultSetStatement() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("show statement_timeout")) {
+        SQLException exception =
+            assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
+        assertEquals(
+            "ERROR: ResultSetMetadata are available only for results that were returned from Cloud Spanner",
+            exception.getMessage());
+      }
+    }
+  }
+
+  @Test
   public void testMultipleQueriesInTransaction() throws SQLException {
     String sql = "SELECT 1";
 
