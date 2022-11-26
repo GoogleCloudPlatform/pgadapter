@@ -175,4 +175,42 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
+
+  @Test
+  public void testRollback() throws IOException, InterruptedException {
+    String sql =
+        "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb \n"
+            + "FROM all_types \n"
+            + "WHERE all_types.col_bigint = 1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql), createAllTypesResultSet("", true)));
+    String updateSql =
+        "UPDATE all_types SET col_varchar='updated string' WHERE all_types.col_bigint = 1";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 1L));
+
+    String actualOutput = execute("orm_rollback.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "Before rollback: AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'updated string'col_jsonb=      {'key': 'value'})\n"
+            + "After rollback: AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'test'col_jsonb=      {'key': 'value'})\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest selectRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql, selectRequest.getSql());
+    assertTrue(selectRequest.getTransaction().hasBegin());
+    assertTrue(selectRequest.getTransaction().getBegin().hasReadWrite());
+
+    ExecuteSqlRequest updateRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
+    assertEquals(updateSql, updateRequest.getSql());
+    assertTrue(updateRequest.getTransaction().hasId());
+
+    ExecuteSqlRequest refreshRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(3);
+    assertEquals(sql, refreshRequest.getSql());
+    assertTrue(refreshRequest.getTransaction().hasBegin());
+    assertTrue(refreshRequest.getTransaction().getBegin().hasReadWrite());
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(3, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
 }

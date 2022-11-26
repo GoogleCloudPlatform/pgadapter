@@ -20,9 +20,14 @@ import sys
 def create_test_engine(autocommit=False, options=""):
   host = sys.argv[1]
   port = sys.argv[2]
-  conn = create_engine(
-    "postgresql+psycopg2://user:password@{host}:{port}/d{options}"
-    .format(host=host, port=port, options=options), future=True)
+  connString = "postgresql+psycopg2://user:password@{host}:{port}/d{options}".format(
+    host=host, port=port, options=options)
+  if host == "":
+    if options == "":
+      connString = connString + "?host=/tmp"
+    else:
+      connString = connString + "&host=/tmp"
+  conn = create_engine(connString, future=True)
   if autocommit:
     return conn.execution_options(isolation_level="AUTOCOMMIT")
   return conn
