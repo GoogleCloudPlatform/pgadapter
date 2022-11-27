@@ -23,11 +23,14 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ListValue;
+import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
+import com.google.spanner.v1.TypeCode;
 import java.io.IOException;
 import java.util.List;
 import org.junit.BeforeClass;
@@ -268,5 +271,121 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     assertEquals(insertAddressesSql, insertAddressesRequest.getSql());
     assertTrue(insertAddressesRequest.getTransaction().hasId());
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testLoadRelationships() throws IOException, InterruptedException {
+    String selectUsersSql =
+        "SELECT user_account.id, user_account.name, user_account.fullname \n"
+            + "FROM user_account ORDER BY user_account.id";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(selectUsersSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.INT64, TypeCode.STRING, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("spongebob"))
+                        .addValues(Value.newBuilder().setStringValue("spongebob squarepants"))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("2").build())
+                        .addValues(Value.newBuilder().setStringValue("sandy"))
+                        .addValues(Value.newBuilder().setStringValue("sandy oyster"))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("3").build())
+                        .addValues(Value.newBuilder().setStringValue("patrick"))
+                        .addValues(Value.newBuilder().setStringValue("patrick sea"))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("4").build())
+                        .addValues(Value.newBuilder().setStringValue("squidward"))
+                        .addValues(Value.newBuilder().setStringValue("squidward manyarms"))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("5").build())
+                        .addValues(Value.newBuilder().setStringValue("ehkrabs"))
+                        .addValues(Value.newBuilder().setStringValue("ehkrabs hibernate"))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("6").build())
+                        .addValues(Value.newBuilder().setStringValue("pkrabs"))
+                        .addValues(Value.newBuilder().setStringValue("pkrabs primary"))
+                        .build())
+                .build()));
+    String selectAddressesSql =
+        "SELECT address.user_id AS address_user_id, address.id AS address_id, address.email_address AS address_email_address \n"
+            + "FROM address \n"
+            + "WHERE address.user_id IN (1, 2, 3, 4, 5, 6)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(selectAddressesSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.INT64, TypeCode.INT64, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("1"))
+                        .addValues(Value.newBuilder().setStringValue("spongebob@sqlalchemy.org"))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("2").build())
+                        .addValues(Value.newBuilder().setStringValue("2"))
+                        .addValues(Value.newBuilder().setStringValue("sandy@sqlalchemy.org"))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("2").build())
+                        .addValues(Value.newBuilder().setStringValue("3"))
+                        .addValues(Value.newBuilder().setStringValue("sandy@squirrelpower.org"))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("6").build())
+                        .addValues(Value.newBuilder().setStringValue("4"))
+                        .addValues(Value.newBuilder().setStringValue("pearl.krabs@gmail.com"))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("6").build())
+                        .addValues(Value.newBuilder().setStringValue("5"))
+                        .addValues(Value.newBuilder().setStringValue("pearl@aol.com"))
+                        .build())
+                .build()));
+
+    String actualOutput = execute("orm_load_relationships.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "spongebob  (spongebob@sqlalchemy.org) \n"
+            + "sandy  (sandy@sqlalchemy.org, sandy@squirrelpower.org) \n"
+            + "patrick  () \n"
+            + "squidward  () \n"
+            + "ehkrabs  () \n"
+            + "pkrabs  (pearl.krabs@gmail.com, pearl@aol.com) \n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest selectUsersRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(selectUsersSql, selectUsersRequest.getSql());
+    assertTrue(selectUsersRequest.getTransaction().hasBegin());
+    assertTrue(selectUsersRequest.getTransaction().getBegin().hasReadWrite());
+    ExecuteSqlRequest selectAddressesRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
+    assertEquals(selectAddressesSql, selectAddressesRequest.getSql());
+    assertTrue(selectAddressesRequest.getTransaction().hasId());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(2, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
 }
