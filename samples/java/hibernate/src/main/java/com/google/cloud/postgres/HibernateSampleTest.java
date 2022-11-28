@@ -298,6 +298,8 @@ public class HibernateSampleTest {
       testJPACriteriaDelete();
       System.out.println("JPA Delete Test Completed");
     } finally {
+      // Make sure we always close the session factory when the test is done. Otherwise, the sample
+      // application might keep non-daemon threads alive and not stop.
       hibernateConfiguration.closeSessionFactory();
     }
   }

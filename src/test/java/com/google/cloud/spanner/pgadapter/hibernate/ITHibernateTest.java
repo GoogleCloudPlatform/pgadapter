@@ -151,7 +151,7 @@ public class ITHibernateTest {
       System.out.println(output);
     }
 
-    // Verify that there were no errors.
+    // Verify that there were no errors, and print the error output if there was an error.
     assertEquals(errors, 0, process.waitFor());
   }
 }
