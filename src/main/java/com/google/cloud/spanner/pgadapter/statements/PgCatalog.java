@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 @InternalApi
 public class PgCatalog {
@@ -35,15 +36,22 @@ public class PgCatalog {
           new TableOrIndexName("pg_catalog", "pg_namespace"),
               new TableOrIndexName(null, "pg_namespace"),
           new TableOrIndexName(null, "pg_namespace"), new TableOrIndexName(null, "pg_namespace"),
+          new TableOrIndexName("pg_catalog", "pg_class"), new TableOrIndexName(null, "pg_class"),
+          new TableOrIndexName(null, "pg_class"), new TableOrIndexName(null, "pg_class"),
           new TableOrIndexName("pg_catalog", "pg_type"), new TableOrIndexName(null, "pg_type"),
           new TableOrIndexName(null, "pg_type"), new TableOrIndexName(null, "pg_type"),
           new TableOrIndexName("pg_catalog", "pg_settings"),
               new TableOrIndexName(null, "pg_settings"),
           new TableOrIndexName(null, "pg_settings"), new TableOrIndexName(null, "pg_settings"));
+  private static final ImmutableMap<Pattern, String> FUNCTION_REPLACEMENTS =
+      ImmutableMap.of(
+          Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), "true",
+          Pattern.compile("pg_table_is_visible\\(.+\\)"), "true");
 
   private final Map<TableOrIndexName, PgCatalogTable> pgCatalogTables =
       ImmutableMap.of(
           new TableOrIndexName(null, "pg_namespace"), new PgNamespace(),
+          new TableOrIndexName(null, "pg_class"), new PgClass(),
           new TableOrIndexName(null, "pg_type"), new PgType(),
           new TableOrIndexName(null, "pg_settings"), new PgSettings());
   private final SessionState sessionState;
@@ -70,9 +78,18 @@ public class PgCatalog {
     return addCommonTableExpressions(replacedTablesStatement.y(), cteBuilder.build());
   }
 
+  static String replaceKnownUnsupportedFunctions(Statement statement) {
+    String sql = statement.getSql();
+    for (Entry<Pattern, String> functionReplacement : FUNCTION_REPLACEMENTS.entrySet()) {
+      sql = functionReplacement.getKey().matcher(sql).replaceAll(functionReplacement.getValue());
+    }
+    return sql;
+  }
+
   static Statement addCommonTableExpressions(
       Statement statement, ImmutableList<String> tableExpressions) {
-    SimpleParser parser = new SimpleParser(statement.getSql());
+    String sql = replaceKnownUnsupportedFunctions(statement);
+    SimpleParser parser = new SimpleParser(sql);
     boolean hadCommonTableExpressions = parser.eatKeyword("with");
     String tableExpressionsSql = String.join(",\n", tableExpressions);
     Statement.Builder builder =
@@ -222,6 +239,92 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return sessionState.generatePGSettingsCte();
+    }
+  }
+
+  private static class PgClass implements PgCatalogTable {
+    private static final String PG_CLASS_CTE =
+        "pg_class as (\n"
+            + "  select\n"
+            + "  -1 as oid,\n"
+            + "  table_name as relname,\n"
+            + "  case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
+            + "  0 as reltype,\n"
+            + "  0 as reloftype,\n"
+            + "  0 as relowner,\n"
+            + "  1 as relam,\n"
+            + "  0 as relfilenode,\n"
+            + "  0 as reltablespace,\n"
+            + "  0 as relpages,\n"
+            + "  0.0::float8 as reltuples,\n"
+            + "  0 as relallvisible,\n"
+            + "  0 as reltoastrelid,\n"
+            + "  false as relhasindex,\n"
+            + "  false as relisshared,\n"
+            + "  'p' as relpersistence,\n"
+            + "  'r' as relkind,\n"
+            + "  count(*) as relnatts,\n"
+            + "  0 as relchecks,\n"
+            + "  false as relhasrules,\n"
+            + "  false as relhastriggers,\n"
+            + "  false as relhassubclass,\n"
+            + "  false as relrowsecurity,\n"
+            + "  false as relforcerowsecurity,\n"
+            + "  true as relispopulated,\n"
+            + "  'n' as relreplident,\n"
+            + "  false as relispartition,\n"
+            + "  0 as relrewrite,\n"
+            + "  0 as relfrozenxid,\n"
+            + "  0 as relminmxid,\n"
+            + "  '{}'::bigint[] as relacl,\n"
+            + "  '{}'::text[] as reloptions,\n"
+            + "  0 as relpartbound\n"
+            + "from information_schema.tables t\n"
+            + "inner join information_schema.columns using (table_catalog, table_schema, table_name)\n"
+            + "group by t.table_name, t.table_schema\n"
+            + "union all\n"
+            + "select\n"
+            + "    -1 as oid,\n"
+            + "    i.index_name as relname,\n"
+            + "    case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
+            + "    0 as reltype,\n"
+            + "    0 as reloftype,\n"
+            + "    0 as relowner,\n"
+            + "    1 as relam,\n"
+            + "    0 as relfilenode,\n"
+            + "    0 as reltablespace,\n"
+            + "    0 as relpages,\n"
+            + "    0.0::float8 as reltuples,\n"
+            + "    0 as relallvisible,\n"
+            + "    0 as reltoastrelid,\n"
+            + "    false as relhasindex,\n"
+            + "    false as relisshared,\n"
+            + "    'p' as relpersistence,\n"
+            + "    'r' as relkind,\n"
+            + "    count(*) as relnatts,\n"
+            + "    0 as relchecks,\n"
+            + "    false as relhasrules,\n"
+            + "    false as relhastriggers,\n"
+            + "    false as relhassubclass,\n"
+            + "    false as relrowsecurity,\n"
+            + "    false as relforcerowsecurity,\n"
+            + "    true as relispopulated,\n"
+            + "    'n' as relreplident,\n"
+            + "    false as relispartition,\n"
+            + "    0 as relrewrite,\n"
+            + "    0 as relfrozenxid,\n"
+            + "    0 as relminmxid,\n"
+            + "    '{}'::bigint[] as relacl,\n"
+            + "    '{}'::text[] as reloptions,\n"
+            + "    0 as relpartbound\n"
+            + "from information_schema.indexes i\n"
+            + "inner join information_schema.index_columns using (table_catalog, table_schema, table_name)\n"
+            + "group by i.index_name, i.table_schema\n"
+            + ")";
+
+    @Override
+    public String getTableExpression() {
+      return PG_CLASS_CTE;
     }
   }
 }

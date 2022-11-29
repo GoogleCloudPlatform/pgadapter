@@ -103,7 +103,7 @@ async function testCreateAllTypes(dataSource: DataSource) {
     const allTypes = {
         col_bigint: 2,
         col_bool: true,
-        col_bytea: Buffer.from(Buffer.from('some random string').toString('base64')),
+        col_bytea: Buffer.from('some random string'),
         col_float8: 0.123456789,
         col_int: 123456789,
         col_numeric: 234.54235,
