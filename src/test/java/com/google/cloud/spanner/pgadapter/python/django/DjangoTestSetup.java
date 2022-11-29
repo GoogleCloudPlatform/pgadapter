@@ -71,5 +71,4 @@ public class DjangoTestSetup extends DjangoMockServerTest {
       throws IOException, InterruptedException {
     return execute(port, host, options, "transaction_test.py");
   }
-
 }
