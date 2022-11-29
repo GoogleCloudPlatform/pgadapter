@@ -16,25 +16,40 @@ package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.error.Severity;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
-/** Translate from wire protocol to UUID. */
+/**
+ * Translate from wire protocol to UUID. This is currently a one-way conversion, as we only accept
+ * UUID as a parameter type. UUIDs are converted to strings.
+ */
 @InternalApi
 public class UuidParser extends Parser<String> {
 
   UuidParser(byte[] item, FormatCode formatCode) {
     switch (formatCode) {
       case TEXT:
-        this.item = new String(item, StandardCharsets.UTF_8);
+        this.item =
+            item == null ? null : verifyStringValue(new String(item, StandardCharsets.UTF_8));
         break;
       case BINARY:
-        this.item = new UUID(ByteConverter.int8(item, 0), ByteConverter.int8(item, 8)).toString();
+        this.item = verifyBinaryValue(item);
         break;
       default:
-        throw new IllegalArgumentException("Unsupported format: " + formatCode);
+        handleInvalidFormat(formatCode);
     }
+  }
+
+  static void handleInvalidFormat(FormatCode formatCode) {
+    throw PGException.newBuilder("Unsupported format: " + formatCode.name())
+        .setSQLState(SQLState.InternalError)
+        .setSeverity(Severity.ERROR)
+        .build();
   }
 
   @Override
@@ -50,12 +65,47 @@ public class UuidParser extends Parser<String> {
     return binaryEncode(this.item);
   }
 
+  static String verifyStringValue(@Nonnull String value) {
+    try {
+      //noinspection ResultOfMethodCallIgnored
+      UUID.fromString(value);
+      return value;
+    } catch (Exception exception) {
+      throw createInvalidUuidValueException(value, exception);
+    }
+  }
+
+  static String verifyBinaryValue(byte[] value) {
+    if (value == null) {
+      return null;
+    }
+    if (value.length != 16) {
+      throw PGException.newBuilder("Invalid UUID binary length: " + value.length)
+          .setSeverity(Severity.ERROR)
+          .setSQLState(SQLState.InvalidParameterValue)
+          .build();
+    }
+    return new UUID(ByteConverter.int8(value, 0), ByteConverter.int8(value, 8)).toString();
+  }
+
   static byte[] binaryEncode(String value) {
-    UUID uuid = UUID.fromString(value);
-    byte[] val = new byte[16];
-    ByteConverter.int8(val, 0, uuid.getMostSignificantBits());
-    ByteConverter.int8(val, 8, uuid.getLeastSignificantBits());
-    return val;
+    try {
+      UUID uuid = UUID.fromString(value);
+      byte[] val = new byte[16];
+      ByteConverter.int8(val, 0, uuid.getMostSignificantBits());
+      ByteConverter.int8(val, 8, uuid.getLeastSignificantBits());
+      return val;
+    } catch (Exception exception) {
+      throw createInvalidUuidValueException(value, exception);
+    }
+  }
+
+  static PGException createInvalidUuidValueException(String value, Exception cause) {
+    return PGException.newBuilder("Invalid UUID: " + value)
+        .setSeverity(Severity.ERROR)
+        .setSQLState(SQLState.InvalidParameterValue)
+        .setCause(cause)
+        .build();
   }
 
   @Override
