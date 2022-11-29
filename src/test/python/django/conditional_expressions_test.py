@@ -57,6 +57,20 @@ def execute(option):
 
     print(aggregate)
 
+  elif option == 'filter':
+    filtered_data = Singer.objects.filter(firstname__icontains=Case(
+        When(lastname='world', then=Value('w')),
+        When(lastname='hello', then=Value('h')),
+    ))
+    for row in filtered_data:
+      print(row.singerid, row.firstname, row.lastname)
+  elif option == 'annotation':
+    lst = Singer.objects.annotate(type=Case(
+        When(firstname__icontains='hello', then=Value('hello singer')),
+        When(firstname__icontains='world', then=Value('world singer')),
+
+    )).values_list('singerid','firstname', 'type');
+    print(lst)
 
 if __name__ == '__main__':
   if len(sys.argv) < 4:
