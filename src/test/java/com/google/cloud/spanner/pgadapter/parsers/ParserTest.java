@@ -14,12 +14,14 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import static com.google.cloud.spanner.pgadapter.parsers.Parser.toOid;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.ByteArray;
@@ -31,14 +33,15 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
-import com.google.common.collect.ImmutableSet;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.spanner.v1.TypeCode;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.Mockito;
 import org.postgresql.core.Oid;
 import org.postgresql.util.ByteConverter;
 
@@ -61,13 +64,13 @@ public class ParserTest {
   }
 
   private void validateCreateBinary(byte[] item, int oid, Object value) {
-    Parser<?> binary = Parser.create(ImmutableSet.of(), item, oid, FormatCode.BINARY);
+    Parser<?> binary = Parser.create(mock(SessionState.class), item, oid, FormatCode.BINARY);
 
     assertParserValueEqual(binary, value);
   }
 
   private void validateCreateText(byte[] item, int oid, Object value) {
-    Parser<?> text = Parser.create(ImmutableSet.of(), item, oid, FormatCode.TEXT);
+    Parser<?> text = Parser.create(mock(SessionState.class), item, oid, FormatCode.TEXT);
 
     assertParserValueEqual(text, value);
   }
@@ -245,7 +248,7 @@ public class ParserTest {
 
     byte[] byteResult = {-1, -1, -38, 1, -93, -70, 48, 0};
 
-    TimestampParser parsedValue = new TimestampParser(value);
+    TimestampParser parsedValue = new TimestampParser(value, mock(SessionState.class));
 
     assertArrayEquals(byteResult, parsedValue.parse(DataFormat.POSTGRESQL_BINARY));
     validateCreateBinary(byteResult, Oid.TIMESTAMP, value);
@@ -313,11 +316,11 @@ public class ParserTest {
       '[', '"', 'a', 'b', 'c', '"', ',', '"', 'd', 'e', 'f', '"', ',', '"', 'j', 'h', 'i', '"', ']'
     };
 
-    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    ResultSet resultSet = mock(ResultSet.class);
     when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.string()));
     when(resultSet.getValue(0)).thenReturn(Value.stringArray(Arrays.asList(value)));
 
-    ArrayParser parser = new ArrayParser(resultSet, 0);
+    ArrayParser parser = new ArrayParser(resultSet, 0, mock(SessionState.class));
 
     validate(parser, byteResult, stringResult, spannerResult);
   }
@@ -339,21 +342,21 @@ public class ParserTest {
     byte[] stringResult = {'{', '1', ',', '2', ',', '3', '}'};
     byte[] spannerResult = {'[', '1', ',', '2', ',', '3', ']'};
 
-    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    ResultSet resultSet = mock(ResultSet.class);
     when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.int64()));
     when(resultSet.getValue(0)).thenReturn(Value.int64Array(Arrays.asList(value)));
 
-    ArrayParser parser = new ArrayParser(resultSet, 0);
+    ArrayParser parser = new ArrayParser(resultSet, 0, mock(SessionState.class));
 
     validate(parser, byteResult, stringResult, spannerResult);
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testArrayArrayParsingFails() {
-    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    ResultSet resultSet = mock(ResultSet.class);
     when(resultSet.getColumnType(0)).thenReturn(Type.array(Type.array(Type.int64())));
 
-    new ArrayParser(resultSet, 0);
+    new ArrayParser(resultSet, 0, mock(SessionState.class));
   }
 
   @Test
@@ -408,5 +411,43 @@ public class ParserTest {
     validate(parser, byteResult, stringResult, stringResult);
     assertEquals(value, parser.getItem());
     validateCreateText(stringResult, Oid.NUMERIC, value);
+  }
+
+  @Test
+  public void testTypeToOid() {
+    assertEquals(Oid.INT8, toOid(createType(TypeCode.INT64)));
+    assertEquals(Oid.BOOL, toOid(createType(TypeCode.BOOL)));
+    assertEquals(Oid.VARCHAR, toOid(createType(TypeCode.STRING)));
+    assertEquals(Oid.JSONB, toOid(createType(TypeCode.JSON)));
+    assertEquals(Oid.FLOAT8, toOid(createType(TypeCode.FLOAT64)));
+    assertEquals(Oid.TIMESTAMPTZ, toOid(createType(TypeCode.TIMESTAMP)));
+    assertEquals(Oid.DATE, toOid(createType(TypeCode.DATE)));
+    assertEquals(Oid.NUMERIC, toOid(createType(TypeCode.NUMERIC)));
+    assertEquals(Oid.BYTEA, toOid(createType(TypeCode.BYTES)));
+
+    assertEquals(Oid.INT8_ARRAY, toOid(createArrayType(TypeCode.INT64)));
+    assertEquals(Oid.BOOL_ARRAY, toOid(createArrayType(TypeCode.BOOL)));
+    assertEquals(Oid.VARCHAR_ARRAY, toOid(createArrayType(TypeCode.STRING)));
+    assertEquals(Oid.JSONB_ARRAY, toOid(createArrayType(TypeCode.JSON)));
+    assertEquals(Oid.FLOAT8_ARRAY, toOid(createArrayType(TypeCode.FLOAT64)));
+    assertEquals(Oid.TIMESTAMPTZ_ARRAY, toOid(createArrayType(TypeCode.TIMESTAMP)));
+    assertEquals(Oid.DATE_ARRAY, toOid(createArrayType(TypeCode.DATE)));
+    assertEquals(Oid.NUMERIC_ARRAY, toOid(createArrayType(TypeCode.NUMERIC)));
+    assertEquals(Oid.BYTEA_ARRAY, toOid(createArrayType(TypeCode.BYTES)));
+
+    assertThrows(PGException.class, () -> toOid(createType(TypeCode.STRUCT)));
+    assertThrows(PGException.class, () -> toOid(createArrayType(TypeCode.ARRAY)));
+    assertThrows(PGException.class, () -> toOid(createArrayType(TypeCode.STRUCT)));
+  }
+
+  static com.google.spanner.v1.Type createType(TypeCode code) {
+    return com.google.spanner.v1.Type.newBuilder().setCode(code).build();
+  }
+
+  static com.google.spanner.v1.Type createArrayType(TypeCode code) {
+    return com.google.spanner.v1.Type.newBuilder()
+        .setCode(TypeCode.ARRAY)
+        .setArrayElementType(com.google.spanner.v1.Type.newBuilder().setCode(code).build())
+        .build();
   }
 }

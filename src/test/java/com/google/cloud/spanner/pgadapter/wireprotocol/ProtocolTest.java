@@ -71,6 +71,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -257,7 +258,7 @@ public class ProtocolTest {
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
     assertArrayEquals(
         expectedParameterDataTypes,
-        ((ParseMessage) message).getStatement().getParameterDataTypes());
+        ((ParseMessage) message).getStatement().getGivenParameterDataTypes());
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
@@ -321,7 +322,7 @@ public class ProtocolTest {
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
     assertArrayEquals(
         expectedParameterDataTypes,
-        ((ParseMessage) message).getStatement().getParameterDataTypes());
+        ((ParseMessage) message).getStatement().getGivenParameterDataTypes());
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
@@ -386,7 +387,7 @@ public class ProtocolTest {
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
     assertArrayEquals(
         expectedParameterDataTypes,
-        ((ParseMessage) message).getStatement().getParameterDataTypes());
+        ((ParseMessage) message).getStatement().getGivenParameterDataTypes());
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
@@ -436,7 +437,7 @@ public class ProtocolTest {
     assertEquals(expectedSQL, ((ParseMessage) message).getStatement().getSql());
     assertArrayEquals(
         expectedParameterDataTypes,
-        ((ParseMessage) message).getStatement().getParameterDataTypes());
+        ((ParseMessage) message).getStatement().getGivenParameterDataTypes());
 
     when(connectionHandler.hasStatement(anyString())).thenReturn(false);
     message.send();
@@ -624,7 +625,11 @@ public class ProtocolTest {
             resultCodesCount);
 
     when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
-    when(intermediatePreparedStatement.getSql()).thenReturn("select * from foo");
+    when(intermediatePreparedStatement.createPortal(anyString(), any(), any(), any()))
+        .thenReturn(intermediatePortalStatement);
+    when(intermediatePortalStatement.getSql()).thenReturn("select * from foo");
+    when(intermediatePortalStatement.getPreparedStatement())
+        .thenReturn(intermediatePreparedStatement);
 
     byte[][] expectedParameters = {parameter};
     List<Short> expectedFormatCodes = new ArrayList<>();
@@ -650,13 +655,6 @@ public class ProtocolTest {
     assertEquals(expectedFormatCodes, ((BindMessage) message).getResultFormatCodes());
     assertEquals("select * from foo", ((BindMessage) message).getSql());
     assertTrue(((BindMessage) message).hasParameterValues());
-
-    when(intermediatePreparedStatement.bind(
-            ArgumentMatchers.anyString(),
-            ArgumentMatchers.any(),
-            ArgumentMatchers.any(),
-            ArgumentMatchers.any()))
-        .thenReturn(intermediatePortalStatement);
 
     message.send();
     ((BindMessage) message).flush();
@@ -728,6 +726,9 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
+    when(intermediatePreparedStatement.createPortal(anyString(), any(), any(), any()))
+        .thenReturn(intermediatePortalStatement);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(BindMessage.class, message.getClass());
@@ -798,6 +799,9 @@ public class ProtocolTest {
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
+    when(intermediatePreparedStatement.createPortal(anyString(), any(), any(), any()))
+        .thenReturn(intermediatePortalStatement);
 
     WireMessage message = ControlMessage.create(connectionHandler);
     assertEquals(BindMessage.class, message.getClass());
@@ -882,6 +886,39 @@ public class ProtocolTest {
     messageSpy.flush();
 
     verify(messageSpy).handleDescribeStatement();
+  }
+
+  @Test
+  public void testDescribeMessageWithException() throws Exception {
+    byte[] messageMetadata = {'D'};
+    byte[] statementType = {'S'};
+    String statementName = "some statement\0";
+
+    byte[] length = intToBytes(4 + 1 + statementName.length());
+
+    byte[] value = Bytes.concat(messageMetadata, length, statementType, statementName.getBytes());
+
+    DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(value));
+    ByteArrayOutputStream result = new ByteArrayOutputStream();
+    DataOutputStream outputStream = new DataOutputStream(result);
+
+    when(connectionHandler.getStatement(anyString())).thenReturn(intermediatePreparedStatement);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    when(connectionMetadata.getInputStream()).thenReturn(inputStream);
+    when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(intermediatePreparedStatement.hasException()).thenReturn(true);
+    when(intermediatePreparedStatement.getException())
+        .thenReturn(PGExceptionFactory.newPGException("test error", SQLState.InternalError));
+
+    WireMessage message = ControlMessage.create(connectionHandler);
+    assertEquals(DescribeMessage.class, message.getClass());
+    DescribeMessage describeMessage = (DescribeMessage) message;
+
+    PGException exception =
+        assertThrows(PGException.class, describeMessage::handleDescribeStatement);
+    assertEquals("test error", exception.getMessage());
   }
 
   @Test
@@ -1586,9 +1623,12 @@ public class ProtocolTest {
         readUntil(outputResult, "standard_conforming_strings\0".length()));
     assertEquals("on\0", readUntil(outputResult, "on\0".length()));
     assertEquals('S', outputResult.readByte());
-    assertEquals(17, outputResult.readInt());
-    assertEquals("TimeZone\0", readUntil(outputResult, "TimeZone\0".length()));
+
     // Timezone will vary depending on the default location of the JVM that is running.
+    String timezoneIdentifier = ZoneId.systemDefault().getId();
+    int expectedLength = timezoneIdentifier.getBytes(StandardCharsets.UTF_8).length + 10 + 4;
+    assertEquals(expectedLength, outputResult.readInt());
+    assertEquals("TimeZone\0", readUntil(outputResult, "TimeZone\0".length()));
     readUntilNullTerminator(outputResult);
 
     // ReadyResponse

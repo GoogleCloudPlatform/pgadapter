@@ -22,9 +22,11 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Set;
 import org.postgresql.core.Oid;
 
 /**
@@ -53,37 +55,16 @@ public abstract class Parser<T> {
   protected T item;
 
   /**
-   * Guess the type of a parameter with unspecified type.
-   *
-   * @param item The value to guess the type for
-   * @param formatCode The encoding that is used for the value
-   * @return The {@link Oid} type code that is guessed for the value or {@link Oid#UNSPECIFIED} if
-   *     no type could be guessed.
-   */
-  private static int guessType(Set<Integer> guessTypes, byte[] item, FormatCode formatCode) {
-    if (formatCode == FormatCode.TEXT && item != null) {
-      String value = new String(item, StandardCharsets.UTF_8);
-      if (guessTypes.contains(Oid.TIMESTAMPTZ) && TimestampParser.isTimestamp(value)) {
-        return Oid.TIMESTAMPTZ;
-      }
-      if (guessTypes.contains(Oid.DATE) && DateParser.isDate(value)) {
-        return Oid.DATE;
-      }
-    }
-    return Oid.UNSPECIFIED;
-  }
-
-  /**
    * Factory method to create a Parser subtype with a designated type from a byte array.
    *
    * @param item The data to be parsed
    * @param oidType The type of the designated data
    * @param formatCode The format of the data to be parsed
-   * @param guessTypes The OIDs of the types that may be 'guessed' based on the input value
+   * @param sessionState The session state to use when parsing and converting
    * @return The parser object for the designated data type.
    */
   public static Parser<?> create(
-      Set<Integer> guessTypes, byte[] item, int oidType, FormatCode formatCode) {
+      SessionState sessionState, byte[] item, int oidType, FormatCode formatCode) {
     switch (oidType) {
       case Oid.BOOL:
       case Oid.BIT:
@@ -108,19 +89,15 @@ public abstract class Parser<T> {
       case Oid.TEXT:
       case Oid.VARCHAR:
         return new StringParser(item, formatCode);
+      case Oid.UUID:
+        return new UuidParser(item, formatCode);
       case Oid.TIMESTAMP:
       case Oid.TIMESTAMPTZ:
-        return new TimestampParser(item, formatCode);
+        return new TimestampParser(item, formatCode, sessionState);
       case Oid.JSONB:
         return new JsonbParser(item, formatCode);
       case Oid.UNSPECIFIED:
-        // Try to guess the type based on the value. Use an unspecified parser if no type could be
-        // determined.
-        int type = guessType(guessTypes, item, formatCode);
-        if (type == Oid.UNSPECIFIED) {
-          return new UnspecifiedParser(item, formatCode);
-        }
-        return create(guessTypes, item, type, formatCode);
+        return new UnspecifiedParser(item, formatCode);
       default:
         throw new IllegalArgumentException("Unsupported parameter type: " + oidType);
     }
@@ -134,7 +111,8 @@ public abstract class Parser<T> {
    * @param columnarPosition Column from the result to be parsed.
    * @return The parser object for the designated data type.
    */
-  public static Parser<?> create(ResultSet result, Type type, int columnarPosition) {
+  public static Parser<?> create(
+      ResultSet result, Type type, int columnarPosition, SessionState sessionState) {
     switch (type.getCode()) {
       case BOOL:
         return new BooleanParser(result, columnarPosition);
@@ -151,11 +129,11 @@ public abstract class Parser<T> {
       case STRING:
         return new StringParser(result, columnarPosition);
       case TIMESTAMP:
-        return new TimestampParser(result, columnarPosition);
+        return new TimestampParser(result, columnarPosition, sessionState);
       case PG_JSONB:
         return new JsonbParser(result, columnarPosition);
       case ARRAY:
-        return new ArrayParser(result, columnarPosition);
+        return new ArrayParser(result, columnarPosition, sessionState);
       case NUMERIC:
       case JSON:
       case STRUCT:
@@ -171,7 +149,7 @@ public abstract class Parser<T> {
    * @param typeCode The type of the object to be parsed.
    * @return The parser object for the designated data type.
    */
-  protected static Parser<?> create(Object result, Code typeCode) {
+  protected static Parser<?> create(Object result, Code typeCode, SessionState sessionState) {
     switch (typeCode) {
       case BOOL:
         return new BooleanParser(result);
@@ -188,7 +166,7 @@ public abstract class Parser<T> {
       case STRING:
         return new StringParser(result);
       case TIMESTAMP:
-        return new TimestampParser(result);
+        return new TimestampParser(result, sessionState);
       case PG_JSONB:
         return new JsonbParser(result);
       case NUMERIC:
@@ -259,6 +237,64 @@ public abstract class Parser<T> {
       default:
         throw SpannerExceptionFactory.newSpannerException(
             ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown type: " + type);
+    }
+  }
+  /**
+   * Translates the given Cloud Spanner {@link Type} to a PostgreSQL OID constant.
+   *
+   * @param type the type to translate
+   * @return The OID constant value for the type
+   */
+  public static int toOid(com.google.spanner.v1.Type type) {
+    switch (type.getCode()) {
+      case BOOL:
+        return Oid.BOOL;
+      case INT64:
+        return Oid.INT8;
+      case NUMERIC:
+        return Oid.NUMERIC;
+      case FLOAT64:
+        return Oid.FLOAT8;
+      case STRING:
+        return Oid.VARCHAR;
+      case JSON:
+        return Oid.JSONB;
+      case BYTES:
+        return Oid.BYTEA;
+      case TIMESTAMP:
+        return Oid.TIMESTAMPTZ;
+      case DATE:
+        return Oid.DATE;
+      case ARRAY:
+        switch (type.getArrayElementType().getCode()) {
+          case BOOL:
+            return Oid.BOOL_ARRAY;
+          case INT64:
+            return Oid.INT8_ARRAY;
+          case NUMERIC:
+            return Oid.NUMERIC_ARRAY;
+          case FLOAT64:
+            return Oid.FLOAT8_ARRAY;
+          case STRING:
+            return Oid.VARCHAR_ARRAY;
+          case JSON:
+            return Oid.JSONB_ARRAY;
+          case BYTES:
+            return Oid.BYTEA_ARRAY;
+          case TIMESTAMP:
+            return Oid.TIMESTAMPTZ_ARRAY;
+          case DATE:
+            return Oid.DATE_ARRAY;
+          case ARRAY:
+          case STRUCT:
+          default:
+            throw PGExceptionFactory.newPGException(
+                "Unsupported or unknown array type: " + type, SQLState.InternalError);
+        }
+      case STRUCT:
+      default:
+        throw PGExceptionFactory.newPGException(
+            "Unsupported or unknown type: " + type, SQLState.InternalError);
     }
   }
 

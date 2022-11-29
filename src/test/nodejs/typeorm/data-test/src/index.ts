@@ -103,7 +103,7 @@ async function testCreateAllTypes(dataSource: DataSource) {
     const allTypes = {
         col_bigint: 2,
         col_bool: true,
-        col_bytea: Buffer.from(Buffer.from('some random string').toString('base64')),
+        col_bytea: Buffer.from('some random string'),
         col_float8: 0.123456789,
         col_int: 123456789,
         col_numeric: 234.54235,
@@ -116,6 +116,24 @@ async function testCreateAllTypes(dataSource: DataSource) {
 
     await repository.save(allTypes)
     console.log('Created one record')
+}
+
+async function testUpdateAllTypes(dataSource: DataSource) {
+    const repository = dataSource.getRepository(AllTypes);
+    const row = await repository.findOneBy({col_bigint: 1});
+
+    row.col_bool = false;
+    row.col_bytea = Buffer.from(Buffer.from('updated string').toString('base64'));
+    row.col_float8 = 1.23456789;
+    row.col_int = 987654321;
+    row.col_numeric = 6.626;
+    row.col_timestamptz = new Date(Date.UTC(2022, 10, 16, 10, 3, 42, 999));
+    row.col_date = '2022-11-16';
+    row.col_varchar = 'some updated string';
+    row.col_jsonb = {key: 'updated-value'};
+
+    await repository.update(row.col_bigint, row);
+    console.log('Updated one record')
 }
 
 require('yargs')
@@ -162,6 +180,13 @@ require('yargs')
         opts => runTest(opts.host, opts.port, opts.database, testCreateAllTypes)
     )
     .example('node $0 createAllTypes 5432')
+    .command(
+        'updateAllTypes <host> <port> <database>',
+        'Updates one row with all types',
+        {},
+        opts => runTest(opts.host, opts.port, opts.database, testUpdateAllTypes)
+    )
+    .example('node $0 updateAllTypes 5432')
     .wrap(120)
     .recommendCommands()
     .strict()

@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.session;
 
 import static com.google.cloud.spanner.pgadapter.session.CopySettings.initCopySettings;
 
-import com.google.api.client.util.Strings;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
@@ -30,8 +29,8 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableSet.Builder;
 import com.google.common.collect.Sets;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -44,7 +43,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 
 /** {@link SessionState} contains all session variables for a connection. */
 @InternalApi
@@ -166,6 +164,10 @@ public class SessionState {
   }
 
   private static String toKey(String extension, String name) {
+    if (extension == null && "timezone".equalsIgnoreCase(name)) {
+      // TimeZone is the only special setting that uses CamelCase.
+      return "TimeZone";
+    }
     return extension == null
         ? name.toLowerCase(Locale.ROOT)
         : extension.toLowerCase(Locale.ROOT) + "." + name.toLowerCase(Locale.ROOT);
@@ -393,41 +395,28 @@ public class SessionState {
         () -> DdlTransactionMode.valueOf(setting.getBootVal()));
   }
 
-  /**
-   * Returns a set of OIDs that PGAdapter should try to guess if it receives an untyped parameter
-   * value. This is needed because some clients (JDBC) deliberately send parameters without a type
-   * code to force the server to infer the type. This specifically applies to date/timestamp
-   * parameters.
-   */
-  public Set<Integer> getGuessTypes() {
-    PGSetting setting = internalGet(toKey("spanner", "guess_types"), false);
-    if (setting == null || Strings.isNullOrEmpty(setting.getSetting())) {
-      return ImmutableSet.of();
+  /** Returns the {@link ZoneId} of the current timezone for this session. */
+  public ZoneId getTimezone() {
+    PGSetting setting = internalGet(toKey(null, "timezone"), false);
+    if (setting == null) {
+      return ZoneId.systemDefault();
     }
-    return convertOidListToSet(setting.getSetting());
+    String id =
+        tryGetFirstNonNull(
+            ZoneId.systemDefault().getId(),
+            setting::getSetting,
+            setting::getResetVal,
+            setting::getBootVal);
+
+    return zoneIdFromString(id);
   }
 
-  /** Keep a cache of 1 element ready as the setting is not likely to change often. */
-  private final Map<String, Set<Integer>> cachedGuessTypes = new HashMap<>(1);
-
-  Set<Integer> convertOidListToSet(@Nonnull String value) {
-    if (cachedGuessTypes.containsKey(value)) {
-      return cachedGuessTypes.get(value);
+  private ZoneId zoneIdFromString(String value) {
+    try {
+      return ZoneId.of(value);
+    } catch (Throwable ignore) {
+      return ZoneId.systemDefault();
     }
-
-    Builder<Integer> builder = ImmutableSet.builder();
-    String[] oids = value.split(",");
-    for (String oid : oids) {
-      try {
-        builder.add(Integer.valueOf(oid));
-      } catch (Exception ignore) {
-        // ignore invalid oids.
-      }
-    }
-    cachedGuessTypes.clear();
-    cachedGuessTypes.put(value, builder.build());
-
-    return cachedGuessTypes.get(value);
   }
 
   @SafeVarargs

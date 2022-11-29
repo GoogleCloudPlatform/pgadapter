@@ -39,6 +39,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
@@ -561,12 +562,14 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   @Test
   public void testDescribeDmlWithSchemaPrefix() throws SQLException {
     String sql = "update public.my_table set value=? where id=?";
-    String describeSql = "select $1, $2 from (select value=$1 from public.my_table where id=$2) p";
+    String describeSql = "update public.my_table set value=$1 where id=$2";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(describeSql),
             com.google.spanner.v1.ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.INT64)))
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.INT64)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     try (Connection connection = createConnection()) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
@@ -580,13 +583,14 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   @Test
   public void testDescribeDmlWithQuotedSchemaPrefix() throws SQLException {
     String sql = "update \"public\".\"my_table\" set value=? where id=?";
-    String describeSql =
-        "select $1, $2 from (select value=$1 from \"public\".\"my_table\" where id=$2) p";
+    String describeSql = "update \"public\".\"my_table\" set value=$1 where id=$2";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(describeSql),
             com.google.spanner.v1.ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.INT64)))
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.INT64)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     try (Connection connection = createConnection()) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
@@ -855,6 +859,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
 
       final int fetchSize = 3;
       try (Connection connection = createConnection(binaryTransferEnable)) {
+        connection.createStatement().execute("set time zone utc");
         connection.setAutoCommit(false);
         connection.unwrap(PGConnection.class).setPrepareThreshold(binary ? -1 : 5);
         try (PreparedStatement statement = connection.prepareStatement(SELECT_RANDOM.getSql())) {
@@ -1364,7 +1369,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   public void testSetTimeZone() throws SQLException {
     try (Connection connection = createConnection()) {
       connection.createStatement().execute("set time zone 'IST'");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 
@@ -1372,7 +1377,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   public void testSetTimeZoneToDefault() throws SQLException {
     try (Connection connection = createConnection("?options=-c%%20timezone=IST")) {
       connection.createStatement().execute("set time zone default");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 
@@ -1380,7 +1385,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   public void testSetTimeZoneToLocal() throws SQLException {
     try (Connection connection = createConnection("?options=-c%%20timezone=IST")) {
       connection.createStatement().execute("set time zone local");
-      verifySettingValue(connection, "timezone", "IST");
+      verifySettingValue(connection, "timezone", "Asia/Kolkata");
     }
   }
 

@@ -19,6 +19,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.collect.ImmutableList;
 
 public class InvalidStatement extends IntermediatePortalStatement {
 
@@ -29,7 +30,18 @@ public class InvalidStatement extends IntermediatePortalStatement {
       ParsedStatement parsedStatement,
       Statement originalStatement,
       Exception exception) {
-    super(connectionHandler, options, name, parsedStatement, originalStatement);
+    super(
+        name,
+        new IntermediatePreparedStatement(
+            connectionHandler,
+            options,
+            name,
+            NO_PARAMETER_TYPES,
+            parsedStatement,
+            originalStatement),
+        NO_PARAMS,
+        ImmutableList.of(),
+        ImmutableList.of());
     setException(PGExceptionFactory.toPGException(exception));
   }
 }
