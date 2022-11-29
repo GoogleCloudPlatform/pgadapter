@@ -59,10 +59,15 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
 
   static String execute(String script, String host, int port)
       throws IOException, InterruptedException {
+    return execute("./src/test/python/sqlalchemy", script, host, port);
+  }
+
+  static String execute(String directory, String script, String host, int port)
+      throws IOException, InterruptedException {
     String[] runCommand = new String[] {"python3", script, host, Integer.toString(port)};
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
-    builder.directory(new File("./src/test/python/sqlalchemy"));
+    builder.directory(new File(directory));
     Process process = builder.start();
     Scanner scanner = new Scanner(process.getInputStream());
     Scanner errorScanner = new Scanner(process.getErrorStream());
@@ -534,5 +539,191 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
     String actualOutput = execute("server_side_cursor.py", host, pgServer.getLocalPort());
     String expectedOutput = "";
     assertEquals(expectedOutput, actualOutput);
+  }
+
+  @Test
+  public void testSample() throws Exception {
+    String checkTableExistsSql =
+        "with pg_class as (\n"
+            + "  select\n"
+            + "  -1 as oid,\n"
+            + "  table_name as relname,\n"
+            + "  case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
+            + "  0 as reltype,\n"
+            + "  0 as reloftype,\n"
+            + "  0 as relowner,\n"
+            + "  1 as relam,\n"
+            + "  0 as relfilenode,\n"
+            + "  0 as reltablespace,\n"
+            + "  0 as relpages,\n"
+            + "  0.0::float8 as reltuples,\n"
+            + "  0 as relallvisible,\n"
+            + "  0 as reltoastrelid,\n"
+            + "  false as relhasindex,\n"
+            + "  false as relisshared,\n"
+            + "  'p' as relpersistence,\n"
+            + "  'r' as relkind,\n"
+            + "  count(*) as relnatts,\n"
+            + "  0 as relchecks,\n"
+            + "  false as relhasrules,\n"
+            + "  false as relhastriggers,\n"
+            + "  false as relhassubclass,\n"
+            + "  false as relrowsecurity,\n"
+            + "  false as relforcerowsecurity,\n"
+            + "  true as relispopulated,\n"
+            + "  'n' as relreplident,\n"
+            + "  false as relispartition,\n"
+            + "  0 as relrewrite,\n"
+            + "  0 as relfrozenxid,\n"
+            + "  0 as relminmxid,\n"
+            + "  '{}'::bigint[] as relacl,\n"
+            + "  '{}'::text[] as reloptions,\n"
+            + "  0 as relpartbound\n"
+            + "from information_schema.tables t\n"
+            + "inner join information_schema.columns using (table_catalog, table_schema, table_name)\n"
+            + "group by t.table_name, t.table_schema\n"
+            + "union all\n"
+            + "select\n"
+            + "    -1 as oid,\n"
+            + "    i.index_name as relname,\n"
+            + "    case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
+            + "    0 as reltype,\n"
+            + "    0 as reloftype,\n"
+            + "    0 as relowner,\n"
+            + "    1 as relam,\n"
+            + "    0 as relfilenode,\n"
+            + "    0 as reltablespace,\n"
+            + "    0 as relpages,\n"
+            + "    0.0::float8 as reltuples,\n"
+            + "    0 as relallvisible,\n"
+            + "    0 as reltoastrelid,\n"
+            + "    false as relhasindex,\n"
+            + "    false as relisshared,\n"
+            + "    'p' as relpersistence,\n"
+            + "    'r' as relkind,\n"
+            + "    count(*) as relnatts,\n"
+            + "    0 as relchecks,\n"
+            + "    false as relhasrules,\n"
+            + "    false as relhastriggers,\n"
+            + "    false as relhassubclass,\n"
+            + "    false as relrowsecurity,\n"
+            + "    false as relforcerowsecurity,\n"
+            + "    true as relispopulated,\n"
+            + "    'n' as relreplident,\n"
+            + "    false as relispartition,\n"
+            + "    0 as relrewrite,\n"
+            + "    0 as relfrozenxid,\n"
+            + "    0 as relminmxid,\n"
+            + "    '{}'::bigint[] as relacl,\n"
+            + "    '{}'::text[] as reloptions,\n"
+            + "    0 as relpartbound\n"
+            + "from information_schema.indexes i\n"
+            + "inner join information_schema.index_columns using (table_catalog, table_schema, table_name)\n"
+            + "group by i.index_name, i.table_schema\n"
+            + "),\n"
+            + "pg_namespace as (\n"
+            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+            + "  from information_schema.schemata\n"
+            + ")\n"
+            + "select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where true and relname='%s'";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(String.format(checkTableExistsSql, "singers")),
+            ResultSet.newBuilder().setMetadata(SELECT1_RESULTSET.getMetadata()).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(String.format(checkTableExistsSql, "albums")),
+            ResultSet.newBuilder().setMetadata(SELECT1_RESULTSET.getMetadata()).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(String.format(checkTableExistsSql, "tracks")),
+            ResultSet.newBuilder().setMetadata(SELECT1_RESULTSET.getMetadata()).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(String.format(checkTableExistsSql, "venues")),
+            ResultSet.newBuilder().setMetadata(SELECT1_RESULTSET.getMetadata()).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(String.format(checkTableExistsSql, "concerts")),
+            ResultSet.newBuilder().setMetadata(SELECT1_RESULTSET.getMetadata()).build()));
+    addDdlResponseToSpannerAdmin();
+
+    String actualOutput =
+        execute(
+            "./samples/python/sqlalchemy-sample", "create_model.py", host, pgServer.getLocalPort());
+    String expectedOutput = "Created data model\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    List<UpdateDatabaseDdlRequest> requests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(req -> req instanceof UpdateDatabaseDdlRequest)
+            .map(req -> (UpdateDatabaseDdlRequest) req)
+            .collect(Collectors.toList());
+    assertEquals(1, requests.size());
+    assertEquals(5, requests.get(0).getStatementsCount());
+    assertEquals(
+        "CREATE TABLE singers (\n"
+            + "\tid VARCHAR NOT NULL, \n"
+            + "\tcreated_at TIMESTAMP WITH TIME ZONE, \n"
+            + "\tupdated_at TIMESTAMP WITH TIME ZONE, \n"
+            + "\tfirst_name VARCHAR(100), \n"
+            + "\tlast_name VARCHAR(200), \n"
+            + "\tfull_name VARCHAR, \n"
+            + "\tactive BOOLEAN, \n"
+            + "\tPRIMARY KEY (id)\n"
+            + ")",
+        requests.get(0).getStatements(0));
+    assertEquals(
+        "CREATE TABLE venues (\n"
+            + "\tid VARCHAR NOT NULL, \n"
+            + "\tcreated_at TIMESTAMP WITH TIME ZONE, \n"
+            + "\tupdated_at TIMESTAMP WITH TIME ZONE, \n"
+            + "\tname VARCHAR(200), \n"
+            + "\tdescription VARCHAR, \n"
+            + "\tPRIMARY KEY (id)\n"
+            + ")",
+        requests.get(0).getStatements(1));
+    assertEquals(
+        "CREATE TABLE albums (\n"
+            + "\tid VARCHAR NOT NULL, \n"
+            + "\tcreated_at TIMESTAMP WITH TIME ZONE, \n"
+            + "\tupdated_at TIMESTAMP WITH TIME ZONE, \n"
+            + "\ttitle VARCHAR(200), \n"
+            + "\tmarketing_budget NUMERIC, \n"
+            + "\trelease_date DATE, \n"
+            + "\tcover_picture BYTEA, \n"
+            + "\tsinger_id VARCHAR, \n"
+            + "\tPRIMARY KEY (id), \n"
+            + "\tFOREIGN KEY(singer_id) REFERENCES singers (id)\n"
+            + ")",
+        requests.get(0).getStatements(2));
+    assertEquals(
+        "CREATE TABLE concerts (\n"
+            + "\tid VARCHAR NOT NULL, \n"
+            + "\tcreated_at TIMESTAMP WITH TIME ZONE, \n"
+            + "\tupdated_at TIMESTAMP WITH TIME ZONE, \n"
+            + "\tname VARCHAR(200), \n"
+            + "\tvenue_id VARCHAR, \n"
+            + "\tsinger_id VARCHAR, \n"
+            + "\tstart_time TIMESTAMP WITH TIME ZONE, \n"
+            + "\tend_time TIMESTAMP WITH TIME ZONE, \n"
+            + "\tPRIMARY KEY (id), \n"
+            + "\tFOREIGN KEY(venue_id) REFERENCES venues (id), \n"
+            + "\tFOREIGN KEY(singer_id) REFERENCES singers (id)\n"
+            + ")",
+        requests.get(0).getStatements(3));
+    assertEquals(
+        "CREATE TABLE tracks (\n"
+            + "\tcreated_at TIMESTAMP WITH TIME ZONE, \n"
+            + "\tupdated_at TIMESTAMP WITH TIME ZONE, \n"
+            + "\tid VARCHAR NOT NULL, \n"
+            + "\ttrack_number INTEGER NOT NULL, \n"
+            + "\ttitle VARCHAR, \n"
+            + "\tsample_rate FLOAT, \n"
+            + "\tPRIMARY KEY (id, track_number), \n"
+            + "\tFOREIGN KEY(id) REFERENCES albums (id)\n"
+            + ")",
+        requests.get(0).getStatements(4));
   }
 }
