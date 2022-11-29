@@ -55,32 +55,27 @@ public class DjangoAggregationTests extends DjangoTestSetup {
 
     StructType.Builder builder = StructType.newBuilder();
 
-    for(int i=0;i<2*numCols;i+=2){
-      if(rows.get(i).equals("int")){
+    for (int i = 0; i < 2 * numCols; i += 2) {
+      if (rows.get(i).equals("int")) {
         builder.addFields(
             Field.newBuilder()
                 .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
-                .setName(rows.get(i+1))
+                .setName(rows.get(i + 1))
                 .build());
 
-      }
-      else if(rows.get(i).equals("string")){
+      } else if (rows.get(i).equals("string")) {
         builder.addFields(
             Field.newBuilder()
                 .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                .setName(rows.get(i+1))
+                .setName(rows.get(i + 1))
                 .build());
-
       }
-
     }
     resultSetBuilder.setMetadata(
-        ResultSetMetadata.newBuilder()
-            .setRowType(builder.build())
-            .build());
-    for (int i = 2*numCols; i < rows.size(); i += numCols) {
+        ResultSetMetadata.newBuilder().setRowType(builder.build()).build());
+    for (int i = 2 * numCols; i < rows.size(); i += numCols) {
       ListValue.Builder rowBuilder = ListValue.newBuilder();
-      for(int j=i;j<i+numCols;++j)
+      for (int j = i; j < i + numCols; ++j)
         rowBuilder.addValues(Value.newBuilder().setStringValue(rows.get(j)).build());
 
       resultSetBuilder.addRows(rowBuilder.build());
@@ -111,9 +106,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(
-        sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
-
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -139,9 +132,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(
-        sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
-
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -167,9 +158,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(
-        sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
-
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
@@ -195,15 +184,14 @@ public class DjangoAggregationTests extends DjangoTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(
-        sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
-
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
   public void aggregateMultiple() throws IOException, InterruptedException {
 
-    String sql = "SELECT MAX(\"singers\".\"singerid\") AS \"singerid__max\", MIN(\"singers\".\"singerid\") AS \"singerid__min\", AVG(\"singers\".\"singerid\") AS \"singerid__avg\" FROM \"singers\"";
+    String sql =
+        "SELECT MAX(\"singers\".\"singerid\") AS \"singerid__max\", MIN(\"singers\".\"singerid\") AS \"singerid__min\", AVG(\"singers\".\"singerid\") AS \"singerid__avg\" FROM \"singers\"";
 
     List<String> result = new ArrayList<>();
     result.add("int");
@@ -229,15 +217,14 @@ public class DjangoAggregationTests extends DjangoTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(
-        sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
-
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
   public void annotateCount() throws IOException, InterruptedException {
 
-    String sql = "SELECT \"singers\".\"firstname\", COUNT(\"singers\".\"firstname\") AS \"firstname__count\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
+    String sql =
+        "SELECT \"singers\".\"firstname\", COUNT(\"singers\".\"firstname\") AS \"firstname__count\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
 
     List<String> result = new ArrayList<>();
     result.add("string");
@@ -259,20 +246,20 @@ public class DjangoAggregationTests extends DjangoTestSetup {
     options.add("annotate_count");
 
     String actualOutput = executeAggregationTests(pgServer.getLocalPort(), host, options);
-    String expectedOutput = "<QuerySet [{'firstname': 'john', 'firstname__count': 2}, {'firstname': 'jane', 'firstname__count': 3}]>\n";
+    String expectedOutput =
+        "<QuerySet [{'firstname': 'john', 'firstname__count': 2}, {'firstname': 'jane', 'firstname__count': 3}]>\n";
 
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(
-        sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
-
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
   public void annotateMin() throws IOException, InterruptedException {
 
-    String sql = "SELECT \"singers\".\"firstname\", MIN(\"singers\".\"firstname\") AS \"firstname__min\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
+    String sql =
+        "SELECT \"singers\".\"firstname\", MIN(\"singers\".\"firstname\") AS \"firstname__min\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
 
     List<String> result = new ArrayList<>();
     result.add("string");
@@ -294,20 +281,20 @@ public class DjangoAggregationTests extends DjangoTestSetup {
     options.add("annotate_min");
 
     String actualOutput = executeAggregationTests(pgServer.getLocalPort(), host, options);
-    String expectedOutput = "<QuerySet [{'firstname': 'john', 'firstname__min': 2}, {'firstname': 'jane', 'firstname__min': 3}]>\n";
+    String expectedOutput =
+        "<QuerySet [{'firstname': 'john', 'firstname__min': 2}, {'firstname': 'jane', 'firstname__min': 3}]>\n";
 
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(
-        sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
-
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
   public void annotateMax() throws IOException, InterruptedException {
 
-    String sql = "SELECT \"singers\".\"firstname\", MAX(\"singers\".\"firstname\") AS \"firstname__max\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
+    String sql =
+        "SELECT \"singers\".\"firstname\", MAX(\"singers\".\"firstname\") AS \"firstname__max\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
 
     List<String> result = new ArrayList<>();
     result.add("string");
@@ -329,20 +316,20 @@ public class DjangoAggregationTests extends DjangoTestSetup {
     options.add("annotate_max");
 
     String actualOutput = executeAggregationTests(pgServer.getLocalPort(), host, options);
-    String expectedOutput = "<QuerySet [{'firstname': 'john', 'firstname__max': 2}, {'firstname': 'jane', 'firstname__max': 3}]>\n";
+    String expectedOutput =
+        "<QuerySet [{'firstname': 'john', 'firstname__max': 2}, {'firstname': 'jane', 'firstname__max': 3}]>\n";
 
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(
-        sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
-
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
   public void annotateAvg() throws IOException, InterruptedException {
 
-    String sql = "SELECT \"singers\".\"firstname\", AVG(\"singers\".\"firstname\") AS \"firstname__avg\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
+    String sql =
+        "SELECT \"singers\".\"firstname\", AVG(\"singers\".\"firstname\") AS \"firstname__avg\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
 
     List<String> result = new ArrayList<>();
     result.add("string");
@@ -364,20 +351,20 @@ public class DjangoAggregationTests extends DjangoTestSetup {
     options.add("annotate_avg");
 
     String actualOutput = executeAggregationTests(pgServer.getLocalPort(), host, options);
-    String expectedOutput = "<QuerySet [{'firstname': 'john', 'firstname__avg': 2}, {'firstname': 'jane', 'firstname__avg': 3}]>\n";
+    String expectedOutput =
+        "<QuerySet [{'firstname': 'john', 'firstname__avg': 2}, {'firstname': 'jane', 'firstname__avg': 3}]>\n";
 
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(
-        sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
-
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 
   @Test
   public void annotateMultiple() throws IOException, InterruptedException {
 
-    String sql = "SELECT \"singers\".\"singerid\", AVG(\"singers\".\"singerid\") AS \"singerid__avg\", COUNT(\"singers\".\"singerid\") AS \"singerid__count\", MAX(\"singers\".\"singerid\") AS \"singerid__max\", MIN(\"singers\".\"singerid\") AS \"singerid__min\" FROM \"singers\" GROUP BY \"singers\".\"singerid\" LIMIT 21";
+    String sql =
+        "SELECT \"singers\".\"singerid\", AVG(\"singers\".\"singerid\") AS \"singerid__avg\", COUNT(\"singers\".\"singerid\") AS \"singerid__count\", MAX(\"singers\".\"singerid\") AS \"singerid__max\", MIN(\"singers\".\"singerid\") AS \"singerid__min\" FROM \"singers\" GROUP BY \"singers\".\"singerid\" LIMIT 21";
 
     List<String> result = new ArrayList<>();
     result.add("int");
@@ -404,15 +391,12 @@ public class DjangoAggregationTests extends DjangoTestSetup {
     options.add("annotate_multiple");
 
     String actualOutput = executeAggregationTests(pgServer.getLocalPort(), host, options);
-    String expectedOutput = "<QuerySet [{'singerid': 1, 'singerid__avg': 10.0, 'singerid__count': 18, 'singerid__max': 15, 'singerid__min': 5}]>\n";
+    String expectedOutput =
+        "<QuerySet [{'singerid': 1, 'singerid__avg': 10.0, 'singerid__count': 18, 'singerid__max': 15, 'singerid__min': 5}]>\n";
 
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(
-        sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
-
+    assertEquals(sql, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
-
-
 }
