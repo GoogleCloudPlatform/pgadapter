@@ -35,7 +35,6 @@ import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ReadContext;
-import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
