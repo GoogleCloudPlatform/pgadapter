@@ -21,19 +21,20 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.spanner.v1.StructType;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 
 @InternalApi
 public class DescribeResult {
-  private final ResultSet resultSet;
+  @Nullable private final ResultSet resultSet;
   private final int[] parameters;
 
-  public DescribeResult(int[] givenParameterTypes, ResultSet resultMetadata) {
+  public DescribeResult(int[] givenParameterTypes, @Nullable ResultSet resultMetadata) {
     this.resultSet = resultMetadata;
     this.parameters = extractParameters(givenParameterTypes, resultMetadata);
   }
 
-  static int[] extractParameters(int[] givenParameterTypes, ResultSet resultSet) {
-    if (!resultSet.getMetadata().hasUndeclaredParameters()) {
+  static int[] extractParameters(int[] givenParameterTypes, @Nullable ResultSet resultSet) {
+    if (resultSet == null || !resultSet.getMetadata().hasUndeclaredParameters()) {
       return givenParameterTypes;
     }
     return extractParameterTypes(
@@ -79,7 +80,7 @@ public class DescribeResult {
     return parameters;
   }
 
-  public ResultSet getResultSet() {
+  public @Nullable ResultSet getResultSet() {
     return resultSet;
   }
 }
