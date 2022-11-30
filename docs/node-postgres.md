@@ -115,4 +115,9 @@ console.log(res);
 ```
 
 ## Limitations
+- `node-postgres` always uses untyped query parameters encoded as strings. Cloud Spanner requires
+  query parameters to be typed. PGAdapter therefore infers the types of the query parameters the
+  first time it sees a given SQL string by analyzing the SQL statement and caching the result on the
+  connection. This means that the first execution of a SQL statement with query parameters on a
+  connection will be slightly slower than the following executions.
 - [Prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are limited to at most 50 parameters.
