@@ -29,6 +29,7 @@ import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
@@ -218,12 +219,13 @@ public class PythonBasicTests extends PythonTestSetup {
     parameters.add("VALUE");
 
     String sql = "INSERT INTO SOME_TABLE(COLUMN_NAME) VALUES ($1)";
-    String describeParametersSql = "select $1 from (select COLUMN_NAME=$1 from SOME_TABLE) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeParametersSql),
-            createResultSetWithOnlyMetadata(ImmutableList.of(TypeCode.STRING))));
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 0));
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("VALUE").build(), 1));
 
@@ -233,20 +235,17 @@ public class PythonBasicTests extends PythonTestSetup {
     String expectedOutput = "1\n1\n";
     assertEquals(expectedOutput, actualOutput);
 
-    // We receive 4 ExecuteSqlRequests:
-    // 1. Describe parameters.
-    // 2. Analyze the update statement.
-    // 3. Execute the update statement twice.
+    // We receive 3 ExecuteSqlRequests:
+    // 1. Analyze the update statement.
+    // 2. Execute the update statement twice.
     List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
-    assertEquals(4, requests.size());
-    assertEquals(describeParametersSql, requests.get(0).getSql());
+    assertEquals(3, requests.size());
+    assertEquals(sql, requests.get(0).getSql());
     assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
     assertEquals(sql, requests.get(1).getSql());
-    assertEquals(QueryMode.PLAN, requests.get(1).getQueryMode());
+    assertEquals(QueryMode.NORMAL, requests.get(1).getQueryMode());
     assertEquals(sql, requests.get(2).getSql());
     assertEquals(QueryMode.NORMAL, requests.get(2).getQueryMode());
-    assertEquals(sql, requests.get(3).getSql());
-    assertEquals(QueryMode.NORMAL, requests.get(3).getQueryMode());
     // This is all executed in auto commit mode. That means that the analyzeUpdate call is also
     // executed in auto commit mode, and is automatically committed.
     assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));

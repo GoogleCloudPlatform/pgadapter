@@ -26,6 +26,7 @@ import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Partition;
 import com.google.cloud.spanner.PartitionOptions;
+import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.ResultSets;
 import com.google.cloud.spanner.Spanner;
@@ -80,6 +81,7 @@ import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -149,6 +151,10 @@ public class BackendConnection {
       this.result = SettableFuture.create();
     }
 
+    boolean isBatchingPossible() {
+      return false;
+    }
+
     abstract void execute();
 
     void checkConnectionState() {
@@ -161,12 +167,34 @@ public class BackendConnection {
   }
 
   private final class Execute extends BufferedStatement<StatementResult> {
-    Execute(ParsedStatement parsedStatement, Statement statement) {
+    private final Function<Statement, Statement> statementBinder;
+    private final boolean analyze;
+
+    Execute(
+        ParsedStatement parsedStatement,
+        Statement statement,
+        Function<Statement, Statement> statementBinder) {
+      this(parsedStatement, statement, statementBinder, false);
+    }
+
+    Execute(
+        ParsedStatement parsedStatement,
+        Statement statement,
+        Function<Statement, Statement> statementBinder,
+        boolean analyze) {
       super(parsedStatement, statement);
+      this.statementBinder = statementBinder;
+      this.analyze = analyze;
+    }
+
+    @Override
+    boolean isBatchingPossible() {
+      return !analyze;
     }
 
     @Override
     void execute() {
+      Statement updatedStatement = statement;
       try {
         checkConnectionState();
         // TODO(b/235719478): If the statement is a BEGIN statement and there is a COMMIT statement
@@ -209,14 +237,18 @@ public class BackendConnection {
         } else if (statement.getSql().isEmpty()) {
           result.set(NO_RESULT);
         } else if (parsedStatement.isDdl()) {
-          result.set(ddlExecutor.execute(parsedStatement, statement));
+          if (analyze) {
+            result.set(NO_RESULT);
+          } else {
+            result.set(ddlExecutor.execute(parsedStatement, statement));
+          }
         } else {
           // Potentially replace pg_catalog table references with common table expressions.
-          Statement updatedStatement =
+          updatedStatement =
               sessionState.isReplacePgCatalogTables()
                   ? pgCatalog.replacePgCatalogTables(statement)
                   : statement;
-          result.set(spannerConnection.execute(updatedStatement));
+          result.set(bindAndExecute(updatedStatement));
         }
       } catch (SpannerException spannerException) {
         // Executing queries against the information schema in a transaction is unsupported.
@@ -229,7 +261,7 @@ public class BackendConnection {
                         spannerConnection
                             .getDatabaseClient()
                             .singleUse()
-                            .executeQuery(statement))));
+                            .executeQuery(updatedStatement))));
             return;
           } catch (Exception exception) {
             throw setAndReturn(result, exception);
@@ -243,6 +275,45 @@ public class BackendConnection {
       } catch (Throwable exception) {
         throw setAndReturn(result, exception);
       }
+    }
+
+    StatementResult bindAndExecute(Statement statement) {
+      statement = statementBinder.apply(statement);
+      if (analyze) {
+        ResultSet resultSet;
+        if (parsedStatement.isUpdate() && !parsedStatement.hasReturningClause()) {
+          // TODO(#477): Single analyzeUpdate statements that are executed in an implicit
+          //     transaction could use a single-use read/write transaction. Replays are not
+          //     dangerous for those.
+
+          // We handle one very specific use case here to prevent unnecessary problems: If the user
+          // has started a DML batch and is then analyzing an update statement (probably a prepared
+          // statement), then we use a separate transaction for that.
+          if (spannerConnection.isDmlBatchActive()) {
+            final Statement statementToAnalyze = statement;
+            resultSet =
+                spannerConnection
+                    .getDatabaseClient()
+                    .readWriteTransaction()
+                    .run(
+                        transaction -> {
+                          ResultSet updateStatementMetadata =
+                              transaction.analyzeUpdateStatement(
+                                  statementToAnalyze, QueryAnalyzeMode.PLAN);
+                          updateStatementMetadata.next();
+                          return updateStatementMetadata;
+                        });
+          } else {
+            resultSet = spannerConnection.analyzeUpdateStatement(statement, QueryAnalyzeMode.PLAN);
+          }
+        } else if (parsedStatement.isQuery() || parsedStatement.hasReturningClause()) {
+          resultSet = spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
+        } else {
+          return NO_RESULT;
+        }
+        return new QueryResult(resultSet);
+      }
+      return spannerConnection.execute(statement);
     }
 
     /**
@@ -428,8 +499,17 @@ public class BackendConnection {
    * message is received. The returned future will contain the result of the statement when
    * execution has finished.
    */
-  public Future<StatementResult> execute(ParsedStatement parsedStatement, Statement statement) {
-    Execute execute = new Execute(parsedStatement, statement);
+  public Future<StatementResult> execute(
+      ParsedStatement parsedStatement,
+      Statement statement,
+      Function<Statement, Statement> statementBinder) {
+    Execute execute = new Execute(parsedStatement, statement, statementBinder);
+    bufferedStatements.add(execute);
+    return execute.result;
+  }
+
+  public Future<StatementResult> analyze(ParsedStatement parsedStatement, Statement statement) {
+    Execute execute = new Execute(parsedStatement, statement, Function.identity(), true);
     bufferedStatements.add(execute);
     return execute.result;
   }
@@ -551,7 +631,7 @@ public class BackendConnection {
           spannerConnection.beginTransaction();
         }
         boolean canUseBatch = false;
-        if (index < (getStatementCount() - 1)) {
+        if (bufferedStatement.isBatchingPossible() && index < (getStatementCount() - 1)) {
           StatementType statementType = getStatementType(index);
           StatementType nextStatementType = getStatementType(index + 1);
           canUseBatch = canBeBatchedTogether(statementType, nextStatementType);
@@ -841,7 +921,8 @@ public class BackendConnection {
                     bufferedStatements.get(index).parsedStatement,
                     bufferedStatements.get(index).statement));
           } else {
-            spannerConnection.execute(bufferedStatements.get(index).statement);
+            Execute execute = (Execute) bufferedStatements.get(index);
+            execute.bindAndExecute(execute.statement);
           }
           index++;
         } else {

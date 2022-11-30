@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.google.cloud.spanner.pgadapter.metadata;
+package com.google.cloud.postgres;
 
-import com.google.api.core.InternalApi;
+import java.time.LocalDateTime;
+import org.hibernate.Session;
+import org.hibernate.tuple.ValueGenerator;
 
-/** Simple POJO superclass to hold results from a describe statement. */
-@InternalApi
-public abstract class DescribeMetadata<T> {
+public class CurrentLocalDateTimeGenerator implements ValueGenerator<LocalDateTime> {
 
-  protected T metadata;
-
-  public T getMetadata() {
-    return this.metadata;
+  @Override
+  public LocalDateTime generateValue(Session session, Object entity) {
+    return LocalDateTime.now();
   }
 }

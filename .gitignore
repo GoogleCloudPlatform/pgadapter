@@ -1,11 +1,13 @@
 target/
 /target
+.DS_STORE
 .idea/
 *.iml
 *.class
 *.lst
 output.txt
 __pycache__
+.DS_Store
 
 src/test/golang/**/*.h
 src/test/golang/**/*.so
