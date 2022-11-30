@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, LargeBinary, Float, \
   Numeric, DateTime, Date, FetchedValue, ForeignKey
 from sqlalchemy.orm import registry, relationship
+from datetime import timezone
 
 mapper_registry = registry()
 Base = mapper_registry.generate_base()
@@ -23,10 +24,12 @@ class Singer(BaseMixin, Base):
 
   def __repr__(self):
     return f"singers(" \
-           f"id=        {self.id!r}," \
+           f"id={self.id!r}," \
            f"first_name={self.first_name!r}," \
-           f"last_name= {self.last_name!r}" \
-           f"active=    {self.active!r}" \
+           f"last_name={self.last_name!r}," \
+           f"active={self.active!r}," \
+           f"created_at={self.created_at.astimezone(timezone.utc)!r}," \
+           f"updated_at={self.updated_at.astimezone(timezone.utc)!r}" \
            f")"
 
 
@@ -43,12 +46,14 @@ class Album(BaseMixin, Base):
 
   def __repr__(self):
     return f"albums(" \
-           f"id=              {self.id!r}," \
-           f"title=           {self.title!r}," \
-           f"marketing_budget={self.marketing_budget!r}" \
-           f"release_date=    {self.release_date!r}" \
-           f"cover_picture=   {self.cover_picture!r}" \
-           f"singer=          {self.singer!r}" \
+           f"id={self.id!r}," \
+           f"title={self.title!r}," \
+           f"marketing_budget={self.marketing_budget!r}," \
+           f"release_date={self.release_date!r}," \
+           f"cover_picture={self.cover_picture!r}," \
+           f"singer={self.singer_id!r}," \
+           f"created_at={self.created_at.astimezone(timezone.utc)!r}," \
+           f"updated_at={self.updated_at.astimezone(timezone.utc)!r}" \
            f")"
 
 
@@ -63,11 +68,12 @@ class Track(BaseMixin, Base):
 
   def __repr__(self):
     return f"tracks(" \
-           f"id=          {self.id!r}," \
+           f"id={self.id!r}," \
            f"track_number={self.track_number!r}," \
-           f"title=       {self.title!r}," \
-           f"sample_rate= {self.sample_rate!r}" \
-           f"album=       {self.album!r}" \
+           f"title={self.title!r}," \
+           f"sample_rate={self.sample_rate!r}," \
+           f"created_at={self.created_at.astimezone(timezone.utc)!r}," \
+           f"updated_at={self.updated_at.astimezone(timezone.utc)!r}" \
            f")"
 
 
@@ -79,9 +85,11 @@ class Venue(BaseMixin, Base):
 
   def __repr__(self):
     return f"venues(" \
-           f"id=         {self.id!r}," \
-           f"name=       {self.name!r}," \
-           f"description={self.description!r}" \
+           f"id={self.id!r}," \
+           f"name={self.name!r}," \
+           f"description={self.description!r}," \
+           f"created_at={self.created_at.astimezone(timezone.utc)!r}," \
+           f"updated_at={self.updated_at.astimezone(timezone.utc)!r}" \
            f")"
 
 
@@ -98,10 +106,12 @@ class Concert(BaseMixin, Base):
 
   def __repr__(self):
     return f"concerts(" \
-           f"id=        {self.id!r}," \
-           f"name=      {self.name!r}," \
-           f"venue=     {self.venue!r}" \
-           f"singer=    {self.singer!r}" \
-           f"start_time={self.start_time!r}" \
-           f"end_time=  {self.end_time!r}" \
+           f"id={self.id!r}," \
+           f"name={self.name!r}," \
+           f"venue={self.venue!r}," \
+           f"singer={self.singer!r}," \
+           f"start_time={self.start_time!r}," \
+           f"end_time={self.end_time!r}," \
+           f"created_at={self.created_at.astimezone(timezone.utc)!r}," \
+           f"updated_at={self.updated_at.astimezone(timezone.utc)!r}" \
            f")"
