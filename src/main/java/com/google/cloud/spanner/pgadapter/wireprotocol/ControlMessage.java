@@ -28,6 +28,7 @@ import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -243,7 +244,7 @@ public abstract class ControlMessage extends WireMessage {
    *
    * <p>NOTE: This method does not flush the output stream.
    */
-  public void sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
+  void sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
     String command = statement.getCommandTag();
     if (Strings.isNullOrEmpty(command)) {
@@ -253,30 +254,37 @@ public abstract class ControlMessage extends WireMessage {
     if (statement.getStatementResult() == null) {
       return;
     }
-
     switch (statement.getStatementType()) {
       case DDL:
-      case CLIENT_SIDE:
       case UNKNOWN:
         new CommandCompleteResponse(this.outputStream, command).send(false);
         break;
-      case QUERY:
-        SendResultSetState state = sendResultSet(statement, mode, maxRows);
-        statement.setHasMoreData(state.hasMoreRows());
-        if (state.hasMoreRows()) {
-          new PortalSuspendedResponse(this.outputStream).send(false);
-        } else {
-          statement.close();
-          new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows()).send(false);
+      case CLIENT_SIDE:
+        if (statement.getStatementResult().getResultType() != ResultType.RESULT_SET) {
+          new CommandCompleteResponse(this.outputStream, command).send(false);
+          break;
         }
-        break;
+        // fallthrough to QUERY
+      case QUERY:
       case UPDATE:
-        // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
-        // inserted. oid used to be the object ID of the inserted row if rows was 1 and the target
-        // table had OIDs, but OIDs system columns are not supported anymore; therefore oid is
-        // always 0.
-        command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
-        new CommandCompleteResponse(this.outputStream, command).send(false);
+        if (statement.getStatementResult().getResultType() == ResultType.RESULT_SET) {
+          SendResultSetState state = sendResultSet(statement, mode, maxRows);
+          statement.setHasMoreData(state.hasMoreRows());
+          if (state.hasMoreRows()) {
+            new PortalSuspendedResponse(this.outputStream).send(false);
+          } else {
+            statement.close();
+            new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows())
+                .send(false);
+          }
+        } else {
+          // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
+          // inserted. oid used to be the object ID of the inserted row if rows was 1 and the target
+          // table had OIDs, but OIDs system columns are not supported anymore; therefore oid is
+          // always 0.
+          command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
+          new CommandCompleteResponse(this.outputStream, command).send(false);
+        }
         break;
       default:
         throw new IllegalStateException("Unknown statement type: " + statement.getStatement());
@@ -293,12 +301,13 @@ public abstract class ControlMessage extends WireMessage {
    * @return An adapted representation with specific metadata which PG wire requires.
    * @throws com.google.cloud.spanner.SpannerException if traversing the {@link ResultSet} fails.
    */
-  public SendResultSetState sendResultSet(
+  SendResultSetState sendResultSet(
       IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
-    Preconditions.checkArgument(
-        describedResult.containsResultSet(), "The statement result must be a result set");
-    long rows;
     StatementResult statementResult = describedResult.getStatementResult();
+    Preconditions.checkArgument(
+        statementResult.getResultType() == ResultType.RESULT_SET,
+        "The statement result must be a result set");
+    long rows;
     boolean hasData;
     if (statementResult instanceof PartitionQueryResult) {
       hasData = false;

@@ -261,47 +261,51 @@ public class HibernateSampleTest {
   }
 
   public void executeTest() {
-    System.out.println("Testing Foreign Key");
-    testForeignKey();
-    System.out.println("Foreign Key Test Completed");
+    try {
+      System.out.println("Testing Foreign Key");
+      testForeignKey();
+      System.out.println("Foreign Key Test Completed");
 
-    System.out.println("Testing Session Rollback");
-    testSessionRollback();
-    System.out.println("Session Rollback Test Completed");
+      System.out.println("Testing Session Rollback");
+      testSessionRollback();
+      System.out.println("Session Rollback Test Completed");
 
-    System.out.println("Testing Data Insert");
-    testAddingData();
-    System.out.println("Data Insert Test Completed");
+      System.out.println("Testing Data Insert");
+      testAddingData();
+      System.out.println("Data Insert Test Completed");
 
-    System.out.println("Testing Data Delete");
-    testDeletingData();
-    System.out.println("Data Delete Test Completed");
+      System.out.println("Testing Data Delete");
+      testDeletingData();
+      System.out.println("Data Delete Test Completed");
 
-    System.out.println("Testing One to Many Fetch");
-    testOneToManyData();
-    System.out.println("One To Many Fetch Test Completed");
+      System.out.println("Testing One to Many Fetch");
+      testOneToManyData();
+      System.out.println("One To Many Fetch Test Completed");
 
-    System.out.println("Testing HQL List");
-    testHqlList();
-    System.out.println("HQL List Test Completed");
+      System.out.println("Testing HQL List");
+      testHqlList();
+      System.out.println("HQL List Test Completed");
 
-    System.out.println("Testing HQL Update");
-    testHqlUpdate();
-    System.out.println("HQL Update Test Completed");
+      System.out.println("Testing HQL Update");
+      testHqlUpdate();
+      System.out.println("HQL Update Test Completed");
 
-    System.out.println("Testing JPA List and Update");
-    testJPACriteria();
-    System.out.println("JPA List and Update Test Completed");
+      System.out.println("Testing JPA List and Update");
+      testJPACriteria();
+      System.out.println("JPA List and Update Test Completed");
 
-    System.out.println("Testing JPA Delete");
-    testJPACriteriaDelete();
-    System.out.println("JPA Delete Test Completed");
-
-    hibernateConfiguration.closeSessionFactory();
+      System.out.println("Testing JPA Delete");
+      testJPACriteriaDelete();
+      System.out.println("JPA Delete Test Completed");
+    } finally {
+      // Make sure we always close the session factory when the test is done. Otherwise, the sample
+      // application might keep non-daemon threads alive and not stop.
+      hibernateConfiguration.closeSessionFactory();
+    }
   }
 
   public static void main(String[] args) {
-    System.out.println("Starting Hibrnate Test");
+    System.out.println("Starting Hibernate Test");
     HibernateSampleTest hibernateSampleTest =
         new HibernateSampleTest(HibernateConfiguration.createHibernateConfiguration());
     hibernateSampleTest.executeTest();

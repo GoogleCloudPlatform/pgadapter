@@ -35,7 +35,6 @@ import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ReadContext;
-import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
@@ -58,7 +57,6 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Bytes;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -303,7 +301,6 @@ public class StatementTest {
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
     SessionState sessionState = mock(SessionState.class);
     when(backendConnection.getSessionState()).thenReturn(sessionState);
-    when(sessionState.getGuessTypes()).thenReturn(ImmutableSet.of());
     String sqlStatement = "SELECT * FROM users WHERE age > $2 AND age < $3 AND name = $1";
     int[] parameterDataTypes = new int[] {Oid.VARCHAR, Oid.INT8, Oid.INT4};
 
@@ -357,7 +354,6 @@ public class StatementTest {
     when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
     SessionState sessionState = mock(SessionState.class);
     when(backendConnection.getSessionState()).thenReturn(sessionState);
-    when(sessionState.getGuessTypes()).thenReturn(ImmutableSet.of());
 
     String sqlStatement = "SELECT * FROM users WHERE metadata = $1";
     int[] parameterDataTypes = new int[] {Oid.JSON};
@@ -384,8 +380,6 @@ public class StatementTest {
     when(connectionHandler.getSpannerConnection()).thenReturn(connection);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     String sqlStatement = "SELECT * FROM users WHERE name = $1 AND age > $2 AND age < $3";
-    when(connection.analyzeQuery(Statement.of(sqlStatement), QueryAnalyzeMode.PLAN))
-        .thenReturn(resultSet);
 
     int[] parameters = new int[3];
     Arrays.fill(parameters, Oid.INT8);

@@ -94,4 +94,38 @@ public class ServerTest {
       System.setErr(originalErr);
     }
   }
+
+  @Test
+  public void testInvalidKeyStore() {
+    ByteArrayOutputStream outArrayStream = new ByteArrayOutputStream();
+    PrintStream out = new PrintStream(outArrayStream);
+    ByteArrayOutputStream errArrayStream = new ByteArrayOutputStream();
+    PrintStream err = new PrintStream(errArrayStream);
+
+    PrintStream originalOut = System.out;
+    PrintStream originalErr = System.err;
+    String originalKeyStore = System.getProperty("javax.net.ssl.keyStore");
+    System.setOut(out);
+    System.setErr(err);
+    System.setProperty("javax.net.ssl.keyStore", "/path/to/non/existing/file.pfx");
+
+    try {
+      Server.main(new String[] {});
+      assertEquals(
+          "The server could not be started because an error occurred: Key store /path/to/non/existing/file.pfx does not exist\n",
+          errArrayStream.toString());
+      assertTrue(
+          outArrayStream.toString(),
+          outArrayStream
+              .toString()
+              .startsWith(
+                  String.format("-- Starting PGAdapter version %s --", Server.getVersion())));
+    } finally {
+      System.setOut(originalOut);
+      System.setErr(originalErr);
+      if (originalKeyStore != null) {
+        System.setProperty("javax.net.ssl.keyStore", originalKeyStore);
+      }
+    }
+  }
 }
