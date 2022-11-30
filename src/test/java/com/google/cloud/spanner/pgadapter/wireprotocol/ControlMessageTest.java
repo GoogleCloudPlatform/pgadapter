@@ -12,24 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package com.google.cloud.spanner.pgadapter;
+package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
+import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.UpdateCount;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
-import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -137,5 +140,20 @@ public final class ControlMessageTest {
     byte[] bytes = new byte[numOfBytes];
     assertEquals(numOfBytes, outputReader.read(bytes, 0, numOfBytes));
     assertEquals(resultMessage, new String(bytes, UTF8));
+  }
+
+  @Test
+  public void testSendNoRowsAsResultSetFails() {
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    IntermediateStatement describedResult = mock(IntermediateStatement.class);
+    StatementResult statementResult = mock(StatementResult.class);
+    when(statementResult.getResultType()).thenReturn(ResultType.NO_RESULT);
+    when(describedResult.getStatementResult()).thenReturn(statementResult);
+
+    ControlMessage message =
+        new DescribeMessage(connectionHandler, ManuallyCreatedToken.MANUALLY_CREATED_TOKEN);
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> message.sendResultSet(describedResult, QueryMode.SIMPLE, 0L));
   }
 }
