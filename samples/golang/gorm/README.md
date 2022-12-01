@@ -52,7 +52,7 @@ psql -h localhost -p 5432 -d my-database -f drop_data_model.sql
 Cloud Spanner supports the following data types in combination with `gorm`.
 
 | PostgreSQL Type                         | gorm / go type               |
-|------------------------------------------------------------------------|
+|-----------------------------------------|------------------------------|
 | boolean                                 | bool, sql.NullBool           |
 | bigint / int8                           | int64, sql.NullInt64         |
 | varchar                                 | string, sql.NullString       |
