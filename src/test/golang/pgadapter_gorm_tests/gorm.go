@@ -40,15 +40,16 @@ func main() {
 
 type User struct {
 	// Prevent gorm from using an auto-generated key.
-	ID           int64 `gorm:"primaryKey;autoIncrement:false"`
-	Name         string
-	Email        *string
-	Age          int64
-	Birthday     *time.Time
-	MemberNumber sql.NullString
-	ActivatedAt  sql.NullTime
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID            int64 `gorm:"primaryKey;autoIncrement:false"`
+	Name          string
+	Email         *string
+	Age           int64
+	Birthday      *time.Time
+	MemberNumber  sql.NullString
+	NameAndNumber string `gorm:"->;type:GENERATED ALWAYS AS (coalesce(concat(name,' '::varchar,member_number))) STORED;default:(-);"`
+	ActivatedAt   sql.NullTime
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type Blog struct {
