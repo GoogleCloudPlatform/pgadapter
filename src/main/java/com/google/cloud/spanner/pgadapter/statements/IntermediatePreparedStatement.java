@@ -18,6 +18,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
@@ -102,7 +103,12 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
     this.describeResult =
         Futures.lazyTransform(
             statementResultFuture,
-            result -> new DescribeResult(this.givenParameterDataTypes, result.getResultSet()));
+            result ->
+                new DescribeResult(
+                    this.givenParameterDataTypes,
+                    result.getResultType() == ResultType.RESULT_SET
+                        ? result.getResultSet()
+                        : null));
     this.described = true;
     return statementResultFuture;
   }

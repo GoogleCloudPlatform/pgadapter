@@ -402,6 +402,98 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testInsertAllDataTypesReturning() {
+    String sql =
+        "INSERT INTO all_types "
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ALL_TYPES_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            createParameterTypesMetadata(
+                                    ImmutableList.of(
+                                        TypeCode.INT64,
+                                        TypeCode.BOOL,
+                                        TypeCode.BYTES,
+                                        TypeCode.FLOAT64,
+                                        TypeCode.INT64,
+                                        TypeCode.NUMERIC,
+                                        TypeCode.TIMESTAMP,
+                                        TypeCode.DATE,
+                                        TypeCode.STRING,
+                                        TypeCode.STRING))
+                                .getUndeclaredParameters()))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to(100L)
+                .bind("p2")
+                .to(true)
+                .bind("p3")
+                .to(ByteArray.copyFrom("test_bytes"))
+                .bind("p4")
+                .to(3.14d)
+                .bind("p5")
+                .to(1L)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .bind("p7")
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .bind("p8")
+                .to(Date.parseDate("2022-04-02"))
+                .bind("p9")
+                .to("test_string")
+                .bind("p10")
+                .to("{\"key\": \"value\"}")
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ALL_TYPES_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            createParameterTypesMetadata(
+                                    ImmutableList.of(
+                                        TypeCode.INT64,
+                                        TypeCode.BOOL,
+                                        TypeCode.BYTES,
+                                        TypeCode.FLOAT64,
+                                        TypeCode.INT64,
+                                        TypeCode.NUMERIC,
+                                        TypeCode.TIMESTAMP,
+                                        TypeCode.DATE,
+                                        TypeCode.STRING,
+                                        TypeCode.STRING))
+                                .getUndeclaredParameters()))
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+                .addRows(ALL_TYPES_RESULTSET.getRows(0))
+                .build()));
+
+    String res = pgxTest.TestInsertAllDataTypesReturning(createConnString());
+
+    assertNull(res);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // pgx by default always uses prepared statements. That means that each request is sent two
+    // times to the backend the first time it is executed:
+    // 1. DescribeStatement (parameters)
+    // 2. Execute
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeParamsRequest = requests.get(0);
+    assertEquals(sql, describeParamsRequest.getSql());
+    assertEquals(QueryMode.PLAN, describeParamsRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = requests.get(1);
+    assertEquals(sql, executeRequest.getSql());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+  }
+
+  @Test
   public void testInsertBatch() {
     String sql =
         "INSERT INTO all_types "
