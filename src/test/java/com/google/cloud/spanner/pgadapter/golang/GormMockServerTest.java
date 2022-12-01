@@ -212,12 +212,21 @@ public class GormMockServerTest extends AbstractMockServerTest {
                 .to(Timestamp.parseTimestamp("2022-09-09T12:00:00+01:00"))
                 .build(),
             ResultSet.newBuilder()
-                .setMetadata(ResultSetMetadata.newBuilder()
-                    .setRowType(StructType.newBuilder()
-                        .addFields(Field.newBuilder().setType(Type.newBuilder().setCode(TypeCode.STRING).build()).setName("name_and_number").build())
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .setName("name_and_number")
+                                        .build())
+                                .build())
                         .build())
-                    .build())
-                .addRows(ListValue.newBuilder().addValues(Value.newBuilder().setStringValue("User Name null").build()).build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("User Name null").build())
+                        .build())
                 .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
                 .build()));
     mockSpanner.putStatementResult(
@@ -226,16 +235,25 @@ public class GormMockServerTest extends AbstractMockServerTest {
             ResultSet.newBuilder()
                 .setMetadata(
                     createParameterTypesMetadata(
-                        ImmutableList.of(
-                            TypeCode.INT64,
-                            TypeCode.STRING,
-                            TypeCode.STRING,
-                            TypeCode.INT64,
-                            TypeCode.DATE,
-                            TypeCode.STRING,
-                            TypeCode.TIMESTAMP,
-                            TypeCode.TIMESTAMP,
-                            TypeCode.TIMESTAMP)))
+                            ImmutableList.of(
+                                TypeCode.INT64,
+                                TypeCode.STRING,
+                                TypeCode.STRING,
+                                TypeCode.INT64,
+                                TypeCode.DATE,
+                                TypeCode.STRING,
+                                TypeCode.TIMESTAMP,
+                                TypeCode.TIMESTAMP,
+                                TypeCode.TIMESTAMP))
+                        .toBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .setName("name_and_number")
+                                        .build())
+                                .build()))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     mockSpanner.putStatementResult(
