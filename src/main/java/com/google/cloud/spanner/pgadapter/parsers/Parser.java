@@ -27,7 +27,6 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Set;
 import org.postgresql.core.Oid;
 
 /**
@@ -54,27 +53,6 @@ public abstract class Parser<T> {
   public static final long PG_EPOCH_DAYS = PG_EPOCH_SECONDS / 86400L;
   protected static final Charset UTF8 = StandardCharsets.UTF_8;
   protected T item;
-
-  /**
-   * Guess the type of a parameter with unspecified type.
-   *
-   * @param item The value to guess the type for
-   * @param formatCode The encoding that is used for the value
-   * @return The {@link Oid} type code that is guessed for the value or {@link Oid#UNSPECIFIED} if
-   *     no type could be guessed.
-   */
-  private static int guessType(Set<Integer> guessTypes, byte[] item, FormatCode formatCode) {
-    if (formatCode == FormatCode.TEXT && item != null) {
-      String value = new String(item, StandardCharsets.UTF_8);
-      if (guessTypes.contains(Oid.TIMESTAMPTZ) && TimestampParser.isTimestamp(value)) {
-        return Oid.TIMESTAMPTZ;
-      }
-      if (guessTypes.contains(Oid.DATE) && DateParser.isDate(value)) {
-        return Oid.DATE;
-      }
-    }
-    return Oid.UNSPECIFIED;
-  }
 
   /**
    * Factory method to create a Parser subtype with a designated type from a byte array.
@@ -111,19 +89,15 @@ public abstract class Parser<T> {
       case Oid.TEXT:
       case Oid.VARCHAR:
         return new StringParser(item, formatCode);
+      case Oid.UUID:
+        return new UuidParser(item, formatCode);
       case Oid.TIMESTAMP:
       case Oid.TIMESTAMPTZ:
         return new TimestampParser(item, formatCode, sessionState);
       case Oid.JSONB:
         return new JsonbParser(item, formatCode);
       case Oid.UNSPECIFIED:
-        // Try to guess the type based on the value. Use an unspecified parser if no type could be
-        // determined.
-        int type = guessType(sessionState.getGuessTypes(), item, formatCode);
-        if (type == Oid.UNSPECIFIED) {
-          return new UnspecifiedParser(item, formatCode);
-        }
-        return create(sessionState, item, type, formatCode);
+        return new UnspecifiedParser(item, formatCode);
       default:
         throw new IllegalArgumentException("Unsupported parameter type: " + oidType);
     }
