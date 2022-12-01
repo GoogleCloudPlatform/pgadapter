@@ -264,8 +264,6 @@ Other `psql` meta-commands are __not__ supported.
 ## Limitations
 
 PGAdapter has the following known limitations at this moment:
-- Server side [prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are limited to at most 50 parameters.
-- SSL connections are not supported.
 - Only [password authentication](https://www.postgresql.org/docs/current/auth-password.html) using
   the `password` method is supported. All other authentication methods are not supported.
 - The COPY protocol only supports COPY TO|FROM STDOUT|STDIN [BINARY]. COPY TO|FROM <FILE|PROGRAM> is not supported.

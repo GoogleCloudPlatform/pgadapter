@@ -106,7 +106,3 @@ try (java.sql.Statement statement = connection.createStatement()) {
 ```
 
 ## Limitations
-- Server side [prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are limited to at most 50 parameters.
-  Note: This is not the same as `java.sql.PreparedStatement`. A `java.sql.PreparedStatement` will only use
-  a server side prepared statement if it has been executed more at least `prepareThreshold` times.
-  See https://jdbc.postgresql.org/documentation/server-prepare/#activation for more information.
