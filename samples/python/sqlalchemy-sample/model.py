@@ -1,7 +1,8 @@
 from sqlalchemy import Column, Integer, String, Boolean, LargeBinary, Float, \
-  Numeric, DateTime, Date, FetchedValue, ForeignKey
+  Numeric, DateTime, Date, FetchedValue, ForeignKey, ColumnDefault
 from sqlalchemy.orm import registry, relationship
-from datetime import timezone
+from sqlalchemy.sql import func
+from datetime import timezone, datetime
 
 mapper_registry = registry()
 Base = mapper_registry.generate_base()
@@ -9,8 +10,9 @@ Base = mapper_registry.generate_base()
 
 class BaseMixin(object):
   id = Column(String, primary_key=True)
-  created_at = Column(DateTime(timezone=True))
-  updated_at = Column(DateTime(timezone=True))
+  created_at = Column(DateTime(timezone=True), ColumnDefault(datetime.utcnow))
+  updated_at = Column(DateTime(timezone=True),
+                      ColumnDefault(datetime.utcnow, for_update=True))
 
 
 class Singer(BaseMixin, Base):
@@ -21,6 +23,8 @@ class Singer(BaseMixin, Base):
   full_name = Column(String, server_default=FetchedValue())
   active = Column(Boolean)
   albums = relationship("Album", back_populates="singer")
+
+  __mapper_args__ = {"eager_defaults": True}
 
   def __repr__(self):
     return f"singers(" \
@@ -60,7 +64,7 @@ class Album(BaseMixin, Base):
 class Track(BaseMixin, Base):
   __tablename__ = "tracks"
 
-  id  = Column(String, ForeignKey("albums.id"), primary_key=True)
+  id = Column(String, ForeignKey("albums.id"), primary_key=True)
   track_number = Column(Integer, primary_key=True)
   title = Column(String)
   sample_rate = Column(Float)

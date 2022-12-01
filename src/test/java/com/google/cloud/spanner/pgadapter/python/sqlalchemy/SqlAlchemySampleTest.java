@@ -91,6 +91,67 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testAddSinger() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "INSERT INTO singers (id, created_at, updated_at, first_name, last_name, active) "
+                    + "VALUES ('123-456-789', ('2011-11-04T00:05:23.123456+00:00'::timestamptz), NULL, 'Myfirstname', 'Mylastname', true) "
+                    + "RETURNING singers.full_name"),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("full_name")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .build()))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder().setStringValue("Myfirstname Mylastname").build())
+                        .build())
+                .build()));
+
+    String output = execute(SAMPLE_DIR, "test_add_singer.py", "localhost", pgServer.getLocalPort());
+    assertEquals("Added singer 123-456-789 with full name Myfirstname Mylastname\n", output);
+  }
+
+  @Test
+  public void testUpdateSinger() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "INSERT INTO singers (id, created_at, updated_at, first_name, last_name, active) "
+                    + "VALUES ('123-456-789', ('2011-11-04T00:05:23.123456+00:00'::timestamptz), NULL, 'Myfirstname', 'Mylastname', true) "
+                    + "RETURNING singers.full_name"),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("full_name")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .build()))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder().setStringValue("Myfirstname Mylastname").build())
+                        .build())
+                .build()));
+
+    String output =
+        execute(SAMPLE_DIR, "test_update_singer.py", "localhost", pgServer.getLocalPort());
+    assertEquals("Added singer 123-456-789 with full name Myfirstname Mylastname\n", output);
+  }
+
+  @Test
   public void testGetAlbum() throws IOException, InterruptedException {
     mockSpanner.putStatementResult(
         StatementResult.query(
