@@ -1,3 +1,17 @@
+// Copyright 2022 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package com.google.cloud.spanner.pgadapter.python.sqlalchemy;
 
 import static com.google.cloud.spanner.pgadapter.python.sqlalchemy.SqlAlchemyBasicsTest.execute;
@@ -38,6 +52,210 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   @BeforeClass
   public static void setupBaseResults() {
     SqlAlchemyBasicsTest.setupBaseResults();
+  }
+
+  @Test
+  public void testAlbumsWithTitleFirstCharEqualToSingerName()
+      throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                    + "FROM albums JOIN singers ON singers.id = albums.singer_id \n"
+                    + "WHERE lower(SUBSTRING(albums.title FROM 1 FOR 1)) = lower(SUBSTRING(singers.first_name FROM 1 FOR 1)) OR "
+                    + "lower(SUBSTRING(albums.title FROM 1 FOR 1)) = lower(SUBSTRING(singers.last_name FROM 1 FOR 1))"),
+            ResultSet.newBuilder().setMetadata(createAlbumsMetadata("albums_")).build()));
+
+    String output =
+        execute(
+            SAMPLE_DIR,
+            "test_print_albums_first_character_of_title_equal_to_first_or_last_name.py",
+            "localhost",
+            pgServer.getLocalPort());
+    assertEquals(
+        "Searching for albums that have a title that starts with the same character as the first or last name of the singer\n",
+        output);
+  }
+
+  @Test
+  public void testSingersWithLimitAndOffset() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT singers.id AS singers_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
+                    + "FROM singers ORDER BY singers.last_name \n"
+                    + " LIMIT 5 OFFSET 3"),
+            ResultSet.newBuilder()
+                .setMetadata(createSingersMetadata("singers_"))
+                .addRows(
+                    createSingerRow(
+                        "123",
+                        "Pete",
+                        "Allison",
+                        true,
+                        Timestamp.parseTimestamp("2022-12-02T17:30:00Z"),
+                        Timestamp.parseTimestamp("2022-12-02T17:30:00Z")))
+                .addRows(
+                    createSingerRow(
+                        "321",
+                        "Alice",
+                        "Henderson",
+                        true,
+                        Timestamp.parseTimestamp("2022-12-02T17:30:00Z"),
+                        Timestamp.parseTimestamp("2022-12-02T17:30:00Z")))
+                .build()));
+    String output =
+        execute(
+            SAMPLE_DIR,
+            "test_print_singers_with_limit_and_offset.py",
+            "localhost",
+            pgServer.getLocalPort());
+    assertEquals(
+        "Printing all singers ordered by last name\n"
+            + "singers(id='123',first_name='Pete',last_name='Allison',active=True,created_at=datetime.datetime(2022, 12, 2, 17, 30, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 2, 17, 30, tzinfo=datetime.timezone.utc))\n"
+            + "singers(id='321',first_name='Alice',last_name='Henderson',active=True,created_at=datetime.datetime(2022, 12, 2, 17, 30, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 2, 17, 30, tzinfo=datetime.timezone.utc))\n"
+            + "Found 2 singers\n",
+        output);
+  }
+
+  @Test
+  public void testPrintAlbumsReleasedBefore1980() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                    + "FROM albums \n"
+                    + "WHERE albums.release_date < '1980-01-01'::date"),
+            ResultSet.newBuilder()
+                .setMetadata(createAlbumsMetadata("albums_"))
+                .addRows(
+                    createAlbumRow(
+                        "a1",
+                        "Album 1",
+                        "123.456",
+                        Date.parseDate("1979-10-16"),
+                        ByteArray.copyFrom("some cover picture"),
+                        "123",
+                        Timestamp.parseTimestamp("2022-12-02T17:30:00Z"),
+                        Timestamp.parseTimestamp("2022-12-02T17:30:00Z")))
+                .build()));
+    String output =
+        execute(
+            SAMPLE_DIR,
+            "test_print_albums_released_before_1980.py",
+            "localhost",
+            pgServer.getLocalPort());
+    assertEquals(
+        "Searching for albums released before 1980\n"
+            + "Album Album 1 was released at 1979-10-16\n",
+        output);
+  }
+
+  @Test
+  public void testPrintConcerts() throws IOException, InterruptedException {
+    List<Field> concertsFields = createConcertsMetadata("concerts_").getRowType().getFieldsList();
+    List<Field> venuesFields = createVenuesMetadata("venues_1_").getRowType().getFieldsList();
+    List<Field> singersFields = createSingersMetadata("singers_1_").getRowType().getFieldsList();
+    List<Value> concertValues =
+        createConcertRow(
+                "c1",
+                "Avenue Park Open",
+                "v1",
+                "123",
+                Timestamp.parseTimestamp("2023-02-01T20:00:00-05:00"),
+                Timestamp.parseTimestamp("2023-02-02T02:00:00-05:00"),
+                Timestamp.parseTimestamp("2022-12-02T17:30:00Z"),
+                Timestamp.parseTimestamp("2022-12-02T17:30:00Z"))
+            .getValuesList();
+    List<Value> venueValues =
+        createVenueRow(
+                "v1",
+                "Avenue Park",
+                "{\n"
+                    + "  \"Capacity\": 5000,\n"
+                    + "  \"Location\": \"New York\",\n"
+                    + "  \"Country\": \"US\"\n"
+                    + "}",
+                Timestamp.parseTimestamp("2022-12-02T17:30:00Z"),
+                Timestamp.parseTimestamp("2022-12-02T17:30:00Z"))
+            .getValuesList();
+    List<Value> singerValues =
+        createSingerRow(
+                "123",
+                "Pete",
+                "Allison",
+                true,
+                Timestamp.parseTimestamp("2022-12-02T17:30:00Z"),
+                Timestamp.parseTimestamp("2022-12-02T17:30:00Z"))
+            .getValuesList();
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT concerts.id AS concerts_id, concerts.created_at AS concerts_created_at, concerts.updated_at AS concerts_updated_at, concerts.name AS concerts_name, concerts.venue_id AS concerts_venue_id, concerts.singer_id AS concerts_singer_id, concerts.start_time AS concerts_start_time, concerts.end_time AS concerts_end_time, "
+                    + "venues_1.id AS venues_1_id, venues_1.created_at AS venues_1_created_at, venues_1.updated_at AS venues_1_updated_at, venues_1.name AS venues_1_name, venues_1.description AS venues_1_description, "
+                    + "singers_1.id AS singers_1_id, singers_1.created_at AS singers_1_created_at, singers_1.updated_at AS singers_1_updated_at, singers_1.first_name AS singers_1_first_name, singers_1.last_name AS singers_1_last_name, singers_1.full_name AS singers_1_full_name, singers_1.active AS singers_1_active \n"
+                    + "FROM concerts LEFT OUTER JOIN venues AS venues_1 ON venues_1.id = concerts.venue_id LEFT OUTER JOIN singers AS singers_1 ON singers_1.id = concerts.singer_id ORDER BY concerts.start_time"),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addAllFields(concertsFields)
+                                .addAllFields(venuesFields)
+                                .addAllFields(singersFields))
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addAllValues(concertValues)
+                        .addAllValues(venueValues)
+                        .addAllValues(singerValues)
+                        .build())
+                .build()));
+    String output =
+        execute(SAMPLE_DIR, "test_print_concerts.py", "localhost", pgServer.getLocalPort());
+    assertEquals(
+        "Concert 'Avenue Park Open' starting at 2023-02-02 02:00:00+01:00 with Pete Allison will be held at Avenue Park\n",
+        output);
+  }
+
+  @Test
+  public void testCreateVenueAndConcertInTransaction() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT singers.id AS singers_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
+                    + "FROM singers \n"
+                    + " LIMIT 1"),
+            ResultSet.newBuilder()
+                .setMetadata(createSingersMetadata("singers_"))
+                .addRows(
+                    createSingerRow(
+                        "123",
+                        "Pete",
+                        "Allison",
+                        true,
+                        Timestamp.parseTimestamp("2001-02-28T00:00:00Z"),
+                        Timestamp.parseTimestamp("2001-02-28T00:00:00Z")))
+                .build()));
+    mockSpanner.putPartialStatementResult(
+        StatementResult.update(
+            Statement.of(
+                "INSERT INTO venues (id, created_at, updated_at, name, description) VALUES "),
+            1L));
+    mockSpanner.putPartialStatementResult(
+        StatementResult.update(
+            Statement.of(
+                "INSERT INTO concerts (id, created_at, updated_at, name, venue_id, singer_id, start_time, end_time) VALUES "),
+            1L));
+
+    String output =
+        execute(
+            SAMPLE_DIR,
+            "test_create_venue_and_concert_in_transaction.py",
+            "localhost",
+            pgServer.getLocalPort());
+    assertEquals("Created Venue and Concert\n", output);
   }
 
   @Test
@@ -602,7 +820,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
                 .addFields(
                     Field.newBuilder()
                         .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                        .setName(prefix + "singers_id")
+                        .setName(prefix + "id")
                         .build())
                 .addFields(
                     Field.newBuilder()
@@ -663,7 +881,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
                 .addFields(
                     Field.newBuilder()
                         .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                        .setName(prefix + "albums_id")
+                        .setName(prefix + "id")
                         .build())
                 .addFields(
                     Field.newBuilder()
@@ -746,7 +964,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
                 .addFields(
                     Field.newBuilder()
                         .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                        .setName(prefix + "tracks_id")
+                        .setName(prefix + "id")
                         .build())
                 .addFields(
                     Field.newBuilder()
@@ -781,6 +999,119 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
         .addValues(Value.newBuilder().setStringValue(String.valueOf(trackNumber)).build())
         .addValues(Value.newBuilder().setStringValue(title).build())
         .addValues(Value.newBuilder().setNumberValue(sampleRate).build())
+        .build();
+  }
+
+  static ResultSetMetadata createConcertsMetadata(String prefix) {
+    return ResultSetMetadata.newBuilder()
+        .setRowType(
+            StructType.newBuilder()
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                        .setName(prefix + "id")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                        .setName(prefix + "created_at")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                        .setName(prefix + "updated_at")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                        .setName(prefix + "name")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                        .setName(prefix + "venue_id")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                        .setName(prefix + "singer_id")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                        .setName(prefix + "start_time")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                        .setName(prefix + "end_time")
+                        .build())
+                .build())
+        .build();
+  }
+
+  static ListValue createConcertRow(
+      String id,
+      String name,
+      String venueId,
+      String singerId,
+      Timestamp startTime,
+      Timestamp endTime,
+      Timestamp createdAt,
+      Timestamp updatedAt) {
+    return ListValue.newBuilder()
+        .addValues(Value.newBuilder().setStringValue(id).build())
+        .addValues(Value.newBuilder().setStringValue(createdAt.toString()).build())
+        .addValues(Value.newBuilder().setStringValue(updatedAt.toString()).build())
+        .addValues(Value.newBuilder().setStringValue(name).build())
+        .addValues(Value.newBuilder().setStringValue(venueId).build())
+        .addValues(Value.newBuilder().setStringValue(singerId).build())
+        .addValues(Value.newBuilder().setStringValue(startTime.toString()).build())
+        .addValues(Value.newBuilder().setStringValue(endTime.toString()).build())
+        .build();
+  }
+
+  static ResultSetMetadata createVenuesMetadata(String prefix) {
+    return ResultSetMetadata.newBuilder()
+        .setRowType(
+            StructType.newBuilder()
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                        .setName(prefix + "id")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                        .setName(prefix + "created_at")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                        .setName(prefix + "updated_at")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                        .setName(prefix + "name")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                        .setName(prefix + "description")
+                        .build())
+                .build())
+        .build();
+  }
+
+  static ListValue createVenueRow(
+      String id, String name, String description, Timestamp createdAt, Timestamp updatedAt) {
+    return ListValue.newBuilder()
+        .addValues(Value.newBuilder().setStringValue(id).build())
+        .addValues(Value.newBuilder().setStringValue(createdAt.toString()).build())
+        .addValues(Value.newBuilder().setStringValue(updatedAt.toString()).build())
+        .addValues(Value.newBuilder().setStringValue(name).build())
+        .addValues(Value.newBuilder().setStringValue(description).build())
         .build();
   }
 }

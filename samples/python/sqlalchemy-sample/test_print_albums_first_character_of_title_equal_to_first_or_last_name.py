@@ -1,0 +1,5 @@
+from sample import \
+  print_albums_first_character_of_title_equal_to_first_or_last_name
+
+
+print_albums_first_character_of_title_equal_to_first_or_last_name()
