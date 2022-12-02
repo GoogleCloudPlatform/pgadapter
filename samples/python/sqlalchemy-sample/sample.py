@@ -122,33 +122,6 @@ def print_albums_first_character_of_title_equal_to_first_or_last_name():
       print(album)
 
 
-# func PrintAlbumsFirstCharTitleAndFirstOrLastNameEqual(db *gorm.DB) error {
-#   fmt.Println("Searching for albums that have a title that starts with the same character as the first or last name of the singer")
-# var albums []*Album
-#     // Join the Singer association to use it in the Where clause.
-#                                                           // Note that `gorm` will use "Singer" (including quotes) as the alias for the singers table.
-# // That means that all references to "Singer" in the query must be quoted, as PostgreSQL treats
-# // the alias as case-sensitive.
-# if err := db.Joins("Singer").Where(
-# `lower(substring(albums.title, 1, 1)) = lower(substring("Singer".first_name, 1, 1))` +
-# `or lower(substring(albums.title, 1, 1)) = lower(substring("Singer".last_name, 1, 1))`,
-# ).Order(`"Singer".last_name, "albums".release_date asc`).Find(&albums).Error; err != nil {
-# fmt.Printf("Failed to load albums: %v\n", err)
-# return err
-# }
-# if len(albums) == 0 {
-# fmt.Println("No albums found that match the criteria")
-# } else {
-# for _, album := range albums {
-# fmt.Printf("Album %q was released by %v\n", album.Title, album.Singer.FullName)
-# }
-# }
-# fmt.Print("\n\n")
-# return nil
-# }
-
-
-
 def create_random_singer(num_albums):
   return Singer(
     id="{}".format(uuid4()),
@@ -216,5 +189,18 @@ def load_album(album_id):
 
 def load_track(album_id, track_number):
   with Session(engine) as session:
+    # The "tracks" table has a composite primary key, as it is an interleaved
+    # child table of "albums".
     track = session.get(Track, [album_id, track_number])
     print(track)
+
+
+# Deletes an album from the database. This will also delete all related tracks.
+# The deletion of the tracks is done by the database, and not by SQLAlchemy, as
+# passive_deletes=True has been set on the relationship.
+def delete_album(album_id):
+  with Session(engine) as session:
+    album = session.get(Album, album_id)
+    session.delete(album)
+    session.commit()
+    print("Deleted album with id {}".format(album_id))

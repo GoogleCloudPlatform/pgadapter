@@ -55,6 +55,36 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testDeleteAlbum() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                    + "FROM albums \n"
+                    + "WHERE albums.id = '123-456-789'"),
+            ResultSet.newBuilder()
+                .setMetadata(createAlbumsMetadata("albums_"))
+                .addRows(
+                    createAlbumRow(
+                        "123-456-789",
+                        "My album",
+                        "5000",
+                        Date.parseDate("2000-01-01"),
+                        ByteArray.copyFrom("My album cover picture"),
+                        "321",
+                        Timestamp.parseTimestamp("2022-12-02T17:30:00Z"),
+                        Timestamp.parseTimestamp("2022-12-02T17:30:00Z")))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.of("DELETE FROM albums WHERE albums.id = '123-456-789'"), 1L));
+
+    String output =
+        execute(SAMPLE_DIR, "test_delete_album.py", "localhost", pgServer.getLocalPort());
+    assertEquals("Deleted album with id 123-456-789\n", output);
+  }
+
+  @Test
   public void testAlbumsWithTitleFirstCharEqualToSingerName()
       throws IOException, InterruptedException {
     mockSpanner.putStatementResult(

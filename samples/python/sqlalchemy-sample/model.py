@@ -57,7 +57,9 @@ class Album(BaseMixin, Base):
   cover_picture = Column(LargeBinary)
   singer_id = Column(String, ForeignKey("singers.id"))
   singer = relationship("Singer", back_populates="albums")
-  tracks = relationship("Track", back_populates="album")
+  # The `tracks` relationship uses passive_deletes=True, because `tracks` is
+  # interleaved in `albums` with `ON DELETE CASCADE`.
+  tracks = relationship("Track", back_populates="album", passive_deletes=True)
 
   def __repr__(self):
     return f"albums(" \
