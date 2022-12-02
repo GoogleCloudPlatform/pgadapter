@@ -125,9 +125,25 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "INSERT INTO singers (id, created_at, updated_at, first_name, last_name, active) "
-                    + "VALUES ('123-456-789', ('2011-11-04T00:05:23.123456+00:00'::timestamptz), NULL, 'Myfirstname', 'Mylastname', true) "
-                    + "RETURNING singers.full_name"),
+                "SELECT singers.id AS singers_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
+                    + "FROM singers \n"
+                    + "WHERE singers.id = '123-456-789'"),
+            ResultSet.newBuilder()
+                .setMetadata(createSingersMetadata("singers_"))
+                .addRows(
+                    createSingerRow(
+                        "123-456-789",
+                        "Myfirstname",
+                        "Mylastname",
+                        true,
+                        Timestamp.parseTimestamp("2022-12-01T10:00:00Z"),
+                        Timestamp.parseTimestamp("2022-12-01T10:00:00Z")))
+                .build()));
+    // We have to use a partial SQL string here, as we don't know exactly what updated_at timestamp
+    // will be used by SQLAlchemy.
+    mockSpanner.putPartialStatementResult(
+        StatementResult.query(
+            Statement.of("UPDATE singers SET updated_at='"),
             ResultSet.newBuilder()
                 .setMetadata(
                     ResultSetMetadata.newBuilder()
@@ -142,13 +158,13 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
                 .addRows(
                     ListValue.newBuilder()
                         .addValues(
-                            Value.newBuilder().setStringValue("Myfirstname Mylastname").build())
+                            Value.newBuilder().setStringValue("Newfirstname Newlastname").build())
                         .build())
                 .build()));
 
     String output =
         execute(SAMPLE_DIR, "test_update_singer.py", "localhost", pgServer.getLocalPort());
-    assertEquals("Added singer 123-456-789 with full name Myfirstname Mylastname\n", output);
+    assertEquals("Updated singer 123-456-789 with full name Newfirstname Newlastname\n", output);
   }
 
   @Test
@@ -204,6 +220,32 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
             + "Tracks:\n"
             + "[tracks(id='123-456-789',track_number=1,title='Track 1',sample_rate=6.34324,created_at=datetime.datetime(2018, 2, 28, 17, 0, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2018, 2, 1, 9, 0, tzinfo=datetime.timezone.utc)),"
             + " tracks(id='123-456-789',track_number=2,title='Track 2',sample_rate=6.34324,created_at=datetime.datetime(2018, 2, 28, 17, 0, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2018, 2, 1, 9, 0, tzinfo=datetime.timezone.utc))]\n",
+        output);
+  }
+
+  @Test
+  public void testGetTrack() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT tracks.created_at AS tracks_created_at, tracks.updated_at AS tracks_updated_at, tracks.id AS tracks_id, tracks.track_number AS tracks_track_number, tracks.title AS tracks_title, tracks.sample_rate AS tracks_sample_rate \n"
+                    + "FROM tracks \n"
+                    + "WHERE tracks.id = '987-654-321' AND tracks.track_number = 1"),
+            ResultSet.newBuilder()
+                .setMetadata(createTracksMetadata("tracks_"))
+                .addRows(
+                    createTrackRow(
+                        "987-654-321",
+                        1L,
+                        "Track 1",
+                        6.34324,
+                        Timestamp.parseTimestamp("2018-02-28T17:00:00Z"),
+                        Timestamp.parseTimestamp("2018-02-01T09:00:00Z")))
+                .build()));
+
+    String output = execute(SAMPLE_DIR, "test_get_track.py", "localhost", pgServer.getLocalPort());
+    assertEquals(
+        "tracks(id='987-654-321',track_number=1,title='Track 1',sample_rate=6.34324,created_at=datetime.datetime(2018, 2, 28, 17, 0, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2018, 2, 1, 9, 0, tzinfo=datetime.timezone.utc))\n",
         output);
   }
 

@@ -12,7 +12,12 @@ class BaseMixin(object):
   id = Column(String, primary_key=True)
   created_at = Column(DateTime(timezone=True), ColumnDefault(datetime.utcnow))
   updated_at = Column(DateTime(timezone=True),
-                      ColumnDefault(datetime.utcnow, for_update=True))
+                      ColumnDefault(
+                        # We need to explicitly format the timestamp with a
+                        # timezone here to ensure that SQLAlchemy uses a
+                        # timestamptz instead of just timestamp.
+                        datetime.utcnow().astimezone(timezone.utc),
+                        for_update=True))
 
 
 class Singer(BaseMixin, Base):
@@ -20,7 +25,9 @@ class Singer(BaseMixin, Base):
 
   first_name = Column(String(100))
   last_name = Column(String(200))
-  full_name = Column(String, server_default=FetchedValue())
+  full_name = Column(String,
+                     server_default=FetchedValue(),
+                     server_onupdate=FetchedValue())
   active = Column(Boolean)
   albums = relationship("Album", back_populates="singer")
 
