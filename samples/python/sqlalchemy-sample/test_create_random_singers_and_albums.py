@@ -1,0 +1,4 @@
+from sample import create_random_singers_and_albums
+
+
+create_random_singers_and_albums()

@@ -10,7 +10,11 @@ Base = mapper_registry.generate_base()
 
 class BaseMixin(object):
   id = Column(String, primary_key=True)
-  created_at = Column(DateTime(timezone=True), ColumnDefault(datetime.utcnow))
+  created_at = Column(DateTime(timezone=True),
+                      # We need to explicitly format the timestamp with a
+                      # timezone here to ensure that SQLAlchemy uses a
+                      # timestamptz instead of just timestamp.
+                      ColumnDefault(datetime.utcnow().astimezone(timezone.utc)))
   updated_at = Column(DateTime(timezone=True),
                       ColumnDefault(
                         # We need to explicitly format the timestamp with a

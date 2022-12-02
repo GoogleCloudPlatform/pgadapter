@@ -15,6 +15,7 @@ import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
@@ -37,6 +38,164 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   @BeforeClass
   public static void setupBaseResults() {
     SqlAlchemyBasicsTest.setupBaseResults();
+  }
+
+  @Test
+  public void testCreateRandomSingersAndAlbums() throws IOException, InterruptedException {
+    mockSpanner.putPartialStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "INSERT INTO singers (id, created_at, updated_at, first_name, last_name, active) "
+                    + "VALUES "),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("full_name")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .build()))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("(unknown)").build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("(unknown)").build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("(unknown)").build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("(unknown)").build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("(unknown)").build())
+                        .build())
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(5L).build())
+                .build()));
+    mockSpanner.putPartialStatementResult(
+        StatementResult.update(
+            Statement.of(
+                "INSERT INTO albums (id, created_at, updated_at, title, marketing_budget, release_date, cover_picture, singer_id) VALUES "),
+            37L));
+
+    String output =
+        execute(
+            SAMPLE_DIR,
+            "test_create_random_singers_and_albums.py",
+            "localhost",
+            pgServer.getLocalPort());
+    assertEquals("Created 5 singers\n", output);
+  }
+
+  @Test
+  public void testPrintSingersAndAlbums() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT singers.id AS singers_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
+                    + "FROM singers ORDER BY singers.last_name"),
+            ResultSet.newBuilder()
+                .setMetadata(createSingersMetadata("singers_"))
+                .addRows(
+                    createSingerRow(
+                        "b2",
+                        "Pete",
+                        "Allison",
+                        true,
+                        Timestamp.parseTimestamp("2022-12-01T15:12:00Z"),
+                        Timestamp.parseTimestamp("2022-12-01T15:12:00Z")))
+                .addRows(
+                    createSingerRow(
+                        "a1",
+                        "Alice",
+                        "Henderson",
+                        true,
+                        Timestamp.parseTimestamp("2022-12-01T15:12:00Z"),
+                        Timestamp.parseTimestamp("2022-12-01T15:12:00Z")))
+                .addRows(
+                    createSingerRow(
+                        "c3",
+                        "Renate",
+                        "Unna",
+                        true,
+                        Timestamp.parseTimestamp("2022-12-01T15:12:00Z"),
+                        Timestamp.parseTimestamp("2022-12-01T15:12:00Z")))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                    + "FROM albums \n"
+                    + "WHERE 'b2' = albums.singer_id"),
+            ResultSet.newBuilder()
+                .setMetadata(createAlbumsMetadata("albums_"))
+                .addRows(
+                    createAlbumRow(
+                        "a1",
+                        "Title 1",
+                        "100.90",
+                        Date.parseDate("2000-01-01"),
+                        ByteArray.copyFrom("cover pic 1"),
+                        "b2",
+                        Timestamp.parseTimestamp("2022-12-01T15:12:00Z"),
+                        Timestamp.parseTimestamp("2022-12-01T15:12:00Z")))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                    + "FROM albums \n"
+                    + "WHERE 'a1' = albums.singer_id"),
+            ResultSet.newBuilder()
+                .setMetadata(createAlbumsMetadata("albums_"))
+                .addRows(
+                    createAlbumRow(
+                        "a2",
+                        "Title 2",
+                        "100.90",
+                        Date.parseDate("2000-01-01"),
+                        ByteArray.copyFrom("cover pic 1"),
+                        "a1",
+                        Timestamp.parseTimestamp("2022-12-01T15:12:00Z"),
+                        Timestamp.parseTimestamp("2022-12-01T15:12:00Z")))
+                .addRows(
+                    createAlbumRow(
+                        "a3",
+                        "Title 3",
+                        "100.90",
+                        Date.parseDate("2000-01-01"),
+                        ByteArray.copyFrom("cover pic 2"),
+                        "a1",
+                        Timestamp.parseTimestamp("2022-12-01T15:12:00Z"),
+                        Timestamp.parseTimestamp("2022-12-01T15:12:00Z")))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                    + "FROM albums \n"
+                    + "WHERE 'c3' = albums.singer_id"),
+            ResultSet.newBuilder().setMetadata(createAlbumsMetadata("albums_")).build()));
+
+    String output =
+        execute(
+            SAMPLE_DIR, "test_print_singers_and_albums.py", "localhost", pgServer.getLocalPort());
+    assertEquals(
+        "singers(id='b2',first_name='Pete',last_name='Allison',active=True,created_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc))\n"
+            + "albums(id='a1',title='Title 1',marketing_budget=Decimal('100.90'),release_date=datetime.date(2000, 1, 1),cover_picture=b'cover pic 1',singer='b2',created_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc))\n"
+            + "singers(id='a1',first_name='Alice',last_name='Henderson',active=True,created_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc))\n"
+            + "albums(id='a2',title='Title 2',marketing_budget=Decimal('100.90'),release_date=datetime.date(2000, 1, 1),cover_picture=b'cover pic 1',singer='a1',created_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc))\n"
+            + "albums(id='a3',title='Title 3',marketing_budget=Decimal('100.90'),release_date=datetime.date(2000, 1, 1),cover_picture=b'cover pic 2',singer='a1',created_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc))\n"
+            + "singers(id='c3',first_name='Renate',last_name='Unna',active=True,created_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc))\n",
+        output);
   }
 
   @Test
