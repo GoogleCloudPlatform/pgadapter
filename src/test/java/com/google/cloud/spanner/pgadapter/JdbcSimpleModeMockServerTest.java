@@ -674,4 +674,72 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     assertEquals("create table test1 (id bigint primary key)", requests.get(0).getStatements(0));
     assertEquals("create table test2 (id bigint primary key)", requests.get(0).getStatements(1));
   }
+
+  @Test
+  public void testMixedImplicitDdlBatch() throws SQLException {
+    String sql =
+        "create table test1 (id bigint primary key); "
+            + "show statement_timeout; "
+            + "create table test2 (id bigint primary key); ";
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(SQLException.class, () -> connection.createStatement().execute(sql));
+      assertEquals(
+          "ERROR: DDL statements are not allowed in mixed batches or transactions.",
+          exception.getMessage());
+    }
+
+    List<UpdateDatabaseDdlRequest> requests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(message -> message instanceof UpdateDatabaseDdlRequest)
+            .map(message -> (UpdateDatabaseDdlRequest) message)
+            .collect(Collectors.toList());
+    assertEquals(0, requests.size());
+  }
+
+  @Test
+  public void testMixedDdlBatchWithStartAndRun() throws SQLException {
+    String sql =
+        "start batch ddl; "
+            + "create table test1 (id bigint primary key); "
+            + "set statement_timeout = '10s'; "
+            + "create table test2 (id bigint primary key); "
+            + "run batch";
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(SQLException.class, () -> connection.createStatement().execute(sql));
+      assertEquals(
+          "ERROR: DDL statements are not allowed in mixed batches or transactions.",
+          exception.getMessage());
+    }
+
+    List<UpdateDatabaseDdlRequest> requests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(message -> message instanceof UpdateDatabaseDdlRequest)
+            .map(message -> (UpdateDatabaseDdlRequest) message)
+            .collect(Collectors.toList());
+    assertEquals(0, requests.size());
+  }
+
+  @Test
+  public void testImplicitBatchOfClientSideStatements() throws SQLException {
+    String sql = "set statement_timeout = '10s'; " + "show statement_timeout; ";
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        assertFalse(statement.execute(sql));
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals("10s", resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
 }
