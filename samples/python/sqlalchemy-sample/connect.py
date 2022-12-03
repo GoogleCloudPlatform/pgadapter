@@ -20,8 +20,12 @@ import sys
 def create_test_engine(autocommit=False, options=""):
   host = sys.argv[1]
   port = sys.argv[2]
-  connString = "postgresql+psycopg2://user:password@{host}:{port}/d{options}".format(
-    host=host, port=port, options=options)
+  database = sys.argv[3] if len(sys.argv) > 3 else "d"
+  connString = "postgresql+psycopg2://user:password@{host}:{port}/" \
+               "{database}{options}".format(host=host,
+                                            port=port,
+                                            database=database,
+                                            options=options)
   if host == "":
     if options == "":
       connString = connString + "?host=/tmp"

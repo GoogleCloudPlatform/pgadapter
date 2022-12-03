@@ -81,7 +81,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
 
     String output =
         execute(SAMPLE_DIR, "test_delete_album.py", "localhost", pgServer.getLocalPort());
-    assertEquals("Deleted album with id 123-456-789\n", output);
+    assertEquals("\n" + "Deleted album with id 123-456-789\n", output);
   }
 
   @Test
@@ -103,7 +103,8 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
             "localhost",
             pgServer.getLocalPort());
     assertEquals(
-        "Searching for albums that have a title that starts with the same character as the first or last name of the singer\n",
+        "\n"
+            + "Searching for albums that have a title that starts with the same character as the first or last name of the singer\n",
         output);
   }
 
@@ -141,9 +142,10 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
             "localhost",
             pgServer.getLocalPort());
     assertEquals(
-        "Printing all singers ordered by last name\n"
-            + "singers(id='123',first_name='Pete',last_name='Allison',active=True,created_at=datetime.datetime(2022, 12, 2, 17, 30, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 2, 17, 30, tzinfo=datetime.timezone.utc))\n"
-            + "singers(id='321',first_name='Alice',last_name='Henderson',active=True,created_at=datetime.datetime(2022, 12, 2, 17, 30, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 2, 17, 30, tzinfo=datetime.timezone.utc))\n"
+        "\n"
+            + "Printing at most 5 singers ordered by last name\n"
+            + "  1. Pete Allison\n"
+            + "  2. Alice Henderson\n"
             + "Found 2 singers\n",
         output);
   }
@@ -176,8 +178,9 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
             "localhost",
             pgServer.getLocalPort());
     assertEquals(
-        "Searching for albums released before 1980\n"
-            + "Album Album 1 was released at 1979-10-16\n",
+        "\n"
+            + "Searching for albums released before 1980\n"
+            + "  Album Album 1 was released at 1979-10-16\n",
         output);
   }
 
@@ -245,7 +248,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     String output =
         execute(SAMPLE_DIR, "test_print_concerts.py", "localhost", pgServer.getLocalPort());
     assertEquals(
-        "Concert 'Avenue Park Open' starting at 2023-02-02 02:00:00+01:00 with Pete Allison will be held at Avenue Park\n",
+        "\nConcert 'Avenue Park Open' starting at 2023-02-02 02:00:00+01:00 with Pete Allison will be held at Avenue Park\n",
         output);
   }
 
@@ -285,7 +288,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
             "test_create_venue_and_concert_in_transaction.py",
             "localhost",
             pgServer.getLocalPort());
-    assertEquals("Created Venue and Concert\n", output);
+    assertEquals("\nCreated Venue and Concert\n", output);
   }
 
   @Test
@@ -437,12 +440,13 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
         execute(
             SAMPLE_DIR, "test_print_singers_and_albums.py", "localhost", pgServer.getLocalPort());
     assertEquals(
-        "singers(id='b2',first_name='Pete',last_name='Allison',active=True,created_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc))\n"
-            + "albums(id='a1',title='Title 1',marketing_budget=Decimal('100.90'),release_date=datetime.date(2000, 1, 1),cover_picture=b'cover pic 1',singer='b2',created_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc))\n"
-            + "singers(id='a1',first_name='Alice',last_name='Henderson',active=True,created_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc))\n"
-            + "albums(id='a2',title='Title 2',marketing_budget=Decimal('100.90'),release_date=datetime.date(2000, 1, 1),cover_picture=b'cover pic 1',singer='a1',created_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc))\n"
-            + "albums(id='a3',title='Title 3',marketing_budget=Decimal('100.90'),release_date=datetime.date(2000, 1, 1),cover_picture=b'cover pic 2',singer='a1',created_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc))\n"
-            + "singers(id='c3',first_name='Renate',last_name='Unna',active=True,created_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 12, 1, 15, 12, tzinfo=datetime.timezone.utc))\n",
+        "\n"
+            + "Pete Allison has 1 albums:\n"
+            + "  'Title 1'\n"
+            + "Alice Henderson has 2 albums:\n"
+            + "  'Title 2'\n"
+            + "  'Title 3'\n"
+            + "Renate Unna has 0 albums:\n",
         output);
   }
 

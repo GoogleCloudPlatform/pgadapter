@@ -1,7 +1,21 @@
+""" Copyright 2022 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+"""
+
 from sqlalchemy import Column, Integer, String, Boolean, LargeBinary, Float, \
   Numeric, DateTime, Date, FetchedValue, ForeignKey, ColumnDefault
 from sqlalchemy.orm import registry, relationship
-from sqlalchemy.sql import func
 from datetime import timezone, datetime
 
 mapper_registry = registry()
@@ -43,8 +57,8 @@ class Singer(BaseMixin, Base):
            f"first_name={self.first_name!r}," \
            f"last_name={self.last_name!r}," \
            f"active={self.active!r}," \
-           f"created_at={self.created_at.astimezone(timezone.utc)!r}," \
-           f"updated_at={self.updated_at.astimezone(timezone.utc)!r}" \
+           f"created_at={self.created_at.astimezone(timezone.utc) if self.created_at else None!r}," \
+           f"updated_at={self.updated_at.astimezone(timezone.utc) if self.updated_at else None!r}" \
            f")"
 
 
@@ -58,7 +72,9 @@ class Album(BaseMixin, Base):
   singer_id = Column(String, ForeignKey("singers.id"))
   singer = relationship("Singer", back_populates="albums")
   # The `tracks` relationship uses passive_deletes=True, because `tracks` is
-  # interleaved in `albums` with `ON DELETE CASCADE`.
+  # interleaved in `albums` with `ON DELETE CASCADE`. This prevents SQLAlchemy
+  # from deleting the related tracks when an album is deleted, and lets the
+  # database handle it.
   tracks = relationship("Track", back_populates="album", passive_deletes=True)
 
   def __repr__(self):
@@ -69,8 +85,8 @@ class Album(BaseMixin, Base):
            f"release_date={self.release_date!r}," \
            f"cover_picture={self.cover_picture!r}," \
            f"singer={self.singer_id!r}," \
-           f"created_at={self.created_at.astimezone(timezone.utc)!r}," \
-           f"updated_at={self.updated_at.astimezone(timezone.utc)!r}" \
+           f"created_at={self.created_at.astimezone(timezone.utc) if self.created_at else None!r}," \
+           f"updated_at={self.updated_at.astimezone(timezone.utc) if self.updated_at else None!r}" \
            f")"
 
 
@@ -89,8 +105,8 @@ class Track(BaseMixin, Base):
            f"track_number={self.track_number!r}," \
            f"title={self.title!r}," \
            f"sample_rate={self.sample_rate!r}," \
-           f"created_at={self.created_at.astimezone(timezone.utc)!r}," \
-           f"updated_at={self.updated_at.astimezone(timezone.utc)!r}" \
+           f"created_at={self.created_at.astimezone(timezone.utc) if self.created_at else None!r}," \
+           f"updated_at={self.updated_at.astimezone(timezone.utc) if self.updated_at else None!r}" \
            f")"
 
 
@@ -105,8 +121,8 @@ class Venue(BaseMixin, Base):
            f"id={self.id!r}," \
            f"name={self.name!r}," \
            f"description={self.description!r}," \
-           f"created_at={self.created_at.astimezone(timezone.utc)!r}," \
-           f"updated_at={self.updated_at.astimezone(timezone.utc)!r}" \
+           f"created_at={self.created_at.astimezone(timezone.utc) if self.created_at else None!r}," \
+           f"updated_at={self.updated_at.astimezone(timezone.utc) if self.updated_at else None!r}" \
            f")"
 
 
@@ -129,6 +145,6 @@ class Concert(BaseMixin, Base):
            f"singer={self.singer!r}," \
            f"start_time={self.start_time!r}," \
            f"end_time={self.end_time!r}," \
-           f"created_at={self.created_at.astimezone(timezone.utc)!r}," \
-           f"updated_at={self.updated_at.astimezone(timezone.utc)!r}" \
+           f"created_at={self.created_at.astimezone(timezone.utc) if self.created_at else None!r}," \
+           f"updated_at={self.updated_at.astimezone(timezone.utc) if self.updated_at else None!r}" \
            f")"

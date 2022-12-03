@@ -64,7 +64,15 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
 
   static String execute(String directory, String script, String host, int port)
       throws IOException, InterruptedException {
-    String[] runCommand = new String[] {"python3", script, host, Integer.toString(port)};
+    return execute(directory, script, host, port, null);
+  }
+
+  static String execute(String directory, String script, String host, int port, String database)
+      throws IOException, InterruptedException {
+    String[] runCommand =
+        new String[] {
+          "python3", script, host, Integer.toString(port), database == null ? "d" : database
+        };
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
     builder.directory(new File(directory));
