@@ -64,6 +64,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -631,7 +632,10 @@ public class BackendConnection {
           spannerConnection.beginTransaction();
         }
         boolean canUseBatch = false;
-        if (bufferedStatement.isBatchingPossible() && index < (getStatementCount() - 1)) {
+        if (!spannerConnection.isDdlBatchActive()
+            && !spannerConnection.isDmlBatchActive()
+            && bufferedStatement.isBatchingPossible()
+            && index < (getStatementCount() - 1)) {
           StatementType statementType = getStatementType(index);
           StatementType nextStatementType = getStatementType(index + 1);
           canUseBatch = canBeBatchedTogether(statementType, nextStatementType);
@@ -789,7 +793,8 @@ public class BackendConnection {
         case Batch:
           if (spannerConnection.isInTransaction()
               || bufferedStatements.stream()
-                  .anyMatch(statement -> !statement.parsedStatement.isDdl())) {
+                  .anyMatch(
+                      statement -> !isStatementAllowedInDdlBatch(statement.parsedStatement))) {
             throw PGExceptionFactory.newPGException(
                 "DDL statements are not allowed in mixed batches or transactions.",
                 SQLState.InvalidTransactionState);
@@ -820,6 +825,18 @@ public class BackendConnection {
     } catch (Throwable throwable) {
       throw setAndReturn(bufferedStatement.result, throwable);
     }
+  }
+
+  private static final ImmutableSet<ClientSideStatementType> DDL_BATCH_STATEMENTS =
+      ImmutableSet.of(
+          ClientSideStatementType.START_BATCH_DDL,
+          ClientSideStatementType.RUN_BATCH,
+          ClientSideStatementType.ABORT_BATCH);
+
+  private boolean isStatementAllowedInDdlBatch(ParsedStatement parsedStatement) {
+    return parsedStatement.isDdl()
+        || (parsedStatement.getType() == StatementType.CLIENT_SIDE
+            && DDL_BATCH_STATEMENTS.contains(parsedStatement.getClientSideStatementType()));
   }
 
   private boolean isBegin(int index) {

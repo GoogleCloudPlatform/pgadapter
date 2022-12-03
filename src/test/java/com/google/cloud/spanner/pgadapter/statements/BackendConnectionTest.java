@@ -444,7 +444,6 @@ public class BackendConnectionTest {
     when(connection.execute(statement1)).thenReturn(NO_RESULT);
     RuntimeException error = new RuntimeException("test error");
     when(connection.execute(statement2)).thenThrow(error);
-    when(connection.isDdlBatchActive()).thenReturn(true);
 
     BackendConnection backendConnection =
         new BackendConnection(
