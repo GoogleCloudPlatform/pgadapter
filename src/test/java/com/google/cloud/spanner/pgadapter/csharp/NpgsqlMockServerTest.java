@@ -50,23 +50,22 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
-  @Parameter public String pgVersion;
+  @Parameter public String host;
 
-  @Parameters(name = "pgVersion = {0}")
+  @Parameters(name = "host = {0}")
   public static Object[] data() {
-    return new Object[] {"1.0", "14.1"};
+    return new Object[] {"localhost", "/tmp"};
   }
 
   private String createConnectionString() {
     return String.format(
-        "Host=localhost;Port=%d;Database=d;SSL Mode=Disable;Options=-c server_version=%s",
-        pgServer.getLocalPort(), pgVersion);
+        "Host=%s;Port=%d;Database=d;SSL Mode=Disable", host, pgServer.getLocalPort());
   }
 
   @Test
   public void testShowServerVersion() throws IOException, InterruptedException {
     String result = execute("TestShowServerVersion", createConnectionString());
-    assertEquals(pgVersion + "\n", result);
+    assertEquals("14.1\n", result);
   }
 
   @Test
