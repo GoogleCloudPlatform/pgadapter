@@ -727,9 +727,10 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
                 .to(Date.parseDate("2022-07-22"))
                 .bind("p9")
                 .to("some random string")
-                // TODO: Change to JSONB
                 .bind("p10")
-                .to("{\"key\":\"value\"}")
+                // TODO: Change to jsonb when https://github.com/googleapis/java-spanner/pull/2182
+                //       has been merged.
+                .to(com.google.cloud.spanner.Value.json("{\"key\":\"value\"}"))
                 .build(),
             1L));
 

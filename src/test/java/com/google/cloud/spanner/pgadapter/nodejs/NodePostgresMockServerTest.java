@@ -259,7 +259,9 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("some-random-string")
                 .bind("p10")
-                .to("{\"my_key\":\"my-value\"}")
+                // TODO: Change to jsonb when https://github.com/googleapis/java-spanner/pull/2182
+                //       has been merged.
+                .to(Value.json("{\"my_key\":\"my-value\"}"))
                 .build(),
             1L);
     mockSpanner.putStatementResult(updateResult);
@@ -384,7 +386,9 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("some-random-string")
                 .bind("p10")
-                .to("{\"my_key\":\"my-value\"}")
+                // TODO: Change to jsonb when https://github.com/googleapis/java-spanner/pull/2182
+                //       has been merged.
+                .to(Value.json("{\"my_key\":\"my-value\"}"))
                 .build(),
             1L);
     mockSpanner.putStatementResult(updateResult);
@@ -412,7 +416,9 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to((String) null)
                 .bind("p10")
-                .to((String) null)
+                // TODO: Change to jsonb when https://github.com/googleapis/java-spanner/pull/2182
+                //       has been merged.
+                .to(Value.json(null))
                 .build(),
             1L));
 
