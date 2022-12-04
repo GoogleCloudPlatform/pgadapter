@@ -39,61 +39,62 @@ public class PgJdbcCatalog {
           + "statistics,stdin,stdout,storage,strict,sysid,tablespace,temp,template,truncate,trusted,"
           + "unencrypted,unlisten,until,vacuum,valid,validator,verbose,volatile'";
 
-  public static final String PG_JDBC_GET_TYPE_NAME =
-      "SELECT n.nspname = ANY(current_schemas(true)), n.nspname, t.typname "
-          + "FROM pg_catalog.pg_type t "
-          + "JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = $1";
-  public static final String PG_JDBC_GET_TYPE_NAME_REPLACEMENT =
-      "SELECT true, n.nspname, t.typname "
-          + "FROM pg_catalog.pg_type t "
-          + "JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = $1";
-  public static final String PG_JDBC_GET_TYPE_INFO_PREFIX_42_2_22 =
-      "SELECT typinput='array_in'::regproc as is_array, typtype, typname "
-          + "  FROM pg_catalog.pg_type "
-          + "  LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r "
-          + "          from pg_namespace as ns "
-          + "          join ( select s.r, (current_schemas(false))[s.r] as nspname "
-          + "                   from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r "
-          + "         using ( nspname ) "
-          + "       ) as sp "
-          + "    ON sp.nspoid = typnamespace ";
-  public static final String PG_JDBC_GET_TYPE_INFO_PREFIX_42_3 =
-      "SELECT typinput='array_in'::regproc as is_array, typtype, typname, pg_type.oid "
-          + "  FROM pg_catalog.pg_type "
-          + "  LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r "
-          + "          from pg_namespace as ns "
-          + "          join ( select s.r, (current_schemas(false))[s.r] as nspname "
-          + "                   from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r "
-          + "         using ( nspname ) "
-          + "       ) as sp "
-          + "    ON sp.nspoid = typnamespace ";
-  public static final String PG_JDBC_GET_TYPE_INFO_SIMPLE_PREFIX_42_3 =
-      "SELECT pg_type.oid, typname "
-          + "  FROM pg_catalog.pg_type "
-          + "  LEFT "
-          + "  JOIN (select ns.oid as nspoid, ns.nspname, r.r "
-          + "          from pg_namespace as ns "
-          + "          join ( select s.r, (current_schemas(false))[s.r] as nspname "
-          + "                   from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r "
-          + "         using ( nspname ) "
-          + "       ) as sp "
-          + "    ON sp.nspoid = typnamespace ";
-  public static final String PG_JDBC_GET_TYPE_INFO_REPLACEMENT_42_3 =
-      "SELECT * FROM (SELECT ''::varchar as typinput, 0::bigint as typtype, ''::varchar as typname, 0::bigint as oid) pg_type WHERE false";
-
-  public static final String PG_JDBC_GET_TYPE_INFO_PREFIX =
-      "SELECT typinput='array_in'::regproc, typtype "
-          + "  FROM pg_catalog.pg_type "
-          + "  LEFT "
-          + "  JOIN (select ns.oid as nspoid, ns.nspname, r.r "
-          + "          from pg_namespace as ns "
-          + "          join ( select s.r, (current_schemas(false))[s.r] as nspname "
-          + "                   from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r "
-          + "         using ( nspname ) "
-          + "       ) as sp "
-          + "    ON sp.nspoid = typnamespace ";
-  public static final String PG_JDBC_GET_TYPE_INFO_REPLACEMENT =
-      "SELECT * FROM (SELECT ''::varchar as typinput, 0::bigint as typtype) pg_type WHERE false";
+  public static final String PG_JDBC_GENERATE_SCHEMAS_ARRAY =
+      "select s.r, \\(current_schemas\\(false\\)\\)\\[s.r\\] as nspname\\s+from generate_series\\(1, array_upper\\(current_schemas\\(false\\), 1\\)\\) as s\\(r\\)";
+  public static final String PG_JDBC_GENERATE_SCHEMAS_ARRAY_REPLACEMENT =
+      "select 1 as r, 'public' as nspname";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_PREFIX_42_2_22 =
+  //      "SELECT typinput='array_in'::regproc as is_array, typtype, typname "
+  //          + "  FROM pg_catalog.pg_type "
+  //          + "  LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r "
+  //          + "          from pg_namespace as ns "
+  //          + "          join ( select s.r, (current_schemas(false))[s.r] as nspname "
+  //          + "                   from generate_series(1, array_upper(current_schemas(false), 1))
+  // as s(r) ) as r "
+  //          + "         using ( nspname ) "
+  //          + "       ) as sp "
+  //          + "    ON sp.nspoid = typnamespace ";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_PREFIX_42_3 =
+  //      "SELECT typinput='array_in'::regproc as is_array, typtype, typname, pg_type.oid "
+  //          + "  FROM pg_catalog.pg_type "
+  //          + "  LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r "
+  //          + "          from pg_namespace as ns "
+  //          + "          join ( select s.r, (current_schemas(false))[s.r] as nspname "
+  //          + "                   from generate_series(1, array_upper(current_schemas(false), 1))
+  // as s(r) ) as r "
+  //          + "         using ( nspname ) "
+  //          + "       ) as sp "
+  //          + "    ON sp.nspoid = typnamespace ";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_SIMPLE_PREFIX_42_3 =
+  //      "SELECT pg_type.oid, typname "
+  //          + "  FROM pg_catalog.pg_type "
+  //          + "  LEFT "
+  //          + "  JOIN (select ns.oid as nspoid, ns.nspname, r.r "
+  //          + "          from pg_namespace as ns "
+  //          + "          join ( select s.r, (current_schemas(false))[s.r] as nspname "
+  //          + "                   from generate_series(1, array_upper(current_schemas(false), 1))
+  // as s(r) ) as r "
+  //          + "         using ( nspname ) "
+  //          + "       ) as sp "
+  //          + "    ON sp.nspoid = typnamespace ";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_REPLACEMENT_42_3 =
+  //      "SELECT pg_type.oid, typname FROM pg_catalog.pg_type ";
+  //
+  //  public static final String PG_JDBC_GET_TYPE_INFO_PREFIX =
+  //      "SELECT typinput='array_in'::regproc, typtype "
+  //          + "  FROM pg_catalog.pg_type "
+  //          + "  LEFT "
+  //          + "  JOIN (select ns.oid as nspoid, ns.nspname, r.r "
+  //          + "          from pg_namespace as ns "
+  //          + "          join ( select s.r, (current_schemas(false))[s.r] as nspname "
+  //          + "                   from generate_series(1, array_upper(current_schemas(false), 1))
+  // as s(r) ) as r "
+  //          + "         using ( nspname ) "
+  //          + "       ) as sp "
+  //          + "    ON sp.nspoid = typnamespace ";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_REPLACEMENT =
+  //      "SELECT * FROM (SELECT ''::varchar as typinput, 0::bigint as typtype) pg_type WHERE
+  // false";
 
   private static final String PG_JDBC_FUNC_TYPE_UNKNOWN_SQL =
       DatabaseMetaData.functionResultUnknown + " ";
@@ -451,132 +452,162 @@ public class PgJdbcCatalog {
           + "                AND IDX.TABLE_NAME=COLS.TABLE_NAME\n"
           + "                AND IDX.INDEX_NAME=COLS.INDEX_NAME\n";
 
-  public static final String PG_JDBC_GET_TYPE_INFO_PREFIX_FULL =
-      "SELECT t.typname,t.oid FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON (t.typnamespace = n.oid)  WHERE n.nspname  != 'pg_toast' AND  (t.typrelid = 0 OR (SELECT c.relkind = 'c' FROM pg_catalog.pg_class c WHERE c.oid = t.typrelid))";
-  public static final String PG_JDBC_GET_TYPE_INFO_REPLACEMENT_FULL =
-      " select 'bool' as typname, 16 as oid union all \n"
-          + " select 'bytea' as typname, 17 as oid union all \n"
-          + " select 'int8' as typname, 20 as oid union all \n"
-          + " select 'float8' as typname, 701 as oid union all \n"
-          + " select 'varchar' as typname, 1043 as oid union all \n"
-          + " select 'date' as typname, 1082 as oid union all \n"
-          + " select 'timestamptz' as typname, 1184 as oid union all \n"
-          + " select 'numeric' as typname, 1700 as oid union all \n"
-          + " select 'jsonb' as typname, 3802 as oid union all \n"
-          + " select '_bool' as typname, 1000 as oid union all \n"
-          + " select '_bytea' as typname, 1001 as oid union all \n"
-          + " select '_int8' as typname, 1016 as oid union all \n"
-          + " select '_float8' as typname, 1022 as oid union all \n"
-          + " select '_varchar' as typname, 1015 as oid union all \n"
-          + " select '_date' as typname, 1182 as oid union all \n"
-          + " select '_timestamptz' as typname, 1185 as oid union all \n"
-          + " select '_numeric' as typname, 1231 as oid union all \n"
-          + " select '_jsonb' as typname, 3807 as oid";
-  public static final String PG_JDBC_GET_TYPE_INFO_WITH_TYPTYPE_PREFIX =
-      "SELECT typinput='array_in'::regproc as is_array, typtype, typname, pg_type.oid   FROM pg_catalog.pg_type   LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname                    from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  ORDER BY sp.r, pg_type.oid DESC";
-  public static final String PG_JDBC_GET_TYPE_INFO_WITH_TYPTYPE_REPLACEMENT =
-      "select true as is_array, 'b' as typtype, '_jsonb' as typname, 3807 as oid union all\n"
-          + " select false as is_array, 'b' as typtype, 'jsonb' as typname, 3802 as oid union all\n"
-          + " select false as is_array, 'b' as typtype, 'numeric' as typname, 1700 as oid union all\n"
-          + " select true as is_array, 'b' as typtype, '_numeric' as typname, 1231 as oid union all\n"
-          + " select true as is_array, 'b' as typtype, '_timestamptz' as typname, 1185 as oid union all\n"
-          + " select false as is_array, 'b' as typtype, 'timestamptz' as typname, 1184 as oid union all\n"
-          + " select true as is_array, 'b' as typtype, '_date' as typname, 1182 as oid union all\n"
-          + " select false as is_array, 'b' as typtype, 'date' as typname, 1082 as oid union all\n"
-          + " select false as is_array, 'b' as typtype, 'varchar' as typname, 1043 as oid union all\n"
-          + " select true as is_array, 'b' as typtype, '_float8' as typname, 1022 as oid union all\n"
-          + " select true as is_array, 'b' as typtype, '_int8' as typname, 1016 as oid union all\n"
-          + " select true as is_array, 'b' as typtype, '_varchar' as typname, 1015 as oid union all\n"
-          + " select true as is_array, 'b' as typtype, '_bytea' as typname, 1001 as oid union all\n"
-          + " select true as is_array, 'b' as typtype, '_bool' as typname, 1000 as oid union all\n"
-          + " select false as is_array, 'b' as typtype, 'float8' as typname, 701 as oid union all\n"
-          + " select false as is_array, 'b' as typtype, 'int8' as typname, 20 as oid union all\n"
-          + " select false as is_array, 'b' as typtype, 'bytea' as typname, 17 as oid union all\n"
-          + " select false as is_array, 'b' as typtype, 'bool' as typname, 16 as oid";
-  public static final String PG_JDBC_GET_TYPE_INFO_WITH_PARAMETER_PREFIX =
-      "SELECT pg_type.oid, typname   FROM pg_catalog.pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname                    from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = $1  ORDER BY sp.r, pg_type.oid DESC LIMIT 1";
-  public static final String PG_JDBC_GET_TYPE_INFO_WITH_PARAMETER_REPLACEMENT =
-      "select 16 as oid, 'bool' as typname from (select 1) t where 'bool'=$1 union all \n"
-          + " select 17 as oid, 'bytea' as typname from (select 1) t where 'bytea'=$1 union all \n"
-          + " select 20 as oid, 'int8' as typname from (select 1) t where 'int8'=$1 union all \n"
-          + " select 701 as oid, 'float8' as typname from (select 1) t where 'float8'=$1 union all \n"
-          + " select 1043 as oid, 'varchar' as typname from (select 1) t where 'varchar'=$1 union all \n"
-          + " select 1082 as oid, 'date' as typname from (select 1) t where 'date'=$1 union all \n"
-          + " select 1184 as oid, 'timestamptz' as typname from (select 1) t where 'timestamptz'=$1 union all \n"
-          + " select 1700 as oid, 'numeric' as typname from (select 1) t where 'numeric'=$1 union all \n"
-          + " select 3802 as oid, 'jsonb' as typname from (select 1) t where 'jsonb'=$1 union all \n"
-          + " select 1000 as oid, '_bool' as typname from (select 1) t where '_bool'=$1 union all \n"
-          + " select 1001 as oid, '_bytea' as typname from (select 1) t where '_bytea'=$1 union all \n"
-          + " select 1016 as oid, '_int8' as typname from (select 1) t where '_int8'=$1 union all \n"
-          + " select 1022 as oid, '_float8' as typname from (select 1) t where '_float8'=$1 union all \n"
-          + " select 1015 as oid, '_varchar' as typname from (select 1) t where '_varchar'=$1 union all \n"
-          + " select 1182 as oid, '_date' as typname from (select 1) t where '_date'=$1 union all \n"
-          + " select 1185 as oid, '_timestamptz' as typname from (select 1) t where '_timestamptz'=$1 union all \n"
-          + " select 1231 as oid, '_numeric' as typname from (select 1) t where '_numeric'=$1 union all \n"
-          + " select 3807 as oid, '_jsonb' as typname from (select 1) t where '_jsonb'=$1";
-  public static final String PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PREFIX =
-      "SELECT typinput='array_in'::regproc as is_array, typtype, typname   FROM pg_catalog.pg_type   LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname                    from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  ORDER BY sp.r, pg_type.oid DESC";
-  public static final String PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_REPLACEMENT =
-      "select true as is_array, 'b' as typtype, '_jsonb' as typname union all\n"
-          + " select false as is_array, 'b' as typtype, 'jsonb' as typname union all\n"
-          + " select false as is_array, 'b' as typtype, 'numeric' as typname union all\n"
-          + " select true as is_array, 'b' as typtype, '_numeric' as typname union all\n"
-          + " select true as is_array, 'b' as typtype, '_timestamptz' as typname union all\n"
-          + " select false as is_array, 'b' as typtype, 'timestamptz' as typname union all\n"
-          + " select true as is_array, 'b' as typtype, '_date' as typname union all\n"
-          + " select false as is_array, 'b' as typtype, 'date' as typname union all\n"
-          + " select false as is_array, 'b' as typtype, 'varchar' as typname union all\n"
-          + " select true as is_array, 'b' as typtype, '_float8' as typname union all\n"
-          + " select true as is_array, 'b' as typtype, '_int8' as typname union all\n"
-          + " select true as is_array, 'b' as typtype, '_varchar' as typname union all\n"
-          + " select true as is_array, 'b' as typtype, '_bytea' as typname union all\n"
-          + " select true as is_array, 'b' as typtype, '_bool' as typname union all\n"
-          + " select false as is_array, 'b' as typtype, 'float8' as typname union all\n"
-          + " select false as is_array, 'b' as typtype, 'int8' as typname union all\n"
-          + " select false as is_array, 'b' as typtype, 'bytea' as typname union all\n"
-          + " select false as is_array, 'b' as typtype, 'bool' as typname";
-  public static final String PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PARAM_PREFIX =
-      "SELECT typinput='array_in'::regproc, typtype   FROM pg_catalog.pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname                    from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = $1  ORDER BY sp.r, pg_type.oid DESC LIMIT 1";
-  public static final String PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PARAM_REPLACEMENT =
-      "select false as is_array, 'b' as typtype from (select 1) t where 'bool'=$1 union all \n"
-          + " select false as is_array, 'b' as typtype from (select 1) t where 'bytea'=$1 union all \n"
-          + " select false as is_array, 'b' as typtype from (select 1) t where 'int8'=$1 union all \n"
-          + " select false as is_array, 'b' as typtype from (select 1) t where 'float8'=$1 union all \n"
-          + " select false as is_array, 'b' as typtype from (select 1) t where 'varchar'=$1 union all \n"
-          + " select false as is_array, 'b' as typtype from (select 1) t where 'date'=$1 union all \n"
-          + " select false as is_array, 'b' as typtype from (select 1) t where 'timestamptz'=$1 union all \n"
-          + " select false as is_array, 'b' as typtype from (select 1) t where 'numeric'=$1 union all \n"
-          + " select false as is_array, 'b' as typtype from (select 1) t where 'jsonb'=$1 union all \n"
-          + " select true as is_array, 'b' as typtype from (select 1) t where '_bool'=$1 union all \n"
-          + " select true as is_array, 'b' as typtype from (select 1) t where '_bytea'=$1 union all \n"
-          + " select true as is_array, 'b' as typtype from (select 1) t where '_int8'=$1 union all \n"
-          + " select true as is_array, 'b' as typtype from (select 1) t where '_float8'=$1 union all \n"
-          + " select true as is_array, 'b' as typtype from (select 1) t where '_varchar'=$1 union all \n"
-          + " select true as is_array, 'b' as typtype from (select 1) t where '_date'=$1 union all \n"
-          + " select true as is_array, 'b' as typtype from (select 1) t where '_timestamptz'=$1 union all \n"
-          + " select true as is_array, 'b' as typtype from (select 1) t where '_numeric'=$1 union all \n"
-          + " select true as is_array, 'b' as typtype from (select 1) t where '_jsonb'=$1";
-  public static final String PG_JDBC_GET_TYPE_INFO_NOT_TOAST_PREFIX =
-      "SELECT t.typname,t.oid FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON (t.typnamespace = n.oid)  WHERE n.nspname  != 'pg_toast'";
-  public static final String PG_JDBC_GET_TYPE_INFO_NOT_TOAST_REPLACEMENT =
-      "select 'bool' as typname, 16 as oid union all\n"
-          + " select 'bytea' as typname, 17 as oid union all\n"
-          + " select 'int8' as typname, 20 as oid union all\n"
-          + " select 'float8' as typname, 701 as oid union all\n"
-          + " select 'varchar' as typname, 1043 as oid union all\n"
-          + " select 'date' as typname, 1082 as oid union all\n"
-          + " select 'timestamptz' as typname, 1184 as oid union all\n"
-          + " select 'numeric' as typname, 1700 as oid union all\n"
-          + " select 'jsonb' as typname, 3802 as oid union all\n"
-          + " select '_bool' as typname, 1000 as oid union all\n"
-          + " select '_bytea' as typname, 1001 as oid union all\n"
-          + " select '_int8' as typname, 1016 as oid union all\n"
-          + " select '_float8' as typname, 1022 as oid union all\n"
-          + " select '_varchar' as typname, 1015 as oid union all\n"
-          + " select '_date' as typname, 1182 as oid union all\n"
-          + " select '_timestamptz' as typname, 1185 as oid union all\n"
-          + " select '_numeric' as typname, 1231 as oid union all\n"
-          + " select '_jsonb' as typname, 3807 as oid";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_PREFIX_FULL =
+  //      "SELECT t.typname,t.oid FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON
+  // (t.typnamespace = n.oid)  WHERE n.nspname  != 'pg_toast' AND  (t.typrelid = 0 OR (SELECT
+  // c.relkind = 'c' FROM pg_catalog.pg_class c WHERE c.oid = t.typrelid))";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_REPLACEMENT_FULL =
+  //      " select 'bool' as typname, 16 as oid union all \n"
+  //          + " select 'bytea' as typname, 17 as oid union all \n"
+  //          + " select 'int8' as typname, 20 as oid union all \n"
+  //          + " select 'float8' as typname, 701 as oid union all \n"
+  //          + " select 'varchar' as typname, 1043 as oid union all \n"
+  //          + " select 'date' as typname, 1082 as oid union all \n"
+  //          + " select 'timestamptz' as typname, 1184 as oid union all \n"
+  //          + " select 'numeric' as typname, 1700 as oid union all \n"
+  //          + " select 'jsonb' as typname, 3802 as oid union all \n"
+  //          + " select '_bool' as typname, 1000 as oid union all \n"
+  //          + " select '_bytea' as typname, 1001 as oid union all \n"
+  //          + " select '_int8' as typname, 1016 as oid union all \n"
+  //          + " select '_float8' as typname, 1022 as oid union all \n"
+  //          + " select '_varchar' as typname, 1015 as oid union all \n"
+  //          + " select '_date' as typname, 1182 as oid union all \n"
+  //          + " select '_timestamptz' as typname, 1185 as oid union all \n"
+  //          + " select '_numeric' as typname, 1231 as oid union all \n"
+  //          + " select '_jsonb' as typname, 3807 as oid";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_WITH_TYPTYPE_PREFIX =
+  //      "SELECT typinput='array_in'::regproc as is_array, typtype, typname, pg_type.oid   FROM
+  // pg_catalog.pg_type   LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from
+  // pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname
+  //             from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r
+  //     using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  ORDER BY sp.r,
+  // pg_type.oid DESC";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_WITH_TYPTYPE_REPLACEMENT =
+  //      "select true as is_array, 'b' as typtype, '_jsonb' as typname, 3807 as oid union all\n"
+  //          + " select false as is_array, 'b' as typtype, 'jsonb' as typname, 3802 as oid union
+  // all\n"
+  //          + " select false as is_array, 'b' as typtype, 'numeric' as typname, 1700 as oid union
+  // all\n"
+  //          + " select true as is_array, 'b' as typtype, '_numeric' as typname, 1231 as oid union
+  // all\n"
+  //          + " select true as is_array, 'b' as typtype, '_timestamptz' as typname, 1185 as oid
+  // union all\n"
+  //          + " select false as is_array, 'b' as typtype, 'timestamptz' as typname, 1184 as oid
+  // union all\n"
+  //          + " select true as is_array, 'b' as typtype, '_date' as typname, 1182 as oid union
+  // all\n"
+  //          + " select false as is_array, 'b' as typtype, 'date' as typname, 1082 as oid union
+  // all\n"
+  //          + " select false as is_array, 'b' as typtype, 'varchar' as typname, 1043 as oid union
+  // all\n"
+  //          + " select true as is_array, 'b' as typtype, '_float8' as typname, 1022 as oid union
+  // all\n"
+  //          + " select true as is_array, 'b' as typtype, '_int8' as typname, 1016 as oid union
+  // all\n"
+  //          + " select true as is_array, 'b' as typtype, '_varchar' as typname, 1015 as oid union
+  // all\n"
+  //          + " select true as is_array, 'b' as typtype, '_bytea' as typname, 1001 as oid union
+  // all\n"
+  //          + " select true as is_array, 'b' as typtype, '_bool' as typname, 1000 as oid union
+  // all\n"
+  //          + " select false as is_array, 'b' as typtype, 'float8' as typname, 701 as oid union
+  // all\n"
+  //          + " select false as is_array, 'b' as typtype, 'int8' as typname, 20 as oid union
+  // all\n"
+  //          + " select false as is_array, 'b' as typtype, 'bytea' as typname, 17 as oid union
+  // all\n"
+  //          + " select false as is_array, 'b' as typtype, 'bool' as typname, 16 as oid";
+
+  //  public static final String PG_JDBC_GET_TYPE_INFO_WITH_PARAMETER_PREFIX =
+  //      "SELECT pg_type.oid, typname   FROM pg_catalog.pg_type   LEFT   JOIN (select ns.oid as
+  // nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select s.r,
+  // (current_schemas(false))[s.r] as nspname                    from generate_series(1,
+  // array_upper(current_schemas(false), 1)) as s(r) ) as r          using ( nspname )        ) as
+  // sp     ON sp.nspoid = typnamespace  WHERE typname = $1  ORDER BY sp.r, pg_type.oid DESC LIMIT
+  // 1";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_WITH_PARAMETER_REPLACEMENT =
+  //      "SELECT pg_type.oid, typname FROM pg_type WHERE typname = $1  ORDER BY pg_type.oid DESC
+  // LIMIT 1";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_BY_OID_PREFIX =
+  //      "SELECT typinput='pg_catalog.array_in'::regproc as is_array, typtype, typname, pg_type.oid
+  // ";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_BY_OID_REPLACEMENT =
+  //      "SELECT substring(typname, 1, 1)='_' as is_array, typtype, typname, pg_type.oid FROM
+  // pg_type WHERE pg_type.oid = $1 ORDER BY pg_type.oid DESC";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PREFIX =
+  //      "SELECT typinput='array_in'::regproc as is_array, typtype, typname   FROM
+  // pg_catalog.pg_type   LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from
+  // pg_namespace as ns           join ( select s.r, (current_schemas(false))[s.r] as nspname
+  //             from generate_series(1, array_upper(current_schemas(false), 1)) as s(r) ) as r
+  //     using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  ORDER BY sp.r,
+  // pg_type.oid DESC";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_REPLACEMENT =
+  //      "SELECT substring(typname, 1, 1)='_' as is_array, typtype, typname FROM pg_type ORDER BY
+  // pg_type.oid DESC";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PARAM_PREFIX =
+  //      "SELECT typinput='array_in'::regproc, typtype   FROM pg_catalog.pg_type   LEFT   JOIN
+  // (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join (
+  // select s.r, (current_schemas(false))[s.r] as nspname                    from generate_series(1,
+  // array_upper(current_schemas(false), 1)) as s(r) ) as r          using ( nspname )        ) as
+  // sp     ON sp.nspoid = typnamespace  WHERE typname = $1  ORDER BY sp.r, pg_type.oid DESC LIMIT
+  // 1";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PARAM_REPLACEMENT =
+  //      "select false as is_array, 'b' as typtype from (select 1) t where 'bool'=$1 union all \n"
+  //          + " select false as is_array, 'b' as typtype from (select 1) t where 'bytea'=$1 union
+  // all \n"
+  //          + " select false as is_array, 'b' as typtype from (select 1) t where 'int8'=$1 union
+  // all \n"
+  //          + " select false as is_array, 'b' as typtype from (select 1) t where 'float8'=$1 union
+  // all \n"
+  //          + " select false as is_array, 'b' as typtype from (select 1) t where 'varchar'=$1
+  // union all \n"
+  //          + " select false as is_array, 'b' as typtype from (select 1) t where 'date'=$1 union
+  // all \n"
+  //          + " select false as is_array, 'b' as typtype from (select 1) t where 'timestamptz'=$1
+  // union all \n"
+  //          + " select false as is_array, 'b' as typtype from (select 1) t where 'numeric'=$1
+  // union all \n"
+  //          + " select false as is_array, 'b' as typtype from (select 1) t where 'jsonb'=$1 union
+  // all \n"
+  //          + " select true as is_array, 'b' as typtype from (select 1) t where '_bool'=$1 union
+  // all \n"
+  //          + " select true as is_array, 'b' as typtype from (select 1) t where '_bytea'=$1 union
+  // all \n"
+  //          + " select true as is_array, 'b' as typtype from (select 1) t where '_int8'=$1 union
+  // all \n"
+  //          + " select true as is_array, 'b' as typtype from (select 1) t where '_float8'=$1 union
+  // all \n"
+  //          + " select true as is_array, 'b' as typtype from (select 1) t where '_varchar'=$1
+  // union all \n"
+  //          + " select true as is_array, 'b' as typtype from (select 1) t where '_date'=$1 union
+  // all \n"
+  //          + " select true as is_array, 'b' as typtype from (select 1) t where '_timestamptz'=$1
+  // union all \n"
+  //          + " select true as is_array, 'b' as typtype from (select 1) t where '_numeric'=$1
+  // union all \n"
+  //          + " select true as is_array, 'b' as typtype from (select 1) t where '_jsonb'=$1";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_NOT_TOAST_PREFIX =
+  //      "SELECT t.typname,t.oid FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON
+  // (t.typnamespace = n.oid)  WHERE n.nspname  != 'pg_toast'";
+  //  public static final String PG_JDBC_GET_TYPE_INFO_NOT_TOAST_REPLACEMENT =
+  //      "select 'bool' as typname, 16 as oid union all\n"
+  //          + " select 'bytea' as typname, 17 as oid union all\n"
+  //          + " select 'int8' as typname, 20 as oid union all\n"
+  //          + " select 'float8' as typname, 701 as oid union all\n"
+  //          + " select 'varchar' as typname, 1043 as oid union all\n"
+  //          + " select 'date' as typname, 1082 as oid union all\n"
+  //          + " select 'timestamptz' as typname, 1184 as oid union all\n"
+  //          + " select 'numeric' as typname, 1700 as oid union all\n"
+  //          + " select 'jsonb' as typname, 3802 as oid union all\n"
+  //          + " select '_bool' as typname, 1000 as oid union all\n"
+  //          + " select '_bytea' as typname, 1001 as oid union all\n"
+  //          + " select '_int8' as typname, 1016 as oid union all\n"
+  //          + " select '_float8' as typname, 1022 as oid union all\n"
+  //          + " select '_varchar' as typname, 1015 as oid union all\n"
+  //          + " select '_date' as typname, 1182 as oid union all\n"
+  //          + " select '_timestamptz' as typname, 1185 as oid union all\n"
+  //          + " select '_numeric' as typname, 1231 as oid union all\n"
+  //          + " select '_jsonb' as typname, 3807 as oid";
 
   public static final String PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_1 =
       "SELECT n.nspname,c.relname,r.rolname,c.relacl  FROM pg_catalog.pg_namespace n, pg_catalog.pg_class c, pg_catalog.pg_roles r  WHERE c.relnamespace = n.oid  AND c.relowner = r.oid  AND c.relkind IN ('r','p'";

@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -104,6 +105,6 @@ public class JsonbParser extends Parser<String> {
 
   @Override
   public void bind(Statement.Builder statementBuilder, String name) {
-    statementBuilder.bind(name).to(this.item);
+    statementBuilder.bind(name).to(Value.pgJsonb(this.item));
   }
 }

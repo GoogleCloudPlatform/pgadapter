@@ -517,12 +517,22 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             assertEquals(LocalDate.of(2022, 3, 29), resultSet.getObject(++index, LocalDate.class));
             assertEquals("test", resultSet.getString(++index));
             assertEquals("{\"key\": \"value\"}", resultSet.getString(++index));
+
+            for (int col = 1; col <= resultSet.getMetaData().getColumnCount(); col++) {
+              assertNotNull(resultSet.getObject(col));
+            }
+
             assertFalse(resultSet.next());
           }
         }
       }
 
-      List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+      List<ExecuteSqlRequest> requests =
+          mockSpanner.getRequests().stream()
+              .filter(request -> request instanceof ExecuteSqlRequest)
+              .map(request -> (ExecuteSqlRequest) request)
+              .filter(request -> request.getSql().equals(pgSql))
+              .collect(Collectors.toList());
       // Prepare threshold less than 0 means use binary transfer + DESCRIBE statement.
       assertEquals(preparedThreshold < 0 ? 2 : 1, requests.size());
 
@@ -1761,7 +1771,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("test")
                 .bind("p10")
-                .to("{\"key\": \"value\"}")
+                // TODO: Change this to Value.pgJsonb(..) when
+                //       has been merged.
+                .to(com.google.cloud.spanner.Value.json("{\"key\": \"value\"}"))
                 .build(),
             com.google.spanner.v1.ResultSet.newBuilder()
                 .setMetadata(ALL_TYPES_METADATA)
@@ -1784,8 +1796,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(Types.TIMESTAMP, parameterMetaData.getParameterType(7));
         assertEquals(Types.DATE, parameterMetaData.getParameterType(8));
         assertEquals(Types.VARCHAR, parameterMetaData.getParameterType(9));
-        // TODO: Enable when support for JSONB has been enabled.
-        // assertEquals(Types.OTHER, parameterMetaData.getParameterType(10));
+        assertEquals(Types.OTHER, parameterMetaData.getParameterType(10));
+
         ResultSetMetaData metadata = statement.getMetaData();
         assertEquals(10, metadata.getColumnCount());
         assertEquals(Types.BIGINT, metadata.getColumnType(1));
@@ -1797,8 +1809,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(Types.TIMESTAMP, metadata.getColumnType(7));
         assertEquals(Types.DATE, metadata.getColumnType(8));
         assertEquals(Types.VARCHAR, metadata.getColumnType(9));
-        // TODO: Enable when support for JSONB has been enabled.
-        // assertEquals(Types.OTHER, metadata.getColumnType(10));
+        assertEquals(Types.OTHER, metadata.getColumnType(10));
 
         int index = 0;
         statement.setLong(++index, 1L);
@@ -1810,7 +1821,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         statement.setObject(++index, zonedDateTime);
         statement.setObject(++index, LocalDate.of(2022, 3, 29));
         statement.setString(++index, "test");
-        statement.setString(++index, "{\"key\": \"value\"}");
+        statement.setObject(++index, createJdbcPgJsonbObject("{\"key\": \"value\"}"));
 
         try (ResultSet resultSet = statement.executeQuery()) {
           assertTrue(resultSet.next());
