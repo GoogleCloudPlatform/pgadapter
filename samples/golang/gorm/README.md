@@ -171,14 +171,3 @@ db, err := gorm.Open(postgres.Open(connectionString), &gorm.Config{
 ### Locking
 Locking clauses, like `clause.Locking{Strength: "UPDATE"}`, are not supported. These are generally speaking also not
 required, as Cloud Spanner uses isolation level `serializable` for read/write transactions.
-
-### Large CreateInBatches
-The `CreateInBatches` function will generate an insert statement in the following form:
-
-```sql
-INSERT INTO my_table (col1, col2, col3)
-VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9), ..., ($x, $y, $z)
-```
-
-PGAdapter currently does not support prepared statements with more than 50 parameters. Either reduce the number of rows
-that are inserted in one batch or use the `SimpleQueryMode` to work around this limitation.
