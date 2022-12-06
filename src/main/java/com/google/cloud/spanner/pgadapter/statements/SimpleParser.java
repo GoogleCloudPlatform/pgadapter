@@ -49,6 +49,14 @@ public class SimpleParser {
     /** Name is the actual object name. */
     final String name;
 
+    static TableOrIndexName of(String name) {
+      return new TableOrIndexName(name);
+    }
+
+    static TableOrIndexName of(String schema, String name) {
+      return new TableOrIndexName(schema, name);
+    }
+
     TableOrIndexName(String name) {
       this.schema = null;
       this.name = name;
@@ -378,6 +386,10 @@ public class SimpleParser {
   }
 
   List<TableOrIndexName> readColumnListInParentheses(String name) {
+    return readColumnListInParentheses(name, true);
+  }
+
+  List<TableOrIndexName> readColumnListInParentheses(String name, boolean required) {
     if (eatToken("(")) {
       List<String> expressions = parseExpressionListUntilKeyword(")", true);
       if (!eatToken(")")) {
@@ -386,9 +398,11 @@ public class SimpleParser {
             SQLState.SyntaxError);
       }
       return expressionListToColumnNames(name, expressions);
-    } else {
+    } else if (required) {
       throw PGExceptionFactory.newPGException(
           String.format("missing opening parentheses for %s", name), SQLState.SyntaxError);
+    } else {
+      return null;
     }
   }
 
