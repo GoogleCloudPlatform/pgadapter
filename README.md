@@ -14,9 +14,10 @@ PGAdapter can be used with the following drivers and clients:
 
 ## Frameworks
 PGAdapter can be used with the following frameworks:
-1. `gorm`: Version 1.23.8 and higher have Pilot Support. See [gorm support](docs/gorm.md) for more details.
+1. `Liquibase`: Version 4.12.0 and higher are supported. See [Liquibase support](docs/liquibase.md)
+   for more details. See also [this directory](samples/java/liquibase) for a sample application using `Liquibase`.
+2. `gorm`: Version 1.23.8 and higher are supported. See [gorm support](docs/gorm.md) for more details.
    See also [this directory](samples/golang/gorm) for a sample application using `gorm`.
-
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
@@ -271,8 +272,6 @@ Other `psql` meta-commands are __not__ supported.
 ## Limitations
 
 PGAdapter has the following known limitations at this moment:
-- Server side [prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are limited to at most 50 parameters.
-- SSL connections are not supported.
 - Only [password authentication](https://www.postgresql.org/docs/current/auth-password.html) using
   the `password` method is supported. All other authentication methods are not supported.
 - The COPY protocol only supports COPY TO|FROM STDOUT|STDIN [BINARY]. COPY TO|FROM <FILE|PROGRAM> is not supported.
