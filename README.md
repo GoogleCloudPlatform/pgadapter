@@ -14,9 +14,10 @@ PGAdapter can be used with the following drivers and clients:
 
 ## Frameworks
 PGAdapter can be used with the following frameworks:
-1. `gorm`: Version 1.23.8 and higher have Pilot Support. See [gorm support](docs/gorm.md) for more details.
+1. `Liquibase`: Version 4.12.0 and higher have Pilot Support. See [Liquibase support](docs/liquibase.md)
+   for more details. See also [this directory](samples/java/liquibase) for a sample application using `Liquibase`.
+2. `gorm`: Version 1.23.8 and higher have Pilot Support. See [gorm support](docs/gorm.md) for more details.
    See also [this directory](samples/golang/gorm) for a sample application using `gorm`.
-
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.

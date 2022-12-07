@@ -1,6 +1,6 @@
 # PGAdapter and Liquibase
 
-PGAdapter can be used in combination with Liquibase, but with a number of limitations. This sample
+PGAdapter has Pilot Support for [Liquibase](https://www.liquibase.org/). This sample
 shows the command line arguments and configuration that is needed in order to use Liquibase with
 PGAdapter.
 
