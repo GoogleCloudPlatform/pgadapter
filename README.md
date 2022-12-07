@@ -3,13 +3,21 @@
 PGAdapter is a proxy which translates the PostgreSQL wire-protocol into the
 equivalent for Spanner databases [that use the PostgreSQL interface](https://cloud.google.com/spanner/docs/postgresql-interface).
 
-PGAdapter can be used with the following clients:
+## Drivers and Clients
+PGAdapter can be used with the following drivers and clients:
 1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
 2. `JDBC`: Versions 42.x and higher are supported. See [JDBC support](docs/jdbc.md) for more details.
 3. `pgx`: Version 4.15 and higher are supported. See [pgx support](docs/pgx.md) for more details.
 4. `psycopg2`: Version 2.9.3 and higher (but not `psycopg3`) are supported. See [psycopg2](docs/psycopg2.md) for more details.
 5. `node-postgres`: Version 8.8.0 and higher have __experimental support__.
    See [node-postgres support](docs/node-postgres.md) for more details.
+
+## Frameworks
+PGAdapter can be used with the following frameworks:
+1. `Liquibase`: Version 4.12.0 and higher have Pilot Support. See [Liquibase support](docs/liquibase.md)
+   for more details. See also [this directory](samples/java/liquibase) for a sample application using `Liquibase`.
+2. `gorm`: Version 1.23.8 and higher have Pilot Support. See [gorm support](docs/gorm.md) for more details.
+   See also [this directory](samples/golang/gorm) for a sample application using `gorm`.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.

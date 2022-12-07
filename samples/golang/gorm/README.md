@@ -1,11 +1,20 @@
 # PGAdapter and gorm
 
-PGAdapter can be used with [gorm](https://gorm.io/) and the `pgx` driver. This document shows how to use this sample
-application, and lists the limitations when working with `gorm` with PGAdapter.
+PGAdapter has Pilot Support for [gorm](https://gorm.io/) with the `pgx` driver. This document shows
+how to use this sample application, and lists the limitations when working with `gorm` with PGAdapter.
 
 The [sample.go](sample.go) file contains a sample application using `gorm` with PGAdapter. Use this as a reference for
 features of `gorm` that are supported with PGAdapter. This sample assumes that the reader is familiar with `gorm`, and
 it is not intended as a tutorial for how to use `gorm` in general.
+
+## Pilot Support
+Pilot Support means that `gorm` can be used with Cloud Spanner PostgreSQL databases, but with limitations.
+Applications that have been developed with `gorm` for PostgreSQL will probably require modifications
+before they can be used with Cloud Spanner PostgreSQL databases. It is possible to develop new
+applications using `gorm` with Cloud Spanner PostgreSQL databases. These applications will also work
+with PostgreSQL without modifications.
+
+See [Limitations](#limitations) for a full list of limitations when working with `gorm`.
 
 ## Start PGAdapter
 You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
@@ -43,7 +52,7 @@ psql -h localhost -p 5432 -d my-database -f drop_data_model.sql
 Cloud Spanner supports the following data types in combination with `gorm`.
 
 | PostgreSQL Type                         | gorm / go type               |
-|------------------------------------------------------------------------|
+|-----------------------------------------|------------------------------|
 | boolean                                 | bool, sql.NullBool           |
 | bigint / int8                           | int64, sql.NullInt64         |
 | varchar                                 | string, sql.NullString       |
