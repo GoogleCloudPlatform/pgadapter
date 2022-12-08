@@ -14,6 +14,8 @@
 '''
 
 import sys
+from django.contrib.postgres.aggregates import StringAgg
+from django.contrib.postgres.aggregates import Corr
 
 def create_django_setup(host, port):
   from django.conf import settings
@@ -39,9 +41,17 @@ def create_django_setup(host, port):
   settings.configure(**conf)
   apps.populate(settings.INSTALLED_APPS)
 
+def execute(option):
+  if option == 'string_agg':
+    print(Singer.objects.values('firstname').annotate(cols=StringAgg('firstname', delimiter=' ')))
+  elif option == 'corr':
+    print(Singer.objects.values('singerid').annotate(cols=Corr(y='singerid', x='singerid')))
 
 if __name__ == '__main__':
 
+  if len(sys.argv) < 4:
+    print('Invalid command line arguments')
+    sys.exit()
   host = sys.argv[1]
   port = sys.argv[2]
 
@@ -51,6 +61,10 @@ if __name__ == '__main__':
   except Exception as e:
     print(e)
     sys.exit()
-  from django.contrib.postgres.aggregates import StringAgg
+
+  try:
+    execute(sys.argv[3])
+  except Exception as e:
+    print(e)
 
 
