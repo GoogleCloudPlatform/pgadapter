@@ -428,9 +428,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
               assertTrue(columns.next());
               assertEquals("col_jsonb", columns.getString("COLUMN_NAME"));
-              // TODO: Change to jsonb when available.
-              assertEquals(Types.VARCHAR, columns.getInt("DATA_TYPE"));
-              assertEquals("varchar", columns.getString("TYPE_NAME"));
+              assertEquals(Types.OTHER, columns.getInt("DATA_TYPE"));
+              assertEquals("\"pg_catalog\".\"jsonb\"", columns.getString("TYPE_NAME"));
 
               assertFalse(columns.next());
             }
