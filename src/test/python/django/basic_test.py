@@ -14,6 +14,10 @@
 '''
 
 import sys
+import datetime
+
+import pytz
+
 
 def create_django_setup(host, port):
   from django.conf import settings
@@ -35,6 +39,7 @@ def create_django_setup(host, port):
   }
   conf['DATABASES']['default']['PORT'] = port
   conf['DATABASES']['default']['HOST'] = host
+  conf['USE_TZ'] = True
   settings.configure(**conf)
   apps.populate(settings.INSTALLED_APPS)
 
@@ -71,6 +76,17 @@ def get_filtered_data(filters):
   for rows in result.values():
     print(rows)
 
+def all_types_insert():
+  obj = all_types(col_bigint=6, col_bool=True, col_bytea=b'hello', col_date=datetime.date(1998, 10, 2), col_int=13, col_varchar='some text', col_float8=26.8, col_numeric=95.6, col_timestamptz=datetime.datetime.fromtimestamp(1545730176, pytz.UTC))
+  obj.save()
+  print('Insert Successful')
+
+def all_types_insert_all_null():
+  obj = all_types()
+  obj.save()
+  print('Insert Successful')
+
+
 def execute(option):
   type = option[0]
   if type == 'all':
@@ -79,6 +95,11 @@ def execute(option):
     insert_data(option[1:])
   elif type == 'filter':
     get_filtered_data(option[1:])
+  elif type == 'all_types_insert':
+    all_types_insert()
+  elif type == 'all_types_insert_null':
+    all_types_insert_all_null()
+
   else:
     print('Invalid Option Type')
 
@@ -92,6 +113,7 @@ if __name__ == '__main__':
   try:
     create_django_setup(host, port)
     from data.models import Singer
+    from data.models import all_types
   except Exception as e:
     print(e)
     sys.exit(1)
