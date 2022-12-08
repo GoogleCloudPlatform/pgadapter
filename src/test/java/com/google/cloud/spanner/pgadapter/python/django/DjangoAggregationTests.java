@@ -113,6 +113,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   public void aggregateAvg() throws IOException, InterruptedException {
 
     String sql = "SELECT AVG(\"singers\".\"singerid\") AS \"singerid__avg\" FROM \"singers\"";
+    String sqlWithLimit = "SELECT MAX(\"singers\".\"singerid\") AS \"singerid__max\" FROM \"singers\" LIMIT 21";
 
     List<String> result = new ArrayList<>();
     result.add("int");
@@ -122,6 +123,9 @@ public class DjangoAggregationTests extends DjangoTestSetup {
 
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createResultSet(result, 1)));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sqlWithLimit), createResultSet(result, 1)));
 
     List<String> options = new ArrayList<>();
     options.add("aggregate_avg");
@@ -139,6 +143,8 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   public void aggregateMin() throws IOException, InterruptedException {
 
     String sql = "SELECT MIN(\"singers\".\"singerid\") AS \"singerid__min\" FROM \"singers\"";
+    String sqlWithLimit = "SELECT MAX(\"singers\".\"singerid\") AS \"singerid__max\" FROM \"singers\" LIMIT 21";
+
 
     List<String> result = new ArrayList<>();
     result.add("int");
@@ -148,6 +154,9 @@ public class DjangoAggregationTests extends DjangoTestSetup {
 
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createResultSet(result, 1)));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sqlWithLimit), createResultSet(result, 1)));
 
     List<String> options = new ArrayList<>();
     options.add("aggregate_min");
@@ -165,6 +174,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   public void aggregateMax() throws IOException, InterruptedException {
 
     String sql = "SELECT MAX(\"singers\".\"singerid\") AS \"singerid__max\" FROM \"singers\"";
+    String sqlWithLimit = "SELECT MAX(\"singers\".\"singerid\") AS \"singerid__max\" FROM \"singers\" LIMIT 21";
 
     List<String> result = new ArrayList<>();
     result.add("int");
@@ -174,6 +184,10 @@ public class DjangoAggregationTests extends DjangoTestSetup {
 
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createResultSet(result, 1)));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sqlWithLimit), createResultSet(result, 1)));
+
 
     List<String> options = new ArrayList<>();
     options.add("aggregate_max");
