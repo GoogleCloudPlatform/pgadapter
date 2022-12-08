@@ -79,7 +79,7 @@ if __name__ == '__main__':
     from data.models import Singer
   except Exception as e:
     print(e)
-    sys.exit(0)
+    sys.exit(1)
 
   try:
     execute(sys.argv[3:])
