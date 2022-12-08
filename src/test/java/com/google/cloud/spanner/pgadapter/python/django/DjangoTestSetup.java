@@ -72,10 +72,10 @@ public class DjangoTestSetup extends DjangoMockServerTest {
     return execute(port, host, options, "transaction_test.py");
   }
 
-
   public String executeConditionalTests(int port, String host, List<String> options)
       throws IOException, InterruptedException {
     return execute(port, host, options, "conditional_expressions_test.py");
+  }
 
   public String executeAggregationTests(int port, String host, List<String> options)
       throws IOException, InterruptedException {
