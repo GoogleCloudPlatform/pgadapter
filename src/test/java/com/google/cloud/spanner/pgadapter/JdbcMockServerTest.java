@@ -226,6 +226,49 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testClientSideStatementWithResultSet() throws SQLException {
+    String sql = "show statement_timeout";
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals("0", resultSet.getString("statement_timeout"));
+        assertFalse(resultSet.next());
+      }
+      connection.createStatement().execute("set statement_timeout=6000");
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals("6s", resultSet.getString("statement_timeout"));
+        assertFalse(resultSet.next());
+      }
+    }
+
+    // The statement is handled locally and not sent to Cloud Spanner.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testClientSideStatementWithoutResultSet() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        statement.execute("start batch dml");
+        statement.execute(INSERT_STATEMENT.getSql());
+        statement.execute(UPDATE_STATEMENT.getSql());
+        statement.execute("run batch");
+      }
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
+    assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
   public void testSelectCurrentSchema() throws SQLException {
     String sql = "SELECT current_schema";
 
@@ -644,6 +687,43 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals("2022-03-29", params.get("p1").getStringValue());
 
         mockSpanner.clearRequests();
+      }
+    }
+  }
+
+  @Test
+  public void testDescribeDdlStatement() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("create table foo (id bigint primary key, value varchar)")) {
+        ParameterMetaData parameterMetaData = preparedStatement.getParameterMetaData();
+        assertEquals(0, parameterMetaData.getParameterCount());
+        assertNull(preparedStatement.getMetaData());
+      }
+    }
+  }
+
+  @Test
+  public void testDescribeClientSideNoResultStatement() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement("start batch dml")) {
+        ParameterMetaData parameterMetaData = preparedStatement.getParameterMetaData();
+        assertEquals(0, parameterMetaData.getParameterCount());
+        assertNull(preparedStatement.getMetaData());
+      }
+    }
+  }
+
+  @Test
+  public void testDescribeClientSideResultSetStatement() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement =
+          connection.prepareStatement("show statement_timeout")) {
+        SQLException exception =
+            assertThrows(SQLException.class, preparedStatement::getParameterMetaData);
+        assertEquals(
+            "ERROR: ResultSetMetadata are available only for results that were returned from Cloud Spanner",
+            exception.getMessage());
       }
     }
   }
