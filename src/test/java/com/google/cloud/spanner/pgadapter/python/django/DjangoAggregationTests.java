@@ -113,7 +113,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   public void aggregateAvg() throws IOException, InterruptedException {
 
     String sql = "SELECT AVG(\"singers\".\"singerid\") AS \"singerid__avg\" FROM \"singers\"";
-    String sqlWithLimit = "SELECT MAX(\"singers\".\"singerid\") AS \"singerid__max\" FROM \"singers\" LIMIT 21";
+    String sqlWithLimit = "SELECT AVG(\"singers\".\"singerid\") AS \"singerid__max\" FROM \"singers\" LIMIT 21";
 
     List<String> result = new ArrayList<>();
     result.add("int");
@@ -143,7 +143,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   public void aggregateMin() throws IOException, InterruptedException {
 
     String sql = "SELECT MIN(\"singers\".\"singerid\") AS \"singerid__min\" FROM \"singers\"";
-    String sqlWithLimit = "SELECT MAX(\"singers\".\"singerid\") AS \"singerid__max\" FROM \"singers\" LIMIT 21";
+    String sqlWithLimit = "SELECT MIN(\"singers\".\"singerid\") AS \"singerid__max\" FROM \"singers\" LIMIT 21";
 
 
     List<String> result = new ArrayList<>();
