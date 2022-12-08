@@ -3371,6 +3371,59 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             .count());
   }
 
+  @Test
+  public void testTruncateInDdlBatch() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("start batch ddl");
+      // TRUNCATE is not supported in DDL batches.
+      SQLException exception =
+          assertThrows(
+              SQLException.class, () -> connection.createStatement().executeUpdate("truncate foo"));
+      assertEquals("ERROR: Cannot execute TRUNCATE in a DDL batch", exception.getMessage());
+    }
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+  }
+
+  @Test
+  public void testTruncateInDmlBatch() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("start batch dml");
+      // TRUNCATE is not supported in DDL batches.
+      SQLException exception =
+          assertThrows(
+              SQLException.class, () -> connection.createStatement().executeUpdate("truncate foo"));
+      assertEquals("ERROR: Cannot execute TRUNCATE in a DML batch", exception.getMessage());
+    }
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+  }
+
+  @Test
+  public void testDescribeTruncate() throws SQLException {
+    String sql = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (PreparedStatement preparedStatement = connection.prepareStatement("truncate foo")) {
+        assertEquals(0, preparedStatement.executeUpdate());
+      }
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertEquals(1, request.getStatementsCount());
+    assertEquals(sql, request.getStatements(0).getSql());
+  }
+
   private void verifySettingIsNull(Connection connection, String setting) throws SQLException {
     try (ResultSet resultSet =
         connection.createStatement().executeQuery(String.format("show %s", setting))) {

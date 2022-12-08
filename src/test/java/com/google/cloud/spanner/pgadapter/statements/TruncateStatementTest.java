@@ -127,4 +127,21 @@ public class TruncateStatementTest {
     assertThrows(PGException.class, () -> parse("truncate foo restrict cascade"));
     assertThrows(PGException.class, () -> parse("truncate foo cascade restrict"));
   }
+
+  @Test
+  public void testInvalidTruncateStatement() {
+    PGException exception;
+
+    exception = assertThrows(PGException.class, () -> parse("trncate foo"));
+    assertEquals("not a valid TRUNCATE statement: trncate foo", exception.getMessage());
+
+    exception = assertThrows(PGException.class, () -> parse("truncate"));
+    assertEquals("invalid or missing table name", exception.getMessage());
+
+    exception = assertThrows(PGException.class, () -> parse("truncate 'foo"));
+    assertEquals("invalid or missing table name", exception.getMessage());
+
+    exception = assertThrows(PGException.class, () -> parse("truncate foo, "));
+    assertEquals("invalid or missing table name", exception.getMessage());
+  }
 }
