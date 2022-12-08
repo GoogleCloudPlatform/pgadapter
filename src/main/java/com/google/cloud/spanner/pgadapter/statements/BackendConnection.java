@@ -466,9 +466,9 @@ public class BackendConnection {
               "VACUUM cannot run inside a transaction block", SQLState.ActiveSqlTransaction);
         }
         for (TableOrIndexName table : vacuumStatement.getTables()) {
-          ImmutableList<TableOrIndexName> columns = vacuumStatement.getColumn(table);
+          ImmutableList<TableOrIndexName> columns = vacuumStatement.getTableColumns(table);
           Statement statement;
-          if (columns.isEmpty()) {
+          if (columns == null || columns.isEmpty()) {
             statement = Statement.of("select * from " + table + " limit 1");
           } else {
             statement =

@@ -135,7 +135,7 @@ public class VacuumStatement extends IntermediatePortalStatement {
     return parsedVacuumStatement.tables;
   }
 
-  public ImmutableList<TableOrIndexName> getColumn(TableOrIndexName table) {
+  public ImmutableList<TableOrIndexName> getTableColumns(TableOrIndexName table) {
     return parsedVacuumStatement.columns.get(table);
   }
 
