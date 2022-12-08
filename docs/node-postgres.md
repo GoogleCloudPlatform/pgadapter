@@ -116,4 +116,3 @@ console.log(res);
 ```
 
 ## Limitations
-- [Prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are limited to at most 50 parameters.
