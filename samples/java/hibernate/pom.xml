@@ -24,23 +24,29 @@
     <junixsocket.version>2.5.1</junixsocket.version>
   </properties>
   <dependencies>
+    <!-- [START spanner_hibernate_dependencies] -->
+    <!-- Hibernate for Entity Management -->
     <dependency>
       <groupId>org.hibernate</groupId>
       <artifactId>hibernate-entitymanager</artifactId>
-      <version>${hibernate.version}</version>
+      <version>5.3.20.Final</version>
     </dependency>
 
+    <!-- Hibernate core dependency -->
     <dependency>
       <groupId>org.hibernate</groupId>
       <artifactId>hibernate-core</artifactId>
-      <version>${hibernate.version}</version>
+      <version>5.3.20.Final</version>
     </dependency>
 
+    <!-- The Postgresql JDBC driver dependency -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <version>42.4.3</version>
     </dependency>
+    <!-- [END spanner_hibernate_dependencies] -->
+
     <dependency>
       <groupId>javax.xml.bind</groupId>
       <artifactId>jaxb-api</artifactId>

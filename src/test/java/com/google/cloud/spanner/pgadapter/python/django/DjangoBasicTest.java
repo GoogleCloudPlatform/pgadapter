@@ -188,4 +188,46 @@ public class DjangoBasicTest extends DjangoTestSetup {
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     assertEquals(sqlSelect, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
+
+  @Test
+  public void testInsertAllTypes() throws IOException, InterruptedException {
+
+    String sqlUpdate =
+        "UPDATE \"all_types\" SET \"col_bool\" = true, \"col_bytea\" = '\\x68656c6c6f'::bytea, \"col_float8\" = 26.8, \"col_int\" = 13, \"col_numeric\" = 95.6000000000000, \"col_timestamptz\" = '2018-12-25T09:29:36+00:00'::timestamptz, \"col_date\" = '1998-10-02'::date, \"col_varchar\" = 'some text' WHERE \"all_types\".\"col_bigint\" = 6";
+    String sqlInsert =
+        "INSERT INTO \"all_types\" (\"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\") VALUES (6, true, '\\x68656c6c6f'::bytea, 26.8, 13, 95.6000000000000, '2018-12-25T09:29:36+00:00'::timestamptz, '1998-10-02'::date, 'some text')";
+
+    List<String> result =
+        new ArrayList<>(Arrays.asList("1", "hello", "world", "2", "hello", "django"));
+
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlUpdate), 0));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlInsert), 1));
+    String expectedOutput = "Insert Successful\n";
+    List<String> options = new ArrayList<>(Arrays.asList("all_types_insert"));
+    String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sqlUpdate, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+    assertEquals(sqlInsert, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1).getSql());
+  }
+
+  @Test
+  public void testInsertAllTypesAllNull() throws IOException, InterruptedException {
+
+    String sqlInsert =
+        "INSERT INTO \"all_types\" (\"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\") VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)";
+
+    List<String> result =
+        new ArrayList<>(Arrays.asList("1", "hello", "world", "2", "hello", "django"));
+
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlInsert), 1));
+    String expectedOutput = "Insert Successful\n";
+    List<String> options = new ArrayList<>(Arrays.asList("all_types_insert_null"));
+    String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sqlInsert, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+  }
 }
