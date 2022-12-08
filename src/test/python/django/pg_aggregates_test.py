@@ -43,7 +43,7 @@ def create_django_setup(host, port):
 
 def execute(option):
   if option == 'string_agg':
-    print(Singer.objects.values('firstname').annotate(str=StringAgg('firstname',delimiter = '|')).query)
+    print(Singer.objects.values('firstname').annotate(str=StringAgg('firstname',delimiter = '|')))
   elif option == 'arr_agg':
     print(Singer.objects.values('singerid').aggregate(arr=ArrayAgg('firstname')))
 
