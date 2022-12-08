@@ -186,11 +186,11 @@ public class GormMockServerTest extends AbstractMockServerTest {
   @Test
   public void testCreateBlogAndUser() {
     String insertUserSql =
-        "INSERT INTO \"users\" (\"id\",\"name\",\"email\",\"age\",\"birthday\",\"member_number\",\"activated_at\",\"created_at\",\"updated_at\") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)";
+        "INSERT INTO \"users\" (\"id\",\"name\",\"email\",\"age\",\"birthday\",\"member_number\",\"activated_at\",\"created_at\",\"updated_at\") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING \"name_and_number\"";
     String insertBlogSql =
         "INSERT INTO \"blogs\" (\"id\",\"name\",\"description\",\"user_id\",\"created_at\",\"updated_at\") VALUES ($1,$2,$3,$4,$5,$6)";
     mockSpanner.putStatementResult(
-        StatementResult.update(
+        StatementResult.query(
             Statement.newBuilder(insertUserSql)
                 .bind("p1")
                 .to(1L)
@@ -211,23 +211,49 @@ public class GormMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to(Timestamp.parseTimestamp("2022-09-09T12:00:00+01:00"))
                 .build(),
-            1L));
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .setName("name_and_number")
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("User Name null").build())
+                        .build())
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+                .build()));
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(insertUserSql),
             ResultSet.newBuilder()
                 .setMetadata(
                     createParameterTypesMetadata(
-                        ImmutableList.of(
-                            TypeCode.INT64,
-                            TypeCode.STRING,
-                            TypeCode.STRING,
-                            TypeCode.INT64,
-                            TypeCode.DATE,
-                            TypeCode.STRING,
-                            TypeCode.TIMESTAMP,
-                            TypeCode.TIMESTAMP,
-                            TypeCode.TIMESTAMP)))
+                            ImmutableList.of(
+                                TypeCode.INT64,
+                                TypeCode.STRING,
+                                TypeCode.STRING,
+                                TypeCode.INT64,
+                                TypeCode.DATE,
+                                TypeCode.STRING,
+                                TypeCode.TIMESTAMP,
+                                TypeCode.TIMESTAMP,
+                                TypeCode.TIMESTAMP))
+                        .toBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .setName("name_and_number")
+                                        .build())
+                                .build()))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     mockSpanner.putStatementResult(

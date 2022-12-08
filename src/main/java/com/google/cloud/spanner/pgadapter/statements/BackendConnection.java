@@ -237,7 +237,11 @@ public class BackendConnection {
         } else if (statement.getSql().isEmpty()) {
           result.set(NO_RESULT);
         } else if (parsedStatement.isDdl()) {
-          result.set(ddlExecutor.execute(parsedStatement, statement));
+          if (analyze) {
+            result.set(NO_RESULT);
+          } else {
+            result.set(ddlExecutor.execute(parsedStatement, statement));
+          }
         } else {
           // Potentially replace pg_catalog table references with common table expressions.
           updatedStatement =
@@ -302,8 +306,10 @@ public class BackendConnection {
           } else {
             resultSet = spannerConnection.analyzeUpdateStatement(statement, QueryAnalyzeMode.PLAN);
           }
-        } else {
+        } else if (parsedStatement.isQuery() || parsedStatement.hasReturningClause()) {
           resultSet = spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
+        } else {
+          return NO_RESULT;
         }
         return new QueryResult(resultSet);
       }
