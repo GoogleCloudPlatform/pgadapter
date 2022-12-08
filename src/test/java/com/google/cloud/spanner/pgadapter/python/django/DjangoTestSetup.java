@@ -76,10 +76,9 @@ public class DjangoTestSetup extends DjangoMockServerTest {
       throws IOException, InterruptedException {
     return execute(port, host, options, "pg_aggregates_test.py");
   }
-  
+
   public String executeAggregationTests(int port, String host, List<String> options)
       throws IOException, InterruptedException {
     return execute(port, host, options, "aggregation_tests.py");
-
   }
 }
