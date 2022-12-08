@@ -687,8 +687,10 @@ func TestCopyIn(connString string) *C.char {
 	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T12:39:10.123456000Z")
 	date := pgtype.Date{}
 	date.Set("2022-07-01")
+	jsonb := pgtype.JSONB{}
+	jsonb.Set("{\"key\": \"value\"}")
 	rows := [][]interface{}{
-		{1, true, []byte{1, 2, 3}, 3.14, 10, numeric, timestamptz, date, "test", "{\"key\": \"value\"}"},
+		{1, true, []byte{1, 2, 3}, 3.14, 10, numeric, timestamptz, date, "test", jsonb},
 		{2, nil, nil, nil, nil, nil, nil, nil, nil, nil},
 	}
 	count, err := conn.CopyFrom(
