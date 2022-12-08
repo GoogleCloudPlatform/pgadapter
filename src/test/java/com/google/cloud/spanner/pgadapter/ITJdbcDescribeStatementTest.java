@@ -39,6 +39,8 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Collections;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -290,6 +292,24 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
         assertEquals(2, metadata.getParameterCount());
         assertEquals(Types.BIGINT, metadata.getParameterType(1));
         assertEquals(Types.BIGINT, metadata.getParameterType(2));
+      }
+    }
+  }
+
+  @Test
+  public void testMoreThan50Parameters() throws SQLException {
+    String sql =
+        "select * from all_types where "
+            + IntStream.range(0, 51)
+                .mapToObj(i -> "col_varchar=?")
+                .collect(Collectors.joining(" or "));
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        ParameterMetaData metadata = statement.getParameterMetaData();
+        assertEquals(51, metadata.getParameterCount());
+        for (int i = 1; i < metadata.getParameterCount(); i++) {
+          assertEquals(Types.VARCHAR, metadata.getParameterType(i));
+        }
       }
     }
   }
