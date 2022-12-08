@@ -15,7 +15,7 @@
 
 import sys
 from django.contrib.postgres.aggregates import StringAgg
-from django.contrib.postgres.aggregates import Corr
+from django.contrib.postgres.aggregates import ArrayAgg
 
 def create_django_setup(host, port):
   from django.conf import settings
@@ -43,9 +43,10 @@ def create_django_setup(host, port):
 
 def execute(option):
   if option == 'string_agg':
-    print(Singer.objects.values('firstname').annotate(cols=StringAgg('firstname', delimiter=' ')))
-  elif option == 'corr':
-    print(Singer.objects.values('singerid').annotate(cols=Corr(y='singerid', x='singerid')))
+    print(Singer.objects.values('firstname').annotate(str=StringAgg('firstname',delimiter = '|')).query)
+  elif option == 'arr_agg':
+    print(Singer.objects.values('singerid').aggregate(arr=ArrayAgg('firstname')))
+
 
 if __name__ == '__main__':
 
