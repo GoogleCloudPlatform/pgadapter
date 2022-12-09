@@ -50,39 +50,6 @@ public class DjangoAggregationTests extends DjangoTestSetup {
     return ImmutableList.of(new Object[] {"localhost"}, new Object[] {"/tmp"});
   }
 
-  private ResultSet createResultSet(List<String> rows, int numCols) {
-    ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();
-
-    StructType.Builder builder = StructType.newBuilder();
-
-    for (int i = 0; i < 2 * numCols; i += 2) {
-      if (rows.get(i).equals("int")) {
-        builder.addFields(
-            Field.newBuilder()
-                .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
-                .setName(rows.get(i + 1))
-                .build());
-
-      } else if (rows.get(i).equals("string")) {
-        builder.addFields(
-            Field.newBuilder()
-                .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                .setName(rows.get(i + 1))
-                .build());
-      }
-    }
-    resultSetBuilder.setMetadata(
-        ResultSetMetadata.newBuilder().setRowType(builder.build()).build());
-    for (int i = 2 * numCols; i < rows.size(); i += numCols) {
-      ListValue.Builder rowBuilder = ListValue.newBuilder();
-      for (int j = i; j < i + numCols; ++j)
-        rowBuilder.addValues(Value.newBuilder().setStringValue(rows.get(j)).build());
-
-      resultSetBuilder.addRows(rowBuilder.build());
-    }
-    return resultSetBuilder.build();
-  }
-
   @Test
   public void simpleCountTest() throws IOException, InterruptedException {
 
