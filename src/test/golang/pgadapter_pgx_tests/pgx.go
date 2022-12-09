@@ -174,12 +174,7 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	if g, w := dateValue, wantDateValue; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
-	// Encoding the timestamp values as a parameter will truncate it to microsecond precision.
 	wantTimestamptzValue, _ := time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456+00:00")
-	if strings.Contains(connString, "prefer_simple_protocol=true") || (oid == pgtype.TimestamptzOID && format == 0) {
-		// Simple protocol writes the timestamp as a string and preserves nanosecond precision.
-		wantTimestamptzValue, _ = time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456789+00:00")
-	}
 	if g, w := timestamptzValue.UTC().String(), wantTimestamptzValue.UTC().String(); g != w {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}

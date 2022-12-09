@@ -214,7 +214,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       copyManager.copyOut("COPY all_types TO STDOUT", writer);
 
       assertEquals(
-          "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+          "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
           writer.toString());
 
       // Verify that we can use the connection for normal queries.
@@ -247,7 +247,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
       copyManager.copyOut("COPY all_types (col_bigint, col_varchar) TO STDOUT", writer);
 
       assertEquals(
-          "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+          "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
           writer.toString());
 
       // Verify that we can use the connection for normal queries.
@@ -280,7 +280,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           "COPY all_types TO STDOUT (format csv, escape '~', delimiter '-')", writer);
 
       assertEquals(
-          "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456789+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n",
+          "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n",
           writer.toString());
     }
   }
@@ -299,7 +299,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "col_bigint-col_bool-col_bytea-col_float8-col_int-col_numeric-col_timestamptz-col_date-col_varchar-col_jsonb\n"
-              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456789+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n",
+              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n",
           writer.toString());
     }
   }
@@ -320,7 +320,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "col_bigint\n"
-              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456789+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n",
+              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n",
           writer.toString());
     }
   }
@@ -341,7 +341,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "col_bigint|col_bool|col_bytea|col_float8|col_int|col_numeric|col_timestamptz|col_date|col_varchar|col_jsonb\n"
-              + "1|t|\"\\\\x74657374\"|3.14|100|6.626|2022-02-16 13:18:02.123456789+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"\n",
+              + "1|t|\"\\\\x74657374\"|3.14|100|6.626|2022-02-16 13:18:02.123456+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"\n",
           writer.toString());
     }
   }
@@ -359,7 +359,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           "COPY all_types TO STDOUT (format csv, escape '\\', delimiter '|', quote '\"')", writer);
 
       assertEquals(
-          "1|t|\"\\\\x74657374\"|3.14|100|6.626|2022-02-16 13:18:02.123456789+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"\n",
+          "1|t|\"\\\\x74657374\"|3.14|100|6.626|2022-02-16 13:18:02.123456+00|2022-03-29|test|\"{\\\"key\\\": \\\"value\\\"}\"\n",
           writer.toString());
     }
   }
@@ -378,7 +378,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           writer);
 
       assertEquals(
-          "\"1\"|\"t\"|\"\\\\x74657374\"|\"3.14\"|\"100\"|\"6.626\"|\"2022-02-16 13:18:02.123456789+00\"|\"2022-03-29\"|\"test\"|\"{\\\"key\\\": \\\"value\\\"}\"\n",
+          "\"1\"|\"t\"|\"\\\\x74657374\"|\"3.14\"|\"100\"|\"6.626\"|\"2022-02-16 13:18:02.123456+00\"|\"2022-03-29\"|\"test\"|\"{\\\"key\\\": \\\"value\\\"}\"\n",
           writer.toString());
     }
   }
