@@ -109,8 +109,8 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
     String actualOutput = execute("select_all_types.py", host, pgServer.getLocalPort());
     String expectedOutput =
         "row: [1, True, b'test', 3.14, 100, Decimal('6.626'), "
-            + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=tzutc()), datetime.date(2022, 3, 29), "
-            + "'test', {'key': 'value'}]\n";
+            + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), "
+            + "datetime.date(2022, 3, 29), 'test', {'key': 'value'}]\n";
     assertEquals(expectedOutput, actualOutput.replace("tzlocal()", "tzutc()"));
   }
 
@@ -122,12 +122,12 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
     String actualOutput = execute("select_parameterized.py", host, pgServer.getLocalPort());
     String expectedOutput =
         "first execution: [1, True, b'test', 3.14, 100, Decimal('6.626'), "
-            + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=tzutc()), datetime.date(2022, 3, 29), "
-            + "'test', {'key': 'value'}]\n"
+            + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), "
+            + "datetime.date(2022, 3, 29), 'test', {'key': 'value'}]\n"
             + "second execution: [1, True, b'test', 3.14, 100, Decimal('6.626'), "
-            + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=tzutc()), datetime.date(2022, 3, 29), "
-            + "'test', {'key': 'value'}]\n";
-    assertEquals(expectedOutput, actualOutput.replace("tzlocal()", "tzutc()"));
+            + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), "
+            + "datetime.date(2022, 3, 29), 'test', {'key': 'value'}]\n";
+    assertEquals(expectedOutput, actualOutput);
 
     List<WireMessage> messages = getWireMessages();
     assertEquals(25, messages.size());

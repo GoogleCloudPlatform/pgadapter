@@ -64,7 +64,9 @@ public class TimestampParser extends Parser<Timestamp> {
           .parseLenient()
           .parseCaseInsensitive()
           .appendPattern("yyyy-MM-dd HH:mm:ss")
-          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+          // We should never return more than microsecond precision, as some PG clients, such as
+          // SQLAlchemy will fail if they receive more.
+          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true)
           // Java 8 does not support seconds in timezone offset.
           .appendOffset(OptionsMetadata.isJava8() ? "+HH:mm" : "+HH:mm:ss", "+00")
           .toFormatter();

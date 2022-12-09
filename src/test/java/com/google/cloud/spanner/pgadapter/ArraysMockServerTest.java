@@ -291,10 +291,10 @@ public class ArraysMockServerTest extends AbstractMockServerTest {
         Array array = resultSet.getArray("TIMESTAMP_ARRAY");
         Timestamp[] expected =
             new Timestamp[] {
-              com.google.cloud.Timestamp.parseTimestamp("2022-02-14T11:47:10.123456700Z")
+              com.google.cloud.Timestamp.parseTimestamp("2022-02-14T11:47:10.123456Z")
                   .toSqlTimestamp(),
               null,
-              com.google.cloud.Timestamp.parseTimestamp("2000-02-29T00:00:01.00000100Z")
+              com.google.cloud.Timestamp.parseTimestamp("2000-02-29T00:00:01.000001Z")
                   .toSqlTimestamp()
             };
         Timestamp[] actual = (Timestamp[]) array.getArray();

@@ -131,7 +131,7 @@ public class ArrayParserTest {
             sessionState);
 
     assertEquals(
-        "{\"2022-07-08 07:00:02.123456789+00\",NULL,\"2000-01-01 00:00:00+00\"}",
+        "{\"2022-07-08 07:00:02.123456+00\",NULL,\"2000-01-01 00:00:00+00\"}",
         parser.stringParse());
   }
 
