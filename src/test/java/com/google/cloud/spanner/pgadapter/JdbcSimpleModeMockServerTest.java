@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
@@ -46,6 +47,7 @@ import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
 import java.util.TimeZone;
+import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -632,6 +634,120 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
               () -> connection.createStatement().execute("set time zone 'foo'"));
       assertEquals(
           "ERROR: invalid value for parameter \"TimeZone\": \"foo\"", exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testImplicitDdlBatch() throws SQLException {
+    String sql =
+        "create table test1 (id bigint primary key); "
+            + "create table test2 (id bigint primary key); ";
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute(sql);
+    }
+
+    List<UpdateDatabaseDdlRequest> requests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(message -> message instanceof UpdateDatabaseDdlRequest)
+            .map(message -> (UpdateDatabaseDdlRequest) message)
+            .collect(Collectors.toList());
+    assertEquals(1, requests.size());
+    assertEquals(2, requests.get(0).getStatementsCount());
+    assertEquals("create table test1 (id bigint primary key)", requests.get(0).getStatements(0));
+    assertEquals("create table test2 (id bigint primary key)", requests.get(0).getStatements(1));
+  }
+
+  @Test
+  public void testDdlBatchWithStartAndRun() throws SQLException {
+    String sql =
+        "start batch ddl; "
+            + "create table test1 (id bigint primary key); "
+            + "create table test2 (id bigint primary key); "
+            + "run batch";
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute(sql);
+    }
+
+    List<UpdateDatabaseDdlRequest> requests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(message -> message instanceof UpdateDatabaseDdlRequest)
+            .map(message -> (UpdateDatabaseDdlRequest) message)
+            .collect(Collectors.toList());
+    assertEquals(1, requests.size());
+    assertEquals(2, requests.get(0).getStatementsCount());
+    assertEquals("create table test1 (id bigint primary key)", requests.get(0).getStatements(0));
+    assertEquals("create table test2 (id bigint primary key)", requests.get(0).getStatements(1));
+  }
+
+  @Test
+  public void testMixedImplicitDdlBatch() throws SQLException {
+    String sql =
+        "create table test1 (id bigint primary key); "
+            + "show statement_timeout; "
+            + "create table test2 (id bigint primary key); ";
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(SQLException.class, () -> connection.createStatement().execute(sql));
+      assertEquals(
+          "ERROR: DDL statements are not allowed in mixed batches or transactions.",
+          exception.getMessage());
+    }
+
+    List<UpdateDatabaseDdlRequest> requests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(message -> message instanceof UpdateDatabaseDdlRequest)
+            .map(message -> (UpdateDatabaseDdlRequest) message)
+            .collect(Collectors.toList());
+    assertEquals(0, requests.size());
+  }
+
+  @Test
+  public void testMixedDdlBatchWithStartAndRun() throws SQLException {
+    String sql =
+        "start batch ddl; "
+            + "create table test1 (id bigint primary key); "
+            + "set statement_timeout = '10s'; "
+            + "create table test2 (id bigint primary key); "
+            + "run batch";
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(SQLException.class, () -> connection.createStatement().execute(sql));
+      assertEquals(
+          "ERROR: DDL statements are not allowed in mixed batches or transactions.",
+          exception.getMessage());
+    }
+
+    List<UpdateDatabaseDdlRequest> requests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(message -> message instanceof UpdateDatabaseDdlRequest)
+            .map(message -> (UpdateDatabaseDdlRequest) message)
+            .collect(Collectors.toList());
+    assertEquals(0, requests.size());
+  }
+
+  @Test
+  public void testImplicitBatchOfClientSideStatements() throws SQLException {
+    String sql = "set statement_timeout = '10s'; " + "show statement_timeout; ";
+    addDdlResponseToSpannerAdmin();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (Statement statement = connection.createStatement()) {
+        assertFalse(statement.execute(sql));
+        assertTrue(statement.getMoreResults());
+        try (ResultSet resultSet = statement.getResultSet()) {
+          assertTrue(resultSet.next());
+          assertEquals("10s", resultSet.getString(1));
+          assertFalse(resultSet.next());
+        }
+      }
     }
   }
 }
