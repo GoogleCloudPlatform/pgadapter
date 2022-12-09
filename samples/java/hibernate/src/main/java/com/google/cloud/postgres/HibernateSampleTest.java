@@ -136,11 +136,10 @@ public class HibernateSampleTest {
       list = query.list();
       System.out.println("Singers list size with first result: " + list.size());
 
-      /* Current Limit is not supported. */
-      // query = s.createQuery("from Singers");
-      // query.setMaxResults(2);
-      // list = query.list();
-      // System.out.println("Singers list size with first result: " + list.size());
+      query = s.createQuery("from Singers");
+      query.setMaxResults(2);
+      list = query.list();
+      System.out.println("Singers list size with first result: " + list.size());
 
       query = s.createQuery("select  sum(sampleRate) from Tracks");
       list = query.list();
