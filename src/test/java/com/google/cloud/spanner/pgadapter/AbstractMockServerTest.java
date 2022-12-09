@@ -170,11 +170,16 @@ public abstract class AbstractMockServerTest {
   }
 
   protected static ResultSet createAllTypesResultSet(String columnPrefix, boolean microsTimestamp) {
+    return createAllTypesResultSet("1", columnPrefix, microsTimestamp);
+  }
+
+  protected static ResultSet createAllTypesResultSet(
+      String id, String columnPrefix, boolean microsTimestamp) {
     return com.google.spanner.v1.ResultSet.newBuilder()
         .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
         .addRows(
             ListValue.newBuilder()
-                .addValues(Value.newBuilder().setStringValue("1").build())
+                .addValues(Value.newBuilder().setStringValue(id).build())
                 .addValues(Value.newBuilder().setBoolValue(true).build())
                 .addValues(
                     Value.newBuilder()

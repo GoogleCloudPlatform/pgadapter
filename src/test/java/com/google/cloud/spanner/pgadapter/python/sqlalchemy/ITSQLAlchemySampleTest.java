@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.python.sqlalchemy;
 
 import static com.google.cloud.spanner.pgadapter.python.sqlalchemy.SqlAlchemyBasicsTest.execute;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
@@ -59,5 +60,10 @@ public class ITSQLAlchemySampleTest implements IntegrationTest {
             testEnv.getServer().getLocalPort(),
             testEnv.getDatabaseId());
     assertNotNull(output);
+    assertTrue(
+        output,
+        output.contains("No album found using a stale read.")
+            || output.contains(
+                "Album was found using a stale read, even though it has already been deleted."));
   }
 }

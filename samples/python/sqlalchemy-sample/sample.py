@@ -23,7 +23,23 @@ from random_names import random_first_name, random_last_name, \
 from uuid import uuid4
 from datetime import datetime, date
 
+# This is the default engine that is connected to PostgreSQL (PGAdapter).
+# This engine will by default use read/write transactions.
 engine = create_test_engine()
+
+# This engine uses read-only transactions instead of read/write transactions.
+# It is recommended to use a read-only transaction instead of a read/write
+# transaction for all workloads that only read data, as read-only transactions
+# do not take any locks.
+read_only_engine = engine.execution_options(postgresql_readonly=True)
+
+# This engine uses auto commit instead of transactions, and will execute all
+# read operations with a max staleness of 10 seconds. This will result in more
+# efficient read operations, but the data that is returned can have a staleness
+# of up to 10 seconds.
+stale_read_engine = create_test_engine(
+  autocommit=True,
+  options="?options=-c spanner.read_only_staleness='MAX_STALENESS 10s'")
 
 
 def run_sample():
@@ -53,6 +69,14 @@ def run_sample():
   with Session(engine) as session:
     album_id = session.query(Album).first().id
   delete_album(album_id)
+
+  # Read all albums using a connection that *could* return stale data.
+  with Session(stale_read_engine) as session:
+    album = session.get(Album, album_id)
+    if album is None:
+      print("No album found using a stale read.")
+    else:
+      print("Album was found using a stale read, even though it has already been deleted.")
 
   print()
   print("Finished running sample")
@@ -87,7 +111,7 @@ def create_random_singers_and_albums():
 
 # Print all singers and albums in currently in the database.
 def print_singers_and_albums():
-  with Session(engine) as session:
+  with Session(read_only_engine) as session:
     print()
     for singer in session.query(Singer).order_by("last_name").all():
       print("{} has {} albums:".format(singer.full_name, len(singer.albums)))
@@ -124,7 +148,7 @@ def create_venue_and_concert_in_transaction():
 
 # Prints the concerts currently in the database.
 def print_concerts():
-  with Session(engine) as session:
+  with Session(read_only_engine) as session:
     # Query all concerts and join both Singer and Venue, so we can directly
     # access the properties of these as well without having to execute
     # additional queries.
@@ -144,7 +168,7 @@ def print_concerts():
 
 # Prints all albums with a release date before 1980-01-01.
 def print_albums_released_before_1980():
-  with Session(engine) as session:
+  with Session(read_only_engine) as session:
     print()
     print("Searching for albums released before 1980")
     albums = session \
@@ -158,7 +182,7 @@ def print_albums_released_before_1980():
 
 # Uses a limit and offset to select a subset of all singers in the database.
 def print_singers_with_limit_and_offset():
-  with Session(engine) as session:
+  with Session(read_only_engine) as session:
     print()
     print("Printing at most 5 singers ordered by last name")
     singers = session \
@@ -180,7 +204,7 @@ def print_albums_first_character_of_title_equal_to_first_or_last_name():
   print()
   print("Searching for albums that have a title that starts with the same "
         "character as the first or last name of the singer")
-  with Session(engine) as session:
+  with Session(read_only_engine) as session:
     albums = session \
       .query(Album) \
       .join(Singer) \

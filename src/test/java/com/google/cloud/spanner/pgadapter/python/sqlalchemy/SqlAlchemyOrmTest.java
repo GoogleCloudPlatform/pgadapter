@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.python.sqlalchemy;
 
 import static com.google.cloud.spanner.pgadapter.python.sqlalchemy.SqlAlchemyBasicsTest.execute;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
@@ -23,8 +24,10 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.Duration;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
@@ -119,6 +122,69 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     assertTrue(request.getTransaction().getBegin().hasReadWrite());
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(2, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testOrmReadOnlyTransaction() throws IOException, InterruptedException {
+    String sql =
+        "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb \n"
+            + "FROM all_types \n"
+            + "WHERE all_types.col_bigint = 1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql), createAllTypesResultSet("", true)));
+
+    String actualOutput = execute("orm_read_only_transaction.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'test'col_jsonb=      {'key': 'value'})\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql, request.getSql());
+    assertFalse(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().hasId());
+    assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class).stream()
+            .filter(req -> req.getOptions().hasReadOnly())
+            .count());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    // This rollback request comes from a system query before the actual data query.
+    // The read-only transaction is not committed or rolled back.
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testStaleRead() throws IOException, InterruptedException {
+    String sql =
+        "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb \n"
+            + "FROM all_types \n"
+            + "WHERE all_types.col_bigint = %d";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(String.format(sql, 1)), createAllTypesResultSet("1", "", true)));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(String.format(sql, 2)), createAllTypesResultSet("2", "", true)));
+
+    String actualOutput = execute("orm_stale_read.py", host, pgServer.getLocalPort());
+    assertTrue(actualOutput, actualOutput.contains("AllTypes(col_bigint=     1"));
+    assertTrue(actualOutput, actualOutput.contains("AllTypes(col_bigint=     2"));
+
+    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    for (int index = 1; index < 3; index++) {
+      ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(index);
+      assertTrue(request.getTransaction().hasSingleUse());
+      assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+      assertTrue(request.getTransaction().getSingleUse().getReadOnly().hasMaxStaleness());
+      assertEquals(
+          Duration.newBuilder().setSeconds(10L).build(),
+          request.getTransaction().getSingleUse().getReadOnly().getMaxStaleness());
+    }
+    // This rollback request comes from a system query before the actual data query.
+    // The read-only transaction is not committed or rolled back.
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
 
   @Test
