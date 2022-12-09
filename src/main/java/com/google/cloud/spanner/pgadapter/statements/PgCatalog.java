@@ -46,7 +46,8 @@ public class PgCatalog {
   private static final ImmutableMap<Pattern, String> FUNCTION_REPLACEMENTS =
       ImmutableMap.of(
           Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), "true",
-          Pattern.compile("pg_table_is_visible\\(.+\\)"), "true");
+          Pattern.compile("pg_table_is_visible\\(.+\\)"), "true",
+          Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), "'public'");
 
   private final Map<TableOrIndexName, PgCatalogTable> pgCatalogTables =
       ImmutableMap.of(
