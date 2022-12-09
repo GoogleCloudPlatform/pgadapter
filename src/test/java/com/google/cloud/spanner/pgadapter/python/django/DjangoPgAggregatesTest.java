@@ -42,7 +42,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
 @Category(PythonTest.class)
-public class DjangoPgAggregates extends DjangoTestSetup {
+public class DjangoPgAggregatesTest extends DjangoTestSetup {
 
   @Parameter public String host;
 
@@ -165,7 +165,7 @@ public class DjangoPgAggregates extends DjangoTestSetup {
   }
 
   @Test
-  public void strAggTest() throws IOException, InterruptedException {
+  public void testStrAgg() throws IOException, InterruptedException {
 
     String sql =
         "SELECT \"singers\".\"firstname\", STRING_AGG(\"singers\".\"firstname\", '|' ) AS \"str\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
@@ -201,7 +201,7 @@ public class DjangoPgAggregates extends DjangoTestSetup {
   }
 
   @Test
-  public void arrAggTest() throws IOException, InterruptedException {
+  public void testArrAgg() throws IOException, InterruptedException {
 
     String sql = "SELECT ARRAY_AGG(\"singers\".\"firstname\" ) AS \"arr\" FROM \"singers\"";
 
