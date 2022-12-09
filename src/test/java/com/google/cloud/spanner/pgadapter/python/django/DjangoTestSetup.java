@@ -90,7 +90,7 @@ public class DjangoTestSetup extends DjangoMockServerTest {
   }
 
   @BeforeClass
-  public static void mockUnnecessarySql() {
+  public static void mockDriverInternalSql() {
     String unnecessarySql =
         "with pg_namespace as (\n"
             + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
