@@ -354,7 +354,7 @@ public class ITPsqlTest implements IntegrationTest {
                     + "and col_timestamptz=$7 "
                     + "and col_date=$8 "
                     + "and col_varchar=$9 "
-                    + "and col_jsonb=$10;\n",
+                    + "and col_jsonb::text=$10::text;\n",
                 "execute find_row (1, true, '\\xaabbcc', 3.14, 100, 6.626, "
                     + "'2022-09-06 17:14:49+02', '2022-09-06', 'hello world', '{\"key\": \"value\"}');\n",
                 "execute insert_row (1, true, '\\xaabbcc', 3.14, 100, 6.626, "
@@ -592,7 +592,7 @@ public class ITPsqlTest implements IntegrationTest {
             + "  random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, "
             + "  (random()*999999)::int, (random()*999999999999)::numeric, now()-random()*interval '250 year', "
             + "  (current_date-random()*interval '400 year')::date, md5(random()::text || clock_timestamp()::text)::varchar,"
-            + "  ('{\\\"key\\\": \\\"' || md5(random()::text || clock_timestamp()::text)::varchar || '\\\"}')::json "
+            + "  ('{\\\"key\\\": \\\"' || md5(random()::text || clock_timestamp()::text)::varchar || '\\\"}')::jsonb "
             + String.format("  from generate_series(1, %d) s(i)) to stdout\" ", numRows)
             + "  | psql "
             + " -h "
@@ -606,7 +606,13 @@ public class ITPsqlTest implements IntegrationTest {
             + " -c \"copy all_types from stdin;\"\n");
     setPgPassword(builder);
     Process process = builder.start();
+    StringBuilder errors = new StringBuilder();
+    try (Scanner scanner = new Scanner(process.getErrorStream())) {
+      while (scanner.hasNextLine()) {
+        errors.append(scanner.nextLine()).append("\n");
+      }
+    }
     int res = process.waitFor();
-    assertEquals(0, res);
+    assertEquals(errors.toString(), 0, res);
   }
 }
