@@ -174,12 +174,7 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	if g, w := dateValue, wantDateValue; !reflect.DeepEqual(g, w) {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
-	// Encoding the timestamp values as a parameter will truncate it to microsecond precision.
 	wantTimestamptzValue, _ := time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456+00:00")
-	if strings.Contains(connString, "prefer_simple_protocol=true") || (oid == pgtype.TimestamptzOID && format == 0) {
-		// Simple protocol writes the timestamp as a string and preserves nanosecond precision.
-		wantTimestamptzValue, _ = time.Parse(time.RFC3339Nano, "2022-02-16T13:18:02.123456789+00:00")
-	}
 	if g, w := timestamptzValue.UTC().String(), wantTimestamptzValue.UTC().String(); g != w {
 		return C.CString(fmt.Sprintf("value mismatch\n Got: %v\nWant: %v", g, w))
 	}
@@ -687,8 +682,10 @@ func TestCopyIn(connString string) *C.char {
 	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T12:39:10.123456000Z")
 	date := pgtype.Date{}
 	date.Set("2022-07-01")
+	jsonb := pgtype.JSONB{}
+	jsonb.Set("{\"key\": \"value\"}")
 	rows := [][]interface{}{
-		{1, true, []byte{1, 2, 3}, 3.14, 10, numeric, timestamptz, date, "test", "{\"key\": \"value\"}"},
+		{1, true, []byte{1, 2, 3}, 3.14, 10, numeric, timestamptz, date, "test", jsonb},
 		{2, nil, nil, nil, nil, nil, nil, nil, nil, nil},
 	}
 	count, err := conn.CopyFrom(

@@ -372,23 +372,25 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
             .timeToString(java.sql.Timestamp.from(Instant.from(zonedDateTime)), true);
 
     String pgSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=1 "
             + "and col_bool='TRUE' "
             + "and col_float8=3.14 "
             + "and col_numeric=6.626 "
             + String.format("and col_timestamptz='%s' ", timestampString)
-            + "and col_varchar='test'";
+            + "and col_varchar='test' "
+            + "and col_jsonb='{\"key\": \"value\"}'";
     String jdbcSql =
-        "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar "
+        "select col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_varchar, col_jsonb "
             + "from all_types "
             + "where col_bigint=? "
             + "and col_bool=? "
             + "and col_float8=? "
             + "and col_numeric=? "
             + "and col_timestamptz=? "
-            + "and col_varchar=?";
+            + "and col_varchar=? "
+            + "and col_jsonb=?";
     mockSpanner.putStatementResult(
         StatementResult.query(com.google.cloud.spanner.Statement.of(pgSql), ALL_TYPES_RESULTSET));
 
@@ -402,6 +404,7 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
         preparedStatement.setTimestamp(
             ++index, java.sql.Timestamp.from(Instant.from(zonedDateTime)));
         preparedStatement.setString(++index, "test");
+        preparedStatement.setObject(++index, createJdbcPgJsonbObject("{\"key\": \"value\"}"));
         try (ResultSet resultSet = preparedStatement.executeQuery()) {
           assertTrue(resultSet.next());
           assertEquals(1L, resultSet.getLong(1));
@@ -411,8 +414,13 @@ public class JdbcSimpleModeMockServerTest extends AbstractMockServerTest {
     }
 
     // The statement is sent only once to the mock server in simple query mode.
-    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    // But as the statement uses a JSONB parameter, the JDBC driver will execute a query to verify
+    // that the type is available.
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest jsonbRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(jsonbRequest.getSql(), SELECT_JSONB_TYPE_BY_NAME_SIMPLE_PROTOCOL.getSql());
+
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
     assertEquals(QueryMode.NORMAL, request.getQueryMode());
     assertEquals(pgSql, request.getSql());
     assertTrue(request.getTransaction().hasSingleUse());

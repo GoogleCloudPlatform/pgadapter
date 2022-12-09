@@ -99,7 +99,7 @@ public class TimestampParserTest {
     SessionState sessionState = mock(SessionState.class);
     when(sessionState.getTimezone()).thenReturn(ZoneId.of("+00"));
     assertEquals(
-        "2022-07-08 07:22:59.123456789+00",
+        "2022-07-08 07:22:59.123456+00",
         new TimestampParser(
                 Timestamp.parseTimestamp("2022-07-08T07:22:59.123456789Z"), sessionState)
             .stringParse());
