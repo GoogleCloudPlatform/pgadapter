@@ -2964,6 +2964,36 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSetConnectionApiOptionInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20spanner.autocommit_dml_mode='partitioned_non_atomic'")) {
+      verifySettingValue(connection, "spanner.autocommit_dml_mode", "PARTITIONED_NON_ATOMIC");
+    }
+  }
+
+  @Test
+  public void testSetInvalidConnectionApiOptionInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20spanner.read_only_staleness='foo'")) {
+      verifySettingValue(connection, "spanner.read_only_staleness", "STRONG");
+    }
+  }
+
+  @Test
+  public void testSetInvalidAndValidConnectionApiOptionInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl()
+                + "?options=-c%20spanner.read_only_staleness='foo'"
+                + "%20-c%20spanner.autocommit_dml_mode='partitioned_non_atomic'")) {
+      verifySettingValue(connection, "spanner.read_only_staleness", "STRONG");
+      verifySettingValue(connection, "spanner.autocommit_dml_mode", "PARTITIONED_NON_ATOMIC");
+    }
+  }
+
+  @Test
   public void testSelectPgType() throws SQLException {
     mockSpanner.putStatementResult(
         StatementResult.query(
