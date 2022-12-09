@@ -21,3 +21,16 @@ class Singer(models.Model):
   singerid = models.IntegerField(primary_key=True)
   firstname = models.CharField(max_length=30)
   lastname = models.CharField(max_length=30)
+
+class all_types(models.Model):
+  class Meta():
+    db_table = 'all_types'
+  col_bigint = models.BigIntegerField(primary_key=True)
+  col_bool = models.BooleanField()
+  col_bytea = models.BinaryField(null=True)
+  col_float8 = models.FloatField()
+  col_int = models.IntegerField()
+  col_numeric = models.DecimalField(max_digits=15, decimal_places=5)
+  col_timestamptz = models.DateTimeField()
+  col_date = models.DateField()
+  col_varchar = models.CharField(null=True)
