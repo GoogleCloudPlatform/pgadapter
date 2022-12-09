@@ -116,7 +116,7 @@ if __name__ == '__main__':
     from data.models import all_types
   except Exception as e:
     print(e)
-    sys.exit()
+    sys.exit(1)
 
   try:
     execute(sys.argv[3:])
