@@ -251,7 +251,8 @@ public class BackendConnection {
               sessionState.isReplacePgCatalogTables()
                   ? pgCatalog.replacePgCatalogTables(statement)
                   : statement;
-          result.set(bindAndExecute(updatedStatement));
+          updatedStatement = bindStatement(updatedStatement);
+          result.set(analyzeOrExecute(updatedStatement));
         }
       } catch (SpannerException spannerException) {
         // Executing queries against the information schema in a transaction is unsupported.
@@ -280,8 +281,11 @@ public class BackendConnection {
       }
     }
 
-    StatementResult bindAndExecute(Statement statement) {
-      statement = statementBinder.apply(statement);
+    Statement bindStatement(Statement statement) {
+      return statementBinder.apply(statement);
+    }
+
+    StatementResult analyzeOrExecute(Statement statement) {
       if (analyze) {
         ResultSet resultSet;
         if (parsedStatement.isUpdate() && !parsedStatement.hasReturningClause()) {
@@ -960,7 +964,7 @@ public class BackendConnection {
                     bufferedStatements.get(index).statement));
           } else {
             Execute execute = (Execute) bufferedStatements.get(index);
-            execute.bindAndExecute(execute.statement);
+            execute.analyzeOrExecute(execute.bindStatement(execute.statement));
           }
           index++;
         } else {
