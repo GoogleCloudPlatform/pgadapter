@@ -14,7 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.QuotedString.unescapeQuotedStringValue;
+import static com.google.cloud.spanner.pgadapter.statements.LiteralParser.QuotedString.unescapeQuotedStringValue;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -24,7 +24,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.pgadapter.error.PGException;
-import com.google.cloud.spanner.pgadapter.statements.SimpleParser.QuotedString;
+import com.google.cloud.spanner.pgadapter.statements.LiteralParser.QuotedString;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
@@ -426,16 +426,16 @@ public class SimpleParserTest {
 
   @Test
   public void testQuotedString() {
-    assertEquals("test", new SimpleParser("'test'").readQuotedString('\'').getValue());
-    assertEquals("test", new SimpleParser("e'test'").readQuotedString('\'').getValue());
+    assertEquals("test", new SimpleParser("'test'").readSingleQuotedString().getValue());
+    assertEquals("test", new SimpleParser("e'test'").readSingleQuotedString().getValue());
     PGException exception =
         assertThrows(
-            PGException.class, () -> new SimpleParser("test").readQuotedString('\'').getValue());
+            PGException.class, () -> new SimpleParser("test").readSingleQuotedString().getValue());
     assertEquals("Invalid quote character: t", exception.getMessage());
     exception =
         assertThrows(
             PGException.class,
-            () -> new SimpleParser("e\"test\"").readQuotedString('\'').getValue());
+            () -> new SimpleParser("e\"test\"").readSingleQuotedString().getValue());
     assertEquals("Invalid quote character: \"", exception.getMessage());
 
     exception =
@@ -445,9 +445,11 @@ public class SimpleParserTest {
         assertThrows(PGException.class, () -> new QuotedString(true, '\'', "test").getValue());
     assertEquals("test is not a valid string", exception.getMessage());
 
-    exception = assertThrows(PGException.class, () -> new SimpleParser("'").readQuotedString('\''));
+    exception =
+        assertThrows(PGException.class, () -> new SimpleParser("'").readSingleQuotedString());
     assertEquals("Missing end quote character", exception.getMessage());
-    exception = assertThrows(PGException.class, () -> new SimpleParser(" ").readQuotedString('\''));
+    exception =
+        assertThrows(PGException.class, () -> new SimpleParser(" ").readSingleQuotedString());
     assertEquals("Unexpected end of expression", exception.getMessage());
   }
 
