@@ -30,6 +30,7 @@ import com.google.protobuf.Value;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
@@ -68,6 +69,44 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
 
     String actualOutput = execute("orm_insert.py", host, pgServer.getLocalPort());
+    String expectedOutput = "Inserted 1 row(s)\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql, request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testInsertAllTypesWithPreparedStatement() throws IOException, InterruptedException {
+    String sql =
+        "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING,
+                            TypeCode.JSON)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+
+    String actualOutput =
+        execute("orm_insert_with_prepared_statement.py", host, pgServer.getLocalPort());
     String expectedOutput = "Inserted 1 row(s)\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -120,6 +159,52 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     assertEquals(sql, request.getSql());
     assertTrue(request.getTransaction().hasBegin());
     assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(2, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testGetAllTypesWithPreparedStatement() throws IOException, InterruptedException {
+    String sql = "select * from all_types where col_bigint=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createAllTypesResultSetMetadata("")
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64))
+                                .getUndeclaredParameters()))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(),
+            createAllTypesResultSet("", true)));
+
+    String actualOutput =
+        execute("orm_get_with_prepared_statement.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'test'col_jsonb=      {'key': 'value'})\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    // We receive 3 ExecuteSqlRequests:
+    // 1. Internal metadata query from SQLAlchemy (ignored in this test).
+    // 2. The SQL statement in PLAN mode to prepare the statement.
+    // 3. The SQL statement in NORMAL mode with 1 as the parameter value.
+    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest planRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    assertEquals(sql, planRequest.getSql());
+    assertTrue(planRequest.getTransaction().hasBegin());
+    assertTrue(planRequest.getTransaction().getBegin().hasReadWrite());
+
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(sql, executeRequest.getSql());
+    assertTrue(executeRequest.getTransaction().hasId());
+
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(2, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }

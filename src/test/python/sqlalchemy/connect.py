@@ -13,21 +13,55 @@
  limitations under the License.
 """
 
-from sqlalchemy import create_engine
+from psycopg2 import sql
+from psycopg2.extensions import register_adapter, AsIs
+from psycopg2.extras import Json
+from sqlalchemy import create_engine, text, bindparam
 import sys
 
 
 def create_test_engine(autocommit=False, options=""):
   host = sys.argv[1]
   port = sys.argv[2]
-  connString = "postgresql+psycopg2://user:password@{host}:{port}/d{options}".format(
+  conn_string = "postgresql+psycopg2://user:password@{host}:{port}/d{options}".format(
     host=host, port=port, options=options)
   if host == "":
     if options == "":
-      connString = connString + "?host=/tmp"
+      conn_string = conn_string + "?host=/tmp"
     else:
-      connString = connString + "&host=/tmp"
-  conn = create_engine(connString, future=True)
+      conn_string = conn_string + "&host=/tmp"
+  conn = create_engine(conn_string, future=True)
   if autocommit:
     return conn.execution_options(isolation_level="AUTOCOMMIT")
   return conn
+
+# Adapts identifiers as-is. This is used to insert PostgreSQL style parameters
+# into psycopg2-formatted strings.
+def adapt_identifier(identifier):
+  return AsIs(identifier.string)
+
+def adapt_dict(value):
+  return Json(value)
+
+
+# Generates a `prepare <name> as <stmt>` statement.
+def generate_prepare_statement(name, stmt):
+  prepare_stmt = text("prepare {} as {}".format(name, stmt))
+  params = {}
+  for index, param in enumerate(stmt.params):
+    params[param] = sql.Identifier("${}".format(index+1))
+  return prepare_stmt, params
+
+def generate_execute_statement(name, stmt):
+  param_names = [""] * len(stmt.params)
+  params = {}
+  for index, param in enumerate(stmt.params):
+    param_names[index] = ":{}".format(str(param))
+    params[param] = bindparam(str(param))
+  execute_stmt = text("execute {} ({})".format(name, ",".join(param_names)))
+  # execute_stmt.bindparams(params)
+  return execute_stmt
+
+
+register_adapter(sql.Identifier, adapt_identifier)
+register_adapter(dict, adapt_dict)

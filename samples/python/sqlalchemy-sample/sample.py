@@ -230,6 +230,8 @@ def create_random_singer(num_albums):
 
 # Creates `num_albums` random album rows.
 def create_random_albums(num_albums):
+  if num_albums == 0:
+    return []
   albums = [None] * num_albums
   for i in range(num_albums):
     albums[i] = Album(
@@ -324,3 +326,31 @@ def delete_album(album_id):
     session.commit()
     print()
     print("Deleted album with id {}".format(album_id))
+
+
+def create_and_load_singer_using_prepared_statements():
+  singer = create_random_singer(0)
+  add_singer_using_prepared_statement(singer)
+
+
+# Loads and prints the singer with the given id using a prepared query.
+def load_singer_using_prepared_query(singer_id):
+  with Session(engine) as session:
+    singer = session.query(Singer) \
+      .from_statement(text("execute {} (:id)"
+                           .format(Singer.__get_query_name__))) \
+      .params(id=singer_id) \
+      .first()
+    print(singer)
+
+
+# Adds a new singer row to the database using a prepared statement.
+def add_singer_using_prepared_statement(singer):
+  with Session(engine) as session:
+    singer.full_name = \
+      session.query(text("execute {} (:id, :created_at, :updated_at, "
+                           ":first_name, :last_name, :active)"
+                           .format(Singer.__add_query_name__)))\
+        .params(id=singer.id)\
+        .first()
+    session.commit()

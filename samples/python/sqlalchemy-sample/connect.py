@@ -13,7 +13,8 @@
  limitations under the License.
 """
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from model import *
 import sys
 
 
@@ -21,17 +22,31 @@ def create_test_engine(autocommit=False, options=""):
   host = sys.argv[1]
   port = sys.argv[2]
   database = sys.argv[3] if len(sys.argv) > 3 else "d"
-  connString = "postgresql+psycopg2://user:password@{host}:{port}/" \
+  conn_string = "postgresql+psycopg2://user:password@{host}:{port}/" \
                "{database}{options}".format(host=host,
                                             port=port,
                                             database=database,
                                             options=options)
   if host == "":
     if options == "":
-      connString = connString + "?host=/tmp"
+      conn_string = conn_string + "?host=/tmp"
     else:
-      connString = connString + "&host=/tmp"
-  conn = create_engine(connString, future=True)
+      conn_string = conn_string + "&host=/tmp"
+  engine = create_engine(conn_string, future=True)
   if autocommit:
-    return conn.execution_options(isolation_level="AUTOCOMMIT")
-  return conn
+    engine = engine.execution_options(isolation_level="AUTOCOMMIT")
+  return engine
+
+
+def register_event_listener_for_prepared_statements(engine):
+  # Register an event listener for this engine that creates a prepared statement
+  # for each connection that is created.
+  @event.listens_for(engine, "connect")
+  def connect(dbapi_connection, connection_record):
+    cursor_obj = dbapi_connection.cursor()
+    for model in BaseMixin.__subclasses__():
+      if not model.__prepare_statements__ is None:
+        for prepare_statement in model.__prepare_statements__:
+          cursor_obj.execute(prepare_statement)
+
+    cursor_obj.close()

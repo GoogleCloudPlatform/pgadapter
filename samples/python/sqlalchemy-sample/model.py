@@ -16,30 +16,50 @@
 from sqlalchemy import Column, Integer, String, Boolean, LargeBinary, Float, \
   Numeric, DateTime, Date, FetchedValue, ForeignKey, ColumnDefault
 from sqlalchemy.orm import registry, relationship
+from sqlalchemy import insert
 from datetime import timezone, datetime
 
 mapper_registry = registry()
 Base = mapper_registry.generate_base()
 
 
+"""
+ BaseMixin contains properties that are common to all models in this sample. All
+ models use a string column that contains a client-side generated UUID as the
+ primary key.
+ The created_at and updated_at properties are automatically filled with the
+ current client system time when a model is created or updated. 
+"""
 class BaseMixin(object):
+  __get_query_name__ = None
+  __add_query_name__ = None
+  __prepare_statements__ = None
+
   id = Column(String, primary_key=True)
   created_at = Column(DateTime(timezone=True),
-                      # We need to explicitly format the timestamp with a
-                      # timezone here to ensure that SQLAlchemy uses a
+                      # We need to explicitly format the timestamps with a
+                      # timezone to ensure that SQLAlchemy uses a
                       # timestamptz instead of just timestamp.
                       ColumnDefault(datetime.utcnow().astimezone(timezone.utc)))
   updated_at = Column(DateTime(timezone=True),
                       ColumnDefault(
-                        # We need to explicitly format the timestamp with a
-                        # timezone here to ensure that SQLAlchemy uses a
-                        # timestamptz instead of just timestamp.
                         datetime.utcnow().astimezone(timezone.utc),
                         for_update=True))
 
 
 class Singer(BaseMixin, Base):
   __tablename__ = "singers"
+  __get_query_name__ = "get_singer"
+  __add_query_name__ = "add_singer"
+  __prepare_statements__ = [
+    "prepare {} as select * from singers where id=$1".format(__get_query_name__),
+    "prepare {} as insert into singers "
+    "(id, created_at, updated_at, first_name, last_name, active) "
+    "values ($1, $2, $3, $4, $5, $6) "
+    "returning last_name"
+    .format(__add_query_name__),
+
+  ]
 
   first_name = Column(String(100))
   last_name = Column(String(200))
