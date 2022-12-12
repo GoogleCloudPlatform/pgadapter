@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.Statement;
