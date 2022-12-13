@@ -23,6 +23,7 @@ import com.google.cloud.spanner.BatchClient;
 import com.google.cloud.spanner.BatchReadOnlyTransaction;
 import com.google.cloud.spanner.BatchTransactionId;
 import com.google.cloud.spanner.DatabaseId;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Partition;
 import com.google.cloud.spanner.PartitionOptions;
@@ -38,6 +39,7 @@ import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.TimestampBound;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
@@ -585,9 +587,23 @@ public class BackendConnection {
    * called during startup with values that come from the connection request.
    */
   public void initSessionSetting(String name, String value) {
+    AbstractStatementParser statementParser =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
     if ("options".equalsIgnoreCase(name)) {
       String[] commands = value.split("-c\\s+");
       for (String command : commands) {
+        // Special case: If the setting is one that is handled by the Connection API, then we need
+        // to execute the statement on the connection instead.
+        try {
+          ParsedStatement parsedStatement = statementParser.parse(Statement.of("set " + command));
+          if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+            this.spannerConnection.execute(Statement.of(parsedStatement.getSqlWithoutComments()));
+            continue;
+          }
+        } catch (Throwable ignore) {
+          // Ignore any exceptions during the potential execution of the SET command on the
+          // connection and continue with just setting it as session state.
+        }
         String[] keyValue = command.split("=", 2);
         if (keyValue.length == 2) {
           SimpleParser parser = new SimpleParser(keyValue[0]);
