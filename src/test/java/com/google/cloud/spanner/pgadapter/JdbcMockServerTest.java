@@ -2800,7 +2800,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(358, count);
+        assertEquals(359, count);
       }
     }
   }
@@ -2960,6 +2960,36 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             createUrl() + "?options=-c%20server_version=5.2 custom version")) {
       verifySettingValue(connection, "server_version", "5.2 custom version");
       verifySettingValue(connection, "server_version_num", "50002");
+    }
+  }
+
+  @Test
+  public void testSetConnectionApiOptionInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20spanner.autocommit_dml_mode='partitioned_non_atomic'")) {
+      verifySettingValue(connection, "spanner.autocommit_dml_mode", "PARTITIONED_NON_ATOMIC");
+    }
+  }
+
+  @Test
+  public void testSetInvalidConnectionApiOptionInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl() + "?options=-c%20spanner.read_only_staleness='foo'")) {
+      verifySettingValue(connection, "spanner.read_only_staleness", "STRONG");
+    }
+  }
+
+  @Test
+  public void testSetInvalidAndValidConnectionApiOptionInConnectionOptions() throws SQLException {
+    try (Connection connection =
+        DriverManager.getConnection(
+            createUrl()
+                + "?options=-c%20spanner.read_only_staleness='foo'"
+                + "%20-c%20spanner.autocommit_dml_mode='partitioned_non_atomic'")) {
+      verifySettingValue(connection, "spanner.read_only_staleness", "STRONG");
+      verifySettingValue(connection, "spanner.autocommit_dml_mode", "PARTITIONED_NON_ATOMIC");
     }
   }
 
@@ -3248,6 +3278,94 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testForceAutocommit() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Force PGAdapter to use autocommit mode in all cases.
+        statement.execute("set spanner.force_autocommit to on");
+        // Set the connection to transactional mode. This will be ignored by PGAdapter.
+        connection.setAutoCommit(false);
+        statement.execute(SELECT1.getSql());
+        statement.execute(UPDATE_STATEMENT.getSql());
+        statement.execute(INSERT_STATEMENT.getSql());
+      }
+    }
+    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    ExecuteSqlRequest selectRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(selectRequest.getSql(), SELECT1.getSql());
+    assertTrue(selectRequest.getTransaction().hasSingleUse());
+    assertTrue(selectRequest.getTransaction().getSingleUse().hasReadOnly());
+    ExecuteSqlRequest updateRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertTrue(updateRequest.getTransaction().hasBegin());
+    assertTrue(updateRequest.getTransaction().getBegin().hasReadWrite());
+    ExecuteSqlRequest insertRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
+    assertTrue(insertRequest.getTransaction().hasBegin());
+    assertTrue(insertRequest.getTransaction().getBegin().hasReadWrite());
+  }
+
+  @Test
+  public void testForceAutocommitWithPdml() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        // Force PGAdapter to use autocommit mode in all cases.
+        statement.execute("set spanner.force_autocommit to on");
+        statement.execute("set spanner.autocommit_dml_mode to 'partitioned_non_atomic'");
+        // Set the connection to transactional mode. This will be ignored by PGAdapter.
+        connection.setAutoCommit(false);
+        statement.execute(UPDATE_STATEMENT.getSql());
+        statement.execute(INSERT_STATEMENT.getSql());
+      }
+    }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    // The update statement should use a partitioned DML transaction.
+    ExecuteSqlRequest updateRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertFalse(updateRequest.getTransaction().hasBegin());
+    assertTrue(updateRequest.getTransaction().hasId());
+    assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class).stream()
+            .filter(request -> request.getOptions().hasPartitionedDml())
+            .count());
+    // The insert statement will use a normal read/write transaction.
+    ExecuteSqlRequest insertRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertTrue(insertRequest.getTransaction().hasBegin());
+    assertTrue(insertRequest.getTransaction().getBegin().hasReadWrite());
+  }
+
+  @Test
+  public void testInsertPdml() throws SQLException {
+    String sql = "insert into my_table (id, value) values (1, 'one')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql),
+            Status.FAILED_PRECONDITION
+                .withDescription(
+                    "insert statements are not allowed in Partitioned DML transactions")
+                .asRuntimeException()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (java.sql.Statement statement = connection.createStatement()) {
+        statement.execute("set spanner.autocommit_dml_mode to 'partitioned_non_atomic'");
+        SQLException exception = assertThrows(SQLException.class, () -> statement.execute(sql));
+        assertEquals(
+            "ERROR: insert statements are not allowed in Partitioned DML transactions",
+            exception.getMessage());
+      }
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class).stream()
+            .filter(request -> request.getOptions().hasPartitionedDml())
+            .count());
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   private void verifySettingIsNull(Connection connection, String setting) throws SQLException {

@@ -42,6 +42,7 @@ import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
+import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.ResultSetHelper;
@@ -216,6 +217,8 @@ public class BackendConnection {
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
           result.set(ROLLBACK_RESULT);
+        } else if (isTransactionStatement(parsedStatement) && sessionState.isForceAutocommit()) {
+          result.set(NO_RESULT);
         } else if (isBegin(parsedStatement) && spannerConnection.isInTransaction()) {
           // Ignore the statement as it is a no-op to execute BEGIN when we are already in a
           // transaction. TODO: Return a warning.
@@ -319,6 +322,24 @@ public class BackendConnection {
           return NO_RESULT;
         }
         return new QueryResult(resultSet);
+      }
+      return executeOnSpanner(statement);
+    }
+
+    StatementResult executeOnSpanner(Statement statement) {
+      // Do not try to execute INSERT statements using Partitioned DML if we are in force_autocommit
+      // mode. We skip this because the user has (probably) set force_autocommit for compatibility
+      // reasons, so we do not want to throw an unnecessary error.
+      if (sessionState.isForceAutocommit()
+          && !spannerConnection.isInTransaction()
+          && spannerConnection.getAutocommitDmlMode() == AutocommitDmlMode.PARTITIONED_NON_ATOMIC
+          && new SimpleParser(statement.getSql()).peekKeyword("insert")) {
+        try {
+          spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.TRANSACTIONAL);
+          return spannerConnection.execute(statement);
+        } finally {
+          spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.PARTITIONED_NON_ATOMIC);
+        }
       }
       return spannerConnection.execute(statement);
     }
@@ -850,6 +871,10 @@ public class BackendConnection {
     } catch (Throwable throwable) {
       throw setAndReturn(bufferedStatement.result, throwable);
     }
+  }
+
+  private boolean isTransactionStatement(ParsedStatement parsedStatement) {
+    return isBegin(parsedStatement) || isCommit(parsedStatement) || isRollback(parsedStatement);
   }
 
   private static final ImmutableSet<ClientSideStatementType> DDL_BATCH_STATEMENTS =
