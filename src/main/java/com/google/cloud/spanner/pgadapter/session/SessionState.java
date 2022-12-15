@@ -369,6 +369,14 @@ public class SessionState {
     this.transactionSettings = null;
   }
 
+  /**
+   * Returns whether transaction statements should be ignored and all statements should be executed
+   * in autocommit mode.
+   */
+  public boolean isForceAutocommit() {
+    return getBoolSetting("spanner", "force_autocommit", false);
+  }
+
   /** Returns the current setting for replacing pg_catalog tables with common table expressions. */
   public boolean isReplacePgCatalogTables() {
     PGSetting setting = internalGet(toKey("spanner", "replace_pg_catalog_tables"), false);

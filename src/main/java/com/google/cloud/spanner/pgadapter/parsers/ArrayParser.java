@@ -105,7 +105,8 @@ public class ArrayParser extends Parser<List<?>> {
     return arrayElementType == Code.BYTES
         || arrayElementType == Code.DATE
         || arrayElementType == Code.STRING
-        || arrayElementType == Code.TIMESTAMP;
+        || arrayElementType == Code.TIMESTAMP
+        || arrayElementType == Code.PG_JSONB;
   }
 
   /**

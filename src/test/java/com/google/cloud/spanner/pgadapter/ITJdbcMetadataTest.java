@@ -428,9 +428,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
               assertTrue(columns.next());
               assertEquals("col_jsonb", columns.getString("COLUMN_NAME"));
-              // TODO: Change to jsonb when available.
-              assertEquals(Types.VARCHAR, columns.getInt("DATA_TYPE"));
-              assertEquals("varchar", columns.getString("TYPE_NAME"));
+              assertEquals(Types.OTHER, columns.getInt("DATA_TYPE"));
+              assertEquals("\"pg_catalog\".\"jsonb\"", columns.getString("TYPE_NAME"));
 
               assertFalse(columns.next());
             }
@@ -758,6 +757,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             assertEquals(Types.DATE, results.get("date").intValue());
             assertTrue(results.containsKey("varchar"));
             assertEquals(Types.VARCHAR, results.get("varchar").intValue());
+            assertTrue(results.containsKey("jsonb"));
+            assertEquals(Types.OTHER, results.get("jsonb").intValue());
           } catch (SQLException e) {
             throw SpannerExceptionFactory.asSpannerException(e);
           }

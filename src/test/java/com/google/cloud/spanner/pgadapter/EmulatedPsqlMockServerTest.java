@@ -58,7 +58,6 @@ import org.postgresql.PGProperty;
 
 @RunWith(JUnit4.class)
 public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
-  // @Rule public Timeout globalTimeout = Timeout.seconds(10);
 
   private static final String INSERT1 = "insert into foo values (1)";
   private static final String INSERT2 = "insert into foo values (2)";
