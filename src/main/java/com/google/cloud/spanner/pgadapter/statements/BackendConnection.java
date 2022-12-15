@@ -23,6 +23,7 @@ import com.google.cloud.spanner.BatchClient;
 import com.google.cloud.spanner.BatchReadOnlyTransaction;
 import com.google.cloud.spanner.BatchTransactionId;
 import com.google.cloud.spanner.DatabaseId;
+import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.Partition;
 import com.google.cloud.spanner.PartitionOptions;
@@ -38,8 +39,10 @@ import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.TimestampBound;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
+import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
+import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.ResultSetHelper;
@@ -64,6 +67,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -213,6 +217,8 @@ public class BackendConnection {
             && !spannerConnection.isInTransaction()
             && (isRollback(parsedStatement) || isCommit(parsedStatement))) {
           result.set(ROLLBACK_RESULT);
+        } else if (isTransactionStatement(parsedStatement) && sessionState.isForceAutocommit()) {
+          result.set(NO_RESULT);
         } else if (isBegin(parsedStatement) && spannerConnection.isInTransaction()) {
           // Ignore the statement as it is a no-op to execute BEGIN when we are already in a
           // transaction. TODO: Return a warning.
@@ -248,7 +254,8 @@ public class BackendConnection {
               sessionState.isReplacePgCatalogTables()
                   ? pgCatalog.replacePgCatalogTables(statement)
                   : statement;
-          result.set(bindAndExecute(updatedStatement));
+          updatedStatement = bindStatement(updatedStatement);
+          result.set(analyzeOrExecute(updatedStatement));
         }
       } catch (SpannerException spannerException) {
         // Executing queries against the information schema in a transaction is unsupported.
@@ -277,8 +284,11 @@ public class BackendConnection {
       }
     }
 
-    StatementResult bindAndExecute(Statement statement) {
-      statement = statementBinder.apply(statement);
+    Statement bindStatement(Statement statement) {
+      return statementBinder.apply(statement);
+    }
+
+    StatementResult analyzeOrExecute(Statement statement) {
       if (analyze) {
         ResultSet resultSet;
         if (parsedStatement.isUpdate() && !parsedStatement.hasReturningClause()) {
@@ -312,6 +322,24 @@ public class BackendConnection {
           return NO_RESULT;
         }
         return new QueryResult(resultSet);
+      }
+      return executeOnSpanner(statement);
+    }
+
+    StatementResult executeOnSpanner(Statement statement) {
+      // Do not try to execute INSERT statements using Partitioned DML if we are in force_autocommit
+      // mode. We skip this because the user has (probably) set force_autocommit for compatibility
+      // reasons, so we do not want to throw an unnecessary error.
+      if (sessionState.isForceAutocommit()
+          && !spannerConnection.isInTransaction()
+          && spannerConnection.getAutocommitDmlMode() == AutocommitDmlMode.PARTITIONED_NON_ATOMIC
+          && new SimpleParser(statement.getSql()).peekKeyword("insert")) {
+        try {
+          spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.TRANSACTIONAL);
+          return spannerConnection.execute(statement);
+        } finally {
+          spannerConnection.setAutocommitDmlMode(AutocommitDmlMode.PARTITIONED_NON_ATOMIC);
+        }
       }
       return spannerConnection.execute(statement);
     }
@@ -559,9 +587,23 @@ public class BackendConnection {
    * called during startup with values that come from the connection request.
    */
   public void initSessionSetting(String name, String value) {
+    AbstractStatementParser statementParser =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL);
     if ("options".equalsIgnoreCase(name)) {
       String[] commands = value.split("-c\\s+");
       for (String command : commands) {
+        // Special case: If the setting is one that is handled by the Connection API, then we need
+        // to execute the statement on the connection instead.
+        try {
+          ParsedStatement parsedStatement = statementParser.parse(Statement.of("set " + command));
+          if (parsedStatement.getType() == StatementType.CLIENT_SIDE) {
+            this.spannerConnection.execute(Statement.of(parsedStatement.getSqlWithoutComments()));
+            continue;
+          }
+        } catch (Throwable ignore) {
+          // Ignore any exceptions during the potential execution of the SET command on the
+          // connection and continue with just setting it as session state.
+        }
         String[] keyValue = command.split("=", 2);
         if (keyValue.length == 2) {
           SimpleParser parser = new SimpleParser(keyValue[0]);
@@ -631,7 +673,10 @@ public class BackendConnection {
           spannerConnection.beginTransaction();
         }
         boolean canUseBatch = false;
-        if (bufferedStatement.isBatchingPossible() && index < (getStatementCount() - 1)) {
+        if (!spannerConnection.isDdlBatchActive()
+            && !spannerConnection.isDmlBatchActive()
+            && bufferedStatement.isBatchingPossible()
+            && index < (getStatementCount() - 1)) {
           StatementType statementType = getStatementType(index);
           StatementType nextStatementType = getStatementType(index + 1);
           canUseBatch = canBeBatchedTogether(statementType, nextStatementType);
@@ -789,7 +834,8 @@ public class BackendConnection {
         case Batch:
           if (spannerConnection.isInTransaction()
               || bufferedStatements.stream()
-                  .anyMatch(statement -> !statement.parsedStatement.isDdl())) {
+                  .anyMatch(
+                      statement -> !isStatementAllowedInDdlBatch(statement.parsedStatement))) {
             throw PGExceptionFactory.newPGException(
                 "DDL statements are not allowed in mixed batches or transactions.",
                 SQLState.InvalidTransactionState);
@@ -820,6 +866,22 @@ public class BackendConnection {
     } catch (Throwable throwable) {
       throw setAndReturn(bufferedStatement.result, throwable);
     }
+  }
+
+  private boolean isTransactionStatement(ParsedStatement parsedStatement) {
+    return isBegin(parsedStatement) || isCommit(parsedStatement) || isRollback(parsedStatement);
+  }
+
+  private static final ImmutableSet<ClientSideStatementType> DDL_BATCH_STATEMENTS =
+      ImmutableSet.of(
+          ClientSideStatementType.START_BATCH_DDL,
+          ClientSideStatementType.RUN_BATCH,
+          ClientSideStatementType.ABORT_BATCH);
+
+  private boolean isStatementAllowedInDdlBatch(ParsedStatement parsedStatement) {
+    return parsedStatement.isDdl()
+        || (parsedStatement.getType() == StatementType.CLIENT_SIDE
+            && DDL_BATCH_STATEMENTS.contains(parsedStatement.getClientSideStatementType()));
   }
 
   private boolean isBegin(int index) {
@@ -922,7 +984,7 @@ public class BackendConnection {
                     bufferedStatements.get(index).statement));
           } else {
             Execute execute = (Execute) bufferedStatements.get(index);
-            execute.bindAndExecute(execute.statement);
+            execute.analyzeOrExecute(execute.bindStatement(execute.statement));
           }
           index++;
         } else {
