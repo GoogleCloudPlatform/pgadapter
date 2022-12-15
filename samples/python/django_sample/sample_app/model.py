@@ -15,62 +15,63 @@
 
 from django.db import models
 from django.db.models import Q, F
+
+class BaseModel(models.Model):
+  class Meta():
+    abstract = True
+  created_at = models.DateTimeField()
+  updated_at = models.DateTimeField()
+
 class Singer(models.Model):
   class Meta():
     db_table = 'singers'
-  id = models.IntegerField(primary_key=True, null=False)
+
+  id = models.CharField(primary_key=True, null=False)
   first_name = models.CharField()
   last_name = models.CharField(null=False)
-
-  @property
-  def _get_full_name(self):
-    return '{first_name} {last_name}'.format(first_name=self.first_name, last_name=self.last_name)
-  full_name = property(_get_full_name())
+  full_name = models.CharField(null=False)
   active = models.BooleanField()
-  createdAt = models.DateTimeField()
-  updatedAt = models.DateTimeField()
 
-class Album(models.Model):
+class Album(BaseModel):
   class Meta():
     db_table = 'albums'
+
   id = models.CharField(primary_key=True, null=False)
   title = models.CharField(null=False)
   marketing_budget = models.DecimalField()
   release_date = models.DateField()
   cover_picture = models.BinaryField()
-  singer_id = models.ForeignKey(Singer, on_delete=models.CASCADE())
-  createdAt = models.DateTimeField()
-  updatedAt = models.DateTimeField()
+  singer = models.ForeignKey(Singer, on_delete=models.DO_NOTHING)
+  created_at = models.DateTimeField()
+  updated_at = models.DateTimeField()
 
-class Track(models.Model):
+class Track(BaseModel):
   class Meta():
     db_table = 'tracks'
-    unique_together = ('id', 'track_number')
-  id = models.ForeignKey(Album, on_delete=models.CASCADE())
+
+  id = models.CharField(primary_key=True, null=False)
+  album = models.ForeignKey(Album, on_delete=models.DO_NOTHING)
   track_number = models.BigIntegerField(null=False)
   title = models.CharField(null=False)
-  sample_rate = models.DecimalField()
-  createdAt = models.DateTimeField()
-  updatedAt = models.DateTimeField()
+  sample_rate = models.FloatField()
 
-class Venue(models.Model):
+
+class Venue(BaseModel):
   class Meta():
     db_table = 'venues'
   id = models.CharField(primary_key=True, null=False)
   name = models.CharField(null=False)
   description = models.CharField(null=False)
-  createdAt = models.DateTimeField()
-  updatedAt = models.DateTimeField()
 
-class Concert(models.Model):
+
+class Concert(BaseModel):
   class Meta():
     db_table = 'concerts'
     constraints = [models.CheckConstraint(check = Q(end_time__gte=F('start_time')), name='chk_end_time_after_start_time' )]
   id = models.CharField(primary_key=True, null=False)
-  venue_id = models.ForeignKey(Venue)
-  singer_id = models.ForeignKey(Singer)
+  venue = models.ForeignKey(Venue, on_delete=models.DO_NOTHING)
+  singer = models.ForeignKey(Singer, on_delete=models.DO_NOTHING)
   name = models.CharField(null=False)
   start_time = models.DateTimeField(null=False)
   end_time = models.DateTimeField(null=False)
-  createdAt = models.DateTimeField()
-  updatedAt = models.DateTimeField()
+
