@@ -22,7 +22,7 @@ class BaseModel(models.Model):
   created_at = models.DateTimeField()
   updated_at = models.DateTimeField()
 
-class Singer(models.Model):
+class Singer(BaseModel):
   class Meta():
     db_table = 'singers'
 
@@ -45,16 +45,17 @@ class Album(BaseModel):
   created_at = models.DateTimeField()
   updated_at = models.DateTimeField()
 
-# Here, id is a column that is supposed to be primary key by Django.
-# But id column will just have a unique index in the actual table.
-# In the actual table, (album_id, track_number) will be the primary key.
-# This is done because Django doesn't support composite primary keys,
-# but we need to have a composite primary key due to the fact that
-# the "tracks" table is interleaved in "albums".
 
 class Track(BaseModel):
   class Meta():
     db_table = 'tracks'
+
+  # Here, id is a column that is supposed to be primary key by Django.
+  # But id column will just have a unique index in the actual table.
+  # In the actual table, (album_id, track_number) will be the primary key.
+  # This is done because Django doesn't support composite primary keys,
+  # but we need to have a composite primary key due to the fact that
+  # the "tracks" table is interleaved in "albums".
 
   id = models.CharField(primary_key=True, null=False)
   album = models.ForeignKey(Album, on_delete=models.DO_NOTHING)
