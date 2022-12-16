@@ -48,9 +48,9 @@ class Album(BaseModel):
 # Here, id is a column that is supposed to be primary key by Django.
 # But id column will just have a unique index in the actual table.
 # In the actual table, (album_id, track_number) will be the primary key.
-# This is done because Django doesn't support composite primary keys.
-# But we need to have a composite primary key
-# due to the interleaved structure of the actual table
+# This is done because Django doesn't support composite primary keys,
+# but we need to have a composite primary key due to the fact that
+# the "tracks" table is interleaved in "albums".
 
 class Track(BaseModel):
   class Meta():
