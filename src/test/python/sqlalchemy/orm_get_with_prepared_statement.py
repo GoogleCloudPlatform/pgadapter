@@ -23,6 +23,6 @@ def get_all_types(col_bigint):
     .first()
 
 
-session = Session(engine)
-row = get_all_types(1)
-print(row)
+with Session(engine) as session:
+  row = get_all_types(1)
+  print(row)

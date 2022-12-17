@@ -38,6 +38,7 @@ import com.google.spanner.v1.TypeCode;
 import java.io.IOException;
 import java.util.List;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -80,6 +81,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
+  @Ignore("requires support for literals like '2022-12-16 10:11:12+01:00'::timestamptz")
   @Test
   public void testInsertAllTypesWithPreparedStatement() throws IOException, InterruptedException {
     String sql =

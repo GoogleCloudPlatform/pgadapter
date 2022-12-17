@@ -791,11 +791,6 @@ public class BackendConnection {
    * allowed.
    */
   private void prepareExecuteDdl(BufferedStatement<?> bufferedStatement) {
-    // Just use the current DDL batch is one has already been started.
-    if (spannerConnection.isDdlBatchActive()) {
-      return;
-    }
-
     DdlTransactionMode ddlTransactionMode = sessionState.getDdlTransactionMode();
     try {
       // Single statements are simpler to check, so we do that in a separate check.
