@@ -29,7 +29,9 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -40,7 +42,15 @@ public class ExecuteStatementTest {
   @Test
   public void testGetStatementType() {
     ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ExtendedQueryProtocolHandler extendedQueryProtocolHandler =
+        mock(ExtendedQueryProtocolHandler.class);
+    BackendConnection backendConnection = mock(BackendConnection.class);
+    SessionState sessionState = mock(SessionState.class);
     when(connectionHandler.getConnectionMetadata()).thenReturn(mock(ConnectionMetadata.class));
+    when(connectionHandler.getExtendedQueryProtocolHandler())
+        .thenReturn(extendedQueryProtocolHandler);
+    when(extendedQueryProtocolHandler.getBackendConnection()).thenReturn(backendConnection);
+    when(backendConnection.getSessionState()).thenReturn(sessionState);
     assertEquals(
         StatementType.CLIENT_SIDE,
         new ExecuteStatement(
@@ -55,32 +65,52 @@ public class ExecuteStatementTest {
 
   @Test
   public void testParse() {
-    assertEquals("foo", parse("execute foo").name);
-    assertEquals("foo", parse("execute FOO").name);
-    assertEquals("foo", parse("execute\tfoo").name);
-    assertEquals("foo", parse("execute\nfoo").name);
-    assertEquals("foo", parse("execute/*comment*/foo").name);
-    assertEquals("foo", parse("execute \"foo\"").name);
-    assertEquals("Foo", parse("execute \"Foo\"").name);
-    assertEquals("foo", parse("execute foo (1)").name);
-    assertEquals("foo", parse("execute foo (1, 'test')").name);
+    SessionState sessionState = mock(SessionState.class);
+    when(sessionState.getTimezone()).thenReturn(ZoneId.of("+01:00"));
+
+    assertEquals("foo", parse("execute foo", sessionState).name);
+    assertEquals("foo", parse("execute FOO", sessionState).name);
+    assertEquals("foo", parse("execute\tfoo", sessionState).name);
+    assertEquals("foo", parse("execute\nfoo", sessionState).name);
+    assertEquals("foo", parse("execute/*comment*/foo", sessionState).name);
+    assertEquals("foo", parse("execute \"foo\"", sessionState).name);
+    assertEquals("Foo", parse("execute \"Foo\"", sessionState).name);
+    assertEquals("foo", parse("execute foo (1)", sessionState).name);
+    assertEquals("foo", parse("execute foo (1, 'test')", sessionState).name);
 
     assertArrayEquals(
-        new byte[][] {param("1"), param("test")}, parse("execute foo (1, 'test')").parameters);
+        new byte[][] {param("1"), param("test")},
+        parse("execute foo (1, 'test')", sessionState).parameters);
     assertArrayEquals(
         new byte[][] {param("3.14"), param("\\x55aa")},
-        parse("execute foo (3.14, '\\x55aa')").parameters);
+        parse("execute foo (3.14, '\\x55aa')", sessionState).parameters);
     assertArrayEquals(
         new byte[][] {null, param("2000-01-01")},
-        parse("execute foo (null, '2000-01-01')").parameters);
+        parse("execute foo (null, '2000-01-01')", sessionState).parameters);
+    assertArrayEquals(
+        new byte[][] {param("1"), param("test")},
+        parse("execute foo (cast(1 as int), varchar 'test')", sessionState).parameters);
+    assertArrayEquals(
+        new byte[][] {param("1"), param("test")},
+        parse("execute foo (1::bigint, varchar 'test')", sessionState).parameters);
+    assertArrayEquals(
+        new byte[][] {param("1"), param("test")},
+        parse("execute foo (1.0::bigint, e'test')", sessionState).parameters);
+    assertArrayEquals(
+        new byte[][] {param("1"), param("2022-10-09")},
+        parse("execute foo (1.0::int, '2022-10-09'::date)", sessionState).parameters);
+    assertArrayEquals(
+        new byte[][] {param("1"), param("2022-10-09 10:09:18+01")},
+        parse("execute foo (1.0::int4, '2022-10-09 10:09:18'::timestamptz)", sessionState)
+            .parameters);
 
-    assertThrows(PGException.class, () -> parse("foo"));
-    assertThrows(PGException.class, () -> parse("execute"));
-    assertThrows(PGException.class, () -> parse("execute foo bar"));
-    assertThrows(PGException.class, () -> parse("execute foo.bar"));
-    assertThrows(PGException.class, () -> parse("execute foo ()"));
-    assertThrows(PGException.class, () -> parse("execute foo (1) bar"));
-    assertThrows(PGException.class, () -> parse("execute foo (1"));
+    assertThrows(PGException.class, () -> parse("foo", sessionState));
+    assertThrows(PGException.class, () -> parse("execute", sessionState));
+    assertThrows(PGException.class, () -> parse("execute foo bar", sessionState));
+    assertThrows(PGException.class, () -> parse("execute foo.bar", sessionState));
+    assertThrows(PGException.class, () -> parse("execute foo ()", sessionState));
+    assertThrows(PGException.class, () -> parse("execute foo (1) bar", sessionState));
+    assertThrows(PGException.class, () -> parse("execute foo (1", sessionState));
   }
 
   static byte[] param(String value) {

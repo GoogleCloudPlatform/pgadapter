@@ -27,8 +27,11 @@ import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
@@ -71,7 +74,7 @@ public class TimestampParser extends Parser<Timestamp> {
           .appendOffset(OptionsMetadata.isJava8() ? "+HH:mm" : "+HH:mm:ss", "+00")
           .toFormatter();
 
-  private static final DateTimeFormatter TIMESTAMP_INPUT_FORMATTER =
+  private static final DateTimeFormatter TIMESTAMPTZ_INPUT_FORMATTER =
       new DateTimeFormatterBuilder()
           .parseLenient()
           .parseCaseInsensitive()
@@ -79,6 +82,13 @@ public class TimestampParser extends Parser<Timestamp> {
           .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
           // Java 8 does not support seconds in timezone offset.
           .appendOffset(OptionsMetadata.isJava8() ? "+HH:mm" : "+HH:mm:ss", "+00:00:00")
+          .toFormatter();
+  private static final DateTimeFormatter TIMESTAMP_INPUT_FORMATTER =
+      new DateTimeFormatterBuilder()
+          .parseLenient()
+          .parseCaseInsensitive()
+          .appendPattern("yyyy-MM-dd[[ ]['T']HH:mm[:ss][XXX]]")
+          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
           .toFormatter();
 
   private final SessionState sessionState;
@@ -98,7 +108,7 @@ public class TimestampParser extends Parser<Timestamp> {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          this.item = toTimestamp(new String(item, StandardCharsets.UTF_8));
+          this.item = toTimestamp(new String(item, StandardCharsets.UTF_8), sessionState);
           break;
         case BINARY:
           this.item = toTimestamp(item);
@@ -123,15 +133,37 @@ public class TimestampParser extends Parser<Timestamp> {
   }
 
   /** Converts the given string value to a {@link Timestamp}. */
-  public static Timestamp toTimestamp(String value) {
+  public static Timestamp toTimestamp(String value, SessionState sessionState) {
     try {
       String stringValue = toPGString(value);
-      TemporalAccessor temporalAccessor = TIMESTAMP_INPUT_FORMATTER.parse(stringValue);
+      TemporalAccessor temporalAccessor = TIMESTAMPTZ_INPUT_FORMATTER.parse(stringValue);
       return Timestamp.ofTimeSecondsAndNanos(
           temporalAccessor.getLong(ChronoField.INSTANT_SECONDS),
           temporalAccessor.get(ChronoField.NANO_OF_SECOND));
-    } catch (Exception exception) {
-      throw PGExceptionFactory.newPGException("Invalid timestamp value: " + value);
+    } catch (Exception ignore) {
+      try {
+        TemporalAccessor temporalAccessor =
+            TIMESTAMP_INPUT_FORMATTER.parseBest(
+                value, ZonedDateTime::from, LocalDateTime::from, LocalDate::from);
+        ZonedDateTime zonedDateTime = null;
+        if (temporalAccessor instanceof ZonedDateTime) {
+          zonedDateTime = (ZonedDateTime) temporalAccessor;
+        } else if (temporalAccessor instanceof LocalDateTime) {
+          LocalDateTime localDateTime = (LocalDateTime) temporalAccessor;
+          zonedDateTime = localDateTime.atZone(sessionState.getTimezone());
+        } else if (temporalAccessor instanceof LocalDate) {
+          LocalDate localDate = (LocalDate) temporalAccessor;
+          zonedDateTime = localDate.atStartOfDay().atZone(sessionState.getTimezone());
+        }
+        if (zonedDateTime != null) {
+          return Timestamp.ofTimeSecondsAndNanos(
+              zonedDateTime.getLong(ChronoField.INSTANT_SECONDS),
+              zonedDateTime.get(ChronoField.NANO_OF_SECOND));
+        }
+        throw PGExceptionFactory.newPGException("Invalid timestamp value: " + value);
+      } catch (Exception exception) {
+        throw PGExceptionFactory.newPGException("Invalid timestamp value: " + value);
+      }
     }
   }
 

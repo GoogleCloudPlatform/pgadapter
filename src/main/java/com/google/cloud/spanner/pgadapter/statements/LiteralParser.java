@@ -22,8 +22,12 @@ import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isValid
 
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.parsers.Parser;
+import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TypeDefinition;
 import com.google.common.collect.ImmutableMap;
+import java.nio.charset.StandardCharsets;
 import java.util.Map.Entry;
 import java.util.Objects;
 import org.apache.commons.text.StringEscapeUtils;
@@ -88,6 +92,16 @@ class LiteralParser {
     private Literal(String value, Integer castToOid) {
       this.value = value;
       this.castToOid = castToOid;
+    }
+
+    String getConvertedValue(SessionState sessionState) {
+      if (castToOid == null) {
+        return value;
+      }
+      Parser<?> pgParser =
+          Parser.create(
+              sessionState, value.getBytes(StandardCharsets.UTF_8), castToOid, FormatCode.TEXT);
+      return pgParser.stringParse();
     }
 
     @Override
@@ -206,6 +220,15 @@ class LiteralParser {
     throw PGExceptionFactory.newPGException("unknown oid: " + oid);
   }
 
+  static Literal parseSingleConstantLiteralExpression(String expression) {
+    LiteralParser literalParser = new LiteralParser(new SimpleParser(expression));
+    Literal result = literalParser.readConstantLiteralExpression();
+    if (literalParser.parser.hasMoreTokens()) {
+      throw PGExceptionFactory.newPGException("Unexpected tokens in expression: " + expression);
+    }
+    return result;
+  }
+
   private final SimpleParser parser;
 
   LiteralParser(SimpleParser parser) {
@@ -235,7 +258,9 @@ class LiteralParser {
    * </ul>
    */
   Literal readConstantLiteralExpression() {
-    parser.skipWhitespaces();
+    if (parser.eatKeyword("null")) {
+      return null;
+    }
     boolean cast = false;
     TypeDefinition precedingTypeDefinition = null;
     boolean functionStyleTypeCast = false;

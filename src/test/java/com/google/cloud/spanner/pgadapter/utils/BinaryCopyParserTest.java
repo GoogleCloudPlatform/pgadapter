@@ -20,11 +20,13 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.utils.BinaryCopyParser.BinaryField;
 import com.google.cloud.spanner.pgadapter.utils.BinaryCopyParser.BinaryRecord;
 import java.io.DataOutputStream;
@@ -215,6 +217,7 @@ public class BinaryCopyParserTest {
 
   @Test
   public void testIteratorNext_NullField() throws IOException {
+    SessionState sessionState = mock(SessionState.class);
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
     BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
@@ -233,12 +236,13 @@ public class BinaryCopyParserTest {
     Iterator<CopyRecord> iterator = parser.iterator();
     assertTrue(iterator.hasNext());
     CopyRecord record = iterator.next();
-    assertTrue(record.getValue(Type.int64(), 0).isNull());
+    assertTrue(record.getValue(sessionState, Type.int64(), 0).isNull());
     assertFalse(iterator.hasNext());
   }
 
   @Test
   public void testIteratorNext_GetValue() throws IOException {
+    SessionState sessionState = mock(SessionState.class);
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
     BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
@@ -258,7 +262,7 @@ public class BinaryCopyParserTest {
     Iterator<CopyRecord> iterator = parser.iterator();
     assertTrue(iterator.hasNext());
     CopyRecord record = iterator.next();
-    assertEquals(Value.int64(100L), record.getValue(Type.int64(), 0));
+    assertEquals(Value.int64(100L), record.getValue(sessionState, Type.int64(), 0));
     assertFalse(iterator.hasNext());
   }
 
@@ -303,6 +307,7 @@ public class BinaryCopyParserTest {
 
   @Test
   public void testIteratorNext_WithOid() throws IOException {
+    SessionState sessionState = mock(SessionState.class);
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
     BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
 
@@ -326,8 +331,8 @@ public class BinaryCopyParserTest {
     Iterator<CopyRecord> iterator = parser.iterator();
     assertTrue(iterator.hasNext());
     CopyRecord record = iterator.next();
-    assertEquals(Value.int64(100L), record.getValue(Type.int64(), 0));
-    assertEquals(Value.string("test"), record.getValue(Type.string(), 1));
+    assertEquals(Value.int64(100L), record.getValue(sessionState, Type.int64(), 0));
+    assertEquals(Value.string("test"), record.getValue(sessionState, Type.string(), 1));
     assertFalse(iterator.hasNext());
   }
 
@@ -354,11 +359,14 @@ public class BinaryCopyParserTest {
 
   @Test
   public void testBinaryRecord() {
+    SessionState sessionState = mock(SessionState.class);
     BinaryRecord record = new BinaryRecord(new BinaryField[1]);
     assertFalse(record.hasColumnNames());
     assertThrows(
-        UnsupportedOperationException.class, () -> record.getValue(Type.string(), "column_name"));
-    assertThrows(IllegalArgumentException.class, () -> record.getValue(Type.string(), 10));
-    assertThrows(SpannerException.class, () -> record.getValue(Type.numeric(), 0));
+        UnsupportedOperationException.class,
+        () -> record.getValue(sessionState, Type.string(), "column_name"));
+    assertThrows(
+        IllegalArgumentException.class, () -> record.getValue(sessionState, Type.string(), 10));
+    assertThrows(SpannerException.class, () -> record.getValue(sessionState, Type.numeric(), 0));
   }
 }

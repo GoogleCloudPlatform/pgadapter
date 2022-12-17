@@ -29,6 +29,7 @@ import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.base.Preconditions;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
@@ -236,13 +237,13 @@ class BinaryCopyParser implements CopyInParser {
     }
 
     @Override
-    public Value getValue(Type type, String columnName) {
+    public Value getValue(SessionState sessionState, Type type, String columnName) {
       // The binary copy format does not include any column name headers or any type information.
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public Value getValue(Type type, int columnIndex) {
+    public Value getValue(SessionState sessionState, Type type, int columnIndex) {
       Preconditions.checkArgument(
           columnIndex >= 0 && columnIndex < numColumns(),
           "columnIndex must be >= 0 && < numColumns");
