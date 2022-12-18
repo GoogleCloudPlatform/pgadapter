@@ -4,6 +4,7 @@ start batch ddl;
 
 create table if not exists singers (
     id         varchar not null primary key,
+    version_id int not null,
     first_name varchar,
     last_name  varchar not null,
     full_name  varchar generated always as (coalesce(concat(first_name, ' '::varchar, last_name), last_name)) stored,
@@ -14,6 +15,7 @@ create table if not exists singers (
 
 create table if not exists albums (
     id               varchar not null primary key,
+    version_id       int not null,
     title            varchar not null,
     marketing_budget numeric,
     release_date     date,
@@ -27,6 +29,7 @@ create table if not exists albums (
 create table if not exists tracks (
     id           varchar not null,
     track_number bigint not null,
+    version_id   int not null,
     title        varchar not null,
     sample_rate  float8 not null,
     created_at   timestamptz,
@@ -36,14 +39,16 @@ create table if not exists tracks (
 
 create table if not exists venues (
     id          varchar not null primary key,
+    version_id  int not null,
     name        varchar not null,
-    description varchar not null,
+    description jsonb not null,
     created_at  timestamptz,
     updated_at  timestamptz
 );
 
 create table if not exists concerts (
     id          varchar not null primary key,
+    version_id  int not null,
     venue_id    varchar not null,
     singer_id   varchar not null,
     name        varchar not null,

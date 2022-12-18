@@ -13,11 +13,10 @@
  limitations under the License.
 """
 
-from connect import create_test_engine
-from model import mapper_registry
+from model import Album
+from sample import stale_read_engine
+from sqlalchemy.orm import Session
 
 
-engine = create_test_engine(options="?options=-c spanner.ddl_transaction_mode"
-                                    "=AutocommitExplicitTransaction")
-mapper_registry.metadata.create_all(engine)
-print("Created data model")
+with Session(stale_read_engine) as session:
+  album = session.get(Album, "987-654-321")

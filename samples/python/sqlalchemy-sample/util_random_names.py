@@ -17,8 +17,12 @@ import secrets
 from random import seed, randrange, random
 from datetime import date
 
-
 seed()
+
+
+"""
+ Helper functions for generating random names and titles.
+"""
 
 def random_first_name():
   return first_names[randrange(len(first_names))]

@@ -18,6 +18,9 @@ from model import *
 import sys
 
 
+# Creates a database engine that can be used with the sample.py script in this
+# directory. This function assumes that the host, port and database name was
+# given as command line arguments.
 def create_test_engine(autocommit=False, options=""):
   host = sys.argv[1]
   port = sys.argv[2]
@@ -39,8 +42,9 @@ def create_test_engine(autocommit=False, options=""):
 
 
 def register_event_listener_for_prepared_statements(engine):
-  # Register an event listener for this engine that creates a prepared statement
-  # for each connection that is created.
+  # Register an event listener for this engine that creates prepared statements
+  # for each connection that is created. The prepared statement definitions can
+  # be added to the model classes.
   @event.listens_for(engine, "connect")
   def connect(dbapi_connection, connection_record):
     cursor_obj = dbapi_connection.cursor()

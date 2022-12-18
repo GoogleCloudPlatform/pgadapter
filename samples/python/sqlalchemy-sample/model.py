@@ -16,7 +16,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, LargeBinary, Float, \
   Numeric, DateTime, Date, FetchedValue, ForeignKey, ColumnDefault
 from sqlalchemy.orm import registry, relationship
-from sqlalchemy import insert
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import timezone, datetime
 
 mapper_registry = registry()
@@ -31,11 +31,10 @@ Base = mapper_registry.generate_base()
  current client system time when a model is created or updated. 
 """
 class BaseMixin(object):
-  __get_query_name__ = None
-  __add_query_name__ = None
   __prepare_statements__ = None
 
   id = Column(String, primary_key=True)
+  version_id = Column(Integer, nullable=False)
   created_at = Column(DateTime(timezone=True),
                       # We need to explicitly format the timestamps with a
                       # timezone to ensure that SQLAlchemy uses a
@@ -45,21 +44,11 @@ class BaseMixin(object):
                       ColumnDefault(
                         datetime.utcnow().astimezone(timezone.utc),
                         for_update=True))
+  __mapper_args__ = {"version_id_col": version_id}
 
 
 class Singer(BaseMixin, Base):
   __tablename__ = "singers"
-  __get_query_name__ = "get_singer"
-  __add_query_name__ = "add_singer"
-  __prepare_statements__ = [
-    "prepare {} as select * from singers where id=$1".format(__get_query_name__),
-    "prepare {} as insert into singers "
-    "(id, created_at, updated_at, first_name, last_name, active) "
-    "values ($1, $2, $3, $4, $5, $6) "
-    "returning last_name"
-    .format(__add_query_name__),
-
-  ]
 
   first_name = Column(String(100))
   last_name = Column(String(200))
@@ -69,7 +58,10 @@ class Singer(BaseMixin, Base):
   active = Column(Boolean)
   albums = relationship("Album", back_populates="singer")
 
-  __mapper_args__ = {"eager_defaults": True}
+  __mapper_args__ = {
+    "eager_defaults": True,
+    "version_id_col": BaseMixin.version_id
+  }
 
   def __repr__(self):
     return f"singers(" \
@@ -134,7 +126,7 @@ class Venue(BaseMixin, Base):
   __tablename__ = "venues"
 
   name = Column(String(200))
-  description = Column(String)
+  description = Column(JSONB)
 
   def __repr__(self):
     return f"venues(" \

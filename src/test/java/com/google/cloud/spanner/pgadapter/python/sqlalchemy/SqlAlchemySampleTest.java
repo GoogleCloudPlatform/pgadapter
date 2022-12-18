@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.python.sqlalchemy;
 
 import static com.google.cloud.spanner.pgadapter.python.sqlalchemy.SqlAlchemyBasicsTest.execute;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -24,9 +25,12 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
+import com.google.protobuf.Duration;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
+import com.google.spanner.v1.BeginTransactionRequest;
+import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.ResultSetStats;
@@ -59,7 +63,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                "SELECT albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
                     + "FROM albums \n"
                     + "WHERE albums.id = '123-456-789'"),
             ResultSet.newBuilder()
@@ -77,7 +81,9 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
                 .build()));
     mockSpanner.putStatementResult(
         StatementResult.update(
-            Statement.of("DELETE FROM albums WHERE albums.id = '123-456-789'"), 1L));
+            Statement.of(
+                "DELETE FROM albums WHERE albums.id = '123-456-789' AND albums.version_id = 1"),
+            1L));
 
     String output =
         execute(SAMPLE_DIR, "test_delete_album.py", "localhost", pgServer.getLocalPort());
@@ -90,7 +96,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                "SELECT albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
                     + "FROM albums JOIN singers ON singers.id = albums.singer_id \n"
                     + "WHERE lower(SUBSTRING(albums.title FROM 1 FOR 1)) = lower(SUBSTRING(singers.first_name FROM 1 FOR 1)) OR "
                     + "lower(SUBSTRING(albums.title FROM 1 FOR 1)) = lower(SUBSTRING(singers.last_name FROM 1 FOR 1))"),
@@ -113,7 +119,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT singers.id AS singers_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
+                "SELECT singers.id AS singers_id, singers.version_id AS singers_version_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
                     + "FROM singers ORDER BY singers.last_name \n"
                     + " LIMIT 5 OFFSET 3"),
             ResultSet.newBuilder()
@@ -155,7 +161,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                "SELECT albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
                     + "FROM albums \n"
                     + "WHERE albums.release_date < '1980-01-01'::date"),
             ResultSet.newBuilder()
@@ -225,9 +231,9 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT concerts.id AS concerts_id, concerts.created_at AS concerts_created_at, concerts.updated_at AS concerts_updated_at, concerts.name AS concerts_name, concerts.venue_id AS concerts_venue_id, concerts.singer_id AS concerts_singer_id, concerts.start_time AS concerts_start_time, concerts.end_time AS concerts_end_time, "
-                    + "venues_1.id AS venues_1_id, venues_1.created_at AS venues_1_created_at, venues_1.updated_at AS venues_1_updated_at, venues_1.name AS venues_1_name, venues_1.description AS venues_1_description, "
-                    + "singers_1.id AS singers_1_id, singers_1.created_at AS singers_1_created_at, singers_1.updated_at AS singers_1_updated_at, singers_1.first_name AS singers_1_first_name, singers_1.last_name AS singers_1_last_name, singers_1.full_name AS singers_1_full_name, singers_1.active AS singers_1_active \n"
+                "SELECT concerts.id AS concerts_id, concerts.version_id AS concerts_version_id, concerts.created_at AS concerts_created_at, concerts.updated_at AS concerts_updated_at, concerts.name AS concerts_name, concerts.venue_id AS concerts_venue_id, concerts.singer_id AS concerts_singer_id, concerts.start_time AS concerts_start_time, concerts.end_time AS concerts_end_time, "
+                    + "venues_1.id AS venues_1_id, venues_1.version_id AS venues_1_version_id, venues_1.created_at AS venues_1_created_at, venues_1.updated_at AS venues_1_updated_at, venues_1.name AS venues_1_name, venues_1.description AS venues_1_description, "
+                    + "singers_1.id AS singers_1_id, singers_1.version_id AS singers_1_version_id, singers_1.created_at AS singers_1_created_at, singers_1.updated_at AS singers_1_updated_at, singers_1.first_name AS singers_1_first_name, singers_1.last_name AS singers_1_last_name, singers_1.full_name AS singers_1_full_name, singers_1.active AS singers_1_active \n"
                     + "FROM concerts LEFT OUTER JOIN venues AS venues_1 ON venues_1.id = concerts.venue_id LEFT OUTER JOIN singers AS singers_1 ON singers_1.id = concerts.singer_id ORDER BY concerts.start_time"),
             ResultSet.newBuilder()
                 .setMetadata(
@@ -257,7 +263,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT singers.id AS singers_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
+                "SELECT singers.id AS singers_id, singers.version_id AS singers_version_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
                     + "FROM singers \n"
                     + " LIMIT 1"),
             ResultSet.newBuilder()
@@ -274,12 +280,12 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putPartialStatementResult(
         StatementResult.update(
             Statement.of(
-                "INSERT INTO venues (id, created_at, updated_at, name, description) VALUES "),
+                "INSERT INTO venues (id, version_id, created_at, updated_at, name, description) VALUES "),
             1L));
     mockSpanner.putPartialStatementResult(
         StatementResult.update(
             Statement.of(
-                "INSERT INTO concerts (id, created_at, updated_at, name, venue_id, singer_id, start_time, end_time) VALUES "),
+                "INSERT INTO concerts (id, version_id, created_at, updated_at, name, venue_id, singer_id, start_time, end_time) VALUES "),
             1L));
 
     String output =
@@ -296,7 +302,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putPartialStatementResult(
         StatementResult.query(
             Statement.of(
-                "INSERT INTO singers (id, created_at, updated_at, first_name, last_name, active) "
+                "INSERT INTO singers (id, version_id, created_at, updated_at, first_name, last_name, active) "
                     + "VALUES "),
             ResultSet.newBuilder()
                 .setMetadata(
@@ -334,7 +340,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putPartialStatementResult(
         StatementResult.update(
             Statement.of(
-                "INSERT INTO albums (id, created_at, updated_at, title, marketing_budget, release_date, cover_picture, singer_id) VALUES "),
+                "INSERT INTO albums (id, version_id, created_at, updated_at, title, marketing_budget, release_date, cover_picture, singer_id) VALUES "),
             37L));
 
     String output =
@@ -351,7 +357,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT singers.id AS singers_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
+                "SELECT singers.id AS singers_id, singers.version_id AS singers_version_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
                     + "FROM singers ORDER BY singers.last_name"),
             ResultSet.newBuilder()
                 .setMetadata(createSingersMetadata("singers_"))
@@ -383,7 +389,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                "SELECT albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
                     + "FROM albums \n"
                     + "WHERE 'b2' = albums.singer_id"),
             ResultSet.newBuilder()
@@ -402,7 +408,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                "SELECT albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
                     + "FROM albums \n"
                     + "WHERE 'a1' = albums.singer_id"),
             ResultSet.newBuilder()
@@ -431,7 +437,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                "SELECT albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
                     + "FROM albums \n"
                     + "WHERE 'c3' = albums.singer_id"),
             ResultSet.newBuilder().setMetadata(createAlbumsMetadata("albums_")).build()));
@@ -448,6 +454,12 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
             + "  'Title 3'\n"
             + "Renate Unna has 0 albums:\n",
         output);
+    List<BeginTransactionRequest> beginRequests =
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class);
+    assertEquals(1, beginRequests.size());
+    assertTrue(beginRequests.get(0).getOptions().hasReadOnly());
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(5, requests.size());
   }
 
   @Test
@@ -455,7 +467,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT singers.id AS singers_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
+                "SELECT singers.id AS singers_id, singers.version_id AS singers_version_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
                     + "FROM singers \n"
                     + "WHERE singers.id = '123-456-789'"),
             ResultSet.newBuilder()
@@ -472,7 +484,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                "SELECT albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
                     + "FROM albums \n"
                     + "WHERE '123-456-789' = albums.singer_id"),
             ResultSet.newBuilder()
@@ -506,8 +518,8 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "INSERT INTO singers (id, created_at, updated_at, first_name, last_name, active) "
-                    + "VALUES ('123-456-789', ('2011-11-04T00:05:23.123456+00:00'::timestamptz), NULL, 'Myfirstname', 'Mylastname', true) "
+                "INSERT INTO singers (id, version_id, created_at, updated_at, first_name, last_name, active) "
+                    + "VALUES ('123-456-789', 1, ('2011-11-04T00:05:23.123456+00:00'::timestamptz), NULL, 'Myfirstname', 'Mylastname', true) "
                     + "RETURNING singers.full_name"),
             ResultSet.newBuilder()
                 .setMetadata(
@@ -536,7 +548,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT singers.id AS singers_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
+                "SELECT singers.id AS singers_id, singers.version_id AS singers_version_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at, singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active \n"
                     + "FROM singers \n"
                     + "WHERE singers.id = '123-456-789'"),
             ResultSet.newBuilder()
@@ -554,7 +566,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     // will be used by SQLAlchemy.
     mockSpanner.putPartialStatementResult(
         StatementResult.query(
-            Statement.of("UPDATE singers SET updated_at='"),
+            Statement.of("UPDATE singers SET version_id=2, updated_at='"),
             ResultSet.newBuilder()
                 .setMetadata(
                     ResultSetMetadata.newBuilder()
@@ -583,7 +595,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT albums.id AS albums_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                "SELECT albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
                     + "FROM albums \n"
                     + "WHERE albums.id = '987-654-321'"),
             ResultSet.newBuilder()
@@ -602,7 +614,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT tracks.created_at AS tracks_created_at, tracks.updated_at AS tracks_updated_at, tracks.id AS tracks_id, tracks.track_number AS tracks_track_number, tracks.title AS tracks_title, tracks.sample_rate AS tracks_sample_rate \n"
+                "SELECT tracks.version_id AS tracks_version_id, tracks.created_at AS tracks_created_at, tracks.updated_at AS tracks_updated_at, tracks.id AS tracks_id, tracks.track_number AS tracks_track_number, tracks.title AS tracks_title, tracks.sample_rate AS tracks_sample_rate \n"
                     + "FROM tracks \n"
                     + "WHERE '123-456-789' = tracks.id"),
             ResultSet.newBuilder()
@@ -635,11 +647,76 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testGetAlbumWithStaleEngine() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT albums.id AS albums_id, albums.version_id AS albums_version_id, albums.created_at AS albums_created_at, albums.updated_at AS albums_updated_at, albums.title AS albums_title, albums.marketing_budget AS albums_marketing_budget, albums.release_date AS albums_release_date, albums.cover_picture AS albums_cover_picture, albums.singer_id AS albums_singer_id \n"
+                    + "FROM albums \n"
+                    + "WHERE albums.id = '987-654-321'"),
+            ResultSet.newBuilder()
+                .setMetadata(createAlbumsMetadata("albums_"))
+                .addRows(
+                    createAlbumRow(
+                        "123-456-789",
+                        "My title",
+                        "9423.13",
+                        Date.parseDate("2002-10-17"),
+                        ByteArray.copyFrom("cover picture"),
+                        "123-456-789",
+                        Timestamp.parseTimestamp("2022-02-21T10:19:18Z"),
+                        Timestamp.parseTimestamp("2022-02-21T10:19:18Z")))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "SELECT tracks.version_id AS tracks_version_id, tracks.created_at AS tracks_created_at, tracks.updated_at AS tracks_updated_at, tracks.id AS tracks_id, tracks.track_number AS tracks_track_number, tracks.title AS tracks_title, tracks.sample_rate AS tracks_sample_rate \n"
+                    + "FROM tracks \n"
+                    + "WHERE '123-456-789' = tracks.id"),
+            ResultSet.newBuilder()
+                .setMetadata(createTracksMetadata("tracks_"))
+                .addRows(
+                    createTrackRow(
+                        "123-456-789",
+                        1L,
+                        "Track 1",
+                        6.34324,
+                        Timestamp.parseTimestamp("2018-02-28T17:00:00Z"),
+                        Timestamp.parseTimestamp("2018-02-01T09:00:00Z")))
+                .addRows(
+                    createTrackRow(
+                        "123-456-789",
+                        2L,
+                        "Track 2",
+                        6.34324,
+                        Timestamp.parseTimestamp("2018-02-28T17:00:00Z"),
+                        Timestamp.parseTimestamp("2018-02-01T09:00:00Z")))
+                .build()));
+
+    String output =
+        execute(
+            SAMPLE_DIR,
+            "test_get_album_with_stale_engine.py",
+            "localhost",
+            pgServer.getLocalPort());
+    assertEquals("", output);
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest request = requests.get(1);
+    assertTrue(request.getTransaction().hasSingleUse());
+    assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+    assertTrue(request.getTransaction().getSingleUse().getReadOnly().hasMaxStaleness());
+    assertEquals(
+        Duration.newBuilder().setSeconds(10L).setNanos(0).build(),
+        request.getTransaction().getSingleUse().getReadOnly().getMaxStaleness());
+  }
+
+  @Test
   public void testGetTrack() throws IOException, InterruptedException {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "SELECT tracks.created_at AS tracks_created_at, tracks.updated_at AS tracks_updated_at, tracks.id AS tracks_id, tracks.track_number AS tracks_track_number, tracks.title AS tracks_title, tracks.sample_rate AS tracks_sample_rate \n"
+                "SELECT tracks.version_id AS tracks_version_id, tracks.created_at AS tracks_created_at, tracks.updated_at AS tracks_updated_at, tracks.id AS tracks_id, tracks.track_number AS tracks_track_number, tracks.title AS tracks_title, tracks.sample_rate AS tracks_sample_rate \n"
                     + "FROM tracks \n"
                     + "WHERE tracks.id = '987-654-321' AND tracks.track_number = 1"),
             ResultSet.newBuilder()
@@ -783,6 +860,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     assertEquals(
         "CREATE TABLE singers (\n"
             + "\tid VARCHAR NOT NULL, \n"
+            + "\tversion_id INTEGER NOT NULL, \n"
             + "\tcreated_at TIMESTAMP WITH TIME ZONE, \n"
             + "\tupdated_at TIMESTAMP WITH TIME ZONE, \n"
             + "\tfirst_name VARCHAR(100), \n"
@@ -795,16 +873,18 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     assertEquals(
         "CREATE TABLE venues (\n"
             + "\tid VARCHAR NOT NULL, \n"
+            + "\tversion_id INTEGER NOT NULL, \n"
             + "\tcreated_at TIMESTAMP WITH TIME ZONE, \n"
             + "\tupdated_at TIMESTAMP WITH TIME ZONE, \n"
             + "\tname VARCHAR(200), \n"
-            + "\tdescription VARCHAR, \n"
+            + "\tdescription JSONB, \n"
             + "\tPRIMARY KEY (id)\n"
             + ")",
         requests.get(0).getStatements(1));
     assertEquals(
         "CREATE TABLE albums (\n"
             + "\tid VARCHAR NOT NULL, \n"
+            + "\tversion_id INTEGER NOT NULL, \n"
             + "\tcreated_at TIMESTAMP WITH TIME ZONE, \n"
             + "\tupdated_at TIMESTAMP WITH TIME ZONE, \n"
             + "\ttitle VARCHAR(200), \n"
@@ -819,6 +899,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     assertEquals(
         "CREATE TABLE concerts (\n"
             + "\tid VARCHAR NOT NULL, \n"
+            + "\tversion_id INTEGER NOT NULL, \n"
             + "\tcreated_at TIMESTAMP WITH TIME ZONE, \n"
             + "\tupdated_at TIMESTAMP WITH TIME ZONE, \n"
             + "\tname VARCHAR(200), \n"
@@ -835,6 +916,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     // the PostgreSQL SQLAlchemy provider does not understand interleaved tables.
     assertEquals(
         "CREATE TABLE tracks (\n"
+            + "\tversion_id INTEGER NOT NULL, \n"
             + "\tcreated_at TIMESTAMP WITH TIME ZONE, \n"
             + "\tupdated_at TIMESTAMP WITH TIME ZONE, \n"
             + "\tid VARCHAR NOT NULL, \n"
@@ -847,6 +929,115 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
         requests.get(0).getStatements(4));
   }
 
+  @Test
+  public void testMetadataReflect() throws IOException, InterruptedException {
+    String sql =
+        "with pg_class as (\n"
+            + "  select\n"
+            + "  -1 as oid,\n"
+            + "  table_name as relname,\n"
+            + "  case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
+            + "  0 as reltype,\n"
+            + "  0 as reloftype,\n"
+            + "  0 as relowner,\n"
+            + "  1 as relam,\n"
+            + "  0 as relfilenode,\n"
+            + "  0 as reltablespace,\n"
+            + "  0 as relpages,\n"
+            + "  0.0::float8 as reltuples,\n"
+            + "  0 as relallvisible,\n"
+            + "  0 as reltoastrelid,\n"
+            + "  false as relhasindex,\n"
+            + "  false as relisshared,\n"
+            + "  'p' as relpersistence,\n"
+            + "  'r' as relkind,\n"
+            + "  count(*) as relnatts,\n"
+            + "  0 as relchecks,\n"
+            + "  false as relhasrules,\n"
+            + "  false as relhastriggers,\n"
+            + "  false as relhassubclass,\n"
+            + "  false as relrowsecurity,\n"
+            + "  false as relforcerowsecurity,\n"
+            + "  true as relispopulated,\n"
+            + "  'n' as relreplident,\n"
+            + "  false as relispartition,\n"
+            + "  0 as relrewrite,\n"
+            + "  0 as relfrozenxid,\n"
+            + "  0 as relminmxid,\n"
+            + "  '{}'::bigint[] as relacl,\n"
+            + "  '{}'::text[] as reloptions,\n"
+            + "  0 as relpartbound\n"
+            + "from information_schema.tables t\n"
+            + "inner join information_schema.columns using (table_catalog, table_schema, table_name)\n"
+            + "group by t.table_name, t.table_schema\n"
+            + "union all\n"
+            + "select\n"
+            + "    -1 as oid,\n"
+            + "    i.index_name as relname,\n"
+            + "    case table_schema when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as relnamespace,\n"
+            + "    0 as reltype,\n"
+            + "    0 as reloftype,\n"
+            + "    0 as relowner,\n"
+            + "    1 as relam,\n"
+            + "    0 as relfilenode,\n"
+            + "    0 as reltablespace,\n"
+            + "    0 as relpages,\n"
+            + "    0.0::float8 as reltuples,\n"
+            + "    0 as relallvisible,\n"
+            + "    0 as reltoastrelid,\n"
+            + "    false as relhasindex,\n"
+            + "    false as relisshared,\n"
+            + "    'p' as relpersistence,\n"
+            + "    'r' as relkind,\n"
+            + "    count(*) as relnatts,\n"
+            + "    0 as relchecks,\n"
+            + "    false as relhasrules,\n"
+            + "    false as relhastriggers,\n"
+            + "    false as relhassubclass,\n"
+            + "    false as relrowsecurity,\n"
+            + "    false as relforcerowsecurity,\n"
+            + "    true as relispopulated,\n"
+            + "    'n' as relreplident,\n"
+            + "    false as relispartition,\n"
+            + "    0 as relrewrite,\n"
+            + "    0 as relfrozenxid,\n"
+            + "    0 as relminmxid,\n"
+            + "    '{}'::bigint[] as relacl,\n"
+            + "    '{}'::text[] as reloptions,\n"
+            + "    0 as relpartbound\n"
+            + "from information_schema.indexes i\n"
+            + "inner join information_schema.index_columns using (table_catalog, table_schema, table_name)\n"
+            + "group by i.index_name, i.table_schema\n"
+            + "),\n"
+            + "pg_namespace as (\n"
+            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
+            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
+            + "  from information_schema.schemata\n"
+            + ")\n"
+            + "SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind in ('r', 'p')";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("relname")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .build())
+                        .build())
+                .build()));
+
+    String actualOutput =
+        execute(SAMPLE_DIR, "test_metadata_reflect.py", "localhost", pgServer.getLocalPort());
+    String expectedOutput = "Reflected current data model\n";
+    assertEquals(expectedOutput, actualOutput);
+  }
+
   static ResultSetMetadata createSingersMetadata(String prefix) {
     return ResultSetMetadata.newBuilder()
         .setRowType(
@@ -855,6 +1046,11 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
                     Field.newBuilder()
                         .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
                         .setName(prefix + "id")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                        .setName(prefix + "version_id")
                         .build())
                 .addFields(
                     Field.newBuilder()
@@ -899,6 +1095,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
       Timestamp updatedAt) {
     return ListValue.newBuilder()
         .addValues(Value.newBuilder().setStringValue(id).build())
+        .addValues(Value.newBuilder().setStringValue("1").build())
         .addValues(Value.newBuilder().setStringValue(createdAt.toString()).build())
         .addValues(Value.newBuilder().setStringValue(updatedAt.toString()).build())
         .addValues(Value.newBuilder().setStringValue(firstName).build())
@@ -916,6 +1113,11 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
                     Field.newBuilder()
                         .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
                         .setName(prefix + "id")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                        .setName(prefix + "version_id")
                         .build())
                 .addFields(
                     Field.newBuilder()
@@ -971,6 +1173,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
       Timestamp updatedAt) {
     return ListValue.newBuilder()
         .addValues(Value.newBuilder().setStringValue(id).build())
+        .addValues(Value.newBuilder().setStringValue("1").build())
         .addValues(Value.newBuilder().setStringValue(createdAt.toString()).build())
         .addValues(Value.newBuilder().setStringValue(updatedAt.toString()).build())
         .addValues(Value.newBuilder().setStringValue(title).build())
@@ -985,6 +1188,11 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
     return ResultSetMetadata.newBuilder()
         .setRowType(
             StructType.newBuilder()
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                        .setName(prefix + "version_id")
+                        .build())
                 .addFields(
                     Field.newBuilder()
                         .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
@@ -1027,6 +1235,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
       Timestamp createdAt,
       Timestamp updatedAt) {
     return ListValue.newBuilder()
+        .addValues(Value.newBuilder().setStringValue("1").build())
         .addValues(Value.newBuilder().setStringValue(createdAt.toString()).build())
         .addValues(Value.newBuilder().setStringValue(updatedAt.toString()).build())
         .addValues(Value.newBuilder().setStringValue(id).build())
@@ -1044,6 +1253,11 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
                     Field.newBuilder()
                         .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
                         .setName(prefix + "id")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                        .setName(prefix + "version_id")
                         .build())
                 .addFields(
                     Field.newBuilder()
@@ -1095,6 +1309,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
       Timestamp updatedAt) {
     return ListValue.newBuilder()
         .addValues(Value.newBuilder().setStringValue(id).build())
+        .addValues(Value.newBuilder().setStringValue("1").build())
         .addValues(Value.newBuilder().setStringValue(createdAt.toString()).build())
         .addValues(Value.newBuilder().setStringValue(updatedAt.toString()).build())
         .addValues(Value.newBuilder().setStringValue(name).build())
@@ -1113,6 +1328,11 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
                     Field.newBuilder()
                         .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
                         .setName(prefix + "id")
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                        .setName(prefix + "version_id")
                         .build())
                 .addFields(
                     Field.newBuilder()
@@ -1142,6 +1362,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
       String id, String name, String description, Timestamp createdAt, Timestamp updatedAt) {
     return ListValue.newBuilder()
         .addValues(Value.newBuilder().setStringValue(id).build())
+        .addValues(Value.newBuilder().setStringValue("1").build())
         .addValues(Value.newBuilder().setStringValue(createdAt.toString()).build())
         .addValues(Value.newBuilder().setStringValue(updatedAt.toString()).build())
         .addValues(Value.newBuilder().setStringValue(name).build())

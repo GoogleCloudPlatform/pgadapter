@@ -17,11 +17,12 @@ from connect import create_test_engine
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text, func, or_
 from model import Singer, Album, Track, Venue, Concert
-from random_names import random_first_name, random_last_name, \
+from util_random_names import random_first_name, random_last_name, \
   random_album_title, random_release_date, random_marketing_budget, \
   random_cover_picture
 from uuid import uuid4
 from datetime import datetime, date
+
 
 # This is the default engine that is connected to PostgreSQL (PGAdapter).
 # This engine will by default use read/write transactions.
@@ -126,11 +127,11 @@ def create_venue_and_concert_in_transaction():
     venue = Venue(
       id="{}".format(uuid4()),
       name="Avenue Park",
-      description='{'
-                  '  "Capacity": 5000,'
-                  '  "Location": "New York",'
-                  '  "Country": "US"'
-                  '}'
+      description={
+        "Capacity": 5000,
+        "Location": "New York",
+        "Country": "US"
+      }
     )
     concert = Concert(
       id="{}".format(uuid4()),
@@ -326,31 +327,3 @@ def delete_album(album_id):
     session.commit()
     print()
     print("Deleted album with id {}".format(album_id))
-
-
-def create_and_load_singer_using_prepared_statements():
-  singer = create_random_singer(0)
-  add_singer_using_prepared_statement(singer)
-
-
-# Loads and prints the singer with the given id using a prepared query.
-def load_singer_using_prepared_query(singer_id):
-  with Session(engine) as session:
-    singer = session.query(Singer) \
-      .from_statement(text("execute {} (:id)"
-                           .format(Singer.__get_query_name__))) \
-      .params(id=singer_id) \
-      .first()
-    print(singer)
-
-
-# Adds a new singer row to the database using a prepared statement.
-def add_singer_using_prepared_statement(singer):
-  with Session(engine) as session:
-    singer.full_name = \
-      session.query(text("execute {} (:id, :created_at, :updated_at, "
-                           ":first_name, :last_name, :active)"
-                           .format(Singer.__add_query_name__)))\
-        .params(id=singer.id)\
-        .first()
-    session.commit()
