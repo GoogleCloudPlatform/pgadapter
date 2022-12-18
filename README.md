@@ -17,6 +17,9 @@ PGAdapter can be used with the following frameworks:
    for more details. See also [this directory](samples/java/liquibase) for a sample application using `Liquibase`.
 2. `gorm`: Version 1.23.8 and higher are supported. See [gorm support](docs/gorm.md) for more details.
    See also [this directory](samples/golang/gorm) for a sample application using `gorm`.
+3. `SQLAlchemy`: Version 1.4.45 has _experimental support_. See [SQLAlchemy support](docs/sqlalchemy.md)
+   for more details. See also [this directory](samples/python/sqlalchemy-sample) for a sample
+   application using `SQLAlchemy`.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
