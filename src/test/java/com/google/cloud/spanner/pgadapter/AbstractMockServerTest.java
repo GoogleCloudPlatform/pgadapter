@@ -405,11 +405,18 @@ public abstract class AbstractMockServerTest {
   }
 
   protected static ResultSet createAllTypesNullResultSet(String columnPrefix) {
+    return createAllTypesNullResultSet(columnPrefix, null);
+  }
+
+  protected static ResultSet createAllTypesNullResultSet(String columnPrefix, Long colBigInt) {
     return com.google.spanner.v1.ResultSet.newBuilder()
         .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
         .addRows(
             ListValue.newBuilder()
-                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(
+                    colBigInt == null
+                        ? Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build()
+                        : Value.newBuilder().setStringValue(String.valueOf(colBigInt)).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())

@@ -35,6 +35,7 @@ import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.Status;
 import java.io.IOException;
 import java.util.List;
 import org.junit.BeforeClass;
@@ -70,6 +71,28 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
 
     String actualOutput = execute("orm_insert.py", host, pgServer.getLocalPort());
+    String expectedOutput = "Inserted 1 row(s)\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql, request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testInsertAllTypes_NullValues() throws IOException, InterruptedException {
+    // Note that the JSONB column is 'null' instead of NULL. That means that SQLAlchemy is inserting
+    // a JSON null values instead of a SQL NULL value into the column. This can be changed by
+    // creating the columns as Column(JSONB(none_as_null=True)) in the SQLAlchemy model.
+    String sql =
+        "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'null')";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
+
+    String actualOutput = execute("orm_insert_null_values.py", host, pgServer.getLocalPort());
     String expectedOutput = "Inserted 1 row(s)\n";
     assertEquals(expectedOutput, actualOutput);
 
@@ -154,6 +177,29 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     String actualOutput = execute("orm_get.py", host, pgServer.getLocalPort());
     String expectedOutput =
         "AllTypes(col_bigint=     1,col_bool=       True,col_bytea=      b'test'col_float8=     3.14col_int=        100col_numeric=    Decimal('6.626')col_timestamptz=datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc)col_date=       datetime.date(2022, 3, 29)col_varchar=    'test'col_jsonb=      {'key': 'value'})\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql, request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(2, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testGetAllTypes_NullValues() throws IOException, InterruptedException {
+    String sql =
+        "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb \n"
+            + "FROM all_types \n"
+            + "WHERE all_types.col_bigint = 1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sql), createAllTypesNullResultSet("", 1L)));
+
+    String actualOutput = execute("orm_get.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "AllTypes(col_bigint=     1,col_bool=       None,col_bytea=      Nonecol_float8=     Nonecol_int=        Nonecol_numeric=    Nonecol_timestamptz=Nonecol_date=       Nonecol_varchar=    Nonecol_jsonb=      None)\n";
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
@@ -540,5 +586,59 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     assertTrue(selectAddressesRequest.getTransaction().hasId());
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(2, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testErrorInReadWriteTransaction() throws IOException, InterruptedException {
+    String sql =
+        "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "VALUES (1, true, '\\x74657374206279746573'::bytea, 3.14, 100, 6.626, '2011-11-04T00:05:23.123456+00:00'::timestamptz, '2011-11-04'::date, 'test string', '{\"key1\": \"value1\", \"key2\": \"value2\"}')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql),
+            Status.ALREADY_EXISTS
+                .withDescription("Row with id 1 already exists")
+                .asRuntimeException()));
+
+    String actualOutput =
+        execute("orm_error_in_read_write_transaction.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "Insert failed: (psycopg2.errors.RaiseException) com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row with id 1 already exists";
+    assertTrue(actualOutput, actualOutput.startsWith(expectedOutput));
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql, request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testErrorInReadWriteTransactionContinue() throws IOException, InterruptedException {
+    String sql =
+        "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "VALUES (1, true, '\\x74657374206279746573'::bytea, 3.14, 100, 6.626, '2011-11-04T00:05:23.123456+00:00'::timestamptz, '2011-11-04'::date, 'test string', '{\"key1\": \"value1\", \"key2\": \"value2\"}')";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql),
+            Status.ALREADY_EXISTS
+                .withDescription("Row with id 1 already exists")
+                .asRuntimeException()));
+
+    String actualOutput =
+        execute("orm_error_in_read_write_transaction_continue.py", host, pgServer.getLocalPort());
+    String expectedOutput =
+        "Getting the row failed: This Session's transaction has been rolled back due to a previous exception during flush. "
+            + "To begin a new transaction with this Session, first issue Session.rollback(). "
+            + "Original exception was: (psycopg2.errors.RaiseException) com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row with id 1 already exists";
+    assertTrue(actualOutput, actualOutput.startsWith(expectedOutput));
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql, request.getSql());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 }
