@@ -1,5 +1,4 @@
 -- Executing the schema creation in a batch will improve execution speed.
-start batch ddl;
 
 CREATE TABLE IF NOT EXISTS singers (
      id character varying NOT NULL,
@@ -36,7 +35,7 @@ CREATE TABLE IF NOT EXISTS tracks (
     PRIMARY KEY(id, track_number)
 ) INTERLEAVE IN PARENT albums ON DELETE CASCADE;
 
-CREATE UNIQUE INDEX unique_idx_id ON tracks(track_id);
+CREATE UNIQUE INDEX IF NOT EXISTS unique_idx_id ON tracks(track_id);
 
 CREATE TABLE IF NOT EXISTS venues (
     id character varying NOT NULL,
@@ -61,5 +60,3 @@ CREATE TABLE IF NOT EXISTS concerts (
   CONSTRAINT fk_concerts_singers FOREIGN KEY (singer_id) REFERENCES singers(id),
   CONSTRAINT fk_concerts_venues FOREIGN KEY (venue_id) REFERENCES venues(id)
 );
-
-run batch;

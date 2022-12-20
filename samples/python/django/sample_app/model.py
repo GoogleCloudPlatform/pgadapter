@@ -42,9 +42,6 @@ class Album(BaseModel):
   release_date = models.DateField()
   cover_picture = models.BinaryField()
   singer = models.ForeignKey(Singer, on_delete=models.DO_NOTHING)
-  created_at = models.DateTimeField()
-  updated_at = models.DateTimeField()
-
 
 class Track(BaseModel):
   class Meta():

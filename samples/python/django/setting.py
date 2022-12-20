@@ -13,5 +13,3 @@ DATABASES = {
 }
 
 USE_TZ = True
-
-
