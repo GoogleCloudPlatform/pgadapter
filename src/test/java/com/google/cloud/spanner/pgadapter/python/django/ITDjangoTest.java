@@ -39,13 +39,6 @@ public class ITDjangoTest extends DjangoTestSetup {
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
 
-  @Parameter public String pgVersion;
-
-  @Parameters(name = "pgVersion = {0}")
-  public static List<Object[]> data() {
-    return ImmutableList.of(new Object[] {"localhost"}, new Object[] {"/tmp"});
-  }
-
   @BeforeClass
   public static void setup() throws Exception {
     if (!isPythonAvailable()
