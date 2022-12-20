@@ -42,23 +42,20 @@ class Album(BaseModel):
   release_date = models.DateField()
   cover_picture = models.BinaryField()
   singer = models.ForeignKey(Singer, on_delete=models.DO_NOTHING)
-  created_at = models.DateTimeField()
-  updated_at = models.DateTimeField()
-
 
 class Track(BaseModel):
   class Meta():
     db_table = 'tracks'
 
-  # Here, id is a column that is supposed to be primary key by Django.
+  # Here, track_id is a column that is supposed to be primary key by Django.
   # But id column will just have a unique index in the actual table.
-  # In the actual table, (album_id, track_number) will be the primary key.
+  # In the actual table, (id, track_number) will be the primary key.
   # This is done because Django doesn't support composite primary keys,
   # but we need to have a composite primary key due to the fact that
   # the "tracks" table is interleaved in "albums".
 
-  id = models.CharField(primary_key=True, null=False)
-  album = models.ForeignKey(Album, on_delete=models.DO_NOTHING)
+  track_id = models.CharField(primary_key=True, null=False)
+  album = models.ForeignKey(Album, on_delete=models.DO_NOTHING, db_column='id')
   track_number = models.BigIntegerField(null=False)
   title = models.CharField(null=False)
   sample_rate = models.FloatField()
