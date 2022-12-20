@@ -4,7 +4,6 @@ import datetime
 import django
 import pytz
 from django.db import connection
-from django.db.transaction import atomic
 from django.db import transaction
 x = 0
 
@@ -33,37 +32,37 @@ def get_concert(concert_id, venue = None, singer = None):
   x += 1
   return Concert(id=concert_id, venue=venue, singer=singer, name='concert'+str(x), start_time=datetime.datetime.now(pytz.UTC), end_time=datetime.datetime.now(pytz.UTC)+datetime.timedelta(hours=1), created_at=datetime.datetime.now(pytz.UTC), updated_at=datetime.datetime.now(pytz.UTC))
 
-
 def create_tables():
   file = open('create_data_model.sql', 'r')
   ddl_statements = file.read()
   with connection.cursor() as cursor:
     cursor.execute(ddl_statements)
 
-@atomic(savepoint=False)
 def test_adding_data():
-  singer = get_singer('1')
-  singer.save()
+  with transaction.atomic():
+    singer = get_singer('1')
+    singer.save()
 
-  album = get_album('1', singer)
-  album.save()
+    album = get_album('1', singer)
+    album.save()
 
-  track = get_track('1', '2', album)
-  track.save(force_insert=True)
+    track = get_track('1', '2', album)
+    track.save(force_insert=True)
 
-  venue = get_venue('1')
-  venue.save()
+    venue = get_venue('1')
+    venue.save()
 
-  concert = get_concert('1', venue, singer)
-  concert.save()
+    concert = get_concert('1', venue, singer)
+    concert.save()
 
-@atomic(savepoint=False)
+
 def test_deleting_data():
-  Track.objects.all().delete()
-  Album.objects.all().delete()
-  Concert.objects.all().delete()
-  Venue.objects.all().delete()
-  Singer.objects.all().delete()
+  with transaction.atomic():
+    Track.objects.all().delete()
+    Album.objects.all().delete()
+    Concert.objects.all().delete()
+    Venue.objects.all().delete()
+    Singer.objects.all().delete()
 
 def test_foreign_key():
   singer1 = Singer.objects.filter(id='1')[0]
