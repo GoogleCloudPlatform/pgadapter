@@ -5,6 +5,7 @@ import django
 import pytz
 from django.db import connection
 from django.db import transaction
+from django.db.transaction import atomic
 x = 0
 
 def get_singer(singer_id):
@@ -38,31 +39,30 @@ def create_tables():
   with connection.cursor() as cursor:
     cursor.execute(ddl_statements)
 
+@atomic(savepoint=False)
 def test_adding_data():
-  with transaction.atomic():
-    singer = get_singer('1')
-    singer.save()
+  singer = get_singer('1')
+  singer.save()
 
-    album = get_album('1', singer)
-    album.save()
+  album = get_album('1', singer)
+  album.save()
 
-    track = get_track('1', '2', album)
-    track.save(force_insert=True)
+  track = get_track('1', '2', album)
+  track.save(force_insert=True)
 
-    venue = get_venue('1')
-    venue.save()
+  venue = get_venue('1')
+  venue.save()
 
-    concert = get_concert('1', venue, singer)
-    concert.save()
+  concert = get_concert('1', venue, singer)
+  concert.save()
 
-
+@atomic(savepoint=False)
 def test_deleting_data():
-  with transaction.atomic():
-    Track.objects.all().delete()
-    Album.objects.all().delete()
-    Concert.objects.all().delete()
-    Venue.objects.all().delete()
-    Singer.objects.all().delete()
+  Track.objects.all().delete()
+  Album.objects.all().delete()
+  Concert.objects.all().delete()
+  Venue.objects.all().delete()
+  Singer.objects.all().delete()
 
 def test_foreign_key():
   singer1 = Singer.objects.filter(id='1')[0]
@@ -104,12 +104,11 @@ def test_transaction_rollback():
   singer3.save()
 
   transaction.rollback()
+  transaction.set_autocommit(True)
   try:
     assert len(Singer.objects.filter(id='3')) == 0
   except:
     raise Exception('Transaction Rollback Unsucessful')
-  finally:
-    transaction.set_autocommit(True)
 
 if __name__ == "__main__":
 
