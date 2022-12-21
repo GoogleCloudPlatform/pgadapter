@@ -117,10 +117,11 @@ read/write transactions.
 ## Performance Considerations
 
 ### Parameterized Queries
-`psycopg2` does not use parameterized queries. Instead, `psycopg2` will replace query parameters with
-literals in the SQL string before sending these to PGAdapter. This means that each query must be
-parsed and planned separately. This will add latency to queries that are executed multiple times
-compared to if the queries were executed using actual query parameters.
+`psycopg2` does not use [parameterized queries](https://cloud.google.com/spanner/docs/sql-best-practices#postgresql_1).
+Instead, `psycopg2` will replace query parameters with literals in the SQL string before sending
+these to PGAdapter. This means that each query must be parsed and planned separately. This will add
+latency to queries that are executed multiple times compared to if the queries were executed using
+actual query parameters.
 
 ### Read-only Transactions
 SQLAlchemy will by default use read/write transactions for all database operations, including for
