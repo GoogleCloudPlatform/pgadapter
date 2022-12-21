@@ -21,6 +21,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -242,5 +243,43 @@ public class ClientAutoDetectorTest {
             EMPTY_LOCAL_STATEMENTS, WellKnownClient.PGX.getLocalStatements(connectionHandler));
       }
     }
+  }
+
+  @Test
+  public void testNpgsql() {
+    assertNotEquals(
+        WellKnownClient.NPGSQL,
+        ClientAutoDetector.detectClient(ImmutableList.of(), ImmutableMap.of()));
+    assertNotEquals(
+        WellKnownClient.NPGSQL,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of("some-param"), ImmutableMap.of("some-param", "some-value")));
+
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ProxyServer server = mock(ProxyServer.class);
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
+    for (boolean useDefaultLocalStatements : new boolean[] {true, false}) {
+      when(options.useDefaultLocalStatements()).thenReturn(useDefaultLocalStatements);
+      if (useDefaultLocalStatements) {
+        assertEquals(
+            DEFAULT_LOCAL_STATEMENTS, WellKnownClient.NPGSQL.getLocalStatements(connectionHandler));
+      } else {
+        assertEquals(
+            EMPTY_LOCAL_STATEMENTS, WellKnownClient.NPGSQL.getLocalStatements(connectionHandler));
+      }
+    }
+    assertEquals(
+        WellKnownClient.NPGSQL,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of(
+                Statement.of(
+                    "SELECT version();\n"
+                        + "\n"
+                        + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n"))));
+    assertEquals(
+        WellKnownClient.UNSPECIFIED,
+        ClientAutoDetector.detectClient(ImmutableList.of(Statement.of("SELECT version()"))));
   }
 }

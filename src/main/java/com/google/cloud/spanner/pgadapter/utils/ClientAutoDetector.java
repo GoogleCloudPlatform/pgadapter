@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.utils;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
@@ -113,6 +114,27 @@ public class ClientAutoDetector {
         return false;
       }
     },
+    NPGSQL {
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // npgsql does not send enough unique parameters for it to be auto-detected.
+        return false;
+      }
+
+      @Override
+      boolean isClient(List<Statement> statements) {
+        // The npgsql client always starts with sending a query that contains multiple statements
+        // and that starts with the following prefix.
+        return statements.size() == 1
+            && statements
+                .get(0)
+                .getSql()
+                .startsWith(
+                    "SELECT version();\n"
+                        + "\n"
+                        + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n");
+      }
+    },
     UNSPECIFIED {
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -120,9 +142,20 @@ public class ClientAutoDetector {
         // defaults defined in this enum.
         return true;
       }
+
+      @Override
+      boolean isClient(List<Statement> statements) {
+        // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
+        // defaults defined in this enum.
+        return true;
+      }
     };
 
     abstract boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters);
+
+    boolean isClient(List<Statement> statements) {
+      return false;
+    }
 
     public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
       if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
@@ -145,6 +178,20 @@ public class ClientAutoDetector {
       List<String> orderParameterKeys, Map<String, String> parameters) {
     for (WellKnownClient client : WellKnownClient.values()) {
       if (client.isClient(orderParameterKeys, parameters)) {
+        return client;
+      }
+    }
+    // The following line should never be reached.
+    throw new IllegalStateException("UNSPECIFIED.isClient() should have returned true");
+  }
+
+  /**
+   * Returns the {@link WellKnownClient} that the detector thinks is connected to PGAdapter based on
+   * the given list of SQL statements that have been executed.
+   */
+  public static @Nonnull WellKnownClient detectClient(List<Statement> statements) {
+    for (WellKnownClient client : WellKnownClient.values()) {
+      if (client.isClient(statements)) {
         return client;
       }
     }
