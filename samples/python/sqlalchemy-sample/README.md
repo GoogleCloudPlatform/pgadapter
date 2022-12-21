@@ -83,6 +83,7 @@ The following limitations are currently known:
 | Transaction isolation level  | Only SERIALIZABLE and AUTOCOMMIT are supported. `postgresql_readonly=True` is also supported. It is recommended to use either autocommit or read-only for workloads that only read data and/or that do not need to be atomic to get the best possible performance.  |
 | Stored procedures            | Cloud Spanner does not support Stored Procedures.                                                                                                                                                                                                                   |
 | User defined functions       | Cloud Spanner does not support User Defined Functions.                                                                                                                                                                                                              |
+| Other drivers than psycopg2  | PGAdapter does not support using SQLAlchemy with any other drivers than `psycopg2`.                                                                                                                                                                                 |
 
 ### Generated Primary Keys
 Generated primary keys are not supported and should be replaced with primary key definitions that
@@ -114,6 +115,12 @@ These are normally also not required, as Cloud Spanner uses isolation level `ser
 read/write transactions.
 
 ## Performance Considerations
+
+### Parameterized Queries
+`psycopg2` does not use parameterized queries. Instead, `psycopg2` will replace query parameters with
+literals in the SQL string before sending these to PGAdapter. This means that each query must be
+parsed and planned separately. This will add latency to queries that are executed multiple times
+compared to if the queries were executed using actual query parameters.
 
 ### Read-only Transactions
 SQLAlchemy will by default use read/write transactions for all database operations, including for
