@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
 import org.junit.BeforeClass;
@@ -149,7 +150,7 @@ public class DjangoTestSetup extends DjangoMockServerTest {
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(unnecessarySql2), rs1));
   }
 
-  static boolean isPythonAvailable() {
+  public static boolean isPythonAvailable() {
     ProcessBuilder builder = new ProcessBuilder();
     String[] pythonCommand = new String[] {"python3", "--version"};
     builder.command(pythonCommand);
@@ -163,16 +164,18 @@ public class DjangoTestSetup extends DjangoMockServerTest {
     }
   }
 
-  private static String DJANGO_PATH = "./src/test/python/django";
+  private static String DJANGO_UNIT_PATH = "./src/test/python/django";
+  private static String DJANGO_IT_PATH = "./samples/python/django";
 
-  private static String execute(int port, String host, List<String> options, String testFileName)
+  private static String execute(
+      int port, String host, List<String> options, String testFileName, String djangoPath)
       throws IOException, InterruptedException {
     List<String> runCommand =
         new ArrayList<>(Arrays.asList("python3", testFileName, host, Integer.toString(port)));
     runCommand.addAll(options);
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
-    builder.directory(new File(DJANGO_PATH));
+    builder.directory(new File(djangoPath));
     Process process = builder.start();
     Scanner scanner = new Scanner(process.getInputStream());
 
@@ -188,26 +191,30 @@ public class DjangoTestSetup extends DjangoMockServerTest {
 
   public String executeBasicTests(int port, String host, List<String> options)
       throws IOException, InterruptedException {
-    return execute(port, host, options, "basic_test.py");
+    return execute(port, host, options, "basic_test.py", DJANGO_UNIT_PATH);
   }
 
   public String executeTransactionTests(int port, String host, List<String> options)
       throws IOException, InterruptedException {
-    return execute(port, host, options, "transaction_test.py");
+    return execute(port, host, options, "transaction_test.py", DJANGO_UNIT_PATH);
   }
 
   public String executePgAggregateTests(int port, String host, List<String> options)
       throws IOException, InterruptedException {
-    return execute(port, host, options, "pg_aggregates_test.py");
+    return execute(port, host, options, "pg_aggregates_test.py", DJANGO_UNIT_PATH);
   }
 
   public String executeConditionalTests(int port, String host, List<String> options)
       throws IOException, InterruptedException {
-    return execute(port, host, options, "conditional_expressions_test.py");
+    return execute(port, host, options, "conditional_expressions_test.py", DJANGO_UNIT_PATH);
   }
 
   public String executeAggregationTests(int port, String host, List<String> options)
       throws IOException, InterruptedException {
-    return execute(port, host, options, "aggregation_tests.py");
+    return execute(port, host, options, "aggregation_tests.py", DJANGO_UNIT_PATH);
+  }
+
+  public String executeIntegrationTests() throws IOException, InterruptedException {
+    return execute(0, "", Collections.emptyList(), "sample.py", DJANGO_IT_PATH);
   }
 }

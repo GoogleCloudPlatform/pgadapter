@@ -66,6 +66,7 @@ def create_sample_concert(concert_id, venue = None, singer = None):
 def create_tables():
   file = open('create_data_model.sql', 'r')
   ddl_statements = file.read()
+  print(ddl_statements)
   with connection.cursor() as cursor:
     cursor.execute(ddl_statements)
 
@@ -145,6 +146,8 @@ def transaction_rollback():
 if __name__ == "__main__":
 
   try:
+    tables_created = False
+
     #setting up django
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'setting')
     django.setup()
@@ -153,6 +156,8 @@ if __name__ == "__main__":
     #creating the tables if they don't exist
     create_tables()
     print('Tables corresponding to data models created')
+
+    tables_created = True
 
     #importing the models
     from sample_app.model import Singer, Album, Track, Concert, Venue
@@ -171,9 +176,10 @@ if __name__ == "__main__":
     delete_all_data()
     print('Deleting Data Successful')
 
-    print('Django Test Completed Successfully')
+    print('Django Sample Completed Successfully')
 
   except Exception as e:
     print(e)
-    delete_all_data()
+    if tables_created:
+      delete_all_data()
     sys.exit(1)
