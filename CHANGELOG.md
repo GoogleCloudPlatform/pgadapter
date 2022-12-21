@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.14.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.13.1...v0.14.0) (2022-12-16)
+
+
+### Features
+
+* support Connection API options in connection string ([#542](https://github.com/GoogleCloudPlatform/pgadapter/issues/542)) ([6247412](https://github.com/GoogleCloudPlatform/pgadapter/commit/6247412b4b0d578f638d763c6470c44db9ddf246))
+* support force_autocommit ([#541](https://github.com/GoogleCloudPlatform/pgadapter/issues/541)) ([52fba80](https://github.com/GoogleCloudPlatform/pgadapter/commit/52fba801f20c2bcdc1fa9e78e29bd3d25b18eeb0))
+
+
+### Documentation
+
+* added sample application model for Django ([#539](https://github.com/GoogleCloudPlatform/pgadapter/issues/539)) ([72b173a](https://github.com/GoogleCloudPlatform/pgadapter/commit/72b173af7130e24a6e3309535a117aaa90df17d6))
+
+## [0.13.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.13.0...v0.13.1) (2022-12-09)
+
+
+### Bug Fixes
+
+* allow start ddl batch / run batch in one query string ([#529](https://github.com/GoogleCloudPlatform/pgadapter/issues/529)) ([2ffb290](https://github.com/GoogleCloudPlatform/pgadapter/commit/2ffb290bf661d99bba6648460c25d73b47fc2bf4))
+* always return timestamp in microsecond precision ([#513](https://github.com/GoogleCloudPlatform/pgadapter/issues/513)) ([e385dd3](https://github.com/GoogleCloudPlatform/pgadapter/commit/e385dd3a7fb2cef2d02616853c283d4869d0f32d))
+
+
+### Documentation
+
+* document node-postgres support ([#489](https://github.com/GoogleCloudPlatform/pgadapter/issues/489)) ([61c6459](https://github.com/GoogleCloudPlatform/pgadapter/commit/61c64593f08899653cfdbddab8b8b5705cd2be0c))
+
 ## [0.13.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.12.0...v0.13.0) (2022-12-07)
 
 

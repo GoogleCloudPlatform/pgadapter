@@ -1068,7 +1068,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING,
-                            TypeCode.STRING)))
+                            TypeCode.JSON)))
                 .build()));
 
     String res = pgxTest.TestCopyIn(createConnString());

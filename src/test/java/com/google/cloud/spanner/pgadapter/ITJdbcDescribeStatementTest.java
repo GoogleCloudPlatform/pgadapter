@@ -159,7 +159,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_timestamptz=? "
               + "and col_date=? "
               + "and col_varchar=? "
-              + "and col_jsonb=?",
+              + "and col_jsonb::text=?",
           "insert into all_types "
               + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
               + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -176,7 +176,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_timestamptz=? "
               + "and col_date=? "
               + "and col_varchar=? "
-              + "and col_jsonb=?",
+              + "and col_jsonb::text=?",
           "insert into all_types " + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           "insert into all_types "
               + "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
@@ -190,7 +190,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_timestamptz=? "
               + "and col_date=? "
               + "and col_varchar=? "
-              + "and col_jsonb=?",
+              + "and col_jsonb::text=?",
           "update all_types set "
               + "col_bool=?, "
               + "col_bytea=?, "
@@ -220,7 +220,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_timestamptz=? "
               + "and col_date=? "
               + "and col_varchar=? "
-              + "and col_jsonb=?",
+              + "and col_jsonb::text=?",
           "delete "
               + "from all_types "
               + "where col_bigint=? "
@@ -232,7 +232,7 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
               + "and col_timestamptz=? "
               + "and col_date=? "
               + "and col_varchar=? "
-              + "and col_jsonb=?"
+              + "and col_jsonb::text=?"
         }) {
       try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -258,7 +258,16 @@ public class ITJdbcDescribeStatementTest implements IntegrationTest {
           assertEquals(sql, Types.TIMESTAMP, metadata.getParameterType(++index));
           assertEquals(sql, Types.DATE, metadata.getParameterType(++index));
           assertEquals(sql, Types.VARCHAR, metadata.getParameterType(++index));
-          assertEquals(sql, Types.VARCHAR, metadata.getParameterType(++index));
+          // jsonb does not support the '=' operator, which means that when a jsonb parameter is
+          // used for comparison, we must cast it to text. That changes the parameter type to
+          // Types.VARCHAR.
+          if (sql.contains("col_jsonb::text=?")) {
+            assertEquals(sql, Types.VARCHAR, metadata.getParameterType(++index));
+          } else {
+            assertEquals(sql, Types.OTHER, metadata.getParameterType(++index));
+          }
+        } catch (SQLException e) {
+          throw new SQLException("Error for statement: " + sql, e);
         }
       }
     }
