@@ -19,18 +19,17 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
-import com.google.common.collect.ImmutableList;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.List;
+import java.util.Scanner;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.junit.runners.Parameterized.Parameter;
-import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(JUnit4.class)
 @Category(IntegrationTest.class)
@@ -38,6 +37,9 @@ public class ITDjangoTest extends DjangoTestSetup {
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
+  private static String DJANGO_SETTING_FILE = "samples/python/django/setting.py";
+  private static String originalDjangoSetting = "";
+  private static String DEFAULT_PORT = "5432";
 
   @BeforeClass
   public static void setup() throws Exception {
@@ -51,10 +53,28 @@ public class ITDjangoTest extends DjangoTestSetup {
     testEnv.setUp();
     database = testEnv.createDatabase(Collections.emptyList());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
+
+    // Update Django setting.py fiel with the PG Adapter Port.properties
+    StringBuilder original = new StringBuilder();
+    try (Scanner scanner = new Scanner(new FileReader(DJANGO_SETTING_FILE))) {
+      while (scanner.hasNextLine()) {
+        original.append(scanner.nextLine()).append("\n");
+      }
+    }
+    originalDjangoSetting = original.toString();
+    String updatedDjangoSetting =
+        original.toString().replace(DEFAULT_PORT, Integer.toString(testEnv.getPGAdapterPort()));
+    try (FileWriter writer = new FileWriter(DJANGO_SETTING_FILE)) {
+      writer.write(updatedDjangoSetting);
+      writer.flush();
+    }
   }
 
   @AfterClass
-  public static void teardown() {
+  public static void teardown() throws IOException {
+    try (FileWriter writer = new FileWriter(DJANGO_SETTING_FILE)) {
+      writer.write(originalDjangoSetting);
+    }
     testEnv.stopPGAdapterServer();
     testEnv.cleanUp();
   }
