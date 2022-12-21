@@ -28,6 +28,7 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -57,6 +58,7 @@ import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.PGConnection;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.Oid;
+import org.postgresql.util.PGobject;
 
 @Category(IntegrationTest.class)
 @RunWith(Parameterized.class)
@@ -216,7 +218,7 @@ public class ITJdbcTest implements IntegrationTest {
             + "and col_timestamptz=? "
             + "and col_date=? "
             + "and col_varchar=? "
-            + "and col_jsonb=?";
+            + "and col_jsonb::text=?::text";
 
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -289,7 +291,7 @@ public class ITJdbcTest implements IntegrationTest {
             ++index, Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp());
         statement.setObject(++index, LocalDate.parse("2000-02-29"));
         statement.setString(++index, "string_test");
-        statement.setString(++index, "{\"key1\": \"value1\", \"key2\": \"value2\"}");
+        statement.setObject(++index, "{\"key1\": \"value1\", \"key2\": \"value2\"}", Types.OTHER);
 
         assertEquals(1, statement.executeUpdate());
       }
@@ -356,7 +358,10 @@ public class ITJdbcTest implements IntegrationTest {
             Timestamp.parseTimestamp("2022-02-11T14:04:59.123456789+01:00").toSqlTimestamp());
         statement.setObject(++index, LocalDate.of(2000, 1, 1));
         statement.setString(++index, "updated");
-        statement.setString(++index, "{\"key1\": \"updated1\", \"key2\": \"updated2\"}");
+        PGobject jsonbObject = new PGobject();
+        jsonbObject.setType("jsonb");
+        jsonbObject.setValue("{\"key1\": \"updated1\", \"key2\": \"updated2\"}");
+        statement.setObject(++index, jsonbObject);
         statement.setLong(++index, 1);
 
         assertEquals(1, statement.executeUpdate());
@@ -411,7 +416,7 @@ public class ITJdbcTest implements IntegrationTest {
         statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
         statement.setNull(++index, Types.DATE);
         statement.setNull(++index, Types.VARCHAR);
-        statement.setNull(++index, Types.VARCHAR);
+        statement.setNull(++index, Types.OTHER);
 
         assertEquals(1, statement.executeUpdate());
       }
@@ -926,7 +931,7 @@ public class ITJdbcTest implements IntegrationTest {
                 .set("col_varchar")
                 .to("bar")
                 .set("col_jsonb")
-                .to("{\"key\": \"value2\"}")
+                .to(Value.pgJsonb("{\"key\": \"value2\"}"))
                 .build(),
             Mutation.newInsertBuilder("all_types")
                 .set("col_bigint")
@@ -948,7 +953,7 @@ public class ITJdbcTest implements IntegrationTest {
                 .set("col_varchar")
                 .to((String) null)
                 .set("col_jsonb")
-                .to((String) null)
+                .to(Value.pgJsonb(null))
                 .build(),
             Mutation.newInsertBuilder("all_types")
                 .set("col_bigint")
@@ -970,7 +975,7 @@ public class ITJdbcTest implements IntegrationTest {
                 .set("col_varchar")
                 .to("")
                 .set("col_jsonb")
-                .to("[]")
+                .to(Value.pgJsonb("[]"))
                 .build(),
             Mutation.newInsertBuilder("all_types")
                 .set("col_bigint")
@@ -992,7 +997,7 @@ public class ITJdbcTest implements IntegrationTest {
                 .set("col_varchar")
                 .to("")
                 .set("col_jsonb")
-                .to("{}")
+                .to(Value.pgJsonb("{}"))
                 .build()));
   }
 }

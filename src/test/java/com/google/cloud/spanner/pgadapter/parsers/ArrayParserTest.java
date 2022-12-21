@@ -31,7 +31,6 @@ import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.ImmutableList;
 import java.time.ZoneId;
 import java.util.Arrays;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -132,7 +131,7 @@ public class ArrayParserTest {
             sessionState);
 
     assertEquals(
-        "{\"2022-07-08 07:00:02.123456789+00\",NULL,\"2000-01-01 00:00:00+00\"}",
+        "{\"2022-07-08 07:00:02.123456+00\",NULL,\"2000-01-01 00:00:00+00\"}",
         parser.stringParse());
   }
 
@@ -148,19 +147,19 @@ public class ArrayParserTest {
     assertEquals("{\"test1\",NULL,\"test2\"}", parser.stringParse());
   }
 
-  @Ignore("json not yet supported")
   @Test
   public void testJsonStringParse() {
     ArrayParser parser =
         new ArrayParser(
             createArrayResultSet(
-                Type.json(),
-                Value.jsonArray(
-                    Arrays.asList("{\"key\": \"value1\"}}", null, "{\"key\": \"value2\"}"))),
+                Type.pgJsonb(),
+                Value.pgJsonbArray(
+                    Arrays.asList("{\"key\": \"value1\"}", null, "{\"key\": \"value2\"}"))),
             0,
             mock(SessionState.class));
 
-    assertEquals("{\"test1\",NULL,\"test2\"}", parser.stringParse());
+    assertEquals(
+        "{\"{\"key\": \"value1\"}\",NULL,\"{\"key\": \"value2\"}\"}", parser.stringParse());
   }
 
   static ResultSet createArrayResultSet(Type arrayElementType, Value value) {
