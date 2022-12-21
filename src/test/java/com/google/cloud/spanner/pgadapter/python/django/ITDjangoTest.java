@@ -82,7 +82,7 @@ public class ITDjangoTest extends DjangoTestSetup {
   @Test
   public void test() throws IOException, InterruptedException {
     String actualOutput = executeIntegrationTests();
-    String expectedOutput = "Django Test Completed Successfully\n";
-    assertTrue(actualOutput.contains(expectedOutput));
+    String expectedOutput = "Django Sample Completed Successfully\n";
+    assertTrue(actualOutput, actualOutput.contains(expectedOutput));
   }
 }

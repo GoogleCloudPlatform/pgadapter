@@ -146,7 +146,7 @@ def transaction_rollback():
 if __name__ == "__main__":
 
   try:
-    tables_created = 0
+    tables_created = False
 
     #setting up django
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'setting')
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     create_tables()
     print('Tables corresponding to data models created')
 
-    tables_created = 1
+    tables_created = True
 
     #importing the models
     from sample_app.model import Singer, Album, Track, Concert, Venue
@@ -176,10 +176,10 @@ if __name__ == "__main__":
     delete_all_data()
     print('Deleting Data Successful')
 
-    print('Django Test Completed Successfully')
+    print('Django Sample Completed Successfully')
 
   except Exception as e:
     print(e)
-    if tables_created == 1:
+    if tables_created:
       delete_all_data()
     sys.exit(1)
