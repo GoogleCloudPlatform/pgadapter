@@ -66,7 +66,6 @@ def create_sample_concert(concert_id, venue = None, singer = None):
 def create_tables():
   file = open('create_data_model.sql', 'r')
   ddl_statements = file.read()
-  print(ddl_statements)
   with connection.cursor() as cursor:
     cursor.execute(ddl_statements)
 
