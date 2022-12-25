@@ -17,6 +17,7 @@ package com.google.cloud.postgres;
 import com.google.cloud.postgres.models.Albums;
 import com.google.cloud.postgres.models.Concerts;
 import com.google.cloud.postgres.models.Singers;
+import com.google.cloud.postgres.models.VenueDescription;
 import com.google.cloud.postgres.models.Tracks;
 import com.google.cloud.postgres.models.TracksId;
 import com.google.cloud.postgres.models.Venues;
@@ -76,8 +77,7 @@ public class Utils {
     final Venues venues = new Venues();
     venues.setCreatedAt(LocalDateTime.now());
     venues.setName("Hall");
-    venues.setDescription("Theater");
-
+    venues.setDescription(new VenueDescription("theater", "kennedy hall"));
     return venues;
   }
 }
