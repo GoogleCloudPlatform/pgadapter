@@ -281,5 +281,14 @@ public class ClientAutoDetectorTest {
     assertEquals(
         WellKnownClient.UNSPECIFIED,
         ClientAutoDetector.detectClient(ImmutableList.of(Statement.of("SELECT version()"))));
+    assertEquals(
+        WellKnownClient.UNSPECIFIED,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of(
+                Statement.of(
+                    "SELECT version();\n"
+                        + "\n"
+                        + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n"),
+                Statement.of("SELECT version();"))));
   }
 }
