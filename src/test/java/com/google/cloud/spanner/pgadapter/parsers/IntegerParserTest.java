@@ -36,4 +36,50 @@ public class IntegerParserTest {
         PGException.class,
         () -> new IntegerParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
   }
+
+  @Test
+  public void testCreate() {
+    assertEquals(
+        0,
+        new IntegerParser("0".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.intValue());
+    assertEquals(
+        1,
+        new IntegerParser("1".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.intValue());
+    assertEquals(
+        100,
+        new IntegerParser("100".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.intValue());
+    assertEquals(
+        Integer.MAX_VALUE,
+        new IntegerParser(
+                String.valueOf(Integer.MAX_VALUE).getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.intValue());
+    assertEquals(
+        Integer.MIN_VALUE,
+        new IntegerParser(
+                String.valueOf(Integer.MIN_VALUE).getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.intValue());
+    assertEquals(
+        0,
+        new IntegerParser("0.1".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.intValue());
+    assertEquals(
+        2,
+        new IntegerParser("1.5".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.intValue());
+    assertEquals(
+        101,
+        new IntegerParser("100.999".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.intValue());
+
+    assertThrows(
+        PGException.class,
+        () ->
+            new IntegerParser(
+                String.valueOf(1L + (long) Integer.MAX_VALUE).getBytes(StandardCharsets.UTF_8),
+                FormatCode.TEXT));
+    assertThrows(
+        PGException.class,
+        () ->
+            new IntegerParser(
+                String.valueOf((long) Integer.MIN_VALUE - 1L).getBytes(StandardCharsets.UTF_8),
+                FormatCode.TEXT));
+  }
 }
