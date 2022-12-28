@@ -602,7 +602,8 @@ public class MutationWriterTest {
               new StringReader("col\n\\N\n"), CSVFormat.POSTGRESQL_TEXT.withFirstRecordAsHeader());
       CSVRecord record = parser.getRecords().get(0);
 
-      Mutation mutation = mutationWriter.buildMutation(new CsvCopyRecord(record, true));
+      Mutation mutation =
+          mutationWriter.buildMutation(new CsvCopyRecord(sessionState, record, true));
 
       assertEquals(String.format("Type: %s", type), 1, mutation.asMap().size());
     }

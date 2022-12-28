@@ -20,6 +20,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.SimulatedExecutionTime;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
@@ -36,7 +37,12 @@ import com.google.spanner.admin.instance.v1.ListInstancesResponse;
 import com.google.spanner.v1.DatabaseName;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.SessionName;
+import com.google.spanner.v1.StructType;
+import com.google.spanner.v1.StructType.Field;
+import com.google.spanner.v1.Type;
+import com.google.spanner.v1.TypeCode;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -305,6 +311,61 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
           "ERROR: prepared statement my_prepared_statement does not exist",
           sqlException.getMessage());
     }
+  }
+
+  @Test
+  public void testDateForTimestamptzParameter() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from my_table where ts=$1"),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createAllTypesResultSetMetadata("")
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(
+                                            Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                                        .build())
+                                .build()))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder("select * from my_table where ts=$1")
+                .bind("p1")
+                .to(Timestamp.parseTimestamp("2022-12-27T23:00:00Z"))
+                .build(),
+            createAllTypesResultSet("")));
+
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      connection.createStatement().execute("set time zone 'Europe/Amsterdam'");
+      connection
+          .createStatement()
+          .execute("prepare my_prepared_statement as select * from my_table where ts=$1");
+      // '2022-12-28' is interpreted in timezone 'Europe/Amsterdam', which means
+      // '2022-12-28T23:00:00Z'.
+      try (ResultSet resultSet =
+          connection
+              .createStatement()
+              .executeQuery("execute my_prepared_statement ('2022-12-28')")) {
+        assertTrue(resultSet.next());
+        assertFalse(resultSet.next());
+      }
+    }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(1, executeRequest.getParamTypesCount());
+    assertEquals(
+        Type.newBuilder().setCode(TypeCode.TIMESTAMP).build(),
+        executeRequest.getParamTypesMap().get("p1"));
+    assertEquals(
+        "2022-12-27T23:00:00Z",
+        executeRequest.getParams().getFieldsMap().get("p1").getStringValue());
   }
 
   static StatusRuntimeException newStatusResourceNotFoundException(

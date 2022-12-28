@@ -20,6 +20,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
+import static org.mockito.Mockito.mock;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -33,6 +34,7 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.cloud.spanner.pgadapter.utils.CopyInParser;
 import com.google.cloud.spanner.pgadapter.utils.CopyRecord;
@@ -455,7 +457,9 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
     }
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
     PipedInputStream inputStream = new PipedInputStream(pipedOutputStream, 1 << 16);
-    CopyInParser copyParser = CopyInParser.create(Format.BINARY, null, inputStream, false);
+    SessionState sessionState = mock(SessionState.class);
+    CopyInParser copyParser =
+        CopyInParser.create(sessionState, Format.BINARY, null, inputStream, false);
     int b;
     while ((b = process.getInputStream().read()) != -1) {
       pipedOutputStream.write(b);
@@ -507,7 +511,9 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
     }
     PipedOutputStream pipedOutputStream = new PipedOutputStream();
     PipedInputStream inputStream = new PipedInputStream(pipedOutputStream, 1 << 16);
-    CopyInParser copyParser = CopyInParser.create(Format.BINARY, null, inputStream, false);
+    SessionState sessionState = mock(SessionState.class);
+    CopyInParser copyParser =
+        CopyInParser.create(sessionState, Format.BINARY, null, inputStream, false);
     int b;
     while ((b = process.getInputStream().read()) != -1) {
       pipedOutputStream.write(b);
