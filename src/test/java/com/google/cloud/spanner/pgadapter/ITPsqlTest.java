@@ -28,6 +28,7 @@ import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,6 +45,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Collections;
@@ -531,20 +533,28 @@ public class ITPsqlTest implements IntegrationTest {
               createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
         int numTimezones;
         try (ResultSet resultSet =
-            pgConnection.createStatement().executeQuery("select count(*) from pg_timezone_names where not name like '%posix%'")) {
+            pgConnection
+                .createStatement()
+                .executeQuery(
+                    "select count(*) from pg_timezone_names where not name like '%posix%'")) {
           assertTrue(resultSet.next());
           numTimezones = resultSet.getInt(1);
         }
 
-        try (ResultSet resultSet =
-            pgConnection
-                .createStatement()
-                .executeQuery(
-                    String.format(
-                        "select name from pg_timezone_names where not name like '%%posix%%' offset %d limit 1",
-                        random.nextInt(numTimezones)))) {
-          assertTrue(resultSet.next());
-          timezone = resultSet.getString(1);
+        while (true) {
+          try (ResultSet resultSet =
+              pgConnection
+                  .createStatement()
+                  .executeQuery(
+                      String.format(
+                          "select name from pg_timezone_names where not name like '%%posix%%' offset %d limit 1",
+                          random.nextInt(numTimezones)))) {
+            assertTrue(resultSet.next());
+            timezone = resultSet.getString(1);
+            if (!PROBLEMATIC_ZONE_IDS.contains(ZoneId.of(timezone))) {
+              break;
+            }
+          }
         }
       }
       for (String timestamp :
@@ -618,6 +628,11 @@ public class ITPsqlTest implements IntegrationTest {
       }
     }
   }
+
+  private static final ImmutableSet<ZoneId> PROBLEMATIC_ZONE_IDS =
+      ImmutableSet.of(
+          // Mexico abolished DST in 2022, but not all databases contain this information.
+          ZoneId.of("America/Chihuahua"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));
