@@ -51,7 +51,7 @@ public interface NodeJSTest {
     Process process = builder.start();
     InputStream inputStream = process.getInputStream();
     InputStream errorStream = process.getErrorStream();
-    boolean finished = process.waitFor(30L, TimeUnit.SECONDS);
+    boolean finished = process.waitFor(120L, TimeUnit.SECONDS);
 
     String output = readAll(inputStream);
     String errors = readAll(errorStream);
