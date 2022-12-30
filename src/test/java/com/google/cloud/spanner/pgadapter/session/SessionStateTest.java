@@ -33,14 +33,12 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.postgresql.core.Oid;
 
 @RunWith(JUnit4.class)
 public class SessionStateTest {
@@ -162,7 +160,7 @@ public class SessionStateTest {
   public void testGetAll() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(357, allSettings.size());
+    assertEquals(358, allSettings.size());
   }
 
   @Test
@@ -200,7 +198,7 @@ public class SessionStateTest {
     state.setLocal("spanner", "custom_local_setting", "value2");
 
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(359, allSettings.size());
+    assertEquals(360, allSettings.size());
 
     PGSetting applicationName =
         allSettings.stream()
@@ -826,29 +824,6 @@ public class SessionStateTest {
     state.set("spanner", "ddl_transaction_mode", null);
 
     assertEquals(DdlTransactionMode.Single, state.getDdlTransactionMode());
-  }
-
-  @Test
-  public void testGuessTypes_defaultNonJdbc() {
-    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
-    SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
-    assertEquals(ImmutableSet.of(), state.getGuessTypes());
-  }
-
-  @Test
-  public void testGuessTypes_defaultJdbc() {
-    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
-    SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
-    state.set("spanner", "guess_types", String.format("%d,%d", Oid.TIMESTAMPTZ, Oid.DATE));
-    assertEquals(ImmutableSet.of(Oid.TIMESTAMPTZ, Oid.DATE), state.getGuessTypes());
-  }
-
-  @Test
-  public void testGuessTypes_invalidOids() {
-    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
-    SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
-    state.set("spanner", "guess_types", String.format("%d,%d,foo", Oid.TIMESTAMPTZ, Oid.DATE));
-    assertEquals(ImmutableSet.of(Oid.TIMESTAMPTZ, Oid.DATE), state.getGuessTypes());
   }
 
   @Test

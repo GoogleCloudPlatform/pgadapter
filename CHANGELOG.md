@@ -1,5 +1,57 @@
 # Changelog
 
+## [0.14.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.13.1...v0.14.0) (2022-12-16)
+
+
+### Features
+
+* support Connection API options in connection string ([#542](https://github.com/GoogleCloudPlatform/pgadapter/issues/542)) ([6247412](https://github.com/GoogleCloudPlatform/pgadapter/commit/6247412b4b0d578f638d763c6470c44db9ddf246))
+* support force_autocommit ([#541](https://github.com/GoogleCloudPlatform/pgadapter/issues/541)) ([52fba80](https://github.com/GoogleCloudPlatform/pgadapter/commit/52fba801f20c2bcdc1fa9e78e29bd3d25b18eeb0))
+
+
+### Documentation
+
+* added sample application model for Django ([#539](https://github.com/GoogleCloudPlatform/pgadapter/issues/539)) ([72b173a](https://github.com/GoogleCloudPlatform/pgadapter/commit/72b173af7130e24a6e3309535a117aaa90df17d6))
+
+## [0.13.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.13.0...v0.13.1) (2022-12-09)
+
+
+### Bug Fixes
+
+* allow start ddl batch / run batch in one query string ([#529](https://github.com/GoogleCloudPlatform/pgadapter/issues/529)) ([2ffb290](https://github.com/GoogleCloudPlatform/pgadapter/commit/2ffb290bf661d99bba6648460c25d73b47fc2bf4))
+* always return timestamp in microsecond precision ([#513](https://github.com/GoogleCloudPlatform/pgadapter/issues/513)) ([e385dd3](https://github.com/GoogleCloudPlatform/pgadapter/commit/e385dd3a7fb2cef2d02616853c283d4869d0f32d))
+
+
+### Documentation
+
+* document node-postgres support ([#489](https://github.com/GoogleCloudPlatform/pgadapter/issues/489)) ([61c6459](https://github.com/GoogleCloudPlatform/pgadapter/commit/61c64593f08899653cfdbddab8b8b5705cd2be0c))
+
+## [0.13.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.12.0...v0.13.0) (2022-12-07)
+
+
+### Features
+
+* accept UUID as a parameter value ([#518](https://github.com/GoogleCloudPlatform/pgadapter/issues/518)) ([46941ab](https://github.com/GoogleCloudPlatform/pgadapter/commit/46941ab318e4269061336e2ecb95a4402cf2a5e5))
+* support 'select version()' and similar ([#495](https://github.com/GoogleCloudPlatform/pgadapter/issues/495)) ([fbd16ec](https://github.com/GoogleCloudPlatform/pgadapter/commit/fbd16ecd44d12ffb65b85555d2ddef0cc533b4be))
+* Support Describe message for DDL statements and other no-result statements ([#501](https://github.com/GoogleCloudPlatform/pgadapter/issues/501)) ([cb616d8](https://github.com/GoogleCloudPlatform/pgadapter/commit/cb616d8f64c6aabe0422020d7ce2bc90734ff837))
+* support DML RETURNING clause ([#498](https://github.com/GoogleCloudPlatform/pgadapter/issues/498)) ([c1d7e4e](https://github.com/GoogleCloudPlatform/pgadapter/commit/c1d7e4eff240449245f223bc17793f393cafea2f))
+* support more than 50 query parameters ([#527](https://github.com/GoogleCloudPlatform/pgadapter/issues/527)) ([9fca9ba](https://github.com/GoogleCloudPlatform/pgadapter/commit/9fca9ba487515d63b586bb4ed6329f2d84d98996))
+* use session timezone to format timestamps ([#470](https://github.com/GoogleCloudPlatform/pgadapter/issues/470)) ([d84564d](https://github.com/GoogleCloudPlatform/pgadapter/commit/d84564dc45a4259c3b8246d05c66a2645cb92f2d))
+
+
+### Bug Fixes
+
+* client side results were not returned ([#493](https://github.com/GoogleCloudPlatform/pgadapter/issues/493)) ([5e9e85e](https://github.com/GoogleCloudPlatform/pgadapter/commit/5e9e85e72b7d51bb6426ad963521fb3e24fa36bb))
+* pg_catalog tables were not replaced for information_schema queries ([#494](https://github.com/GoogleCloudPlatform/pgadapter/issues/494)) ([e1f02fe](https://github.com/GoogleCloudPlatform/pgadapter/commit/e1f02fed232c09c96adb426b9f8ce91d61c6659d))
+
+
+### Documentation
+
+* [WIP] Hibernate sample ([#373](https://github.com/GoogleCloudPlatform/pgadapter/issues/373)) ([7125c91](https://github.com/GoogleCloudPlatform/pgadapter/commit/7125c9110eab429ea311676445c71308c1018aac))
+* document Liquibase Pilot Support ([#485](https://github.com/GoogleCloudPlatform/pgadapter/issues/485)) ([745089f](https://github.com/GoogleCloudPlatform/pgadapter/commit/745089f8d7f6df2401eb0fb15cca80c85dc18437))
+* document Support for gorm ([#469](https://github.com/GoogleCloudPlatform/pgadapter/issues/469)) ([0b962af](https://github.com/GoogleCloudPlatform/pgadapter/commit/0b962af9f0037b7fb86225ed0b3f89c072bf7bcf))
+* remove limitation for RETURNING and generated columns for gorm ([#526](https://github.com/GoogleCloudPlatform/pgadapter/issues/526)) ([0420e99](https://github.com/GoogleCloudPlatform/pgadapter/commit/0420e997fb1c334bd08ee2507ca73ad11426e370))
+
 ## [0.12.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.11.0...v0.12.0) (2022-11-02)
 
 

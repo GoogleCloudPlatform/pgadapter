@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
+import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.BindCompleteResponse;
 import com.google.common.base.Preconditions;
@@ -39,7 +40,7 @@ public class BindMessage extends AbstractQueryProtocolMessage {
   private final List<Short> formatCodes;
   private final List<Short> resultFormatCodes;
   private final byte[][] parameters;
-  private final IntermediatePreparedStatement statement;
+  private final IntermediatePortalStatement statement;
 
   /** Constructor for Bind messages that are received from the front-end. */
   public BindMessage(ConnectionHandler connection) throws Exception {
@@ -49,7 +50,11 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.formatCodes = getFormatCodes(this.inputStream);
     this.parameters = getParameters(this.inputStream);
     this.resultFormatCodes = getFormatCodes(this.inputStream);
-    this.statement = connection.getStatement(this.statementName);
+    IntermediatePreparedStatement statement = connection.getStatement(statementName);
+    this.statement =
+        statement.createPortal(
+            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
+    this.connection.registerPortal(this.portalName, this.statement);
   }
 
   /** Constructor for Bind messages that are constructed to execute a Query message. */
@@ -69,7 +74,11 @@ public class BindMessage extends AbstractQueryProtocolMessage {
     this.formatCodes = ImmutableList.of();
     this.resultFormatCodes = ImmutableList.of();
     this.parameters = Preconditions.checkNotNull(parameters);
-    this.statement = connection.getStatement(statementName);
+    IntermediatePreparedStatement statement = connection.getStatement(statementName);
+    this.statement =
+        statement.createPortal(
+            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes);
+    this.connection.registerPortal(this.portalName, this.statement);
   }
 
   boolean hasParameterValues() {
@@ -78,21 +87,19 @@ public class BindMessage extends AbstractQueryProtocolMessage {
 
   @Override
   void buffer(BackendConnection backendConnection) {
-    if (isExtendedProtocol() && hasParameterValues() && !this.statement.isDescribed()) {
+    if (isExtendedProtocol() && !this.statement.getPreparedStatement().isDescribed()) {
       try {
         // Make sure all parameters have been described, so we always send typed parameters to Cloud
         // Spanner.
-        this.statement.describeParameters(this.parameters, true);
+        this.statement
+            .getPreparedStatement()
+            .autoDescribeParameters(this.parameters, backendConnection);
       } catch (Throwable ignore) {
         // Ignore any error messages while describing the parameters, and let the following
         // DescribePortal or execute message handle any errors that are caused by invalid
         // statements.
       }
     }
-    this.connection.registerPortal(
-        this.portalName,
-        this.statement.bind(
-            this.portalName, this.parameters, this.formatCodes, this.resultFormatCodes));
   }
 
   @Override
