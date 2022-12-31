@@ -27,5 +27,4 @@ jobs:
           service_account_key: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
           export_default_credentials: true
       - name: Create and start ycsb job
-        working-directory: benchmarks/ycsb
-        run: ./create-and-run-ycsb-job.sh
+        run: ./benchmarks/ycsb/create-and-run-ycsb-job.sh
