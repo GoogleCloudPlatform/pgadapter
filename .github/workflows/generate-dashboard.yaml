@@ -1,0 +1,43 @@
+on:
+  pull_request:
+  workflow_dispatch:
+name: generate-dashboard
+jobs:
+  check-env:
+    outputs:
+      has-key: ${{ steps.project-id.outputs.defined }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: project-id
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        if: "${{ env.GCP_PROJECT_ID != '' }}"
+        run: echo "::set-output name=defined::true"
+  generate-dashboard:
+    needs: [check-env]
+    if: needs.check-env.outputs.has-key == 'true'
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: zulu
+          java-version: 17
+      - run: java -version
+      - name: Setup GCloud
+        uses: google-github-actions/setup-gcloud@v0
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
+          export_default_credentials: true
+      - name: Generate dashboard content
+        run: mvn test-compile exec:java -Dexec.mainClass="com.google.cloud.spanner.pgadapter.DashboardGenerator" -Dexec.classpathScope=test
+      - id: create-dashboard-issue
+        if: "${{ failure() && (github.event.schedule=='52 4 * * *' || github.event.schedule=='14 3 * * *' || inputs.endpoint != '')}}"
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          filename: .github/test-template.md
