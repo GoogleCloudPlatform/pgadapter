@@ -35,9 +35,10 @@ jobs:
       - name: Generate dashboard content
         run: mvn test-compile exec:java -Dexec.mainClass="com.google.cloud.spanner.pgadapter.DashboardGenerator" -Dexec.classpathScope=test
       - id: create-dashboard-issue
-        if: "${{ failure() && (github.event.schedule=='52 4 * * *' || github.event.schedule=='14 3 * * *' || inputs.endpoint != '')}}"
         uses: JasonEtco/create-an-issue@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           filename: .github/test-template.md
+          update_existing: true
+          search_existing: open
