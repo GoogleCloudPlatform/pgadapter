@@ -29,8 +29,5 @@ jobs:
           export_default_credentials: true
           install_components: 'beta'
 
-      # Configure docker to use the gcloud command-line tool as a credential helper
-      - run: gcloud auth configure-docker gcr.io
-
       - name: Create and start ycsb job
         run: ./benchmarks/ycsb/create-and-run-ycsb-job.sh
