@@ -18,16 +18,16 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v3
       - id: 'auth'
         uses: 'google-github-actions/auth@v1'
         with:
           credentials_json: '${{ secrets.CLOUD_SPANNER_PG_ADAPTER_SERVICE_ACCOUNT }}'
-
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v0'
         with:
           export_default_credentials: true
           install_components: 'beta'
-
       - name: Create and start ycsb job
         run: ./benchmarks/ycsb/create-and-run-ycsb-job.sh
