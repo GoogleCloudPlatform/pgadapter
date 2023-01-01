@@ -25,5 +25,6 @@ jobs:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           service_account_key: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
           export_default_credentials: true
+          install_components: 'beta'
       - name: Create and start ycsb job
         run: ./benchmarks/ycsb/create-and-run-ycsb-job.sh
