@@ -26,5 +26,6 @@ gcloud beta run jobs create $PGADAPTER_YCSB_JOB \
     --max-retries 0 \
     --cpu 8 \
     --memory 4Gi \
-    --task-timeout 60m
+    --task-timeout 60m \
+    --service-account $(gcloud config get account --quiet)
 gcloud beta run jobs execute $PGADAPTER_YCSB_JOB
