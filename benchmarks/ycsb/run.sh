@@ -9,7 +9,7 @@ if [[ "$DATABASES" != *"$SPANNER_DATABASE"* ]]; then
   gcloud spanner databases create $SPANNER_DATABASE --instance=$SPANNER_INSTANCE --database-dialect='POSTGRESQL'
 fi
 
-java -jar pgadapter.jar -p $(gcloud --quiet config get project) -i $SPANNER_INSTANCE &
+java -jar pgadapter.jar -p $(gcloud --quiet config get project) -i $SPANNER_INSTANCE -r="minSessions=1000;maxSessions=1000;numChannels=20" &
 sleep 6
 export PGDATABASE=$SPANNER_DATABASE
 psql -h localhost -c "CREATE TABLE IF NOT EXISTS usertable (
