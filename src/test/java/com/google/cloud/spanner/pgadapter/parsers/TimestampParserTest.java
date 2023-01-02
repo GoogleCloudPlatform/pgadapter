@@ -110,4 +110,14 @@ public class TimestampParserTest {
             new TimestampParser(
                 "foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT, sessionState));
   }
+
+  @Test
+  public void testTextToTimestamp() {
+    SessionState sessionState = mock(SessionState.class);
+    when(sessionState.getTimezone()).thenReturn(ZoneId.of("-09:00"));
+
+    assertEquals(
+        Timestamp.parseTimestamp("2022-10-09T19:09:18Z"),
+        TimestampParser.toTimestamp("2022-10-09 10:09:18", sessionState));
+  }
 }

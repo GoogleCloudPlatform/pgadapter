@@ -24,6 +24,7 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.Iterators;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -94,18 +95,21 @@ class CsvCopyParser implements CopyInParser {
     }
 
     @Override
-    public Value getValue(Type type, String columnName) throws SpannerException {
+    public Value getValue(SessionState sessionState, Type type, String columnName)
+        throws SpannerException {
       String recordValue = record.get(columnName);
-      return getSpannerValue(type, recordValue);
+      return getSpannerValue(sessionState, type, recordValue);
     }
 
     @Override
-    public Value getValue(Type type, int columnIndex) throws SpannerException {
+    public Value getValue(SessionState sessionState, Type type, int columnIndex)
+        throws SpannerException {
       String recordValue = record.get(columnIndex);
-      return getSpannerValue(type, recordValue);
+      return getSpannerValue(sessionState, type, recordValue);
     }
 
-    static Value getSpannerValue(Type type, String recordValue) throws SpannerException {
+    static Value getSpannerValue(SessionState sessionState, Type type, String recordValue)
+        throws SpannerException {
       try {
         switch (type.getCode()) {
           case STRING:
@@ -134,7 +138,7 @@ class CsvCopyParser implements CopyInParser {
             return Value.date(recordValue == null ? null : Date.parseDate(recordValue));
           case TIMESTAMP:
             Timestamp timestamp =
-                recordValue == null ? null : TimestampParser.toTimestamp(recordValue);
+                recordValue == null ? null : TimestampParser.toTimestamp(recordValue, sessionState);
             return Value.timestamp(timestamp);
           default:
             SpannerException spannerException =

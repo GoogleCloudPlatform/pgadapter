@@ -24,6 +24,8 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.cloud.spanner.pgadapter.statements.LiteralParser.Literal;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
@@ -71,7 +73,13 @@ public class ExecuteStatement extends IntermediatePortalStatement {
         NO_PARAMS,
         ImmutableList.of(),
         ImmutableList.of());
-    this.executeStatement = parse(originalStatement.getSql());
+    this.executeStatement =
+        parse(
+            originalStatement.getSql(),
+            connectionHandler
+                .getExtendedQueryProtocolHandler()
+                .getBackendConnection()
+                .getSessionState());
   }
 
   @Override
@@ -126,7 +134,7 @@ public class ExecuteStatement extends IntermediatePortalStatement {
     return this;
   }
 
-  static ParsedExecuteStatement parse(String sql) {
+  static ParsedExecuteStatement parse(String sql, SessionState sessionState) {
     Preconditions.checkNotNull(sql);
 
     SimpleParser parser = new SimpleParser(sql);
@@ -139,7 +147,7 @@ public class ExecuteStatement extends IntermediatePortalStatement {
     }
     String statementName = unquoteOrFoldIdentifier(name.name);
 
-    List<String> parameters;
+    List<Literal> parameters;
     if (parser.eatToken("(")) {
       List<String> parametersList = parser.parseExpressionList();
       if (parametersList == null || parametersList.isEmpty()) {
@@ -149,7 +157,9 @@ public class ExecuteStatement extends IntermediatePortalStatement {
         throw PGExceptionFactory.newPGException("missing closing parentheses in parameters list");
       }
       parameters =
-          parametersList.stream().map(ExecuteStatement::unquoteString).collect(Collectors.toList());
+          parametersList.stream()
+              .map(LiteralParser::parseSingleConstantLiteralExpression)
+              .collect(Collectors.toList());
     } else {
       parameters = Collections.emptyList();
     }
@@ -161,7 +171,11 @@ public class ExecuteStatement extends IntermediatePortalStatement {
     return new ParsedExecuteStatement(
         statementName,
         parameters.stream()
-            .map(p -> p == null ? null : p.getBytes(StandardCharsets.UTF_8))
+            .map(
+                p ->
+                    p == null
+                        ? null
+                        : p.getConvertedValue(sessionState).getBytes(StandardCharsets.UTF_8))
             .toArray(byte[][]::new));
   }
 

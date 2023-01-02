@@ -524,8 +524,8 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       Type columnType = this.tableColumns.get(columnName);
       Value value =
           record.hasColumnNames()
-              ? record.getValue(columnType, columnName)
-              : record.getValue(columnType, index);
+              ? record.getValue(copySettings.getSessionState(), columnType, columnName)
+              : record.getValue(copySettings.getSessionState(), columnType, index);
       builder.set(columnName).to(value);
       index++;
     }

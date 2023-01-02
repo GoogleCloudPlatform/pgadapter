@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import static com.google.cloud.spanner.pgadapter.statements.PrepareStatement.dataTypeNameToOid;
 import static com.google.cloud.spanner.pgadapter.statements.PrepareStatement.parse;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -29,63 +28,6 @@ import org.postgresql.core.Oid;
 
 @RunWith(JUnit4.class)
 public class PrepareStatementTest {
-
-  @Test
-  public void testDataTypeNameToOid() {
-    assertEquals(Oid.UNSPECIFIED, dataTypeNameToOid("unknown"));
-    assertEquals(Oid.INT8, dataTypeNameToOid("bigint"));
-    assertEquals(Oid.INT8_ARRAY, dataTypeNameToOid("bigint[]"));
-    assertEquals(Oid.INT8, dataTypeNameToOid("int8"));
-    assertEquals(Oid.INT8_ARRAY, dataTypeNameToOid("int8[]"));
-    assertEquals(Oid.INT4, dataTypeNameToOid("int"));
-    assertEquals(Oid.INT4_ARRAY, dataTypeNameToOid("int[]"));
-    assertEquals(Oid.INT4, dataTypeNameToOid("int4"));
-    assertEquals(Oid.INT4_ARRAY, dataTypeNameToOid("int4[]"));
-    assertEquals(Oid.INT4, dataTypeNameToOid("integer"));
-    assertEquals(Oid.INT4_ARRAY, dataTypeNameToOid("integer[]"));
-    assertEquals(Oid.BOOL, dataTypeNameToOid("boolean"));
-    assertEquals(Oid.BOOL_ARRAY, dataTypeNameToOid("boolean[]"));
-    assertEquals(Oid.BOOL, dataTypeNameToOid("bool"));
-    assertEquals(Oid.BOOL_ARRAY, dataTypeNameToOid("bool[]"));
-    assertEquals(Oid.DATE, dataTypeNameToOid("date"));
-    assertEquals(Oid.DATE_ARRAY, dataTypeNameToOid("date[]"));
-    assertEquals(Oid.FLOAT8, dataTypeNameToOid("double precision"));
-    assertEquals(Oid.FLOAT8_ARRAY, dataTypeNameToOid("double precision[]"));
-    assertEquals(Oid.FLOAT8, dataTypeNameToOid("float8"));
-    assertEquals(Oid.FLOAT8_ARRAY, dataTypeNameToOid("float8[]"));
-    assertEquals(Oid.JSONB, dataTypeNameToOid("jsonb"));
-    assertEquals(Oid.JSONB_ARRAY, dataTypeNameToOid("jsonb[]"));
-    assertEquals(Oid.NUMERIC, dataTypeNameToOid("numeric"));
-    assertEquals(Oid.NUMERIC_ARRAY, dataTypeNameToOid("numeric[]"));
-    assertEquals(Oid.NUMERIC, dataTypeNameToOid("decimal"));
-    assertEquals(Oid.NUMERIC_ARRAY, dataTypeNameToOid("decimal[]"));
-    assertEquals(Oid.NUMERIC, dataTypeNameToOid("numeric(1,1)"));
-    assertEquals(Oid.NUMERIC_ARRAY, dataTypeNameToOid("numeric(2, 1)[]"));
-
-    assertEquals(Oid.VARCHAR, dataTypeNameToOid("character varying"));
-    assertEquals(Oid.VARCHAR, dataTypeNameToOid("varchar"));
-    assertEquals(Oid.VARCHAR, dataTypeNameToOid("character varying(100)"));
-    assertEquals(Oid.VARCHAR, dataTypeNameToOid("varchar(100)"));
-    assertEquals(Oid.VARCHAR, dataTypeNameToOid("character varying (100)"));
-    assertEquals(Oid.VARCHAR, dataTypeNameToOid("varchar (100)"));
-    assertEquals(Oid.VARCHAR, dataTypeNameToOid("character     varying   ( 100 )  \t"));
-    assertEquals(Oid.VARCHAR, dataTypeNameToOid("varchar\t(100)  \n"));
-
-    assertEquals(Oid.VARCHAR_ARRAY, dataTypeNameToOid("character varying[]"));
-    assertEquals(Oid.VARCHAR_ARRAY, dataTypeNameToOid("varchar[]"));
-    assertEquals(Oid.VARCHAR_ARRAY, dataTypeNameToOid("character varying(100)[]"));
-    assertEquals(Oid.VARCHAR_ARRAY, dataTypeNameToOid("varchar(100)[]"));
-    assertEquals(Oid.VARCHAR_ARRAY, dataTypeNameToOid("character varying (100) []"));
-    assertEquals(Oid.VARCHAR_ARRAY, dataTypeNameToOid("varchar (100) []"));
-    assertEquals(Oid.VARCHAR_ARRAY, dataTypeNameToOid("character     varying   ( 100 )  \t[\n]"));
-    assertEquals(Oid.VARCHAR_ARRAY, dataTypeNameToOid("varchar\t(100)  \n[  ]"));
-
-    assertThrows(PGException.class, () -> dataTypeNameToOid("invalid_type"));
-    assertThrows(PGException.class, () -> dataTypeNameToOid("varchar(100"));
-    assertThrows(PGException.class, () -> dataTypeNameToOid("bigint["));
-    assertThrows(PGException.class, () -> dataTypeNameToOid("varchar(bar)"));
-    assertThrows(PGException.class, () -> dataTypeNameToOid("numeric(10, bar)"));
-  }
 
   @Test
   public void testParse() {

@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.utils;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 
 /**
  * {@link CopyRecord} is a common interface for COPY data records that are produced by a parser for
@@ -29,8 +30,8 @@ public interface CopyRecord {
   int numColumns();
 
   /**
-   * Returns true if the copy record has column names. The {@link #getValue(Type, String)} method
-   * can only be used for records that have column names.
+   * Returns true if the copy record has column names. The {@link #getValue(SessionState, Type,
+   * String)} method can only be used for records that have column names.
    */
   boolean hasColumnNames();
 
@@ -40,12 +41,12 @@ public interface CopyRecord {
    * where it is being inserted. This method can only be used with records that contains column
    * names.
    */
-  Value getValue(Type type, String columnName);
+  Value getValue(SessionState sessionState, Type type, String columnName);
 
   /**
    * Returns the value of the given column as a Cloud Spanner {@link Value} of the given type. This
    * method is used by a COPY ... FROM ... operation to convert a value to the type of the column
    * where it is being inserted. This method is supported for all types of {@link CopyRecord}.
    */
-  Value getValue(Type type, int columnIndex);
+  Value getValue(SessionState sessionState, Type type, int columnIndex);
 }

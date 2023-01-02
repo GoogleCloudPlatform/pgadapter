@@ -20,6 +20,8 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -33,6 +35,7 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.cloud.spanner.pgadapter.utils.CopyInParser;
 import com.google.cloud.spanner.pgadapter.utils.CopyRecord;
@@ -58,6 +61,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -469,18 +473,22 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
     CopyRecord record = iterator.next();
     assertFalse(iterator.hasNext());
 
-    assertEquals(Value.int64(1L), record.getValue(Type.int64(), 0));
-    assertEquals(Value.bool(true), record.getValue(Type.bool(), 1));
-    assertEquals(Value.bytes(ByteArray.copyFrom("test")), record.getValue(Type.bytes(), 2));
-    assertEquals(Value.float64(3.14), record.getValue(Type.float64(), 3));
-    assertEquals(Value.int64(100L), record.getValue(Type.int64(), 4));
-    assertEquals(Value.pgNumeric("6.626"), record.getValue(Type.pgNumeric(), 5));
+    SessionState sessionState = mock(SessionState.class);
+    when(sessionState.getTimezone()).thenReturn(ZoneId.systemDefault());
+    assertEquals(Value.int64(1L), record.getValue(sessionState, Type.int64(), 0));
+    assertEquals(Value.bool(true), record.getValue(sessionState, Type.bool(), 1));
+    assertEquals(
+        Value.bytes(ByteArray.copyFrom("test")), record.getValue(sessionState, Type.bytes(), 2));
+    assertEquals(Value.float64(3.14), record.getValue(sessionState, Type.float64(), 3));
+    assertEquals(Value.int64(100L), record.getValue(sessionState, Type.int64(), 4));
+    assertEquals(Value.pgNumeric("6.626"), record.getValue(sessionState, Type.pgNumeric(), 5));
     // Note: The binary format truncates timestamptz value to microsecond precision.
     assertEquals(
         Value.timestamp(Timestamp.parseTimestamp("2022-02-16T13:18:02.123456000Z")),
-        record.getValue(Type.timestamp(), 6));
-    assertEquals(Value.date(Date.parseDate("2022-03-29")), record.getValue(Type.date(), 7));
-    assertEquals(Value.string("test"), record.getValue(Type.string(), 8));
+        record.getValue(sessionState, Type.timestamp(), 6));
+    assertEquals(
+        Value.date(Date.parseDate("2022-03-29")), record.getValue(sessionState, Type.date(), 7));
+    assertEquals(Value.string("test"), record.getValue(sessionState, Type.string(), 8));
   }
 
   @Test
@@ -521,10 +529,11 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
     CopyRecord record = iterator.next();
     assertFalse(iterator.hasNext());
 
+    SessionState sessionState = mock(SessionState.class);
     for (int col = 0; col < record.numColumns(); col++) {
       // Note: Null values in a COPY BINARY stream are untyped, so it does not matter what type we
       // specify when getting the value.
-      assertTrue(record.getValue(Type.string(), col).isNull());
+      assertTrue(record.getValue(sessionState, Type.string(), col).isNull());
     }
   }
 

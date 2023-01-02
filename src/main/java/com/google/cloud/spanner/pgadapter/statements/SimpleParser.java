@@ -19,6 +19,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.statements.LiteralParser.QuotedString;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -29,18 +30,17 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.text.StringEscapeUtils;
 
 /** A very simple parser that can interpret SQL statements to find specific parts in the string. */
 @InternalApi
 public class SimpleParser {
   private static final char STATEMENT_DELIMITER = ';';
-  private static final char SINGLE_QUOTE = '\'';
-  private static final char DOUBLE_QUOTE = '"';
+  static final char SINGLE_QUOTE = '\'';
+  static final char DOUBLE_QUOTE = '"';
   private static final char HYPHEN = '-';
   private static final char SLASH = '/';
   private static final char ASTERISK = '*';
-  private static final char DOLLAR = '$';
+  static final char DOLLAR = '$';
 
   /** Name of table or index. */
   static class TableOrIndexName {
@@ -115,62 +115,6 @@ public class SimpleParser {
 
     String getNameAndArrayBrackets() {
       return array ? name + "[]" : name;
-    }
-  }
-
-  static class QuotedString {
-    final boolean escaped;
-    final char quote;
-    final String rawValue;
-    private String value;
-
-    QuotedString(boolean escaped, char quote, String rawValue) {
-      this.escaped = escaped;
-      this.quote = quote;
-      this.rawValue = rawValue;
-    }
-
-    String getValue() {
-      if (this.value == null) {
-        this.value =
-            this.escaped
-                ? unescapeQuotedStringValue(this.rawValue, this.quote)
-                : quotedStringValue(this.rawValue, this.quote);
-      }
-      return this.value;
-    }
-
-    static String quotedStringValue(String quotedString, char quoteChar) {
-      if (quotedString.length() < 2
-          || quotedString.charAt(0) != quoteChar
-          || quotedString.charAt(quotedString.length() - 1) != quoteChar) {
-        throw PGExceptionFactory.newPGException(
-            quotedString + " is not a valid string", SQLState.SyntaxError);
-      }
-      String doubleQuotes = String.valueOf(quoteChar) + quoteChar;
-      String singleQuote = String.valueOf(quoteChar);
-      return quotedString
-          .substring(1, quotedString.length() - 1)
-          .replace(doubleQuotes, singleQuote);
-    }
-
-    static String unescapeQuotedStringValue(String quotedString, char quoteChar) {
-      if (quotedString.length() < 2
-          || quotedString.charAt(0) != quoteChar
-          || quotedString.charAt(quotedString.length() - 1) != quoteChar) {
-        throw PGExceptionFactory.newPGException(
-            quotedString + " is not a valid string", SQLState.SyntaxError);
-      }
-      if (quotedString.startsWith(quoteChar + "\\x")) {
-        throw PGExceptionFactory.newPGException(
-            "PGAdapter does not support hexadecimal byte values in string literals",
-            SQLState.SyntaxError);
-      }
-      String result =
-          StringEscapeUtils.unescapeJava(quotedString.substring(1, quotedString.length() - 1));
-      String doubleQuotes = String.valueOf(quoteChar) + quoteChar;
-      String singleQuote = String.valueOf(quoteChar);
-      return result.replace(doubleQuotes, singleQuote);
     }
   }
 
@@ -412,6 +356,9 @@ public class SimpleParser {
   @Nonnull
   String readKeyword() {
     skipWhitespaces();
+    if (!isValidStartOfKeyword(pos)) {
+      return "";
+    }
     int startPos = pos;
     while (pos < sql.length() && !isValidEndOfKeyword(pos)) {
       pos++;
@@ -517,11 +464,11 @@ public class SimpleParser {
     return sql.substring(start);
   }
 
-  private boolean isValidIdentifierFirstChar(char c) {
+  static boolean isValidIdentifierFirstChar(char c) {
     return Character.isLetter(c) || c == '_';
   }
 
-  private boolean isValidIdentifierChar(char c) {
+  static boolean isValidIdentifierChar(char c) {
     return isValidIdentifierFirstChar(c) || Character.isDigit(c) || c == '$';
   }
 
@@ -535,6 +482,15 @@ public class SimpleParser {
 
   boolean peek(boolean skipWhitespaceBefore, boolean requireWhitespaceAfter, String keyword) {
     return internalEat(keyword, skipWhitespaceBefore, requireWhitespaceAfter, false);
+  }
+
+  boolean peekCharsIgnoreCase(String characters) {
+    Preconditions.checkNotNull(characters);
+    Preconditions.checkArgument(characters.length() > 0);
+    if (characters.length() > sql.length() - pos) {
+      return false;
+    }
+    return sql.substring(pos, pos + characters.length()).equalsIgnoreCase(characters);
   }
 
   boolean eatKeyword(String... keywords) {
@@ -653,6 +609,13 @@ public class SimpleParser {
     return false;
   }
 
+  private boolean isValidStartOfKeyword(int index) {
+    if (sql.length() == index) {
+      return false;
+    }
+    return isValidIdentifierFirstChar(sql.charAt(index));
+  }
+
   private boolean isValidEndOfKeyword(int index) {
     if (sql.length() == index) {
       return true;
@@ -664,11 +627,22 @@ public class SimpleParser {
     if (pos >= sql.length()) {
       return true;
     }
-    if ((sql.charAt(pos) == 'e' || sql.charAt(pos) == 'E')
+    if ((sql.charAt(pos) == 'e'
+            || sql.charAt(pos) == 'E'
+            || sql.charAt(pos) == 'b'
+            || sql.charAt(pos) == 'B'
+            || sql.charAt(pos) == 'x'
+            || sql.charAt(pos) == 'X')
         && sql.length() > (pos + 1)
         && sql.charAt(pos + 1) == '\'') {
       pos++;
       return skipQuotedString(true);
+    } else if (sql.length() > (pos + 2)
+        && (sql.charAt(pos) == 'U' || sql.charAt(pos) == 'u')
+        && sql.charAt(pos + 1) == '&'
+        && sql.charAt(pos + 2) == '\'') {
+      pos += 2;
+      return skipQuotedString(false);
     } else if (sql.charAt(pos) == SINGLE_QUOTE || sql.charAt(pos) == DOUBLE_QUOTE) {
       return skipQuotedString(false);
     } else if (sql.charAt(pos) == HYPHEN
@@ -690,28 +664,11 @@ public class SimpleParser {
   }
 
   QuotedString readSingleQuotedString() {
-    return readQuotedString(SINGLE_QUOTE);
+    return LiteralParser.readSingleQuotedString(this);
   }
 
   QuotedString readDoubleQuotedString() {
-    return readQuotedString(DOUBLE_QUOTE);
-  }
-
-  QuotedString readQuotedString(char quote) {
-    skipWhitespaces();
-    if (pos >= sql.length()) {
-      throw PGExceptionFactory.newPGException("Unexpected end of expression", SQLState.SyntaxError);
-    }
-    boolean escaped = eatToken("e");
-    if (sql.charAt(pos) != quote) {
-      throw PGExceptionFactory.newPGException(
-          "Invalid quote character: " + sql.charAt(pos), SQLState.SyntaxError);
-    }
-    int startPos = pos;
-    if (skipQuotedString(escaped)) {
-      return new QuotedString(escaped, quote, sql.substring(startPos, pos));
-    }
-    throw PGExceptionFactory.newPGException("Missing end quote character", SQLState.SyntaxError);
+    return LiteralParser.readDoubleQuotedString(this);
   }
 
   boolean skipQuotedString(boolean escaped) {
@@ -792,6 +749,7 @@ public class SimpleParser {
   }
 
   String parseDollarQuotedTag() {
+    int originalPos = pos;
     // Look ahead to the next dollar sign (if any). Everything in between is the quote tag.
     StringBuilder tag = new StringBuilder();
     while (pos < sql.length()) {

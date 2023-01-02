@@ -26,65 +26,19 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
-import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TypeDefinition;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.ManuallyCreatedToken;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Futures;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
-import org.postgresql.core.Oid;
 
 @InternalApi
 public class PrepareStatement extends IntermediatePortalStatement {
-  private static final ImmutableMap<String, Integer> TYPE_NAME_TO_OID_MAPPING =
-      ImmutableMap.<String, Integer>builder()
-          .put("unknown", Oid.UNSPECIFIED)
-          .put("bigint", Oid.INT8)
-          .put("bigint[]", Oid.INT8_ARRAY)
-          .put("int8", Oid.INT8)
-          .put("int8[]", Oid.INT8_ARRAY)
-          .put("int4", Oid.INT4)
-          .put("int4[]", Oid.INT4_ARRAY)
-          .put("int", Oid.INT4)
-          .put("int[]", Oid.INT4_ARRAY)
-          .put("integer", Oid.INT4)
-          .put("integer[]", Oid.INT4_ARRAY)
-          .put("boolean", Oid.BOOL)
-          .put("boolean[]", Oid.BOOL_ARRAY)
-          .put("bool", Oid.BOOL)
-          .put("bool[]", Oid.BOOL_ARRAY)
-          .put("bytea", Oid.BYTEA)
-          .put("bytea[]", Oid.BYTEA_ARRAY)
-          .put("character varying", Oid.VARCHAR)
-          .put("character varying[]", Oid.VARCHAR_ARRAY)
-          .put("varchar", Oid.VARCHAR)
-          .put("varchar[]", Oid.VARCHAR_ARRAY)
-          .put("date", Oid.DATE)
-          .put("date[]", Oid.DATE_ARRAY)
-          .put("double precision", Oid.FLOAT8)
-          .put("double precision[]", Oid.FLOAT8_ARRAY)
-          .put("float8", Oid.FLOAT8)
-          .put("float8[]", Oid.FLOAT8_ARRAY)
-          .put("jsonb", Oid.JSONB)
-          .put("jsonb[]", Oid.JSONB_ARRAY)
-          .put("numeric", Oid.NUMERIC)
-          .put("numeric[]", Oid.NUMERIC_ARRAY)
-          .put("decimal", Oid.NUMERIC)
-          .put("decimal[]", Oid.NUMERIC_ARRAY)
-          .put("text", Oid.TEXT)
-          .put("text[]", Oid.TEXT_ARRAY)
-          .put("timestamp with time zone", Oid.TIMESTAMPTZ)
-          .put("timestamp with time zone[]", Oid.TIMESTAMPTZ_ARRAY)
-          .put("timestamptz", Oid.TIMESTAMPTZ)
-          .put("timestamptz[]", Oid.TIMESTAMPTZ_ARRAY)
-          .build();
-
   static final class ParsedPreparedStatement {
     final String name;
     final int[] dataTypes;
@@ -198,7 +152,7 @@ public class PrepareStatement extends IntermediatePortalStatement {
       }
       dataTypesBuilder.addAll(
           dataTypesNames.stream()
-              .map(PrepareStatement::dataTypeNameToOid)
+              .map(LiteralParser::dataTypeNameToOid)
               .collect(Collectors.toList()));
     }
     if (!parser.eatKeyword("as")) {
@@ -208,16 +162,5 @@ public class PrepareStatement extends IntermediatePortalStatement {
         name.name,
         dataTypesBuilder.build().stream().mapToInt(i -> i).toArray(),
         parser.getSql().substring(parser.getPos()).trim());
-  }
-
-  static int dataTypeNameToOid(String type) {
-    SimpleParser parser = new SimpleParser(type);
-    TypeDefinition typeDefinition = parser.readType();
-    Integer oid =
-        TYPE_NAME_TO_OID_MAPPING.get(typeDefinition.getNameAndArrayBrackets().toLowerCase());
-    if (oid != null) {
-      return oid;
-    }
-    throw PGExceptionFactory.newPGException("unknown type name: " + type);
   }
 }
