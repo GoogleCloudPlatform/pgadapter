@@ -253,7 +253,9 @@ public class SessionState {
     currentSettings.put(key, newSetting);
   }
 
-  private void clearCachedValues() {}
+  private void clearCachedValues() {
+    cachedZoneId = null;
+  }
 
   /** Returns the current value of the specified setting. */
   public PGSetting get(String extension, String name) {
