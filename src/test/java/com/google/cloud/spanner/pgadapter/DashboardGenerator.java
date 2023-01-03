@@ -14,20 +14,16 @@
 
 package com.google.cloud.spanner.pgadapter;
 
-import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.spanner.DatabaseClient;
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
-import java.io.FileInputStream;
+import com.google.cloud.spanner.Type.StructField;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.Random;
 import java.util.Scanner;
 
 public class DashboardGenerator {
@@ -40,37 +36,83 @@ public class DashboardGenerator {
         original.append(scanner.nextLine()).append("\n");
       }
     }
-    String output =
-        original
-            .toString()
-            .replace(
-                "{{ dashboard.contents }}",
-                "This is some random content: " + new Random().nextInt());
+    String output = original.toString().replace("{{ dashboard.contents }}", readYcsbResults());
     try (FileWriter writer = new FileWriter(templateFile)) {
       writer.write(output);
       writer.flush();
     }
   }
 
-  private static void readYcsbResults() throws IOException {
-    try (Spanner spanner = SpannerOptions.newBuilder()
-        .setCredentials(GoogleCredentials.fromStream(
-            Files.newInputStream(Paths.get("/Users/loite/Downloads/cloud-spanner-pg-adapter.json"))))
-        .build().getService()) {
-      DatabaseClient client = spanner.getDatabaseClient(
-          DatabaseId.of(
-              spanner.getOptions().getProjectId(),
-              "pgadapter-ycsb-regional-test",
-              "pgadapter-ycsb-test"
-              ));
-      String lastExecutionTime;
-      try (ResultSet resultSet = client.singleUse().executeQuery(Statement.of("select max(executed_at) from run"))) {
-        while (resultSet.next()) {
-          lastExecutionTime = resultSet.getString(0);
-        }
+  private static String readYcsbResults() {
+    String results = "";
+    try (Spanner spanner = SpannerOptions.newBuilder().build().getService()) {
+      DatabaseClient client =
+          spanner.getDatabaseClient(
+              DatabaseId.of(
+                  spanner.getOptions().getProjectId(),
+                  "pgadapter-ycsb-regional-test",
+                  "pgadapter-ycsb-test"));
+      results = results + "\n\n" + "### Workload A\n\n";
+      try (ResultSet resultSetWorkloadA =
+          client
+              .singleUse()
+              .executeQuery(
+                  Statement.of(
+                      "select tcp.workload, tcp.executed_at, "
+                          + "tcp.read_p95 as tcp_read_p95, uds.read_p95 as uds_read_p95, "
+                          + "tcp.update_p95 as tcp_update_p95, uds.update_p95 as uds_update_p95\n"
+                          + "from run tcp\n"
+                          + "inner join run uds using (executed_at, threads, batch_size, workload)\n"
+                          + "where tcp.deployment='java_tcp'\n"
+                          + "and uds.deployment='java_uds'\n"
+                          + "and tcp.threads=50 and tcp.batch_size=50\n"
+                          + "and tcp.workload='f'\n"
+                          + "order by executed_at"))) {
+        results = results + convertResultSetToMarkdown(resultSetWorkloadA);
       }
-      
+
+      results = results + "\n\n" + "### Workload D\n\n";
+      try (ResultSet resultSetWorkloadD =
+          client
+              .singleUse()
+              .executeQuery(
+                  Statement.of(
+                      "select tcp.workload, tcp.executed_at, "
+                          + "tcp.read_p95 as tcp_read_p95, uds.read_p95 as uds_read_p95, "
+                          + "tcp.insert_p95 as tcp_insert_p95, uds.insert_p95 as uds_insert_p95\n"
+                          + "from run tcp\n"
+                          + "inner join run uds using (executed_at, threads, batch_size, workload)\n"
+                          + "where tcp.deployment='java_tcp'\n"
+                          + "and uds.deployment='java_uds'\n"
+                          + "and tcp.threads=50 and tcp.batch_size=50\n"
+                          + "and tcp.workload='d'\n"
+                          + "order by executed_at"))) {
+        results = results + convertResultSetToMarkdown(resultSetWorkloadD);
+      }
     }
+    return results;
   }
 
+  private static String convertResultSetToMarkdown(ResultSet resultSet) {
+    StringBuilder builder = new StringBuilder();
+    boolean first = true;
+    while (resultSet.next()) {
+      if (first) {
+        for (StructField header : resultSet.getType().getStructFields()) {
+          builder.append("| ").append(header.getName());
+        }
+        builder.append('\n');
+        for (StructField ignored : resultSet.getType().getStructFields()) {
+          builder.append("|-");
+        }
+        builder.append('\n');
+        first = false;
+      }
+      for (int i = 0; i < resultSet.getColumnCount(); i++) {
+        builder.append("| ").append(resultSet.getValue(i).toString());
+      }
+      builder.append('\n');
+    }
+    return builder.toString();
+  }
 }
