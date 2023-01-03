@@ -108,7 +108,32 @@ public class DateParser extends Parser<Date> {
 
   @Override
   public String stringParse() {
-    return this.item == null ? null : item.toString();
+    return this.item == null ? null : toString(this.item);
+  }
+
+  private static String toString(Date date) {
+    int yearValue = date.getYear();
+    int monthValue = date.getMonth();
+    int dayValue = date.getDayOfMonth();
+    int absYear = Math.abs(yearValue);
+    StringBuilder buf = new StringBuilder(10);
+    if (absYear < 1000) {
+      if (yearValue < 0) {
+        buf.append(yearValue - 10000).deleteCharAt(1);
+      } else {
+        buf.append(yearValue + 10000).deleteCharAt(0);
+      }
+    } else {
+      if (yearValue > 9999) {
+        buf.append('+');
+      }
+      buf.append(yearValue);
+    }
+    return buf.append(monthValue < 10 ? "-0" : "-")
+        .append(monthValue)
+        .append(dayValue < 10 ? "-0" : "-")
+        .append(dayValue)
+        .toString();
   }
 
   @Override
@@ -130,7 +155,7 @@ public class DateParser extends Parser<Date> {
     switch (format) {
       case SPANNER:
       case POSTGRESQL_TEXT:
-        return resultSet.getDate(position).toString().getBytes(StandardCharsets.UTF_8);
+        return toString(resultSet.getDate(position)).getBytes(StandardCharsets.UTF_8);
       case POSTGRESQL_BINARY:
         return convertToPG(resultSet.getDate(position));
       default:

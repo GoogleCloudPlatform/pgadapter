@@ -231,6 +231,7 @@ public class SessionState {
 
   private void internalSet(
       String extension, String name, String setting, Map<String, PGSetting> currentSettings) {
+    clearCachedValues();
     String key = toKey(extension, name);
     PGSetting newSetting = currentSettings.get(key);
     if (newSetting == null) {
@@ -251,6 +252,8 @@ public class SessionState {
     newSetting.setSetting(Context.SUPERUSER, setting);
     currentSettings.put(key, newSetting);
   }
+
+  private void clearCachedValues() {}
 
   /** Returns the current value of the specified setting. */
   public PGSetting get(String extension, String name) {
@@ -403,8 +406,13 @@ public class SessionState {
         () -> DdlTransactionMode.valueOf(setting.getBootVal()));
   }
 
+  private ZoneId cachedZoneId;
+
   /** Returns the {@link ZoneId} of the current timezone for this session. */
   public ZoneId getTimezone() {
+    if (cachedZoneId != null) {
+      return cachedZoneId;
+    }
     PGSetting setting = internalGet(toKey(null, "timezone"), false);
     if (setting == null) {
       return ZoneId.systemDefault();
@@ -416,7 +424,7 @@ public class SessionState {
             setting::getResetVal,
             setting::getBootVal);
 
-    return zoneIdFromString(id);
+    return (cachedZoneId = zoneIdFromString(id));
   }
 
   private ZoneId zoneIdFromString(String value) {
