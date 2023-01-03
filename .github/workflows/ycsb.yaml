@@ -1,5 +1,8 @@
 on:
   workflow_dispatch:
+  schedule:
+    # Run at 05:36UTC every day.
+    - cron: '36 5 * * *'
 name: ycsb
 jobs:
   check-env:
