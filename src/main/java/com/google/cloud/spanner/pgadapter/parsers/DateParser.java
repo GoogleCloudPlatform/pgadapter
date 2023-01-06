@@ -22,9 +22,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import javax.annotation.Nonnull;
@@ -85,25 +83,6 @@ public class DateParser extends Parser<Date> {
     LocalDate localDate = LocalDate.ofEpochDay(validateRange(days));
     return Date.fromYearMonthDay(
         localDate.getYear(), localDate.getMonthValue(), localDate.getDayOfMonth());
-  }
-
-  /**
-   * Checks whether the given text contains a date that can be parsed by PostgreSQL.
-   *
-   * @param value The value to check. May not be <code>null</code>.
-   * @return <code>true</code> if the text contains a valid date.
-   */
-  static boolean isDate(String value) {
-    Preconditions.checkNotNull(value);
-    for (SimpleDateFormat dateFormat : VALID_DATE_FORMATS) {
-      try {
-        dateFormat.parse(value);
-        return true;
-      } catch (ParseException e) {
-        // ignore and try the next
-      }
-    }
-    return false;
   }
 
   @Override
