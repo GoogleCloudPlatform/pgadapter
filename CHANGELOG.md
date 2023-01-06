@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.14.0...v0.14.1) (2023-01-06)
+
+
+### Bug Fixes
+
+* enable gracefully stopping Docker container ([#554](https://github.com/GoogleCloudPlatform/pgadapter/issues/554)) ([80e9c8b](https://github.com/GoogleCloudPlatform/pgadapter/commit/80e9c8b988a168b30d44335b5de3c09e57c18d76))
+
+
+### Performance Improvements
+
+* reduce conversion time for timestamptz, date and bytea ([#572](https://github.com/GoogleCloudPlatform/pgadapter/issues/572)) ([bb73990](https://github.com/GoogleCloudPlatform/pgadapter/commit/bb739901bd875a7c706377dc065c1936db56e5d7))
+
 ## [0.14.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.13.1...v0.14.0) (2022-12-16)
 
 
