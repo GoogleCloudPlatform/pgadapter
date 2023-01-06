@@ -108,7 +108,32 @@ public class DateParser extends Parser<Date> {
 
   @Override
   public String stringParse() {
-    return this.item == null ? null : item.toString();
+    return this.item == null ? null : toString(this.item);
+  }
+
+  static String toString(Date date) {
+    int yearValue = date.getYear();
+    int monthValue = date.getMonth();
+    int dayValue = date.getDayOfMonth();
+    StringBuilder buf = new StringBuilder(10);
+    if (yearValue < 1000) {
+      // Note that Date cannot contain negative year numbers, so this value is always guaranteed to
+      // be between 1 and 999 (inclusive).
+      buf.append(yearValue + 10000).deleteCharAt(0);
+    } else {
+      // Year values beyond 9999 are not supported by Cloud Spanner, but it is allowed by the Date
+      // class. The ISO specification requires year numbers that have more than 4 digits to have a
+      // plus or minus sign.
+      if (yearValue > 9999) {
+        buf.append('+');
+      }
+      buf.append(yearValue);
+    }
+    return buf.append(monthValue < 10 ? "-0" : "-")
+        .append(monthValue)
+        .append(dayValue < 10 ? "-0" : "-")
+        .append(dayValue)
+        .toString();
   }
 
   @Override
@@ -130,7 +155,7 @@ public class DateParser extends Parser<Date> {
     switch (format) {
       case SPANNER:
       case POSTGRESQL_TEXT:
-        return resultSet.getDate(position).toString().getBytes(StandardCharsets.UTF_8);
+        return toString(resultSet.getDate(position)).getBytes(StandardCharsets.UTF_8);
       case POSTGRESQL_BINARY:
         return convertToPG(resultSet.getDate(position));
       default:
