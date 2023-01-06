@@ -111,19 +111,19 @@ public class DateParser extends Parser<Date> {
     return this.item == null ? null : toString(this.item);
   }
 
-  private static String toString(Date date) {
+  static String toString(Date date) {
     int yearValue = date.getYear();
     int monthValue = date.getMonth();
     int dayValue = date.getDayOfMonth();
-    int absYear = Math.abs(yearValue);
     StringBuilder buf = new StringBuilder(10);
-    if (absYear < 1000) {
-      if (yearValue < 0) {
-        buf.append(yearValue - 10000).deleteCharAt(1);
-      } else {
-        buf.append(yearValue + 10000).deleteCharAt(0);
-      }
+    if (yearValue < 1000) {
+      // Note that Date cannot contain negative year numbers, so this value is always guaranteed to
+      // be between 1 and 999 (inclusive).
+      buf.append(yearValue + 10000).deleteCharAt(0);
     } else {
+      // Year values beyond 9999 are not supported by Cloud Spanner, but it is allowed by the Date
+      // class. The ISO specification requires year numbers that have more than 4 digits to have a
+      // plus or minus sign.
       if (yearValue > 9999) {
         buf.append('+');
       }
