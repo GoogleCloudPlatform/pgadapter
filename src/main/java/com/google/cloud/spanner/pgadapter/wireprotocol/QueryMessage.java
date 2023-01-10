@@ -36,6 +36,7 @@ public class QueryMessage extends ControlMessage {
   public QueryMessage(ConnectionHandler connection) throws Exception {
     super(connection);
     this.originalStatement = Statement.of(this.readAll());
+    connection.maybeDetermineWellKnownClient(this.originalStatement);
     this.simpleQueryStatement =
         new SimpleQueryStatement(
             connection.getServer().getOptions(), this.originalStatement, this.connection);

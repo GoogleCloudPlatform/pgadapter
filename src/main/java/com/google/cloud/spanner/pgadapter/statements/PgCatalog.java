@@ -32,17 +32,31 @@ import java.util.regex.Pattern;
 @InternalApi
 public class PgCatalog {
   private static final ImmutableMap<TableOrIndexName, TableOrIndexName> TABLE_REPLACEMENTS =
-      ImmutableMap.of(
-          new TableOrIndexName("pg_catalog", "pg_namespace"),
+      ImmutableMap.<TableOrIndexName, TableOrIndexName>builder()
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_namespace"),
+              new TableOrIndexName(null, "pg_namespace"))
+          .put(
               new TableOrIndexName(null, "pg_namespace"),
-          new TableOrIndexName(null, "pg_namespace"), new TableOrIndexName(null, "pg_namespace"),
-          new TableOrIndexName("pg_catalog", "pg_class"), new TableOrIndexName(null, "pg_class"),
-          new TableOrIndexName(null, "pg_class"), new TableOrIndexName(null, "pg_class"),
-          new TableOrIndexName("pg_catalog", "pg_type"), new TableOrIndexName(null, "pg_type"),
-          new TableOrIndexName(null, "pg_type"), new TableOrIndexName(null, "pg_type"),
-          new TableOrIndexName("pg_catalog", "pg_settings"),
-              new TableOrIndexName(null, "pg_settings"),
-          new TableOrIndexName(null, "pg_settings"), new TableOrIndexName(null, "pg_settings"));
+              new TableOrIndexName(null, "pg_namespace"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_class"),
+              new TableOrIndexName(null, "pg_class"))
+          .put(new TableOrIndexName(null, "pg_class"), new TableOrIndexName(null, "pg_class"))
+          .put(new TableOrIndexName("pg_catalog", "pg_proc"), new TableOrIndexName(null, "pg_proc"))
+          .put(new TableOrIndexName(null, "pg_proc"), new TableOrIndexName(null, "pg_proc"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_range"),
+              new TableOrIndexName(null, "pg_range"))
+          .put(new TableOrIndexName(null, "pg_range"), new TableOrIndexName(null, "pg_range"))
+          .put(new TableOrIndexName("pg_catalog", "pg_type"), new TableOrIndexName(null, "pg_type"))
+          .put(new TableOrIndexName(null, "pg_type"), new TableOrIndexName(null, "pg_type"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_settings"),
+              new TableOrIndexName(null, "pg_settings"))
+          .put(new TableOrIndexName(null, "pg_settings"), new TableOrIndexName(null, "pg_settings"))
+          .build();
+
   private static final ImmutableMap<Pattern, String> FUNCTION_REPLACEMENTS =
       ImmutableMap.of(
           Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), "true",
@@ -53,6 +67,8 @@ public class PgCatalog {
       ImmutableMap.of(
           new TableOrIndexName(null, "pg_namespace"), new PgNamespace(),
           new TableOrIndexName(null, "pg_class"), new PgClass(),
+          new TableOrIndexName(null, "pg_proc"), new PgProc(),
+          new TableOrIndexName(null, "pg_range"), new PgRange(),
           new TableOrIndexName(null, "pg_type"), new PgType(),
           new TableOrIndexName(null, "pg_settings"), new PgSettings());
   private final SessionState sessionState;
@@ -326,6 +342,40 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return PG_CLASS_CTE;
+    }
+  }
+
+  private static class PgProc implements PgCatalogTable {
+    private static final String PG_PROC_CTE =
+        "pg_proc as (\n"
+            + "select * from ("
+            + "select 0::bigint as oid, ''::varchar as proname, 0::bigint as pronamespace, 0::bigint as proowner, "
+            + "0::bigint as prolang, 0.0::float8 as procost, 0.0::float8 as prorows, 0::bigint as provariadic, "
+            + "''::varchar as prosupport, ''::varchar as prokind, false::bool as prosecdef, false::bool as proleakproof, "
+            + "false::bool as proisstrict, false::bool as proretset, ''::varchar as provolatile, ''::varchar as proparallel, "
+            + "0::bigint as pronargs, 0::bigint as pronargdefaults, 0::bigint as prorettype, 0::bigint as proargtypes, "
+            + "'{}'::bigint[] as proallargtypes, '{}'::varchar[] as proargmodes, '{}'::text[] as proargnames, "
+            + "''::varchar as proargdefaults, '{}'::bigint[] as protrftypes, ''::text as prosrc, ''::text as probin, "
+            + "''::varchar as prosqlbody, '{}'::text[] as proconfig, '{}'::bigint[] as proacl\n"
+            + ") proc where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_PROC_CTE;
+    }
+  }
+
+  private static class PgRange implements PgCatalogTable {
+    private static final String PG_RANGE_CTE =
+        "pg_range as (\n"
+            + "select * from ("
+            + "select 0::bigint as rngtypid, 0::bigint as rngsubtype, 0::bigint as rngmultitypid, "
+            + "0::bigint as rngcollation, 0::bigint as rngsubopc, ''::varchar as rngcanonical, ''::varchar as rngsubdiff\n"
+            + ") range where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_RANGE_CTE;
     }
   }
 }

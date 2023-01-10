@@ -29,6 +29,7 @@ import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
@@ -45,6 +46,7 @@ import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandle
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
@@ -55,6 +57,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.ImmutableList;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
 import java.io.DataOutputStream;
@@ -118,6 +121,7 @@ public class ConnectionHandler extends Thread {
   private Connection spannerConnection;
   private DatabaseId databaseId;
   private WellKnownClient wellKnownClient;
+  private boolean hasDeterminedClientUsingQuery;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   private CopyStatement activeCopyStatement;
 
@@ -700,6 +704,30 @@ public class ConnectionHandler extends Thread {
 
   public void setWellKnownClient(WellKnownClient wellKnownClient) {
     this.wellKnownClient = wellKnownClient;
+  }
+
+  /**
+   * This is called by the simple {@link
+   * com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage} to give the connection the
+   * opportunity to determine the client that is connected based on the SQL string that is being
+   * executed.
+   */
+  public void maybeDetermineWellKnownClient(Statement statement) {
+    if (!this.hasDeterminedClientUsingQuery
+        && this.wellKnownClient == WellKnownClient.UNSPECIFIED
+        && getServer().getOptions().shouldAutoDetectClient()) {
+      this.wellKnownClient = ClientAutoDetector.detectClient(ImmutableList.of(statement));
+      if (this.wellKnownClient != WellKnownClient.UNSPECIFIED) {
+        logger.log(
+            Level.INFO,
+            () ->
+                String.format(
+                    "Well-known client %s detected for connection %d.",
+                    this.wellKnownClient, getConnectionId()));
+      }
+    }
+    // Make sure that we only try to detect the client once.
+    this.hasDeterminedClientUsingQuery = true;
   }
 
   /** Status of a {@link ConnectionHandler} */
