@@ -35,6 +35,15 @@ CREATE TABLE IF NOT EXISTS tracks (
 
 CREATE UNIQUE INDEX IF NOT EXISTS unique_idx_id ON tracks(track_id);
 
+CREATE TABLE IF NOT EXISTS venues (
+  id character varying NOT NULL,
+  name character varying NOT NULL,
+  description character varying NOT NULL,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  PRIMARY KEY(id)
+);
+
 CREATE TABLE IF NOT EXISTS concerts (
   id character varying NOT NULL,
   venue_id character varying NOT NULL,
@@ -48,13 +57,4 @@ CREATE TABLE IF NOT EXISTS concerts (
   CONSTRAINT chk_end_time_after_start_time CHECK((end_time > start_time)),
   CONSTRAINT fk_concerts_singers FOREIGN KEY (singer_id) REFERENCES singers(id),
   CONSTRAINT fk_concerts_venues FOREIGN KEY (venue_id) REFERENCES venues(id)
-);
-
-CREATE TABLE IF NOT EXISTS venues (
-  id character varying NOT NULL,
-  name character varying NOT NULL,
-  description character varying NOT NULL,
-  created_at timestamp with time zone,
-  updated_at timestamp with time zone,
-  PRIMARY KEY(id)
 );
