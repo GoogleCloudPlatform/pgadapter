@@ -49,4 +49,13 @@ public class DateParserTest {
         PGException.class,
         () -> new DateParser("2022".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
   }
+
+  @Test
+  public void testToString() {
+    assertEquals("2023-01-06", DateParser.toString(Date.fromYearMonthDay(2023, 1, 6)));
+    assertEquals("0900-01-06", DateParser.toString(Date.fromYearMonthDay(900, 1, 6)));
+    assertEquals("0016-02-28", DateParser.toString(Date.fromYearMonthDay(16, 2, 28)));
+    assertEquals("0001-01-01", DateParser.toString(Date.fromYearMonthDay(1, 1, 1)));
+    assertEquals("+10000-01-01", DateParser.toString(Date.fromYearMonthDay(10000, 1, 1)));
+  }
 }

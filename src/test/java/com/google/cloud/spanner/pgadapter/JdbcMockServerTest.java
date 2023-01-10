@@ -42,6 +42,7 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedTy
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
@@ -77,9 +78,11 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -3539,6 +3542,29 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertTrue(request.getTransaction().hasBegin());
     assertEquals(1, request.getStatementsCount());
     assertEquals(sql, request.getStatements(0).getSql());
+  }
+
+  @Ignore("Only used for manual performance testing")
+  @Test
+  public void testBasePerformance() throws SQLException {
+    final int numRuns = 1000;
+    String sql = "select * from random_benchmark";
+    RandomResultSetGenerator generator = new RandomResultSetGenerator(10, Dialect.POSTGRESQL);
+    for (int run = 0; run < numRuns; run++) {
+      mockSpanner.putStatementResult(
+          StatementResult.query(Statement.of(sql + run), generator.generate()));
+    }
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      Stopwatch watch = Stopwatch.createStarted();
+      for (int run = 0; run < numRuns; run++) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql + run)) {
+          while (resultSet.next()) {
+            // ignore
+          }
+        }
+      }
+      System.out.printf("Elapsed: %dms\n", watch.elapsed(TimeUnit.MILLISECONDS));
+    }
   }
 
   private void verifySettingIsNull(Connection connection, String setting) throws SQLException {
