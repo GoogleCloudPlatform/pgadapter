@@ -93,7 +93,7 @@ public class User {
 
 ### Transaction
 Hibernate by default initiates every transaction as read-write even when there
-are only read queries. This causes over-head due to the locks required for read-write
+are only read queries. This causes overhead due to the locks required for read-write
 transaction.
 This can be optimized by initiating read only transaction for read queries.
 
