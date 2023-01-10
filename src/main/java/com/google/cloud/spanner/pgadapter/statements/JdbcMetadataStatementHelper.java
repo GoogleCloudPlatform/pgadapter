@@ -82,24 +82,6 @@ class JdbcMetadataStatementHelper {
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_PRIMARY_KEY_PREFIX_2)) {
       return replaceGetPrimaryKeyQuery(sql);
     }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_PREFIX_FULL)) {
-      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_REPLACEMENT_FULL;
-    }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITH_TYPTYPE_PREFIX)) {
-      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITH_TYPTYPE_REPLACEMENT;
-    }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITH_PARAMETER_PREFIX)) {
-      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITH_PARAMETER_REPLACEMENT;
-    }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PREFIX)) {
-      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_REPLACEMENT;
-    }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PARAM_PREFIX)) {
-      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_WITHOUT_OID_PARAM_REPLACEMENT;
-    }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_NOT_TOAST_PREFIX)) {
-      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_NOT_TOAST_REPLACEMENT;
-    }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_1)
         || sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_PREFIX_2)) {
       return PgJdbcCatalog.PG_JDBC_GET_TABLE_PRIVILEGES_REPLACEMENT;
@@ -131,21 +113,6 @@ class JdbcMetadataStatementHelper {
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_SQL_KEYWORDS_PREFIX)) {
       return PgJdbcCatalog.PG_JDBC_GET_SQL_KEYWORDS_REPLACEMENT;
     }
-    if (sql.equals(PgJdbcCatalog.PG_JDBC_GET_TYPE_NAME)) {
-      return PgJdbcCatalog.PG_JDBC_GET_TYPE_NAME_REPLACEMENT;
-    }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_PREFIX)) {
-      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_REPLACEMENT;
-    }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_PREFIX_42_3)) {
-      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_REPLACEMENT_42_3;
-    }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_PREFIX_42_2_22)) {
-      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_REPLACEMENT_42_3;
-    }
-    if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_SIMPLE_PREFIX_42_3)) {
-      return PgJdbcCatalog.PG_JDBC_GET_TYPE_INFO_REPLACEMENT_42_3;
-    }
     if (sql.startsWith(PgJdbcCatalog.PG_JDBC_GET_SEQUENCES)) {
       return PgJdbcCatalog.PG_JDBC_GET_SEQUENCES_REPLACEMENT;
     }
@@ -164,6 +131,11 @@ class JdbcMetadataStatementHelper {
         .replace(
             PgJdbcCatalog.PG_JDBC_BEST_ROW_IDENTIFIER_PREFIX,
             PgJdbcCatalog.PG_JDBC_PK_QUERY_REPLACEMENT)
+        .replaceAll(
+            PgJdbcCatalog.PG_JDBC_GENERATE_SCHEMAS_ARRAY,
+            PgJdbcCatalog.PG_JDBC_GENERATE_SCHEMAS_ARRAY_REPLACEMENT)
+        .replaceAll("typinput='array_in'::regproc", "substring(typname, 1, 1)='_'")
+        .replaceAll("typinput='pg_catalog\\.array_in'::regproc", "substring(typname, 1, 1)='_'")
 
         // Replace unsupported pg_catalog tables with fixed (empty) sub-selects.
         .replace(

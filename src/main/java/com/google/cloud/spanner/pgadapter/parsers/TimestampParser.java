@@ -24,7 +24,6 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
-import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -33,7 +32,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
-import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
 
@@ -48,23 +46,14 @@ public class TimestampParser extends Parser<Timestamp> {
   private static final String ZERO_TIMEZONE = "Z";
   private static final String PG_ZERO_TIMEZONE = "+00";
 
-  /** Regular expression for parsing timestamps. */
-  private static final String TIMESTAMP_REGEX =
-      // yyyy-MM-dd
-      "(\\d{4})-(\\d{2})-(\\d{2})"
-          // ' 'HH:mm:ss.milliseconds
-          + "( (\\d{2}):(\\d{2}):(\\d{2})(\\.\\d{1,9})?)"
-          // 'Z' or time zone shift HH:mm following '+' or '-'
-          + "([Zz]|([+-])(\\d{2})(:(\\d{2}))?)?";
-
-  private static final Pattern TIMESTAMP_PATTERN = Pattern.compile(TIMESTAMP_REGEX);
-
   private static final DateTimeFormatter TIMESTAMP_OUTPUT_FORMATTER =
       new DateTimeFormatterBuilder()
           .parseLenient()
           .parseCaseInsensitive()
           .appendPattern("yyyy-MM-dd HH:mm:ss")
-          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+          // We should never return more than microsecond precision, as some PG clients, such as
+          // SQLAlchemy will fail if they receive more.
+          .appendFraction(ChronoField.NANO_OF_SECOND, 0, 6, true)
           // Java 8 does not support seconds in timezone offset.
           .appendOffset(OptionsMetadata.isJava8() ? "+HH:mm" : "+HH:mm:ss", "+00")
           .toFormatter();
@@ -131,17 +120,6 @@ public class TimestampParser extends Parser<Timestamp> {
     } catch (Exception exception) {
       throw PGExceptionFactory.newPGException("Invalid timestamp value: " + value);
     }
-  }
-
-  /**
-   * Checks whether the given text contains a timestamp that can be parsed by PostgreSQL.
-   *
-   * @param value The value to check. May not be <code>null</code>.
-   * @return <code>true</code> if the text contains a valid timestamp.
-   */
-  static boolean isTimestamp(String value) {
-    Preconditions.checkNotNull(value);
-    return TIMESTAMP_PATTERN.matcher(toPGString(value)).matches();
   }
 
   @Override

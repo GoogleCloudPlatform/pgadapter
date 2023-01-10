@@ -15,4 +15,4 @@ done
 cd /home/pgadapter
 COMMAND="java ${JAVA_ARGUMENTS} -jar pgadapter.jar ${ARGUMENTS}"
 echo $COMMAND
-eval " $COMMAND"
+exec $COMMAND

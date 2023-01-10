@@ -50,14 +50,22 @@ Cloud Spanner supports the following data types in combination with `Hibernate`.
 | timestamptz / timestamp with time zone | LocalDateTime     |
 | bytea                                  | byte[]            |
 | date                                   | LocalDate         |
+| jsonb                                  | Custom Data Type  |
+
+### JSONB
+Hibernate 5.* does not have native support for JSONB. For this, custom data type
+will have to be added. There are modules available that provide support for this.
+For the sample, we have used [vladmihalcea/hibernate-types](https://github.com/vladmihalcea/hibernate-types).
 
 ## Limitations
 The following limitations are currently known:
 
-| Limitation             | Workaround                                                                                                                                                                                                                                                                    |
-|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Schema updates         | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated schema updates using `hibernate` are therefore not supported. It is recommended to set the option `hibernate.hbm2ddl.auto=none` (or `spring.jpa.hibernate.ddl-auto=none` if you are using Spring).  |
-| Generated primary keys | Cloud Spanner does not support `sequences`. Auto-increment primary key is not supported. Remove auto increment annotation for primary key columns. The recommended type of primary key is a client side generated `UUID` stored as a string.                                  |
+| Limitation             | Workaround                                                                                                                                                                                                                                                                   |
+|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Hibernate Version      | Version 5.3.20.Final is supported.                                                                                                                                                                                                                                           |
+| Postgresql JDBC driver | Version 42.4.3 is supported.                                                                                                                                                                                                                                                 |
+| Schema updates         | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated schema updates using `hibernate` are therefore not supported. It is recommended to set the option `hibernate.hbm2ddl.auto=none` (or `spring.jpa.hibernate.ddl-auto=none` if you are using Spring). |
+| Generated primary keys | Cloud Spanner does not support `sequences`. Auto-increment primary key is not supported. Remove auto increment annotation for primary key columns. The recommended type of primary key is a client side generated `UUID` stored as a string.                                 |
 
 
 ### Schema Updates
