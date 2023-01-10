@@ -27,6 +27,8 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ListValue;
+import com.google.protobuf.Value;
 import com.google.rpc.ResourceInfo;
 import com.google.spanner.admin.database.v1.Database;
 import com.google.spanner.admin.database.v1.DatabaseDialect;
@@ -310,6 +312,96 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
       assertEquals(
           "ERROR: prepared statement my_prepared_statement does not exist",
           sqlException.getMessage());
+    }
+  }
+
+  @Test
+  public void testRoundParamValueForPreparedStatement() throws SQLException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from my_table where id=$1"),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createAllTypesResultSetMetadata("")
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build()))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder("select * from my_table where id=$1").bind("p1").to(2L).build(),
+            createAllTypesResultSet("")));
+
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      connection
+          .createStatement()
+          .execute("prepare my_prepared_statement as select * from my_table where id=$1");
+      // 1.5 is automatically rounded to 2 because the parameter type has been inferred as bigint.
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("execute my_prepared_statement (1.5)")) {
+        assertTrue(resultSet.next());
+        assertFalse(resultSet.next());
+      }
+    }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(1, executeRequest.getParamTypesCount());
+    assertEquals(
+        Type.newBuilder().setCode(TypeCode.INT64).build(),
+        executeRequest.getParamTypesMap().get("p1"));
+    assertEquals("2", executeRequest.getParams().getFieldsMap().get("p1").getStringValue());
+  }
+
+  @Test
+  public void testTimezone() throws SQLException {
+    String sql = "select ts from foo";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.TIMESTAMP)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder()
+                                .setStringValue("2023-01-06T11:49:15.123456789Z")
+                                .build())
+                        .build())
+                .build()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      connection.createStatement().execute("set time zone cet");
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        while (resultSet.next()) {
+          assertEquals("2023-01-06 12:49:15.123456+01", resultSet.getString(1));
+        }
+      }
+      connection.createStatement().execute("set time zone ist");
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        while (resultSet.next()) {
+          assertEquals("2023-01-06 17:19:15.123456+05:30", resultSet.getString(1));
+        }
+      }
+      connection.createStatement().execute("set time zone 'America/Los_Angeles'");
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        while (resultSet.next()) {
+          assertEquals("2023-01-06 03:49:15.123456-08", resultSet.getString(1));
+        }
+      }
+      connection.createStatement().execute("set time zone -12");
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        while (resultSet.next()) {
+          assertEquals("2023-01-05 23:49:15.123456-12", resultSet.getString(1));
+        }
+      }
     }
   }
 

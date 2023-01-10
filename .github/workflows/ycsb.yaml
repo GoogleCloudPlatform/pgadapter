@@ -1,0 +1,36 @@
+on:
+  workflow_dispatch:
+  schedule:
+    # Run at 05:36UTC every day.
+    - cron: '36 5 * * *'
+name: ycsb
+jobs:
+  check-env:
+    outputs:
+      has-key: ${{ steps.project-id.outputs.defined }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: project-id
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        if: "${{ env.GCP_PROJECT_ID != '' }}"
+        run: echo "::set-output name=defined::true"
+  ycsb-benchmark:
+    needs: [check-env]
+    if: needs.check-env.outputs.has-key == 'true'
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ secrets.CLOUD_SPANNER_PG_ADAPTER_SERVICE_ACCOUNT }}'
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v0'
+        with:
+          export_default_credentials: true
+          install_components: 'beta'
+      - name: Create and start ycsb job
+        run: ./benchmarks/ycsb/create-and-run-ycsb-job.sh

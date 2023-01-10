@@ -49,6 +49,14 @@ public class SimpleParser {
     /** Name is the actual object name. */
     final String name;
 
+    static TableOrIndexName of(String name) {
+      return new TableOrIndexName(name);
+    }
+
+    static TableOrIndexName of(String schema, String name) {
+      return new TableOrIndexName(schema, name);
+    }
+
     TableOrIndexName(String name) {
       this.schema = null;
       this.name = name;

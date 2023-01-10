@@ -116,7 +116,9 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   @Override
   public DescribeResult describe() {
     if (this.describeResult == null) {
-      return null;
+      // Just return a DescribeResult that contains whatever information we were given in the
+      // PARSE message.
+      return new DescribeResult(this.givenParameterDataTypes, null);
     }
     try {
       return this.describeResult.get();
