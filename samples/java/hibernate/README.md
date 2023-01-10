@@ -53,9 +53,8 @@ Cloud Spanner supports the following data types in combination with `Hibernate`.
 | jsonb                                  | Custom Data Type  |
 
 ### JSONB
-Hibernate 5.* does not have native support for JSONB. For this, custom data type
-will have to be added. There are modules available that provide support for this.
-For the sample, we have used [vladmihalcea/hibernate-types](https://github.com/vladmihalcea/hibernate-types).
+Hibernate 5.* does not have native support for JSONB. For this, a custom data type
+must be added. This sample uses [vladmihalcea/hibernate-types](https://github.com/vladmihalcea/hibernate-types).
 
 ## Limitations
 The following limitations are currently known:
