@@ -15,7 +15,9 @@
 package com.google.cloud.spanner.pgadapter.utils;
 
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import java.io.IOException;
 import java.io.PipedInputStream;
@@ -32,6 +34,7 @@ public class CopyInParserTest {
   public void testCreateText() throws IOException {
     CopyInParser parser =
         CopyInParser.create(
+            mock(SessionState.class),
             Format.TEXT,
             CSVFormat.POSTGRESQL_TEXT,
             new PipedInputStream(new PipedOutputStream(), 256),
@@ -43,6 +46,7 @@ public class CopyInParserTest {
   public void testCreateCsv() throws IOException {
     CopyInParser parser =
         CopyInParser.create(
+            mock(SessionState.class),
             Format.CSV,
             CSVFormat.POSTGRESQL_CSV,
             new PipedInputStream(new PipedOutputStream(), 256),
@@ -54,7 +58,11 @@ public class CopyInParserTest {
   public void testCreateBinary() throws IOException {
     CopyInParser parser =
         CopyInParser.create(
-            Format.BINARY, null, new PipedInputStream(new PipedOutputStream(), 256), false);
+            mock(SessionState.class),
+            Format.BINARY,
+            null,
+            new PipedInputStream(new PipedOutputStream(), 256),
+            false);
     assertTrue(parser instanceof BinaryCopyParser);
   }
 }
