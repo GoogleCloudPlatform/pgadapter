@@ -279,11 +279,14 @@ public class SessionStatementParser {
       // Ignore, this is the default.
       parser.eatKeyword("session");
     }
-    TableOrIndexName name = null;
-    boolean isSpacedTimeZone = false;
+    TableOrIndexName name;
+    boolean isAliasStatement = false;
     if (parser.eatKeyword("time", "zone")) {
       name = new TableOrIndexName("TIMEZONE");
-      isSpacedTimeZone = true;
+      isAliasStatement = true;
+    } else if (parser.eatKeyword("names")) {
+      name = new TableOrIndexName("CLIENT_ENCODING");
+      isAliasStatement = true;
     } else {
       name = parser.readTableOrIndexName();
     }
@@ -293,7 +296,7 @@ public class SessionStatementParser {
           "Invalid SET statement: " + parser.getSql() + ". Expected configuration parameter name.");
     }
     builder.setName(name);
-    if (!isSpacedTimeZone && !(parser.eatKeyword("to") || parser.eatToken("="))) {
+    if (!isAliasStatement && !(parser.eatKeyword("to") || parser.eatToken("="))) {
       throw SpannerExceptionFactory.newSpannerException(
           ErrorCode.INVALID_ARGUMENT,
           "Invalid SET statement: " + parser.getSql() + ". Expected TO or =.");
@@ -305,7 +308,7 @@ public class SessionStatementParser {
           "Invalid SET statement: " + parser.getSql() + ". Expected value.");
     }
     if ("default".equalsIgnoreCase(value)
-        || (isSpacedTimeZone && "local".equalsIgnoreCase(value))) {
+        || (isAliasStatement && "local".equalsIgnoreCase(value))) {
       builder.setValue(null);
     } else {
       builder.setValue(value);
