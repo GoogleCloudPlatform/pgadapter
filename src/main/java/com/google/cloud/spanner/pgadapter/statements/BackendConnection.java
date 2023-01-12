@@ -518,6 +518,43 @@ public class BackendConnection {
     }
   }
 
+  private final class Truncate extends BufferedStatement<StatementResult> {
+    final TruncateStatement truncateStatement;
+
+    Truncate(TruncateStatement truncateStatement) {
+      super(truncateStatement.parsedStatement, truncateStatement.originalStatement);
+      this.truncateStatement = truncateStatement;
+    }
+
+    @Override
+    void execute() {
+      try {
+        checkConnectionState();
+        if (spannerConnection.isDdlBatchActive()) {
+          throw PGExceptionFactory.newPGException("Cannot execute TRUNCATE in a DDL batch");
+        }
+        if (spannerConnection.isDmlBatchActive()) {
+          throw PGExceptionFactory.newPGException("Cannot execute TRUNCATE in a DML batch");
+        }
+        if (spannerConnection.isInTransaction()
+            || spannerConnection.getAutocommitDmlMode() == AutocommitDmlMode.TRANSACTIONAL) {
+          spannerConnection.executeBatchUpdate(truncateStatement.getDeleteStatements());
+        } else {
+          // BatchDML is not supported for PDML, so we have to loop over the statements.
+          // We do not execute the statements in parallel, as there might be dependencies between
+          // the tables that are being truncated.
+          for (Statement statement : truncateStatement.getDeleteStatements()) {
+            spannerConnection.executeUpdate(statement);
+          }
+        }
+        result.set(NO_RESULT);
+      } catch (Exception exception) {
+        result.setException(exception);
+        throw exception;
+      }
+    }
+  }
+
   private static final ImmutableMap<String, LocalStatement> EMPTY_LOCAL_STATEMENTS =
       ImmutableMap.of();
   private static final StatementResult NO_RESULT = new NoResult();
@@ -611,6 +648,12 @@ public class BackendConnection {
     Vacuum vacuum = new Vacuum(vacuumStatement);
     bufferedStatements.add(vacuum);
     return vacuum.result;
+  }
+
+  public Future<StatementResult> execute(TruncateStatement truncateStatement) {
+    Truncate truncate = new Truncate(truncateStatement);
+    bufferedStatements.add(truncate);
+    return truncate.result;
   }
 
   /** Flushes the buffered statements to Spanner. */

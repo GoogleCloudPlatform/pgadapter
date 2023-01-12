@@ -60,4 +60,46 @@ public class LongParserTest {
         PGException.class,
         () -> new LongParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
   }
+
+  @Test
+  public void testCreate() {
+    assertEquals(
+        0L, new LongParser("0".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.longValue());
+    assertEquals(
+        1L, new LongParser("1".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.longValue());
+    assertEquals(
+        100L,
+        new LongParser("100".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.longValue());
+    assertEquals(
+        Long.MAX_VALUE,
+        new LongParser(
+                String.valueOf(Long.MAX_VALUE).getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.longValue());
+    assertEquals(
+        Long.MIN_VALUE,
+        new LongParser(
+                String.valueOf(Long.MIN_VALUE).getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.longValue());
+    assertEquals(
+        0L,
+        new LongParser("0.1".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.longValue());
+    assertEquals(
+        2L,
+        new LongParser("1.5".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.longValue());
+    assertEquals(
+        101L,
+        new LongParser("100.999".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.longValue());
+
+    assertThrows(
+        PGException.class,
+        () ->
+            new LongParser(
+                (Long.MAX_VALUE + "0").getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
+    assertThrows(
+        PGException.class,
+        () ->
+            new LongParser(
+                (Long.MIN_VALUE + "0").getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
+  }
 }
