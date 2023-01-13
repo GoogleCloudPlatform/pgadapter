@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
@@ -43,7 +42,7 @@ public class RowDescriptionResponse extends WireOutput {
   private static final byte DEFAULT_FLAG = 0;
 
   private final IntermediateStatement statement;
-  private final ResultSet resultSet;
+  private final Type columns;
   private final QueryMode mode;
   private final OptionsMetadata options;
   private final int columnCount;
@@ -51,25 +50,24 @@ public class RowDescriptionResponse extends WireOutput {
   public RowDescriptionResponse(
       DataOutputStream output,
       IntermediateStatement statement,
-      ResultSet resultSet,
+      Type columns,
       OptionsMetadata options,
-      QueryMode mode)
-      throws Exception {
-    super(output, calculateLength(resultSet));
+      QueryMode mode) {
+    super(output, calculateLength(columns));
     this.statement = statement;
-    this.resultSet = resultSet;
+    this.columns = columns;
     this.options = options;
     this.mode = mode;
-    this.columnCount = resultSet.getColumnCount();
+    this.columnCount = columns.getStructFields().size();
   }
 
-  private static int calculateLength(ResultSet resultSet) throws Exception {
+  private static int calculateLength(Type columns) {
     int length = HEADER_LENGTH + FIELD_NUMBER_LENGTH;
     for (int column_index = 0; /* columns start at 0 */
-        column_index < resultSet.getColumnCount();
+        column_index < columns.getStructFields().size();
         column_index++) {
       length +=
-          resultSet.getType().getStructFields().get(column_index).getName().length()
+          columns.getStructFields().get(column_index).getName().length()
               + NULL_TERMINATOR_LENGTH
               + TABLE_OID_LENGTH
               + COLUMN_INDEX_LENGTH
@@ -89,7 +87,7 @@ public class RowDescriptionResponse extends WireOutput {
         column_index < this.columnCount;
         column_index++) {
       this.outputStream.write(
-          this.resultSet.getType().getStructFields().get(column_index).getName().getBytes(UTF8));
+          this.columns.getStructFields().get(column_index).getName().getBytes(UTF8));
       // If it can be identified as a column of a table, the object ID of the table.
       this.outputStream.writeByte(DEFAULT_FLAG);
       // If it can be identified as a column of a table, the attribute number of the column
@@ -129,9 +127,9 @@ public class RowDescriptionResponse extends WireOutput {
             });
   }
 
-  int getOidType(int column_index) {
+  int getOidType(int columnIndex) {
     try {
-      Type type = this.resultSet.getColumnType(column_index);
+      Type type = this.columns.getStructFields().get(columnIndex).getType();
       return Parser.toOid(type);
     } catch (Exception ignored) {
       return Oid.UNSPECIFIED;

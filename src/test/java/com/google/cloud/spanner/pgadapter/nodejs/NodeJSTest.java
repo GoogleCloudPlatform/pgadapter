@@ -57,7 +57,7 @@ public interface NodeJSTest {
     String errors = readAll(errorStream);
     assertEquals("", errors);
     assertTrue(finished);
-    assertEquals(0, process.exitValue());
+    assertEquals(errors, 0, process.exitValue());
 
     return output;
   }

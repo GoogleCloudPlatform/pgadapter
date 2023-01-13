@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.metadata;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
@@ -25,12 +26,12 @@ import javax.annotation.Nullable;
 
 @InternalApi
 public class DescribeResult {
-  @Nullable private final ResultSet resultSet;
+  @Nullable private final Type columns;
   private final int[] parameters;
 
   public DescribeResult(int[] givenParameterTypes, @Nullable ResultSet resultMetadata) {
-    this.resultSet = resultMetadata;
     this.parameters = extractParameters(givenParameterTypes, resultMetadata);
+    this.columns = resultMetadata == null ? null : resultMetadata.getType();
   }
 
   static int[] extractParameters(int[] givenParameterTypes, @Nullable ResultSet resultSet) {
@@ -80,7 +81,7 @@ public class DescribeResult {
     return parameters;
   }
 
-  public @Nullable ResultSet getResultSet() {
-    return resultSet;
+  public @Nullable Type getColumns() {
+    return columns;
   }
 }
