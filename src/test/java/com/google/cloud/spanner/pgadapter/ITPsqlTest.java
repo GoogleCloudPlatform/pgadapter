@@ -632,7 +632,9 @@ public class ITPsqlTest implements IntegrationTest {
   private static final ImmutableSet<ZoneId> PROBLEMATIC_ZONE_IDS =
       ImmutableSet.of(
           // Mexico abolished DST in 2022, but not all databases contain this information.
-          ZoneId.of("America/Chihuahua"));
+          ZoneId.of("America/Chihuahua"),
+          // Jordan abolished DST in 2022, but not all databases contain this information.
+          ZoneId.of("Asia/Amman"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));
