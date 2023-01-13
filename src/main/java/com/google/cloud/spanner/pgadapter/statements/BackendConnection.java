@@ -573,7 +573,8 @@ public class BackendConnection {
     return execute.result;
   }
 
-  public Future<StatementResult> analyze(ParsedStatement parsedStatement, Statement statement) {
+  public ListenableFuture<StatementResult> analyze(
+      ParsedStatement parsedStatement, Statement statement) {
     Execute execute = new Execute(parsedStatement, statement, Function.identity(), true);
     bufferedStatements.add(execute);
     return execute.result;
