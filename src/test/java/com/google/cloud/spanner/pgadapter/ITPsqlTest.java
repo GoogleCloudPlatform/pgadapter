@@ -536,7 +536,7 @@ public class ITPsqlTest implements IntegrationTest {
             pgConnection
                 .createStatement()
                 .executeQuery(
-                    "select count(*) from pg_timezone_names where not name like '%posix%'")) {
+                    "select count(*) from pg_timezone_names where not name like '%posix%' and not name like 'Factory'")) {
           assertTrue(resultSet.next());
           numTimezones = resultSet.getInt(1);
         }
@@ -547,7 +547,7 @@ public class ITPsqlTest implements IntegrationTest {
                   .createStatement()
                   .executeQuery(
                       String.format(
-                          "select name from pg_timezone_names where not name like '%%posix%%' offset %d limit 1",
+                          "select name from pg_timezone_names where not name like '%%posix%%' and not name like 'Factory' offset %d limit 1",
                           random.nextInt(numTimezones)))) {
             assertTrue(resultSet.next());
             timezone = resultSet.getString(1);
