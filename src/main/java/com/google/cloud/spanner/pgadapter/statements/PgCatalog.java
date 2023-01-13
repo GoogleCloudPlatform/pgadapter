@@ -20,6 +20,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -27,7 +28,9 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import javax.annotation.Nonnull;
 
 @InternalApi
 public class PgCatalog {
@@ -57,11 +60,7 @@ public class PgCatalog {
           .put(new TableOrIndexName(null, "pg_settings"), new TableOrIndexName(null, "pg_settings"))
           .build();
 
-  private static final ImmutableMap<Pattern, String> FUNCTION_REPLACEMENTS =
-      ImmutableMap.of(
-          Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), "true",
-          Pattern.compile("pg_table_is_visible\\(.+\\)"), "true",
-          Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), "'public'");
+  private final ImmutableMap<Pattern, Supplier<String>> functionReplacements;
 
   private final Map<TableOrIndexName, PgCatalogTable> pgCatalogTables =
       ImmutableMap.of(
@@ -73,8 +72,14 @@ public class PgCatalog {
           new TableOrIndexName(null, "pg_settings"), new PgSettings());
   private final SessionState sessionState;
 
-  public PgCatalog(SessionState sessionState) {
-    this.sessionState = sessionState;
+  public PgCatalog(@Nonnull SessionState sessionState) {
+    this.sessionState = Preconditions.checkNotNull(sessionState);
+    this.functionReplacements =
+        ImmutableMap.of(
+            Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), () -> "true",
+            Pattern.compile("pg_table_is_visible\\(.+\\)"), () -> "true",
+            Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), () -> "'public'",
+            Pattern.compile("version\\(\\)"), sessionState::getServerVersion);
   }
 
   /** Replace supported pg_catalog tables with Common Table Expressions. */
@@ -95,16 +100,19 @@ public class PgCatalog {
     return addCommonTableExpressions(replacedTablesStatement.y(), cteBuilder.build());
   }
 
-  static String replaceKnownUnsupportedFunctions(Statement statement) {
+  String replaceKnownUnsupportedFunctions(Statement statement) {
     String sql = statement.getSql();
-    for (Entry<Pattern, String> functionReplacement : FUNCTION_REPLACEMENTS.entrySet()) {
-      sql = functionReplacement.getKey().matcher(sql).replaceAll(functionReplacement.getValue());
+    for (Entry<Pattern, Supplier<String>> functionReplacement : functionReplacements.entrySet()) {
+      sql =
+          functionReplacement
+              .getKey()
+              .matcher(sql)
+              .replaceAll(functionReplacement.getValue().get());
     }
     return sql;
   }
 
-  static Statement addCommonTableExpressions(
-      Statement statement, ImmutableList<String> tableExpressions) {
+  Statement addCommonTableExpressions(Statement statement, ImmutableList<String> tableExpressions) {
     String sql = replaceKnownUnsupportedFunctions(statement);
     SimpleParser parser = new SimpleParser(sql);
     boolean hadCommonTableExpressions = parser.eatKeyword("with");
