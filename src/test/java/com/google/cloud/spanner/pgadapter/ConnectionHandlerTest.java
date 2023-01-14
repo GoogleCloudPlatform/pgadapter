@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.error.PGException;
@@ -36,6 +37,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.SslMode;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -527,5 +529,67 @@ public class ConnectionHandlerTest {
     ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
 
     assertTrue(connectionHandler.checkValidConnection(false));
+  }
+
+  @Test
+  public void testMaybeDetermineWellKnownClient_remainsUnspecifiedForUnknownStatement() {
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ProxyServer server = mock(ProxyServer.class);
+    when(server.getOptions()).thenReturn(options);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
+
+    when(options.shouldAutoDetectClient()).thenReturn(true);
+    connectionHandler.setWellKnownClient(WellKnownClient.UNSPECIFIED);
+
+    connectionHandler.maybeDetermineWellKnownClient(Statement.of("select 1"));
+
+    assertEquals(WellKnownClient.UNSPECIFIED, connectionHandler.getWellKnownClient());
+  }
+
+  @Test
+  public void testMaybeDetermineWellKnownClient_changesFromUnspecifiedWithKnownStatement() {
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ProxyServer server = mock(ProxyServer.class);
+    when(server.getOptions()).thenReturn(options);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
+
+    when(options.shouldAutoDetectClient()).thenReturn(true);
+    connectionHandler.setWellKnownClient(WellKnownClient.UNSPECIFIED);
+
+    connectionHandler.maybeDetermineWellKnownClient(
+        Statement.of(
+            "SELECT version();\n"
+                + "\n"
+                + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n"));
+
+    assertEquals(WellKnownClient.NPGSQL, connectionHandler.getWellKnownClient());
+  }
+
+  @Test
+  public void testMaybeDetermineWellKnownClient_respectsAutoDetectClientSetting() {
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    ProxyServer server = mock(ProxyServer.class);
+    when(server.getOptions()).thenReturn(options);
+    Socket socket = mock(Socket.class);
+    InetAddress address = mock(InetAddress.class);
+    when(socket.getInetAddress()).thenReturn(address);
+    ConnectionHandler connectionHandler = new ConnectionHandler(server, socket);
+
+    when(options.shouldAutoDetectClient()).thenReturn(false);
+    connectionHandler.setWellKnownClient(WellKnownClient.UNSPECIFIED);
+
+    connectionHandler.maybeDetermineWellKnownClient(
+        Statement.of(
+            "SELECT version();\n"
+                + "\n"
+                + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n"));
+
+    assertEquals(WellKnownClient.UNSPECIFIED, connectionHandler.getWellKnownClient());
   }
 }

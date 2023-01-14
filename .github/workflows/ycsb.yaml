@@ -1,5 +1,8 @@
 on:
   workflow_dispatch:
+  schedule:
+    # Run at 05:36UTC every day.
+    - cron: '36 5 * * *'
 name: ycsb
 jobs:
   check-env:
@@ -18,12 +21,16 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Setup GCloud
-        uses: google-github-actions/setup-gcloud@v0
+      - name: Checkout
+        uses: actions/checkout@v3
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v1'
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.JSON_SERVICE_ACCOUNT_CREDENTIALS }}
+          credentials_json: '${{ secrets.CLOUD_SPANNER_PG_ADAPTER_SERVICE_ACCOUNT }}'
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v0'
+        with:
           export_default_credentials: true
+          install_components: 'beta'
       - name: Create and start ycsb job
         run: ./benchmarks/ycsb/create-and-run-ycsb-job.sh

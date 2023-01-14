@@ -210,7 +210,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   public StatementResult call() throws Exception {
     PipedInputStream inputStream = new PipedInputStream(payload, copySettings.getPipeBufferSize());
     pipeCreatedLatch.countDown();
-    final CopyInParser parser = CopyInParser.create(copyFormat, csvFormat, inputStream, hasHeader);
+    final CopyInParser parser =
+        CopyInParser.create(
+            copySettings.getSessionState(), copyFormat, csvFormat, inputStream, hasHeader);
     // This LinkedBlockingDeque holds a reference to all transactions that are currently active. The
     // max capacity of this deque is what ensures that we never have more than maxParallelism
     // transactions running at the same time. We could also achieve that by using a thread pool with

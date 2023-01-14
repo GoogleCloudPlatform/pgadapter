@@ -28,17 +28,25 @@ import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Random;
@@ -69,6 +77,8 @@ public class ITPsqlTest implements IntegrationTest {
   public static final String POSTGRES_USER = System.getenv("POSTGRES_USER");
   public static final String POSTGRES_DATABASE = System.getenv("POSTGRES_DATABASE");
   public static final String POSTGRES_PASSWORD = System.getenv("POSTGRES_PASSWORD");
+
+  private final Random random = new Random();
 
   @BeforeClass
   public static void setup() throws Exception {
@@ -395,7 +405,7 @@ public class ITPsqlTest implements IntegrationTest {
         DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
       try (PreparedStatement preparedStatement =
           connection.prepareStatement("insert into all_types (col_bigint) values (?)")) {
-        preparedStatement.setLong(1, new Random().nextLong());
+        preparedStatement.setLong(1, random.nextLong());
         assertEquals(1, preparedStatement.executeUpdate());
       }
     }
@@ -511,6 +521,137 @@ public class ITPsqlTest implements IntegrationTest {
       // Compare table contents again.
       compareTableContents();
     }
+  }
+
+  @Test
+  public void testTimestamptzParsing() throws Exception {
+    final int numTests = 10;
+    for (int i = 0; i < numTests; i++) {
+      String timezone;
+      try (Connection pgConnection =
+          DriverManager.getConnection(
+              createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+        int numTimezones;
+        try (ResultSet resultSet =
+            pgConnection
+                .createStatement()
+                .executeQuery(
+                    "select count(*) from pg_timezone_names where not name like '%posix%' and not name like 'Factory'")) {
+          assertTrue(resultSet.next());
+          numTimezones = resultSet.getInt(1);
+        }
+
+        while (true) {
+          try (ResultSet resultSet =
+              pgConnection
+                  .createStatement()
+                  .executeQuery(
+                      String.format(
+                          "select name from pg_timezone_names where not name like '%%posix%%' and not name like 'Factory' offset %d limit 1",
+                          random.nextInt(numTimezones)))) {
+            assertTrue(resultSet.next());
+            timezone = resultSet.getString(1);
+            if (!PROBLEMATIC_ZONE_IDS.contains(ZoneId.of(timezone))) {
+              break;
+            }
+          }
+        }
+      }
+      for (String timestamp :
+          new String[] {
+            generateRandomLocalDate().toString(),
+            generateRandomLocalDateTime().toString().replace('T', ' '),
+            generateRandomOffsetDateTime().toString().replace('T', ' ')
+          }) {
+        ProcessBuilder realPgBuilder = new ProcessBuilder();
+        realPgBuilder.command(
+            "bash",
+            "-c",
+            "psql"
+                + " -h "
+                + POSTGRES_HOST
+                + " -p "
+                + POSTGRES_PORT
+                + " -U "
+                + POSTGRES_USER
+                + " -d "
+                + POSTGRES_DATABASE);
+        setPgPassword(realPgBuilder);
+
+        ProcessBuilder pgAdapterBuilder = new ProcessBuilder();
+        pgAdapterBuilder.command(
+            "bash",
+            "-c",
+            "psql"
+                + " -h "
+                + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+                + " -p "
+                + testEnv.getPGAdapterPort()
+                + " -d "
+                + database.getId().getDatabase());
+
+        String realPgOutput = "";
+        String pgAdapterOutput = "";
+        for (ProcessBuilder builder : new ProcessBuilder[] {realPgBuilder, pgAdapterBuilder}) {
+          Process process = builder.start();
+          try (Writer writer = new OutputStreamWriter(process.getOutputStream())) {
+            writer.write(String.format("set time zone '%s';\n", timezone));
+            writer.write("prepare test (timestamptz) as select $1;\n");
+            writer.write(String.format("execute test ('%s');\n", timestamp));
+            writer.write("\\q\n");
+          }
+
+          StringBuilder error = new StringBuilder();
+          try (Scanner scanner = new Scanner(process.getErrorStream())) {
+            while (scanner.hasNextLine()) {
+              error.append(scanner.nextLine()).append('\n');
+            }
+          }
+          StringBuilder output = new StringBuilder();
+          try (Scanner scanner = new Scanner(process.getInputStream())) {
+            while (scanner.hasNextLine()) {
+              output.append(scanner.nextLine()).append('\n');
+            }
+          }
+          int res = process.waitFor();
+          assertEquals(error.toString(), 0, res);
+          if (builder == realPgBuilder) {
+            realPgOutput = output.toString();
+          } else {
+            pgAdapterOutput = output.toString();
+          }
+        }
+        assertEquals(
+            String.format("Timestamp: %s, Timezone: %s", timestamp, timezone),
+            realPgOutput,
+            pgAdapterOutput);
+      }
+    }
+  }
+
+  private static final ImmutableSet<ZoneId> PROBLEMATIC_ZONE_IDS =
+      ImmutableSet.of(
+          // Mexico abolished DST in 2022, but not all databases contain this information.
+          ZoneId.of("America/Chihuahua"),
+          // Jordan abolished DST in 2022, but not all databases contain this information.
+          ZoneId.of("Asia/Amman"));
+
+  private LocalDate generateRandomLocalDate() {
+    return LocalDate.ofEpochDay(random.nextInt(365 * 100));
+  }
+
+  private LocalDateTime generateRandomLocalDateTime() {
+    return LocalDateTime.of(generateRandomLocalDate(), generateRandomLocalTime());
+  }
+
+  private LocalTime generateRandomLocalTime() {
+    return LocalTime.ofSecondOfDay(random.nextInt(24 * 60 * 60));
+  }
+
+  private OffsetDateTime generateRandomOffsetDateTime() {
+    return OffsetDateTime.of(
+        generateRandomLocalDateTime(),
+        ZoneOffset.ofHoursMinutes(random.nextInt(12), random.nextInt(60)));
   }
 
   private void compareTableContents() throws SQLException {
