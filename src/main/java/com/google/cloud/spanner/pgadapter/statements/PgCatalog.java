@@ -48,6 +48,8 @@ public class PgCatalog {
           .put(new TableOrIndexName(null, "pg_class"), new TableOrIndexName(null, "pg_class"))
           .put(new TableOrIndexName("pg_catalog", "pg_proc"), new TableOrIndexName(null, "pg_proc"))
           .put(new TableOrIndexName(null, "pg_proc"), new TableOrIndexName(null, "pg_proc"))
+          .put(new TableOrIndexName("pg_catalog", "pg_enum"), new TableOrIndexName(null, "pg_enum"))
+          .put(new TableOrIndexName(null, "pg_enum"), new TableOrIndexName(null, "pg_enum"))
           .put(
               new TableOrIndexName("pg_catalog", "pg_range"),
               new TableOrIndexName(null, "pg_range"))
@@ -67,6 +69,7 @@ public class PgCatalog {
           new TableOrIndexName(null, "pg_namespace"), new PgNamespace(),
           new TableOrIndexName(null, "pg_class"), new PgClass(),
           new TableOrIndexName(null, "pg_proc"), new PgProc(),
+          new TableOrIndexName(null, "pg_enum"), new PgEnum(),
           new TableOrIndexName(null, "pg_range"), new PgRange(),
           new TableOrIndexName(null, "pg_type"), new PgType(),
           new TableOrIndexName(null, "pg_settings"), new PgSettings());
@@ -79,7 +82,8 @@ public class PgCatalog {
             Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), () -> "true",
             Pattern.compile("pg_table_is_visible\\(.+\\)"), () -> "true",
             Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), () -> "'public'",
-            Pattern.compile("version\\(\\)"), sessionState::getServerVersion);
+            Pattern.compile("version\\(\\)"), sessionState::getServerVersion,
+            Pattern.compile("namespace.nspname\\s*=\\s*ANY\\s*\\(\\s\\$1\\s*\\)"), () -> "\\$1::varchar[] is not null");
   }
 
   /** Replace supported pg_catalog tables with Common Table Expressions. */
@@ -370,6 +374,19 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return PG_PROC_CTE;
+    }
+  }
+
+  private static class PgEnum implements PgCatalogTable {
+    private static final String PG_ENUM_CTE =
+        "pg_enum as (\n"
+            + "select * from ("
+            + "select 0::bigint as oid, 0::bigint as enumtypid, 0.0::float8 as enumsortorder, ''::varchar as enumlabel\n"
+            + ") e where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_ENUM_CTE;
     }
   }
 

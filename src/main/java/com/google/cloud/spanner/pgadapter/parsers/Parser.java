@@ -97,9 +97,9 @@ public abstract class Parser<T> {
       case Oid.JSONB:
         return new JsonbParser(item, formatCode);
       case Oid.UNSPECIFIED:
-        return new UnspecifiedParser(item, formatCode);
       default:
-        throw new IllegalArgumentException("Unsupported parameter type: " + oidType);
+        return new UnspecifiedParser(item, formatCode);
+//        throw new IllegalArgumentException("Unsupported parameter type: " + oidType);
     }
   }
 
