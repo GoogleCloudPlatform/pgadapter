@@ -28,6 +28,7 @@ public class QueryMessage extends ControlMessage {
   public static final String PREPARE = "PREPARE";
   public static final String EXECUTE = "EXECUTE";
   public static final String DEALLOCATE = "DEALLOCATE";
+  public static final String VACUUM = "VACUUM";
   public static final String TRUNCATE = "TRUNCATE";
 
   private final Statement originalStatement;

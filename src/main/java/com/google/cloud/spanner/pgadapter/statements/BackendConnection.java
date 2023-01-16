@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
@@ -135,7 +136,7 @@ public class BackendConnection {
   }
 
   static <T> PGException setAndReturn(SettableFuture<T> future, Throwable throwable) {
-    PGException pgException = PGExceptionFactory.toPGException(throwable);
+    PGException pgException = toPGException(throwable);
     future.setException(pgException);
     return pgException;
   }
@@ -476,6 +477,47 @@ public class BackendConnection {
     }
   }
 
+  private final class Vacuum extends BufferedStatement<StatementResult> {
+    final VacuumStatement vacuumStatement;
+
+    Vacuum(VacuumStatement vacuumStatement) {
+      super(vacuumStatement.parsedStatement, vacuumStatement.originalStatement);
+      this.vacuumStatement = vacuumStatement;
+    }
+
+    @Override
+    void execute() {
+      try {
+        checkConnectionState();
+        if (spannerConnection.isInTransaction()) {
+          throw PGExceptionFactory.newPGException(
+              "VACUUM cannot run inside a transaction block", SQLState.ActiveSqlTransaction);
+        }
+        for (TableOrIndexName table : vacuumStatement.getTables()) {
+          ImmutableList<TableOrIndexName> columns = vacuumStatement.getTableColumns(table);
+          Statement statement;
+          if (columns == null || columns.isEmpty()) {
+            statement = Statement.of("select * from " + table + " limit 1");
+          } else {
+            statement =
+                Statement.of(
+                    "select "
+                        + columns.stream().map(c -> c.name).collect(Collectors.joining(","))
+                        + " from "
+                        + table
+                        + " limit 1");
+          }
+          // Just analyze the query to ensure the table and column names are valid.
+          spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
+        }
+        result.set(NO_RESULT);
+      } catch (Exception exception) {
+        result.setException(toPGException(exception));
+        throw exception;
+      }
+    }
+  }
+
   private final class Truncate extends BufferedStatement<StatementResult> {
     final TruncateStatement truncateStatement;
 
@@ -600,6 +642,12 @@ public class BackendConnection {
     CopyOut copyOut = new CopyOut(parsedStatement, statement);
     bufferedStatements.add(copyOut);
     return copyOut.result;
+  }
+
+  public Future<StatementResult> execute(VacuumStatement vacuumStatement) {
+    Vacuum vacuum = new Vacuum(vacuumStatement);
+    bufferedStatements.add(vacuum);
+    return vacuum.result;
   }
 
   public Future<StatementResult> execute(TruncateStatement truncateStatement) {
