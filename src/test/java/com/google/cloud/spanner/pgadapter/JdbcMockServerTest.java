@@ -38,6 +38,7 @@ import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
@@ -732,6 +733,30 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(
             "ERROR: ResultSetMetadata are available only for results that were returned from Cloud Spanner",
             exception.getMessage());
+      }
+    }
+  }
+
+  @Test(timeout = 60_000)
+  public void testMultiplePreparedStatements() throws SQLException {
+    // Execute more statements than there are sessions in the pool to verify that repeatedly
+    // creating a prepared statement with the same name does not cause a session leak.
+    final int numStatements = 1000;
+    String sql = "SELECT 1";
+
+    for (boolean autocommit : new boolean[] {true, false}) {
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        // Verify that there's no session leak both in autocommit and transactional mode.
+        connection.setAutoCommit(autocommit);
+        // Force the use of prepared statements.
+        connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+        for (int i = 0; i < numStatements; i++) {
+          try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+            assertFalse(resultSet.next());
+          }
+        }
       }
     }
   }
@@ -3291,6 +3316,117 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testVacuumStatement_noTables() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum");
+    }
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testVacuumStatement_oneTable() throws SQLException {
+    String sql = "select * from my_table limit 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum my_table");
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql, request.getSql());
+    assertEquals(QueryMode.PLAN, request.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatement_multipleTables() throws SQLException {
+    String sql1 = "select * from my_table1 limit 1";
+    String sql2 = "select * from my_table2 limit 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql1), SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), SELECT2_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum my_table1, my_table2");
+    }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request1 = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql1, request1.getSql());
+    assertEquals(QueryMode.PLAN, request1.getQueryMode());
+    ExecuteSqlRequest request2 = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql2, request2.getSql());
+    assertEquals(QueryMode.PLAN, request1.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatement_oneTableWithColumns() throws SQLException {
+    String sql = "select col1,col2 from my_table limit 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum my_table (col1, col2)");
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql, request.getSql());
+    assertEquals(QueryMode.PLAN, request.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatement_multipleTablesWithColumns() throws SQLException {
+    String sql1 = "select col1 from my_table1 limit 1";
+    String sql2 = "select col1,col2 from my_table2 limit 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql1), SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), SELECT2_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum my_table1 (col1), my_table2(col1,col2)");
+    }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request1 = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql1, request1.getSql());
+    assertEquals(QueryMode.PLAN, request1.getQueryMode());
+    ExecuteSqlRequest request2 = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql2, request2.getSql());
+    assertEquals(QueryMode.PLAN, request1.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatement_unknownTable() throws SQLException {
+    String sql = "select * from unknown_table limit 1";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql),
+            Status.NOT_FOUND
+                .withDescription("Table not found: unknown_table")
+                .asRuntimeException()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().execute("vacuum unknown_table"));
+      assertEquals(
+          "ERROR: Table not found: unknown_table - Statement: 'select * from unknown_table limit 1'",
+          exception.getMessage());
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql, request.getSql());
+    assertEquals(QueryMode.PLAN, request.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatementInTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      PSQLException exception =
+          assertThrows(PSQLException.class, () -> connection.createStatement().execute("vacuum"));
+      assertEquals("ERROR: VACUUM cannot run inside a transaction block", exception.getMessage());
+      assertEquals(SQLState.ActiveSqlTransaction.toString(), exception.getSQLState());
+    }
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test
