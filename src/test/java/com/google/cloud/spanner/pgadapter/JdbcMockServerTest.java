@@ -737,6 +737,30 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
+  @Test(timeout = 60_000)
+  public void testMultiplePreparedStatements() throws SQLException {
+    // Execute more statements than there are sessions in the pool to verify that repeatedly
+    // creating a prepared statement with the same name does not cause a session leak.
+    final int numStatements = 1000;
+    String sql = "SELECT 1";
+
+    for (boolean autocommit : new boolean[] {true, false}) {
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        // Verify that there's no session leak both in autocommit and transactional mode.
+        connection.setAutoCommit(autocommit);
+        // Force the use of prepared statements.
+        connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+        for (int i = 0; i < numStatements; i++) {
+          try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+            assertFalse(resultSet.next());
+          }
+        }
+      }
+    }
+  }
+
   @Test
   public void testMultipleQueriesInTransaction() throws SQLException {
     String sql = "SELECT 1";
