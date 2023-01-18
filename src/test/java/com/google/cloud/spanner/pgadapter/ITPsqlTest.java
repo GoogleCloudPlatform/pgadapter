@@ -634,7 +634,10 @@ public class ITPsqlTest implements IntegrationTest {
           // Mexico abolished DST in 2022, but not all databases contain this information.
           ZoneId.of("America/Chihuahua"),
           // Jordan abolished DST in 2022, but not all databases contain this information.
-          ZoneId.of("Asia/Amman"));
+          ZoneId.of("Asia/Amman"),
+          // 'EST' is not a geographical timezone and is automatically converted to -05:00 by Java.
+          // This makes it unusable for this test. It does work with PGAdapter in general.
+          ZoneId.of("EST"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));
