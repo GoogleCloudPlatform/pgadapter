@@ -2939,6 +2939,16 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSetNames() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set names 'utf8'");
+      verifySettingValue(connection, "client_encoding", "utf8");
+      connection.createStatement().execute("set names 'foo'");
+      verifySettingValue(connection, "client_encoding", "foo");
+    }
+  }
+
+  @Test
   public void testSettingsAreUniqueToConnections() throws SQLException {
     // Verify that each new connection gets a separate set of settings.
     for (int connectionNum = 0; connectionNum < 5; connectionNum++) {
