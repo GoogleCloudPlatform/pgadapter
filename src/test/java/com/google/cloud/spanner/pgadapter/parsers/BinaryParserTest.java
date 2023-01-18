@@ -22,9 +22,11 @@ import com.google.cloud.ByteArray;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import java.nio.charset.StandardCharsets;
+import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.postgresql.core.Utils;
 
 @RunWith(JUnit4.class)
 public class BinaryParserTest {
@@ -45,5 +47,13 @@ public class BinaryParserTest {
     assertThrows(
         PGException.class,
         () -> new BinaryParser("\\xzz".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
+  }
+
+  @Test
+  public void testBytesToHex() {
+    Random random = new Random();
+    byte[] value = new byte[random.nextInt(1024) + 1];
+    random.nextBytes(value);
+    assertEquals("\\x" + Utils.toHexString(value), new String(BinaryParser.bytesToHex(value)));
   }
 }
