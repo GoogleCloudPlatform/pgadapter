@@ -33,7 +33,6 @@ import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
@@ -251,14 +250,6 @@ public class IntermediateStatement {
 
   public void setStatementResult(StatementResult statementResult) {
     this.statementResult = statementResult;
-    if (statementResult != null) {
-      if (statementResult.getResultType() == ResultType.RESULT_SET) {
-        this.hasMoreData = statementResult.getResultSet().next();
-      } else if (statementResult instanceof NoResult
-          && ((NoResult) statementResult).hasCommandTag()) {
-        this.commandTag = ((NoResult) statementResult).getCommandTag();
-      }
-    }
   }
 
   protected void setFutureStatementResult(Future<StatementResult> result) {
