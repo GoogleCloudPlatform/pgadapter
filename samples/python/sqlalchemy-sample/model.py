@@ -30,6 +30,12 @@ Base = mapper_registry.generate_base()
  The created_at and updated_at properties are automatically filled with the
  current client system time when a model is created or updated. 
 """
+
+
+def format_timestamp(timestamp: datetime) -> str:
+  return timestamp.astimezone(timezone.utc).isoformat() if timestamp else None
+
+
 class BaseMixin(object):
   __prepare_statements__ = None
 
@@ -64,14 +70,16 @@ class Singer(BaseMixin, Base):
   }
 
   def __repr__(self):
-    return f"singers(" \
-           f"id={self.id!r}," \
-           f"first_name={self.first_name!r}," \
-           f"last_name={self.last_name!r}," \
-           f"active={self.active!r}," \
-           f"created_at={self.created_at.astimezone(timezone.utc) if self.created_at else None!r}," \
-           f"updated_at={self.updated_at.astimezone(timezone.utc) if self.updated_at else None!r}" \
-           f")"
+    return (
+      f"singers("
+      f"id={self.id!r},"
+      f"first_name={self.first_name!r},"
+      f"last_name={self.last_name!r},"
+      f"active={self.active!r},"
+      f"created_at={format_timestamp(self.created_at)!r},"
+      f"updated_at={format_timestamp(self.updated_at)!r}"
+      f")"
+    )
 
 
 class Album(BaseMixin, Base):
@@ -90,16 +98,18 @@ class Album(BaseMixin, Base):
   tracks = relationship("Track", back_populates="album", passive_deletes=True)
 
   def __repr__(self):
-    return f"albums(" \
-           f"id={self.id!r}," \
-           f"title={self.title!r}," \
-           f"marketing_budget={self.marketing_budget!r}," \
-           f"release_date={self.release_date!r}," \
-           f"cover_picture={self.cover_picture!r}," \
-           f"singer={self.singer_id!r}," \
-           f"created_at={self.created_at.astimezone(timezone.utc) if self.created_at else None!r}," \
-           f"updated_at={self.updated_at.astimezone(timezone.utc) if self.updated_at else None!r}" \
-           f")"
+    return (
+      f"albums("
+      f"id={self.id!r},"
+      f"title={self.title!r},"
+      f"marketing_budget={self.marketing_budget!r},"
+      f"release_date={self.release_date!r},"
+      f"cover_picture={self.cover_picture!r},"
+      f"singer={self.singer_id!r},"
+      f"created_at={format_timestamp(self.created_at)!r},"
+      f"updated_at={format_timestamp(self.updated_at)!r}"
+      f")"
+    )
 
 
 class Track(BaseMixin, Base):
@@ -112,14 +122,16 @@ class Track(BaseMixin, Base):
   album = relationship("Album", back_populates="tracks")
 
   def __repr__(self):
-    return f"tracks(" \
-           f"id={self.id!r}," \
-           f"track_number={self.track_number!r}," \
-           f"title={self.title!r}," \
-           f"sample_rate={self.sample_rate!r}," \
-           f"created_at={self.created_at.astimezone(timezone.utc) if self.created_at else None!r}," \
-           f"updated_at={self.updated_at.astimezone(timezone.utc) if self.updated_at else None!r}" \
-           f")"
+    return (
+      f"tracks("
+      f"id={self.id!r},"
+      f"track_number={self.track_number!r},"
+      f"title={self.title!r},"
+      f"sample_rate={self.sample_rate!r},"
+      f"created_at={format_timestamp(self.created_at)!r},"
+      f"updated_at={format_timestamp(self.updated_at)!r}"
+      f")"
+    )
 
 
 class Venue(BaseMixin, Base):
@@ -129,13 +141,15 @@ class Venue(BaseMixin, Base):
   description = Column(JSONB)
 
   def __repr__(self):
-    return f"venues(" \
-           f"id={self.id!r}," \
-           f"name={self.name!r}," \
-           f"description={self.description!r}," \
-           f"created_at={self.created_at.astimezone(timezone.utc) if self.created_at else None!r}," \
-           f"updated_at={self.updated_at.astimezone(timezone.utc) if self.updated_at else None!r}" \
-           f")"
+    return (
+      f"venues("
+      f"id={self.id!r},"
+      f"name={self.name!r},"
+      f"description={self.description!r},"
+      f"created_at={format_timestamp(self.created_at)!r},"
+      f"updated_at={format_timestamp(self.updated_at)!r}"
+      f")"
+    )
 
 
 class Concert(BaseMixin, Base):
@@ -150,13 +164,15 @@ class Concert(BaseMixin, Base):
   end_time = Column(DateTime(timezone=True))
 
   def __repr__(self):
-    return f"concerts(" \
-           f"id={self.id!r}," \
-           f"name={self.name!r}," \
-           f"venue={self.venue!r}," \
-           f"singer={self.singer!r}," \
-           f"start_time={self.start_time!r}," \
-           f"end_time={self.end_time!r}," \
-           f"created_at={self.created_at.astimezone(timezone.utc) if self.created_at else None!r}," \
-           f"updated_at={self.updated_at.astimezone(timezone.utc) if self.updated_at else None!r}" \
-           f")"
+    return (
+      f"concerts("
+      f"id={self.id!r},"
+      f"name={self.name!r},"
+      f"venue={self.venue!r},"
+      f"singer={self.singer!r},"
+      f"start_time={self.start_time!r},"
+      f"end_time={self.end_time!r},"
+      f"created_at={format_timestamp(self.created_at)!r},"
+      f"updated_at={format_timestamp(self.updated_at)!r}"
+      f")"
+    )

@@ -109,6 +109,11 @@ use https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialec
 or https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_nothing
 will fail.
 
+### SAVEPOINT - Nested transactions
+`SAVEPOINT`s are not supported by Cloud Spanner. Nested transactions in SQLAlchemy are translated to
+savepoints and are therefore not supported. Trying to use `Session.begin_nested()`
+(https://docs.sqlalchemy.org/en/14/orm/session_api.html#sqlalchemy.orm.Session.begin_nested) will fail.
+
 ### Locking - SELECT ... FOR UPDATE
 Locking clauses, like `SELECT ... FOR UPDATE`, are not supported (see also https://docs.sqlalchemy.org/en/20/orm/queryguide/query.html#sqlalchemy.orm.Query.with_for_update).
 These are normally also not required, as Cloud Spanner uses isolation level `serializable` for
@@ -136,7 +141,7 @@ read_only_engine = engine.execution_options(postgresql_readonly=True)
 ```
 
 ### Autocommit
-Using isolation level `AUTOCOMMIT` will supress the use of (read/write) transactions for each
+Using isolation level `AUTOCOMMIT` will suppress the use of (read/write) transactions for each
 database operation in SQLAlchemy. Using autocommit is more efficient than read/write transactions
 for workloads that only read and/or that do not need the atomicity that is offered by transactions.
 

@@ -12,6 +12,7 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
+import argparse
 
 from psycopg2 import sql
 from psycopg2.extensions import register_adapter, AsIs
@@ -21,11 +22,15 @@ import sys
 
 
 def create_test_engine(autocommit=False, options=""):
-  host = sys.argv[1]
-  port = sys.argv[2]
+  parser = argparse.ArgumentParser(description='Run SQLAlchemy tests.')
+  parser.add_argument('host', type=str, help='host to connect to')
+  parser.add_argument('port', type=int, help='port number to connect to')
+  parser.add_argument('database', type=str, help='database to connect to')
+  args = parser.parse_args()
+
   conn_string = "postgresql+psycopg2://user:password@{host}:{port}/d{options}".format(
-    host=host, port=port, options=options)
-  if host == "":
+    host=args.host, port=args.port, options=options)
+  if args.host == "":
     if options == "":
       conn_string = conn_string + "?host=/tmp"
     else:

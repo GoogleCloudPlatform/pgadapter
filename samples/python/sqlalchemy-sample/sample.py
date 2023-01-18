@@ -125,7 +125,7 @@ def create_venue_and_concert_in_transaction():
   with Session(engine) as session:
     singer = session.query(Singer).first()
     venue = Venue(
-      id="{}".format(uuid4()),
+      id=str(uuid4()),
       name="Avenue Park",
       description={
         "Capacity": 5000,
@@ -134,7 +134,7 @@ def create_venue_and_concert_in_transaction():
       }
     )
     concert = Concert(
-      id="{}".format(uuid4()),
+      id=str(uuid4()),
       name="Avenue Park Open",
       venue=venue,
       singer=singer,
@@ -153,11 +153,13 @@ def print_concerts():
     # Query all concerts and join both Singer and Venue, so we can directly
     # access the properties of these as well without having to execute
     # additional queries.
-    concerts = session.query(Concert) \
-      .options(joinedload(Concert.venue)) \
-      .options(joinedload(Concert.singer)) \
-      .order_by("start_time") \
-      .all()
+    concerts = (
+      session.query(Concert)
+        .options(joinedload(Concert.venue))
+        .options(joinedload(Concert.singer))
+        .order_by("start_time")
+        .all()
+    )
     print()
     for concert in concerts:
       print("Concert '{}' starting at {} with {} will be held at {}"
@@ -172,10 +174,12 @@ def print_albums_released_before_1980():
   with Session(read_only_engine) as session:
     print()
     print("Searching for albums released before 1980")
-    albums = session \
-      .query(Album) \
-      .filter(Album.release_date < date.fromisoformat("1980-01-01")) \
-      .all()
+    albums = (
+      session
+        .query(Album)
+        .filter(Album.release_date < date.fromisoformat("1980-01-01"))
+        .all()
+    )
     for album in albums:
       print(
         "  Album {} was released at {}".format(album.title, album.release_date))
@@ -186,12 +190,14 @@ def print_singers_with_limit_and_offset():
   with Session(read_only_engine) as session:
     print()
     print("Printing at most 5 singers ordered by last name")
-    singers = session \
-      .query(Singer) \
-      .order_by(Singer.last_name) \
-      .limit(5) \
-      .offset(3) \
-      .all()
+    singers = (
+      session
+        .query(Singer)
+        .order_by(Singer.last_name)
+        .limit(5)
+        .offset(3)
+        .all()
+    )
     num_singers = 0
     for singer in singers:
       num_singers = num_singers + 1
@@ -206,14 +212,16 @@ def print_albums_first_character_of_title_equal_to_first_or_last_name():
   print("Searching for albums that have a title that starts with the same "
         "character as the first or last name of the singer")
   with Session(read_only_engine) as session:
-    albums = session \
-      .query(Album) \
-      .join(Singer) \
-      .filter(or_(func.lower(func.substring(Album.title, 1, 1)) ==
-                  func.lower(func.substring(Singer.first_name, 1, 1)),
-                  func.lower(func.substring(Album.title, 1, 1)) ==
-                  func.lower(func.substring(Singer.last_name, 1, 1)))) \
-      .all()
+    albums = (
+      session
+        .query(Album)
+        .join(Singer)
+        .filter(or_(func.lower(func.substring(Album.title, 1, 1)) ==
+                    func.lower(func.substring(Singer.first_name, 1, 1)),
+                    func.lower(func.substring(Album.title, 1, 1)) ==
+                    func.lower(func.substring(Singer.last_name, 1, 1))))
+        .all()
+    )
     for album in albums:
       print("  '{}' by {}".format(album.title, album.singer.full_name))
 
@@ -221,7 +229,7 @@ def print_albums_first_character_of_title_equal_to_first_or_last_name():
 # Creates a random singer row with `num_albums` random albums.
 def create_random_singer(num_albums):
   return Singer(
-    id="{}".format(uuid4()),
+    id=str(uuid4()),
     first_name=random_first_name(),
     last_name=random_last_name(),
     active=True,
@@ -233,14 +241,16 @@ def create_random_singer(num_albums):
 def create_random_albums(num_albums):
   if num_albums == 0:
     return []
-  albums = [None] * num_albums
+  albums = []
   for i in range(num_albums):
-    albums[i] = Album(
-      id="{}".format(uuid4()),
-      title=random_album_title(),
-      release_date=random_release_date(),
-      marketing_budget=random_marketing_budget(),
-      cover_picture=random_cover_picture()
+    albums.append(
+      Album(
+        id=str(uuid4()),
+        title=random_album_title(),
+        release_date=random_release_date(),
+        marketing_budget=random_marketing_budget(),
+        cover_picture=random_cover_picture()
+      )
     )
   return albums
 

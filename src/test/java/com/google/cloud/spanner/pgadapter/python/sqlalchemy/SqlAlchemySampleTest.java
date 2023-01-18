@@ -503,13 +503,9 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
 
     String output = execute(SAMPLE_DIR, "test_get_singer.py", "localhost", pgServer.getLocalPort());
     assertEquals(
-        "singers(id='123-456-789',first_name='Myfirstname',last_name='Mylastname',active=True,"
-            + "created_at=datetime.datetime(2022, 2, 21, 10, 19, 18, tzinfo=datetime.timezone.utc),"
-            + "updated_at=datetime.datetime(2022, 2, 21, 10, 19, 18, tzinfo=datetime.timezone.utc))\n"
+        "singers(id='123-456-789',first_name='Myfirstname',last_name='Mylastname',active=True,created_at='2022-02-21T10:19:18+00:00',updated_at='2022-02-21T10:19:18+00:00')\n"
             + "Albums:\n"
-            + "[albums(id='987-654-321',title='My title',marketing_budget=Decimal('9423.13'),"
-            + "release_date=datetime.date(2002, 10, 17),cover_picture=b'cover picture',"
-            + "singer='123-456-789',created_at=datetime.datetime(2022, 2, 21, 10, 19, 18, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 2, 21, 10, 19, 18, tzinfo=datetime.timezone.utc))]\n",
+            + "[albums(id='987-654-321',title='My title',marketing_budget=Decimal('9423.13'),release_date=datetime.date(2002, 10, 17),cover_picture=b'cover picture',singer='123-456-789',created_at='2022-02-21T10:19:18+00:00',updated_at='2022-02-21T10:19:18+00:00')]\n",
         output);
   }
 
@@ -639,10 +635,10 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
 
     String output = execute(SAMPLE_DIR, "test_get_album.py", "localhost", pgServer.getLocalPort());
     assertEquals(
-        "albums(id='123-456-789',title='My title',marketing_budget=Decimal('9423.13'),release_date=datetime.date(2002, 10, 17),cover_picture=b'cover picture',singer='123-456-789',created_at=datetime.datetime(2022, 2, 21, 10, 19, 18, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2022, 2, 21, 10, 19, 18, tzinfo=datetime.timezone.utc))\n"
+        "albums(id='123-456-789',title='My title',marketing_budget=Decimal('9423.13'),release_date=datetime.date(2002, 10, 17),cover_picture=b'cover picture',singer='123-456-789',created_at='2022-02-21T10:19:18+00:00',updated_at='2022-02-21T10:19:18+00:00')\n"
             + "Tracks:\n"
-            + "[tracks(id='123-456-789',track_number=1,title='Track 1',sample_rate=6.34324,created_at=datetime.datetime(2018, 2, 28, 17, 0, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2018, 2, 1, 9, 0, tzinfo=datetime.timezone.utc)),"
-            + " tracks(id='123-456-789',track_number=2,title='Track 2',sample_rate=6.34324,created_at=datetime.datetime(2018, 2, 28, 17, 0, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2018, 2, 1, 9, 0, tzinfo=datetime.timezone.utc))]\n",
+            + "[tracks(id='123-456-789',track_number=1,title='Track 1',sample_rate=6.34324,created_at='2018-02-28T17:00:00+00:00',updated_at='2018-02-01T09:00:00+00:00'), "
+            + "tracks(id='123-456-789',track_number=2,title='Track 2',sample_rate=6.34324,created_at='2018-02-28T17:00:00+00:00',updated_at='2018-02-01T09:00:00+00:00')]\n",
         output);
   }
 
@@ -733,7 +729,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
 
     String output = execute(SAMPLE_DIR, "test_get_track.py", "localhost", pgServer.getLocalPort());
     assertEquals(
-        "tracks(id='987-654-321',track_number=1,title='Track 1',sample_rate=6.34324,created_at=datetime.datetime(2018, 2, 28, 17, 0, tzinfo=datetime.timezone.utc),updated_at=datetime.datetime(2018, 2, 1, 9, 0, tzinfo=datetime.timezone.utc))\n",
+        "tracks(id='987-654-321',track_number=1,title='Track 1',sample_rate=6.34324,created_at='2018-02-28T17:00:00+00:00',updated_at='2018-02-01T09:00:00+00:00')\n",
         output);
   }
 

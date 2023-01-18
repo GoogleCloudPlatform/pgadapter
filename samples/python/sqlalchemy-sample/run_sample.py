@@ -12,35 +12,16 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
-
-import sys
-
-
-def print_usage():
-  print()
-  print("Usage: `python run_sample.py <host> <port> <database>`")
-  print()
+import argparse
 
 
-if len(sys.argv) != 4:
-  print_usage()
-  raise ValueError("Invalid number of arguments. Expected 3")
-
-if not sys.argv[1]:
-  print_usage()
-  raise ValueError("Invalid host: {}".format(sys.argv[1]))
-
-if not sys.argv[2]:
-  print_usage()
-  raise ValueError("Invalid port: {}".format(sys.argv[2]))
-
-if not sys.argv[3]:
-  print_usage()
-  raise ValueError("Invalid database: {}".format(sys.argv[3]))
+parser = argparse.ArgumentParser(description='Run SQLAlchemy sample.')
+parser.add_argument('host', type=str, help='host to connect to')
+parser.add_argument('port', type=int, help='port number to connect to')
+parser.add_argument('database', type=str, help='database to connect to')
+args = parser.parse_args()
 
 
 from sample import run_sample
 
 run_sample()
-
-

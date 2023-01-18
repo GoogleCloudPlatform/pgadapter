@@ -605,6 +605,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
     String expectedOutput =
         "Insert failed: (psycopg2.errors.RaiseException) com.google.api.gax.rpc.AlreadyExistsException: io.grpc.StatusRuntimeException: ALREADY_EXISTS: Row with id 1 already exists";
     assertTrue(actualOutput, actualOutput.startsWith(expectedOutput));
+    assertFalse(actualOutput, actualOutput.contains("Getting the row after an error succeeded"));
 
     assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
