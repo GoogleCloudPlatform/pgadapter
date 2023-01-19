@@ -7,8 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Post {
+  id        String  @id
+  title     String
+  content   String?
+  published Boolean @default(false)
+  author    User?   @relation(fields:  [authorId], references: [id])
+  authorId  String?
+}
+
 model User {
-  id    Int     @id @default(autoincrement())
+  id    String  @id
   email String  @unique
   name  String?
+  posts Post[]
 }

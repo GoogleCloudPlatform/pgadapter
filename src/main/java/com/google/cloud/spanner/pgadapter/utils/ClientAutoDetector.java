@@ -26,6 +26,7 @@ import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaSt
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -47,6 +48,8 @@ public class ClientAutoDetector {
           SelectCurrentCatalogStatement.INSTANCE,
           SelectVersionStatement.INSTANCE,
           DjangoGetTableNamesStatement.INSTANCE);
+  private static final ImmutableSet<String> DEFAULT_CHECK_PG_CATALOG_PREFIXES =
+      ImmutableSet.of("pg_");
 
   public enum WellKnownClient {
     PSQL {
@@ -138,6 +141,14 @@ public class ClientAutoDetector {
       }
     },
     PRISMA {
+      private final ImmutableSet<String> checkPgCatalogPrefixes =
+          ImmutableSet.<String>builder()
+              .addAll(DEFAULT_CHECK_PG_CATALOG_PREFIXES)
+              .add("_prisma_migrations")
+              .build();
+      private final ImmutableMap<String, String> tableReplacements =
+          ImmutableMap.of("_prisma_migrations", "prisma_migrations");
+
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
         // Prisma does not send any unique connection parameters.
@@ -153,10 +164,30 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableMap<Pattern, Supplier<String>> getPgCatalogFunctionReplacements() {
+      public ImmutableSet<String> getPgCatalogCheckPrefixes() {
+        return checkPgCatalogPrefixes;
+      }
+
+      @Override
+      public ImmutableMap<String, String> getTableReplacements() {
+        return tableReplacements;
+      }
+
+      @Override
+      public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
         return ImmutableMap.of(
-            Pattern.compile("namespace.nspname\\s*=\\s*ANY\\s*\\(\\s\\$1\\s*\\)"),
-            () -> "\\$1::varchar[] is not null");
+            Pattern.compile("\\s+namespace\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+            () -> " \\$1::varchar[] is not null",
+            Pattern.compile("\\s+pg_namespace\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+            () -> " \\$1::varchar[] is not null",
+            Pattern.compile("\\s+n\\.nspname\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+            () -> " \\$1::varchar[] is not null",
+            Pattern.compile("\\s+table_schema\\s*=\\s*ANY\\s*\\(\\s*\\$1\\s*\\)"),
+            () -> " \\$1::varchar[] is not null",
+            Pattern.compile("format_type\\(.*,.*\\)"),
+            () -> "''",
+            Pattern.compile("pg_get_expr\\(.*,.*\\)"),
+            () -> "''");
       }
     },
     UNSPECIFIED {
@@ -188,7 +219,15 @@ public class ClientAutoDetector {
       return EMPTY_LOCAL_STATEMENTS;
     }
 
-    public ImmutableMap<Pattern, Supplier<String>> getPgCatalogFunctionReplacements() {
+    public ImmutableSet<String> getPgCatalogCheckPrefixes() {
+      return DEFAULT_CHECK_PG_CATALOG_PREFIXES;
+    }
+
+    public ImmutableMap<String, String> getTableReplacements() {
+      return ImmutableMap.of();
+    }
+
+    public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
       return ImmutableMap.of();
     }
 

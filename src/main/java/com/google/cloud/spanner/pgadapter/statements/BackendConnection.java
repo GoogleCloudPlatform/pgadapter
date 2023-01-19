@@ -61,6 +61,7 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
+import com.google.cloud.spanner.pgadapter.utils.LazyInit;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
@@ -88,6 +89,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -209,9 +211,10 @@ public class BackendConnection {
         //  block always ends with a ROLLBACK, PGAdapter should skip the entire execution of that
         //  block.
         SessionStatement sessionStatement = getSessionManagementStatement(parsedStatement);
-        if (!localStatements.isEmpty() && localStatements.containsKey(statement.getSql())) {
+        if (!localStatements.get().isEmpty()
+            && localStatements.get().containsKey(statement.getSql())) {
           result.set(
-              Objects.requireNonNull(localStatements.get(statement.getSql()))
+              Objects.requireNonNull(localStatements.get().get(statement.getSql()))
                   .execute(BackendConnection.this));
         } else if (sessionStatement != null) {
           result.set(sessionStatement.execute(sessionState));
@@ -254,7 +257,7 @@ public class BackendConnection {
           // Potentially replace pg_catalog table references with common table expressions.
           updatedStatement =
               sessionState.isReplacePgCatalogTables()
-                  ? pgCatalog.replacePgCatalogTables(statement)
+                  ? pgCatalog.get().replacePgCatalogTables(statement)
                   : statement;
           updatedStatement = bindStatement(updatedStatement);
           result.set(analyzeOrExecute(updatedStatement));
@@ -563,8 +566,8 @@ public class BackendConnection {
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
   private final SessionState sessionState;
-  private final PgCatalog pgCatalog;
-  private final ImmutableMap<String, LocalStatement> localStatements;
+  private final LazyInit<PgCatalog> pgCatalog;
+  private final LazyInit<ImmutableMap<String, LocalStatement>> localStatements;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
   private final String currentSchema = "public";
@@ -577,25 +580,37 @@ public class BackendConnection {
   BackendConnection(
       DatabaseId databaseId,
       Connection spannerConnection,
-      WellKnownClient wellKnownClient,
+      Supplier<WellKnownClient> wellKnownClient,
       OptionsMetadata optionsMetadata,
-      ImmutableList<LocalStatement> localStatements) {
+      Supplier<ImmutableList<LocalStatement>> localStatements) {
     this.sessionState = new SessionState(optionsMetadata);
-    this.pgCatalog = new PgCatalog(this.sessionState, wellKnownClient);
+    this.pgCatalog =
+        new LazyInit<PgCatalog>() {
+          @Override
+          protected PgCatalog initialize() {
+            return new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get());
+          }
+        };
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
-    if (localStatements.isEmpty()) {
-      this.localStatements = EMPTY_LOCAL_STATEMENTS;
-    } else {
-      Builder<String, LocalStatement> builder = ImmutableMap.builder();
-      for (LocalStatement localStatement : localStatements) {
-        for (String sql : localStatement.getSql()) {
-          builder.put(new SimpleImmutableEntry<>(sql, localStatement));
-        }
-      }
-      this.localStatements = builder.build();
-    }
+    this.localStatements =
+        new LazyInit<ImmutableMap<String, LocalStatement>>() {
+          @Override
+          protected ImmutableMap<String, LocalStatement> initialize() {
+            if (localStatements.get().isEmpty()) {
+              return EMPTY_LOCAL_STATEMENTS;
+            } else {
+              Builder<String, LocalStatement> builder = ImmutableMap.builder();
+              for (LocalStatement localStatement : localStatements.get()) {
+                for (String sql : localStatement.getSql()) {
+                  builder.put(new SimpleImmutableEntry<>(sql, localStatement));
+                }
+              }
+              return builder.build();
+            }
+          }
+        };
   }
 
   /** Returns the current connection state. */

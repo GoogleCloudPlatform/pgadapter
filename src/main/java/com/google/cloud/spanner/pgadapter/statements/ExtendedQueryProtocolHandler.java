@@ -40,9 +40,9 @@ public class ExtendedQueryProtocolHandler {
         new BackendConnection(
             connectionHandler.getDatabaseId(),
             connectionHandler.getSpannerConnection(),
-            connectionHandler.getWellKnownClient(),
+            connectionHandler::getWellKnownClient,
             connectionHandler.getServer().getOptions(),
-            connectionHandler.getWellKnownClient().getLocalStatements(connectionHandler));
+            () -> connectionHandler.getWellKnownClient().getLocalStatements(connectionHandler));
   }
 
   /** Constructor only intended for testing. */

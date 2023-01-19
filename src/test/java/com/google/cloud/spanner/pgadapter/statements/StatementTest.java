@@ -198,9 +198,9 @@ public class StatementTest {
         new BackendConnection(
             connectionHandler.getDatabaseId(),
             connection,
-            WellKnownClient.UNSPECIFIED,
+            () -> WellKnownClient.UNSPECIFIED,
             options,
-            EMPTY_LOCAL_STATEMENTS);
+            () -> EMPTY_LOCAL_STATEMENTS);
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("UPDATE", intermediateStatement.getCommand());
@@ -288,9 +288,9 @@ public class StatementTest {
         new BackendConnection(
             connectionHandler.getDatabaseId(),
             connection,
-            WellKnownClient.UNSPECIFIED,
+            () -> WellKnownClient.UNSPECIFIED,
             options,
-            EMPTY_LOCAL_STATEMENTS);
+            () -> EMPTY_LOCAL_STATEMENTS);
 
     intermediateStatement.executeAsync(backendConnection);
     backendConnection.flush();
@@ -327,9 +327,9 @@ public class StatementTest {
         new BackendConnection(
             connectionHandler.getDatabaseId(),
             connection,
-            WellKnownClient.UNSPECIFIED,
+            () -> WellKnownClient.UNSPECIFIED,
             options,
-            EMPTY_LOCAL_STATEMENTS);
+            () -> EMPTY_LOCAL_STATEMENTS);
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(
@@ -434,9 +434,9 @@ public class StatementTest {
         new BackendConnection(
             connectionHandler.getDatabaseId(),
             connection,
-            WellKnownClient.UNSPECIFIED,
+            () -> WellKnownClient.UNSPECIFIED,
             options,
-            EMPTY_LOCAL_STATEMENTS);
+            () -> EMPTY_LOCAL_STATEMENTS);
 
     when(connection.execute(Statement.of(sqlStatement)))
         .thenThrow(
@@ -500,9 +500,9 @@ public class StatementTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             connection,
-            WellKnownClient.UNSPECIFIED,
+            () -> WellKnownClient.UNSPECIFIED,
             options,
-            ImmutableList.of());
+            ImmutableList::of);
     statement.executeAsync(backendConnection);
 
     ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -572,9 +572,9 @@ public class StatementTest {
         new BackendConnection(
             connectionHandler.getDatabaseId(),
             connection,
-            WellKnownClient.UNSPECIFIED,
+            () -> WellKnownClient.UNSPECIFIED,
             options,
-            EMPTY_LOCAL_STATEMENTS);
+            () -> EMPTY_LOCAL_STATEMENTS);
 
     intermediateStatement.executeAsync(backendConnection);
 
@@ -597,9 +597,9 @@ public class StatementTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             connection,
-            WellKnownClient.UNSPECIFIED,
+            () -> WellKnownClient.UNSPECIFIED,
             options,
-            ImmutableList.of());
+            ImmutableList::of);
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
 
@@ -650,9 +650,9 @@ public class StatementTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             connection,
-            WellKnownClient.UNSPECIFIED,
+            () -> WellKnownClient.UNSPECIFIED,
             options,
-            ImmutableList.of());
+            ImmutableList::of);
 
     byte[] payload = "1\t'one'\n2".getBytes();
 

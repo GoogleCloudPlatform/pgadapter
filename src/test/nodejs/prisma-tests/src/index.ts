@@ -45,6 +45,11 @@ async function testSelect1(client: PrismaClient) {
   }
 }
 
+async function testFindAllUsers(client: PrismaClient) {
+  const allUsers = await client.user.findMany({take: 10});
+  console.log(allUsers);
+}
+
 require('yargs')
 .demand(4)
 .command(
@@ -52,6 +57,12 @@ require('yargs')
     'Executes SELECT 1',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testSelect1)
+)
+.command(
+    'testFindAllUsers <host> <port> <database>',
+    'Executes FindAllUsers',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testFindAllUsers)
 )
 .wrap(120)
 .recommendCommands()

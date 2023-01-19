@@ -17,10 +17,18 @@ package com.google.cloud.spanner.pgadapter.nodejs;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ListValue;
+import com.google.protobuf.Value;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
+import com.google.spanner.v1.ResultSet;
+import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.TypeCode;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -72,6 +80,81 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     assertTrue(planRequest.getTransaction().hasSingleUse());
     assertTrue(planRequest.getTransaction().getSingleUse().hasReadOnly());
     assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+  }
+
+  @Test
+  public void testFindAllUsers() throws Exception {
+    String sql =
+        "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" "
+            + "FROM \"public\".\"User\" WHERE 1=1 "
+            + "ORDER BY \"public\".\"User\".\"id\" ASC "
+            + "LIMIT $1 OFFSET $2";
+    ResultSetMetadata metadata =
+        createMetadata(
+            ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING),
+            ImmutableList.of("id", "email", "name"));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    metadata
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            createParameterTypesMetadata(
+                                    ImmutableList.of(TypeCode.INT64, TypeCode.INT64))
+                                .getUndeclaredParameters())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(10L).bind("p2").to(0L).build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("Peter").build())
+                        .addValues(Value.newBuilder().setStringValue("peter@prisma.com").build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("2").build())
+                        .addValues(Value.newBuilder().setStringValue("Alice").build())
+                        .addValues(Value.newBuilder().setStringValue("alice@prisma.com").build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("3").build())
+                        .addValues(Value.newBuilder().setStringValue("Hannah").build())
+                        .addValues(Value.newBuilder().setStringValue("hannah@prisma.com").build())
+                        .build())
+                .build()));
+
+    String output = runTest("testFindAllUsers", getHost(), pgServer.getLocalPort());
+
+    assertEquals(
+        "[\n"
+            + "  { id: 1, email: 'Peter', name: 'peter@prisma.com' },\n"
+            + "  { id: 2, email: 'Alice', name: 'alice@prisma.com' },\n"
+            + "  { id: 3, email: 'Hannah', name: 'hannah@prisma.com' }\n"
+            + "]\n",
+        output);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(2, executeSqlRequests.size());
+    ExecuteSqlRequest planRequest = executeSqlRequests.get(0);
+    assertTrue(planRequest.getTransaction().hasSingleUse());
+    assertTrue(planRequest.getTransaction().getSingleUse().hasReadOnly());
+    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.getTransaction().hasSingleUse());
+    assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
   }
 
   static String runTest(String testName, String host, int port)

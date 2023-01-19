@@ -35,7 +35,7 @@ import javax.annotation.Nonnull;
 
 @InternalApi
 public class PgCatalog {
-  private static final ImmutableMap<TableOrIndexName, TableOrIndexName> TABLE_REPLACEMENTS =
+  private static final ImmutableMap<TableOrIndexName, TableOrIndexName> DEFAULT_TABLE_REPLACEMENTS =
       ImmutableMap.<TableOrIndexName, TableOrIndexName>builder()
           .put(
               new TableOrIndexName("pg_catalog", "pg_namespace"),
@@ -61,7 +61,27 @@ public class PgCatalog {
               new TableOrIndexName("pg_catalog", "pg_settings"),
               new TableOrIndexName(null, "pg_settings"))
           .put(new TableOrIndexName(null, "pg_settings"), new TableOrIndexName(null, "pg_settings"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_constraint"),
+              new TableOrIndexName(null, "pg_constraint"))
+          .put(
+              new TableOrIndexName(null, "pg_constraint"),
+              new TableOrIndexName(null, "pg_constraint"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_attribute"),
+              new TableOrIndexName(null, "pg_attribute"))
+          .put(
+              new TableOrIndexName(null, "pg_attribute"),
+              new TableOrIndexName(null, "pg_attribute"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_attrdef"),
+              new TableOrIndexName(null, "pg_attrdef"))
+          .put(new TableOrIndexName(null, "pg_attrdef"), new TableOrIndexName(null, "pg_attrdef"))
           .build();
+
+  private final ImmutableSet<String> checkPrefixes;
+
+  private final ImmutableMap<TableOrIndexName, TableOrIndexName> tableReplacements;
 
   private final ImmutableMap<Pattern, Supplier<String>> functionReplacements;
 
@@ -73,11 +93,22 @@ public class PgCatalog {
           new TableOrIndexName(null, "pg_enum"), new PgEnum(),
           new TableOrIndexName(null, "pg_range"), new PgRange(),
           new TableOrIndexName(null, "pg_type"), new PgType(),
-          new TableOrIndexName(null, "pg_settings"), new PgSettings());
+          new TableOrIndexName(null, "pg_settings"), new PgSettings(),
+          new TableOrIndexName(null, "pg_constraint"), new PgConstraint(),
+          new TableOrIndexName(null, "pg_attribute"), new PgAttribute(),
+          new TableOrIndexName(null, "pg_attrdef"), new PgAttrdef());
   private final SessionState sessionState;
 
   public PgCatalog(@Nonnull SessionState sessionState, @Nonnull WellKnownClient wellKnownClient) {
     this.sessionState = Preconditions.checkNotNull(sessionState);
+    this.checkPrefixes = wellKnownClient.getPgCatalogCheckPrefixes();
+    ImmutableMap.Builder<TableOrIndexName, TableOrIndexName> builder =
+        ImmutableMap.<TableOrIndexName, TableOrIndexName>builder()
+            .putAll(DEFAULT_TABLE_REPLACEMENTS);
+    wellKnownClient
+        .getTableReplacements()
+        .forEach((k, v) -> builder.put(TableOrIndexName.of(k), TableOrIndexName.of(v)));
+    this.tableReplacements = builder.build();
     this.functionReplacements =
         ImmutableMap.<Pattern, Supplier<String>>builder()
             .put(Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), () -> "true")
@@ -85,14 +116,26 @@ public class PgCatalog {
             .put(Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), () -> "'public'")
             .put(
                 Pattern.compile("version\\(\\)"), () -> "'" + sessionState.getServerVersion() + "'")
-            .putAll(wellKnownClient.getPgCatalogFunctionReplacements())
+            .putAll(wellKnownClient.getFunctionReplacements())
             .build();
   }
 
   /** Replace supported pg_catalog tables with Common Table Expressions. */
   public Statement replacePgCatalogTables(Statement statement) {
+    // Do a quick check first before doing a full check.
+    boolean potentialMatch = false;
+    for (String checkPrefix : this.checkPrefixes) {
+      if (statement.getSql().contains(checkPrefix)) {
+        potentialMatch = true;
+        break;
+      }
+    }
+    if (!potentialMatch) {
+      return statement;
+    }
+
     Tuple<Set<TableOrIndexName>, Statement> replacedTablesStatement =
-        new TableParser(statement).detectAndReplaceTables(TABLE_REPLACEMENTS);
+        new TableParser(statement).detectAndReplaceTables(tableReplacements);
     if (replacedTablesStatement.x().isEmpty()) {
       return replacedTablesStatement.y();
     }
@@ -120,6 +163,10 @@ public class PgCatalog {
   }
 
   Statement addCommonTableExpressions(Statement statement, ImmutableList<String> tableExpressions) {
+    if (tableExpressions.isEmpty()) {
+      return statement;
+    }
+
     String sql = replaceKnownUnsupportedFunctions(statement);
     SimpleParser parser = new SimpleParser(sql);
     boolean hadCommonTableExpressions = parser.eatKeyword("with");
@@ -404,6 +451,56 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return PG_RANGE_CTE;
+    }
+  }
+
+  private static class PgAttribute implements PgCatalogTable {
+    private static final String PG_ATTRIBUTE_CTE =
+        "pg_attribute as (\n"
+            + "select * from ("
+            + "select 0::bigint as attrelid, '' as attname, 0::bigint as atttypid, 0::bigint as attstattarget, "
+            + "0::bigint as attlen, 0::bigint as attnum, 0::bigint as attndims, -1::bigint as attcacheoff, "
+            + "0::bigint as atttypmod, true as attbyval, '' as attalign, '' as attstorage, '' as attcompression, "
+            + "false as attnotnull, true as atthasdef, false as atthasmissing, '' as attidentity, '' as attgenerated, "
+            + "false as attisdropped, true as attislocal, 0 as attinhcount, 0 as attcollation, '{}'::bigint[] as attacl, "
+            + "'{}'::text[] as attoptions, '{}'::text[] as attfdwoptions, null as attmissingval\n"
+            + ") a where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_ATTRIBUTE_CTE;
+    }
+  }
+
+  private static class PgAttrdef implements PgCatalogTable {
+    private static final String PG_ATTRDEF_CTE =
+        "pg_attrdef as (\n"
+            + "select * from ("
+            + "select 0::bigint as oid, 0 as adrelid, 0::bigint as adnum, '' as adbin\n"
+            + ") a where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_ATTRDEF_CTE;
+    }
+  }
+
+  private static class PgConstraint implements PgCatalogTable {
+    private static final String PG_CONSTRAINT_CTE =
+        "pg_constraint as (\n"
+            + "select * from ("
+            + "select 0::bigint as oid, '' as conname, 0::bigint as connamespace, '' as contype, "
+            + "false as condeferrable, false as condeferred, true as convalidated, 0 as conrelid, "
+            + "0 as contypid, 0 as conindid, 0 as conparentid, 0 as confrelid, '' as confupdtype, "
+            + "'' as confdeltype, '' as confmatchtype, true as conislocal, 0 as coninhcount, "
+            + "true as connoinherit, '{}'::bigint[] as conkey, '{}'::bigint[] as confkey, "
+            + "'{}'::bigint[] as conpfeqop, '{}'::bigint[] as conppeqop, '{}'::bigint[] as conffeqop, "
+            + "'{}'::bigint[] as confdelsetcols, '{}'::bigint[] as conexclop, null as conbin\n"
+            + ") c where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_CONSTRAINT_CTE;
     }
   }
 }
