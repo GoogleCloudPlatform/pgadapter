@@ -52,7 +52,8 @@ public class RowDescriptionResponse extends WireOutput {
       IntermediateStatement statement,
       Type columns,
       OptionsMetadata options,
-      QueryMode mode) {
+      QueryMode mode)
+      throws Exception {
     super(output, calculateLength(columns));
     this.statement = statement;
     this.columns = columns;
@@ -83,18 +84,18 @@ public class RowDescriptionResponse extends WireOutput {
   protected void sendPayload() throws Exception {
     this.outputStream.writeShort(this.columnCount);
     DataFormat defaultFormat = DataFormat.getDataFormat(0, this.statement, this.mode, this.options);
-    for (int column_index = 0; /* columns start at 0 */
-        column_index < this.columnCount;
-        column_index++) {
+    for (int columnIndex = 0; /* columns start at 0 */
+        columnIndex < this.columnCount;
+        columnIndex++) {
       this.outputStream.write(
-          this.columns.getStructFields().get(column_index).getName().getBytes(UTF8));
+          this.columns.getStructFields().get(columnIndex).getName().getBytes(UTF8));
       // If it can be identified as a column of a table, the object ID of the table.
       this.outputStream.writeByte(DEFAULT_FLAG);
       // If it can be identified as a column of a table, the attribute number of the column
       this.outputStream.writeInt(DEFAULT_FLAG);
       // The object ID of the field's data type.
       this.outputStream.writeShort(DEFAULT_FLAG);
-      int oidType = getOidType(column_index);
+      int oidType = getOidType(columnIndex);
       this.outputStream.writeInt(oidType);
       this.outputStream.writeShort(getOidTypeSize(oidType));
       // The type modifier. The meaning of the modifier is type-specific.
@@ -103,7 +104,7 @@ public class RowDescriptionResponse extends WireOutput {
       short format =
           this.statement == null
               ? defaultFormat.getCode()
-              : this.statement.getResultFormatCode(column_index);
+              : this.statement.getResultFormatCode(columnIndex);
       this.outputStream.writeShort(format);
     }
   }

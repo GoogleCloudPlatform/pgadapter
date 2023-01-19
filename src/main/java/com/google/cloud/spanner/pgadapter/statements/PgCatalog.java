@@ -83,7 +83,8 @@ public class PgCatalog {
             Pattern.compile("pg_table_is_visible\\(.+\\)"), () -> "true",
             Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), () -> "'public'",
             Pattern.compile("version\\(\\)"), sessionState::getServerVersion,
-            Pattern.compile("namespace.nspname\\s*=\\s*ANY\\s*\\(\\s\\$1\\s*\\)"), () -> "\\$1::varchar[] is not null");
+            Pattern.compile("namespace.nspname\\s*=\\s*ANY\\s*\\(\\s\\$1\\s*\\)"),
+                () -> "\\$1::varchar[] is not null");
   }
 
   /** Replace supported pg_catalog tables with Common Table Expressions. */

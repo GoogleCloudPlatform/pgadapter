@@ -98,8 +98,8 @@ public abstract class Parser<T> {
         return new JsonbParser(item, formatCode);
       case Oid.UNSPECIFIED:
       default:
+        // Try to use a generic string value if we don't know the type.
         return new UnspecifiedParser(item, formatCode);
-//        throw new IllegalArgumentException("Unsupported parameter type: " + oidType);
     }
   }
 
