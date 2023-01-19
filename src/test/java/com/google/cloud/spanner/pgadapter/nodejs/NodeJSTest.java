@@ -35,8 +35,12 @@ public interface NodeJSTest {
     builder.directory(new File(testFilePath));
 
     Process process = builder.start();
-    int res = process.waitFor();
-    assertEquals(0, res);
+    InputStream errorStream = process.getErrorStream();
+    process.waitFor();
+
+    String errors = readAll(errorStream);
+    assertEquals("", errors);
+    assertEquals(errors, 0, process.exitValue());
   }
 
   static String runTest(String directory, String testName, String host, int port, String database)

@@ -52,6 +52,7 @@ import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResu
 import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.common.collect.ImmutableList;
@@ -134,6 +135,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList.of());
 
@@ -168,6 +170,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList.of());
     Future<StatementResult> result =
@@ -205,6 +208,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList.of());
     onlyDmlStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
@@ -216,6 +220,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList.of());
     onlyCopyStatements.executeCopy(parsedCopyStatement, copyStatement, receiver, writer, executor);
@@ -227,6 +232,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList.of());
     dmlAndCopyStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
@@ -239,6 +245,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList.of());
     onlySelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
@@ -250,6 +257,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList.of());
     onlyClientSideStatements.execute(
@@ -263,6 +271,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList.of());
     onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
@@ -274,6 +283,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList.of());
     dmlAndSelectStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
@@ -285,6 +295,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList.of());
     copyAndSelectStatements.executeCopy(
@@ -297,6 +308,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             spannerConnection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             ImmutableList.of());
     copyAndUnknownStatements.executeCopy(
@@ -323,7 +335,11 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
-            DatabaseId.of("p", "i", "d"), connection, mock(OptionsMetadata.class), localStatements);
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            localStatements);
     Future<StatementResult> resultFuture =
         backendConnection.execute(
             parsedListDatabasesStatement,
@@ -355,7 +371,11 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
-            DatabaseId.of("p", "i", "d"), connection, mock(OptionsMetadata.class), localStatements);
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            localStatements);
     Future<StatementResult> resultFuture =
         backendConnection.execute(parsedStatement, statement, Function.identity());
     backendConnection.flush();
@@ -388,6 +408,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             connection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             EMPTY_LOCAL_STATEMENTS);
     Future<StatementResult> resultFuture =
@@ -412,6 +433,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             connection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             EMPTY_LOCAL_STATEMENTS);
     Future<StatementResult> resultFuture =
@@ -449,6 +471,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             connection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             EMPTY_LOCAL_STATEMENTS);
     Future<StatementResult> resultFuture1 =
@@ -474,7 +497,11 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
-            DatabaseId.of("p", "i", "d"), connection, options, EMPTY_LOCAL_STATEMENTS);
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            WellKnownClient.UNSPECIFIED,
+            options,
+            EMPTY_LOCAL_STATEMENTS);
 
     backendConnection.execute(parsedStatement, statement, Function.identity());
     backendConnection.flush();
@@ -517,7 +544,11 @@ public class BackendConnectionTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
-            DatabaseId.of("p", "i", "d"), connection, options, EMPTY_LOCAL_STATEMENTS);
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            WellKnownClient.UNSPECIFIED,
+            options,
+            EMPTY_LOCAL_STATEMENTS);
 
     backendConnection.execute(parsedStatement, statement, Function.identity());
     backendConnection.flush();
@@ -537,6 +568,7 @@ public class BackendConnectionTest {
         new BackendConnection(
             DatabaseId.of("p", "i", "d"),
             connection,
+            WellKnownClient.UNSPECIFIED,
             mock(OptionsMetadata.class),
             EMPTY_LOCAL_STATEMENTS);
 

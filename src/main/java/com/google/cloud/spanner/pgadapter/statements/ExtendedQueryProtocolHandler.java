@@ -40,6 +40,7 @@ public class ExtendedQueryProtocolHandler {
         new BackendConnection(
             connectionHandler.getDatabaseId(),
             connectionHandler.getSpannerConnection(),
+            connectionHandler.getWellKnownClient(),
             connectionHandler.getServer().getOptions(),
             connectionHandler.getWellKnownClient().getLocalStatements(connectionHandler));
   }

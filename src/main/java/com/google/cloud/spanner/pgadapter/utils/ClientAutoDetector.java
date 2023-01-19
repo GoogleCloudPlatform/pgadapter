@@ -28,6 +28,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import org.postgresql.core.Oid;
 
@@ -135,6 +137,28 @@ public class ClientAutoDetector {
                         + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n");
       }
     },
+    PRISMA {
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // Prisma does not send any unique connection parameters.
+        return false;
+      }
+
+      @Override
+      boolean isClient(List<Statement> statements) {
+        // https://github.com/prisma/quaint/blob/6df49f14efe99696e577ffb9902c83b09bec8de2/src/connector/postgres.rs#L554
+        return statements.size() == 1
+            && Character.isWhitespace(statements.get(0).getSql().charAt(0))
+            && statements.get(0).getSql().contains("SET NAMES 'UTF8';");
+      }
+
+      @Override
+      public ImmutableMap<Pattern, Supplier<String>> getPgCatalogFunctionReplacements() {
+        return ImmutableMap.of(
+            Pattern.compile("namespace.nspname\\s*=\\s*ANY\\s*\\(\\s\\$1\\s*\\)"),
+            () -> "\\$1::varchar[] is not null");
+      }
+    },
     UNSPECIFIED {
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -162,6 +186,10 @@ public class ClientAutoDetector {
         return DEFAULT_LOCAL_STATEMENTS;
       }
       return EMPTY_LOCAL_STATEMENTS;
+    }
+
+    public ImmutableMap<Pattern, Supplier<String>> getPgCatalogFunctionReplacements() {
+      return ImmutableMap.of();
     }
 
     public ImmutableMap<String, String> getDefaultParameters() {

@@ -20,6 +20,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -75,16 +76,17 @@ public class PgCatalog {
           new TableOrIndexName(null, "pg_settings"), new PgSettings());
   private final SessionState sessionState;
 
-  public PgCatalog(@Nonnull SessionState sessionState) {
+  public PgCatalog(@Nonnull SessionState sessionState, @Nonnull WellKnownClient wellKnownClient) {
     this.sessionState = Preconditions.checkNotNull(sessionState);
     this.functionReplacements =
-        ImmutableMap.of(
-            Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), () -> "true",
-            Pattern.compile("pg_table_is_visible\\(.+\\)"), () -> "true",
-            Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), () -> "'public'",
-            Pattern.compile("version\\(\\)"), sessionState::getServerVersion,
-            Pattern.compile("namespace.nspname\\s*=\\s*ANY\\s*\\(\\s\\$1\\s*\\)"),
-                () -> "\\$1::varchar[] is not null");
+        ImmutableMap.<Pattern, Supplier<String>>builder()
+            .put(Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), () -> "true")
+            .put(Pattern.compile("pg_table_is_visible\\(.+\\)"), () -> "true")
+            .put(Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), () -> "'public'")
+            .put(
+                Pattern.compile("version\\(\\)"), () -> "'" + sessionState.getServerVersion() + "'")
+            .putAll(wellKnownClient.getPgCatalogFunctionReplacements())
+            .build();
   }
 
   /** Replace supported pg_catalog tables with Common Table Expressions. */

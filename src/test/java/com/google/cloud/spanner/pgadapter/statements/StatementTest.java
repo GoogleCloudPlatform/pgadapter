@@ -53,6 +53,7 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
@@ -195,7 +196,11 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
-            connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
+            connectionHandler.getDatabaseId(),
+            connection,
+            WellKnownClient.UNSPECIFIED,
+            options,
+            EMPTY_LOCAL_STATEMENTS);
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("UPDATE", intermediateStatement.getCommand());
@@ -281,7 +286,11 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
-            connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
+            connectionHandler.getDatabaseId(),
+            connection,
+            WellKnownClient.UNSPECIFIED,
+            options,
+            EMPTY_LOCAL_STATEMENTS);
 
     intermediateStatement.executeAsync(backendConnection);
     backendConnection.flush();
@@ -316,7 +325,11 @@ public class StatementTest {
             .build();
     BackendConnection backendConnection =
         new BackendConnection(
-            connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
+            connectionHandler.getDatabaseId(),
+            connection,
+            WellKnownClient.UNSPECIFIED,
+            options,
+            EMPTY_LOCAL_STATEMENTS);
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(
@@ -419,7 +432,11 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
-            connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
+            connectionHandler.getDatabaseId(),
+            connection,
+            WellKnownClient.UNSPECIFIED,
+            options,
+            EMPTY_LOCAL_STATEMENTS);
 
     when(connection.execute(Statement.of(sqlStatement)))
         .thenThrow(
@@ -481,7 +498,11 @@ public class StatementTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
-            DatabaseId.of("p", "i", "d"), connection, options, ImmutableList.of());
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            WellKnownClient.UNSPECIFIED,
+            options,
+            ImmutableList.of());
     statement.executeAsync(backendConnection);
 
     ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -549,7 +570,11 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
-            connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
+            connectionHandler.getDatabaseId(),
+            connection,
+            WellKnownClient.UNSPECIFIED,
+            options,
+            EMPTY_LOCAL_STATEMENTS);
 
     intermediateStatement.executeAsync(backendConnection);
 
@@ -570,7 +595,11 @@ public class StatementTest {
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
-            DatabaseId.of("p", "i", "d"), connection, options, ImmutableList.of());
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            WellKnownClient.UNSPECIFIED,
+            options,
+            ImmutableList.of());
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
 
@@ -619,7 +648,11 @@ public class StatementTest {
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
-            DatabaseId.of("p", "i", "d"), connection, options, ImmutableList.of());
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            WellKnownClient.UNSPECIFIED,
+            options,
+            ImmutableList.of());
 
     byte[] payload = "1\t'one'\n2".getBytes();
 
