@@ -236,6 +236,9 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
       // returned.
       while (!rollback.get() && iterator.hasNext()) {
         CopyRecord record = iterator.next();
+        if (record.isEndRecord()) {
+          break;
+        }
         if (record.numColumns() != this.tableColumns.keySet().size()) {
           throw PGExceptionFactory.newPGException(
               "Invalid COPY data: Row length mismatched. Expected "

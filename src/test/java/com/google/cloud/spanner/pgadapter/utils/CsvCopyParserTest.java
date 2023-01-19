@@ -43,7 +43,6 @@ public class CsvCopyParserTest {
 
   @Test
   public void testCanCreateIterator() throws IOException {
-
     CsvCopyParser parser =
         new CsvCopyParser(
             mock(SessionState.class),
