@@ -30,6 +30,8 @@ import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Scanner;
 import org.junit.BeforeClass;
 import org.postgresql.core.Oid;
@@ -582,14 +584,23 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
     builder.command(runCommand);
     builder.directory(new File("./src/test/csharp/pgadapter_npgsql_tests/npgsql_tests"));
     Process process = builder.start();
-    Scanner scanner = new Scanner(process.getInputStream());
-    StringBuilder output = new StringBuilder();
-    while (scanner.hasNextLine()) {
-      output.append(scanner.nextLine()).append("\n");
-    }
+    String output = readAll(process.getInputStream());
+    String errors = readAll(process.getErrorStream());
     int result = process.waitFor();
-    assertEquals(output.toString(), 0, result);
+    assertEquals(errors, 0, result);
 
-    return output.toString();
+    return output;
   }
+
+
+  static String readAll(InputStream inputStream) {
+    StringBuilder result = new StringBuilder();
+    try (Scanner scanner = new Scanner(new InputStreamReader(inputStream))) {
+      while (scanner.hasNextLine()) {
+        result.append(scanner.nextLine()).append("\n");
+      }
+    }
+    return result.toString();
+  }
+
 }

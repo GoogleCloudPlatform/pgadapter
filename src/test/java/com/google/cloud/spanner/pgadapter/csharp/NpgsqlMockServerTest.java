@@ -155,8 +155,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   public void testInsertAllDataTypes() throws IOException, InterruptedException {
     String sql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8)";
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -176,6 +176,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .to(Date.parseDate("2022-04-02"))
                 .bind("p8")
                 .to("test_string")
+                .bind("p9")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                 .build(),
             1L));
 

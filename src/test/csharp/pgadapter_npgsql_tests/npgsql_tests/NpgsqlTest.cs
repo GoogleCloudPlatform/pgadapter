@@ -188,8 +188,8 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8)";
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
         using var cmd = new NpgsqlCommand(sql, connection)
         {
             Parameters =
@@ -202,6 +202,7 @@ public class NpgsqlTest
                 new () {Value = DateTime.Parse("2022-03-24T08:39:10.1234568+02:00").ToUniversalTime(), DbType = DbType.DateTimeOffset},
                 new () {Value = DateTime.Parse("2022-04-02"), DbType = DbType.Date},
                 new () {Value = "test_string"},
+                new () {Value = System.Text.Json.JsonDocument.Parse("{\"key\":\"value\"}")},
             }
         };
         var updateCount = cmd.ExecuteNonQuery();
