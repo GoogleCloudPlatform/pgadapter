@@ -592,7 +592,6 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
     return output;
   }
 
-
   static String readAll(InputStream inputStream) {
     StringBuilder result = new StringBuilder();
     try (Scanner scanner = new Scanner(new InputStreamReader(inputStream))) {
@@ -602,5 +601,4 @@ public abstract class AbstractNpgsqlMockServerTest extends AbstractMockServerTes
     }
     return result.toString();
   }
-
 }

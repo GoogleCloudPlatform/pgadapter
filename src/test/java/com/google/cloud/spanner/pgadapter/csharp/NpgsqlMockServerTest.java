@@ -24,6 +24,7 @@ import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
@@ -31,6 +32,7 @@ import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
@@ -152,11 +154,9 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   }
 
   @Test
-  public void testInsertAllDataTypes() throws IOException, InterruptedException {
+  public void testUpdateAllDataTypes() throws IOException, InterruptedException {
     String sql =
-        "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+        "UPDATE all_types SET col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 WHERE col_varchar = $11";
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -169,14 +169,62 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .bind("p4")
                 .to(3.14d)
                 .bind("p5")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .to(1L)
                 .bind("p6")
-                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
                 .bind("p7")
-                .to(Date.parseDate("2022-04-02"))
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
                 .bind("p8")
-                .to("test_string")
+                .to(Date.parseDate("2022-04-02"))
                 .bind("p9")
+                .to("test_string")
+                .bind("p10")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
+                .bind("p11")
+                .to("test")
+                .build(),
+            1L));
+
+    String result = execute("TestUpdateAllDataTypes", createConnectionString());
+    assertEquals("Success\n", result);
+
+    List<ExecuteSqlRequest> requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, requests.size());
+    ExecuteSqlRequest request = requests.get(0);
+    assertEquals(QueryMode.NORMAL, request.getQueryMode());
+  }
+
+  @Test
+  public void testInsertAllDataTypes() throws IOException, InterruptedException {
+    String sql =
+        "INSERT INTO all_types "
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to(100L)
+                .bind("p2")
+                .to(true)
+                .bind("p3")
+                .to(ByteArray.copyFrom("test_bytes"))
+                .bind("p4")
+                .to(3.14d)
+                .bind("p5")
+                .to(100)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .bind("p7")
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .bind("p8")
+                .to(Date.parseDate("2022-04-02"))
+                .bind("p9")
+                .to("test_string")
+                .bind("p10")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                 .build(),
             1L));
@@ -197,8 +245,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   public void testInsertNullsAllDataTypes() throws IOException, InterruptedException {
     String sql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -220,6 +268,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .to((com.google.cloud.spanner.Value) null)
                 .bind("p9")
                 .to((com.google.cloud.spanner.Value) null)
+                .bind("p10")
+                .to((com.google.cloud.spanner.Value) null)
                 .build(),
             1L));
 
@@ -237,6 +287,70 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     // The ID is typed (INT64)
     assertEquals(1, request.getParamTypesMap().size());
     assertEquals(TypeCode.INT64, request.getParamTypesMap().get("p1").getCode());
+    assertEquals(QueryMode.NORMAL, request.getQueryMode());
+  }
+
+  @Test
+  public void testInsertAllDataTypesReturning() throws IOException, InterruptedException {
+    String sql =
+        "INSERT INTO all_types "
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(true)
+                .bind("p3")
+                .to(ByteArray.copyFrom("test_bytes"))
+                .bind("p4")
+                .to(3.14d)
+                .bind("p5")
+                .to(100L)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .bind("p7")
+                .to(Timestamp.parseTimestamp("2022-02-16T13:18:02.123456000Z"))
+                .bind("p8")
+                .to(Date.parseDate("2022-03-29"))
+                .bind("p9")
+                .to("test_string")
+                .bind("p10")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ALL_TYPES_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            createParameterTypesMetadata(
+                                    ImmutableList.of(
+                                        TypeCode.INT64,
+                                        TypeCode.BOOL,
+                                        TypeCode.BYTES,
+                                        TypeCode.FLOAT64,
+                                        TypeCode.INT64,
+                                        TypeCode.NUMERIC,
+                                        TypeCode.TIMESTAMP,
+                                        TypeCode.DATE,
+                                        TypeCode.STRING,
+                                        TypeCode.JSON))
+                                .getUndeclaredParameters()))
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+                .addRows(ALL_TYPES_RESULTSET.getRows(0))
+                .build()));
+
+    String result = execute("TestInsertAllDataTypesReturning", createConnectionString());
+    assertEquals("Success\n", result);
+
+    List<ExecuteSqlRequest> requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, requests.size());
+    ExecuteSqlRequest request = requests.get(0);
     assertEquals(QueryMode.NORMAL, request.getQueryMode());
   }
 }
