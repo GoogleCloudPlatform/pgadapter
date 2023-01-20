@@ -393,5 +393,44 @@ public class NpgsqlTest
         }
         Console.WriteLine("Success");
     }
+
+    public void TestInsertBatch()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+
+        var sql =
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+
+        var batchSize = 10;
+        using var batch = new NpgsqlBatch(connection);
+        for (var i = 0; i < batchSize; i++)
+        {
+            batch.BatchCommands.Add(new NpgsqlBatchCommand(sql)
+            {
+                Parameters =
+                {
+                    new () {Value = 100L + i},
+                    new () {Value = i%2 == 0},
+                    new () {Value = Encoding.UTF8.GetBytes(i + "test_bytes")},
+                    new () {Value = 3.14d + i},
+                    new () {Value = i},
+                    new () {Value = i + 0.123m},
+                    new () {Value = DateTime.Parse($"2022-03-24 {i:D2}:39:10.123456000+00").ToUniversalTime(), DbType = DbType.DateTimeOffset},
+                    new () {Value = DateTime.Parse($"2022-04-{i+1:D2}"), DbType = DbType.Date},
+                    new () {Value = "test_string" + i},
+                    new () {Value = JsonDocument.Parse($"{{\"key\":\"value{i}\"}}")},
+                }
+            });
+        }
+        var updateCount = batch.ExecuteNonQuery();
+        if (updateCount != batchSize)
+        {
+            Console.WriteLine($"Update count mismatch. Got: {updateCount}, Want: {batchSize}");
+            return;
+        }
+        Console.WriteLine("Success");
+    }
     
 }

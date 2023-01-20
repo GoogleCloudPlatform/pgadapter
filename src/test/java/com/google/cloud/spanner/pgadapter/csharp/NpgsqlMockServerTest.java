@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.csharp;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
@@ -28,6 +29,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
@@ -352,5 +354,55 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     assertEquals(1, requests.size());
     ExecuteSqlRequest request = requests.get(0);
     assertEquals(QueryMode.NORMAL, request.getQueryMode());
+  }
+
+  @Test
+  public void testInsertBatch() throws IOException, InterruptedException {
+    String sql =
+        "INSERT INTO all_types "
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+    int batchSize = 10;
+    for (int i = 0; i < batchSize; i++) {
+      mockSpanner.putStatementResult(
+          StatementResult.update(
+              Statement.newBuilder(sql)
+                  .bind("p1")
+                  .to(100L + i)
+                  .bind("p2")
+                  .to(i % 2 == 0)
+                  .bind("p3")
+                  .to(ByteArray.copyFrom(i + "test_bytes"))
+                  .bind("p4")
+                  .to(3.14d + i)
+                  .bind("p5")
+                  .to(i)
+                  .bind("p6")
+                  .to(com.google.cloud.spanner.Value.pgNumeric(i + ".123"))
+                  .bind("p7")
+                  .to(
+                      Timestamp.parseTimestamp(
+                          String.format("2022-03-24T%02d:39:10.123456000Z", i)))
+                  .bind("p8")
+                  .to(Date.parseDate(String.format("2022-04-%02d", i + 1)))
+                  .bind("p9")
+                  .to("test_string" + i)
+                  .bind("p10")
+                  .to(
+                      com.google.cloud.spanner.Value.pgJsonb(
+                          String.format("{\"key\":\"value%d\"}", i)))
+                  .build(),
+              1L));
+    }
+
+    String result = execute("TestInsertBatch", createConnectionString());
+    assertEquals("Success\n", result);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest batchDmlRequest =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertEquals(batchSize, batchDmlRequest.getStatementsCount());
+    assertTrue(batchDmlRequest.getTransaction().hasBegin());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 }
