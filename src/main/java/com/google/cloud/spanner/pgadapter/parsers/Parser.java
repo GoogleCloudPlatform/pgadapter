@@ -97,9 +97,12 @@ public abstract class Parser<T> {
       case Oid.JSONB:
         return new JsonbParser(item, formatCode);
       case Oid.UNSPECIFIED:
-        return new UnspecifiedParser(item, formatCode);
       default:
-        throw new IllegalArgumentException("Unsupported parameter type: " + oidType);
+        // Use the UnspecifiedParser for unknown types. This will encode the parameter value as a
+        // string and send it to Spanner without any type information. This will ensure that clients
+        // that for example send char instead of varchar as the type code for a parameter would
+        // still work.
+        return new UnspecifiedParser(item, formatCode);
     }
   }
 
