@@ -15,6 +15,7 @@
 using System.Data;
 using Npgsql;
 using NpgsqlTypes;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -639,6 +640,10 @@ public class NpgsqlTest
 
     public void TestBinaryCopyOut()
     {
+        var nfi = new NumberFormatInfo
+        {
+            NumberDecimalSeparator = "."
+        };
         using var connection = new NpgsqlConnection(ConnectionString);
         connection.Open();
         
@@ -686,7 +691,7 @@ public class NpgsqlTest
                 }
                 else
                 {
-                    Console.Write(reader.Read<double>(NpgsqlDbType.Double));
+                    Console.Write(reader.Read<double>(NpgsqlDbType.Double).ToString(nfi));
                 }
                 Console.Write("\t");
                 if (reader.IsNull)
@@ -706,7 +711,7 @@ public class NpgsqlTest
                 }
                 else
                 {
-                    Console.Write(reader.Read<decimal>(NpgsqlDbType.Numeric));
+                    Console.Write(reader.Read<decimal>(NpgsqlDbType.Numeric).ToString(nfi));
                 }
                 Console.Write("\t");
                 if (reader.IsNull)

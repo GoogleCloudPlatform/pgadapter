@@ -529,7 +529,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
     String result = execute("TestBinaryCopyOut", createConnectionString());
     assertEquals(
-        "1\tTrue\tdGVzdA==\t3,14\t100\t6,626\t20220216T131802123456\t20220329\ttest\t{\"key\": \"value\"}\n"
+        "1\tTrue\tdGVzdA==\t3.14\t100\t6.626\t20220216T131802123456\t20220329\ttest\t{\"key\": \"value\"}\n"
             + "NULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\n"
             + "Success\n",
         result);
