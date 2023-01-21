@@ -14,6 +14,7 @@
 
 using System.Data;
 using Npgsql;
+using NpgsqlTypes;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -429,6 +430,326 @@ public class NpgsqlTest
         {
             Console.WriteLine($"Update count mismatch. Got: {updateCount}, Want: {batchSize}");
             return;
+        }
+        Console.WriteLine("Success");
+    }
+
+    public void TestMixedBatch()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+
+        var sql =
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+
+        var batchSize = 5;
+        using var batch = new NpgsqlBatch(connection);
+        for (var i = 0; i < batchSize; i++)
+        {
+            batch.BatchCommands.Add(new NpgsqlBatchCommand(sql)
+            {
+                Parameters =
+                {
+                    new () {Value = 100L + i},
+                    new () {Value = i%2 == 0},
+                    new () {Value = Encoding.UTF8.GetBytes(i + "test_bytes")},
+                    new () {Value = 3.14d + i},
+                    new () {Value = i},
+                    new () {Value = i + 0.123m},
+                    new () {Value = DateTime.Parse($"2022-03-24 {i:D2}:39:10.123456000+00").ToUniversalTime(), DbType = DbType.DateTimeOffset},
+                    new () {Value = DateTime.Parse($"2022-04-{i+1:D2}"), DbType = DbType.Date},
+                    new () {Value = "test_string" + i},
+                    new () {Value = JsonDocument.Parse($"{{\"key\":\"value{i}\"}}")},
+                }
+            });
+        }
+        batch.BatchCommands.Add(new NpgsqlBatchCommand("select count(*) from all_types where col_bool=$1")
+        {
+            Parameters = { new () {Value = true} }
+        });
+        batch.BatchCommands.Add(new NpgsqlBatchCommand("update all_types set col_bool=false where col_bool=$1")
+        {
+            Parameters = { new () {Value = true} }
+        });
+        using (var reader = batch.ExecuteReader())
+        {
+            if (reader.RecordsAffected != batchSize)
+            {
+                Console.WriteLine($"Insert count mismatch. Got: {reader.Rows}, Want: {batchSize}");
+                return;
+            }
+            if (!reader.Read())
+            {
+                Console.WriteLine("Missing expected row");
+                return;
+            }
+            if (reader.GetInt64(0) != 3L)
+            {
+                Console.WriteLine($"Value mismatch: Got '{reader.GetInt64(0)}', Want: 3");
+                return;
+            }
+            if (reader.Read())
+            {
+                Console.WriteLine("Got unexpected expected row");
+                return;
+            }
+            if (reader.NextResult())
+            {
+                Console.WriteLine("Unexpected result set after select");
+                return;
+            }
+            // npgsql returns the total number of rows affected for the entire batch until here.
+            if (reader.RecordsAffected != 8)
+            {
+                Console.WriteLine($"Update count mismatch. Got: {reader.RecordsAffected}, Want: 8");
+                return;
+            }
+            if (reader.NextResult())
+            {
+                Console.WriteLine("Unexpected result after update");
+                return;
+            }
+            if (reader.RecordsAffected != 8)
+            {
+                Console.WriteLine($"Unexpected update count after last result. Got {reader.RecordsAffected}, Want: 8");
+                return;
+            }
+        }
+        Console.WriteLine("Success");
+    }
+
+    public void TestBatchExecutionError()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+
+        var sql =
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+
+        var batchSize = 3;
+        using var batch = new NpgsqlBatch(connection);
+        for (var i = 0; i < batchSize; i++)
+        {
+            batch.BatchCommands.Add(new NpgsqlBatchCommand(sql)
+            {
+                Parameters =
+                {
+                    new () {Value = 100L + i},
+                    new () {Value = i%2 == 0},
+                    new () {Value = Encoding.UTF8.GetBytes(i + "test_bytes")},
+                    new () {Value = 3.14d + i},
+                    new () {Value = i},
+                    new () {Value = i + 0.123m},
+                    new () {Value = DateTime.Parse($"2022-03-24 {i:D2}:39:10.123456000+00").ToUniversalTime(), DbType = DbType.DateTimeOffset},
+                    new () {Value = DateTime.Parse($"2022-04-{i+1:D2}"), DbType = DbType.Date},
+                    new () {Value = "test_string" + i},
+                    new () {Value = JsonDocument.Parse($"{{\"key\":\"value{i}\"}}")},
+                }
+            });
+        }
+        try
+        {
+            var updateCount = batch.ExecuteNonQuery();
+            Console.WriteLine($"Update count: {updateCount}");
+        }
+        catch (Exception exception)
+        {
+            Console.WriteLine($"Executing batch failed with error: {exception.Message}");
+        }
+    }
+
+    public void TestBinaryCopyIn()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+        
+        using (var writer =
+               connection.BeginBinaryImport("COPY all_types " +
+                                            "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
+                                            "FROM STDIN (FORMAT BINARY)"))
+        {
+            writer.StartRow();
+            writer.Write(1L);
+            writer.Write(true);
+            writer.Write(new byte[] {1,2,3});
+            writer.Write(3.14d);
+            writer.Write(10);
+            writer.Write(6.626m);
+            writer.Write(DateTime.Parse("2022-03-24 12:39:10.123456000Z").ToUniversalTime());
+            writer.Write(DateTime.Parse("2022-07-01"), NpgsqlDbType.Date);
+            writer.Write("test");
+            writer.Write(JsonDocument.Parse("{\"key\": \"value\"}"));
+
+            writer.StartRow();
+            writer.Write(2L);
+            writer.WriteNull();
+            writer.WriteNull();
+            writer.WriteNull();
+            writer.WriteNull();
+            writer.WriteNull();
+            writer.WriteNull();
+            writer.WriteNull();
+            writer.WriteNull();
+            writer.WriteNull();
+
+            writer.Complete();
+        }
+        
+        Console.WriteLine("Success");
+    }
+
+    public void TestTextCopyIn()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+        
+        using (var writer =
+               connection.BeginTextImport("COPY all_types " +
+                                            "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
+                                            "FROM STDIN"))
+        {
+            writer.Write("1\t");
+            writer.Write("t\t");
+            writer.Write("\\x010203\t");
+            writer.Write("3.14\t");
+            writer.Write("10\t");
+            writer.Write("6.626\t");
+            writer.Write("2022-03-24 12:39:10.123456Z\t");
+            writer.Write("2022-07-01\t");
+            writer.Write("test\t");
+            writer.Write("{\"key\":\"value\"}");
+            writer.Write("\n");
+
+            writer.Write("2\t");
+            writer.Write("\\N\t");
+            writer.Write("\\N\t");
+            writer.Write("\\N\t");
+            writer.Write("\\N\t");
+            writer.Write("\\N\t");
+            writer.Write("\\N\t");
+            writer.Write("\\N\t");
+            writer.Write("\\N\t");
+            writer.Write("\\N\n");
+        }
+        
+        Console.WriteLine("Success");
+    }
+
+    public void TestBinaryCopyOut()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+        
+        using (var reader =
+               connection.BeginBinaryExport("COPY all_types " +
+                                            "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
+                                            "TO STDOUT (FORMAT BINARY)"))
+        {
+            while (reader.StartRow() > -1)
+            {
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write(reader.Read<long>(NpgsqlDbType.Bigint));
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write(reader.Read<bool>(NpgsqlDbType.Boolean));
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write(Convert.ToBase64String(reader.Read<byte[]>(NpgsqlDbType.Bytea)));
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write(reader.Read<double>(NpgsqlDbType.Double));
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write(reader.Read<long>(NpgsqlDbType.Bigint));
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write(reader.Read<decimal>(NpgsqlDbType.Numeric));
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write(reader.Read<DateTime>(NpgsqlDbType.TimestampTz).ToUniversalTime().ToString("yyyyMMddTHHmmssFFFFFFF"));
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write(reader.Read<DateTime>(NpgsqlDbType.Date).ToString("yyyyMMdd"));
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write(reader.Read<string>(NpgsqlDbType.Varchar));
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write(reader.Read<string>(NpgsqlDbType.Jsonb));
+                }
+                Console.Write("\n");
+            }
         }
         Console.WriteLine("Success");
     }

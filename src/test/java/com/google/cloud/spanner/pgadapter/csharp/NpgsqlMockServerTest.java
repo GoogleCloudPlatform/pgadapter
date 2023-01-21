@@ -22,16 +22,22 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.ByteArray;
 import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
+import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.CopyInMockServerTest;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
+import com.google.spanner.v1.Mutation;
+import com.google.spanner.v1.Mutation.OperationCase;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.ResultSetStats;
@@ -40,7 +46,9 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.Status;
 import java.io.IOException;
+import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.Test;
@@ -201,10 +209,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
   @Test
   public void testInsertAllDataTypes() throws IOException, InterruptedException {
-    String sql =
-        "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+    String sql = getInsertAllTypesSql();
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -245,10 +250,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
   @Test
   public void testInsertNullsAllDataTypes() throws IOException, InterruptedException {
-    String sql =
-        "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+    String sql = getInsertAllTypesSql();
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
@@ -294,10 +296,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
   @Test
   public void testInsertAllDataTypesReturning() throws IOException, InterruptedException {
-    String sql =
-        "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *";
+    String sql = getInsertAllTypesSql() + " returning *";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(sql)
@@ -358,41 +357,9 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
   @Test
   public void testInsertBatch() throws IOException, InterruptedException {
-    String sql =
-        "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
     int batchSize = 10;
     for (int i = 0; i < batchSize; i++) {
-      mockSpanner.putStatementResult(
-          StatementResult.update(
-              Statement.newBuilder(sql)
-                  .bind("p1")
-                  .to(100L + i)
-                  .bind("p2")
-                  .to(i % 2 == 0)
-                  .bind("p3")
-                  .to(ByteArray.copyFrom(i + "test_bytes"))
-                  .bind("p4")
-                  .to(3.14d + i)
-                  .bind("p5")
-                  .to(i)
-                  .bind("p6")
-                  .to(com.google.cloud.spanner.Value.pgNumeric(i + ".123"))
-                  .bind("p7")
-                  .to(
-                      Timestamp.parseTimestamp(
-                          String.format("2022-03-24T%02d:39:10.123456000Z", i)))
-                  .bind("p8")
-                  .to(Date.parseDate(String.format("2022-04-%02d", i + 1)))
-                  .bind("p9")
-                  .to("test_string" + i)
-                  .bind("p10")
-                  .to(
-                      com.google.cloud.spanner.Value.pgJsonb(
-                          String.format("{\"key\":\"value%d\"}", i)))
-                  .build(),
-              1L));
+      mockSpanner.putStatementResult(StatementResult.update(createBatchInsertStatement(i), 1L));
     }
 
     String result = execute("TestInsertBatch", createConnectionString());
@@ -404,5 +371,198 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     assertEquals(batchSize, batchDmlRequest.getStatementsCount());
     assertTrue(batchDmlRequest.getTransaction().hasBegin());
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testMixedBatch() throws IOException, InterruptedException {
+    String insertSql = getInsertAllTypesSql();
+    String selectSql = "select count(*) from all_types where col_bool=$1";
+    ResultSetMetadata metadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("c")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                            .build())
+                    .build())
+            .build();
+    ResultSet resultSet =
+        ResultSet.newBuilder()
+            .setMetadata(metadata)
+            .addRows(
+                ListValue.newBuilder()
+                    .addValues(Value.newBuilder().setStringValue("3").build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(selectSql).bind("p1").to(true).build(), resultSet));
+
+    String updateSql = "update all_types set col_bool=false where col_bool=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(updateSql).bind("p1").to(true).build(), 3L));
+
+    int batchSize = 5;
+    for (int i = 0; i < batchSize; i++) {
+      mockSpanner.putStatementResult(StatementResult.update(createBatchInsertStatement(i), 1L));
+    }
+
+    String result = execute("TestMixedBatch", createConnectionString());
+    assertEquals("Success\n", result);
+
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    // Reverse the requests list, so it's a little easier to check what we want to check. There are
+    // couple of system queries before the actual queries that we want to ignore.
+    requests = Lists.reverse(requests);
+    // We should have 2 data queries.
+    assertTrue(requests.size() >= 2);
+    assertEquals(updateSql, requests.get(0).getSql());
+    assertEquals(selectSql, requests.get(1).getSql());
+    // The insert statements are executed as Batch DML.
+    List<ExecuteBatchDmlRequest> batchRequests =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class);
+    assertEquals(1, batchRequests.size());
+    ExecuteBatchDmlRequest batchRequest = batchRequests.get(0);
+    assertEquals(batchSize, batchRequest.getStatementsCount());
+    int index = 0;
+    for (ExecuteBatchDmlRequest.Statement statement : batchRequest.getStatementsList()) {
+      assertEquals(insertSql, statement.getSql());
+      assertEquals(
+          String.valueOf(100 + index),
+          statement.getParams().getFieldsMap().get("p1").getStringValue());
+      index++;
+    }
+  }
+
+  @Test
+  public void testBatchExecutionError() throws IOException, InterruptedException {
+    String insertSql = getInsertAllTypesSql();
+    int batchSize = 3;
+    for (int i = 0; i < batchSize; i++) {
+      Statement statement = createBatchInsertStatement(i);
+      if (i == 1) {
+        mockSpanner.putStatementResult(
+            StatementResult.exception(statement, Status.ALREADY_EXISTS.asRuntimeException()));
+      } else {
+        mockSpanner.putStatementResult(StatementResult.update(statement, 1L));
+      }
+    }
+
+    String result = execute("TestBatchExecutionError", createConnectionString());
+    assertTrue(result, result.contains("Executing batch failed with error"));
+    assertTrue(result, result.contains("ALREADY_EXISTS"));
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).stream()
+            .findAny()
+            .orElseThrow(
+                () ->
+                    SpannerExceptionFactory.newSpannerException(
+                        ErrorCode.NOT_FOUND, "ExecuteBatchDmlRequest not found"));
+    assertEquals(3, request.getStatementsCount());
+    for (ExecuteBatchDmlRequest.Statement statement : request.getStatementsList()) {
+      assertEquals(insertSql, statement.getSql());
+    }
+  }
+
+  @Test
+  public void testBinaryCopyIn() throws IOException, InterruptedException {
+    testCopyIn("TestBinaryCopyIn");
+  }
+
+  @Test
+  public void testTextCopyIn() throws IOException, InterruptedException {
+    testCopyIn("TestTextCopyIn");
+  }
+
+  private void testCopyIn(String testMethod) throws IOException, InterruptedException {
+    CopyInMockServerTest.setupCopyInformationSchemaResults(
+        mockSpanner, "public", "all_types", true);
+
+    String result = execute(testMethod, createConnectionString());
+    assertEquals("Success\n", result);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    CommitRequest request = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
+    assertEquals(1, request.getMutationsCount());
+    Mutation mutation = request.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    assertEquals(2, mutation.getInsert().getValuesCount());
+    assertEquals(10, mutation.getInsert().getColumnsCount());
+    ListValue insert = mutation.getInsert().getValues(0);
+    assertEquals("1", insert.getValues(0).getStringValue());
+    assertTrue(insert.getValues(1).getBoolValue());
+    assertEquals(
+        Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}),
+        insert.getValues(2).getStringValue());
+    assertEquals(3.14, insert.getValues(3).getNumberValue(), 0.0);
+    assertEquals("10", insert.getValues(4).getStringValue());
+    assertEquals("6.626", insert.getValues(5).getStringValue());
+    assertEquals("2022-03-24T12:39:10.123456000Z", insert.getValues(6).getStringValue());
+    assertEquals("2022-07-01", insert.getValues(7).getStringValue());
+    assertEquals("test", insert.getValues(8).getStringValue());
+    assertEquals("{\"key\":\"value\"}", insert.getValues(9).getStringValue());
+
+    insert = mutation.getInsert().getValues(1);
+    assertEquals("2", insert.getValues(0).getStringValue());
+    for (int i = 1; i < insert.getValuesCount(); i++) {
+      assertTrue(insert.getValues(i).hasNullValue());
+    }
+  }
+
+  @Test
+  public void testBinaryCopyOut() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb from all_types"),
+            ALL_TYPES_RESULTSET
+                .toBuilder()
+                .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
+                .build()));
+
+    CopyInMockServerTest.setupCopyInformationSchemaResults(
+        mockSpanner, "public", "all_types", true);
+
+    String result = execute("TestBinaryCopyOut", createConnectionString());
+    assertEquals(
+        "1\tTrue\tdGVzdA==\t3,14\t100\t6,626\t20220216T131802123456\t20220329\ttest\t{\"key\": \"value\"}\n"
+            + "NULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\n"
+            + "Success\n",
+        result);
+  }
+
+  private static String getInsertAllTypesSql() {
+    return "INSERT INTO all_types "
+        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+  }
+
+  private static Statement createBatchInsertStatement(int index) {
+    return Statement.newBuilder(getInsertAllTypesSql())
+        .bind("p1")
+        .to(100L + index)
+        .bind("p2")
+        .to(index % 2 == 0)
+        .bind("p3")
+        .to(ByteArray.copyFrom(index + "test_bytes"))
+        .bind("p4")
+        .to(3.14d + index)
+        .bind("p5")
+        .to(index)
+        .bind("p6")
+        .to(com.google.cloud.spanner.Value.pgNumeric(index + ".123"))
+        .bind("p7")
+        .to(Timestamp.parseTimestamp(String.format("2022-03-24T%02d:39:10.123456000Z", index)))
+        .bind("p8")
+        .to(Date.parseDate(String.format("2022-04-%02d", index + 1)))
+        .bind("p9")
+        .to("test_string" + index)
+        .bind("p10")
+        .to(com.google.cloud.spanner.Value.pgJsonb(String.format("{\"key\":\"value%d\"}", index)))
+        .build();
   }
 }

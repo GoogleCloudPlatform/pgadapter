@@ -58,6 +58,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
 
   private final ParsedCopyStatement parsedCopyStatement;
   private final CSVFormat csvFormat;
+  private boolean hasReturnedData;
 
   public CopyToStatement(
       ConnectionHandler connectionHandler,
@@ -223,10 +224,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
     return this.parsedCopyStatement.format == CopyStatement.Format.BINARY
         ? new WireOutput[] {
           new CopyOutResponse(
-              this.outputStream,
-              resultSet.getColumnCount(),
-              DataFormat.POSTGRESQL_BINARY.getCode()),
-          CopyDataResponse.createBinaryHeader(this.outputStream)
+              this.outputStream, resultSet.getColumnCount(), DataFormat.POSTGRESQL_BINARY.getCode())
         }
         : new WireOutput[] {
           new CopyOutResponse(
@@ -236,6 +234,13 @@ public class CopyToStatement extends IntermediatePortalStatement {
 
   @Override
   public CopyDataResponse createDataRowResponse(Converter converter) {
+    // Keep track of whether this COPY statement has returned at least one row. This is necessary to
+    // know whether we need to include the header in the current row and/or in the trailer.
+    // PostgreSQL includes the header in either the first data row or in the trailer if there are no
+    // rows. This is not specifically mentioned in the protocol description, but some clients assume
+    // this behavior. See
+    // https://github.com/npgsql/npgsql/blob/7f97dbad28c71b2202dd7bcccd05fc42a7de23c8/src/Npgsql/NpgsqlBinaryExporter.cs#L156
+    this.hasReturnedData = true;
     return parsedCopyStatement.format == CopyStatement.Format.BINARY
         ? createBinaryDataResponse(converter)
         : createDataResponse(converter.getResultSet());
@@ -245,7 +250,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
   public WireOutput[] createResultSuffix() {
     return this.parsedCopyStatement.format == Format.BINARY
         ? new WireOutput[] {
-          CopyDataResponse.createBinaryTrailer(this.outputStream),
+          CopyDataResponse.createBinaryTrailer(this.outputStream, !hasReturnedData),
           new CopyDoneResponse(this.outputStream)
         }
         : new WireOutput[] {new CopyDoneResponse(this.outputStream)};
