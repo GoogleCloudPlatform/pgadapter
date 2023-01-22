@@ -15,8 +15,10 @@
 package com.google.cloud.spanner.pgadapter.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import com.google.cloud.ByteArray;
@@ -33,6 +35,7 @@ import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
 import org.apache.commons.csv.CSVFormat;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -43,7 +46,6 @@ public class CsvCopyParserTest {
 
   @Test
   public void testCanCreateIterator() throws IOException {
-
     CsvCopyParser parser =
         new CsvCopyParser(
             mock(SessionState.class),
@@ -292,5 +294,61 @@ public class CsvCopyParserTest {
         () ->
             CsvCopyRecord.getSpannerValue(
                 sessionState, Type.struct(StructField.of("f1", Type.string())), "value"));
+  }
+
+  @Test
+  public void testIsNull() throws IOException {
+    PipedOutputStream outputStream = new PipedOutputStream();
+    DataOutputStream data = new DataOutputStream(outputStream);
+    new Thread(
+            () -> {
+              while (true) {
+                try {
+                  data.write("\"value1\"\t\"value2\"\n".getBytes(StandardCharsets.UTF_8));
+                  data.write("\"value1\"\t\\N\n".getBytes(StandardCharsets.UTF_8));
+                  data.write("\\N\t\"value2\"\n".getBytes(StandardCharsets.UTF_8));
+                  data.write("\\N\t\\N\n".getBytes(StandardCharsets.UTF_8));
+                  data.close();
+                  break;
+                } catch (IOException e) {
+                  if (e.getMessage().contains("Pipe not connected")) {
+                    Thread.yield();
+                  } else {
+                    throw new RuntimeException(e);
+                  }
+                }
+              }
+            })
+        .start();
+    CsvCopyParser parser =
+        new CsvCopyParser(
+            mock(SessionState.class),
+            CSVFormat.POSTGRESQL_TEXT,
+            new PipedInputStream(outputStream, 256),
+            false);
+    Iterator<CopyRecord> iterator = parser.iterator();
+
+    assertTrue(iterator.hasNext());
+    CopyRecord record = iterator.next();
+    assertFalse(record.isNull(0));
+    assertFalse(record.isNull(1));
+
+    assertTrue(iterator.hasNext());
+    record = iterator.next();
+    assertFalse(record.isNull(0));
+    assertTrue(record.isNull(1));
+
+    assertTrue(iterator.hasNext());
+    record = iterator.next();
+    assertTrue(record.isNull(0));
+    assertFalse(record.isNull(1));
+
+    assertTrue(iterator.hasNext());
+    record = iterator.next();
+    assertTrue(record.isNull(0));
+    assertTrue(record.isNull(1));
+
+    assertFalse(iterator.hasNext());
+    parser.close();
   }
 }

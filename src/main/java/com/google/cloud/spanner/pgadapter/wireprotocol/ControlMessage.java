@@ -38,6 +38,7 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.SendResultSetState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.PartitionQueryResult;
+import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
@@ -444,7 +445,10 @@ public abstract class ControlMessage extends WireMessage {
               describedResult,
               mode,
               describedResult.getConnectionHandler().getServer().getOptions(),
-              resultSet);
+              resultSet,
+              includePrefix
+                  && describedResult instanceof CopyToStatement
+                  && ((CopyToStatement) describedResult).isBinary());
       this.batchReadOnlyTransaction = null;
       this.partition = null;
       this.maxRows = maxRows;
