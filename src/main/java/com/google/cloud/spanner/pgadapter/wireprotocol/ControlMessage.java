@@ -485,7 +485,8 @@ public abstract class ControlMessage extends WireMessage {
                     describedResult,
                     mode,
                     describedResult.getConnectionHandler().getServer().getOptions(),
-                    resultSet);
+                    resultSet,
+                    includePrefix);
             hasData = resultSet.next();
           } catch (Throwable t) {
             if (includePrefix) {
@@ -501,14 +502,15 @@ public abstract class ControlMessage extends WireMessage {
             for (WireOutput prefix : describedResult.createResultPrefix(resultSet)) {
               prefix.send(false);
             }
-            prefixSent.set(true);
           } catch (Throwable t) {
             prefixSent.setException(t);
             throw t;
           }
         }
         // Wait until the prefix (if any) has been sent.
-        prefixSent.get();
+        if (!includePrefix) {
+          prefixSent.get();
+        }
         long rows = 0L;
         while (hasData) {
           if (Thread.interrupted()) {
@@ -517,6 +519,10 @@ public abstract class ControlMessage extends WireMessage {
           WireOutput wireOutput = describedResult.createDataRowResponse(converter);
           synchronized (describedResult) {
             wireOutput.send(false);
+          }
+          // The prefix will be included in the first data row.
+          if (includePrefix && rows == 0L) {
+            prefixSent.set(true);
           }
           rows++;
           hasData = resultSet.next();

@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import static com.google.cloud.spanner.pgadapter.statements.CopyToStatement.COPY_BINARY_HEADER;
+
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -46,12 +48,23 @@ public class Converter implements AutoCloseable {
   private final OptionsMetadata options;
   private final ResultSet resultSet;
   private final SessionState sessionState;
+  private final boolean includeHeaderInFirstRow;
+  private boolean firstRow = true;
 
   public Converter(
       IntermediateStatement statement,
       QueryMode mode,
       OptionsMetadata options,
       ResultSet resultSet) {
+    this(statement, mode, options, resultSet, true);
+  }
+
+  public Converter(
+      IntermediateStatement statement,
+      QueryMode mode,
+      OptionsMetadata options,
+      ResultSet resultSet,
+      boolean includeHeaderInFirstRow) {
     this.statement = statement;
     this.mode = mode;
     this.options = options;
@@ -62,6 +75,7 @@ public class Converter implements AutoCloseable {
             .getExtendedQueryProtocolHandler()
             .getBackendConnection()
             .getSessionState();
+    this.includeHeaderInFirstRow = includeHeaderInFirstRow;
   }
 
   @Override
@@ -83,6 +97,15 @@ public class Converter implements AutoCloseable {
               : DataFormat.POSTGRESQL_TEXT;
     }
     buffer.reset();
+    if (includeHeaderInFirstRow
+        && firstRow
+        && statement instanceof CopyToStatement
+        && ((CopyToStatement) statement).isBinary()) {
+      outputStream.write(COPY_BINARY_HEADER);
+      outputStream.writeInt(0); // flags
+      outputStream.writeInt(0); // header extension area length
+    }
+    firstRow = false;
     outputStream.writeShort(resultSet.getColumnCount());
     for (int column_index = 0; /* column indices start at 0 */
         column_index < resultSet.getColumnCount();

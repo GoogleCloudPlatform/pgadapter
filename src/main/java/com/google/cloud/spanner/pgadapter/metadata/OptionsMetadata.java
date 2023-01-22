@@ -674,8 +674,10 @@ public class OptionsMetadata {
         OPTION_DEBUG_MODE,
         "debug-mode",
         false,
-        "-- ONLY USE FOR DEBUGGING -- This option only intended for debugging. It will "
-            + "instruct the server to keep track of all messages it receives.");
+        "-- ONLY USE FOR INTERNAL DEBUGGING -- This option only intended for INTERNAL debugging. It will "
+            + "instruct the server to keep track of all messages it receives.\n"
+            + "You should not enable this option unless you want to debug PGAdapter.\n"
+            + "This option will NOT enable any additional LOGGING.");
 
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
