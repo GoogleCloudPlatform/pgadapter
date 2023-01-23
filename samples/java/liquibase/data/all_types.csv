@@ -1,5 +1,0 @@
-col_bigint;col_bool;col_bytea;col_float8;col_int;col_numeric;col_timestamptz;col_date;col_varchar;col_text
-1;true;cm93MQ==;3.14;100;6.626;2022-08-08T07:51:13.248632+02:00;2022-08-08;"varchar1";"text1's"
-2;false;"";0.0;200;0.0;2000-01-01T00:00:00Z;2000-01-01;"";""
-3;true;cm93Mw==;-3.14;300;-6.626;1953-06-01T20:18:59.123456789-09:00;1953-06-01;varchar3;text3
-4;null;null;null;null;null;null;null;null;null
