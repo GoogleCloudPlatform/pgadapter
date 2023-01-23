@@ -1794,9 +1794,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("test")
                 .bind("p10")
-                // TODO: Change to jsonb when https://github.com/googleapis/java-spanner/pull/2182
-                //       has been merged.
-                .to(com.google.cloud.spanner.Value.json("{\"key\": \"value\"}"))
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             com.google.spanner.v1.ResultSet.newBuilder()
                 .setMetadata(ALL_TYPES_METADATA)

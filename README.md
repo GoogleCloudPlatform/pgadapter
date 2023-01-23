@@ -17,6 +17,9 @@ PGAdapter can be used with the following frameworks:
    for more details. See also [this directory](samples/java/liquibase) for a sample application using `Liquibase`.
 2. `gorm`: Version 1.23.8 and higher are supported. See [gorm support](docs/gorm.md) for more details.
    See also [this directory](samples/golang/gorm) for a sample application using `gorm`.
+3. `SQLAlchemy`: Version 1.4.45 has _experimental support_. See [SQLAlchemy support](docs/sqlalchemy.md)
+   for more details. See also [this directory](samples/python/sqlalchemy-sample) for a sample
+   application using `SQLAlchemy`.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
@@ -63,9 +66,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.14.1` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.15.0` with the version you want to download):
 ```shell
-VERSION=v0.14.1
+VERSION=v0.15.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -100,7 +103,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.14.1</version>
+  <version>0.15.0</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```
