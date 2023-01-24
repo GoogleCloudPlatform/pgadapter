@@ -361,4 +361,67 @@ public class BinaryCopyParserTest {
     assertThrows(IllegalArgumentException.class, () -> record.getValue(Type.string(), 10));
     assertThrows(SpannerException.class, () -> record.getValue(Type.numeric(), 0));
   }
+
+  @Test
+  public void testIsNull() throws IOException {
+    PipedOutputStream pipedOutputStream = new PipedOutputStream();
+    BinaryCopyParser parser = new BinaryCopyParser(new PipedInputStream(pipedOutputStream, 256));
+
+    DataOutputStream data = new DataOutputStream(pipedOutputStream);
+    data.write(COPY_BINARY_HEADER);
+    data.writeInt(0);
+    data.writeInt(0);
+
+    // Write a tuple with two non-null fields.
+    data.writeShort(2);
+    data.writeInt(8);
+    data.writeLong(1L);
+    data.writeInt(8);
+    data.writeLong(2L);
+
+    // Write a tuple with one non-null and one null field.
+    data.writeShort(2);
+    data.writeInt(8);
+    data.writeLong(1L);
+    data.writeInt(-1);
+
+    // Write a tuple with one null and one non-null field.
+    data.writeShort(2);
+    data.writeInt(-1);
+    data.writeInt(8);
+    data.writeLong(2L);
+
+    // Write a tuple with two non-null fields.
+    data.writeShort(2);
+    data.writeInt(-1);
+    data.writeInt(-1);
+
+    // Trailer.
+    data.writeShort(-1);
+
+    Iterator<CopyRecord> iterator = parser.iterator();
+    assertTrue(iterator.hasNext());
+    CopyRecord record1 = iterator.next();
+    assertFalse(record1.isNull(0));
+    assertFalse(record1.isNull(1));
+    assertThrows(IllegalArgumentException.class, () -> record1.isNull(-1));
+    assertThrows(IllegalArgumentException.class, () -> record1.isNull(2));
+
+    assertTrue(iterator.hasNext());
+    CopyRecord record2 = iterator.next();
+    assertFalse(record2.isNull(0));
+    assertTrue(record2.isNull(1));
+
+    assertTrue(iterator.hasNext());
+    CopyRecord record3 = iterator.next();
+    assertTrue(record3.isNull(0));
+    assertFalse(record3.isNull(1));
+
+    assertTrue(iterator.hasNext());
+    CopyRecord record4 = iterator.next();
+    assertTrue(record4.isNull(0));
+    assertTrue(record4.isNull(1));
+
+    assertFalse(iterator.hasNext());
+  }
 }
