@@ -103,6 +103,11 @@ class CsvCopyParser implements CopyInParser {
     }
 
     @Override
+    public boolean isNull(int columnIndex) {
+      return record.get(columnIndex) == null;
+    }
+
+    @Override
     public Value getValue(Type type, String columnName) throws SpannerException {
       String recordValue = record.get(columnName);
       return getSpannerValue(sessionState, type, recordValue);

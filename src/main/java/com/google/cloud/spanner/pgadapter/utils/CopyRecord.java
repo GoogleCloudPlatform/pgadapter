@@ -34,6 +34,9 @@ public interface CopyRecord {
    */
   boolean hasColumnNames();
 
+  /** Returns true if the value of the given column is null. */
+  boolean isNull(int columnIndex);
+
   /**
    * Returns the value of the given column as a Cloud Spanner {@link Value} of the given type. This
    * method is used by a COPY ... FROM ... operation to convert a value to the type of the column
