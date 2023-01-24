@@ -24,7 +24,8 @@
     <differenceType>7005</differenceType>
     <className>com/google/cloud/spanner/pgadapter/statements/local/LocalStatement</className>
     <method>com.google.cloud.spanner.connection.StatementResult execute(com.google.cloud.spanner.connection.Connection)</method>
-    <to>com.google.cloud.spanner.connection.StatementResult execute(com.google.cloud.spanner.pgadapter.statements.BackendConnection)</to>
+    <to>com.google.cloud.spanner.connection.StatementResult
+      execute(com.google.cloud.spanner.myadapter.statements.BackendConnection)</to>
   </difference>
   <!-- Return type changed to String[]. This is only for internal use. -->
   <difference>
@@ -39,7 +40,8 @@
     <differenceType>7005</differenceType>
     <className>com/google/cloud/spanner/pgadapter/statements/local/ListDatabasesStatement</className>
     <method>com.google.cloud.spanner.connection.StatementResult execute(com.google.cloud.spanner.connection.Connection)</method>
-    <to>com.google.cloud.spanner.connection.StatementResult execute(com.google.cloud.spanner.pgadapter.statements.BackendConnection)</to>
+    <to>com.google.cloud.spanner.connection.StatementResult
+      execute(com.google.cloud.spanner.myadapter.statements.BackendConnection)</to>
   </difference>
   <!-- Return type changed to String[]. This is only for internal use. -->
   <difference>
@@ -59,17 +61,20 @@
   <difference>
     <differenceType>7002</differenceType>
     <className>com/google/cloud/spanner/pgadapter/ConnectionHandler</className>
-    <method>void addActiveStatement(com.google.cloud.spanner.pgadapter.statements.IntermediateStatement)</method>
+    <method>void
+      addActiveStatement(com.google.cloud.spanner.myadapter.statements.IntermediateStatement)</method>
   </difference>
   <difference>
     <differenceType>7002</differenceType>
     <className>com/google/cloud/spanner/pgadapter/ConnectionHandler</className>
-    <method>com.google.cloud.spanner.pgadapter.statements.IntermediateStatement getActiveStatement()</method>
+    <method>com.google.cloud.spanner.myadapter.statements.IntermediateStatement
+      getActiveStatement()</method>
   </difference>
   <difference>
     <differenceType>7002</differenceType>
     <className>com/google/cloud/spanner/pgadapter/ConnectionHandler</className>
-    <method>void removeActiveStatement(com.google.cloud.spanner.pgadapter.statements.IntermediateStatement)</method>
+    <method>void
+      removeActiveStatement(com.google.cloud.spanner.myadapter.statements.IntermediateStatement)</method>
   </difference>
   <difference>
     <differenceType>7006</differenceType>
