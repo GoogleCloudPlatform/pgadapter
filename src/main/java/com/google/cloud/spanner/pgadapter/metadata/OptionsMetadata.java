@@ -123,7 +123,7 @@ public class OptionsMetadata {
   private static final String OPTION_SPANNER_ENDPOINT = "e";
   private static final String OPTION_JDBC_PROPERTIES = "r";
   private static final String OPTION_SERVER_VERSION = "v";
-  private static final String OPTION_DEBUG_MODE = "debug";
+  private static final String OPTION_DEBUG_MODE = "internal_debug";
 
   private final String osName;
   private final CommandLine commandLine;
@@ -672,11 +672,14 @@ public class OptionsMetadata {
             + "errors when used with PGAdapter.");
     options.addOption(
         OPTION_DEBUG_MODE,
-        "debug-mode",
+        "internal-debug-mode",
         false,
-        "-- ONLY USE FOR DEBUGGING -- This option only intended for debugging. It will "
-            + "instruct the server to keep track of all messages it receives.");
-
+        "-- ONLY USE FOR INTERNAL DEBUGGING -- This option only intended for INTERNAL debugging. It will "
+            + "instruct the server to keep track of all messages it receives.\n"
+            + "You should not enable this option unless you want to debug PGAdapter, for example if"
+            + "you are developing a new feature for PGAdapter that you want to test.\n"
+            + "This option will NOT enable any additional LOGGING.\n"
+            + "You should not enable this option if you are just trying out PGAdapter.");
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
     help.setWidth(120);
