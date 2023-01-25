@@ -758,5 +758,28 @@ public class NpgsqlTest
         }
         Console.WriteLine("Success");
     }
+
+    public void TestTextCopyOut()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+        
+        using (var reader =
+               connection.BeginTextExport("COPY all_types " +
+                                            "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) " +
+                                            "TO STDOUT"))
+        {
+            while (true)
+            {
+                var line = reader.ReadLine();
+                if (line == null)
+                {
+                    break;
+                }
+                Console.WriteLine(line);
+            }
+        }
+        Console.WriteLine("Success");
+    }
     
 }

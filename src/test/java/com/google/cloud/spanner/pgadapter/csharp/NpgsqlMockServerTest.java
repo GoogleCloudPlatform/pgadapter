@@ -535,6 +535,28 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
         result);
   }
 
+  @Test
+  public void testTextCopyOut() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb from all_types"),
+            ALL_TYPES_RESULTSET
+                .toBuilder()
+                .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
+                .build()));
+
+    CopyInMockServerTest.setupCopyInformationSchemaResults(
+        mockSpanner, "public", "all_types", true);
+
+    String result = execute("TestTextCopyOut", createConnectionString());
+    assertEquals(
+        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\n"
+            + "\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
+            + "Success\n",
+        result);
+  }
+
   private static String getInsertAllTypesSql() {
     return "INSERT INTO all_types "
         + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
