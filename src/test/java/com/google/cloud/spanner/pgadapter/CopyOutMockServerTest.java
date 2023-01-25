@@ -35,6 +35,7 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.cloud.spanner.pgadapter.utils.CopyInParser;
 import com.google.cloud.spanner.pgadapter.utils.CopyRecord;
@@ -577,63 +578,65 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCopyOutPartitioned() throws SQLException, IOException {
-    final int expectedRowCount = 100;
-    RandomResultSetGenerator randomResultSetGenerator =
-        new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
-    com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
-    mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of("select * from random"), resultSet));
+    for (int expectedRowCount : new int[] {0, 1, 2, 3, 5, BackendConnection.MAX_PARTITIONS, 100}) {
+      RandomResultSetGenerator randomResultSetGenerator =
+          new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
+      com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
+      mockSpanner.putStatementResult(
+          StatementResult.query(Statement.of("select * from random"), resultSet));
 
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
-      StringWriter writer = new StringWriter();
-      long rows = copyManager.copyOut("COPY random TO STDOUT", writer);
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+        StringWriter writer = new StringWriter();
+        long rows = copyManager.copyOut("COPY random TO STDOUT", writer);
 
-      assertEquals(expectedRowCount, rows);
+        assertEquals(expectedRowCount, rows);
 
-      try (Scanner scanner = new Scanner(writer.toString())) {
-        int lineCount = 0;
-        while (scanner.hasNextLine()) {
-          lineCount++;
-          String line = scanner.nextLine();
-          String[] columns = line.split("\t");
-          int index = findIndex(resultSet, columns);
-          assertNotEquals(String.format("Row %d not found: %s", lineCount, line), -1, index);
+        try (Scanner scanner = new Scanner(writer.toString())) {
+          int lineCount = 0;
+          while (scanner.hasNextLine()) {
+            lineCount++;
+            String line = scanner.nextLine();
+            String[] columns = line.split("\t");
+            int index = findIndex(resultSet, columns);
+            assertNotEquals(String.format("Row %d not found: %s", lineCount, line), -1, index);
+          }
+          assertEquals(expectedRowCount, lineCount);
         }
-        assertEquals(expectedRowCount, lineCount);
       }
     }
   }
 
   @Test
   public void testCopyOutPartitionedBinary() throws SQLException, IOException {
-    final int expectedRowCount = 100;
-    RandomResultSetGenerator randomResultSetGenerator =
-        new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
-    com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
-    mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of("select * from random"), resultSet));
+    for (int expectedRowCount : new int[] {0, 1, 2, 3, 5, BackendConnection.MAX_PARTITIONS, 100}) {
+      RandomResultSetGenerator randomResultSetGenerator =
+          new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
+      com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
+      mockSpanner.putStatementResult(
+          StatementResult.query(Statement.of("select * from random"), resultSet));
 
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
-      PipedOutputStream pipedOutputStream = new PipedOutputStream();
-      PipedInputStream inputStream = new PipedInputStream(pipedOutputStream, 1 << 20);
-      SessionState sessionState = mock(SessionState.class);
-      CopyInParser copyParser =
-          CopyInParser.create(sessionState, Format.BINARY, null, inputStream, false);
-      long rows = copyManager.copyOut("COPY random TO STDOUT (format binary)", pipedOutputStream);
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+        PipedOutputStream pipedOutputStream = new PipedOutputStream();
+        PipedInputStream inputStream = new PipedInputStream(pipedOutputStream, 1 << 20);
+        SessionState sessionState = mock(SessionState.class);
+        CopyInParser copyParser =
+            CopyInParser.create(sessionState, Format.BINARY, null, inputStream, false);
+        long rows = copyManager.copyOut("COPY random TO STDOUT (format binary)", pipedOutputStream);
 
-      assertEquals(expectedRowCount, rows);
+        assertEquals(expectedRowCount, rows);
 
-      Iterator<CopyRecord> iterator = copyParser.iterator();
-      int recordCount = 0;
-      while (iterator.hasNext()) {
-        recordCount++;
-        CopyRecord record = iterator.next();
-        int index = findIndex(resultSet, record);
-        assertNotEquals(String.format("Row %d not found: %s", recordCount, record), -1, index);
+        Iterator<CopyRecord> iterator = copyParser.iterator();
+        int recordCount = 0;
+        while (iterator.hasNext()) {
+          recordCount++;
+          CopyRecord record = iterator.next();
+          int index = findIndex(resultSet, record);
+          assertNotEquals(String.format("Row %d not found: %s", recordCount, record), -1, index);
+        }
+        assertEquals(expectedRowCount, recordCount);
       }
-      assertEquals(expectedRowCount, recordCount);
     }
   }
 
