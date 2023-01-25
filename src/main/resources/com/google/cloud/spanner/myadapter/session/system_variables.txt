@@ -12,10 +12,10 @@ lower_case_table_names	INT64	0
 max_allowed_packet	INT64	67108864
 net_write_timeout	INT64	60
 performance_schema	INT64	1
-sql_mode	STRING	ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+sql_mode	STRING	ONLY_FULL_GROUP_BY, STRICT_TRANS_TABLES, NO_ZERO_IN_DATE, ERROR_FOR_DIVISION_BY_ZERO, NO_ENGINE_SUBSTITUTION
 system_time_zone	STRING	\N
 time_zone	STRING	\N
-transaction_isolation	STRING	REPEATABLE-READ
+transaction_isolation	STRING	 SERIALIZABLE
 wait_timeout	INT64	28800
 autocommit	INT64	1
 transaction_read_only	INT64	0
