@@ -28,6 +28,10 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.CopyInMockServerTest;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
+import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.protobuf.ListValue;
@@ -555,6 +559,128 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
             + "\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
             + "Success\n",
         result);
+  }
+
+  @Test
+  public void testSimplePrepare() throws IOException, InterruptedException {
+    String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql), ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+
+    String result = execute("TestSimplePrepare", createConnectionString());
+    assertEquals("Success\n", result);
+
+    List<ParseMessage> parseMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(msg -> msg instanceof ParseMessage)
+            .map(msg -> (ParseMessage) msg)
+            .filter(msg -> msg.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, parseMessages.size());
+    ParseMessage parseMessage = parseMessages.get(0);
+    List<DescribeMessage> describeMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(msg -> msg instanceof DescribeMessage)
+            .map(msg -> (DescribeMessage) msg)
+            .filter(msg -> msg.getName().equals(parseMessage.getName()))
+            .collect(Collectors.toList());
+    assertEquals(1, describeMessages.size());
+    DescribeMessage describeMessage = describeMessages.get(0);
+    assertEquals(PreparedType.Statement, describeMessage.getType());
+  }
+
+  @Test
+  public void testPrepareAndExecute() throws IOException, InterruptedException {
+    String sql = getInsertAllTypesSql();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING,
+                            TypeCode.JSON)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to(100L)
+                .bind("p2")
+                .to(true)
+                .bind("p3")
+                .to(ByteArray.copyFrom("test_bytes"))
+                .bind("p4")
+                .to(3.14d)
+                .bind("p5")
+                .to(100)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .bind("p7")
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .bind("p8")
+                .to(Date.parseDate("2022-04-02"))
+                .bind("p9")
+                .to("test_string")
+                .bind("p10")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
+                .build(),
+            1L));
+
+    String result = execute("TestPrepareAndExecute", createConnectionString());
+    assertEquals("Success\n", result);
+
+    List<ExecuteSqlRequest> requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest prepareRequest = requests.get(0);
+    assertEquals(QueryMode.PLAN, prepareRequest.getQueryMode());
+    assertEquals(0, prepareRequest.getParamTypesCount());
+    assertEquals(0, prepareRequest.getParams().getFieldsCount());
+    ExecuteSqlRequest executeRequest = requests.get(1);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertEquals(10, executeRequest.getParamTypesCount());
+    assertEquals(10, executeRequest.getParams().getFieldsCount());
+
+    List<ParseMessage> parseMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(msg -> msg instanceof ParseMessage)
+            .map(msg -> (ParseMessage) msg)
+            .filter(msg -> msg.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, parseMessages.size());
+    ParseMessage parseMessage = parseMessages.get(0);
+    List<DescribeMessage> describeMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(msg -> msg instanceof DescribeMessage)
+            .map(msg -> (DescribeMessage) msg)
+            .filter(msg -> msg.getName().equals(parseMessage.getName()))
+            .collect(Collectors.toList());
+    assertEquals(1, describeMessages.size());
+    DescribeMessage describeMessage = describeMessages.get(0);
+    assertEquals(PreparedType.Statement, describeMessage.getType());
+    List<BindMessage> bindMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(msg -> msg instanceof BindMessage)
+            .map(msg -> (BindMessage) msg)
+            .filter(msg -> msg.getStatementName().equals(parseMessage.getName()))
+            .collect(Collectors.toList());
+    assertEquals(1, bindMessages.size());
+    BindMessage bindMessage = bindMessages.get(0);
+    assertEquals(10, bindMessage.getParameters().length);
   }
 
   private static String getInsertAllTypesSql() {

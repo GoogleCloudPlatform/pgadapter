@@ -781,5 +781,57 @@ public class NpgsqlTest
         }
         Console.WriteLine("Success");
     }
+
+    public void TestSimplePrepare()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+        
+        var cmd = new NpgsqlCommand("SELECT * FROM all_types WHERE col_bigint=$1", connection);
+        cmd.Parameters.Add("param", NpgsqlDbType.Integer);
+        cmd.Prepare();
+        Console.WriteLine("Success");
+    }
+
+    public void TestPrepareAndExecute()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+        
+        var sql =
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+        var cmd = new NpgsqlCommand(sql, connection);
+        cmd.Parameters.Add(null, NpgsqlDbType.Bigint);
+        cmd.Parameters.Add(null, NpgsqlDbType.Boolean);
+        cmd.Parameters.Add(null, NpgsqlDbType.Bytea);
+        cmd.Parameters.Add(null, NpgsqlDbType.Double);
+        cmd.Parameters.Add(null, NpgsqlDbType.Integer);
+        cmd.Parameters.Add(null, NpgsqlDbType.Numeric);
+        cmd.Parameters.Add(null, NpgsqlDbType.TimestampTz);
+        cmd.Parameters.Add(null, NpgsqlDbType.Date);
+        cmd.Parameters.Add(null, NpgsqlDbType.Varchar);
+        cmd.Parameters.Add(null, NpgsqlDbType.Jsonb);
+        cmd.Prepare();
+
+        var index = 0;
+        cmd.Parameters[index++].Value = 100L;
+        cmd.Parameters[index++].Value = true;
+        cmd.Parameters[index++].Value = Encoding.UTF8.GetBytes("test_bytes");
+        cmd.Parameters[index++].Value = 3.14d;
+        cmd.Parameters[index++].Value = 100;
+        cmd.Parameters[index++].Value = 6.626m;
+        cmd.Parameters[index++].Value = DateTime.Parse("2022-03-24T08:39:10.1234568+02:00").ToUniversalTime();
+        cmd.Parameters[index++].Value = DateTime.Parse("2022-04-02");
+        cmd.Parameters[index++].Value = "test_string";
+        cmd.Parameters[index++].Value = JsonDocument.Parse("{\"key\":\"value\"}");
+        var updateCount = cmd.ExecuteNonQuery();
+        if (updateCount != 1)
+        {
+            Console.WriteLine($"Update count mismatch. Got: {updateCount}, Want: 1");
+            return;
+        }
+        Console.WriteLine("Success");
+    }
     
 }
