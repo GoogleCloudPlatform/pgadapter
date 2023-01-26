@@ -14,6 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.utils;
 
+import static com.google.cloud.spanner.pgadapter.statements.CopyToStatement.COPY_BINARY_HEADER;
+
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -38,6 +41,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 /** Utility class for converting between generic PostgreSQL conversions. */
+@InternalApi
 public class Converter implements AutoCloseable {
   private final ByteArrayOutputStream buffer = new ByteArrayOutputStream(256);
   private final DataOutputStream outputStream = new DataOutputStream(buffer);
@@ -46,12 +50,15 @@ public class Converter implements AutoCloseable {
   private final OptionsMetadata options;
   private final ResultSet resultSet;
   private final SessionState sessionState;
+  private boolean includeBinaryCopyHeaderInFirstRow;
+  private boolean firstRow = true;
 
   public Converter(
       IntermediateStatement statement,
       QueryMode mode,
       OptionsMetadata options,
-      ResultSet resultSet) {
+      ResultSet resultSet,
+      boolean includeBinaryCopyHeaderInFirstRow) {
     this.statement = statement;
     this.mode = mode;
     this.options = options;
@@ -62,6 +69,16 @@ public class Converter implements AutoCloseable {
             .getExtendedQueryProtocolHandler()
             .getBackendConnection()
             .getSessionState();
+    this.includeBinaryCopyHeaderInFirstRow = includeBinaryCopyHeaderInFirstRow;
+  }
+
+  public Converter includeBinaryCopyHeader() {
+    this.includeBinaryCopyHeaderInFirstRow = true;
+    return this;
+  }
+
+  public boolean isIncludeBinaryCopyHeaderInFirstRow() {
+    return this.includeBinaryCopyHeaderInFirstRow;
   }
 
   @Override
@@ -83,6 +100,12 @@ public class Converter implements AutoCloseable {
               : DataFormat.POSTGRESQL_TEXT;
     }
     buffer.reset();
+    if (includeBinaryCopyHeaderInFirstRow && firstRow) {
+      outputStream.write(COPY_BINARY_HEADER);
+      outputStream.writeInt(0); // flags
+      outputStream.writeInt(0); // header extension area length
+    }
+    firstRow = false;
     outputStream.writeShort(resultSet.getColumnCount());
     for (int column_index = 0; /* column indices start at 0 */
         column_index < resultSet.getColumnCount();
