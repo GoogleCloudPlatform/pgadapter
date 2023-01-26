@@ -51,6 +51,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -68,6 +69,8 @@ import org.junit.runners.JUnit4;
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
 public class ITPsqlTest implements IntegrationTest {
+  private static final Logger logger = Logger.getLogger(ITPsqlTest.class.getName());
+
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
   private static boolean allAssumptionsPassed = false;
@@ -402,6 +405,7 @@ public class ITPsqlTest implements IntegrationTest {
   public void testCopyBetweenPostgreSQLAndCloudSpanner() throws Exception {
     int numRows = 100;
 
+    logger.info("Copying initial data to PG");
     // Generate 99 random rows.
     copyRandomRowsToPostgreSQL(numRows - 1);
     // Also add one row with all nulls to ensure that nulls are also copied correctly.
@@ -414,6 +418,7 @@ public class ITPsqlTest implements IntegrationTest {
       }
     }
 
+    logger.info("Verifying initial data in PG");
     // Verify that we have 100 rows in PostgreSQL.
     try (Connection connection =
         DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
@@ -427,10 +432,12 @@ public class ITPsqlTest implements IntegrationTest {
 
     // Execute the COPY tests in both binary and text mode.
     for (boolean binary : new boolean[] {false, true}) {
+      logger.info("Testing binary: " + binary);
       // Make sure the all_types table on Cloud Spanner is empty.
       String databaseId = database.getId().getDatabase();
       testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
+      logger.info("Copying rows to Spanner");
       // COPY the rows to Cloud Spanner.
       ProcessBuilder builder = new ProcessBuilder();
       builder.command(
@@ -462,6 +469,7 @@ public class ITPsqlTest implements IntegrationTest {
       int res = process.waitFor();
       assertEquals(0, res);
 
+      logger.info("Verifying data in Spanner");
       // Verify that we now also have 100 rows in Spanner.
       try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
         try (ResultSet resultSet =
@@ -472,9 +480,11 @@ public class ITPsqlTest implements IntegrationTest {
         }
       }
 
+      logger.info("Comparing table contents");
       // Verify that the rows in both databases are equal.
       compareTableContents();
 
+      logger.info("Deleting all data in PG");
       // Remove all rows in the table in the local PostgreSQL database and then copy everything from
       // Cloud Spanner to PostgreSQL.
       try (Connection connection =
@@ -483,6 +493,7 @@ public class ITPsqlTest implements IntegrationTest {
         assertEquals(numRows, connection.createStatement().executeUpdate("delete from all_types"));
       }
 
+      logger.info("Copying rows to PG");
       // COPY the rows from Cloud Spanner to PostgreSQL.
       ProcessBuilder copyToPostgresBuilder = new ProcessBuilder();
       copyToPostgresBuilder.command(
@@ -522,6 +533,7 @@ public class ITPsqlTest implements IntegrationTest {
       assertEquals("", errors.toString());
       assertEquals(0, copyToPostgresResult);
 
+      logger.info("Compare table contents");
       // Compare table contents again.
       compareTableContents();
     }
@@ -530,6 +542,7 @@ public class ITPsqlTest implements IntegrationTest {
   /** This test verifies that we can copy an empty table between PostgreSQL and Cloud Spanner. */
   @Test
   public void testCopyEmptyTableBetweenCloudSpannerAndPostgreSQL() throws Exception {
+    logger.info("Deleting all data in PG");
     // Remove all rows in the table in the local PostgreSQL database.
     try (Connection connection =
         DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
@@ -538,10 +551,12 @@ public class ITPsqlTest implements IntegrationTest {
 
     // Execute the COPY tests in both binary and text mode.
     for (boolean binary : new boolean[] {false, true}) {
+      logger.info("Testing binary: " + binary);
       // Make sure the all_types table on Cloud Spanner is empty.
       String databaseId = database.getId().getDatabase();
       testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
+      logger.info("Copy empty table to CS");
       // COPY the empty table to Cloud Spanner.
       ProcessBuilder builder = new ProcessBuilder();
       builder.command(
@@ -573,6 +588,7 @@ public class ITPsqlTest implements IntegrationTest {
       int res = process.waitFor();
       assertEquals(0, res);
 
+      logger.info("Verify that CS is empty");
       // Verify that still have 0 rows in Cloud Spanner.
       try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
         try (ResultSet resultSet =
@@ -583,6 +599,7 @@ public class ITPsqlTest implements IntegrationTest {
         }
       }
 
+      logger.info("Copy empty table to PG");
       // COPY the empty table from Cloud Spanner to PostgreSQL.
       ProcessBuilder copyToPostgresBuilder = new ProcessBuilder();
       copyToPostgresBuilder.command(
