@@ -231,6 +231,11 @@ class BinaryCopyParser implements CopyInParser {
     }
 
     @Override
+    public boolean isEndRecord() {
+      return false;
+    }
+
+    @Override
     public boolean hasColumnNames() {
       return false;
     }

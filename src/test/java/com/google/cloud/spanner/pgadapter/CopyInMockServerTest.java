@@ -150,6 +150,27 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testEndRecord() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+      copyManager.copyIn("COPY users FROM STDIN;", new StringReader("5\t5\t5\n\\.\n7\t7\t7\n"));
+    }
+
+    List<CommitRequest> commitRequests = mockSpanner.getRequestsOfType(CommitRequest.class);
+    assertEquals(1, commitRequests.size());
+    CommitRequest commitRequest = commitRequests.get(0);
+    assertEquals(1, commitRequest.getMutationsCount());
+
+    Mutation mutation = commitRequest.getMutations(0);
+    assertEquals(OperationCase.INSERT, mutation.getOperationCase());
+    // We should only receive 1 row, as there is an end record in the middle of the stream.
+    assertEquals(1, mutation.getInsert().getValuesCount());
+    assertEquals(3, mutation.getInsert().getColumnsCount());
+  }
+
+  @Test
   public void testCopyUpsert() throws SQLException, IOException {
     setupCopyInformationSchemaResults();
 
