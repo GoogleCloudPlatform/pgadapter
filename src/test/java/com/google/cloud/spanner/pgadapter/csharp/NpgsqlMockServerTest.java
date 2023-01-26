@@ -31,6 +31,7 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -170,31 +171,29 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   @Test
   public void testUpdateAllDataTypes() throws IOException, InterruptedException {
     String sql =
-        "UPDATE all_types SET col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 WHERE col_varchar = $11";
+        "UPDATE all_types SET col_bool=$1, col_bytea=$2, col_float8=$3, col_int=$4, col_numeric=$5, col_timestamptz=$6, col_date=$7, col_varchar=$8, col_jsonb=$9 WHERE col_varchar = $10";
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(sql)
                 .bind("p1")
-                .to(100L)
-                .bind("p2")
                 .to(true)
-                .bind("p3")
+                .bind("p2")
                 .to(ByteArray.copyFrom("test_bytes"))
-                .bind("p4")
+                .bind("p3")
                 .to(3.14d)
-                .bind("p5")
+                .bind("p4")
                 .to(1L)
-                .bind("p6")
+                .bind("p5")
                 .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
-                .bind("p7")
+                .bind("p6")
                 .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
-                .bind("p8")
+                .bind("p7")
                 .to(Date.parseDate("2022-04-02"))
-                .bind("p9")
+                .bind("p8")
                 .to("test_string")
-                .bind("p10")
+                .bind("p9")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
-                .bind("p11")
+                .bind("p10")
                 .to("test")
                 .build(),
             1L));
@@ -309,7 +308,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .bind("p2")
                 .to(true)
                 .bind("p3")
-                .to(ByteArray.copyFrom("test_bytes"))
+                .to(ByteArray.copyFrom("test"))
                 .bind("p4")
                 .to(3.14d)
                 .bind("p5")
@@ -321,7 +320,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                 .bind("p8")
                 .to(Date.parseDate("2022-03-29"))
                 .bind("p9")
-                .to("test_string")
+                .to("test")
                 .bind("p10")
                 .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                 .build(),
@@ -645,15 +644,17 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(sql))
             .collect(Collectors.toList());
-    assertEquals(2, requests.size());
+    assertEquals(3, requests.size());
     ExecuteSqlRequest prepareRequest = requests.get(0);
     assertEquals(QueryMode.PLAN, prepareRequest.getQueryMode());
     assertEquals(0, prepareRequest.getParamTypesCount());
     assertEquals(0, prepareRequest.getParams().getFieldsCount());
-    ExecuteSqlRequest executeRequest = requests.get(1);
-    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
-    assertEquals(10, executeRequest.getParamTypesCount());
-    assertEquals(10, executeRequest.getParams().getFieldsCount());
+    for (int i = 1; i <= 2; i++) {
+      ExecuteSqlRequest executeRequest = requests.get(i);
+      assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+      assertEquals(10, executeRequest.getParamTypesCount());
+      assertEquals(10, executeRequest.getParams().getFieldsCount());
+    }
 
     List<ParseMessage> parseMessages =
         pgServer.getDebugMessages().stream()
@@ -678,9 +679,16 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
             .map(msg -> (BindMessage) msg)
             .filter(msg -> msg.getStatementName().equals(parseMessage.getName()))
             .collect(Collectors.toList());
-    assertEquals(1, bindMessages.size());
+    assertEquals(2, bindMessages.size());
     BindMessage bindMessage = bindMessages.get(0);
     assertEquals(10, bindMessage.getParameters().length);
+    List<ExecuteMessage> executeMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(msg -> msg instanceof ExecuteMessage)
+            .map(msg -> (ExecuteMessage) msg)
+            .filter(msg -> msg.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(2, executeMessages.size());
   }
 
   private static String getInsertAllTypesSql() {

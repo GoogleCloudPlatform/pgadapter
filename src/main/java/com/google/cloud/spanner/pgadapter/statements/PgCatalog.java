@@ -55,13 +55,23 @@ public class PgCatalog {
               new TableOrIndexName("pg_catalog", "pg_settings"),
               new TableOrIndexName(null, "pg_settings"))
           .put(new TableOrIndexName(null, "pg_settings"), new TableOrIndexName(null, "pg_settings"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_attribute"),
+              new TableOrIndexName(null, "pg_attribute"))
+          .put(
+              new TableOrIndexName(null, "pg_attribute"),
+              new TableOrIndexName(null, "pg_attribute"))
+          .put(new TableOrIndexName("pg_catalog", "pg_enum"), new TableOrIndexName(null, "pg_enum"))
+          .put(new TableOrIndexName(null, "pg_enum"), new TableOrIndexName(null, "pg_enum"))
           .build();
 
   private static final ImmutableMap<Pattern, String> FUNCTION_REPLACEMENTS =
       ImmutableMap.of(
           Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), "true",
           Pattern.compile("pg_table_is_visible\\(.+\\)"), "true",
-          Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), "'public'");
+          Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), "'public'",
+          Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"), "false",
+          Pattern.compile("proc\\.oid = typ\\.typreceive"), "false");
 
   private final Map<TableOrIndexName, PgCatalogTable> pgCatalogTables =
       ImmutableMap.of(
@@ -69,6 +79,8 @@ public class PgCatalog {
           new TableOrIndexName(null, "pg_class"), new PgClass(),
           new TableOrIndexName(null, "pg_proc"), new PgProc(),
           new TableOrIndexName(null, "pg_range"), new PgRange(),
+          new TableOrIndexName(null, "pg_attribute"), new PgAttribute(),
+          new TableOrIndexName(null, "pg_enum"), new PgEnum(),
           new TableOrIndexName(null, "pg_type"), new PgType(),
           new TableOrIndexName(null, "pg_settings"), new PgSettings());
   private final SessionState sessionState;
@@ -376,6 +388,37 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return PG_RANGE_CTE;
+    }
+  }
+
+  private static class PgAttribute implements PgCatalogTable {
+    private static final String PG_ATTRIBUTE_CTE =
+        "pg_attribute as (\n"
+            + "select * from ("
+            + "select 0::bigint as attrelid, '' as attname, 0::bigint as atttypid, 0::bigint as attstattarget, "
+            + "0::bigint as attlen, 0::bigint as attnum, 0::bigint as attndims, -1::bigint as attcacheoff, "
+            + "0::bigint as atttypmod, true as attbyval, '' as attalign, '' as attstorage, '' as attcompression, "
+            + "false as attnotnull, true as atthasdef, false as atthasmissing, '' as attidentity, '' as attgenerated, "
+            + "false as attisdropped, true as attislocal, 0 as attinhcount, 0 as attcollation, '{}'::bigint[] as attacl, "
+            + "'{}'::text[] as attoptions, '{}'::text[] as attfdwoptions, null as attmissingval\n"
+            + ") a where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_ATTRIBUTE_CTE;
+    }
+  }
+
+  private static class PgEnum implements PgCatalogTable {
+    private static final String PG_ENUM_CTE =
+        "pg_enum as (\n"
+            + "select * from ("
+            + "select 0::bigint as oid, 0::bigint as enumtypid, 0.0::float8 as enumsortorder, ''::varchar as enumlabel\n"
+            + ") e where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_ENUM_CTE;
     }
   }
 }

@@ -209,13 +209,12 @@ public class NpgsqlTest
         connection.Open();
 
         var sql =
-            "UPDATE all_types SET col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, " +
-            "col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 WHERE col_varchar = $11";
+            "UPDATE all_types SET col_bool=$1, col_bytea=$2, col_float8=$3, col_int=$4, col_numeric=$5, " +
+            "col_timestamptz=$6, col_date=$7, col_varchar=$8, col_jsonb=$9 WHERE col_varchar = $10";
         using var cmd = new NpgsqlCommand(sql, connection)
         {
             Parameters =
             {
-                new () {Value = 100L},
                 new () {Value = true},
                 new () {Value = Encoding.UTF8.GetBytes("test_bytes")},
                 new () {Value = 3.14d},
@@ -318,13 +317,13 @@ public class NpgsqlTest
             {
                 new () {Value = 1L},
                 new () {Value = true},
-                new () {Value = Encoding.UTF8.GetBytes("test_bytes")},
+                new () {Value = Encoding.UTF8.GetBytes("test")},
                 new () {Value = 3.14d},
                 new () {Value = 100},
                 new () {Value = 6.626m},
                 new () {Value = DateTime.Parse("2022-02-16T13:18:02.123456789Z").ToUniversalTime(), DbType = DbType.DateTimeOffset},
                 new () {Value = DateTime.Parse("2022-03-29"), DbType = DbType.Date},
-                new () {Value = "test_string"},
+                new () {Value = "test"},
                 new () {Value = JsonDocument.Parse("{\"key\":\"value\"}")},
             }
         };
@@ -797,39 +796,46 @@ public class NpgsqlTest
     {
         using var connection = new NpgsqlConnection(ConnectionString);
         connection.Open();
-        
-        var sql =
-            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
-            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
-        var cmd = new NpgsqlCommand(sql, connection);
-        cmd.Parameters.Add(null, NpgsqlDbType.Bigint);
-        cmd.Parameters.Add(null, NpgsqlDbType.Boolean);
-        cmd.Parameters.Add(null, NpgsqlDbType.Bytea);
-        cmd.Parameters.Add(null, NpgsqlDbType.Double);
-        cmd.Parameters.Add(null, NpgsqlDbType.Integer);
-        cmd.Parameters.Add(null, NpgsqlDbType.Numeric);
-        cmd.Parameters.Add(null, NpgsqlDbType.TimestampTz);
-        cmd.Parameters.Add(null, NpgsqlDbType.Date);
-        cmd.Parameters.Add(null, NpgsqlDbType.Varchar);
-        cmd.Parameters.Add(null, NpgsqlDbType.Jsonb);
-        cmd.Prepare();
 
-        var index = 0;
-        cmd.Parameters[index++].Value = 100L;
-        cmd.Parameters[index++].Value = true;
-        cmd.Parameters[index++].Value = Encoding.UTF8.GetBytes("test_bytes");
-        cmd.Parameters[index++].Value = 3.14d;
-        cmd.Parameters[index++].Value = 100;
-        cmd.Parameters[index++].Value = 6.626m;
-        cmd.Parameters[index++].Value = DateTime.Parse("2022-03-24T08:39:10.1234568+02:00").ToUniversalTime();
-        cmd.Parameters[index++].Value = DateTime.Parse("2022-04-02");
-        cmd.Parameters[index++].Value = "test_string";
-        cmd.Parameters[index++].Value = JsonDocument.Parse("{\"key\":\"value\"}");
-        var updateCount = cmd.ExecuteNonQuery();
-        if (updateCount != 1)
+        // Prepare-and-execute twice to verify that the statement is only
+        // parsed and prepared once, and executed twice.
+        for (var i = 0; i < 2; i++)
         {
-            Console.WriteLine($"Update count mismatch. Got: {updateCount}, Want: 1");
-            return;
+            var sql =
+                "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+                + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+            var cmd = new NpgsqlCommand(sql, connection);
+#pragma warning disable CS8625
+            cmd.Parameters.Add(null, NpgsqlDbType.Bigint);
+            cmd.Parameters.Add(null, NpgsqlDbType.Boolean);
+            cmd.Parameters.Add(null, NpgsqlDbType.Bytea);
+            cmd.Parameters.Add(null, NpgsqlDbType.Double);
+            cmd.Parameters.Add(null, NpgsqlDbType.Integer);
+            cmd.Parameters.Add(null, NpgsqlDbType.Numeric);
+            cmd.Parameters.Add(null, NpgsqlDbType.TimestampTz);
+            cmd.Parameters.Add(null, NpgsqlDbType.Date);
+            cmd.Parameters.Add(null, NpgsqlDbType.Varchar);
+            cmd.Parameters.Add(null, NpgsqlDbType.Jsonb);
+#pragma warning restore CS8625
+            cmd.Prepare();
+
+            var index = 0;
+            cmd.Parameters[index++].Value = 100L;
+            cmd.Parameters[index++].Value = true;
+            cmd.Parameters[index++].Value = Encoding.UTF8.GetBytes("test_bytes");
+            cmd.Parameters[index++].Value = 3.14d;
+            cmd.Parameters[index++].Value = 100;
+            cmd.Parameters[index++].Value = 6.626m;
+            cmd.Parameters[index++].Value = DateTime.Parse("2022-03-24T08:39:10.1234568+02:00").ToUniversalTime();
+            cmd.Parameters[index++].Value = DateTime.Parse("2022-04-02");
+            cmd.Parameters[index++].Value = "test_string";
+            cmd.Parameters[index++].Value = JsonDocument.Parse("{\"key\":\"value\"}");
+            var updateCount = cmd.ExecuteNonQuery();
+            if (updateCount != 1)
+            {
+                Console.WriteLine($"Update count mismatch. Got: {updateCount}, Want: 1");
+                return;
+            }
         }
         Console.WriteLine("Success");
     }
