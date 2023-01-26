@@ -752,7 +752,11 @@ public class ITPsqlTest implements IntegrationTest {
           // Mexico abolished DST in 2022, but not all databases contain this information.
           ZoneId.of("America/Chihuahua"),
           // Jordan abolished DST in 2022, but not all databases contain this information.
-          ZoneId.of("Asia/Amman"));
+          ZoneId.of("Asia/Amman"),
+          // Iran observed DST in 1978. Not all databases agree on this.
+          ZoneId.of("Asia/Tehran"),
+          // Rankin_Inlet did not observer DST in 1970-1979, but not all databases agree.
+          ZoneId.of("America/Rankin_Inlet"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));
