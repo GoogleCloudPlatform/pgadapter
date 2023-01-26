@@ -50,6 +50,7 @@ import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -383,6 +384,19 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
               "copy all_types from stdin;",
               new FileInputStream("./src/test/resources/all_types_data_small.txt"));
       assertEquals(100L, copyCount);
+    }
+  }
+
+  @Test
+  public void testCopyIn_Empty() throws SQLException, IOException {
+    setupCopyInformationSchemaResults();
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      PGConnection pgConnection = connection.unwrap(PGConnection.class);
+      CopyManager copyManager = pgConnection.getCopyAPI();
+      long copyCount =
+          copyManager.copyIn("copy all_types from stdin;", new ByteArrayInputStream(new byte[0]));
+      assertEquals(0L, copyCount);
     }
   }
 
