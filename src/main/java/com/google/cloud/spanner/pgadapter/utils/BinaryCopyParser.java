@@ -236,6 +236,14 @@ class BinaryCopyParser implements CopyInParser {
     }
 
     @Override
+    public boolean isNull(int columnIndex) {
+      Preconditions.checkArgument(
+          columnIndex >= 0 && columnIndex < numColumns(),
+          "columnIndex must be >= 0 && < numColumns");
+      return fields[columnIndex].data == null;
+    }
+
+    @Override
     public Value getValue(Type type, String columnName) {
       // The binary copy format does not include any column name headers or any type information.
       throw new UnsupportedOperationException();
