@@ -376,7 +376,7 @@ public class BackendConnection {
     }
   }
 
-  private static final int MAX_PARTITIONS =
+  public static final int MAX_PARTITIONS =
       Math.max(16, 2 * Runtime.getRuntime().availableProcessors());
 
   private final class CopyOut extends BufferedStatement<StatementResult> {
@@ -405,9 +405,14 @@ public class BackendConnection {
               // No need for the extra complexity of a partitioned query.
               result.set(spannerConnection.execute(statement));
             } else {
+              // Get the metadata of the query, so we can include that in the result.
+              ResultSet metadataResultSet =
+                  spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
               result.set(
                   new PartitionQueryResult(
-                      batchReadOnlyTransaction.getBatchTransactionId(), partitions));
+                      batchReadOnlyTransaction.getBatchTransactionId(),
+                      partitions,
+                      metadataResultSet));
             }
           } catch (SpannerException spannerException) {
             // The query might not be suitable for partitioning. Just try with a normal query.
@@ -1279,10 +1284,15 @@ public class BackendConnection {
   public static final class PartitionQueryResult implements StatementResult {
     private final BatchTransactionId batchTransactionId;
     private final List<Partition> partitions;
+    private final ResultSet metadataResultSet;
 
-    public PartitionQueryResult(BatchTransactionId batchTransactionId, List<Partition> partitions) {
+    public PartitionQueryResult(
+        BatchTransactionId batchTransactionId,
+        List<Partition> partitions,
+        ResultSet metadataResultSet) {
       this.batchTransactionId = batchTransactionId;
       this.partitions = partitions;
+      this.metadataResultSet = metadataResultSet;
     }
 
     public BatchTransactionId getBatchTransactionId() {
@@ -1291,6 +1301,10 @@ public class BackendConnection {
 
     public List<Partition> getPartitions() {
       return partitions;
+    }
+
+    public ResultSet getMetadataResultSet() {
+      return metadataResultSet;
     }
 
     @Override
