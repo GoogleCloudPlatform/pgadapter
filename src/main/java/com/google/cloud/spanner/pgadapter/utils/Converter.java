@@ -50,7 +50,7 @@ public class Converter implements AutoCloseable {
   private final OptionsMetadata options;
   private final ResultSet resultSet;
   private final SessionState sessionState;
-  private final boolean includeBinaryCopyHeaderInFirstRow;
+  private boolean includeBinaryCopyHeaderInFirstRow;
   private boolean firstRow = true;
 
   public Converter(
@@ -70,6 +70,15 @@ public class Converter implements AutoCloseable {
             .getBackendConnection()
             .getSessionState();
     this.includeBinaryCopyHeaderInFirstRow = includeBinaryCopyHeaderInFirstRow;
+  }
+
+  public Converter includeBinaryCopyHeader() {
+    this.includeBinaryCopyHeaderInFirstRow = true;
+    return this;
+  }
+
+  public boolean isIncludeBinaryCopyHeaderInFirstRow() {
+    return this.includeBinaryCopyHeaderInFirstRow;
   }
 
   @Override

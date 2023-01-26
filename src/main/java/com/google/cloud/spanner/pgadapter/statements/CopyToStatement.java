@@ -41,6 +41,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import java.util.List;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.QuoteMode;
@@ -57,7 +58,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
 
   private final ParsedCopyStatement parsedCopyStatement;
   private final CSVFormat csvFormat;
-  private boolean hasReturnedData;
+  private final AtomicBoolean hasReturnedData = new AtomicBoolean(false);
 
   public CopyToStatement(
       ConnectionHandler connectionHandler,
@@ -236,7 +237,9 @@ public class CopyToStatement extends IntermediatePortalStatement {
     // rows. This is not specifically mentioned in the protocol description, but some clients assume
     // this behavior. See
     // https://github.com/npgsql/npgsql/blob/7f97dbad28c71b2202dd7bcccd05fc42a7de23c8/src/Npgsql/NpgsqlBinaryExporter.cs#L156
-    this.hasReturnedData = true;
+    if (parsedCopyStatement.format == Format.BINARY && !hasReturnedData.getAndSet(true)) {
+      converter = converter.includeBinaryCopyHeader();
+    }
     return parsedCopyStatement.format == CopyStatement.Format.BINARY
         ? createBinaryDataResponse(converter)
         : createDataResponse(converter.getResultSet());
@@ -246,7 +249,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
   public WireOutput[] createResultSuffix() {
     return this.parsedCopyStatement.format == Format.BINARY
         ? new WireOutput[] {
-          CopyDataResponse.createBinaryTrailer(this.outputStream, !hasReturnedData),
+          CopyDataResponse.createBinaryTrailer(this.outputStream, !hasReturnedData.get()),
           new CopyDoneResponse(this.outputStream)
         }
         : new WireOutput[] {new CopyDoneResponse(this.outputStream)};
