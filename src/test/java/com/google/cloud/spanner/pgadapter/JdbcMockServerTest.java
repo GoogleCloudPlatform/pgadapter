@@ -1830,9 +1830,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("test")
                 .bind("p10")
-                // TODO: Change to jsonb when https://github.com/googleapis/java-spanner/pull/2182
-                //       has been merged.
-                .to(com.google.cloud.spanner.Value.json("{\"key\": \"value\"}"))
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             com.google.spanner.v1.ResultSet.newBuilder()
                 .setMetadata(ALL_TYPES_METADATA)
@@ -2913,6 +2911,21 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set time zone 'IST'");
       verifySettingValue(connection, "timezone", "Asia/Kolkata");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneEST() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Java considers 'EST' to always be '-05:00'. That is; it is never DST.
+      connection.createStatement().execute("set time zone 'EST'");
+      verifySettingValue(connection, "timezone", "-05:00");
+      // 'EST5EDT' is the ID for the timezone that will change with DST.
+      connection.createStatement().execute("set time zone 'EST5EDT'");
+      verifySettingValue(connection, "timezone", "EST5EDT");
+      // 'America/New_York' is the full name of the geographical timezone.
+      connection.createStatement().execute("set time zone 'America/New_York'");
+      verifySettingValue(connection, "timezone", "America/New_York");
     }
   }
 
