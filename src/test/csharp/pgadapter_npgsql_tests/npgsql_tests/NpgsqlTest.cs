@@ -820,7 +820,7 @@ public class NpgsqlTest
             cmd.Prepare();
 
             var index = 0;
-            cmd.Parameters[index++].Value = 100L;
+            cmd.Parameters[index++].Value = 100L + i;
             cmd.Parameters[index++].Value = true;
             cmd.Parameters[index++].Value = Encoding.UTF8.GetBytes("test_bytes");
             cmd.Parameters[index++].Value = 3.14d;
@@ -837,6 +837,85 @@ public class NpgsqlTest
                 return;
             }
         }
+        Console.WriteLine("Success");
+    }
+
+    public void TestReadWriteTransaction()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+        // The serialization level *MUST* be specified in npgsql. Otherwise, the
+        // connection will default to read-committed.
+        var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
+
+        var selectCommand = new NpgsqlCommand("SELECT 1", connection);
+        selectCommand.Transaction = transaction;
+        using (var reader = selectCommand.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                Console.WriteLine("Row: " + reader.GetInt64(0));
+            }
+        }
+        var insertSql =
+            "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+            + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+        foreach (var id in new [] {10, 20})
+        {
+            using var insertCommand = new NpgsqlCommand(insertSql, connection)
+            {
+                Parameters =
+                {
+                    new() { Value = id },
+                    new() { Value = true },
+                    new() { Value = Encoding.UTF8.GetBytes("test_bytes") },
+                    new() { Value = 3.14d },
+                    new() { Value = 100 },
+                    new() { Value = 6.626m },
+                    new()
+                    {
+                        Value = DateTime.Parse("2022-03-24T08:39:10.1234568+02:00").ToUniversalTime(),
+                        DbType = DbType.DateTimeOffset
+                    },
+                    new() { Value = DateTime.Parse("2022-04-02"), DbType = DbType.Date },
+                    new() { Value = "test_string" },
+                    new() { Value = JsonDocument.Parse("{\"key\":\"value\"}") },
+                }
+            };
+            insertCommand.Transaction = transaction;
+            var updateCount = insertCommand.ExecuteNonQuery();
+            if (updateCount != 1)
+            {
+                Console.WriteLine($"Update count mismatch. Got: {updateCount}, Want: 1");
+                return;
+            }
+        }
+        transaction.Commit();
+        Console.WriteLine("Success");
+    }
+
+    public void TestReadOnlyTransaction()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+        // The serialization level *MUST* be specified in npgsql. Otherwise, the
+        // connection will default to read-committed.
+        var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
+        // npgsql and ADO.NET do not expose any native API creating a read-only transaction.
+        var setReadOnlyCommand = new NpgsqlCommand("set transaction read only", connection, transaction);
+        setReadOnlyCommand.ExecuteNonQuery();
+
+        foreach (var i in new[] { 1, 2 })
+        {
+            var selectCommand = new NpgsqlCommand($"SELECT {i}", connection, transaction);
+            using var reader = selectCommand.ExecuteReader();
+            while (reader.Read())
+            {
+                Console.WriteLine("Row: " + reader.GetInt64(0));
+            }
+        }
+        // We need to either commit or rollback the transaction to release the underlying resources.
+        transaction.Commit();
         Console.WriteLine("Success");
     }
     

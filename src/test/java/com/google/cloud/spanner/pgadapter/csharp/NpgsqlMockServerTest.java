@@ -35,8 +35,10 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -611,31 +613,33 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
                             TypeCode.JSON)))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(
-        StatementResult.update(
-            Statement.newBuilder(sql)
-                .bind("p1")
-                .to(100L)
-                .bind("p2")
-                .to(true)
-                .bind("p3")
-                .to(ByteArray.copyFrom("test_bytes"))
-                .bind("p4")
-                .to(3.14d)
-                .bind("p5")
-                .to(100)
-                .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
-                .bind("p7")
-                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
-                .bind("p8")
-                .to(Date.parseDate("2022-04-02"))
-                .bind("p9")
-                .to("test_string")
-                .bind("p10")
-                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
-                .build(),
-            1L));
+    for (int i = 0; i < 2; i++) {
+      mockSpanner.putStatementResult(
+          StatementResult.update(
+              Statement.newBuilder(sql)
+                  .bind("p1")
+                  .to(100L + i)
+                  .bind("p2")
+                  .to(true)
+                  .bind("p3")
+                  .to(ByteArray.copyFrom("test_bytes"))
+                  .bind("p4")
+                  .to(3.14d)
+                  .bind("p5")
+                  .to(100)
+                  .bind("p6")
+                  .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                  .bind("p7")
+                  .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                  .bind("p8")
+                  .to(Date.parseDate("2022-04-02"))
+                  .bind("p9")
+                  .to("test_string")
+                  .bind("p10")
+                  .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
+                  .build(),
+              1L));
+    }
 
     String result = execute("TestPrepareAndExecute", createConnectionString());
     assertEquals("Success\n", result);
@@ -689,6 +693,91 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
             .filter(msg -> msg.getSql().equals(sql))
             .collect(Collectors.toList());
     assertEquals(2, executeMessages.size());
+  }
+
+  @Test
+  public void testReadWriteTransaction() throws IOException, InterruptedException {
+    String sql = getInsertAllTypesSql();
+    for (long id : new Long[] {10L, 20L}) {
+      mockSpanner.putStatementResult(
+          StatementResult.update(
+              Statement.newBuilder(sql)
+                  .bind("p1")
+                  .to(id)
+                  .bind("p2")
+                  .to(true)
+                  .bind("p3")
+                  .to(ByteArray.copyFrom("test_bytes"))
+                  .bind("p4")
+                  .to(3.14d)
+                  .bind("p5")
+                  .to(100L)
+                  .bind("p6")
+                  .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                  .bind("p7")
+                  .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                  .bind("p8")
+                  .to(Date.parseDate("2022-04-02"))
+                  .bind("p9")
+                  .to("test_string")
+                  .bind("p10")
+                  .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
+                  .build(),
+              1L));
+    }
+
+    String result = execute("TestReadWriteTransaction", createConnectionString());
+    assertEquals("Row: 1\n" + "Success\n", result);
+
+    List<ExecuteSqlRequest> select1Requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals("SELECT 1"))
+            .collect(Collectors.toList());
+    assertEquals(1, select1Requests.size());
+    assertTrue(select1Requests.get(0).hasTransaction());
+    assertTrue(select1Requests.get(0).getTransaction().hasBegin());
+    assertTrue(select1Requests.get(0).getTransaction().getBegin().hasReadWrite());
+    List<ExecuteSqlRequest> insertRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(getInsertAllTypesSql()))
+            .collect(Collectors.toList());
+    assertEquals(2, insertRequests.size());
+    for (ExecuteSqlRequest insertRequest : insertRequests) {
+      assertTrue(insertRequest.hasTransaction());
+      assertTrue(insertRequest.getTransaction().hasId());
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testReadOnlyTransaction() throws IOException, InterruptedException {
+    String result = execute("TestReadOnlyTransaction", createConnectionString());
+    assertEquals("Row: 1\n" + "Row: 2\n" + "Success\n", result);
+
+    // There are two BeginTransaction requests on the server, because the initial metadata queries
+    // that are executed by the npgsql driver will also use a read-only transaction.
+    assertEquals(2, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+    BeginTransactionRequest beginTransactionRequest =
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class).get(1);
+    assertTrue(beginTransactionRequest.getOptions().hasReadOnly());
+    List<ByteString> transactionsStarted = mockSpanner.getTransactionsStarted();
+    assertFalse(transactionsStarted.isEmpty());
+    ByteString transactionId = transactionsStarted.get(transactionsStarted.size() - 1);
+
+    List<ExecuteSqlRequest> requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(
+                request ->
+                    request.getSql().equals("SELECT 1") || request.getSql().equals("SELECT 2"))
+            .collect(Collectors.toList());
+    assertEquals(2, requests.size());
+    for (ExecuteSqlRequest request : requests) {
+      assertEquals(transactionId, request.getTransaction().getId());
+    }
+    // Read-only transactions are not really committed or rolled back.s
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
 
   private static String getInsertAllTypesSql() {

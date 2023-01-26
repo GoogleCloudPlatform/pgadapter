@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.csharp;
 
 import static com.google.cloud.spanner.pgadapter.csharp.AbstractNpgsqlMockServerTest.execute;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -29,12 +30,14 @@ import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Collections;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -122,6 +125,13 @@ public class ITNpgsqlTest implements IntegrationTest {
                 .set("col_jsonb")
                 .to("{\"key\": \"value\"}")
                 .build()));
+  }
+
+  @After
+  public void clearTestData() {
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(
+        databaseId, Collections.singletonList(Mutation.delete("all_types", KeySet.all())));
   }
 
   @Test
@@ -239,5 +249,175 @@ public class ITNpgsqlTest implements IntegrationTest {
       assertEquals(0L, resultSet.getLong(0));
       assertFalse(resultSet.next());
     }
+  }
+
+  @Test
+  public void testBatchExecutionError() throws IOException, InterruptedException {
+    // Add a new record to cause the batch insert to fail with an ALREADY_EXISTS error.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(
+        databaseId,
+        Collections.singletonList(
+            Mutation.newInsertOrUpdateBuilder("all_types")
+                .set("col_bigint")
+                .to(101L)
+                .set("col_bool")
+                .to(true)
+                .set("col_bytea")
+                .to(ByteArray.copyFrom("test"))
+                .set("col_float8")
+                .to(3.14d)
+                .set("col_int")
+                .to(100)
+                .set("col_numeric")
+                .to(new BigDecimal("6.626"))
+                .set("col_timestamptz")
+                .to(Timestamp.parseTimestamp("2022-02-16T14:18:02.123456789+01:00"))
+                .set("col_date")
+                .to(Date.parseDate("2022-03-29"))
+                .set("col_varchar")
+                .to("test")
+                .set("col_jsonb")
+                .to("{\"key\": \"value\"}")
+                .build()));
+
+    String result = execute("TestBatchExecutionError", createConnectionString());
+    assertTrue(result, result.contains("Executing batch failed with error"));
+    assertTrue(result, result.contains("Row [101] in table all_types already exists"));
+  }
+
+  @Test
+  public void testBinaryCopyIn() throws IOException, InterruptedException {
+    testCopyIn("TestBinaryCopyIn");
+  }
+
+  @Test
+  public void testTextCopyIn() throws IOException, InterruptedException {
+    testCopyIn("TestTextCopyIn");
+  }
+
+  private void testCopyIn(String testMethod) throws IOException, InterruptedException {
+    // Make sure the table is empty before we execute the test.
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(
+        databaseId, Collections.singletonList(Mutation.delete("all_types", KeySet.all())));
+
+    String result = execute(testMethod, createConnectionString());
+    assertEquals("Success\n", result);
+
+    DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
+    try (ResultSet resultSet =
+        client
+            .singleUse()
+            .executeQuery(Statement.of("SELECT * FROM all_types ORDER BY col_bigint"))) {
+      assertTrue(resultSet.next());
+      int col = 0;
+      assertEquals(1L, resultSet.getLong(col++));
+      assertTrue(resultSet.getBoolean(col++));
+      assertArrayEquals(new byte[] {1, 2, 3}, resultSet.getBytes(col++).toByteArray());
+      assertEquals(3.14d, resultSet.getDouble(col++), 0.0d);
+      assertEquals(10L, resultSet.getLong(col++));
+      assertEquals("6.626", resultSet.getString(col++));
+      assertEquals(
+          Timestamp.parseTimestamp("2022-03-24T12:39:10.123456000Z"),
+          resultSet.getTimestamp(col++));
+      assertEquals(Date.parseDate("2022-07-01"), resultSet.getDate(col++));
+      assertEquals("test", resultSet.getString(col++));
+      assertEquals("{\"key\": \"value\"}", resultSet.getPgJsonb(col++));
+
+      assertTrue(resultSet.next());
+      col = 0;
+      assertEquals(2L, resultSet.getLong(col++));
+      assertEquals(10, resultSet.getColumnCount());
+      for (col = 1; col < resultSet.getColumnCount(); col++) {
+        assertTrue(resultSet.isNull(col));
+      }
+
+      assertFalse(resultSet.next());
+    }
+  }
+
+  @Test
+  public void testBinaryCopyOut() throws IOException, InterruptedException {
+    // Add an extra NULL-row to the table.
+    addNullRow();
+    String result = execute("TestBinaryCopyOut", createConnectionString());
+    assertEquals(
+        "1\tTrue\tdGVzdA==\t3.14\t100\t6.626\t20220216T131802123456\t20220329\ttest\t{\"key\": \"value\"}\n"
+            + "2\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\n"
+            + "Success\n",
+        result);
+  }
+
+  @Test
+  public void testTextCopyOut() throws IOException, InterruptedException {
+    // Add an extra NULL-row to the table.
+    addNullRow();
+    String result = execute("TestTextCopyOut", createConnectionString());
+    assertEquals(
+        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 14:18:02.123456+01\t2022-03-29\ttest\t{\"key\": \"value\"}\n"
+            + "2\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\t\\N\n"
+            + "Success\n",
+        result);
+  }
+
+  private void addNullRow() {
+    String databaseId = database.getId().getDatabase();
+    testEnv.write(
+        databaseId,
+        Collections.singletonList(
+            Mutation.newInsertOrUpdateBuilder("all_types")
+                .set("col_bigint")
+                .to(2L)
+                .set("col_bool")
+                .to((Boolean) null)
+                .set("col_bytea")
+                .to((ByteArray) null)
+                .set("col_float8")
+                .to((Double) null)
+                .set("col_int")
+                .to((Long) null)
+                .set("col_numeric")
+                .to(Value.pgNumeric(null))
+                .set("col_timestamptz")
+                .to((Timestamp) null)
+                .set("col_date")
+                .to((Date) null)
+                .set("col_varchar")
+                .to((String) null)
+                .set("col_jsonb")
+                .to(Value.pgJsonb(null))
+                .build()));
+  }
+
+  @Test
+  public void testSimplePrepare() throws IOException, InterruptedException {
+    String result = execute("TestSimplePrepare", createConnectionString());
+    assertEquals("Success\n", result);
+  }
+
+  @Test
+  public void testPrepareAndExecute() throws IOException, InterruptedException {
+    String result = execute("TestPrepareAndExecute", createConnectionString());
+    assertEquals("Success\n", result);
+  }
+
+  @Test
+  public void testReadWriteTransaction() throws IOException, InterruptedException {
+    String result = execute("TestReadWriteTransaction", createConnectionString());
+    assertEquals("Row: 1\n" + "Success\n", result);
+    DatabaseClient client = testEnv.getSpanner().getDatabaseClient(database.getId());
+    try (ResultSet resultSet =
+        client.singleUse().executeQuery(Statement.of("SELECT COUNT(*) FROM all_types"))) {
+      assertTrue(resultSet.next());
+      assertEquals(3L, resultSet.getLong(0));
+      assertFalse(resultSet.next());
+    }
+  }
+
+  @Test
+  public void testReadOnlyTransaction() throws IOException, InterruptedException {
+    String result = execute("TestReadOnlyTransaction", createConnectionString());
+    assertEquals("Row: 1\n" + "Row: 2\n" + "Success\n", result);
   }
 }
