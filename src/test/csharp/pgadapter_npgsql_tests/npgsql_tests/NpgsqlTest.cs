@@ -560,6 +560,149 @@ public class NpgsqlTest
         }
     }
 
+    public void TestDdlBatch()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+
+        using var command = new NpgsqlBatch(connection);
+        command.BatchCommands.Add(new NpgsqlBatchCommand(@"
+            create table singers (
+                id         varchar not null primary key,
+                first_name varchar,
+                last_name  varchar not null,
+                full_name  varchar generated always as (coalesce(concat(first_name, ' '::varchar, last_name), last_name)) stored,
+                active     boolean,
+                created_at timestamptz,
+                updated_at timestamptz
+            )"));
+        command.BatchCommands.Add(new NpgsqlBatchCommand(@"
+            create table albums (
+                id               varchar not null primary key,
+                title            varchar not null,
+                marketing_budget numeric,
+                release_date     date,
+                cover_picture    bytea,
+                singer_id        varchar not null,
+                created_at       timestamptz,
+                updated_at       timestamptz,
+                constraint fk_albums_singers foreign key (singer_id) references singers (id)
+            )"));
+        command.BatchCommands.Add(new NpgsqlBatchCommand(@"
+            create table tracks (
+                id           varchar not null,
+                track_number bigint not null,
+                title        varchar not null,
+                sample_rate  float8 not null,
+                created_at   timestamptz,
+                updated_at   timestamptz,
+                primary key (id, track_number)
+            ) interleave in parent albums on delete cascade"));
+        command.BatchCommands.Add(new NpgsqlBatchCommand(@"
+            create table venues (
+                id          varchar not null primary key,
+                name        varchar not null,
+                description varchar not null,
+                created_at  timestamptz,
+                updated_at  timestamptz
+            )"));
+        command.BatchCommands.Add(new NpgsqlBatchCommand(@"
+            create table concerts (
+            id          varchar not null primary key,
+            venue_id    varchar not null,
+            singer_id   varchar not null,
+            name        varchar not null,
+            start_time  timestamptz not null,
+            end_time    timestamptz not null,
+            created_at  timestamptz,
+            updated_at  timestamptz,
+            constraint fk_concerts_venues  foreign key (venue_id)  references venues  (id),
+            constraint fk_concerts_singers foreign key (singer_id) references singers (id),
+            constraint chk_end_time_after_start_time check (end_time > start_time)
+        )"));
+        var updateCount = command.ExecuteNonQuery();
+        if (updateCount != -1)
+        {
+            Console.WriteLine($"Batch returned {updateCount} updates, expected -1.");
+            return;
+        }
+        Console.WriteLine("Success");
+    }
+
+    public void TestDdlScript()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+
+        using var command = new NpgsqlCommand(@"
+            -- Executing the schema creation in a batch will improve execution speed.
+            start batch ddl;
+
+            create table singers (
+                id         varchar not null primary key,
+                first_name varchar,
+                last_name  varchar not null,
+                full_name  varchar generated always as (coalesce(concat(first_name, ' '::varchar, last_name), last_name)) stored,
+                active     boolean,
+                created_at timestamptz,
+                updated_at timestamptz
+            );
+
+            create table albums (
+                id               varchar not null primary key,
+                title            varchar not null,
+                marketing_budget numeric,
+                release_date     date,
+                cover_picture    bytea,
+                singer_id        varchar not null,
+                created_at       timestamptz,
+                updated_at       timestamptz,
+                constraint fk_albums_singers foreign key (singer_id) references singers (id)
+            );
+
+            create table tracks (
+                id           varchar not null,
+                track_number bigint not null,
+                title        varchar not null,
+                sample_rate  float8 not null,
+                created_at   timestamptz,
+                updated_at   timestamptz,
+                primary key (id, track_number)
+            ) interleave in parent albums on delete cascade;
+
+            create table venues (
+                id          varchar not null primary key,
+                name        varchar not null,
+                description varchar not null,
+                created_at  timestamptz,
+                updated_at  timestamptz
+            );
+
+            create table concerts (
+                id          varchar not null primary key,
+                venue_id    varchar not null,
+                singer_id   varchar not null,
+                name        varchar not null,
+                start_time  timestamptz not null,
+                end_time    timestamptz not null,
+                created_at  timestamptz,
+                updated_at  timestamptz,
+                constraint fk_concerts_venues  foreign key (venue_id)  references venues  (id),
+                constraint fk_concerts_singers foreign key (singer_id) references singers (id),
+                constraint chk_end_time_after_start_time check (end_time > start_time)
+            );
+
+            run batch;", connection);
+        
+        var updateCount = command.ExecuteNonQuery();
+        if (updateCount != -1)
+        {
+            Console.WriteLine($"Batch returned {updateCount} updates, expected -1.");
+            return;
+        }
+        Console.WriteLine("Success");
+    }
+
     public void TestBinaryCopyIn()
     {
         using var connection = new NpgsqlConnection(ConnectionString);
@@ -844,8 +987,8 @@ public class NpgsqlTest
     {
         using var connection = new NpgsqlConnection(ConnectionString);
         connection.Open();
-        // The serialization level *MUST* be specified in npgsql. Otherwise, the
-        // connection will default to read-committed.
+        // The serialization level *MUST* be specified in npgsql. Otherwise,
+        // npgsql will default to read-committed.
         var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
 
         var selectCommand = new NpgsqlCommand("SELECT 1", connection);
@@ -898,12 +1041,11 @@ public class NpgsqlTest
     {
         using var connection = new NpgsqlConnection(ConnectionString);
         connection.Open();
-        // The serialization level *MUST* be specified in npgsql. Otherwise, the
-        // connection will default to read-committed.
+        // The serialization level *MUST* be specified in npgsql. Otherwise,
+        // npgsql will default to read-committed.
         var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
         // npgsql and ADO.NET do not expose any native API creating a read-only transaction.
-        var setReadOnlyCommand = new NpgsqlCommand("set transaction read only", connection, transaction);
-        setReadOnlyCommand.ExecuteNonQuery();
+        new NpgsqlCommand("set transaction read only", connection, transaction).ExecuteNonQuery();
 
         foreach (var i in new[] { 1, 2 })
         {

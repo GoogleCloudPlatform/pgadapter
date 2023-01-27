@@ -10,6 +10,7 @@ PGAdapter can be used with the following drivers and clients:
 3. `pgx`: Version 4.15 and higher are supported. See [pgx support](docs/pgx.md) for more details.
 4. `psycopg2`: Version 2.9.3 and higher (but not `psycopg3`) are supported. See [psycopg2](docs/psycopg2.md) for more details.
 5. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
+6. `npgsql`: Version 6.0.x and higher have experimental support. See [npgsql support](docs/npgsql.md) for more details.
 
 ## Frameworks
 PGAdapter can be used with the following frameworks:

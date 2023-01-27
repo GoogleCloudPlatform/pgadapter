@@ -38,6 +38,7 @@ import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
@@ -210,6 +211,11 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     assertEquals(1, requests.size());
     ExecuteSqlRequest request = requests.get(0);
     assertEquals(QueryMode.NORMAL, request.getQueryMode());
+    assertTrue(request.hasTransaction());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
 
   @Test
@@ -471,6 +477,40 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
     for (ExecuteBatchDmlRequest.Statement statement : request.getStatementsList()) {
       assertEquals(insertSql, statement.getSql());
     }
+  }
+
+  @Test
+  public void testDdlBatch() throws IOException, InterruptedException {
+    addDdlResponseToSpannerAdmin();
+
+    String result = execute("TestDdlBatch", createConnectionString());
+    assertEquals("Success\n", result);
+
+    List<UpdateDatabaseDdlRequest> requests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(request -> (UpdateDatabaseDdlRequest) request)
+            .collect(Collectors.toList());
+    assertEquals(1, requests.size());
+    UpdateDatabaseDdlRequest request = requests.get(0);
+    assertEquals(5, request.getStatementsCount());
+  }
+
+  @Test
+  public void testDdlScript() throws IOException, InterruptedException {
+    addDdlResponseToSpannerAdmin();
+
+    String result = execute("TestDdlScript", createConnectionString());
+    assertEquals("Success\n", result);
+
+    List<UpdateDatabaseDdlRequest> requests =
+        mockDatabaseAdmin.getRequests().stream()
+            .filter(request -> request instanceof UpdateDatabaseDdlRequest)
+            .map(request -> (UpdateDatabaseDdlRequest) request)
+            .collect(Collectors.toList());
+    assertEquals(1, requests.size());
+    UpdateDatabaseDdlRequest request = requests.get(0);
+    assertEquals(5, request.getStatementsCount());
   }
 
   @Test
