@@ -47,6 +47,7 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.zone.ZoneRulesException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Random;
@@ -668,9 +669,13 @@ public class ITPsqlTest implements IntegrationTest {
                           "select name from pg_timezone_names where not name like '%%posix%%' and not name like 'Factory' offset %d limit 1",
                           random.nextInt(numTimezones)))) {
             assertTrue(resultSet.next());
-            timezone = resultSet.getString(1);
-            if (!PROBLEMATIC_ZONE_IDS.contains(ZoneId.of(timezone))) {
-              break;
+            try {
+              timezone = resultSet.getString(1);
+              if (!PROBLEMATIC_ZONE_IDS.contains(ZoneId.of(timezone))) {
+                break;
+              }
+            } catch (ZoneRulesException ignore) {
+              // Skip and try a different one if it is not a supported timezone on this system.
             }
           }
         }
@@ -752,7 +757,11 @@ public class ITPsqlTest implements IntegrationTest {
           // Mexico abolished DST in 2022, but not all databases contain this information.
           ZoneId.of("America/Chihuahua"),
           // Jordan abolished DST in 2022, but not all databases contain this information.
-          ZoneId.of("Asia/Amman"));
+          ZoneId.of("Asia/Amman"),
+          // Iran observed DST in 1978. Not all databases agree on this.
+          ZoneId.of("Asia/Tehran"),
+          // Rankin_Inlet did not observer DST in 1970-1979, but not all databases agree.
+          ZoneId.of("America/Rankin_Inlet"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));

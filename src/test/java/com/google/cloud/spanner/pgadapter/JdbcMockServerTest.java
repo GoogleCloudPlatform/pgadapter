@@ -93,6 +93,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
 import org.postgresql.jdbc.PgStatement;
+import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
 
 @RunWith(Parameterized.class)
@@ -635,6 +636,41 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         mockSpanner.clearRequests();
       }
     }
+  }
+
+  @Test
+  public void testCharParam() throws SQLException {
+    String sql = "insert into foo values ($1)";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
+    String jdbcSql = "insert into foo values (?)";
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(jdbcSql)) {
+        PGobject pgObject = new PGobject();
+        pgObject.setType("char");
+        pgObject.setValue("a");
+        preparedStatement.setObject(1, pgObject);
+        assertEquals(1, preparedStatement.executeUpdate());
+      }
+    }
+
+    List<ParseMessage> parseMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(message -> message instanceof ParseMessage)
+            .map(message -> (ParseMessage) message)
+            .collect(Collectors.toList());
+    assertFalse(parseMessages.isEmpty());
+    ParseMessage parseMessage = parseMessages.get(parseMessages.size() - 1);
+    assertEquals(1, parseMessage.getStatement().getGivenParameterDataTypes().length);
+    assertEquals(Oid.CHAR, parseMessage.getStatement().getGivenParameterDataTypes()[0]);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(1, executeSqlRequests.size());
+    ExecuteSqlRequest request = executeSqlRequests.get(0);
+    // Oid.CHAR is not a recognized type in PGAdapter.
+    assertEquals(0, request.getParamTypesCount());
+    assertEquals(1, request.getParams().getFieldsCount());
+    assertEquals("a", request.getParams().getFieldsMap().get("p1").getStringValue());
   }
 
   @Test
@@ -2875,6 +2911,21 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set time zone 'IST'");
       verifySettingValue(connection, "timezone", "Asia/Kolkata");
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneEST() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Java considers 'EST' to always be '-05:00'. That is; it is never DST.
+      connection.createStatement().execute("set time zone 'EST'");
+      verifySettingValue(connection, "timezone", "-05:00");
+      // 'EST5EDT' is the ID for the timezone that will change with DST.
+      connection.createStatement().execute("set time zone 'EST5EDT'");
+      verifySettingValue(connection, "timezone", "EST5EDT");
+      // 'America/New_York' is the full name of the geographical timezone.
+      connection.createStatement().execute("set time zone 'America/New_York'");
+      verifySettingValue(connection, "timezone", "America/New_York");
     }
   }
 

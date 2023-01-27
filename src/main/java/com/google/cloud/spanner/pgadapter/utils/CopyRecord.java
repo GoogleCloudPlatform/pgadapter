@@ -28,6 +28,9 @@ public interface CopyRecord {
   /** Returns the number of columns in the record. */
   int numColumns();
 
+  /** Returns true if this record is the PG end record (\.). */
+  boolean isEndRecord();
+
   /**
    * Returns true if the copy record has column names. The {@link #getValue(Type, String)} method
    * can only be used for records that have column names.
