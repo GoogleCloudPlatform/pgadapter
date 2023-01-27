@@ -31,16 +31,19 @@ psql -h localhost -c "CREATE TABLE IF NOT EXISTS usertable (
                   read_min        float,
                   read_max        float,
                   read_avg        float,
+                  read_p50        float,
                   read_p95        float,
                   read_p99        float,
                   update_min      float,
                   update_max      float,
                   update_avg      float,
+                  update_p50      float,
                   update_p95      float,
                   update_p99      float,
                   insert_min      float,
                   insert_max      float,
                   insert_avg      float,
+                  insert_p50      float,
                   insert_p95      float,
                   insert_p99      float,
                   primary key (executed_at, deployment, workload, threads, batch_size, operation_count)
@@ -97,6 +100,7 @@ do
           BATCH_API=true
         fi
         ./bin/ycsb run jdbc -P workloads/workload$WORKLOAD \
+          -hdrhistogram.percentiles=50,95,99 \
           -threads $THREADS \
           -p operationcount=$OPERATION_COUNT \
           -p recordcount=100000 \
@@ -112,30 +116,33 @@ do
         READ_AVG=$(grep '\[READ\], AverageLatency(us), ' ycsb.log | sed 's/^.*, //' | sed "s/NaN/'NaN'/" || echo null)
         READ_MIN=$(grep '\[READ\], MinLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
         READ_MAX=$(grep '\[READ\], MaxLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
+        READ_P50=$(grep '\[READ\], 50thPercentileLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
         READ_P95=$(grep '\[READ\], 95thPercentileLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
         READ_P99=$(grep '\[READ\], 99thPercentileLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
 
         UPDATE_AVG=$(grep '\[UPDATE\], AverageLatency(us), ' ycsb.log | sed 's/^.*, //' | sed "s/NaN/'NaN'/" || echo null)
         UPDATE_MIN=$(grep '\[UPDATE\], MinLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
         UPDATE_MAX=$(grep '\[UPDATE\], MaxLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
+        UPDATE_P50=$(grep '\[UPDATE\], 50thPercentileLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
         UPDATE_P95=$(grep '\[UPDATE\], 95thPercentileLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
         UPDATE_P99=$(grep '\[UPDATE\], 99thPercentileLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
 
         INSERT_AVG=$(grep '\[INSERT\], AverageLatency(us), ' ycsb.log | sed 's/^.*, //' | sed "s/NaN/'NaN'/" || echo null)
         INSERT_MIN=$(grep '\[INSERT\], MinLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
         INSERT_MAX=$(grep '\[INSERT\], MaxLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
+        INSERT_P50=$(grep '\[INSERT\], 50thPercentileLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
         INSERT_P95=$(grep '\[INSERT\], 95thPercentileLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
         INSERT_P99=$(grep '\[INSERT\], 99thPercentileLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
 
         psql -h localhost \
           -c "insert into run (executed_at, deployment, workload, threads, batch_size, operation_count, run_time, throughput,
-                               read_min, read_max, read_avg, read_p95, read_p99,
-                               update_min, update_max, update_avg, update_p95, update_p99,
-                               insert_min, insert_max, insert_avg, insert_p95, insert_p99) values
+                               read_min, read_max, read_avg, read_p50, read_p95, read_p99,
+                               update_min, update_max, update_avg, update_p50, update_p95, update_p99,
+                               insert_min, insert_max, insert_avg, insert_p50, insert_p95, insert_p99) values
                                ('$EXECUTED_AT', '$DEPLOYMENT', '$WORKLOAD', $THREADS, $BATCH_SIZE, $OPERATION_COUNT, $OVERALL_RUNTIME, $OVERALL_THROUGHPUT,
-                                $READ_MIN, $READ_MAX, $READ_AVG, $READ_P95, $READ_P99,
-                                $UPDATE_MIN, $UPDATE_MAX, $UPDATE_AVG, $UPDATE_P95, $UPDATE_P99,
-                                $INSERT_MIN, $INSERT_MAX, $INSERT_AVG, $INSERT_P95, $INSERT_P99)"
+                                $READ_MIN, $READ_MAX, $READ_AVG, $READ_P50, $READ_P95, $READ_P99,
+                                $UPDATE_MIN, $UPDATE_MAX, $UPDATE_AVG, $UPDATE_P50, $UPDATE_P95, $UPDATE_P99,
+                                $INSERT_MIN, $INSERT_MAX, $INSERT_AVG, $INSERT_P50, $INSERT_P95, $INSERT_P99)"
       done
     done
   done
