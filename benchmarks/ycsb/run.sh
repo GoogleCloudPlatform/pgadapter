@@ -100,8 +100,8 @@ do
           BATCH_API=true
         fi
         ./bin/ycsb run jdbc -P workloads/workload$WORKLOAD \
-          -hdrhistogram.percentiles=50,95,99 \
           -threads $THREADS \
+          -p hdrhistogram.percentiles=50,95,99 \
           -p operationcount=$OPERATION_COUNT \
           -p recordcount=100000 \
           -p db.batchsize=$BATCH_SIZE \
