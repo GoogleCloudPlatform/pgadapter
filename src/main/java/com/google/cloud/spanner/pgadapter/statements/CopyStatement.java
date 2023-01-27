@@ -563,7 +563,7 @@ public class CopyStatement extends IntermediatePortalStatement {
     }
     ParsedCopyStatement.Builder builder = new ParsedCopyStatement.Builder();
     if (parser.eatToken("(")) {
-      builder.query = parser.parseExpressionUntilKeyword(ImmutableList.of("to"), true, true, false);
+      builder.query = parser.parseExpressionUntilKeyword(ImmutableList.of(), true, true, false);
       if (!parser.eatToken(")")) {
         throw PGExceptionFactory.newPGException(
             "missing closing parentheses after query", SQLState.SyntaxError);
