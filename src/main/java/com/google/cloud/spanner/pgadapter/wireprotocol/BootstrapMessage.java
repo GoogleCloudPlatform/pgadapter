@@ -19,6 +19,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.wireoutput.AuthenticationOkResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.KeyDataResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterStatusResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
@@ -107,7 +108,11 @@ public abstract class BootstrapMessage extends WireMessage {
    * @throws Exception
    */
   public static void sendStartupMessage(
-      DataOutputStream output, int connectionId, int secret, SessionState sessionState)
+      DataOutputStream output,
+      int connectionId,
+      int secret,
+      SessionState sessionState,
+      Iterable<NoticeResponse> startupNotices)
       throws Exception {
     new AuthenticationOkResponse(output).send(false);
     new KeyDataResponse(output, connectionId, secret).send(false);
@@ -166,6 +171,9 @@ public abstract class BootstrapMessage extends WireMessage {
             "TimeZone".getBytes(StandardCharsets.UTF_8),
             ZoneId.systemDefault().getId().getBytes(StandardCharsets.UTF_8))
         .send(false);
+    for (NoticeResponse noticeResponse : startupNotices) {
+      noticeResponse.send(false);
+    }
     new ReadyResponse(output, Status.IDLE).send();
   }
 }

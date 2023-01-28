@@ -46,19 +46,20 @@ psql -h /tmp -p 5432 -d my-database \
 `pgbench` deletes and inserts data into PostgreSQL using a combination of `truncate`, `insert` and
 `copy` statements. These statements all run in a single transaction. The amount of data that is
 modified during this transaction will exceed the transaction mutation limits of Cloud Spanner. This
-can be worked around by adding the following options to the `pgbench` initalization command:
+can be worked around by adding the following options to the `pgbench` initialization command:
 
 ```shell
 pgbench "host=/tmp port=5432 dbname=my-database \
         options='-c spanner.force_autocommit=on -c spanner.autocommit_dml_mode=\'partitioned_non_atomic\''" \
-        -i -Ig
+        -i -Ig \
+        --scale=100
 ```
 
 These additional options do the following:
 1. `spanner.force_autocommit=true`: This instructs PGAdapter to ignore any transaction statements and
    execute all statements in autocommit mode. This prevents the initialization from being executed as
    a single, large transaction.
-2. `spanner.autocommit_dml_mode='partitioned_non_atomic''`: This instructs PGAdapter to use Partitioned
+2. `spanner.autocommit_dml_mode='partitioned_non_atomic'`: This instructs PGAdapter to use Partitioned
    DML for (large) update statements. This ensures that a single statement succeeds even if it would
    exceed the transaction limits of Cloud Spanner, including large `copy` operations.
 3. `-i` activates initialization mode of `pgbench`.
@@ -84,15 +85,12 @@ pgbench "host=/tmp port=5432 dbname=my-database" \
         --progress=10
 ```
 
-## Deleting Data
-Execute the following command to remove all `pgbench` test data
-
 ## Dropping Tables
 Execute the following command to remove the `pgbench` tables from your database if you no longer
 need them.
 
 ```shell
-psql -h localhost -p 5433 -d knut-test-db \
+psql -h /tmp -p 5432 -d my-database \
         -c "START BATCH DDL;
             DROP TABLE pgbench_history;
             DROP TABLE pgbench_tellers;

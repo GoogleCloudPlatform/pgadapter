@@ -24,6 +24,8 @@ import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentCatalogS
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentDatabaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
+import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
+import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse.NoticeSeverity;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
@@ -65,6 +67,24 @@ public class ClientAutoDetector {
               .build();
         }
         return ImmutableList.of(new ListDatabasesStatement(connectionHandler));
+      }
+    },
+    PGBENCH {
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // PGBENCH makes it easy for us, as it sends its own name in the application_name parameter.
+        return parameters.containsKey("application_name")
+            && parameters.get("application_name").equals("pgbench");
+      }
+
+      @Override
+      public Iterable<NoticeResponse> createStartupNoticeResponses(ConnectionHandler connection) {
+        return ImmutableList.of(
+            new NoticeResponse(
+                connection.getConnectionMetadata().getOutputStream(),
+                NoticeSeverity.INFO,
+                "See https://github.com/GoogleCloudPlatform/pgadapter/blob/-/docs/pgbench.md for how to use pgbench with PGAdapter",
+                null));
       }
     },
     JDBC {
@@ -162,6 +182,11 @@ public class ClientAutoDetector {
         return DEFAULT_LOCAL_STATEMENTS;
       }
       return EMPTY_LOCAL_STATEMENTS;
+    }
+
+    /** Creates specific notice messages for a client after startup. */
+    public Iterable<NoticeResponse> createStartupNoticeResponses(ConnectionHandler connection) {
+      return ImmutableList.of();
     }
 
     public ImmutableMap<String, String> getDefaultParameters() {
