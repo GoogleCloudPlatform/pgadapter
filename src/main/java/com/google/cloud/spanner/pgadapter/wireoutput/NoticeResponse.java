@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.common.base.Preconditions;
 import java.io.DataOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -40,25 +41,35 @@ public class NoticeResponse extends WireOutput {
   private static final int NULL_TERMINATOR_LENGTH = 1;
 
   private static final byte MESSAGE_FLAG = 'M';
+  private static final byte CODE_FLAG = 'C';
   private static final byte SEVERITY_FLAG = 'S';
   private static final byte HINT_FLAG = 'H';
   private static final byte NULL_TERMINATOR = 0;
 
+  private SQLState sqlState;
   private final NoticeSeverity severity;
   private final String message;
   private final String hint;
 
   public NoticeResponse(DataOutputStream output, String message) {
-    this(output, NoticeSeverity.NOTICE, Preconditions.checkNotNull(message), null);
+    this(
+        output, SQLState.Success, NoticeSeverity.NOTICE, Preconditions.checkNotNull(message), null);
   }
 
   public NoticeResponse(
-      DataOutputStream output, NoticeSeverity severity, String message, String hint) {
+      DataOutputStream output,
+      SQLState sqlState,
+      NoticeSeverity severity,
+      String message,
+      String hint) {
     super(
         output,
         HEADER_LENGTH
             + FIELD_IDENTIFIER_LENGTH
             + Preconditions.checkNotNull(severity).name().getBytes(StandardCharsets.UTF_8).length
+            + NULL_TERMINATOR_LENGTH
+            + FIELD_IDENTIFIER_LENGTH
+            + sqlState.getBytes().length
             + NULL_TERMINATOR_LENGTH
             + FIELD_IDENTIFIER_LENGTH
             + Preconditions.checkNotNull(message).getBytes(StandardCharsets.UTF_8).length
@@ -69,6 +80,7 @@ public class NoticeResponse extends WireOutput {
                     + hint.getBytes(StandardCharsets.UTF_8).length
                     + NULL_TERMINATOR_LENGTH))
             + NULL_TERMINATOR_LENGTH);
+    this.sqlState = sqlState;
     this.severity = severity;
     this.message = message;
     this.hint = hint;
@@ -78,6 +90,9 @@ public class NoticeResponse extends WireOutput {
   protected void sendPayload() throws Exception {
     this.outputStream.writeByte(SEVERITY_FLAG);
     this.outputStream.write(severity.name().getBytes(StandardCharsets.UTF_8));
+    this.outputStream.writeByte(NULL_TERMINATOR);
+    this.outputStream.writeByte(CODE_FLAG);
+    this.outputStream.write(sqlState.getBytes());
     this.outputStream.writeByte(NULL_TERMINATOR);
     this.outputStream.writeByte(MESSAGE_FLAG);
     this.outputStream.write(message.getBytes(StandardCharsets.UTF_8));
@@ -98,6 +113,14 @@ public class NoticeResponse extends WireOutput {
   @Override
   protected String getMessageName() {
     return "Notice";
+  }
+
+  public String getMessage() {
+    return this.message;
+  }
+
+  public String getHint() {
+    return this.hint;
   }
 
   @Override

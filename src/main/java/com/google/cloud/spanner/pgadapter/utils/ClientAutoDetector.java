@@ -17,6 +17,8 @@ package com.google.cloud.spanner.pgadapter.utils;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
@@ -26,8 +28,10 @@ import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaSt
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse.NoticeSeverity;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -47,6 +51,8 @@ public class ClientAutoDetector {
           SelectCurrentCatalogStatement.INSTANCE,
           SelectVersionStatement.INSTANCE,
           DjangoGetTableNamesStatement.INSTANCE);
+  public static final String PGBENCH_USAGE_HINT =
+      "See https://github.com/GoogleCloudPlatform/pgadapter/blob/-/docs/pgbench.md for how to use pgbench with PGAdapter";
 
   public enum WellKnownClient {
     PSQL {
@@ -70,6 +76,14 @@ public class ClientAutoDetector {
       }
     },
     PGBENCH {
+      final ImmutableList<String> errorHints = ImmutableList.of(PGBENCH_USAGE_HINT);
+      volatile long lastHintTimestampMillis = 0L;
+
+      @Override
+      public void reset() {
+        lastHintTimestampMillis = 0L;
+      }
+
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
         // PGBENCH makes it easy for us, as it sends its own name in the application_name parameter.
@@ -78,13 +92,29 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public Iterable<NoticeResponse> createStartupNoticeResponses(ConnectionHandler connection) {
-        return ImmutableList.of(
-            new NoticeResponse(
-                connection.getConnectionMetadata().getOutputStream(),
-                NoticeSeverity.INFO,
-                "See https://github.com/GoogleCloudPlatform/pgadapter/blob/-/docs/pgbench.md for how to use pgbench with PGAdapter",
-                null));
+      public ImmutableList<NoticeResponse> createStartupNoticeResponses(
+          ConnectionHandler connection) {
+        synchronized (PGBENCH) {
+          // Only send the hint at most once every 30 seconds, to prevent benchmark runs that open
+          // multiple connections from showing the hint every time.
+          if (Duration.ofMillis(System.currentTimeMillis() - lastHintTimestampMillis).getSeconds()
+              > 30L) {
+            lastHintTimestampMillis = System.currentTimeMillis();
+            return ImmutableList.of(
+                new NoticeResponse(
+                    connection.getConnectionMetadata().getOutputStream(),
+                    SQLState.Success,
+                    NoticeSeverity.INFO,
+                    "Detected connection from pgbench",
+                    PGBENCH_USAGE_HINT + "\n"));
+          }
+        }
+        return super.createStartupNoticeResponses(connection);
+      }
+
+      @Override
+      public ImmutableList<String> getErrorHints(PGException exception) {
+        return errorHints;
       }
     },
     JDBC {
@@ -173,6 +203,10 @@ public class ClientAutoDetector {
 
     abstract boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters);
 
+    /** Resets any cached or temporary settings for the client. */
+    @VisibleForTesting
+    public void reset() {}
+
     boolean isClient(List<Statement> statements) {
       return false;
     }
@@ -185,7 +219,12 @@ public class ClientAutoDetector {
     }
 
     /** Creates specific notice messages for a client after startup. */
-    public Iterable<NoticeResponse> createStartupNoticeResponses(ConnectionHandler connection) {
+    public ImmutableList<NoticeResponse> createStartupNoticeResponses(
+        ConnectionHandler connection) {
+      return ImmutableList.of();
+    }
+
+    public ImmutableList<String> getErrorHints(PGException exception) {
       return ImmutableList.of();
     }
 

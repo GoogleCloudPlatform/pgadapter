@@ -15,9 +15,11 @@
 package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import com.google.api.core.InternalApi;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.base.Strings;
-import java.io.DataOutputStream;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
@@ -25,6 +27,7 @@ import java.text.MessageFormat;
 /** Sends error information back to client. */
 @InternalApi
 public class ErrorResponse extends WireOutput {
+  private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
 
   private static final int HEADER_LENGTH = 4;
   private static final int FIELD_IDENTIFIER_LENGTH = 1;
@@ -36,58 +39,83 @@ public class ErrorResponse extends WireOutput {
   private static final byte HINT_FLAG = 'H';
   private static final byte NULL_TERMINATOR = 0;
 
-  private final byte[] severity;
-  private final byte[] errorMessage;
-  private final byte[] errorState;
-  private final byte[] hints;
+  private final PGException pgException;
+  private final WellKnownClient client;
 
-  public ErrorResponse(DataOutputStream output, PGException pgException) {
-    super(output, calculateLength(pgException));
-    this.errorMessage = pgException.getMessage().getBytes(StandardCharsets.UTF_8);
-    this.errorState = pgException.getSQLState().getBytes();
-    this.severity = pgException.getSeverity().name().getBytes(StandardCharsets.UTF_8);
-    this.hints =
-        Strings.isNullOrEmpty(pgException.getHints())
-            ? null
-            : pgException.getHints().getBytes(StandardCharsets.UTF_8);
+  public ErrorResponse(ConnectionHandler connection, PGException pgException) {
+    super(
+        connection.getConnectionMetadata().getOutputStream(),
+        calculateLength(pgException, connection.getWellKnownClient()));
+    this.pgException = pgException;
+    this.client = connection.getWellKnownClient();
   }
 
-  static int calculateLength(PGException pgException) {
+  static int calculateLength(PGException pgException, WellKnownClient client) {
     int length =
         HEADER_LENGTH
             + FIELD_IDENTIFIER_LENGTH
-            + pgException.getSeverity().name().getBytes(StandardCharsets.UTF_8).length
+            + getSeverity(pgException).length
             + NULL_TERMINATOR_LENGTH
             + FIELD_IDENTIFIER_LENGTH
-            + pgException.getSQLState().getBytes().length
+            + getSQLState(pgException).length
             + NULL_TERMINATOR_LENGTH
             + FIELD_IDENTIFIER_LENGTH
-            + pgException.getMessage().getBytes(StandardCharsets.UTF_8).length
+            + getMessage(pgException).length
             + NULL_TERMINATOR_LENGTH
             + NULL_TERMINATOR_LENGTH;
-    if (!Strings.isNullOrEmpty(pgException.getHints())) {
-      length +=
-          FIELD_IDENTIFIER_LENGTH
-              + pgException.getHints().getBytes(StandardCharsets.UTF_8).length
-              + NULL_TERMINATOR_LENGTH;
+    byte[] hints = getHints(pgException, client);
+    if (hints.length > 0) {
+      length += FIELD_IDENTIFIER_LENGTH + hints.length + NULL_TERMINATOR_LENGTH;
     }
     return length;
+  }
+
+  static byte[] getSeverity(PGException pgException) {
+    return pgException.getSeverity().name().getBytes(StandardCharsets.UTF_8);
+  }
+
+  static byte[] getSQLState(PGException pgException) {
+    return pgException.getSQLState().getBytes();
+  }
+
+  static byte[] getMessage(PGException pgException) {
+    return pgException.getMessage().getBytes(StandardCharsets.UTF_8);
+  }
+
+  static byte[] getHints(PGException pgException, WellKnownClient client) {
+    if (Strings.isNullOrEmpty(pgException.getHints())
+        && client.getErrorHints(pgException).isEmpty()) {
+      return EMPTY_BYTE_ARRAY;
+    }
+    String hints = "";
+    if (!Strings.isNullOrEmpty(pgException.getHints())) {
+      hints += pgException.getHints();
+    }
+    ImmutableList<String> clientHints = client.getErrorHints(pgException);
+    if (!clientHints.isEmpty()) {
+      if (hints.length() > 0) {
+        hints += "\n";
+      }
+      hints += String.join("\n", clientHints);
+    }
+    return hints.getBytes(StandardCharsets.UTF_8);
   }
 
   @Override
   protected void sendPayload() throws IOException {
     this.outputStream.writeByte(SEVERITY_FLAG);
-    this.outputStream.write(severity);
+    this.outputStream.write(getSeverity(pgException));
     this.outputStream.writeByte(NULL_TERMINATOR);
     this.outputStream.writeByte(CODE_FLAG);
-    this.outputStream.write(this.errorState);
+    this.outputStream.write(getSQLState(pgException));
     this.outputStream.writeByte(NULL_TERMINATOR);
     this.outputStream.writeByte(MESSAGE_FLAG);
-    this.outputStream.write(this.errorMessage);
+    this.outputStream.write(getMessage(pgException));
     this.outputStream.writeByte(NULL_TERMINATOR);
-    if (this.hints != null) {
+    byte[] hints = getHints(pgException, client);
+    if (hints.length > 0) {
       this.outputStream.writeByte(HINT_FLAG);
-      this.outputStream.write(this.hints);
+      this.outputStream.write(hints);
       this.outputStream.writeByte(NULL_TERMINATOR);
     }
     this.outputStream.writeByte(NULL_TERMINATOR);
@@ -109,8 +137,10 @@ public class ErrorResponse extends WireOutput {
         .format(
             new Object[] {
               this.length,
-              new String(this.errorMessage, UTF8),
-              this.hints == null ? "" : new String(this.hints, UTF8)
+              new String(getMessage(pgException), UTF8),
+              getHints(pgException, client).length == 0
+                  ? ""
+                  : new String(getHints(pgException, client), UTF8)
             });
   }
 }

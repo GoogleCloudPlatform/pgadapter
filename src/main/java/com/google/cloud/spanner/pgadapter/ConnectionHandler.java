@@ -120,7 +120,7 @@ public class ConnectionHandler extends Thread {
   private int invalidMessagesCount;
   private Connection spannerConnection;
   private DatabaseId databaseId;
-  private WellKnownClient wellKnownClient;
+  private WellKnownClient wellKnownClient = WellKnownClient.UNSPECIFIED;
   private boolean hasDeterminedClientUsingQuery;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   private CopyStatement activeCopyStatement;
@@ -476,12 +476,12 @@ public class ConnectionHandler extends Thread {
     DataOutputStream output = getConnectionMetadata().getOutputStream();
     if (this.status == ConnectionStatus.TERMINATED
         || this.status == ConnectionStatus.UNAUTHENTICATED) {
-      new ErrorResponse(output, exception).send();
+      new ErrorResponse(this, exception).send();
       new TerminateResponse(output).send();
     } else if (this.status == ConnectionStatus.COPY_IN) {
-      new ErrorResponse(output, exception).send();
+      new ErrorResponse(this, exception).send();
     } else {
-      new ErrorResponse(output, exception).send();
+      new ErrorResponse(this, exception).send();
       new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
     }
   }
