@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
@@ -39,6 +40,39 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ClientAutoDetectorTest {
+
+  @Test
+  public void testUnspecified() {
+    WellKnownClient.UNSPECIFIED.reset();
+
+    assertEquals(
+        WellKnownClient.UNSPECIFIED,
+        ClientAutoDetector.detectClient(ImmutableList.of(), ImmutableMap.of()));
+    assertEquals(
+        WellKnownClient.UNSPECIFIED,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of("some-param"), ImmutableMap.of("some-param", "some-value")));
+
+    ConnectionHandler connection = mock(ConnectionHandler.class);
+    ProxyServer server = mock(ProxyServer.class);
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    when(server.getOptions()).thenReturn(options);
+    when(connection.getServer()).thenReturn(server);
+
+    when(options.useDefaultLocalStatements()).thenReturn(true);
+    assertEquals(
+        DEFAULT_LOCAL_STATEMENTS, WellKnownClient.UNSPECIFIED.getLocalStatements(connection));
+
+    when(options.useDefaultLocalStatements()).thenReturn(false);
+    assertEquals(ImmutableList.of(), WellKnownClient.UNSPECIFIED.getLocalStatements(connection));
+
+    assertEquals(
+        ImmutableList.of(), WellKnownClient.UNSPECIFIED.createStartupNoticeResponses(connection));
+    assertEquals(
+        ImmutableList.of(), WellKnownClient.UNSPECIFIED.getErrorHints(mock(PGException.class)));
+    assertEquals(ImmutableMap.of(), WellKnownClient.UNSPECIFIED.getDefaultParameters());
+  }
+
   @Test
   public void testJdbc() {
     // The JDBC driver will **always** include these startup parameters in exactly this order.

@@ -51,11 +51,6 @@ public class NoticeResponse extends WireOutput {
   private final String message;
   private final String hint;
 
-  public NoticeResponse(DataOutputStream output, String message) {
-    this(
-        output, SQLState.Success, NoticeSeverity.NOTICE, Preconditions.checkNotNull(message), null);
-  }
-
   public NoticeResponse(
       DataOutputStream output,
       SQLState sqlState,
@@ -125,7 +120,10 @@ public class NoticeResponse extends WireOutput {
 
   @Override
   protected String getPayloadString() {
-    return new MessageFormat("Length: {0}, Severity: {1}, Notice Message: {2}")
-        .format(new Object[] {this.length, this.severity, this.message});
+    return new MessageFormat("Length: {0}, Severity: {1}, Notice Message: {2}, Hint: {3}")
+        .format(
+            new Object[] {
+              this.length, this.severity, this.message, this.hint == null ? "" : this.hint
+            });
   }
 }
