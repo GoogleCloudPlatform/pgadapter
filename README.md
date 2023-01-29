@@ -20,6 +20,8 @@ PGAdapter can be used with the following frameworks and tools:
 3. `SQLAlchemy`: Version 1.4.45 has _experimental support_. See [SQLAlchemy support](docs/sqlalchemy.md)
    for more details. See also [this directory](samples/python/sqlalchemy-sample) for a sample
    application using `SQLAlchemy`.
+4. `pgbench` can be used with PGAdapter, but with some limitations. See [pgbench.md](docs/pgbench.md)
+   for more details.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
