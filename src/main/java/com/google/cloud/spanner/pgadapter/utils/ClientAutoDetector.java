@@ -224,6 +224,7 @@ public class ClientAutoDetector {
       return ImmutableList.of();
     }
 
+    /** Returns the client-specific hint(s) that should be included with the given exception. */
     public ImmutableList<String> getErrorHints(PGException exception) {
       return ImmutableList.of();
     }

@@ -332,6 +332,7 @@ public class ClientAutoDetectorTest {
         ClientAutoDetector.detectClient(
             ImmutableList.of("application_name"), ImmutableMap.of("application_name", "PGBENCH")));
 
+    WellKnownClient.PGBENCH.reset();
     ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
     when(connectionHandler.getConnectionMetadata()).thenReturn(mock(ConnectionMetadata.class));
     ImmutableList<NoticeResponse> startupNotices =
