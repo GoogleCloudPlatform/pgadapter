@@ -70,7 +70,7 @@ public class PasswordMessage extends ControlMessage {
   protected void sendPayload() throws Exception {
     if (!useAuthentication()) {
       new ErrorResponse(
-              this.outputStream,
+              this.connection,
               PGException.newBuilder("Received PasswordMessage while authentication is disabled.")
                   .setSQLState(SQLState.ProtocolViolation)
                   .setSeverity(Severity.ERROR)
@@ -83,7 +83,7 @@ public class PasswordMessage extends ControlMessage {
     Credentials credentials = checkCredentials(this.username, this.password);
     if (credentials == null) {
       new ErrorResponse(
-              this.outputStream,
+              this.connection,
               PGException.newBuilder("Invalid credentials received.")
                   .setHints(
                       "PGAdapter expects credentials to be one of the following:\n"

@@ -39,6 +39,7 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
@@ -371,8 +372,10 @@ public class StatementTest {
 
     IntermediatePortalStatement portalStatement =
         intermediateStatement.createPortal("", parameters, new ArrayList<>(), new ArrayList<>());
-    assertThrows(
-        IllegalArgumentException.class, () -> portalStatement.bind(Statement.of(sqlStatement)));
+    Statement boundStatement = portalStatement.bind(Statement.of(sqlStatement));
+    assertEquals(
+        Value.untyped(com.google.protobuf.Value.newBuilder().setStringValue("{}").build()),
+        boundStatement.getParameters().get("p1"));
   }
 
   @Test

@@ -11,8 +11,8 @@ PGAdapter can be used with the following drivers and clients:
 4. `psycopg2`: Version 2.9.3 and higher (but not `psycopg3`) are supported. See [psycopg2](docs/psycopg2.md) for more details.
 5. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
 
-## Frameworks
-PGAdapter can be used with the following frameworks:
+## Frameworks and Tools
+PGAdapter can be used with the following frameworks and tools:
 1. `Liquibase`: Version 4.12.0 and higher are supported. See [Liquibase support](docs/liquibase.md)
    for more details. See also [this directory](samples/java/liquibase) for a sample application using `Liquibase`.
 2. `gorm`: Version 1.23.8 and higher are supported. See [gorm support](docs/gorm.md) for more details.
@@ -20,6 +20,8 @@ PGAdapter can be used with the following frameworks:
 3. `SQLAlchemy`: Version 1.4.45 has _experimental support_. See [SQLAlchemy support](docs/sqlalchemy.md)
    for more details. See also [this directory](samples/python/sqlalchemy-sample) for a sample
    application using `SQLAlchemy`.
+4. `pgbench` can be used with PGAdapter, but with some limitations. See [pgbench.md](docs/pgbench.md)
+   for more details.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
