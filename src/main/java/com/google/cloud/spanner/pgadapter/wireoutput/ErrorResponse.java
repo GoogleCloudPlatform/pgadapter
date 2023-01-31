@@ -54,35 +54,35 @@ public class ErrorResponse extends WireOutput {
     int length =
         HEADER_LENGTH
             + FIELD_IDENTIFIER_LENGTH
-            + getSeverity(pgException).length
+            + convertSeverityToWireProtocol(pgException).length
             + NULL_TERMINATOR_LENGTH
             + FIELD_IDENTIFIER_LENGTH
-            + getSQLState(pgException).length
+            + convertSQLStateToWireProtocol(pgException).length
             + NULL_TERMINATOR_LENGTH
             + FIELD_IDENTIFIER_LENGTH
-            + getMessage(pgException).length
+            + convertMessageToWireProtocol(pgException).length
             + NULL_TERMINATOR_LENGTH
             + NULL_TERMINATOR_LENGTH;
-    byte[] hints = getHints(pgException, client);
+    byte[] hints = convertHintsToWireProtocol(pgException, client);
     if (hints.length > 0) {
       length += FIELD_IDENTIFIER_LENGTH + hints.length + NULL_TERMINATOR_LENGTH;
     }
     return length;
   }
 
-  static byte[] getSeverity(PGException pgException) {
+  static byte[] convertSeverityToWireProtocol(PGException pgException) {
     return pgException.getSeverity().name().getBytes(StandardCharsets.UTF_8);
   }
 
-  static byte[] getSQLState(PGException pgException) {
+  static byte[] convertSQLStateToWireProtocol(PGException pgException) {
     return pgException.getSQLState().getBytes();
   }
 
-  static byte[] getMessage(PGException pgException) {
+  static byte[] convertMessageToWireProtocol(PGException pgException) {
     return pgException.getMessage().getBytes(StandardCharsets.UTF_8);
   }
 
-  static byte[] getHints(PGException pgException, WellKnownClient client) {
+  static byte[] convertHintsToWireProtocol(PGException pgException, WellKnownClient client) {
     if (Strings.isNullOrEmpty(pgException.getHints())
         && client.getErrorHints(pgException).isEmpty()) {
       return EMPTY_BYTE_ARRAY;
@@ -104,15 +104,15 @@ public class ErrorResponse extends WireOutput {
   @Override
   protected void sendPayload() throws IOException {
     this.outputStream.writeByte(SEVERITY_FLAG);
-    this.outputStream.write(getSeverity(pgException));
+    this.outputStream.write(convertSeverityToWireProtocol(pgException));
     this.outputStream.writeByte(NULL_TERMINATOR);
     this.outputStream.writeByte(CODE_FLAG);
-    this.outputStream.write(getSQLState(pgException));
+    this.outputStream.write(convertSQLStateToWireProtocol(pgException));
     this.outputStream.writeByte(NULL_TERMINATOR);
     this.outputStream.writeByte(MESSAGE_FLAG);
-    this.outputStream.write(getMessage(pgException));
+    this.outputStream.write(convertMessageToWireProtocol(pgException));
     this.outputStream.writeByte(NULL_TERMINATOR);
-    byte[] hints = getHints(pgException, client);
+    byte[] hints = convertHintsToWireProtocol(pgException, client);
     if (hints.length > 0) {
       this.outputStream.writeByte(HINT_FLAG);
       this.outputStream.write(hints);
@@ -137,10 +137,10 @@ public class ErrorResponse extends WireOutput {
         .format(
             new Object[] {
               this.length,
-              new String(getMessage(pgException), UTF8),
-              getHints(pgException, client).length == 0
+              new String(convertMessageToWireProtocol(pgException), UTF8),
+              convertHintsToWireProtocol(pgException, client).length == 0
                   ? ""
-                  : new String(getHints(pgException, client), UTF8)
+                  : new String(convertHintsToWireProtocol(pgException, client), UTF8)
             });
   }
 }
