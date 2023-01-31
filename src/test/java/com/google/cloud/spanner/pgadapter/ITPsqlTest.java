@@ -761,7 +761,11 @@ public class ITPsqlTest implements IntegrationTest {
           // Iran observed DST in 1978. Not all databases agree on this.
           ZoneId.of("Asia/Tehran"),
           // Rankin_Inlet did not observer DST in 1970-1979, but not all databases agree.
-          ZoneId.of("America/Rankin_Inlet"));
+          ZoneId.of("America/Rankin_Inlet"),
+          // Pangnirtung did not observer DST in 1970-1979, but not all databases agree.
+          ZoneId.of("America/Pangnirtung"),
+          // Niue switched from -11:30 to -11 in 1978. Not all JDKs know that.
+          ZoneId.of("Pacific/Niue"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));

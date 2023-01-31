@@ -291,7 +291,13 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
   @Test
   public void testCopyOutCsvWithHeader() throws SQLException, IOException {
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+        StatementResult.query(
+            Statement.of("select * from all_types"),
+            ALL_TYPES_RESULTSET
+                .toBuilder()
+                .addRows(ALL_TYPES_RESULTSET.getRows(0))
+                .addRows(ALL_TYPES_NULLS_RESULTSET.getRows(0))
+                .build()));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set time zone 'UTC'");
@@ -302,7 +308,9 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "col_bigint-col_bool-col_bytea-col_float8-col_int-col_numeric-col_timestamptz-col_date-col_varchar-col_jsonb\n"
-              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n",
+              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n"
+              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n"
+              + "\\N-\\N-\\N-\\N-\\N-\\N-\\N-\\N-\\N-\\N\n",
           writer.toString());
     }
   }
