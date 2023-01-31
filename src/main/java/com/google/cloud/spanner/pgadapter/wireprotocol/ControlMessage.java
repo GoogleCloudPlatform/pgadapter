@@ -179,7 +179,7 @@ public abstract class ControlMessage extends WireMessage {
         connection.increaseInvalidMessageCount();
         if (connection.getInvalidMessageCount() > MAX_INVALID_MESSAGE_COUNT) {
           new ErrorResponse(
-                  connection.getConnectionMetadata().getOutputStream(),
+                  connection,
                   PGException.newBuilder(
                           String.format(
                               "Received %d invalid/unexpected messages. Last received message: '%c'",
@@ -233,7 +233,7 @@ public abstract class ControlMessage extends WireMessage {
    * @throws Exception if there is some issue in the sending of the error messages.
    */
   protected void handleError(Exception exception) throws Exception {
-    new ErrorResponse(this.outputStream, PGExceptionFactory.toPGException(exception)).send(false);
+    new ErrorResponse(this.connection, PGExceptionFactory.toPGException(exception)).send(false);
   }
 
   /**
