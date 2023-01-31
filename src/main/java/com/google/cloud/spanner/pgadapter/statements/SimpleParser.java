@@ -354,6 +354,15 @@ public class SimpleParser {
       ImmutableList<String> keywords,
       boolean sameParensLevelAsStart,
       boolean stopAtEndOfExpression) {
+    return parseExpressionUntilKeyword(
+        keywords, sameParensLevelAsStart, stopAtEndOfExpression, true);
+  }
+
+  String parseExpressionUntilKeyword(
+      ImmutableList<String> keywords,
+      boolean sameParensLevelAsStart,
+      boolean stopAtEndOfExpression,
+      boolean stopAtComma) {
     skipWhitespaces();
     int start = pos;
     boolean valid;
@@ -366,7 +375,7 @@ public class SimpleParser {
         if (stopAtEndOfExpression && parens < 0) {
           break;
         }
-      } else if (stopAtEndOfExpression && parens == 0 && sql.charAt(pos) == ',') {
+      } else if (stopAtEndOfExpression && parens == 0 && stopAtComma && sql.charAt(pos) == ',') {
         break;
       }
       if ((!sameParensLevelAsStart || parens == 0)
