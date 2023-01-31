@@ -96,7 +96,8 @@ public class StartupMessage extends BootstrapMessage {
         connection.getConnectionMetadata().getOutputStream(),
         connection.getConnectionId(),
         connection.getSecret(),
-        connection.getExtendedQueryProtocolHandler().getBackendConnection().getSessionState());
+        connection.getExtendedQueryProtocolHandler().getBackendConnection().getSessionState(),
+        connection.getWellKnownClient().createStartupNoticeResponses(connection));
     connection.setStatus(ConnectionStatus.AUTHENTICATED);
   }
 
