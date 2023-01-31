@@ -61,12 +61,12 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
-import com.google.cloud.spanner.pgadapter.utils.LazyInit;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
@@ -590,32 +590,26 @@ public class BackendConnection {
       Supplier<ImmutableList<LocalStatement>> localStatements) {
     this.sessionState = new SessionState(optionsMetadata);
     this.pgCatalog =
-        new LazyInit<PgCatalog>() {
-          @Override
-          protected PgCatalog initialize() {
-            return new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get());
-          }
-        };
+        Suppliers.memoize(
+            () -> new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get()));
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
     this.localStatements =
-        new LazyInit<ImmutableMap<String, LocalStatement>>() {
-          @Override
-          protected ImmutableMap<String, LocalStatement> initialize() {
-            if (localStatements.get().isEmpty()) {
-              return EMPTY_LOCAL_STATEMENTS;
-            } else {
-              Builder<String, LocalStatement> builder = ImmutableMap.builder();
-              for (LocalStatement localStatement : localStatements.get()) {
-                for (String sql : localStatement.getSql()) {
-                  builder.put(new SimpleImmutableEntry<>(sql, localStatement));
+        Suppliers.memoize(
+            () -> {
+              if (localStatements.get().isEmpty()) {
+                return EMPTY_LOCAL_STATEMENTS;
+              } else {
+                Builder<String, LocalStatement> builder = ImmutableMap.builder();
+                for (LocalStatement localStatement : localStatements.get()) {
+                  for (String sql : localStatement.getSql()) {
+                    builder.put(new SimpleImmutableEntry<>(sql, localStatement));
+                  }
                 }
+                return builder.build();
               }
-              return builder.build();
-            }
-          }
-        };
+            });
   }
 
   /** Returns the current connection state. */
