@@ -23,7 +23,6 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
@@ -42,6 +41,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import java.util.List;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.QuoteMode;
@@ -57,8 +57,8 @@ public class CopyToStatement extends IntermediatePortalStatement {
       new byte[] {'P', 'G', 'C', 'O', 'P', 'Y', '\n', -1, '\r', '\n', '\0'};
 
   private final ParsedCopyStatement parsedCopyStatement;
-  private final CSVFormat csvFormat;
-  private boolean hasReturnedData;
+  private CSVFormat csvFormat;
+  private final AtomicBoolean hasReturnedData = new AtomicBoolean(false);
 
   public CopyToStatement(
       ConnectionHandler connectionHandler,
@@ -221,15 +221,12 @@ public class CopyToStatement extends IntermediatePortalStatement {
 
   @Override
   public WireOutput[] createResultPrefix(ResultSet resultSet) {
-    return this.parsedCopyStatement.format == CopyStatement.Format.BINARY
-        ? new WireOutput[] {
-          new CopyOutResponse(
-              this.outputStream, resultSet.getColumnCount(), DataFormat.POSTGRESQL_BINARY.getCode())
-        }
-        : new WireOutput[] {
-          new CopyOutResponse(
-              this.outputStream, resultSet.getColumnCount(), DataFormat.POSTGRESQL_TEXT.getCode())
-        };
+    return new WireOutput[] {
+      new CopyOutResponse(
+          this.outputStream,
+          resultSet.getColumnCount(),
+          this.parsedCopyStatement.format.getDataFormat().getCode())
+    };
   }
 
   @Override
@@ -240,7 +237,9 @@ public class CopyToStatement extends IntermediatePortalStatement {
     // rows. This is not specifically mentioned in the protocol description, but some clients assume
     // this behavior. See
     // https://github.com/npgsql/npgsql/blob/7f97dbad28c71b2202dd7bcccd05fc42a7de23c8/src/Npgsql/NpgsqlBinaryExporter.cs#L156
-    this.hasReturnedData = true;
+    if (parsedCopyStatement.format == Format.BINARY && !hasReturnedData.getAndSet(true)) {
+      converter = converter.includeBinaryCopyHeader();
+    }
     return parsedCopyStatement.format == CopyStatement.Format.BINARY
         ? createBinaryDataResponse(converter)
         : createDataResponse(converter.getResultSet());
@@ -250,7 +249,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
   public WireOutput[] createResultSuffix() {
     return this.parsedCopyStatement.format == Format.BINARY
         ? new WireOutput[] {
-          CopyDataResponse.createBinaryTrailer(this.outputStream, !hasReturnedData),
+          CopyDataResponse.createBinaryTrailer(this.outputStream, !hasReturnedData.get()),
           new CopyDoneResponse(this.outputStream)
         }
         : new WireOutput[] {new CopyDoneResponse(this.outputStream)};
@@ -273,6 +272,10 @@ public class CopyToStatement extends IntermediatePortalStatement {
       }
     }
     String row = csvFormat.format((Object[]) data);
+    // Only include the header with the first row.
+    if (!csvFormat.getSkipHeaderRecord()) {
+      csvFormat = csvFormat.builder().setSkipHeaderRecord(true).build();
+    }
     return new CopyDataResponse(this.outputStream, row, csvFormat.getRecordSeparator().charAt(0));
   }
 

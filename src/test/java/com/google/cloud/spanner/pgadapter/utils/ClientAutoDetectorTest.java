@@ -24,9 +24,12 @@ import static org.mockito.Mockito.when;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
@@ -37,6 +40,39 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ClientAutoDetectorTest {
+
+  @Test
+  public void testUnspecified() {
+    WellKnownClient.UNSPECIFIED.reset();
+
+    assertEquals(
+        WellKnownClient.UNSPECIFIED,
+        ClientAutoDetector.detectClient(ImmutableList.of(), ImmutableMap.of()));
+    assertEquals(
+        WellKnownClient.UNSPECIFIED,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of("some-param"), ImmutableMap.of("some-param", "some-value")));
+
+    ConnectionHandler connection = mock(ConnectionHandler.class);
+    ProxyServer server = mock(ProxyServer.class);
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    when(server.getOptions()).thenReturn(options);
+    when(connection.getServer()).thenReturn(server);
+
+    when(options.useDefaultLocalStatements()).thenReturn(true);
+    assertEquals(
+        DEFAULT_LOCAL_STATEMENTS, WellKnownClient.UNSPECIFIED.getLocalStatements(connection));
+
+    when(options.useDefaultLocalStatements()).thenReturn(false);
+    assertEquals(ImmutableList.of(), WellKnownClient.UNSPECIFIED.getLocalStatements(connection));
+
+    assertEquals(
+        ImmutableList.of(), WellKnownClient.UNSPECIFIED.createStartupNoticeResponses(connection));
+    assertEquals(
+        ImmutableList.of(), WellKnownClient.UNSPECIFIED.getErrorHints(mock(PGException.class)));
+    assertEquals(ImmutableMap.of(), WellKnownClient.UNSPECIFIED.getDefaultParameters());
+  }
+
   @Test
   public void testJdbc() {
     // The JDBC driver will **always** include these startup parameters in exactly this order.
@@ -290,5 +326,53 @@ public class ClientAutoDetectorTest {
                         + "\n"
                         + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n"),
                 Statement.of("SELECT version();"))));
+  }
+
+  @Test
+  public void testPgbench() {
+    // pgbench always includes itself as the application_name.
+    assertEquals(
+        WellKnownClient.PGBENCH,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of("application_name"), ImmutableMap.of("application_name", "pgbench")));
+    assertEquals(
+        WellKnownClient.PGBENCH,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of("application_name", "some-param"),
+            ImmutableMap.of(
+                "application_name", "pgbench",
+                "some-param", "some-value")));
+    assertEquals(
+        WellKnownClient.PGBENCH,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of("some-param1", "application_name", "some-param2"),
+            ImmutableMap.of(
+                "some-param1", "some-value1",
+                "application_name", "pgbench",
+                "some-param2", "some-value2")));
+    assertNotEquals(
+        WellKnownClient.PGBENCH,
+        ClientAutoDetector.detectClient(ImmutableList.of(), ImmutableMap.of()));
+    assertNotEquals(
+        WellKnownClient.PGBENCH,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of("some-param1"), ImmutableMap.of("some-param1", "some-value1")));
+    assertNotEquals(
+        WellKnownClient.PGBENCH,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of("application_name"), ImmutableMap.of("application_name", "JDBC")));
+    assertNotEquals(
+        WellKnownClient.PGBENCH,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of("application_name"), ImmutableMap.of("application_name", "PGBENCH")));
+
+    WellKnownClient.PGBENCH.reset();
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(mock(ConnectionMetadata.class));
+    ImmutableList<NoticeResponse> startupNotices =
+        WellKnownClient.PGBENCH.createStartupNoticeResponses(connectionHandler);
+    assertEquals(1, startupNotices.size());
+    assertEquals("Detected connection from pgbench", startupNotices.get(0).getMessage());
+    assertEquals(ClientAutoDetector.PGBENCH_USAGE_HINT + "\n", startupNotices.get(0).getHint());
   }
 }

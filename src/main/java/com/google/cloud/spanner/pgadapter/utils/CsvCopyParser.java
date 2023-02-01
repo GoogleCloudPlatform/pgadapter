@@ -33,6 +33,7 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeParseException;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.codec.binary.Hex;
@@ -98,8 +99,22 @@ class CsvCopyParser implements CopyInParser {
     }
 
     @Override
+    public boolean isEndRecord() {
+      // End of data can be represented by a single line containing just backslash-period (\.). An
+      // end-of-data marker is not necessary when reading from a file, since the end of file serves
+      // perfectly well; it is needed only when copying data to or from client applications using
+      // pre-3.0 client protocol.
+      return record.size() == 1 && Objects.equals("\\.", record.get(0));
+    }
+
+    @Override
     public boolean hasColumnNames() {
       return this.hasHeader;
+    }
+
+    @Override
+    public boolean isNull(int columnIndex) {
+      return record.get(columnIndex) == null;
     }
 
     @Override

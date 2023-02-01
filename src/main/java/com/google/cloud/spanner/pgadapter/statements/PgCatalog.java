@@ -20,6 +20,8 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -27,11 +29,13 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import javax.annotation.Nonnull;
 
 @InternalApi
 public class PgCatalog {
-  private static final ImmutableMap<TableOrIndexName, TableOrIndexName> TABLE_REPLACEMENTS =
+  private static final ImmutableMap<TableOrIndexName, TableOrIndexName> DEFAULT_TABLE_REPLACEMENTS =
       ImmutableMap.<TableOrIndexName, TableOrIndexName>builder()
           .put(
               new TableOrIndexName("pg_catalog", "pg_namespace"),
@@ -73,6 +77,12 @@ public class PgCatalog {
           Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"), "false",
           Pattern.compile("proc\\.oid = typ\\.typreceive"), "false");
 
+  private final ImmutableSet<String> checkPrefixes;
+
+  private final ImmutableMap<TableOrIndexName, TableOrIndexName> tableReplacements;
+
+  private final ImmutableMap<Pattern, Supplier<String>> functionReplacements;
+
   private final Map<TableOrIndexName, PgCatalogTable> pgCatalogTables =
       ImmutableMap.of(
           new TableOrIndexName(null, "pg_namespace"), new PgNamespace(),
@@ -85,14 +95,31 @@ public class PgCatalog {
           new TableOrIndexName(null, "pg_settings"), new PgSettings());
   private final SessionState sessionState;
 
-  public PgCatalog(SessionState sessionState) {
-    this.sessionState = sessionState;
+  public PgCatalog(@Nonnull SessionState sessionState, @Nonnull WellKnownClient wellKnownClient) {
+    this.sessionState = Preconditions.checkNotNull(sessionState);
+    this.checkPrefixes = wellKnownClient.getPgCatalogCheckPrefixes();
+    ImmutableMap.Builder<TableOrIndexName, TableOrIndexName> builder =
+        ImmutableMap.<TableOrIndexName, TableOrIndexName>builder()
+            .putAll(DEFAULT_TABLE_REPLACEMENTS);
+    wellKnownClient
+        .getTableReplacements()
+        .forEach((k, v) -> builder.put(TableOrIndexName.of(k), TableOrIndexName.of(v)));
+    this.tableReplacements = builder.build();
+    this.functionReplacements =
+        ImmutableMap.<Pattern, Supplier<String>>builder()
+            .put(Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), () -> "true")
+            .put(Pattern.compile("pg_table_is_visible\\(.+\\)"), () -> "true")
+            .put(Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), () -> "'public'")
+            .put(
+                Pattern.compile("version\\(\\)"), () -> "'" + sessionState.getServerVersion() + "'")
+            .putAll(wellKnownClient.getFunctionReplacements())
+            .build();
   }
 
   /** Replace supported pg_catalog tables with Common Table Expressions. */
   public Statement replacePgCatalogTables(Statement statement) {
     Tuple<Set<TableOrIndexName>, Statement> replacedTablesStatement =
-        new TableParser(statement).detectAndReplaceTables(TABLE_REPLACEMENTS);
+        new TableParser(statement).detectAndReplaceTables(DEFAULT_TABLE_REPLACEMENTS);
     if (replacedTablesStatement.x().isEmpty()) {
       return replacedTablesStatement.y();
     }
