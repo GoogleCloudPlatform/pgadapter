@@ -461,4 +461,15 @@ public class SimpleParserTest {
   public void testUnescapeQuotedStringValue() {
     assertEquals("'", unescapeQuotedStringValue("'\\''", '\''));
   }
+
+  @Test
+  public void testParserTableOrIndexName() {
+    assertEquals(TableOrIndexName.of("foo"), TableOrIndexName.parse("foo"));
+    assertEquals(
+        TableOrIndexName.of(/* schema= */ "foo", /* name= */ "bar"),
+        TableOrIndexName.parse("foo.bar"));
+
+    assertThrows(IllegalArgumentException.class, () -> TableOrIndexName.parse(""));
+    assertThrows(IllegalArgumentException.class, () -> TableOrIndexName.parse("foo.bar baz"));
+  }
 }

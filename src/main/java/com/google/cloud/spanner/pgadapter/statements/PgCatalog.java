@@ -22,6 +22,7 @@ import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -59,40 +60,28 @@ public class PgCatalog {
               new TableOrIndexName("pg_catalog", "pg_settings"),
               new TableOrIndexName(null, "pg_settings"))
           .put(new TableOrIndexName(null, "pg_settings"), new TableOrIndexName(null, "pg_settings"))
-          .put(
-              new TableOrIndexName("pg_catalog", "pg_attribute"),
-              new TableOrIndexName(null, "pg_attribute"))
-          .put(
-              new TableOrIndexName(null, "pg_attribute"),
-              new TableOrIndexName(null, "pg_attribute"))
-          .put(new TableOrIndexName("pg_catalog", "pg_enum"), new TableOrIndexName(null, "pg_enum"))
-          .put(new TableOrIndexName(null, "pg_enum"), new TableOrIndexName(null, "pg_enum"))
           .build();
 
-  private static final ImmutableMap<Pattern, String> FUNCTION_REPLACEMENTS =
+  private static final ImmutableMap<Pattern, Supplier<String>> DEFAULT_FUNCTION_REPLACEMENTS =
       ImmutableMap.of(
-          Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), "true",
-          Pattern.compile("pg_table_is_visible\\(.+\\)"), "true",
-          Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), "'public'",
-          Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"), "false",
-          Pattern.compile("proc\\.oid = typ\\.typreceive"), "false");
+          Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), Suppliers.ofInstance("true"),
+          Pattern.compile("pg_table_is_visible\\(.+\\)"), Suppliers.ofInstance("true"),
+          Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), Suppliers.ofInstance("'public'"));
 
   private final ImmutableSet<String> checkPrefixes;
 
   private final ImmutableMap<TableOrIndexName, TableOrIndexName> tableReplacements;
+  private final ImmutableMap<TableOrIndexName, PgCatalogTable> pgCatalogTables;
 
   private final ImmutableMap<Pattern, Supplier<String>> functionReplacements;
 
-  private final Map<TableOrIndexName, PgCatalogTable> pgCatalogTables =
+  private static final Map<TableOrIndexName, PgCatalogTable> DEFAULT_PG_CATALOG_TABLES =
       ImmutableMap.of(
           new TableOrIndexName(null, "pg_namespace"), new PgNamespace(),
           new TableOrIndexName(null, "pg_class"), new PgClass(),
           new TableOrIndexName(null, "pg_proc"), new PgProc(),
           new TableOrIndexName(null, "pg_range"), new PgRange(),
-          new TableOrIndexName(null, "pg_attribute"), new PgAttribute(),
-          new TableOrIndexName(null, "pg_enum"), new PgEnum(),
-          new TableOrIndexName(null, "pg_type"), new PgType(),
-          new TableOrIndexName(null, "pg_settings"), new PgSettings());
+          new TableOrIndexName(null, "pg_type"), new PgType());
   private final SessionState sessionState;
 
   public PgCatalog(@Nonnull SessionState sessionState, @Nonnull WellKnownClient wellKnownClient) {
@@ -103,13 +92,21 @@ public class PgCatalog {
             .putAll(DEFAULT_TABLE_REPLACEMENTS);
     wellKnownClient
         .getTableReplacements()
-        .forEach((k, v) -> builder.put(TableOrIndexName.of(k), TableOrIndexName.of(v)));
+        .forEach((k, v) -> builder.put(TableOrIndexName.parse(k), TableOrIndexName.parse(v)));
     this.tableReplacements = builder.build();
+
+    ImmutableMap.Builder<TableOrIndexName, PgCatalogTable> pgCatalogTablesBuilder =
+        ImmutableMap.<TableOrIndexName, PgCatalogTable>builder()
+            .putAll(DEFAULT_PG_CATALOG_TABLES)
+            .put(new TableOrIndexName(null, "pg_settings"), new PgSettings());
+    wellKnownClient
+        .getPgCatalogTables()
+        .forEach((k, v) -> pgCatalogTablesBuilder.put(TableOrIndexName.parse(k), v));
+    this.pgCatalogTables = pgCatalogTablesBuilder.build();
+
     this.functionReplacements =
         ImmutableMap.<Pattern, Supplier<String>>builder()
-            .put(Pattern.compile("pg_catalog.pg_table_is_visible\\(.+\\)"), () -> "true")
-            .put(Pattern.compile("pg_table_is_visible\\(.+\\)"), () -> "true")
-            .put(Pattern.compile("ANY\\(current_schemas\\(true\\)\\)"), () -> "'public'")
+            .putAll(DEFAULT_FUNCTION_REPLACEMENTS)
             .put(
                 Pattern.compile("version\\(\\)"), () -> "'" + sessionState.getServerVersion() + "'")
             .putAll(wellKnownClient.getFunctionReplacements())
@@ -118,8 +115,13 @@ public class PgCatalog {
 
   /** Replace supported pg_catalog tables with Common Table Expressions. */
   public Statement replacePgCatalogTables(Statement statement) {
+    // Only replace tables if the statement contains at least one of the known prefixes.
+    if (checkPrefixes.stream().noneMatch(prefix -> statement.getSql().contains(prefix))) {
+      return statement;
+    }
+
     Tuple<Set<TableOrIndexName>, Statement> replacedTablesStatement =
-        new TableParser(statement).detectAndReplaceTables(DEFAULT_TABLE_REPLACEMENTS);
+        new TableParser(statement).detectAndReplaceTables(tableReplacements);
     if (replacedTablesStatement.x().isEmpty()) {
       return replacedTablesStatement.y();
     }
@@ -134,16 +136,19 @@ public class PgCatalog {
     return addCommonTableExpressions(replacedTablesStatement.y(), cteBuilder.build());
   }
 
-  static String replaceKnownUnsupportedFunctions(Statement statement) {
+  String replaceKnownUnsupportedFunctions(Statement statement) {
     String sql = statement.getSql();
-    for (Entry<Pattern, String> functionReplacement : FUNCTION_REPLACEMENTS.entrySet()) {
-      sql = functionReplacement.getKey().matcher(sql).replaceAll(functionReplacement.getValue());
+    for (Entry<Pattern, Supplier<String>> functionReplacement : functionReplacements.entrySet()) {
+      sql =
+          functionReplacement
+              .getKey()
+              .matcher(sql)
+              .replaceAll(functionReplacement.getValue().get());
     }
     return sql;
   }
 
-  static Statement addCommonTableExpressions(
-      Statement statement, ImmutableList<String> tableExpressions) {
+  Statement addCommonTableExpressions(Statement statement, ImmutableList<String> tableExpressions) {
     String sql = replaceKnownUnsupportedFunctions(statement);
     SimpleParser parser = new SimpleParser(sql);
     boolean hadCommonTableExpressions = parser.eatKeyword("with");
@@ -192,7 +197,8 @@ public class PgCatalog {
     return null;
   }
 
-  private interface PgCatalogTable {
+  @InternalApi
+  public interface PgCatalogTable {
     String getTableExpression();
 
     default ImmutableSet<TableOrIndexName> getDependencies() {
@@ -418,7 +424,8 @@ public class PgCatalog {
     }
   }
 
-  private static class PgAttribute implements PgCatalogTable {
+  @InternalApi
+  public static class EmptyPgAttribute implements PgCatalogTable {
     private static final String PG_ATTRIBUTE_CTE =
         "pg_attribute as (\n"
             + "select * from ("
@@ -436,7 +443,8 @@ public class PgCatalog {
     }
   }
 
-  private static class PgEnum implements PgCatalogTable {
+  @InternalApi
+  public static class EmptyPgEnum implements PgCatalogTable {
     private static final String PG_ENUM_CTE =
         "pg_enum as (\n"
             + "select * from ("
