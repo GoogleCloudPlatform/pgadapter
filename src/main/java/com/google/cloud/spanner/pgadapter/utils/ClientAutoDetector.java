@@ -31,9 +31,12 @@ import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse.NoticeSeveri
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import org.postgresql.core.Oid;
 
@@ -51,6 +54,8 @@ public class ClientAutoDetector {
           SelectCurrentCatalogStatement.INSTANCE,
           SelectVersionStatement.INSTANCE,
           DjangoGetTableNamesStatement.INSTANCE);
+  private static final ImmutableSet<String> DEFAULT_CHECK_PG_CATALOG_PREFIXES =
+      ImmutableSet.of("pg_");
   public static final String PGBENCH_USAGE_HINT =
       "See https://github.com/GoogleCloudPlatform/pgadapter/blob/-/docs/pgbench.md for how to use pgbench with PGAdapter";
 
@@ -216,6 +221,18 @@ public class ClientAutoDetector {
         return DEFAULT_LOCAL_STATEMENTS;
       }
       return EMPTY_LOCAL_STATEMENTS;
+    }
+
+    public ImmutableSet<String> getPgCatalogCheckPrefixes() {
+      return DEFAULT_CHECK_PG_CATALOG_PREFIXES;
+    }
+
+    public ImmutableMap<String, String> getTableReplacements() {
+      return ImmutableMap.of();
+    }
+
+    public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
+      return ImmutableMap.of();
     }
 
     /** Creates specific notice messages for a client after startup. */
