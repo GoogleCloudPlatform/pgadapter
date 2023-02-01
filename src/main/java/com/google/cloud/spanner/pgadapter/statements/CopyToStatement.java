@@ -57,7 +57,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
       new byte[] {'P', 'G', 'C', 'O', 'P', 'Y', '\n', -1, '\r', '\n', '\0'};
 
   private final ParsedCopyStatement parsedCopyStatement;
-  private final CSVFormat csvFormat;
+  private CSVFormat csvFormat;
   private final AtomicBoolean hasReturnedData = new AtomicBoolean(false);
 
   public CopyToStatement(
@@ -272,6 +272,10 @@ public class CopyToStatement extends IntermediatePortalStatement {
       }
     }
     String row = csvFormat.format((Object[]) data);
+    // Only include the header with the first row.
+    if (!csvFormat.getSkipHeaderRecord()) {
+      csvFormat = csvFormat.builder().setSkipHeaderRecord(true).build();
+    }
     return new CopyDataResponse(this.outputStream, row, csvFormat.getRecordSeparator().charAt(0));
   }
 
