@@ -16,13 +16,13 @@ package com.google.cloud.spanner.pgadapter.statements.local;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.ResultSets;
 import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
+import com.google.cloud.spanner.pgadapter.statements.ClientSideResultSet;
 import com.google.common.collect.ImmutableList;
 
 @InternalApi
@@ -50,7 +50,7 @@ public class SelectCurrentSchemaStatement implements LocalStatement {
   @Override
   public StatementResult execute(BackendConnection backendConnection) {
     ResultSet resultSet =
-        ResultSets.forRows(
+        ClientSideResultSet.forRows(
             Type.struct(StructField.of("current_schema", Type.string())),
             ImmutableList.of(
                 Struct.newBuilder()

@@ -358,7 +358,7 @@ public class ProxyServer extends AbstractApiService {
     return String.format("ProxyServer[port: %d]", getLocalPort());
   }
 
-  ConcurrentLinkedQueue<WireMessage> getDebugMessages() {
+  public ConcurrentLinkedQueue<WireMessage> getDebugMessages() {
     return debugMessages;
   }
 
