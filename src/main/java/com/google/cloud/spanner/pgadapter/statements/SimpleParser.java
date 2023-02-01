@@ -49,6 +49,19 @@ public class SimpleParser {
     /** Name is the actual object name. */
     final String name;
 
+    /**
+     * Parses an unquoted, qualified identifier. Use this to quickly parse strings like 'foo' and
+     * 'foo.bar' as an identifier.
+     */
+    static TableOrIndexName parse(String qualifiedName) {
+      SimpleParser parser = new SimpleParser(qualifiedName);
+      TableOrIndexName result = parser.readTableOrIndexName();
+      if (result == null || parser.hasMoreTokens()) {
+        throw new IllegalArgumentException("Invalid identifier: " + qualifiedName);
+      }
+      return result;
+    }
+
     static TableOrIndexName of(String name) {
       return new TableOrIndexName(name);
     }
