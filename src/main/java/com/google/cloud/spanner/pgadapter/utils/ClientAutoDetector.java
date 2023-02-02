@@ -19,6 +19,9 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgAttribute;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgEnum;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCatalogTable;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
@@ -28,7 +31,9 @@ import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaSt
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse.NoticeSeverity;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -168,8 +173,34 @@ public class ClientAutoDetector {
         // pgx does not send enough unique parameters for it to be auto-detected.
         return false;
       }
+
+      @Override
+      boolean isClient(ParseMessage parseMessage) {
+        // pgx uses a relatively unique naming scheme for prepared statements (and uses prepared
+        // statements for everything by default).
+        return parseMessage.getName() != null && parseMessage.getName().startsWith("lrupsc_");
+      }
     },
     NPGSQL {
+      final ImmutableMap<String, String> tableReplacements =
+          ImmutableMap.of(
+              "pg_catalog.pg_attribute",
+              "pg_attribute",
+              "pg_attribute",
+              "pg_attribute",
+              "pg_catalog.pg_enum",
+              "pg_enum",
+              "pg_enum",
+              "pg_enum");
+      final ImmutableMap<String, PgCatalogTable> pgCatalogTables =
+          ImmutableMap.of("pg_attribute", new EmptyPgAttribute(), "pg_enum", new EmptyPgEnum());
+
+      final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
+          ImmutableMap.of(
+              Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"),
+                  Suppliers.ofInstance("false"),
+              Pattern.compile("proc\\.oid = typ\\.typreceive"), Suppliers.ofInstance("false"));
+
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
         // npgsql does not send enough unique parameters for it to be auto-detected.
@@ -189,6 +220,21 @@ public class ClientAutoDetector {
                         + "\n"
                         + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n");
       }
+
+      @Override
+      public ImmutableMap<String, String> getTableReplacements() {
+        return tableReplacements;
+      }
+
+      @Override
+      public ImmutableMap<String, PgCatalogTable> getPgCatalogTables() {
+        return pgCatalogTables;
+      }
+
+      @Override
+      public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
+        return functionReplacements;
+      }
     },
     UNSPECIFIED {
       @Override
@@ -200,6 +246,13 @@ public class ClientAutoDetector {
 
       @Override
       boolean isClient(List<Statement> statements) {
+        // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
+        // defaults defined in this enum.
+        return true;
+      }
+
+      @Override
+      boolean isClient(ParseMessage parseMessage) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
         return true;
@@ -216,6 +269,10 @@ public class ClientAutoDetector {
       return false;
     }
 
+    boolean isClient(ParseMessage parseMessage) {
+      return false;
+    }
+
     public ImmutableList<LocalStatement> getLocalStatements(ConnectionHandler connectionHandler) {
       if (connectionHandler.getServer().getOptions().useDefaultLocalStatements()) {
         return DEFAULT_LOCAL_STATEMENTS;
@@ -228,6 +285,10 @@ public class ClientAutoDetector {
     }
 
     public ImmutableMap<String, String> getTableReplacements() {
+      return ImmutableMap.of();
+    }
+
+    public ImmutableMap<String, PgCatalogTable> getPgCatalogTables() {
       return ImmutableMap.of();
     }
 
@@ -274,6 +335,20 @@ public class ClientAutoDetector {
   public static @Nonnull WellKnownClient detectClient(List<Statement> statements) {
     for (WellKnownClient client : WellKnownClient.values()) {
       if (client.isClient(statements)) {
+        return client;
+      }
+    }
+    // The following line should never be reached.
+    throw new IllegalStateException("UNSPECIFIED.isClient() should have returned true");
+  }
+
+  /**
+   * Returns the {@link WellKnownClient} that the detector thinks is connected to PGAdapter based on
+   * the Parse message that has been received.
+   */
+  public static @Nonnull WellKnownClient detectClient(ParseMessage parseMessage) {
+    for (WellKnownClient client : WellKnownClient.values()) {
+      if (client.isClient(parseMessage)) {
         return client;
       }
     }

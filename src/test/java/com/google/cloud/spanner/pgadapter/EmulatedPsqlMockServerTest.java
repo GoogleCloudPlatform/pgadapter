@@ -196,6 +196,18 @@ public class EmulatedPsqlMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testShowApplicationName() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl("my-db"))) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show application_name")) {
+        assertTrue(resultSet.next());
+        assertEquals("psql", resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testConnectToNonExistingInstance() {
     try {
       mockSpanner.setExecuteStreamingSqlExecutionTime(
