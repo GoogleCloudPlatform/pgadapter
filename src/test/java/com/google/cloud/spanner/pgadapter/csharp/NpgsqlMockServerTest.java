@@ -92,6 +92,12 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   }
 
   @Test
+  public void testShowApplicationName() throws IOException, InterruptedException {
+    String result = execute("TestShowApplicationName", createConnectionString());
+    assertEquals("npgsql\n", result);
+  }
+
+  @Test
   public void testSelect1() throws IOException, InterruptedException {
     String result = execute("TestSelect1", createConnectionString());
     assertEquals("Success\n", result);

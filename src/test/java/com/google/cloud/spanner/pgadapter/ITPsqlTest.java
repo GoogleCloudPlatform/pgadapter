@@ -398,6 +398,20 @@ public class ITPsqlTest implements IntegrationTest {
         output);
   }
 
+  @Test
+  public void testSetOperationWithOrderBy() throws IOException, InterruptedException {
+    // TODO: Remove
+    assumeTrue(
+        testEnv.getSpannerUrl().equals("https://staging-wrenchworks.sandbox.googleapis.com"));
+
+    Tuple<String, String> result =
+        runUsingPsql(
+            "select * from (select 1) one union all select * from (select 2) two order by 1");
+    String output = result.x(), errors = result.y();
+    assertEquals("", errors);
+    assertEquals(" ?column? \n----------\n        1\n        2\n(2 rows)\n", output);
+  }
+
   /**
    * This test copies data back and forth between PostgreSQL and Cloud Spanner and verifies that the
    * contents are equal after the COPY operation in both directions.

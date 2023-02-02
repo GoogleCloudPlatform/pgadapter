@@ -76,6 +76,22 @@ public class NpgsqlTest
         }
     }
 
+    public void TestShowApplicationName()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+
+        using var cmd = new NpgsqlCommand("show application_name", connection);
+        using (var reader = cmd.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var applicationName = reader.GetString(0);
+                Console.WriteLine($"{applicationName}");
+            }
+        }
+    }
+
     public void TestSelect1()
     {
         using var connection = new NpgsqlConnection(ConnectionString);

@@ -31,6 +31,7 @@ import com.google.cloud.spanner.pgadapter.statements.local.SelectCurrentSchemaSt
 import com.google.cloud.spanner.pgadapter.statements.local.SelectVersionStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse.NoticeSeverity;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -172,6 +173,13 @@ public class ClientAutoDetector {
         // pgx does not send enough unique parameters for it to be auto-detected.
         return false;
       }
+
+      @Override
+      boolean isClient(ParseMessage parseMessage) {
+        // pgx uses a relatively unique naming scheme for prepared statements (and uses prepared
+        // statements for everything by default).
+        return parseMessage.getName() != null && parseMessage.getName().startsWith("lrupsc_");
+      }
     },
     NPGSQL {
       final ImmutableMap<String, String> tableReplacements =
@@ -242,6 +250,13 @@ public class ClientAutoDetector {
         // defaults defined in this enum.
         return true;
       }
+
+      @Override
+      boolean isClient(ParseMessage parseMessage) {
+        // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
+        // defaults defined in this enum.
+        return true;
+      }
     };
 
     abstract boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters);
@@ -251,6 +266,10 @@ public class ClientAutoDetector {
     public void reset() {}
 
     boolean isClient(List<Statement> statements) {
+      return false;
+    }
+
+    boolean isClient(ParseMessage parseMessage) {
       return false;
     }
 
@@ -316,6 +335,20 @@ public class ClientAutoDetector {
   public static @Nonnull WellKnownClient detectClient(List<Statement> statements) {
     for (WellKnownClient client : WellKnownClient.values()) {
       if (client.isClient(statements)) {
+        return client;
+      }
+    }
+    // The following line should never be reached.
+    throw new IllegalStateException("UNSPECIFIED.isClient() should have returned true");
+  }
+
+  /**
+   * Returns the {@link WellKnownClient} that the detector thinks is connected to PGAdapter based on
+   * the Parse message that has been received.
+   */
+  public static @Nonnull WellKnownClient detectClient(ParseMessage parseMessage) {
+    for (WellKnownClient client : WellKnownClient.values()) {
+      if (client.isClient(parseMessage)) {
         return client;
       }
     }
