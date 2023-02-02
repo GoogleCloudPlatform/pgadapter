@@ -754,19 +754,25 @@ public class ConnectionHandler extends Thread {
   }
 
   private void maybeSetApplicationName() {
-    if (this.wellKnownClient != WellKnownClient.UNSPECIFIED
-        && getExtendedQueryProtocolHandler() != null
-        && Strings.isNullOrEmpty(
-            getExtendedQueryProtocolHandler()
-                .getBackendConnection()
-                .getSessionState()
-                .get(null, "application_name")
-                .getSetting())) {
-      getExtendedQueryProtocolHandler()
-          .getBackendConnection()
-          .getSessionState()
-          .set(null, "application_name", wellKnownClient.name().toLowerCase(Locale.ENGLISH));
-      getExtendedQueryProtocolHandler().getBackendConnection().getSessionState().commit();
+    try {
+      if (this.wellKnownClient != WellKnownClient.UNSPECIFIED
+          && getExtendedQueryProtocolHandler() != null
+          && Strings.isNullOrEmpty(
+              getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getSessionState()
+                  .get(null, "application_name")
+                  .getSetting())) {
+        getExtendedQueryProtocolHandler()
+            .getBackendConnection()
+            .getSessionState()
+            .set(null, "application_name", wellKnownClient.name().toLowerCase(Locale.ENGLISH));
+        getExtendedQueryProtocolHandler().getBackendConnection().getSessionState().commit();
+      }
+    } catch (Throwable ignore) {
+      // Safeguard against a theoretical situation that 'application_name' has been removed from
+      // the list of settings. Just ignore this situation, as the only consequence is that the
+      // 'application_name' setting has not been set.
     }
   }
 
