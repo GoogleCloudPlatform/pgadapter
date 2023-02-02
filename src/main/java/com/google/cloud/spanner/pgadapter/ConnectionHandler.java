@@ -52,9 +52,11 @@ import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
@@ -69,6 +71,7 @@ import java.text.MessageFormat;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -704,6 +707,14 @@ public class ConnectionHandler extends Thread {
 
   public void setWellKnownClient(WellKnownClient wellKnownClient) {
     this.wellKnownClient = wellKnownClient;
+    if (this.wellKnownClient != WellKnownClient.UNSPECIFIED) {
+      logger.log(
+          Level.INFO,
+          () ->
+              String.format(
+                  "Well-known client %s detected for connection %d.",
+                  this.wellKnownClient, getConnectionId()));
+    }
   }
 
   /**
@@ -713,21 +724,56 @@ public class ConnectionHandler extends Thread {
    * executed.
    */
   public void maybeDetermineWellKnownClient(Statement statement) {
-    if (!this.hasDeterminedClientUsingQuery
-        && this.wellKnownClient == WellKnownClient.UNSPECIFIED
-        && getServer().getOptions().shouldAutoDetectClient()) {
-      this.wellKnownClient = ClientAutoDetector.detectClient(ImmutableList.of(statement));
-      if (this.wellKnownClient != WellKnownClient.UNSPECIFIED) {
-        logger.log(
-            Level.INFO,
-            () ->
-                String.format(
-                    "Well-known client %s detected for connection %d.",
-                    this.wellKnownClient, getConnectionId()));
+    if (!this.hasDeterminedClientUsingQuery) {
+      if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
+          && getServer().getOptions().shouldAutoDetectClient()) {
+        setWellKnownClient(ClientAutoDetector.detectClient(ImmutableList.of(statement)));
       }
+      maybeSetApplicationName();
     }
     // Make sure that we only try to detect the client once.
     this.hasDeterminedClientUsingQuery = true;
+  }
+
+  /**
+   * This is called by the extended query protocol {@link
+   * com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage} to give the connection the
+   * opportunity to determine the client that is connected based on the data in the (first) parse
+   * messages.
+   */
+  public void maybeDetermineWellKnownClient(ParseMessage parseMessage) {
+    if (!this.hasDeterminedClientUsingQuery) {
+      if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
+          && getServer().getOptions().shouldAutoDetectClient()) {
+        setWellKnownClient(ClientAutoDetector.detectClient(parseMessage));
+      }
+      maybeSetApplicationName();
+    }
+    // Make sure that we only try to detect the client once.
+    this.hasDeterminedClientUsingQuery = true;
+  }
+
+  private void maybeSetApplicationName() {
+    try {
+      if (this.wellKnownClient != WellKnownClient.UNSPECIFIED
+          && getExtendedQueryProtocolHandler() != null
+          && Strings.isNullOrEmpty(
+              getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getSessionState()
+                  .get(null, "application_name")
+                  .getSetting())) {
+        getExtendedQueryProtocolHandler()
+            .getBackendConnection()
+            .getSessionState()
+            .set(null, "application_name", wellKnownClient.name().toLowerCase(Locale.ENGLISH));
+        getExtendedQueryProtocolHandler().getBackendConnection().getSessionState().commit();
+      }
+    } catch (Throwable ignore) {
+      // Safeguard against a theoretical situation that 'application_name' has been removed from
+      // the list of settings. Just ignore this situation, as the only consequence is that the
+      // 'application_name' setting has not been set.
+    }
   }
 
   /** Status of a {@link ConnectionHandler} */

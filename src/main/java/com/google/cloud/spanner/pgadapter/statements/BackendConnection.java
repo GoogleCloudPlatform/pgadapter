@@ -30,7 +30,6 @@ import com.google.cloud.spanner.Partition;
 import com.google.cloud.spanner.PartitionOptions;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.ResultSets;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerBatchUpdateException;
 import com.google.cloud.spanner.SpannerException;
@@ -1313,7 +1312,7 @@ public class BackendConnection {
 
     @Override
     public ResultSet getResultSet() {
-      return ResultSets.forRows(
+      return ClientSideResultSet.forRows(
           Type.struct(StructField.of("partition", Type.bytes())),
           partitions.stream()
               .map(

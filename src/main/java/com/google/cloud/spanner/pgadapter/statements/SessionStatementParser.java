@@ -17,7 +17,6 @@ package com.google.cloud.spanner.pgadapter.statements;
 import com.google.api.client.util.Strings;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
-import com.google.cloud.spanner.ResultSets;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
@@ -186,7 +185,7 @@ public class SessionStatementParser {
     public StatementResult execute(SessionState sessionState) {
       if (name != null) {
         return new QueryResult(
-            ResultSets.forRows(
+            ClientSideResultSet.forRows(
                 Type.struct(StructField.of(getKey(), Type.string())),
                 ImmutableList.of(
                     Struct.newBuilder()
@@ -195,7 +194,7 @@ public class SessionStatementParser {
                         .build())));
       }
       return new QueryResult(
-          ResultSets.forRows(
+          ClientSideResultSet.forRows(
               Type.struct(
                   StructField.of("name", Type.string()),
                   StructField.of("setting", Type.string()),
