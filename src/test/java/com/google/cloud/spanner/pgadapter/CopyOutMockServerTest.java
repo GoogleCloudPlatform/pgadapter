@@ -310,7 +310,7 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           "col_bigint-col_bool-col_bytea-col_float8-col_int-col_numeric-col_timestamptz-col_date-col_varchar-col_jsonb\n"
               + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n"
               + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n"
-              + "\\N-\\N-\\N-\\N-\\N-\\N-\\N-\\N-\\N-\\N\n",
+              + "---------\n",
           writer.toString());
     }
   }
