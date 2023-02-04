@@ -29,11 +29,15 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.CopyInMockServerTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
+import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
+import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -62,6 +66,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+import org.postgresql.util.ByteConverter;
 
 @RunWith(Parameterized.class)
 @Category(PythonTest.class)
@@ -272,7 +277,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"
-            + "col_bytea: b'test'\n"
+            + "col_bytea: test\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -305,7 +310,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"
-            + "col_bytea: b'test'\n"
+            + "col_bytea: test\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -565,7 +570,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"
-            + "col_bytea: b'test'\n"
+            + "col_bytea: test\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -812,7 +817,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"
-            + "col_bytea: b'test'\n"
+            + "col_bytea: test\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -851,7 +856,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"
-            + "col_bytea: b'test'\n"
+            + "col_bytea: test\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -870,6 +875,180 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             + "col_string: None\n"
             + "col_jsonb: None\n",
         result);
+  }
+
+  @Test
+  public void testPrepareQuery() throws IOException, InterruptedException {
+    String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(), ALL_TYPES_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(2L).build(), ALL_TYPES_NULLS_RESULTSET));
+
+    String result = execute("prepare_query");
+    assertEquals(
+        "col_bigint: 1\n"
+            + "col_bool: True\n"
+            + "col_bytea: test\n"
+            + "col_float8: 3.14\n"
+            + "col_int: 100\n"
+            + "col_numeric: 6.626\n"
+            + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_date: 2022-03-29\n"
+            + "col_string: test\n"
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_bigint: None\n"
+            + "col_bool: None\n"
+            + "col_bytea: None\n"
+            + "col_float8: None\n"
+            + "col_int: None\n"
+            + "col_numeric: None\n"
+            + "col_timestamptz: None\n"
+            + "col_date: None\n"
+            + "col_string: None\n"
+            + "col_jsonb: None\n",
+        result);
+
+    List<ParseMessage> parseMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(msg -> msg instanceof ParseMessage)
+            .map(msg -> (ParseMessage) msg)
+            .filter(msg -> msg.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, parseMessages.size());
+    ParseMessage parseMessage = parseMessages.get(0);
+    List<BindMessage> bindMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(msg -> msg instanceof BindMessage)
+            .map(msg -> (BindMessage) msg)
+            .filter(msg -> msg.getStatementName().equals(parseMessage.getName()))
+            .collect(Collectors.toList());
+    assertEquals(2, bindMessages.size());
+    // psycopg3 sends small integer values as int2 values.
+    assertEquals(1, ByteConverter.int2(bindMessages.get(0).getParameters()[0], 0));
+    assertEquals(2, ByteConverter.int2(bindMessages.get(1).getParameters()[0], 0));
+  }
+
+  @Test
+  public void testInt8Param() throws IOException, InterruptedException {
+    String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to((long) Integer.MAX_VALUE + 1L).build(),
+            ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+
+    String result = execute("int8_param");
+    assertEquals("None\n", result);
+
+    List<ParseMessage> parseMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(msg -> msg instanceof ParseMessage)
+            .map(msg -> (ParseMessage) msg)
+            .filter(msg -> msg.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, parseMessages.size());
+    ParseMessage parseMessage = parseMessages.get(0);
+    List<BindMessage> bindMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(msg -> msg instanceof BindMessage)
+            .map(msg -> (BindMessage) msg)
+            .filter(msg -> msg.getStatementName().equals(parseMessage.getName()))
+            .collect(Collectors.toList());
+    assertEquals(1, bindMessages.size());
+    // psycopg3 sends large integer values as int8 values.
+    assertEquals(
+        (long) Integer.MAX_VALUE + 1L,
+        ByteConverter.int8(bindMessages.get(0).getParameters()[0], 0));
+  }
+
+  @Test
+  public void testReadWriteTransaction() throws IOException, InterruptedException {
+    addDescribeInsertAllTypesResult();
+    String sql = getInsertAllTypesSql();
+    for (long id : new Long[] {10L, 20L}) {
+      mockSpanner.putStatementResult(
+          StatementResult.update(
+              Statement.newBuilder(sql)
+                  .bind("p1")
+                  .to(id)
+                  .bind("p2")
+                  .to(true)
+                  .bind("p3")
+                  .to(ByteArray.copyFrom("test_bytes"))
+                  .bind("p4")
+                  .to(3.14d)
+                  .bind("p5")
+                  .to(100L)
+                  .bind("p6")
+                  .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                  .bind("p7")
+                  .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                  .bind("p8")
+                  .to(Date.parseDate("2022-04-02"))
+                  .bind("p9")
+                  .to("test_string")
+                  .bind("p10")
+                  .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
+                  .build(),
+              1L));
+    }
+
+    String result = execute("read_write_transaction");
+    assertEquals("(1,)\n" + "Insert count: 1\n" + "Insert count: 1\n", result);
+
+    List<ExecuteSqlRequest> select1Requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals("SELECT 1"))
+            .collect(Collectors.toList());
+    assertEquals(1, select1Requests.size());
+    assertTrue(select1Requests.get(0).hasTransaction());
+    assertTrue(select1Requests.get(0).getTransaction().hasBegin());
+    assertTrue(select1Requests.get(0).getTransaction().getBegin().hasReadWrite());
+    List<ExecuteSqlRequest> insertRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(getInsertAllTypesSql()))
+            .collect(Collectors.toList());
+
+    // We get the insert request 3 times, as it needs to be auto-described once to get all param
+    // types.
+    assertEquals(3, insertRequests.size());
+    assertEquals(QueryMode.PLAN, insertRequests.get(0).getQueryMode());
+    for (ExecuteSqlRequest insertRequest : insertRequests) {
+      assertTrue(insertRequest.hasTransaction());
+      assertTrue(insertRequest.getTransaction().hasId());
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testReadOnlyTransaction() throws IOException, InterruptedException {
+    String result = execute("read_only_transaction");
+    assertEquals("(1,)\n" + "(2,)\n", result);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+    BeginTransactionRequest beginTransactionRequest =
+        mockSpanner.getRequestsOfType(BeginTransactionRequest.class).get(0);
+    assertTrue(beginTransactionRequest.getOptions().hasReadOnly());
+    List<ByteString> transactionsStarted = mockSpanner.getTransactionsStarted();
+    assertFalse(transactionsStarted.isEmpty());
+    ByteString transactionId = transactionsStarted.get(transactionsStarted.size() - 1);
+
+    List<ExecuteSqlRequest> requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(
+                request ->
+                    request.getSql().equals("SELECT 1") || request.getSql().equals("SELECT 2"))
+            .collect(Collectors.toList());
+    assertEquals(2, requests.size());
+    for (ExecuteSqlRequest request : requests) {
+      assertEquals(transactionId, request.getTransaction().getId());
+    }
+    // Read-only transactions are not really committed or rolled back.
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
   }
 
   private static String getInsertAllTypesSql() {

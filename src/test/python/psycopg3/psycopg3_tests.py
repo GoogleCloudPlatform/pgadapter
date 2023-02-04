@@ -382,6 +382,55 @@ def text_copy_out(conn_string: str):
           print_all_types(row)
 
 
+def prepare_query(conn_string: str):
+  with psycopg.connect(conn_string) as conn:
+    conn.autocommit = True
+    for i in range(2):
+      row = conn.execute("SELECT * FROM all_types WHERE col_bigint=%s",
+                         (i+1,), prepare=True).fetchone()
+      print_all_types(row)
+
+
+def int8_param(conn_string: str):
+  with psycopg.connect(conn_string) as conn:
+    conn.autocommit = True
+    row = conn.execute("SELECT * FROM all_types WHERE col_bigint=%s",
+                       (2147483648,), prepare=True).fetchone()
+    print(row)
+
+
+def read_write_transaction(conn_string: str):
+  insert_sql = "INSERT INTO all_types " \
+        "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, " \
+        "col_timestamptz, col_date, col_varchar, col_jsonb) " \
+        "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+  with psycopg.connect(conn_string) as conn:
+    print(conn.execute("SELECT 1").fetchone())
+    curs = conn.execute(
+      insert_sql,
+      (10, True, bytearray(b'test_bytes'), 3.14, 100, Decimal("6.626"),
+       datetime(year=2022, month=3, day=24, hour=6, minute=39, second=10,
+                microsecond=123456, tzinfo=None),
+       date(2022, 4, 2), "test_string", Jsonb({"key": "value"}),))
+    print("Insert count:", curs.rowcount)
+    curs = conn.execute(
+      insert_sql,
+      (20, True, bytearray(b'test_bytes'), 3.14, 100, Decimal("6.626"),
+       datetime(year=2022, month=3, day=24, hour=6, minute=39, second=10,
+                microsecond=123456, tzinfo=None),
+       date(2022, 4, 2), "test_string", Jsonb({"key": "value"}),))
+    print("Insert count:", curs.rowcount)
+    conn.commit()
+
+
+def read_only_transaction(conn_string: str):
+  with psycopg.connect(conn_string) as conn:
+    conn.read_only = True
+    print(conn.execute("SELECT 1").fetchone())
+    print(conn.execute("SELECT 2").fetchone())
+    conn.commit()
+
+
 def create_batch_insert_values(batch_size: int):
   values = []
   for i in range(batch_size):
@@ -399,7 +448,7 @@ def create_batch_insert_values(batch_size: int):
 def print_all_types(row):
   print("col_bigint:",      row[0])
   print("col_bool:",        row[1])
-  print("col_bytea:",       "{}".format(row[2]))
+  print("col_bytea:",       None if row[2] is None else row[2].decode("utf-8"))
   print("col_float8:",      row[3])
   print("col_int:",         row[4])
   print("col_numeric:",     row[5])
