@@ -65,7 +65,7 @@ public class CopyDataReceiver implements Callable<Void> {
       this.connectionHandler.setActiveCopyStatement(copyStatement);
       new CopyInResponse(
               this.connectionHandler.getConnectionMetadata().getOutputStream(),
-              copyStatement.getTableColumns().size(),
+              (short) copyStatement.getTableColumns().size(),
               copyStatement.getFormatCode())
           .send();
       ConnectionStatus initialConnectionStatus = this.connectionHandler.getStatus();
