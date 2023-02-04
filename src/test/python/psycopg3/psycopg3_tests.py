@@ -19,6 +19,7 @@ from decimal import Decimal
 
 import pytz
 import psycopg
+from psycopg import Copy
 from psycopg.types.json import Jsonb
 
 
@@ -321,20 +322,6 @@ def ddl_script(conn_string: str):
     print("Update count:", curs.rowcount)
 
 
-def binary_copy_in_test(conn_string: str):
-  # with psycopg.connect("host=localhost dbname=loite user=loite password=loite") as conn:
-  with psycopg.connect(conn_string) as conn:
-    try:
-      with conn.cursor() as cur:
-        with cur.copy("COPY users FROM STDIN (FORMAT BINARY)") as copy:
-          copy.set_types(["int8", "int8", "varchar"])
-          copy.write_row((3, 20, "Three"))
-          copy.write_row((4, 30, "Four"))
-        print("Copy count:", cur.rowcount)
-    except Exception as e:
-      print(e)
-
-
 def binary_copy_in(conn_string: str):
   with psycopg.connect(conn_string) as conn:
     conn.autocommit = True
@@ -344,12 +331,7 @@ def binary_copy_in(conn_string: str):
         # binary copy.
         copy.set_types(["bigint", "boolean", "bytea", "float8", "bigint",
                         "numeric", "timestamptz", "date", "varchar", "jsonb"])
-        copy.write_row((1, True, b'test_bytes', 3.14, 10, Decimal("6.626"),
-                        datetime(year=2022, month=3, day=24, hour=12, minute=39,
-                                 second=10, microsecond=123456, tzinfo=pytz.UTC),
-                        date(2022, 7, 1), "test", Jsonb({"key": "value"})))
-        copy.write_row((2,
-                        None, None, None, None, None, None, None, None, None,))
+        write_copy_data(copy)
       print("Copy count:", cur.rowcount)
 
 
@@ -358,15 +340,46 @@ def text_copy_in(conn_string: str):
     conn.autocommit = True
     with conn.cursor() as cur:
       with cur.copy("COPY all_types FROM STDIN") as copy:
-        # copy.set_types(["bigint", "boolean", "bytea", "float8", "bigint",
-        #                 "numeric", "timestamptz", "date", "varchar", "jsonb"])
-        copy.write_row((1, True, b'test_bytes', 3.14, 10, Decimal("6.626"),
-                        datetime(year=2022, month=3, day=24, hour=12, minute=39,
-                                 second=10, microsecond=123456, tzinfo=None),
-                        date(2022, 7, 1), "test", Jsonb({"key": "value"})))
-        copy.write_row((2,
-                        None, None, None, None, None, None, None, None, None,))
-    print("Copy count:", cur.rowcount)
+        write_copy_data(copy)
+      print("Copy count:", cur.rowcount)
+
+
+def write_copy_data(copy: Copy):
+  copy.write_row((1, True, b'test_bytes', 3.14, 10, Decimal("6.626"),
+                  datetime(year=2022, month=3, day=24, hour=12, minute=39,
+                           second=10, microsecond=123456, tzinfo=pytz.UTC),
+                  date(2022, 7, 1), "test", Jsonb({"key": "value"})))
+  copy.write_row((2,
+                  None, None, None, None, None, None, None, None, None,))
+
+
+def binary_copy_out(conn_string: str):
+  with psycopg.connect(conn_string) as conn:
+    conn.autocommit = True
+    with conn.cursor() as cur:
+      with cur.copy("COPY all_types (col_bigint, col_bool, col_bytea, "
+                    "col_float8, col_int, col_numeric, col_timestamptz, "
+                    "col_date, col_varchar, col_jsonb) TO STDOUT (FORMAT "
+                    "BINARY)") as copy:
+        # We must instruct psycopg3 exactly which types we are using when using
+        # binary copy.
+        copy.set_types(["bigint", "boolean", "bytea", "float8", "bigint",
+                        "numeric", "timestamptz", "date", "varchar", "jsonb"])
+        for row in copy.rows():
+          print_all_types(row)
+
+
+def text_copy_out(conn_string: str):
+  with psycopg.connect(conn_string) as conn:
+    conn.autocommit = True
+    with conn.cursor() as cur:
+      with cur.copy("COPY all_types (col_bigint, col_bool, col_bytea, "
+                    "col_float8, col_int, col_numeric, col_timestamptz, "
+                    "col_date, col_varchar, col_jsonb) TO STDOUT") as copy:
+        copy.set_types(["bigint", "boolean", "bytea", "float8", "bigint",
+                        "numeric", "timestamptz", "date", "varchar", "jsonb"])
+        for row in copy.rows():
+          print_all_types(row)
 
 
 def create_batch_insert_values(batch_size: int):
@@ -390,7 +403,7 @@ def print_all_types(row):
   print("col_float8:",      row[3])
   print("col_int:",         row[4])
   print("col_numeric:",     row[5])
-  print("col_timestamptz:", row[6].astimezone(pytz.UTC))
+  print("col_timestamptz:", None if row[6] is None else row[6].astimezone(pytz.UTC))
   print("col_date:",        row[7])
   print("col_string:",      row[8])
   print("col_jsonb:",       row[9])

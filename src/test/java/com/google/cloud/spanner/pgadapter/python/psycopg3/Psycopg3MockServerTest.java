@@ -794,6 +794,84 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     }
   }
 
+  @Test
+  public void testBinaryCopyOut() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb from all_types"),
+            ALL_TYPES_RESULTSET
+                .toBuilder()
+                .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
+                .build()));
+
+    CopyInMockServerTest.setupCopyInformationSchemaResults(
+        mockSpanner, "public", "all_types", true);
+
+    String result = execute("binary_copy_out");
+    assertEquals(
+        "col_bigint: 1\n"
+            + "col_bool: True\n"
+            + "col_bytea: b'test'\n"
+            + "col_float8: 3.14\n"
+            + "col_int: 100\n"
+            + "col_numeric: 6.626\n"
+            + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_date: 2022-03-29\n"
+            + "col_string: test\n"
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_bigint: None\n"
+            + "col_bool: None\n"
+            + "col_bytea: None\n"
+            + "col_float8: None\n"
+            + "col_int: None\n"
+            + "col_numeric: None\n"
+            + "col_timestamptz: None\n"
+            + "col_date: None\n"
+            + "col_string: None\n"
+            + "col_jsonb: None\n",
+        result);
+  }
+
+  @Test
+  public void testTextCopyOut() throws IOException, InterruptedException {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb from all_types"),
+            ALL_TYPES_RESULTSET
+                .toBuilder()
+                .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
+                .build()));
+
+    CopyInMockServerTest.setupCopyInformationSchemaResults(
+        mockSpanner, "public", "all_types", true);
+
+    String result = execute("text_copy_out");
+    assertEquals(
+        "col_bigint: 1\n"
+            + "col_bool: True\n"
+            + "col_bytea: b'test'\n"
+            + "col_float8: 3.14\n"
+            + "col_int: 100\n"
+            + "col_numeric: 6.626\n"
+            + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_date: 2022-03-29\n"
+            + "col_string: test\n"
+            + "col_jsonb: {'key': 'value'}\n"
+            + "col_bigint: None\n"
+            + "col_bool: None\n"
+            + "col_bytea: None\n"
+            + "col_float8: None\n"
+            + "col_int: None\n"
+            + "col_numeric: None\n"
+            + "col_timestamptz: None\n"
+            + "col_date: None\n"
+            + "col_string: None\n"
+            + "col_jsonb: None\n",
+        result);
+  }
+
   private static String getInsertAllTypesSql() {
     return "INSERT INTO all_types "
         + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
