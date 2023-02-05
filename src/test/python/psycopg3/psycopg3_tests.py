@@ -24,8 +24,7 @@ from psycopg.types.json import Jsonb
 
 
 def select1(conn_string: str):
-  with psycopg.connect(conn_string) as conn:
-    conn.autocommit = True
+  with psycopg.connect(conn_string, autocommit=True) as conn:
     with conn.cursor() as cur:
       cur.execute("SELECT 1")
       print(cur.fetchone())

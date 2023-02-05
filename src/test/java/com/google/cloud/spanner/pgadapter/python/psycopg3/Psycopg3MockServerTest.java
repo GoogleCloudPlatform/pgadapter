@@ -83,7 +83,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   String createConnectionString() {
-    return String.format("host=%s port=%d dbname=d", host, pgServer.getLocalPort());
+    return String.format("host=%s port=%d dbname=d sslmode=disable", host, pgServer.getLocalPort());
   }
 
   String execute(String method) throws IOException, InterruptedException {
