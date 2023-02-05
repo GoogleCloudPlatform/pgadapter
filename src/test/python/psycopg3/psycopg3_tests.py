@@ -448,7 +448,7 @@ def create_batch_insert_values(batch_size: int):
 def print_all_types(row):
   print("col_bigint:",      row[0])
   print("col_bool:",        row[1])
-  print("col_bytea:",       None if row[2] is None else row[2].decode("utf-8"))
+  print("col_bytea:",       None if row[2] is None else bytes(row[2]))
   print("col_float8:",      row[3])
   print("col_int:",         row[4])
   print("col_numeric:",     row[5])

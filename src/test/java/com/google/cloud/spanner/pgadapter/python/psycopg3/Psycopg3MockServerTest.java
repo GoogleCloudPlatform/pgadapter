@@ -277,7 +277,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"
-            + "col_bytea: test\n"
+            + "col_bytea: b'test'\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -310,7 +310,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"
-            + "col_bytea: test\n"
+            + "col_bytea: b'test'\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -570,7 +570,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"
-            + "col_bytea: test\n"
+            + "col_bytea: b'test'\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -817,7 +817,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"
-            + "col_bytea: test\n"
+            + "col_bytea: b'test'\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -856,7 +856,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"
-            + "col_bytea: test\n"
+            + "col_bytea: b'test'\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
@@ -891,7 +891,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"
-            + "col_bytea: test\n"
+            + "col_bytea: b'test'\n"
             + "col_float8: 3.14\n"
             + "col_int: 100\n"
             + "col_numeric: 6.626\n"
