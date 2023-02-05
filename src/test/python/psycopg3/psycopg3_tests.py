@@ -492,8 +492,6 @@ def nested_transaction(conn_string: str):
         row = conn.execute(
           "SELECT * FROM all_types WHERE col_bigint=%s", (1,)).fetchone()
         print_all_types(row)
-      #   tx2.commit()
-      # tx1.commit()
 
 
 def create_batch_insert_values(batch_size: int):

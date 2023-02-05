@@ -56,12 +56,12 @@ import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
 import java.io.File;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -82,20 +82,21 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     return ImmutableList.of(new Object[] {"localhost"}, new Object[] {"/tmp"});
   }
 
-  String createConnectionString() {
-    return String.format("host=%s port=%d dbname=d sslmode=disable", host, pgServer.getLocalPort());
+  @BeforeClass
+  public static void createVirtualEnv() throws Exception {
+    File directory = new File("./src/test/python/psycopg3");
+    run(new String[] {"python3", "-m", "venv", "venv"});
+    run(
+        new String[] {
+          directory.getAbsolutePath() + "/venv/bin/pip3", "install", "-r", "requirements.txt"
+        });
   }
 
-  String execute(String method) throws IOException, InterruptedException {
-    return execute(method, createConnectionString());
-  }
-
-  static String execute(String method, String connectionString)
-      throws IOException, InterruptedException {
-    String[] runCommand = new String[] {"python3", "psycopg3_tests.py", method, connectionString};
+  private static String run(String[] command) throws Exception {
+    File directory = new File("./src/test/python/psycopg3");
     ProcessBuilder builder = new ProcessBuilder();
-    builder.command(runCommand);
-    builder.directory(new File("./src/test/python/psycopg3"));
+    builder.command(command);
+    builder.directory(directory);
     Process process = builder.start();
     Scanner scanner = new Scanner(process.getInputStream());
     Scanner errorScanner = new Scanner(process.getErrorStream());
@@ -114,8 +115,28 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     return output.toString();
   }
 
+  String createConnectionString() {
+    return String.format("host=%s port=%d dbname=d sslmode=disable", host, pgServer.getLocalPort());
+  }
+
+  String execute(String method) throws Exception {
+    return execute(method, createConnectionString());
+  }
+
+  static String execute(String method, String connectionString) throws Exception {
+    File directory = new File("./src/test/python/psycopg3");
+    // Make sure to run the python executable in the specific virtual environment.
+    return run(
+        new String[] {
+          directory.getAbsolutePath() + "/venv/bin/python3",
+          "psycopg3_tests.py",
+          method,
+          connectionString
+        });
+  }
+
   @Test
-  public void testSelect1() throws IOException, InterruptedException {
+  public void testSelect1() throws Exception {
     String sql = "SELECT 1";
 
     String actualOutput = execute("select1");
@@ -130,19 +151,19 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testShowServerVersion() throws IOException, InterruptedException {
+  public void testShowServerVersion() throws Exception {
     String actualOutput = execute("show_server_version");
     assertEquals("14.1\n", actualOutput);
   }
 
   @Test
-  public void testShowApplicationName() throws IOException, InterruptedException {
+  public void testShowApplicationName() throws Exception {
     String actualOutput = execute("show_application_name");
     assertEquals("None\n", actualOutput);
   }
 
   @Test
-  public void testQueryWithParameter() throws IOException, InterruptedException {
+  public void testQueryWithParameter() throws Exception {
     String sql = "SELECT * FROM FOO WHERE BAR=$1";
     Statement statement = Statement.newBuilder(sql).bind("p1").to("baz").build();
 
@@ -201,7 +222,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testQueryWithParameterTwice() throws IOException, InterruptedException {
+  public void testQueryWithParameterTwice() throws Exception {
     // Verifies that executing the same query twice will only auto-describe it once.
     String sql = "SELECT * FROM FOO WHERE BAR=$1";
     Statement selectBaz = Statement.newBuilder(sql).bind("p1").to("baz").build();
@@ -276,7 +297,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testQueryAllDataTypes() throws IOException, InterruptedException {
+  public void testQueryAllDataTypes() throws Exception {
     String sql = "SELECT * FROM all_types WHERE col_bigint=1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
@@ -304,7 +325,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testQueryAllDataTypesWithParameter() throws IOException, InterruptedException {
+  public void testQueryAllDataTypesWithParameter() throws Exception {
     String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -339,17 +360,16 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testQueryAllDataTypesText() throws IOException, InterruptedException {
+  public void testQueryAllDataTypesText() throws Exception {
     testQueryAllDataTypesWithFixedFormat(DataFormat.POSTGRESQL_TEXT);
   }
 
   @Test
-  public void testQueryAllDataTypesBinary() throws IOException, InterruptedException {
+  public void testQueryAllDataTypesBinary() throws Exception {
     testQueryAllDataTypesWithFixedFormat(DataFormat.POSTGRESQL_BINARY);
   }
 
-  private void testQueryAllDataTypesWithFixedFormat(DataFormat format)
-      throws IOException, InterruptedException {
+  private void testQueryAllDataTypesWithFixedFormat(DataFormat format) throws Exception {
     String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -394,7 +414,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testUpdateAllDataTypes() throws IOException, InterruptedException {
+  public void testUpdateAllDataTypes() throws Exception {
     String sql =
         "UPDATE all_types SET col_bool=$1, col_bytea=$2, col_float8=$3, col_int=$4, col_numeric=$5, col_timestamptz=$6, col_date=$7, col_varchar=$8, col_jsonb=$9 WHERE col_varchar = $10";
     mockSpanner.putStatementResult(
@@ -469,7 +489,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testInsertAllDataTypes() throws IOException, InterruptedException {
+  public void testInsertAllDataTypes() throws Exception {
     String sql = getInsertAllTypesSql();
     addDescribeInsertAllTypesResult();
     mockSpanner.putStatementResult(
@@ -525,7 +545,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testInsertAllDataTypesBinary() throws IOException, InterruptedException {
+  public void testInsertAllDataTypesBinary() throws Exception {
     String sql = getInsertAllTypesSql();
     mockSpanner.putStatementResult(
         StatementResult.update(
@@ -585,7 +605,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testInsertAllDataTypesText() throws IOException, InterruptedException {
+  public void testInsertAllDataTypesText() throws Exception {
     String sql = getInsertAllTypesSql();
     addDescribeInsertAllTypesResult();
     mockSpanner.putStatementResult(
@@ -653,7 +673,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testInsertNullsAllDataTypes() throws IOException, InterruptedException {
+  public void testInsertNullsAllDataTypes() throws Exception {
     String sql = getInsertAllTypesSql();
     mockSpanner.putStatementResult(
         StatementResult.update(
@@ -699,7 +719,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testInsertAllDataTypesReturning() throws IOException, InterruptedException {
+  public void testInsertAllDataTypesReturning() throws Exception {
     String sql = getInsertAllTypesSql() + " returning *";
     ResultSetMetadata metadata =
         ALL_TYPES_METADATA
@@ -794,7 +814,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testInsertBatch() throws IOException, InterruptedException {
+  public void testInsertBatch() throws Exception {
     addDescribeInsertAllTypesResult();
     int batchSize = 10;
     for (int i = 0; i < batchSize; i++) {
@@ -814,7 +834,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testMixedBatch() throws IOException, InterruptedException {
+  public void testMixedBatch() throws Exception {
     String insertSql = getInsertAllTypesSql();
     String selectSql = "select count(*) from all_types where col_bool=$1";
     ResultSetMetadata metadata =
@@ -878,7 +898,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testBatchExecutionError() throws IOException, InterruptedException {
+  public void testBatchExecutionError() throws Exception {
     addDescribeInsertAllTypesResult();
     String insertSql = getInsertAllTypesSql();
     int batchSize = 3;
@@ -911,7 +931,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testDdlBatch() throws IOException, InterruptedException {
+  public void testDdlBatch() throws Exception {
     addDdlResponseToSpannerAdmin();
 
     String result = execute("ddl_batch");
@@ -928,7 +948,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testDdlScript() throws IOException, InterruptedException {
+  public void testDdlScript() throws Exception {
     addDdlResponseToSpannerAdmin();
 
     String result = execute("ddl_script");
@@ -945,16 +965,16 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testBinaryCopyIn() throws IOException, InterruptedException {
+  public void testBinaryCopyIn() throws Exception {
     testCopyIn("binary_copy_in");
   }
 
   @Test
-  public void testTextCopyIn() throws IOException, InterruptedException {
+  public void testTextCopyIn() throws Exception {
     testCopyIn("text_copy_in");
   }
 
-  private void testCopyIn(String testMethod) throws IOException, InterruptedException {
+  private void testCopyIn(String testMethod) throws Exception {
     CopyInMockServerTest.setupCopyInformationSchemaResults(
         mockSpanner, "public", "all_types", true);
 
@@ -990,7 +1010,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testBinaryCopyOut() throws IOException, InterruptedException {
+  public void testBinaryCopyOut() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -1029,7 +1049,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testTextCopyOut() throws IOException, InterruptedException {
+  public void testTextCopyOut() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -1068,7 +1088,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testPrepareQuery() throws IOException, InterruptedException {
+  public void testPrepareQuery() throws Exception {
     String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -1122,7 +1142,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testInt8Param() throws IOException, InterruptedException {
+  public void testInt8Param() throws Exception {
     String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -1154,7 +1174,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testReadWriteTransaction() throws IOException, InterruptedException {
+  public void testReadWriteTransaction() throws Exception {
     addDescribeInsertAllTypesResult();
     String sql = getInsertAllTypesSql();
     for (long id : new Long[] {10L, 20L}) {
@@ -1214,7 +1234,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testReadOnlyTransaction() throws IOException, InterruptedException {
+  public void testReadOnlyTransaction() throws Exception {
     String result = execute("read_only_transaction");
     assertEquals("(1,)\n" + "(2,)\n", result);
 
@@ -1243,7 +1263,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
 
   @Test
   @Ignore("Named cursors are not yet supported")
-  public void testNamedCursor() throws IOException, InterruptedException {
+  public void testNamedCursor() throws Exception {
     String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -1269,7 +1289,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
 
   @Test
   @Ignore("Nested transactions are not yet supported")
-  public void testNestedTransaction() throws IOException, InterruptedException {
+  public void testNestedTransaction() throws Exception {
     String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
     mockSpanner.putStatementResult(
         StatementResult.query(
