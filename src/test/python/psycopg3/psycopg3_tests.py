@@ -76,6 +76,23 @@ def query_all_data_types_with_parameter(conn_string: str):
     print_all_types(row)
 
 
+def query_all_data_types_text(conn_string: str):
+  query_all_data_types_with_fixed_format(conn_string, False)
+
+
+def query_all_data_types_binary(conn_string: str):
+  query_all_data_types_with_fixed_format(conn_string, True)
+
+
+def query_all_data_types_with_fixed_format(conn_string: str, binary: bool):
+  with psycopg.connect(conn_string) as conn:
+    conn.autocommit = True
+    curs = conn.cursor(binary=binary)
+    row = curs.execute("SELECT * FROM all_types WHERE col_bigint=%s",
+                       (1,)).fetchone()
+    print_all_types(row)
+
+
 def update_all_data_types(conn_string: str):
   with psycopg.connect(conn_string) as conn:
     conn.autocommit = True
@@ -100,7 +117,32 @@ def insert_all_data_types(conn_string: str):
       "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
       (100, True, bytearray(b'test_bytes'), 3.14, 100, Decimal("6.626"),
        datetime(year=2022, month=3, day=24, hour=6, minute=39, second=10,
-                microsecond=123456, tzinfo=None),
+                microsecond=123456, tzinfo=pytz.UTC),
+       date(2022, 4, 2), "test_string", Jsonb({"key": "value"}),))
+    print("Insert count:", curs.rowcount)
+
+
+def insert_all_data_types_binary(conn_string: str):
+  insert_all_data_types_with_format(
+    conn_string, "(%b, %b, %b, %b, %b, %b, %b, %b, %b, %b)")
+
+
+def insert_all_data_types_text(conn_string: str):
+  insert_all_data_types_with_format(
+    conn_string, "(%t, %t, %t, %t, %t, %t, %t, %t, %t, %t)")
+
+
+def insert_all_data_types_with_format(conn_string: str, params_string: str):
+  with psycopg.connect(conn_string) as conn:
+    conn.autocommit = True
+    curs = conn.execute(
+      "INSERT INTO all_types "
+      "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, "
+      "col_timestamptz, col_date, col_varchar, col_jsonb) "
+      "values " + params_string,
+      (100, True, bytearray(b'test_bytes'), 3.14, 100, Decimal("6.626"),
+       datetime(year=2022, month=3, day=24, hour=6, minute=39, second=10,
+                microsecond=123456, tzinfo=pytz.UTC),
        date(2022, 4, 2), "test_string", Jsonb({"key": "value"}),))
     print("Insert count:", curs.rowcount)
 
@@ -429,6 +471,17 @@ def read_only_transaction(conn_string: str):
     print(conn.execute("SELECT 1").fetchone())
     print(conn.execute("SELECT 2").fetchone())
     conn.commit()
+
+
+# This method is currently not being used, as named cursors are not yet
+# supported.
+def named_cursor(conn_string: str):
+  with psycopg.connect(conn_string) as conn:
+    conn.autocommit = True
+    with conn.cursor(name="my_cursor") as curs:
+      row = curs.execute(
+        "SELECT * FROM all_types WHERE col_bigint=%s", (1,)).fetchone()
+      print_all_types(row)
 
 
 def create_batch_insert_values(batch_size: int):

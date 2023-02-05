@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.python.psycopg3;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -28,6 +29,7 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.CopyInMockServerTest;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
@@ -60,6 +62,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -332,6 +335,61 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testQueryAllDataTypesText() throws IOException, InterruptedException {
+    testQueryAllDataTypesWithFixedFormat(DataFormat.POSTGRESQL_TEXT);
+  }
+
+  @Test
+  public void testQueryAllDataTypesBinary() throws IOException, InterruptedException {
+    testQueryAllDataTypesWithFixedFormat(DataFormat.POSTGRESQL_BINARY);
+  }
+
+  private void testQueryAllDataTypesWithFixedFormat(DataFormat format)
+      throws IOException, InterruptedException {
+    String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql), ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(), ALL_TYPES_RESULTSET));
+
+    String result =
+        execute(
+            "query_all_data_types_" + (format == DataFormat.POSTGRESQL_BINARY ? "binary" : "text"));
+    assertEquals(
+        "col_bigint: 1\n"
+            + "col_bool: True\n"
+            + "col_bytea: b'test'\n"
+            + "col_float8: 3.14\n"
+            + "col_int: 100\n"
+            + "col_numeric: 6.626\n"
+            + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_date: 2022-03-29\n"
+            + "col_string: test\n"
+            + "col_jsonb: {'key': 'value'}\n",
+        result);
+
+    List<ExecuteSqlRequest> requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, requests.size());
+    ExecuteSqlRequest request = requests.get(0);
+    assertEquals(QueryMode.NORMAL, request.getQueryMode());
+
+    List<BindMessage> bindMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(message -> message instanceof BindMessage)
+            .map(message -> (BindMessage) message)
+            .collect(Collectors.toList());
+    assertEquals(1, bindMessages.size());
+    BindMessage bindMessage = bindMessages.get(0);
+    assertEquals(1, bindMessage.getResultFormatCodes().size());
+    assertEquals(format.getCode(), bindMessage.getResultFormatCodes().get(0).shortValue());
+  }
+
+  @Test
   public void testUpdateAllDataTypes() throws IOException, InterruptedException {
     String sql =
         "UPDATE all_types SET col_bool=$1, col_bytea=$2, col_float8=$3, col_int=$4, col_numeric=$5, col_timestamptz=$6, col_date=$7, col_varchar=$8, col_jsonb=$9 WHERE col_varchar = $10";
@@ -460,6 +518,134 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     // committed.
     assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testInsertAllDataTypesBinary() throws IOException, InterruptedException {
+    String sql = getInsertAllTypesSql();
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to(100L)
+                .bind("p2")
+                .to(true)
+                .bind("p3")
+                .to(ByteArray.copyFrom("test_bytes"))
+                .bind("p4")
+                .to(3.14d)
+                .bind("p5")
+                .to(100)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .bind("p7")
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .bind("p8")
+                .to(Date.parseDate("2022-04-02"))
+                .bind("p9")
+                .to("test_string")
+                .bind("p10")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
+                .build(),
+            1L));
+
+    String result = execute("insert_all_data_types_binary");
+    assertEquals("Insert count: 1\n", result);
+
+    List<ExecuteSqlRequest> requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    // psycopg3 does include a type code for strings when using the binary protocol. We therefore do
+    // not need to do an auto-describe roundtrip in this case.
+    assertEquals(1, requests.size());
+    ExecuteSqlRequest executeRequest = requests.get(0);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.hasTransaction());
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+
+    List<BindMessage> bindMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(message -> message instanceof BindMessage)
+            .map(message -> (BindMessage) message)
+            .collect(Collectors.toList());
+    assertEquals(1, bindMessages.size());
+    BindMessage bindMessage = bindMessages.get(0);
+    assertEquals(10, bindMessage.getFormatCodes().size());
+    assertArrayEquals(
+        new Short[] {1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+        bindMessage.getFormatCodes().toArray(new Short[0]));
+  }
+
+  @Test
+  public void testInsertAllDataTypesText() throws IOException, InterruptedException {
+    String sql = getInsertAllTypesSql();
+    addDescribeInsertAllTypesResult();
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to(100L)
+                .bind("p2")
+                .to(true)
+                .bind("p3")
+                .to(ByteArray.copyFrom("test_bytes"))
+                .bind("p4")
+                .to(3.14d)
+                .bind("p5")
+                .to(100)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .bind("p7")
+                .to(Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"))
+                .bind("p8")
+                .to(Date.parseDate("2022-04-02"))
+                .bind("p9")
+                .to("test_string")
+                .bind("p10")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
+                .build(),
+            1L));
+
+    String result = execute("insert_all_data_types_text");
+    assertEquals("Insert count: 1\n", result);
+
+    List<ExecuteSqlRequest> requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    // psycopg3 does not include an explicit type for string parameters when they are sent as text.
+    // This causes PGAdapter to do an auto-describe roundtrip the first time it sees the statement.
+    assertEquals(2, requests.size());
+    ExecuteSqlRequest describeRequest = requests.get(0);
+    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+    ExecuteSqlRequest executeRequest = requests.get(1);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.hasTransaction());
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    // As the test runs in auto-commit mode, both the Describe and the Execute statement are
+    // committed.
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+
+    List<BindMessage> bindMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(message -> message instanceof BindMessage)
+            .map(message -> (BindMessage) message)
+            .collect(Collectors.toList());
+    assertEquals(1, bindMessages.size());
+    BindMessage bindMessage = bindMessages.get(0);
+    assertEquals(10, bindMessage.getFormatCodes().size());
+    assertArrayEquals(
+        new Short[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        bindMessage.getFormatCodes().toArray(new Short[0]));
   }
 
   @Test
@@ -1049,6 +1235,32 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     // Read-only transactions are not really committed or rolled back.
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  @Ignore("Named cursors are not yet supported")
+  public void testNamedCursor() throws IOException, InterruptedException {
+    String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql), ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(), ALL_TYPES_RESULTSET));
+
+    String result = execute("named_cursor");
+    assertEquals(
+        "col_bigint: 1\n"
+            + "col_bool: True\n"
+            + "col_bytea: b'test'\n"
+            + "col_float8: 3.14\n"
+            + "col_int: 100\n"
+            + "col_numeric: 6.626\n"
+            + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_date: 2022-03-29\n"
+            + "col_string: test\n"
+            + "col_jsonb: {'key': 'value'}\n",
+        result);
   }
 
   private static String getInsertAllTypesSql() {
