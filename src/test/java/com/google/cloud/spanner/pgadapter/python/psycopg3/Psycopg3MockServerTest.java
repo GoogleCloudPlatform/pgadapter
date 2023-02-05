@@ -87,8 +87,12 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   String execute(String method) throws IOException, InterruptedException {
-    String[] runCommand =
-        new String[] {"python3", "psycopg3_tests.py", method, createConnectionString()};
+    return execute(method, createConnectionString());
+  }
+
+  static String execute(String method, String connectionString)
+      throws IOException, InterruptedException {
+    String[] runCommand = new String[] {"python3", "psycopg3_tests.py", method, connectionString};
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(runCommand);
     builder.directory(new File("./src/test/python/psycopg3"));
@@ -1249,6 +1253,32 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
             Statement.newBuilder(sql).bind("p1").to(1L).build(), ALL_TYPES_RESULTSET));
 
     String result = execute("named_cursor");
+    assertEquals(
+        "col_bigint: 1\n"
+            + "col_bool: True\n"
+            + "col_bytea: b'test'\n"
+            + "col_float8: 3.14\n"
+            + "col_int: 100\n"
+            + "col_numeric: 6.626\n"
+            + "col_timestamptz: 2022-02-16 13:18:02.123456+00:00\n"
+            + "col_date: 2022-03-29\n"
+            + "col_string: test\n"
+            + "col_jsonb: {'key': 'value'}\n",
+        result);
+  }
+
+  @Test
+  @Ignore("Nested transactions are not yet supported")
+  public void testNestedTransaction() throws IOException, InterruptedException {
+    String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql), ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(), ALL_TYPES_RESULTSET));
+
+    String result = execute("nested_transaction");
     assertEquals(
         "col_bigint: 1\n"
             + "col_bool: True\n"

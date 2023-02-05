@@ -67,6 +67,16 @@ Creating a server-side cursor in `psycopg3` with PGAdapter will cause an error l
 psycopg.errors.RaiseException: Unknown statement: DECLARE "my_cursor" CURSOR FOR SELECT * FROM my_table WHERE my_column=$1
 ```
 
+### Nested Transactions
+`psycopg3` implements [nested transactions](https://www.psycopg.org/psycopg3/docs/basic/transactions.html#nested-transactions)
+using `SAVEPOINT`. This feature is currently not supported with PGAdapter.
+
+Creating a nested transaction in `psycopg3` with PGAdapter will cause an error like the following:
+
+```
+psycopg.errors.RaiseException: Unknown statement: SAVEPOINT "_pg3_2"
+```
+
 ## Performance Considerations
 
 The following will give you the best possible performance when using `psycopg3` with PGAdapter.
