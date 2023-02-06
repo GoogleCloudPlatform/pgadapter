@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
@@ -53,14 +52,6 @@ public class StartupMessage extends BootstrapMessage {
       WellKnownClient wellKnownClient =
           ClientAutoDetector.detectClient(this.parseParameterKeys(rawParameters), this.parameters);
       connection.setWellKnownClient(wellKnownClient);
-      if (wellKnownClient != WellKnownClient.UNSPECIFIED) {
-        logger.log(
-            Level.INFO,
-            () ->
-                String.format(
-                    "Well-known client %s detected for connection %d.",
-                    wellKnownClient, connection.getConnectionId()));
-      }
     } else {
       connection.setWellKnownClient(WellKnownClient.UNSPECIFIED);
     }
@@ -96,7 +87,8 @@ public class StartupMessage extends BootstrapMessage {
         connection.getConnectionMetadata().getOutputStream(),
         connection.getConnectionId(),
         connection.getSecret(),
-        connection.getExtendedQueryProtocolHandler().getBackendConnection().getSessionState());
+        connection.getExtendedQueryProtocolHandler().getBackendConnection().getSessionState(),
+        connection.getWellKnownClient().createStartupNoticeResponses(connection));
     connection.setStatus(ConnectionStatus.AUTHENTICATED);
   }
 

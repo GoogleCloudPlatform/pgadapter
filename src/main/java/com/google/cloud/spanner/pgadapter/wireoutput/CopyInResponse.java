@@ -35,23 +35,25 @@ public class CopyInResponse extends WireOutput {
 
   protected static final char IDENTIFIER = 'G';
 
-  private final int numColumns;
-  private final int formatCode;
-  private final byte[] columnFormat;
+  private final short numColumns;
+  private final byte formatCode;
+  private final short[] columnFormat;
 
-  public CopyInResponse(DataOutputStream output, int numColumns, int formatCode) {
+  public CopyInResponse(DataOutputStream output, short numColumns, byte formatCode) {
     super(output, calculateLength(numColumns));
     this.numColumns = numColumns;
     this.formatCode = formatCode;
-    columnFormat = new byte[COLUMN_NUM_LENGTH * this.numColumns];
-    Arrays.fill(columnFormat, (byte) formatCode);
+    this.columnFormat = new short[this.numColumns];
+    Arrays.fill(this.columnFormat, formatCode);
   }
 
   @Override
   protected void sendPayload() throws IOException {
     this.outputStream.writeByte(this.formatCode);
     this.outputStream.writeShort(this.numColumns);
-    this.outputStream.write(this.columnFormat);
+    for (int i = 0; i < this.numColumns; i++) {
+      this.outputStream.writeShort(this.columnFormat[i]);
+    }
   }
 
   @Override

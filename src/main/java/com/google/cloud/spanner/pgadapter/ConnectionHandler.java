@@ -29,6 +29,7 @@ import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
@@ -45,16 +46,20 @@ import com.google.cloud.spanner.pgadapter.statements.ExtendedQueryProtocolHandle
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePortalStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.TerminateResponse;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BootstrapMessage;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.ImmutableList;
 import com.google.spanner.admin.database.v1.InstanceName;
 import com.google.spanner.v1.DatabaseName;
 import java.io.DataOutputStream;
@@ -66,6 +71,7 @@ import java.text.MessageFormat;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -117,7 +123,8 @@ public class ConnectionHandler extends Thread {
   private int invalidMessagesCount;
   private Connection spannerConnection;
   private DatabaseId databaseId;
-  private WellKnownClient wellKnownClient;
+  private WellKnownClient wellKnownClient = WellKnownClient.UNSPECIFIED;
+  private boolean hasDeterminedClientUsingQuery;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   private CopyStatement activeCopyStatement;
 
@@ -472,12 +479,12 @@ public class ConnectionHandler extends Thread {
     DataOutputStream output = getConnectionMetadata().getOutputStream();
     if (this.status == ConnectionStatus.TERMINATED
         || this.status == ConnectionStatus.UNAUTHENTICATED) {
-      new ErrorResponse(output, exception).send();
+      new ErrorResponse(this, exception).send();
       new TerminateResponse(output).send();
     } else if (this.status == ConnectionStatus.COPY_IN) {
-      new ErrorResponse(output, exception).send();
+      new ErrorResponse(this, exception).send();
     } else {
-      new ErrorResponse(output, exception).send();
+      new ErrorResponse(this, exception).send();
       new ReadyResponse(output, ReadyResponse.Status.IDLE).send();
     }
   }
@@ -700,6 +707,73 @@ public class ConnectionHandler extends Thread {
 
   public void setWellKnownClient(WellKnownClient wellKnownClient) {
     this.wellKnownClient = wellKnownClient;
+    if (this.wellKnownClient != WellKnownClient.UNSPECIFIED) {
+      logger.log(
+          Level.INFO,
+          () ->
+              String.format(
+                  "Well-known client %s detected for connection %d.",
+                  this.wellKnownClient, getConnectionId()));
+    }
+  }
+
+  /**
+   * This is called by the simple {@link
+   * com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage} to give the connection the
+   * opportunity to determine the client that is connected based on the SQL string that is being
+   * executed.
+   */
+  public void maybeDetermineWellKnownClient(Statement statement) {
+    if (!this.hasDeterminedClientUsingQuery) {
+      if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
+          && getServer().getOptions().shouldAutoDetectClient()) {
+        setWellKnownClient(ClientAutoDetector.detectClient(ImmutableList.of(statement)));
+      }
+      maybeSetApplicationName();
+    }
+    // Make sure that we only try to detect the client once.
+    this.hasDeterminedClientUsingQuery = true;
+  }
+
+  /**
+   * This is called by the extended query protocol {@link
+   * com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage} to give the connection the
+   * opportunity to determine the client that is connected based on the data in the (first) parse
+   * messages.
+   */
+  public void maybeDetermineWellKnownClient(ParseMessage parseMessage) {
+    if (!this.hasDeterminedClientUsingQuery) {
+      if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
+          && getServer().getOptions().shouldAutoDetectClient()) {
+        setWellKnownClient(ClientAutoDetector.detectClient(parseMessage));
+      }
+      maybeSetApplicationName();
+    }
+    // Make sure that we only try to detect the client once.
+    this.hasDeterminedClientUsingQuery = true;
+  }
+
+  private void maybeSetApplicationName() {
+    try {
+      if (this.wellKnownClient != WellKnownClient.UNSPECIFIED
+          && getExtendedQueryProtocolHandler() != null
+          && Strings.isNullOrEmpty(
+              getExtendedQueryProtocolHandler()
+                  .getBackendConnection()
+                  .getSessionState()
+                  .get(null, "application_name")
+                  .getSetting())) {
+        getExtendedQueryProtocolHandler()
+            .getBackendConnection()
+            .getSessionState()
+            .set(null, "application_name", wellKnownClient.name().toLowerCase(Locale.ENGLISH));
+        getExtendedQueryProtocolHandler().getBackendConnection().getSessionState().commit();
+      }
+    } catch (Throwable ignore) {
+      // Safeguard against a theoretical situation that 'application_name' has been removed from
+      // the list of settings. Just ignore this situation, as the only consequence is that the
+      // 'application_name' setting has not been set.
+    }
   }
 
   /** Status of a {@link ConnectionHandler} */

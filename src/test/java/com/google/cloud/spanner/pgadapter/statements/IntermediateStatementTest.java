@@ -19,7 +19,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -102,14 +101,13 @@ public class IntermediateStatementTest {
         new IntermediateStatement(
             mock(OptionsMetadata.class), parse(sql), Statement.of(sql), connectionHandler);
     ResultSet resultSet = mock(ResultSet.class);
-    when(resultSet.next()).thenReturn(true, false);
     StatementResult result = mock(StatementResult.class);
-    when(result.getResultType()).thenReturn(ResultType.RESULT_SET);
     when(result.getResultSet()).thenReturn(resultSet);
 
     statement.setStatementResult(result);
 
-    assertTrue(statement.hasMoreData);
+    // Only IntermediatePortalStatements can return data.
+    assertFalse(statement.hasMoreData);
     assertEquals(-1, statement.getUpdateCount());
     assertSame(resultSet, statement.getStatementResult().getResultSet());
   }

@@ -21,6 +21,8 @@ import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
 import org.postgresql.util.ByteConverter;
@@ -43,7 +45,8 @@ public class LongParser extends Parser<Long> {
         case TEXT:
           String stringValue = new String(item);
           try {
-            this.item = Long.valueOf(stringValue);
+            this.item =
+                new BigDecimal(stringValue).setScale(0, RoundingMode.HALF_UP).longValueExact();
           } catch (Exception exception) {
             throw PGExceptionFactory.newPGException("Invalid int8 value: " + stringValue);
           }

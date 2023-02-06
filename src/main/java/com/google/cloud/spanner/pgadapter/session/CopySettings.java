@@ -78,6 +78,11 @@ public class CopySettings {
     this.sessionState = sessionState;
   }
 
+  /** Returns the {@link SessionState} associated with this {@link CopySettings}. */
+  public SessionState getSessionState() {
+    return this.sessionState;
+  }
+
   /** Returns the maximum number of parallel transactions for a single COPY operation. */
   public int getMaxParallelism() {
     return sessionState.getIntegerSetting("spanner", "copy_max_parallelism", 128);

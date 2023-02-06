@@ -159,6 +159,16 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testShowApplicationName() {
+    String res = pgxTest.TestShowApplicationName(createConnString());
+
+    assertNull(res);
+
+    // This should all be handled in PGAdapter.
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
   public void testQueryWithParameter() {
     String sql = "SELECT * FROM FOO WHERE BAR=$1";
     Statement statement = Statement.newBuilder(sql).bind("p1").to("baz").build();
