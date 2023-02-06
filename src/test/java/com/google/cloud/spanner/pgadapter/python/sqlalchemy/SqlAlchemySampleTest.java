@@ -39,7 +39,6 @@ import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeAnnotationCode;
 import com.google.spanner.v1.TypeCode;
-import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
@@ -54,12 +53,12 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   private static final String SAMPLE_DIR = "./samples/python/sqlalchemy-sample";
 
   @BeforeClass
-  public static void setupBaseResults() {
-    SqlAlchemyBasicsTest.setupBaseResults();
+  public static void setupBaseResults() throws Exception {
+    SqlAlchemyBasicsTest.setupBaseResults(SAMPLE_DIR);
   }
 
   @Test
-  public void testDeleteAlbum() throws IOException, InterruptedException {
+  public void testDeleteAlbum() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -91,8 +90,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testAlbumsWithTitleFirstCharEqualToSingerName()
-      throws IOException, InterruptedException {
+  public void testAlbumsWithTitleFirstCharEqualToSingerName() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -115,7 +113,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testSingersWithLimitAndOffset() throws IOException, InterruptedException {
+  public void testSingersWithLimitAndOffset() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -157,7 +155,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testPrintAlbumsReleasedBefore1980() throws IOException, InterruptedException {
+  public void testPrintAlbumsReleasedBefore1980() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -191,7 +189,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testPrintConcerts() throws IOException, InterruptedException {
+  public void testPrintConcerts() throws Exception {
     List<Field> concertsFields = createConcertsMetadata("concerts_").getRowType().getFieldsList();
     List<Field> venuesFields = createVenuesMetadata("venues_1_").getRowType().getFieldsList();
     List<Field> singersFields = createSingersMetadata("singers_1_").getRowType().getFieldsList();
@@ -259,7 +257,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCreateVenueAndConcertInTransaction() throws IOException, InterruptedException {
+  public void testCreateVenueAndConcertInTransaction() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -298,7 +296,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCreateRandomSingersAndAlbums() throws IOException, InterruptedException {
+  public void testCreateRandomSingersAndAlbums() throws Exception {
     mockSpanner.putPartialStatementResult(
         StatementResult.query(
             Statement.of(
@@ -353,7 +351,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testPrintSingersAndAlbums() throws IOException, InterruptedException {
+  public void testPrintSingersAndAlbums() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -463,7 +461,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testGetSinger() throws IOException, InterruptedException {
+  public void testGetSinger() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -510,7 +508,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testAddSinger() throws IOException, InterruptedException {
+  public void testAddSinger() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -540,7 +538,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testUpdateSinger() throws IOException, InterruptedException {
+  public void testUpdateSinger() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -587,7 +585,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testGetAlbum() throws IOException, InterruptedException {
+  public void testGetAlbum() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -643,7 +641,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testGetAlbumWithStaleEngine() throws IOException, InterruptedException {
+  public void testGetAlbumWithStaleEngine() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -708,7 +706,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testGetTrack() throws IOException, InterruptedException {
+  public void testGetTrack() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -926,7 +924,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testMetadataReflect() throws IOException, InterruptedException {
+  public void testMetadataReflect() throws Exception {
     String sql =
         "with pg_class as (\n"
             + "  select\n"

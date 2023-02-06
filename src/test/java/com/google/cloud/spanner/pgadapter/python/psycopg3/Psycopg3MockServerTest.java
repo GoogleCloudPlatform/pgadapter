@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.python.psycopg3;
 
+import static com.google.cloud.spanner.pgadapter.python.PythonTestUtil.run;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -31,6 +32,7 @@ import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.CopyInMockServerTest;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
+import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
@@ -59,7 +61,6 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
-import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -74,6 +75,7 @@ import org.postgresql.util.ByteConverter;
 @RunWith(Parameterized.class)
 @Category(PythonTest.class)
 public class Psycopg3MockServerTest extends AbstractMockServerTest {
+  static final String DIRECTORY_NAME = "./src/test/python/psycopg3";
 
   @Parameter public String host;
 
@@ -84,35 +86,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void createVirtualEnv() throws Exception {
-    File directory = new File("./src/test/python/psycopg3");
-    run(new String[] {"python3", "-m", "venv", "venv"});
-    run(
-        new String[] {
-          directory.getAbsolutePath() + "/venv/bin/pip3", "install", "-r", "requirements.txt"
-        });
-  }
-
-  private static String run(String[] command) throws Exception {
-    File directory = new File("./src/test/python/psycopg3");
-    ProcessBuilder builder = new ProcessBuilder();
-    builder.command(command);
-    builder.directory(directory);
-    Process process = builder.start();
-    Scanner scanner = new Scanner(process.getInputStream());
-    Scanner errorScanner = new Scanner(process.getErrorStream());
-
-    StringBuilder output = new StringBuilder();
-    while (scanner.hasNextLine()) {
-      output.append(scanner.nextLine()).append("\n");
-    }
-    StringBuilder error = new StringBuilder();
-    while (errorScanner.hasNextLine()) {
-      error.append(errorScanner.nextLine()).append("\n");
-    }
-    int result = process.waitFor();
-    assertEquals(error.toString(), 0, result);
-
-    return output.toString();
+    PythonTestUtil.createVirtualEnv(DIRECTORY_NAME, "psycopg[binary]");
   }
 
   String createConnectionString() {
@@ -124,7 +98,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   }
 
   static String execute(String method, String connectionString) throws Exception {
-    File directory = new File("./src/test/python/psycopg3");
+    File directory = new File(DIRECTORY_NAME);
     // Make sure to run the python executable in the specific virtual environment.
     return run(
         new String[] {
@@ -132,7 +106,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
           "psycopg3_tests.py",
           method,
           connectionString
-        });
+        },
+        DIRECTORY_NAME);
   }
 
   @Test
