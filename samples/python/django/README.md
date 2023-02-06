@@ -110,4 +110,9 @@ def func():
 ```
 
 ### Interleaved Tables
-A possible workaround 
+A possible workaround for Django's inability to use interleaved table with Django and PGAdapter includes 
+having a column which has unique index in the actual table while pretending to Django like it's a primary key. 
+
+One important thing to note here is that we can't use usual `save` function for creating new records for such a model 
+because that might generate an `UPDATE` statement which will try to update the unique index. 
+So, we will have to use `force_insert = True`, while creating new records. For more details, see the sample application.
