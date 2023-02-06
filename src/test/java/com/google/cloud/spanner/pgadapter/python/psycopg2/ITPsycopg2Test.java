@@ -25,7 +25,6 @@ import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
 import com.google.common.collect.ImmutableList;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,7 +41,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
 @Category(IntegrationTest.class)
-public class ITPsycopg2Test extends PythonTestSetup {
+public class ITPsycopg2Test extends AbstractPsycopg2Test {
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
@@ -125,7 +124,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testInsert() throws IOException, InterruptedException {
+  public void testInsert() throws Exception {
     String sql =
         "Insert into all_types("
             + "col_bigint, "
@@ -155,7 +154,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testSelect() throws IOException, InterruptedException {
+  public void testSelect() throws Exception {
     String sql =
         "Select "
             + "col_bigint, "
@@ -175,7 +174,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testUpdate() throws IOException, InterruptedException {
+  public void testUpdate() throws Exception {
     String sql =
         "UPDATE all_types SET "
             + "col_bool = 'off',"
@@ -212,7 +211,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testDelete() throws IOException, InterruptedException {
+  public void testDelete() throws Exception {
     String sql = "DELETE FROM all_types where col_bigint = 1";
 
     String actualOutput =
@@ -229,7 +228,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testInsertParameterized() throws IOException, InterruptedException {
+  public void testInsertParameterized() throws Exception {
     String sql =
         "Insert into all_types("
             + "col_bigint, "
@@ -289,7 +288,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testSelectParameterized() throws IOException, InterruptedException {
+  public void testSelectParameterized() throws Exception {
     String sql =
         "Select "
             + "col_bigint, "
@@ -314,7 +313,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testUpdateParameterized() throws IOException, InterruptedException {
+  public void testUpdateParameterized() throws Exception {
     String sql =
         "UPDATE all_types SET "
             + "col_bool = %(bool)s,"
@@ -383,7 +382,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testDeleteParameterized() throws IOException, InterruptedException {
+  public void testDeleteParameterized() throws Exception {
     String sql = "DELETE FROM all_types where col_varchar = %s";
 
     ArrayList<String> parameters = new ArrayList<>();
@@ -408,7 +407,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testInsertUsingExecuteMany() throws IOException, InterruptedException {
+  public void testInsertUsingExecuteMany() throws Exception {
     String insertSql =
         "Insert into all_types("
             + "col_bigint, "
@@ -523,7 +522,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testInsertUsingExecuteBatch() throws IOException, InterruptedException {
+  public void testInsertUsingExecuteBatch() throws Exception {
     String insertSql =
         "Insert into all_types("
             + "col_bigint, "
@@ -638,7 +637,7 @@ public class ITPsycopg2Test extends PythonTestSetup {
   }
 
   @Test
-  public void testInsertUsingExecuteValues() throws IOException, InterruptedException {
+  public void testInsertUsingExecuteValues() throws Exception {
     String insertSql =
         "Insert into all_types("
             + "col_bigint, "

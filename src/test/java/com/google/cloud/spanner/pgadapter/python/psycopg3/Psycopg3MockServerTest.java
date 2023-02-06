@@ -86,7 +86,7 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void createVirtualEnv() throws Exception {
-    PythonTestUtil.createVirtualEnv(DIRECTORY_NAME, "psycopg[binary]");
+    PythonTestUtil.createVirtualEnv(DIRECTORY_NAME);
   }
 
   String createConnectionString() {

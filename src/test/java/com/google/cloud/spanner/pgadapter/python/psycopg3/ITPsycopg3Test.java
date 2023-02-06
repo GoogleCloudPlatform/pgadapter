@@ -68,7 +68,7 @@ public class ITPsycopg3Test {
 
   @BeforeClass
   public static void setup() throws Exception {
-    PythonTestUtil.createVirtualEnv(DIRECTORY_NAME, "psycopg2-binary");
+    PythonTestUtil.createVirtualEnv(DIRECTORY_NAME);
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());

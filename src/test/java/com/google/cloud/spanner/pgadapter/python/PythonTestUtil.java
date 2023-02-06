@@ -21,8 +21,7 @@ import java.util.Scanner;
 
 public class PythonTestUtil {
 
-  public static void createVirtualEnv(String directoryName, String psycopgVersion)
-      throws Exception {
+  public static void createVirtualEnv(String directoryName) throws Exception {
     File directory = new File(directoryName);
     run(new String[] {"python3", "-m", "venv", "venv"}, directoryName);
     run(
@@ -40,11 +39,6 @@ public class PythonTestUtil {
           directory.getAbsolutePath() + "/venv/bin/pip", "install", "-r", "requirements.txt"
         },
         directoryName);
-    // Make sure that psycopg is available in the venv.
-    //    PythonTestUtil.run(new String[]{
-    //        directory.getAbsolutePath() + "/venv/bin/pip",
-    //        "install", psycopgVersion
-    //    }, directoryName);
   }
 
   public static String run(String[] command, String directoryName) throws Exception {

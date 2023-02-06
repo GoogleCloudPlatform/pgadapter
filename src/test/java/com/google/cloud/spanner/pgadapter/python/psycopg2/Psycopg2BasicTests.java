@@ -34,7 +34,6 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -47,7 +46,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
 @Category(PythonTest.class)
-public class PythonBasicTests extends PythonTestSetup {
+public class Psycopg2BasicTests extends AbstractPsycopg2Test {
 
   private ResultSet createResultSet() {
     ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();
@@ -91,7 +90,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicSelect() throws IOException, InterruptedException {
+  public void testBasicSelect() throws Exception {
     String sql = "SELECT * FROM some_table";
 
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), createResultSet()));
@@ -106,7 +105,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicUpdate() throws IOException, InterruptedException {
+  public void testBasicUpdate() throws Exception {
     String sql = "UPDATE SET column_name='value' where column_name2 = 'value2'";
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10));
@@ -122,7 +121,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicInsert() throws IOException, InterruptedException {
+  public void testBasicInsert() throws Exception {
     String sql = "INSERT INTO SOME_TABLE(COLUMN_NAME) VALUES ('VALUE')";
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1));
@@ -137,7 +136,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicDelete() throws IOException, InterruptedException {
+  public void testBasicDelete() throws Exception {
     String sql = "DELETE FROM SOME_TABLE WHERE COLUMN_NAME = VALUE";
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 12));
@@ -152,7 +151,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicSelectWithParameters() throws IOException, InterruptedException {
+  public void testBasicSelectWithParameters() throws Exception {
     String sql = "SELECT * FROM some_table where COLUMN_NAME1 = %s and COLUMN_NAME2 = %s";
 
     ArrayList<String> parameters = new ArrayList<>();
@@ -174,7 +173,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicUpdateWithParameters() throws IOException, InterruptedException {
+  public void testBasicUpdateWithParameters() throws Exception {
     String sql = "UPDATE SET column_name=%s where column_name2 = %s";
     ArrayList<String> parameters = new ArrayList<>();
 
@@ -195,7 +194,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicInsertWithParameters() throws IOException, InterruptedException {
+  public void testBasicInsertWithParameters() throws Exception {
     String sql = "INSERT INTO SOME_TABLE(COLUMN_NAME) VALUES (%s)";
 
     ArrayList<String> parameters = new ArrayList<>();
@@ -214,7 +213,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testPreparedInsertWithParameters() throws IOException, InterruptedException {
+  public void testPreparedInsertWithParameters() throws Exception {
     ArrayList<String> parameters = new ArrayList<>();
     parameters.add("VALUE");
 
@@ -252,7 +251,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicDeleteWithParameters() throws IOException, InterruptedException {
+  public void testBasicDeleteWithParameters() throws Exception {
     String sql = "DELETE FROM SOME_TABLE WHERE COLUMN_NAME = %s";
 
     ArrayList<String> parameters = new ArrayList<>();
@@ -271,7 +270,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicSelectWithNamedParameters() throws IOException, InterruptedException {
+  public void testBasicSelectWithNamedParameters() throws Exception {
     String sql =
         "SELECT * FROM some_table where COLUMN_NAME1 = %(NAME1)s and COLUMN_NAME2 = %(NAME2)s";
 
@@ -296,7 +295,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicUpdateWithNamedParameters() throws IOException, InterruptedException {
+  public void testBasicUpdateWithNamedParameters() throws Exception {
     String sql = "UPDATE SET column_name=%(NAME1)s where column_name2 = %(NAME2)s";
     ArrayList<String> parameters = new ArrayList<>();
 
@@ -320,7 +319,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicInsertWithNamedParameters() throws IOException, InterruptedException {
+  public void testBasicInsertWithNamedParameters() throws Exception {
     String sql = "INSERT INTO SOME_TABLE(COLUMN_NAME) VALUES (%(NAME)s)";
 
     ArrayList<String> parameters = new ArrayList<>();
@@ -341,7 +340,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicDeleteWithNamedParameters() throws IOException, InterruptedException {
+  public void testBasicDeleteWithNamedParameters() throws Exception {
     String sql = "DELETE FROM SOME_TABLE WHERE COLUMN_NAME = %(NAME)s";
 
     ArrayList<String> parameters = new ArrayList<>();
@@ -362,8 +361,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicSelectWithNamedParametersIntDataType()
-      throws IOException, InterruptedException {
+  public void testBasicSelectWithNamedParametersIntDataType() throws Exception {
     String sql =
         "SELECT * FROM some_table where COLUMN_NAME1 = %(NAME1)s and COLUMN_NAME2 = %(NAME2)s";
 
@@ -389,8 +387,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicSelectWithNamedParametersBoolDataType()
-      throws IOException, InterruptedException {
+  public void testBasicSelectWithNamedParametersBoolDataType() throws Exception {
     String sql =
         "SELECT * FROM some_table where COLUMN_NAME1 = %(NAME1)s and COLUMN_NAME2 = %(NAME2)s";
 
@@ -416,8 +413,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicSelectWithNamedParametersFloatDataType()
-      throws IOException, InterruptedException {
+  public void testBasicSelectWithNamedParametersFloatDataType() throws Exception {
     String sql =
         "SELECT * FROM some_table where COLUMN_NAME1 = %(NAME1)s and COLUMN_NAME2 = %(NAME2)s";
 
@@ -443,8 +439,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicSelectWithNamedParametersByteaDataType()
-      throws IOException, InterruptedException {
+  public void testBasicSelectWithNamedParametersByteaDataType() throws Exception {
     String sql =
         "SELECT * FROM some_table where COLUMN_NAME1 = %(NAME1)s and COLUMN_NAME2 = %(NAME2)s or COLUMN_NAME3 = %(NAME3)s";
 
@@ -478,8 +473,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicSelectWithNamedParametersDateDataType()
-      throws IOException, InterruptedException {
+  public void testBasicSelectWithNamedParametersDateDataType() throws Exception {
     String sql =
         "SELECT * FROM some_table where COLUMN_NAME1 = %(NAME1)s and COLUMN_NAME2 = %(NAME2)s";
 
@@ -506,8 +500,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testBasicSelectWithNamedParametersTupleListDataType()
-      throws IOException, InterruptedException {
+  public void testBasicSelectWithNamedParametersTupleListDataType() throws Exception {
     String sql =
         "SELECT * FROM some_table where COLUMN_NAME1 in %(NAME1)s and COLUMN_NAME2 = ANY(%(NAME2)s)";
 
@@ -534,7 +527,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testDmlBatch() throws IOException, InterruptedException {
+  public void testDmlBatch() throws Exception {
     String sql1 = "UPDATE SET column_name='value' where column_name2 = 'value2'";
     String sql2 = "UPDATE SET column_name='other-value' where column_name2 = 'other-value2'";
     String sql = String.format("%s;%s;", sql1, sql2);
@@ -557,7 +550,7 @@ public class PythonBasicTests extends PythonTestSetup {
   }
 
   @Test
-  public void testDdlBatch() throws IOException, InterruptedException {
+  public void testDdlBatch() throws Exception {
     addDdlResponseToSpannerAdmin();
 
     String sql1 = "CREATE TABLE foo";

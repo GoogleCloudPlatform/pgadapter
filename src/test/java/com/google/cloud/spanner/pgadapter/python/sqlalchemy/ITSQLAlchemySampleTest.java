@@ -39,7 +39,7 @@ public class ITSQLAlchemySampleTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() throws Exception {
-    PythonTestUtil.createVirtualEnv(SAMPLE_DIR, "psycopg2-binary");
+    PythonTestUtil.createVirtualEnv(SAMPLE_DIR);
     testEnv.setUp();
     Database database = testEnv.createDatabase(ImmutableList.of());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());

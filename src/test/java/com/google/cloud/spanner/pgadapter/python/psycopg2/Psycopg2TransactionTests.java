@@ -39,7 +39,6 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -53,7 +52,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 @Category(PythonTest.class)
 @RunWith(Parameterized.class)
-public class PythonTransactionTests extends PythonTestSetup {
+public class Psycopg2TransactionTests extends AbstractPsycopg2Test {
 
   private static ResultSet createResultSet(int id, String name) {
     ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();
@@ -97,7 +96,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testSimpleStatementsUsingTransactions() throws IOException, InterruptedException {
+  public void testSimpleStatementsUsingTransactions() throws Exception {
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
     String sql2 = "insert into some_table(col1, col2) values(value1, value2)";
@@ -197,7 +196,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testAutocommitInTransactions() throws IOException, InterruptedException {
+  public void testAutocommitInTransactions() throws Exception {
     // tests autocommit settings using connection.autocommit variable
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
@@ -289,7 +288,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testAutocommitSessionInTransactions() throws IOException, InterruptedException {
+  public void testAutocommitSessionInTransactions() throws Exception {
     // tests autocommit settings using set_session() function
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
@@ -381,7 +380,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testDeferrableInTransactions() throws IOException, InterruptedException {
+  public void testDeferrableInTransactions() throws Exception {
     List<String> statements = new ArrayList<>();
     String sql = "Select * from some_table";
 
@@ -412,7 +411,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testDeferrableSessionInTransactions() throws IOException, InterruptedException {
+  public void testDeferrableSessionInTransactions() throws Exception {
     List<String> statements = new ArrayList<>();
     String sql = "Select * from some_table";
 
@@ -443,7 +442,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testReadOnlyInTransactions() throws IOException, InterruptedException {
+  public void testReadOnlyInTransactions() throws Exception {
     // tests readonly settings using connection.readonly variable
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
@@ -550,7 +549,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testReadOnlySessionInTransactions() throws IOException, InterruptedException {
+  public void testReadOnlySessionInTransactions() throws Exception {
     // tests readonly settings using set_session() function
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
@@ -740,8 +739,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testUnsupportedIsolationLevelsSessionInTransactions()
-      throws IOException, InterruptedException {
+  public void testUnsupportedIsolationLevelsSessionInTransactions() throws Exception {
     // tests isolation_level settings for unsupported isolation levels using set_session function
     List<String> unsupportedIsolationLevels = Arrays.asList("1", "2", "4");
 
@@ -841,7 +839,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testSupportedIsolationLevelInTransactions() throws IOException, InterruptedException {
+  public void testSupportedIsolationLevelInTransactions() throws Exception {
     // tests supported isolation_level settings using connection.isolation_level variable
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
@@ -918,8 +916,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testSupportedIsolationLevelSessionInTransactions()
-      throws IOException, InterruptedException {
+  public void testSupportedIsolationLevelSessionInTransactions() throws Exception {
     // tests supported isolation_level settings using set_session function
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
@@ -1371,8 +1368,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testIsolationLevelAutocommitInTransactions()
-      throws IOException, InterruptedException {
+  public void testIsolationLevelAutocommitInTransactions() throws Exception {
     // tests isolation level autocommit settings using set_isolation_level() function
     List<String> statements = new ArrayList<>();
     String sql1 = "Select * from some_table";
@@ -1490,8 +1486,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testSetAllPropertiesUsingSetSessionWithoutDeferrableError()
-      throws IOException, InterruptedException {
+  public void testSetAllPropertiesUsingSetSessionWithoutDeferrableError() throws Exception {
     List<String> statements = new ArrayList<>();
 
     String sql = "insert into some_table values(value1, value2)";
@@ -1514,8 +1509,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testSetAllPropertiesUsingSetSessionWithDeferrableTrue()
-      throws IOException, InterruptedException {
+  public void testSetAllPropertiesUsingSetSessionWithDeferrableTrue() throws Exception {
     List<String> statements = new ArrayList<>();
 
     String sql = "insert into some_table values(value1, value2)";
@@ -1541,8 +1535,7 @@ public class PythonTransactionTests extends PythonTestSetup {
   }
 
   @Test
-  public void testSetAllPropertiesUsingSetSessionWithDeferrableFalse()
-      throws IOException, InterruptedException {
+  public void testSetAllPropertiesUsingSetSessionWithDeferrableFalse() throws Exception {
     List<String> statements = new ArrayList<>();
 
     String sql = "insert into some_table values(value1, value2)";

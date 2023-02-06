@@ -86,7 +86,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   public static void setupBaseResults(String directory) throws Exception {
-    PythonTestUtil.createVirtualEnv(directory, "psycopg2-binary");
+    PythonTestUtil.createVirtualEnv(directory);
     String selectHstoreType =
         "with pg_namespace as (\n"
             + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
