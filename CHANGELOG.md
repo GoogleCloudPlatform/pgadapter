@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.15.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.14.1...v0.15.0) (2023-01-18)
+
+
+### Features
+
+* allow decimal values to be used for int params ([#564](https://github.com/GoogleCloudPlatform/pgadapter/issues/564)) ([3aecf34](https://github.com/GoogleCloudPlatform/pgadapter/commit/3aecf34aa1500fc593c3a33d4eab132f24fbb2d8))
+* auto-detect npgsql ([#559](https://github.com/GoogleCloudPlatform/pgadapter/issues/559)) ([e1e8526](https://github.com/GoogleCloudPlatform/pgadapter/commit/e1e85267b8b77a853916b911b37548bd3f5f97c7))
+* support more timestamp values for query parameters ([#565](https://github.com/GoogleCloudPlatform/pgadapter/issues/565)) ([5905213](https://github.com/GoogleCloudPlatform/pgadapter/commit/5905213b9b662b1f1bb8afc1ef0ca4a5cdaf7097))
+* support TRUNCATE ([#533](https://github.com/GoogleCloudPlatform/pgadapter/issues/533)) ([293aaaa](https://github.com/GoogleCloudPlatform/pgadapter/commit/293aaaa9f0db0dada42e246708678501aba39ea6))
+* support VACUUM as a no-op ([#532](https://github.com/GoogleCloudPlatform/pgadapter/issues/532)) ([20dc062](https://github.com/GoogleCloudPlatform/pgadapter/commit/20dc062c1d10b69377c5d7da26c2bf12dc7fd00d))
+
+
+### Bug Fixes
+
+* potential session leak when using prepared statements in autocommit mode ([#591](https://github.com/GoogleCloudPlatform/pgadapter/issues/591)) ([185dcd5](https://github.com/GoogleCloudPlatform/pgadapter/commit/185dcd5635d0a8c042cc8975ccb58b331dd29eb7))
+* support ([#586](https://github.com/GoogleCloudPlatform/pgadapter/issues/586)) ([c91fe66](https://github.com/GoogleCloudPlatform/pgadapter/commit/c91fe6651d7040680211db4b2fecea6c26a69e31)), closes [#581](https://github.com/GoogleCloudPlatform/pgadapter/issues/581)
+
+
+### Performance Improvements
+
+* keep converted bytes ([#584](https://github.com/GoogleCloudPlatform/pgadapter/issues/584)) ([1486bc4](https://github.com/GoogleCloudPlatform/pgadapter/commit/1486bc4a57ac70155f67823ca82063956122d772))
+
+## [0.14.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.14.0...v0.14.1) (2023-01-06)
+
+
+### Bug Fixes
+
+* enable gracefully stopping Docker container ([#554](https://github.com/GoogleCloudPlatform/pgadapter/issues/554)) ([80e9c8b](https://github.com/GoogleCloudPlatform/pgadapter/commit/80e9c8b988a168b30d44335b5de3c09e57c18d76))
+
+
+### Performance Improvements
+
+* reduce conversion time for timestamptz, date and bytea ([#572](https://github.com/GoogleCloudPlatform/pgadapter/issues/572)) ([bb73990](https://github.com/GoogleCloudPlatform/pgadapter/commit/bb739901bd875a7c706377dc065c1936db56e5d7))
+
 ## [0.14.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.13.1...v0.14.0) (2022-12-16)
 
 

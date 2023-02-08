@@ -24,6 +24,8 @@ import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -97,18 +99,24 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
 
   @Override
   public Future<StatementResult> describeAsync(BackendConnection backendConnection) {
-    Future<StatementResult> statementResultFuture =
+    ListenableFuture<StatementResult> statementResultFuture =
         backendConnection.analyze(this.parsedStatement, this.statement);
     setFutureStatementResult(statementResultFuture);
     this.describeResult =
-        Futures.lazyTransform(
+        Futures.transform(
             statementResultFuture,
-            result ->
-                new DescribeResult(
-                    this.givenParameterDataTypes,
-                    result.getResultType() == ResultType.RESULT_SET
-                        ? result.getResultSet()
-                        : null));
+            result -> {
+              DescribeResult describeResult;
+              if (result.getResultType() == ResultType.RESULT_SET) {
+                describeResult =
+                    new DescribeResult(this.givenParameterDataTypes, result.getResultSet());
+                result.getResultSet().close();
+              } else {
+                describeResult = new DescribeResult(this.givenParameterDataTypes, null);
+              }
+              return describeResult;
+            },
+            MoreExecutors.directExecutor());
     this.described = true;
     return statementResultFuture;
   }
@@ -116,7 +124,9 @@ public class IntermediatePreparedStatement extends IntermediateStatement {
   @Override
   public DescribeResult describe() {
     if (this.describeResult == null) {
-      return null;
+      // Just return a DescribeResult that contains whatever information we were given in the
+      // PARSE message.
+      return new DescribeResult(this.givenParameterDataTypes, null);
     }
     try {
       return this.describeResult.get();

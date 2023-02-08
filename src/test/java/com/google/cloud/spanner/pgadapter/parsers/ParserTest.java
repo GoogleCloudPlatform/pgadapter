@@ -17,10 +17,8 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import static com.google.cloud.spanner.pgadapter.parsers.Parser.toOid;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -214,20 +212,6 @@ public class ParserTest {
   }
 
   @Test
-  public void testDateParsingDateValidityChecks() {
-    assertTrue(DateParser.isDate("1998-09-01 00:00"));
-    assertTrue(DateParser.isDate("1998-09-01 +00:00"));
-    assertTrue(DateParser.isDate("1998-09-01 -00:00"));
-    assertFalse(DateParser.isDate("This is not a date right?"));
-    assertFalse(DateParser.isDate("1998-09-01 *00:00"));
-    assertFalse(DateParser.isDate("1998-a-01 00:00"));
-    assertFalse(DateParser.isDate("1998-01-a 00:00"));
-    assertFalse(DateParser.isDate("1998-01-01 a:00"));
-    assertFalse(DateParser.isDate("1998-01-01 00:a"));
-    assertFalse(DateParser.isDate("1998-01 00:00"));
-  }
-
-  @Test
   public void testStringParsing() {
     String value = "This is a String.";
 
@@ -252,34 +236,6 @@ public class ParserTest {
 
     assertArrayEquals(byteResult, parsedValue.parse(DataFormat.POSTGRESQL_BINARY));
     validateCreateBinary(byteResult, Oid.TIMESTAMP, value);
-  }
-
-  @Test
-  public void testTimestampParsingTimestampValidityChecks() {
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.0"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000Z"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000z"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000+00"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000+00:00"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000-00:00"));
-    assertFalse(TimestampParser.isTimestamp("This is not a timestamp right?"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000z00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000z00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000+"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000-"));
-    assertFalse(TimestampParser.isTimestamp("99999-09-01 00:00:00.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("aaaa-09-01 00:00:00.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-aa-01 00:00:00.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-aa 00:00:00.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 aa:00:00.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:aa:00.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:aa.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.a+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000+aa:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000+00:aa"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000*00:00"));
   }
 
   @Test

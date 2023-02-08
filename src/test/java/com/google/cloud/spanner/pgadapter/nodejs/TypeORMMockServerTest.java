@@ -728,9 +728,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("some random string")
                 .bind("p10")
-                // TODO: Change to jsonb when https://github.com/googleapis/java-spanner/pull/2182
-                //       has been merged.
-                .to(com.google.cloud.spanner.Value.json("{\"key\":\"value\"}"))
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
                 .build(),
             1L));
 

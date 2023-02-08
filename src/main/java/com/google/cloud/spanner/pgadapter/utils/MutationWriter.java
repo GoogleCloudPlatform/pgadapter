@@ -66,6 +66,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nonnull;
@@ -109,6 +110,8 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   private final CSVFormat csvFormat;
   private final boolean hasHeader;
   private final CountDownLatch pipeCreatedLatch = new CountDownLatch(1);
+  private final CountDownLatch dataReceivedLatch = new CountDownLatch(1);
+  private final AtomicLong bytesReceived = new AtomicLong();
   private final PipedOutputStream payload = new PipedOutputStream();
   private final AtomicBoolean commit = new AtomicBoolean(false);
   private final AtomicBoolean rollback = new AtomicBoolean(false);
@@ -164,6 +167,8 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     }
     try {
       pipeCreatedLatch.await();
+      bytesReceived.addAndGet(payload.length);
+      dataReceivedLatch.countDown();
       this.payload.write(payload);
     } catch (InterruptedException | InterruptedIOException interruptedIOException) {
       // The IO operation was interrupted. This indicates that the user wants to cancel the COPY
@@ -204,13 +209,16 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
   public void close() throws IOException {
     this.payload.close();
     this.closedLatch.countDown();
+    this.dataReceivedLatch.countDown();
   }
 
   @Override
   public StatementResult call() throws Exception {
     PipedInputStream inputStream = new PipedInputStream(payload, copySettings.getPipeBufferSize());
     pipeCreatedLatch.countDown();
-    final CopyInParser parser = CopyInParser.create(copyFormat, csvFormat, inputStream, hasHeader);
+    final CopyInParser parser =
+        CopyInParser.create(
+            copySettings.getSessionState(), copyFormat, csvFormat, inputStream, hasHeader);
     // This LinkedBlockingDeque holds a reference to all transactions that are currently active. The
     // max capacity of this deque is what ensures that we never have more than maxParallelism
     // transactions running at the same time. We could also achieve that by using a thread pool with
@@ -226,14 +234,21 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
     // before finishing, to ensure that all data has been written before we signal that we are done.
     List<ApiFuture<Void>> allCommitFutures = new ArrayList<>();
     try {
+      // Wait until we know whether we actually will receive any data. It could be that it is an
+      // empty copy operation, and we should then end early.
+      dataReceivedLatch.await();
+
       Iterator<CopyRecord> iterator = parser.iterator();
       List<Mutation> mutations = new ArrayList<>();
       long currentBufferByteSize = 0L;
       // Note: iterator.hasNext() blocks if there is not enough data in the pipeline to construct a
       // complete record. It returns false if the stream has been closed and all records have been
       // returned.
-      while (!rollback.get() && iterator.hasNext()) {
+      while (bytesReceived.get() > 0L && !rollback.get() && iterator.hasNext()) {
         CopyRecord record = iterator.next();
+        if (record.isEndRecord()) {
+          break;
+        }
         if (record.numColumns() != this.tableColumns.keySet().size()) {
           throw PGExceptionFactory.newPGException(
               "Invalid COPY data: Row length mismatched. Expected "

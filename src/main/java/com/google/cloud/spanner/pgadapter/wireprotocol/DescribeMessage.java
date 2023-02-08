@@ -147,7 +147,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
             new RowDescriptionResponse(
                     this.outputStream,
                     this.statement,
-                    getPortalMetadata().getResultSet(),
+                    getPortalMetadata().getResultSet().getType(),
                     this.connection.getServer().getOptions(),
                     this.queryMode)
                 .send(false);
@@ -191,11 +191,11 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
       if (isExtendedProtocol()) {
         DescribeResult metadata = this.statement.describe();
         new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send(false);
-        if (metadata.getResultSet() != null && metadata.getResultSet().getColumnCount() > 0) {
+        if (metadata.getColumns() != null && metadata.getColumns().getStructFields().size() > 0) {
           new RowDescriptionResponse(
                   this.outputStream,
                   this.statement,
-                  metadata.getResultSet(),
+                  metadata.getColumns(),
                   this.connection.getServer().getOptions(),
                   this.queryMode)
               .send(false);
