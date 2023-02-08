@@ -27,6 +27,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OneToMany;
 import org.hibernate.annotations.GenerationTime;
 import org.hibernate.annotations.GeneratorType;
+import org.hibernate.annotations.Type;
 
 @Entity
 public class Venues {
@@ -39,8 +40,9 @@ public class Venues {
   @Column(name = "name", nullable = false)
   private String name;
 
-  @Column(name = "description", nullable = false)
-  private String description;
+  @Column(name = "description", nullable = false, columnDefinition = "jsonb")
+  @Type(type = "com.vladmihalcea.hibernate.type.json.JsonBinaryType")
+  private VenueDescription description;
 
   @Column(name = "created_at", columnDefinition = "timestamptz")
   private LocalDateTime createdAt;
@@ -69,11 +71,11 @@ public class Venues {
     this.name = name;
   }
 
-  public String getDescription() {
+  public VenueDescription getDescription() {
     return description;
   }
 
-  public void setDescription(String description) {
+  public void setDescription(VenueDescription description) {
     this.description = description;
   }
 

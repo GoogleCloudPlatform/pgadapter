@@ -14,16 +14,23 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl;
+import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.wireprotocol.SSLMessage;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.ByteStreams;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.util.List;
@@ -140,5 +147,92 @@ public class PsqlMockServerTest extends AbstractMockServerTest {
 
     assertEquals(
         1L, pgServer.getDebugMessages().stream().filter(m -> m instanceof SSLMessage).count());
+  }
+
+  @Test
+  public void testCopyToBinaryPsql() throws Exception {
+    assumeTrue("This test requires psql to be installed", isPsqlAvailable());
+
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand =
+        new String[] {
+          "psql",
+          "-h",
+          "localhost",
+          "-p",
+          String.valueOf(pgServer.getLocalPort()),
+          "-c",
+          "COPY (SELECT 1) TO STDOUT (FORMAT BINARY)"
+        };
+    builder.command(psqlCommand);
+    Process process = builder.start();
+    String errors;
+
+    try (BufferedReader errorReader =
+        new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+    }
+    byte[] copyOutput = ByteStreams.toByteArray(process.getInputStream());
+
+    assertEquals("", errors);
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    ByteArrayOutputStream byteArrayOutputStream =
+        new ByteArrayOutputStream(CopyToStatement.COPY_BINARY_HEADER.length);
+    DataOutputStream expectedOutputStream = new DataOutputStream(byteArrayOutputStream);
+    expectedOutputStream.write(CopyToStatement.COPY_BINARY_HEADER);
+    expectedOutputStream.writeInt(0); // flags
+    expectedOutputStream.writeInt(0); // header extension area length
+    expectedOutputStream.writeShort(1); // Column count
+    expectedOutputStream.writeInt(8); // Value length
+    expectedOutputStream.writeLong(1L); // Column value
+    expectedOutputStream.writeShort(-1); // Column count == -1 means end of data.
+
+    assertArrayEquals(byteArrayOutputStream.toByteArray(), copyOutput);
+  }
+
+  @Test
+  public void testCopyToBinaryPsqlEmptyTable() throws Exception {
+    assumeTrue("This test requires psql to be installed", isPsqlAvailable());
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from all_types"),
+            ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+
+    ProcessBuilder builder = new ProcessBuilder();
+    String[] psqlCommand =
+        new String[] {
+          "psql",
+          "-h",
+          "localhost",
+          "-p",
+          String.valueOf(pgServer.getLocalPort()),
+          "-c",
+          "COPY all_types TO STDOUT (FORMAT BINARY)"
+        };
+    builder.command(psqlCommand);
+    Process process = builder.start();
+    String errors;
+
+    try (BufferedReader errorReader =
+        new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      errors = errorReader.lines().collect(Collectors.joining("\n"));
+    }
+    byte[] copyOutput = ByteStreams.toByteArray(process.getInputStream());
+
+    assertEquals("", errors);
+    int res = process.waitFor();
+    assertEquals(0, res);
+
+    ByteArrayOutputStream byteArrayOutputStream =
+        new ByteArrayOutputStream(CopyToStatement.COPY_BINARY_HEADER.length);
+    DataOutputStream expectedOutputStream = new DataOutputStream(byteArrayOutputStream);
+    expectedOutputStream.write(CopyToStatement.COPY_BINARY_HEADER);
+    expectedOutputStream.writeInt(0); // flags
+    expectedOutputStream.writeInt(0); // header extension area length
+    expectedOutputStream.writeShort(-1); // Column count == -1 means end of data.
+
+    assertArrayEquals(byteArrayOutputStream.toByteArray(), copyOutput);
   }
 }

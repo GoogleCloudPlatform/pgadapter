@@ -38,10 +38,12 @@ import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
@@ -77,9 +79,11 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -89,6 +93,7 @@ import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
 import org.postgresql.jdbc.PgStatement;
+import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
 
 @RunWith(Parameterized.class)
@@ -131,7 +136,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   private String getExpectedInitialApplicationName() {
-    return pgVersion.equals("1.0") ? null : "PostgreSQL JDBC Driver";
+    return pgVersion.equals("1.0") ? "jdbc" : "PostgreSQL JDBC Driver";
   }
 
   @Test
@@ -158,6 +163,23 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals(sql, request.getSql());
       assertTrue(request.getTransaction().hasSingleUse());
       assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+    }
+  }
+
+  @Test
+  public void testShowApplicationName() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show application_name")) {
+        assertTrue(resultSet.next());
+        // If the PG version is 1.0, the JDBC driver thinks that the server does not support the
+        // application_name property and does not send any value. That means that PGAdapter fills it
+        // in automatically based on the client that is detected.
+        // Otherwise, the JDBC driver includes its own name, and that is not overwritten by
+        // PGAdapter.
+        assertEquals(getExpectedInitialApplicationName(), resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
     }
   }
 
@@ -634,6 +656,41 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCharParam() throws SQLException {
+    String sql = "insert into foo values ($1)";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
+    String jdbcSql = "insert into foo values (?)";
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(jdbcSql)) {
+        PGobject pgObject = new PGobject();
+        pgObject.setType("char");
+        pgObject.setValue("a");
+        preparedStatement.setObject(1, pgObject);
+        assertEquals(1, preparedStatement.executeUpdate());
+      }
+    }
+
+    List<ParseMessage> parseMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(message -> message instanceof ParseMessage)
+            .map(message -> (ParseMessage) message)
+            .collect(Collectors.toList());
+    assertFalse(parseMessages.isEmpty());
+    ParseMessage parseMessage = parseMessages.get(parseMessages.size() - 1);
+    assertEquals(1, parseMessage.getStatement().getGivenParameterDataTypes().length);
+    assertEquals(Oid.CHAR, parseMessage.getStatement().getGivenParameterDataTypes()[0]);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(1, executeSqlRequests.size());
+    ExecuteSqlRequest request = executeSqlRequests.get(0);
+    // Oid.CHAR is not a recognized type in PGAdapter.
+    assertEquals(0, request.getParamTypesCount());
+    assertEquals(1, request.getParams().getFieldsCount());
+    assertEquals("a", request.getParams().getFieldsMap().get("p1").getStringValue());
+  }
+
+  @Test
   public void testAutoDescribedStatementsAreReused() throws SQLException {
     String jdbcSql = "select col_date from all_types where col_date=?";
     String pgSql = "select col_date from all_types where col_date=$1";
@@ -729,6 +786,30 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(
             "ERROR: ResultSetMetadata are available only for results that were returned from Cloud Spanner",
             exception.getMessage());
+      }
+    }
+  }
+
+  @Test(timeout = 60_000)
+  public void testMultiplePreparedStatements() throws SQLException {
+    // Execute more statements than there are sessions in the pool to verify that repeatedly
+    // creating a prepared statement with the same name does not cause a session leak.
+    final int numStatements = 1000;
+    String sql = "SELECT 1";
+
+    for (boolean autocommit : new boolean[] {true, false}) {
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        // Verify that there's no session leak both in autocommit and transactional mode.
+        connection.setAutoCommit(autocommit);
+        // Force the use of prepared statements.
+        connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+        for (int i = 0; i < numStatements; i++) {
+          try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+            assertFalse(resultSet.next());
+          }
+        }
       }
     }
   }
@@ -1766,9 +1847,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("test")
                 .bind("p10")
-                // TODO: Change to jsonb when https://github.com/googleapis/java-spanner/pull/2182
-                //       has been merged.
-                .to(com.google.cloud.spanner.Value.json("{\"key\": \"value\"}"))
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             com.google.spanner.v1.ResultSet.newBuilder()
                 .setMetadata(ALL_TYPES_METADATA)
@@ -2853,6 +2932,21 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSetTimeZoneEST() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Java considers 'EST' to always be '-05:00'. That is; it is never DST.
+      connection.createStatement().execute("set time zone 'EST'");
+      verifySettingValue(connection, "timezone", "-05:00");
+      // 'EST5EDT' is the ID for the timezone that will change with DST.
+      connection.createStatement().execute("set time zone 'EST5EDT'");
+      verifySettingValue(connection, "timezone", "EST5EDT");
+      // 'America/New_York' is the full name of the geographical timezone.
+      connection.createStatement().execute("set time zone 'America/New_York'");
+      verifySettingValue(connection, "timezone", "America/New_York");
+    }
+  }
+
+  @Test
   public void testSetTimeZoneToServerDefault() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set time zone 'atlantic/faeroe'");
@@ -2907,6 +3001,16 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       verifySettingValue(connection, "time zone", "UTC");
       connection.rollback();
       verifySettingValue(connection, "time zone", originalTimeZone);
+    }
+  }
+
+  @Test
+  public void testSetNames() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set names 'utf8'");
+      verifySettingValue(connection, "client_encoding", "utf8");
+      connection.createStatement().execute("set names 'foo'");
+      verifySettingValue(connection, "client_encoding", "foo");
     }
   }
 
@@ -3281,6 +3385,233 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testVacuumStatement_noTables() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum");
+    }
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testVacuumStatement_oneTable() throws SQLException {
+    String sql = "select * from my_table limit 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum my_table");
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql, request.getSql());
+    assertEquals(QueryMode.PLAN, request.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatement_multipleTables() throws SQLException {
+    String sql1 = "select * from my_table1 limit 1";
+    String sql2 = "select * from my_table2 limit 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql1), SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), SELECT2_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum my_table1, my_table2");
+    }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request1 = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql1, request1.getSql());
+    assertEquals(QueryMode.PLAN, request1.getQueryMode());
+    ExecuteSqlRequest request2 = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql2, request2.getSql());
+    assertEquals(QueryMode.PLAN, request1.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatement_oneTableWithColumns() throws SQLException {
+    String sql = "select col1,col2 from my_table limit 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum my_table (col1, col2)");
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql, request.getSql());
+    assertEquals(QueryMode.PLAN, request.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatement_multipleTablesWithColumns() throws SQLException {
+    String sql1 = "select col1 from my_table1 limit 1";
+    String sql2 = "select col1,col2 from my_table2 limit 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql1), SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), SELECT2_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum my_table1 (col1), my_table2(col1,col2)");
+    }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request1 = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql1, request1.getSql());
+    assertEquals(QueryMode.PLAN, request1.getQueryMode());
+    ExecuteSqlRequest request2 = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql2, request2.getSql());
+    assertEquals(QueryMode.PLAN, request1.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatement_unknownTable() throws SQLException {
+    String sql = "select * from unknown_table limit 1";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql),
+            Status.NOT_FOUND
+                .withDescription("Table not found: unknown_table")
+                .asRuntimeException()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().execute("vacuum unknown_table"));
+      assertEquals(
+          "ERROR: Table not found: unknown_table - Statement: 'select * from unknown_table limit 1'",
+          exception.getMessage());
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql, request.getSql());
+    assertEquals(QueryMode.PLAN, request.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatementInTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      PSQLException exception =
+          assertThrows(PSQLException.class, () -> connection.createStatement().execute("vacuum"));
+      assertEquals("ERROR: VACUUM cannot run inside a transaction block", exception.getMessage());
+      assertEquals(SQLState.ActiveSqlTransaction.toString(), exception.getSQLState());
+    }
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testTruncateTransactional() throws SQLException {
+    String sql = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      // TRUNCATE does not return the update count.
+      assertEquals(0, connection.createStatement().executeUpdate("truncate foo"));
+      connection.rollback();
+    }
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertEquals(1, request.getStatementsCount());
+    assertEquals(sql, request.getStatements(0).getSql());
+  }
+
+  @Test
+  public void testTruncateTransactional_multipleTables() throws SQLException {
+    String sql1 = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 10L));
+    String sql2 = "delete from bar";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql2), 10L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      // TRUNCATE does not return the update count.
+      assertEquals(0, connection.createStatement().executeUpdate("truncate foo, bar"));
+      connection.commit();
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(sql1, request.getStatements(0).getSql());
+    assertEquals(sql2, request.getStatements(1).getSql());
+  }
+
+  @Test
+  public void testTruncateAutocommitAtomic() throws SQLException {
+    String sql = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(true);
+      // TRUNCATE does not return the update count.
+      assertEquals(0, connection.createStatement().executeUpdate("truncate foo"));
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertEquals(1, request.getStatementsCount());
+    assertEquals(sql, request.getStatements(0).getSql());
+  }
+
+  @Test
+  public void testTruncateAutocommitAtomic_multipleTables() throws SQLException {
+    String sql1 = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 10L));
+    String sql2 = "delete from bar";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql2),
+            Status.FAILED_PRECONDITION
+                .withDescription("foreign key constraint violation")
+                .asRuntimeException()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(true);
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().executeUpdate("truncate foo, bar"));
+      assertTrue(exception.getMessage().contains("foreign key constraint violation"));
+    }
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(sql1, request.getStatements(0).getSql());
+    assertEquals(sql2, request.getStatements(1).getSql());
+  }
+
+  @Test
+  public void testTruncateAutocommitNonAtomic() throws SQLException {
+    String sql = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(true);
+      connection
+          .createStatement()
+          .execute("set spanner.autocommit_dml_mode='partitioned_non_atomic'");
+      assertEquals(0, connection.createStatement().executeUpdate("truncate foo"));
+    }
+
+    // PDML transactions are not committed.
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
   public void testForceAutocommit() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (java.sql.Statement statement = connection.createStatement()) {
@@ -3364,8 +3695,88 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(BeginTransactionRequest.class).stream()
             .filter(request -> request.getOptions().hasPartitionedDml())
             .count());
-    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .count());
+  }
+
+  @Test
+  public void testTruncateInDdlBatch() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("start batch ddl");
+      // TRUNCATE is not supported in DDL batches.
+      SQLException exception =
+          assertThrows(
+              SQLException.class, () -> connection.createStatement().executeUpdate("truncate foo"));
+      assertEquals("ERROR: Cannot execute TRUNCATE in a DDL batch", exception.getMessage());
+    }
+
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+  }
+
+  @Test
+  public void testTruncateInDmlBatch() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("start batch dml");
+      // TRUNCATE is not supported in DDL batches.
+      SQLException exception =
+          assertThrows(
+              SQLException.class, () -> connection.createStatement().executeUpdate("truncate foo"));
+      assertEquals("ERROR: Cannot execute TRUNCATE in a DML batch", exception.getMessage());
+    }
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+  }
+
+  @Test
+  public void testDescribeTruncate() throws SQLException {
+    String sql = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (PreparedStatement preparedStatement = connection.prepareStatement("truncate foo")) {
+        assertEquals(0, preparedStatement.executeUpdate());
+      }
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertEquals(1, request.getStatementsCount());
+    assertEquals(sql, request.getStatements(0).getSql());
+  }
+
+  @Ignore("Only used for manual performance testing")
+  @Test
+  public void testBasePerformance() throws SQLException {
+    final int numRuns = 1000;
+    String sql = "select * from random_benchmark";
+    RandomResultSetGenerator generator = new RandomResultSetGenerator(10, Dialect.POSTGRESQL);
+    for (int run = 0; run < numRuns; run++) {
+      mockSpanner.putStatementResult(
+          StatementResult.query(Statement.of(sql + run), generator.generate()));
+    }
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      Stopwatch watch = Stopwatch.createStarted();
+      for (int run = 0; run < numRuns; run++) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql + run)) {
+          while (resultSet.next()) {
+            // ignore
+          }
+        }
+      }
+      System.out.printf("Elapsed: %dms\n", watch.elapsed(TimeUnit.MILLISECONDS));
+    }
   }
 
   private void verifySettingIsNull(Connection connection, String setting) throws SQLException {

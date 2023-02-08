@@ -24,6 +24,7 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.common.collect.Iterators;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -32,6 +33,7 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeParseException;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.codec.binary.Hex;
@@ -43,12 +45,18 @@ import org.apache.commons.csv.CSVRecord;
 class CsvCopyParser implements CopyInParser {
   private static final Logger logger = Logger.getLogger(CsvCopyParser.class.getName());
 
+  private final SessionState sessionState;
   private final CSVFormat format;
   private final boolean hasHeader;
   private final CSVParser parser;
 
-  CsvCopyParser(CSVFormat csvFormat, PipedInputStream inputStream, boolean hasHeader)
+  CsvCopyParser(
+      SessionState sessionState,
+      CSVFormat csvFormat,
+      PipedInputStream inputStream,
+      boolean hasHeader)
       throws IOException {
+    this.sessionState = sessionState;
     this.format = csvFormat;
     this.hasHeader = hasHeader;
     this.parser = createParser(inputStream);
@@ -57,7 +65,7 @@ class CsvCopyParser implements CopyInParser {
   @Override
   public Iterator<CopyRecord> iterator() {
     return Iterators.transform(
-        parser.iterator(), record -> new CsvCopyRecord(record, this.hasHeader));
+        parser.iterator(), record -> new CsvCopyRecord(this.sessionState, record, this.hasHeader));
   }
 
   @Override
@@ -75,10 +83,12 @@ class CsvCopyParser implements CopyInParser {
   }
 
   static class CsvCopyRecord implements CopyRecord {
+    private final SessionState sessionState;
     private final CSVRecord record;
     private final boolean hasHeader;
 
-    CsvCopyRecord(CSVRecord record, boolean hasHeader) {
+    CsvCopyRecord(SessionState sessionState, CSVRecord record, boolean hasHeader) {
+      this.sessionState = sessionState;
       this.record = record;
       this.hasHeader = hasHeader;
     }
@@ -89,23 +99,38 @@ class CsvCopyParser implements CopyInParser {
     }
 
     @Override
+    public boolean isEndRecord() {
+      // End of data can be represented by a single line containing just backslash-period (\.). An
+      // end-of-data marker is not necessary when reading from a file, since the end of file serves
+      // perfectly well; it is needed only when copying data to or from client applications using
+      // pre-3.0 client protocol.
+      return record.size() == 1 && Objects.equals("\\.", record.get(0));
+    }
+
+    @Override
     public boolean hasColumnNames() {
       return this.hasHeader;
     }
 
     @Override
+    public boolean isNull(int columnIndex) {
+      return record.get(columnIndex) == null;
+    }
+
+    @Override
     public Value getValue(Type type, String columnName) throws SpannerException {
       String recordValue = record.get(columnName);
-      return getSpannerValue(type, recordValue);
+      return getSpannerValue(sessionState, type, recordValue);
     }
 
     @Override
     public Value getValue(Type type, int columnIndex) throws SpannerException {
       String recordValue = record.get(columnIndex);
-      return getSpannerValue(type, recordValue);
+      return getSpannerValue(sessionState, type, recordValue);
     }
 
-    static Value getSpannerValue(Type type, String recordValue) throws SpannerException {
+    static Value getSpannerValue(SessionState sessionState, Type type, String recordValue)
+        throws SpannerException {
       try {
         switch (type.getCode()) {
           case STRING:
@@ -134,7 +159,9 @@ class CsvCopyParser implements CopyInParser {
             return Value.date(recordValue == null ? null : Date.parseDate(recordValue));
           case TIMESTAMP:
             Timestamp timestamp =
-                recordValue == null ? null : TimestampParser.toTimestamp(recordValue);
+                recordValue == null
+                    ? null
+                    : TimestampParser.toTimestamp(recordValue, sessionState.getTimezone());
             return Value.timestamp(timestamp);
           default:
             SpannerException spannerException =

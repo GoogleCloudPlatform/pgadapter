@@ -39,4 +39,50 @@ public class ShortParserTest {
         PGException.class,
         () -> new ShortParser("foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT));
   }
+
+  @Test
+  public void testCreate() {
+    assertEquals(
+        0,
+        new ShortParser("0".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.shortValue());
+    assertEquals(
+        1,
+        new ShortParser("1".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.shortValue());
+    assertEquals(
+        100,
+        new ShortParser("100".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.shortValue());
+    assertEquals(
+        Short.MAX_VALUE,
+        new ShortParser(
+                String.valueOf(Short.MAX_VALUE).getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.shortValue());
+    assertEquals(
+        Short.MIN_VALUE,
+        new ShortParser(
+                String.valueOf(Short.MIN_VALUE).getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.shortValue());
+    assertEquals(
+        0,
+        new ShortParser("0.1".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.shortValue());
+    assertEquals(
+        2,
+        new ShortParser("1.5".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT).item.shortValue());
+    assertEquals(
+        101,
+        new ShortParser("100.999".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT)
+            .item.shortValue());
+
+    assertThrows(
+        PGException.class,
+        () ->
+            new ShortParser(
+                String.valueOf(1 + (int) Short.MAX_VALUE).getBytes(StandardCharsets.UTF_8),
+                FormatCode.TEXT));
+    assertThrows(
+        PGException.class,
+        () ->
+            new ShortParser(
+                String.valueOf((int) Short.MIN_VALUE - 1L).getBytes(StandardCharsets.UTF_8),
+                FormatCode.TEXT));
+  }
 }

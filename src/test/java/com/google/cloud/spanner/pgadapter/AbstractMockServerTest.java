@@ -366,11 +366,20 @@ public abstract class AbstractMockServerTest {
       Status.INVALID_ARGUMENT.withDescription("Statement is invalid.").asRuntimeException();
 
   protected static ResultSet createAllTypesResultSet(String columnPrefix) {
+    return createAllTypesResultSet(columnPrefix, false);
+  }
+
+  protected static ResultSet createAllTypesResultSet(String columnPrefix, boolean microsTimestamp) {
+    return createAllTypesResultSet("1", columnPrefix, microsTimestamp);
+  }
+
+  protected static ResultSet createAllTypesResultSet(
+      String id, String columnPrefix, boolean microsTimestamp) {
     return com.google.spanner.v1.ResultSet.newBuilder()
         .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
         .addRows(
             ListValue.newBuilder()
-                .addValues(Value.newBuilder().setStringValue("1").build())
+                .addValues(Value.newBuilder().setStringValue(id).build())
                 .addValues(Value.newBuilder().setBoolValue(true).build())
                 .addValues(
                     Value.newBuilder()
@@ -382,7 +391,12 @@ public abstract class AbstractMockServerTest {
                 .addValues(Value.newBuilder().setStringValue("100").build())
                 .addValues(Value.newBuilder().setStringValue("6.626").build())
                 .addValues(
-                    Value.newBuilder().setStringValue("2022-02-16T13:18:02.123456789Z").build())
+                    Value.newBuilder()
+                        .setStringValue(
+                            microsTimestamp
+                                ? "2022-02-16T13:18:02.123456Z"
+                                : "2022-02-16T13:18:02.123456789Z")
+                        .build())
                 .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
                 .addValues(Value.newBuilder().setStringValue("test").build())
                 .addValues(Value.newBuilder().setStringValue("{\"key\": \"value\"}").build())
@@ -391,11 +405,18 @@ public abstract class AbstractMockServerTest {
   }
 
   protected static ResultSet createAllTypesNullResultSet(String columnPrefix) {
+    return createAllTypesNullResultSet(columnPrefix, null);
+  }
+
+  protected static ResultSet createAllTypesNullResultSet(String columnPrefix, Long colBigInt) {
     return com.google.spanner.v1.ResultSet.newBuilder()
         .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
         .addRows(
             ListValue.newBuilder()
-                .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                .addValues(
+                    colBigInt == null
+                        ? Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build()
+                        : Value.newBuilder().setStringValue(String.valueOf(colBigInt)).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
                 .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())

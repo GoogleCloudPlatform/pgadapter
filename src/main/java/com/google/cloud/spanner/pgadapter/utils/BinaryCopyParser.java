@@ -231,8 +231,21 @@ class BinaryCopyParser implements CopyInParser {
     }
 
     @Override
+    public boolean isEndRecord() {
+      return false;
+    }
+
+    @Override
     public boolean hasColumnNames() {
       return false;
+    }
+
+    @Override
+    public boolean isNull(int columnIndex) {
+      Preconditions.checkArgument(
+          columnIndex >= 0 && columnIndex < numColumns(),
+          "columnIndex must be >= 0 && < numColumns");
+      return fields[columnIndex].data == null;
     }
 
     @Override

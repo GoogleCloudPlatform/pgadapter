@@ -22,7 +22,6 @@ import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
-import org.postgresql.core.Utils;
 import org.postgresql.util.PGbytea;
 
 /**
@@ -67,7 +66,21 @@ public class BinaryParser extends Parser<ByteArray> {
 
   @Override
   public String stringParse() {
-    return this.item == null ? null : "\\x" + Utils.toHexString(this.item.toByteArray());
+    return this.item == null ? null : new String(bytesToHex(this.item.toByteArray()));
+  }
+
+  private static final byte[] HEX_ARRAY = "0123456789abcdef".getBytes(StandardCharsets.UTF_8);
+
+  static byte[] bytesToHex(byte[] bytes) {
+    byte[] hexChars = new byte[bytes.length * 2 + 2];
+    hexChars[0] = '\\';
+    hexChars[1] = 'x';
+    for (int j = 0; j < bytes.length; j++) {
+      int v = bytes[j] & 0xFF;
+      hexChars[j * 2 + 2] = HEX_ARRAY[v >>> 4];
+      hexChars[j * 2 + 3] = HEX_ARRAY[v & 0x0F];
+    }
+    return hexChars;
   }
 
   @Override
@@ -86,8 +99,7 @@ public class BinaryParser extends Parser<ByteArray> {
       case POSTGRESQL_BINARY:
         return resultSet.getBytes(position).toByteArray();
       case POSTGRESQL_TEXT:
-        return ("\\x" + Utils.toHexString(resultSet.getBytes(position).toByteArray()))
-            .getBytes(StandardCharsets.UTF_8);
+        return bytesToHex(resultSet.getBytes(position).toByteArray());
       default:
         throw new IllegalArgumentException("unknown data format: " + format);
     }

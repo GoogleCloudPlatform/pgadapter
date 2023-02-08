@@ -36,7 +36,7 @@ create table if not exists tracks (
 create table if not exists venues (
     id          varchar not null primary key,
     name        varchar not null,
-    description varchar not null,
+    description jsonb not null,
     created_at  timestamptz,
     updated_at  timestamptz
 );

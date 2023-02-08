@@ -26,23 +26,34 @@ import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.zone.ZoneRulesException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -60,6 +71,8 @@ import org.junit.runners.JUnit4;
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
 public class ITPsqlTest implements IntegrationTest {
+  private static final Logger logger = Logger.getLogger(ITPsqlTest.class.getName());
+
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
   private static boolean allAssumptionsPassed = false;
@@ -69,6 +82,8 @@ public class ITPsqlTest implements IntegrationTest {
   public static final String POSTGRES_USER = System.getenv("POSTGRES_USER");
   public static final String POSTGRES_DATABASE = System.getenv("POSTGRES_DATABASE");
   public static final String POSTGRES_PASSWORD = System.getenv("POSTGRES_PASSWORD");
+
+  private final Random random = new Random();
 
   @BeforeClass
   public static void setup() throws Exception {
@@ -385,9 +400,28 @@ public class ITPsqlTest implements IntegrationTest {
   }
 
   @Test
-  public void testCopyFromPostgreSQLToCloudSpanner() throws Exception {
+  public void testSetOperationWithOrderBy() throws IOException, InterruptedException {
+    // TODO: Remove
+    assumeTrue(
+        testEnv.getSpannerUrl().equals("https://staging-wrenchworks.sandbox.googleapis.com"));
+
+    Tuple<String, String> result =
+        runUsingPsql(
+            "select * from (select 1) one union all select * from (select 2) two order by 1");
+    String output = result.x(), errors = result.y();
+    assertEquals("", errors);
+    assertEquals(" ?column? \n----------\n        1\n        2\n(2 rows)\n", output);
+  }
+
+  /**
+   * This test copies data back and forth between PostgreSQL and Cloud Spanner and verifies that the
+   * contents are equal after the COPY operation in both directions.
+   */
+  @Test
+  public void testCopyBetweenPostgreSQLAndCloudSpanner() throws Exception {
     int numRows = 100;
 
+    logger.info("Copying initial data to PG");
     // Generate 99 random rows.
     copyRandomRowsToPostgreSQL(numRows - 1);
     // Also add one row with all nulls to ensure that nulls are also copied correctly.
@@ -395,11 +429,12 @@ public class ITPsqlTest implements IntegrationTest {
         DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
       try (PreparedStatement preparedStatement =
           connection.prepareStatement("insert into all_types (col_bigint) values (?)")) {
-        preparedStatement.setLong(1, new Random().nextLong());
+        preparedStatement.setLong(1, random.nextLong());
         assertEquals(1, preparedStatement.executeUpdate());
       }
     }
 
+    logger.info("Verifying initial data in PG");
     // Verify that we have 100 rows in PostgreSQL.
     try (Connection connection =
         DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
@@ -411,12 +446,14 @@ public class ITPsqlTest implements IntegrationTest {
       }
     }
 
-    // Execute the COPY tests in both binary and text mode.
-    for (boolean binary : new boolean[] {false, true}) {
+    // Execute the COPY tests in both binary, csv and text mode.
+    for (Format format : Format.values()) {
+      logger.info("Testing format: " + format);
       // Make sure the all_types table on Cloud Spanner is empty.
       String databaseId = database.getId().getDatabase();
       testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
+      logger.info("Copying rows to Spanner");
       // COPY the rows to Cloud Spanner.
       ProcessBuilder builder = new ProcessBuilder();
       builder.command(
@@ -431,8 +468,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \" "
               + "  | psql "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
@@ -440,14 +478,16 @@ public class ITPsqlTest implements IntegrationTest {
               + testEnv.getPGAdapterPort()
               + " -d "
               + database.getId().getDatabase()
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(builder);
       Process process = builder.start();
       int res = process.waitFor();
       assertEquals(0, res);
 
+      logger.info("Verifying data in Spanner");
       // Verify that we now also have 100 rows in Spanner.
       try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
         try (ResultSet resultSet =
@@ -458,9 +498,11 @@ public class ITPsqlTest implements IntegrationTest {
         }
       }
 
+      logger.info("Comparing table contents");
       // Verify that the rows in both databases are equal.
       compareTableContents();
 
+      logger.info("Deleting all data in PG");
       // Remove all rows in the table in the local PostgreSQL database and then copy everything from
       // Cloud Spanner to PostgreSQL.
       try (Connection connection =
@@ -469,14 +511,16 @@ public class ITPsqlTest implements IntegrationTest {
         assertEquals(numRows, connection.createStatement().executeUpdate("delete from all_types"));
       }
 
+      logger.info("Copying rows to PG");
       // COPY the rows from Cloud Spanner to PostgreSQL.
       ProcessBuilder copyToPostgresBuilder = new ProcessBuilder();
       copyToPostgresBuilder.command(
           "bash",
           "-c",
           "psql"
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \" "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
               + " -p "
@@ -492,8 +536,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(copyToPostgresBuilder);
       Process copyToPostgresProcess = copyToPostgresBuilder.start();
@@ -508,9 +553,259 @@ public class ITPsqlTest implements IntegrationTest {
       assertEquals("", errors.toString());
       assertEquals(0, copyToPostgresResult);
 
+      logger.info("Compare table contents");
       // Compare table contents again.
       compareTableContents();
     }
+  }
+
+  /** This test verifies that we can copy an empty table between PostgreSQL and Cloud Spanner. */
+  @Test
+  public void testCopyEmptyTableBetweenCloudSpannerAndPostgreSQL() throws Exception {
+    logger.info("Deleting all data in PG");
+    // Remove all rows in the table in the local PostgreSQL database.
+    try (Connection connection =
+        DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+      connection.createStatement().executeUpdate("delete from all_types");
+    }
+
+    // Execute the COPY tests in both binary, csv and text mode.
+    for (Format format : Format.values()) {
+      logger.info("Testing format: " + format);
+      // Make sure the all_types table on Cloud Spanner is empty.
+      String databaseId = database.getId().getDatabase();
+      testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
+
+      logger.info("Copy empty table to CS");
+      // COPY the empty table to Cloud Spanner.
+      ProcessBuilder builder = new ProcessBuilder();
+      builder.command(
+          "bash",
+          "-c",
+          "psql"
+              + " -h "
+              + POSTGRES_HOST
+              + " -p "
+              + POSTGRES_PORT
+              + " -U "
+              + POSTGRES_USER
+              + " -d "
+              + POSTGRES_DATABASE
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \" "
+              + "  | psql "
+              + " -h "
+              + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+              + " -p "
+              + testEnv.getPGAdapterPort()
+              + " -d "
+              + database.getId().getDatabase()
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
+              + ";\"\n");
+      setPgPassword(builder);
+      Process process = builder.start();
+      int res = process.waitFor();
+      assertEquals(0, res);
+
+      logger.info("Verify that CS is empty");
+      // Verify that still have 0 rows in Cloud Spanner.
+      try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select count(*) from all_types")) {
+          assertTrue(resultSet.next());
+          assertEquals(0, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
+
+      logger.info("Copy empty table to PG");
+      // COPY the empty table from Cloud Spanner to PostgreSQL.
+      ProcessBuilder copyToPostgresBuilder = new ProcessBuilder();
+      copyToPostgresBuilder.command(
+          "bash",
+          "-c",
+          "psql"
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \""
+              + " -h "
+              + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+              + " -p "
+              + testEnv.getPGAdapterPort()
+              + " -d "
+              + database.getId().getDatabase()
+              + "  | psql "
+              + " -h "
+              + POSTGRES_HOST
+              + " -p "
+              + POSTGRES_PORT
+              + " -U "
+              + POSTGRES_USER
+              + " -d "
+              + POSTGRES_DATABASE
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
+              + ";\"\n");
+      setPgPassword(copyToPostgresBuilder);
+      Process copyToPostgresProcess = copyToPostgresBuilder.start();
+      InputStream errorStream = copyToPostgresProcess.getErrorStream();
+      int copyToPostgresResult = copyToPostgresProcess.waitFor();
+      StringBuilder errors = new StringBuilder();
+      try (Scanner scanner = new Scanner(new InputStreamReader(errorStream))) {
+        while (scanner.hasNextLine()) {
+          errors.append(errors).append(scanner.nextLine()).append("\n");
+        }
+      }
+      assertEquals("", errors.toString());
+      assertEquals(0, copyToPostgresResult);
+    }
+  }
+
+  @Test
+  public void testTimestamptzParsing() throws Exception {
+    final int numTests = 10;
+    for (int i = 0; i < numTests; i++) {
+      String timezone;
+      try (Connection pgConnection =
+          DriverManager.getConnection(
+              createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+        int numTimezones;
+        try (ResultSet resultSet =
+            pgConnection
+                .createStatement()
+                .executeQuery(
+                    "select count(*) from pg_timezone_names where not name like '%posix%' and not name like 'Factory'")) {
+          assertTrue(resultSet.next());
+          numTimezones = resultSet.getInt(1);
+        }
+
+        while (true) {
+          try (ResultSet resultSet =
+              pgConnection
+                  .createStatement()
+                  .executeQuery(
+                      String.format(
+                          "select name from pg_timezone_names where not name like '%%posix%%' and not name like 'Factory' offset %d limit 1",
+                          random.nextInt(numTimezones)))) {
+            assertTrue(resultSet.next());
+            try {
+              timezone = resultSet.getString(1);
+              if (!PROBLEMATIC_ZONE_IDS.contains(ZoneId.of(timezone))) {
+                break;
+              }
+            } catch (ZoneRulesException ignore) {
+              // Skip and try a different one if it is not a supported timezone on this system.
+            }
+          }
+        }
+      }
+      for (String timestamp :
+          new String[] {
+            generateRandomLocalDate().toString(),
+            generateRandomLocalDateTime().toString().replace('T', ' '),
+            generateRandomOffsetDateTime().toString().replace('T', ' ')
+          }) {
+        ProcessBuilder realPgBuilder = new ProcessBuilder();
+        realPgBuilder.command(
+            "bash",
+            "-c",
+            "psql"
+                + " -h "
+                + POSTGRES_HOST
+                + " -p "
+                + POSTGRES_PORT
+                + " -U "
+                + POSTGRES_USER
+                + " -d "
+                + POSTGRES_DATABASE);
+        setPgPassword(realPgBuilder);
+
+        ProcessBuilder pgAdapterBuilder = new ProcessBuilder();
+        pgAdapterBuilder.command(
+            "bash",
+            "-c",
+            "psql"
+                + " -h "
+                + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+                + " -p "
+                + testEnv.getPGAdapterPort()
+                + " -d "
+                + database.getId().getDatabase());
+
+        String realPgOutput = "";
+        String pgAdapterOutput = "";
+        for (ProcessBuilder builder : new ProcessBuilder[] {realPgBuilder, pgAdapterBuilder}) {
+          Process process = builder.start();
+          try (Writer writer = new OutputStreamWriter(process.getOutputStream())) {
+            writer.write(String.format("set time zone '%s';\n", timezone));
+            writer.write("prepare test (timestamptz) as select $1;\n");
+            writer.write(String.format("execute test ('%s');\n", timestamp));
+            writer.write("\\q\n");
+          }
+
+          StringBuilder error = new StringBuilder();
+          try (Scanner scanner = new Scanner(process.getErrorStream())) {
+            while (scanner.hasNextLine()) {
+              error.append(scanner.nextLine()).append('\n');
+            }
+          }
+          StringBuilder output = new StringBuilder();
+          try (Scanner scanner = new Scanner(process.getInputStream())) {
+            while (scanner.hasNextLine()) {
+              output.append(scanner.nextLine()).append('\n');
+            }
+          }
+          int res = process.waitFor();
+          assertEquals(error.toString(), 0, res);
+          if (builder == realPgBuilder) {
+            realPgOutput = output.toString();
+          } else {
+            pgAdapterOutput = output.toString();
+          }
+        }
+        assertEquals(
+            String.format("Timestamp: %s, Timezone: %s", timestamp, timezone),
+            realPgOutput,
+            pgAdapterOutput);
+      }
+    }
+  }
+
+  private static final ImmutableSet<ZoneId> PROBLEMATIC_ZONE_IDS =
+      ImmutableSet.of(
+          // Mexico abolished DST in 2022, but not all databases contain this information.
+          ZoneId.of("America/Chihuahua"),
+          // Jordan abolished DST in 2022, but not all databases contain this information.
+          ZoneId.of("Asia/Amman"),
+          // Iran observed DST in 1978. Not all databases agree on this.
+          ZoneId.of("Asia/Tehran"),
+          // Rankin_Inlet did not observer DST in 1970-1979, but not all databases agree.
+          ZoneId.of("America/Rankin_Inlet"),
+          // Pangnirtung did not observer DST in 1970-1979, but not all databases agree.
+          ZoneId.of("America/Pangnirtung"),
+          // Niue switched from -11:30 to -11 in 1978. Not all JDKs know that.
+          ZoneId.of("Pacific/Niue"));
+
+  private LocalDate generateRandomLocalDate() {
+    return LocalDate.ofEpochDay(random.nextInt(365 * 100));
+  }
+
+  private LocalDateTime generateRandomLocalDateTime() {
+    return LocalDateTime.of(generateRandomLocalDate(), generateRandomLocalTime());
+  }
+
+  private LocalTime generateRandomLocalTime() {
+    return LocalTime.ofSecondOfDay(random.nextInt(24 * 60 * 60));
+  }
+
+  private OffsetDateTime generateRandomOffsetDateTime() {
+    return OffsetDateTime.of(
+        generateRandomLocalDateTime(),
+        ZoneOffset.ofHoursMinutes(random.nextInt(12), random.nextInt(60)));
   }
 
   private void compareTableContents() throws SQLException {
