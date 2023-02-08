@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.python.psycopg2;
 
-
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
 import java.util.ArrayList;

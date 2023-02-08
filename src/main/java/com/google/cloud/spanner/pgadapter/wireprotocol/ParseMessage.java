@@ -19,6 +19,8 @@ import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.DEALLOCATE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.EXECUTE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.PREPARE;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.RELEASE;
+import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.SAVEPOINT;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.TRUNCATE;
 import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.VACUUM;
 
@@ -35,6 +37,8 @@ import com.google.cloud.spanner.pgadapter.statements.ExecuteStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.InvalidStatement;
 import com.google.cloud.spanner.pgadapter.statements.PrepareStatement;
+import com.google.cloud.spanner.pgadapter.statements.ReleaseStatement;
+import com.google.cloud.spanner.pgadapter.statements.SavepointStatement;
 import com.google.cloud.spanner.pgadapter.statements.TruncateStatement;
 import com.google.cloud.spanner.pgadapter.statements.VacuumStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParseCompleteResponse;
@@ -136,6 +140,20 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
             originalStatement);
       } else if (isCommand(TRUNCATE, originalStatement.getSql())) {
         return new TruncateStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(SAVEPOINT, originalStatement.getSql())) {
+        return new SavepointStatement(
+            connectionHandler,
+            connectionHandler.getServer().getOptions(),
+            name,
+            parsedStatement,
+            originalStatement);
+      } else if (isCommand(RELEASE, originalStatement.getSql())) {
+        return new ReleaseStatement(
             connectionHandler,
             connectionHandler.getServer().getOptions(),
             name,
