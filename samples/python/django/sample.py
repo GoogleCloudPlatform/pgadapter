@@ -74,7 +74,7 @@ def create_sample_concert(concert_id, venue=None, singer=None):
 def create_tables():
   file = open('create_data_model.sql', 'r')
   ddl_statements = file.read()
-  # print(ddl_statements)
+
   with connection.cursor() as cursor:
     cursor.execute(ddl_statements)
 
@@ -97,6 +97,9 @@ def add_data():
       raise Exception('Saving Album Data Failed')
 
     track = create_sample_track('1', '2', album)
+    # Since the track table contains columns that are part of primary key in the original table,
+    # we have to make sure that Django doesn't send any update query for those columns.
+    # Using for_insert=True will make sure that Django doesn't send an update query for the primary key columns
     track.save(force_insert=True)
     track_object = Track.objects.get(track_number=track.track_number,
                                      album=track.album)
@@ -179,13 +182,18 @@ def transaction_rollback():
 
 
 def interleaved_table_update():
+  # updating the rows of an interleaved table
+  # should be done in the following manner
+  # instead of using save() for the object
+  # because save() will try to update the columns
+  # that are part of primary key in the original interleaved table
   Track.objects.filter(track_number='2', album_id='1').update(sample_rate=0.25)
   updated_track = Track.objects.get(track_number='2', album_id='1')
   if updated_track.sample_rate != 0.25:
     raise Exception('Update on Interleaved Table Failed')
 
 
-def fetch_data():
+def create_and_query_sample_data():
   singer1 = create_sample_singer('2')
   singer2 = create_sample_singer('3')
 
@@ -282,7 +290,7 @@ if __name__ == "__main__":
     interleaved_table_update()
     print('Interleaved Table Update Successful')
 
-    fetch_data()
+    create_and_query_sample_data()
     print('Fetching Data Successful')
 
     delete_all_data()
