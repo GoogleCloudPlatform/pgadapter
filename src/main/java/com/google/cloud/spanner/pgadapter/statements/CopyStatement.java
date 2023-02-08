@@ -241,8 +241,8 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   /** @return 0 for text/csv formatting and 1 for binary */
-  public int getFormatCode() {
-    return (parsedCopyStatement.format == Format.BINARY) ? 1 : 0;
+  public byte getFormatCode() {
+    return (parsedCopyStatement.format == Format.BINARY) ? (byte) 1 : (byte) 0;
   }
 
   private void verifyCopyColumns() {
