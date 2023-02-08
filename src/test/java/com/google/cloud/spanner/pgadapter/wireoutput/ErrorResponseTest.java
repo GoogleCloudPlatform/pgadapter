@@ -16,10 +16,16 @@ package com.google.cloud.spanner.pgadapter.wireoutput;
 
 import static com.google.cloud.spanner.pgadapter.wireoutput.ErrorResponse.calculateLength;
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import org.junit.Test;
@@ -44,7 +50,8 @@ public class ErrorResponseTest {
             PGException.newBuilder("test message")
                 .setSeverity(Severity.ERROR)
                 .setSQLState(SQLState.RaiseException)
-                .build()));
+                .build(),
+            WellKnownClient.UNSPECIFIED));
     assertEquals(
         4
             + "test message".length()
@@ -61,16 +68,59 @@ public class ErrorResponseTest {
                 .setSeverity(Severity.ERROR)
                 .setSQLState(SQLState.RaiseException)
                 .setHints("test hint")
-                .build()));
+                .build(),
+            WellKnownClient.UNSPECIFIED));
+
+    assertEquals(
+        4
+            + "test message".length()
+            + /* Field header + null terminator */ 2
+            + "ERROR".length()
+            + 2
+            + "P0001".length()
+            + 2
+            + ClientAutoDetector.PGBENCH_USAGE_HINT.length()
+            + 2
+            + 1,
+        calculateLength(
+            PGException.newBuilder("test message")
+                .setSeverity(Severity.ERROR)
+                .setSQLState(SQLState.RaiseException)
+                .build(),
+            WellKnownClient.PGBENCH));
+    assertEquals(
+        4
+            + "test message".length()
+            + /* Field header + null terminator */ 2
+            + "ERROR".length()
+            + 2
+            + "P0001".length()
+            + 2
+            + "test hint\n".length()
+            + ClientAutoDetector.PGBENCH_USAGE_HINT.length()
+            + 2
+            + 1,
+        calculateLength(
+            PGException.newBuilder("test message")
+                .setSeverity(Severity.ERROR)
+                .setSQLState(SQLState.RaiseException)
+                .setHints("test hint")
+                .build(),
+            WellKnownClient.PGBENCH));
   }
 
   @Test
   public void testSendPayload() throws Exception {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     DataOutputStream output = new DataOutputStream(out);
+    ConnectionMetadata metadata = mock(ConnectionMetadata.class);
+    when(metadata.getOutputStream()).thenReturn(output);
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(metadata);
     ErrorResponse response =
         new ErrorResponse(
-            output,
+            connectionHandler,
             PGException.newBuilder("test message")
                 .setSeverity(Severity.ERROR)
                 .setSQLState(SQLState.RaiseException)
@@ -86,9 +136,14 @@ public class ErrorResponseTest {
   public void testSendPayloadWithHint() throws Exception {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     DataOutputStream output = new DataOutputStream(out);
+    ConnectionMetadata metadata = mock(ConnectionMetadata.class);
+    when(metadata.getOutputStream()).thenReturn(output);
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(metadata);
     ErrorResponse response =
         new ErrorResponse(
-            output,
+            connectionHandler,
             PGException.newBuilder("test message")
                 .setSeverity(Severity.ERROR)
                 .setSQLState(SQLState.RaiseException)
@@ -100,6 +155,65 @@ public class ErrorResponseTest {
     assertEquals("SERROR\0CP0001\0Mtest message\0Htest hint\nline 2\0\0", out.toString());
     assertEquals(
         "Length: 51, Error Message: test message, Hints: test hint\n" + "line 2",
+        response.getPayloadString());
+  }
+
+  @Test
+  public void testSendPayloadWithClientHint() throws Exception {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    DataOutputStream output = new DataOutputStream(out);
+    ConnectionMetadata metadata = mock(ConnectionMetadata.class);
+    when(metadata.getOutputStream()).thenReturn(output);
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.PGBENCH);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(metadata);
+    ErrorResponse response =
+        new ErrorResponse(
+            connectionHandler,
+            PGException.newBuilder("test message")
+                .setSeverity(Severity.ERROR)
+                .setSQLState(SQLState.RaiseException)
+                .build());
+
+    response.sendPayload();
+
+    assertEquals(
+        String.format(
+            "SERROR\0CP0001\0Mtest message\0H%s\0\0", ClientAutoDetector.PGBENCH_USAGE_HINT),
+        out.toString());
+    assertEquals(
+        "Length: 148, Error Message: test message, Hints: " + ClientAutoDetector.PGBENCH_USAGE_HINT,
+        response.getPayloadString());
+  }
+
+  @Test
+  public void testSendPayloadWithErrorAndClientHint() throws Exception {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    DataOutputStream output = new DataOutputStream(out);
+    ConnectionMetadata metadata = mock(ConnectionMetadata.class);
+    when(metadata.getOutputStream()).thenReturn(output);
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.PGBENCH);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(metadata);
+    ErrorResponse response =
+        new ErrorResponse(
+            connectionHandler,
+            PGException.newBuilder("test message")
+                .setSeverity(Severity.ERROR)
+                .setSQLState(SQLState.RaiseException)
+                .setHints("test hint\nline 2")
+                .build());
+
+    response.sendPayload();
+
+    assertEquals(
+        String.format(
+            "SERROR\0CP0001\0Mtest message\0Htest hint\nline 2\n%s\0\0",
+            ClientAutoDetector.PGBENCH_USAGE_HINT),
+        out.toString());
+    assertEquals(
+        "Length: 165, Error Message: test message, Hints: test hint\nline 2\n"
+            + ClientAutoDetector.PGBENCH_USAGE_HINT,
         response.getPayloadString());
   }
 }

@@ -28,9 +28,9 @@ import java.nio.charset.StandardCharsets;
 public class CopyDataResponse extends WireOutput {
   @InternalApi
   public enum ResponseType {
-    HEADER,
     ROW,
     TRAILER,
+    TRAILER_WITH_HEADER,
   }
 
   private final ResponseType responseType;
@@ -39,16 +39,14 @@ public class CopyDataResponse extends WireOutput {
   private final char rowTerminator;
   private final Converter converter;
 
-  /** Creates a {@link CopyDataResponse} message containing the fixed binary COPY header. */
-  @InternalApi
-  public static CopyDataResponse createBinaryHeader(DataOutputStream output) {
-    return new CopyDataResponse(output, COPY_BINARY_HEADER.length + 8, ResponseType.HEADER);
-  }
-
   /** Creates a {@link CopyDataResponse} message containing the fixed binary COPY trailer. */
   @InternalApi
-  public static CopyDataResponse createBinaryTrailer(DataOutputStream output) {
-    return new CopyDataResponse(output, 2, ResponseType.TRAILER);
+  public static CopyDataResponse createBinaryTrailer(
+      DataOutputStream output, boolean includeHeader) {
+    return new CopyDataResponse(
+        output,
+        includeHeader ? 21 : 2,
+        includeHeader ? ResponseType.TRAILER_WITH_HEADER : ResponseType.TRAILER);
   }
 
   private CopyDataResponse(DataOutputStream output, int length, ResponseType responseType) {
@@ -78,6 +76,7 @@ public class CopyDataResponse extends WireOutput {
     this.converter = converter;
   }
 
+  @Override
   public void send(boolean flush) throws Exception {
     if (converter != null) {
       this.length = 4 + converter.convertResultSetRowToDataRowResponse();
@@ -91,10 +90,11 @@ public class CopyDataResponse extends WireOutput {
       this.outputStream.write(this.stringData.getBytes(StandardCharsets.UTF_8));
       this.outputStream.write(this.rowTerminator);
     } else if (this.format == DataFormat.POSTGRESQL_BINARY) {
-      if (this.responseType == ResponseType.HEADER) {
+      if (this.responseType == ResponseType.TRAILER_WITH_HEADER) {
         this.outputStream.write(COPY_BINARY_HEADER);
         this.outputStream.writeInt(0); // flags
         this.outputStream.writeInt(0); // header extension area length
+        this.outputStream.writeShort(-1);
       } else if (this.responseType == ResponseType.TRAILER) {
         this.outputStream.writeShort(-1);
       } else if (this.converter != null) {

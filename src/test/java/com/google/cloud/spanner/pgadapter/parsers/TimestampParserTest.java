@@ -110,4 +110,29 @@ public class TimestampParserTest {
             new TimestampParser(
                 "foo".getBytes(StandardCharsets.UTF_8), FormatCode.TEXT, sessionState));
   }
+
+  @Test
+  public void testTextToTimestamp() {
+    assertEquals(
+        Timestamp.parseTimestamp("2022-10-09T19:09:18Z"),
+        TimestampParser.toTimestamp("2022-10-09 10:09:18", ZoneId.of("-09:00")));
+    assertEquals(
+        Timestamp.parseTimestamp("2022-12-28T09:00Z"),
+        TimestampParser.toTimestamp("2022-12-28 10:00", ZoneId.of("CET")));
+    assertEquals(
+        Timestamp.parseTimestamp("2022-08-28T08:00Z"),
+        TimestampParser.toTimestamp("2022-08-28 10:00", ZoneId.of("CET")));
+    assertEquals(
+        Timestamp.parseTimestamp("2022-08-28T08:00Z"),
+        TimestampParser.toTimestamp("2022-08-28 10:00", ZoneId.of("Europe/Amsterdam")));
+    assertEquals(
+        Timestamp.parseTimestamp("2022-12-27T14:00:00Z"),
+        TimestampParser.toTimestamp("2022-12-28", ZoneId.of("+10:00")));
+    assertEquals(
+        Timestamp.parseTimestamp("2022-12-28T08:00Z"),
+        TimestampParser.toTimestamp("2022-12-28 10:00+02:00", ZoneId.of("CET")));
+    assertEquals(
+        Timestamp.parseTimestamp("2022-12-28T07:30Z"),
+        TimestampParser.toTimestamp("2022-12-28 10:00+02:30", ZoneId.of("CET")));
+  }
 }

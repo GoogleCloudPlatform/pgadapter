@@ -18,9 +18,7 @@ import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.StructField;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -60,15 +58,16 @@ public final class RowDescriptionTest {
 
   @Test
   public void OidTest() throws Exception {
-    when(metadata.getColumnCount()).thenReturn(0);
-    when(metadata.getColumnType(0)).thenReturn(Type.int64());
-    when(metadata.getColumnType(1)).thenReturn(Type.pgNumeric());
-    when(metadata.getColumnType(2)).thenReturn(Type.float64());
-    when(metadata.getColumnType(3)).thenReturn(Type.string());
-    when(metadata.getColumnType(4)).thenReturn(Type.bytes());
-    when(metadata.getColumnType(5)).thenReturn(Type.bool());
-    when(metadata.getColumnType(6)).thenReturn(Type.date());
-    when(metadata.getColumnType(7)).thenReturn(Type.timestamp());
+    Type type =
+        Type.struct(
+            StructField.of("f1", Type.int64()),
+            StructField.of("f1", Type.pgNumeric()),
+            StructField.of("f1", Type.float64()),
+            StructField.of("f1", Type.string()),
+            StructField.of("f1", Type.bytes()),
+            StructField.of("f1", Type.bool()),
+            StructField.of("f1", Type.date()),
+            StructField.of("f1", Type.timestamp()));
 
     JSONParser parser = new JSONParser();
     JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
@@ -84,7 +83,7 @@ public final class RowDescriptionTest {
             commandMetadata);
     QueryMode mode = QueryMode.SIMPLE;
     RowDescriptionResponse response =
-        new RowDescriptionResponse(output, statement, metadata, options, mode);
+        new RowDescriptionResponse(output, statement, type, options, mode);
 
     // Types.BIGINT
     assertEquals(Oid.INT8, response.getOidType(0));
@@ -123,10 +122,7 @@ public final class RowDescriptionTest {
   public void SendPayloadNullStatementTest() throws Exception {
     int COLUMN_COUNT = 1;
     String COLUMN_NAME = "default-column-name";
-    Type rowType = Type.struct(StructField.of(COLUMN_NAME, Type.string()));
-    when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
-    when(metadata.getType()).thenReturn(rowType);
-    when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Type.int64());
+    Type rowType = Type.struct(StructField.of(COLUMN_NAME, Type.int64()));
 
     JSONParser parser = new JSONParser();
     JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
@@ -142,7 +138,7 @@ public final class RowDescriptionTest {
             commandMetadata);
     QueryMode mode = QueryMode.EXTENDED;
     RowDescriptionResponse response =
-        new RowDescriptionResponse(output, null, metadata, options, mode);
+        new RowDescriptionResponse(output, null, rowType, options, mode);
     response.sendPayload();
     DataInputStream outputReader =
         new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));
@@ -176,9 +172,6 @@ public final class RowDescriptionTest {
         Type.struct(
             StructField.of("numeric-text", Type.pgNumeric()),
             StructField.of("numeric-binary", Type.pgNumeric()));
-    when(metadata.getColumnCount()).thenReturn(rowType.getStructFields().size());
-    when(metadata.getType()).thenReturn(rowType);
-    when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Type.pgNumeric());
     when(statement.getResultFormatCode(0)).thenReturn((short) 0);
     when(statement.getResultFormatCode(1)).thenReturn((short) 1);
     JSONParser parser = new JSONParser();
@@ -195,7 +188,7 @@ public final class RowDescriptionTest {
             commandMetadata);
     QueryMode mode = QueryMode.EXTENDED;
     RowDescriptionResponse response =
-        new RowDescriptionResponse(output, statement, metadata, options, mode);
+        new RowDescriptionResponse(output, statement, rowType, options, mode);
     response.sendPayload();
     DataInputStream outputReader =
         new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));
@@ -247,10 +240,7 @@ public final class RowDescriptionTest {
   public void SendPayloadStatementWithBinaryOptionTest() throws Exception {
     int COLUMN_COUNT = 1;
     String COLUMN_NAME = "default-column-name";
-    Type rowType = Type.struct(StructField.of(COLUMN_NAME, Type.string()));
-    when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
-    when(metadata.getType()).thenReturn(rowType);
-    when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Type.int64());
+    Type rowType = Type.struct(StructField.of(COLUMN_NAME, Type.int64()));
     when(statement.getResultFormatCode(Mockito.anyInt())).thenReturn((short) 1);
     JSONParser parser = new JSONParser();
     JSONObject commandMetadata = (JSONObject) parser.parse(EMPTY_COMMAND_JSON);
@@ -266,7 +256,7 @@ public final class RowDescriptionTest {
             commandMetadata);
     QueryMode mode = QueryMode.EXTENDED;
     RowDescriptionResponse response =
-        new RowDescriptionResponse(output, statement, metadata, options, mode);
+        new RowDescriptionResponse(output, statement, rowType, options, mode);
     response.sendPayload();
     DataInputStream outputReader =
         new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));
@@ -300,10 +290,7 @@ public final class RowDescriptionTest {
     String COLUMN_NAME = "default-column-name";
     Type rowType =
         Type.struct(
-            StructField.of(COLUMN_NAME, Type.string()), StructField.of(COLUMN_NAME, Type.string()));
-    when(metadata.getColumnCount()).thenReturn(COLUMN_COUNT);
-    when(metadata.getType()).thenReturn(rowType);
-    when(metadata.getColumnType(Mockito.anyInt())).thenReturn(Type.int64());
+            StructField.of(COLUMN_NAME, Type.int64()), StructField.of(COLUMN_NAME, Type.int64()));
     when(statement.getResultFormatCode(Mockito.anyInt()))
         .thenReturn((short) 0)
         .thenReturn((short) 0)
@@ -322,7 +309,7 @@ public final class RowDescriptionTest {
             commandMetadata);
     QueryMode mode = QueryMode.EXTENDED;
     RowDescriptionResponse response =
-        new RowDescriptionResponse(output, statement, metadata, options, mode);
+        new RowDescriptionResponse(output, statement, rowType, options, mode);
     response.sendPayload();
     DataInputStream outputReader =
         new DataInputStream(new ByteArrayInputStream(buffer.toByteArray()));
@@ -353,15 +340,13 @@ public final class RowDescriptionTest {
 
   @Test
   public void testUnknownTypeReturnsUnspecified() throws Exception {
-    ResultSet resultSet = mock(ResultSet.class);
-    when(resultSet.getColumnType(0))
-        .thenThrow(SpannerExceptionFactory.newSpannerException(ErrorCode.INTERNAL, "unknown type"));
+    Type type = Type.struct();
 
     RowDescriptionResponse response =
         new RowDescriptionResponse(
             mock(DataOutputStream.class),
             mock(IntermediateStatement.class),
-            resultSet,
+            type,
             mock(OptionsMetadata.class),
             QueryMode.SIMPLE);
 

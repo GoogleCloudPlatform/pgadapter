@@ -66,13 +66,13 @@ public class BinaryParser extends Parser<ByteArray> {
 
   @Override
   public String stringParse() {
-    return this.item == null ? null : bytesToHex(this.item.toByteArray());
+    return this.item == null ? null : new String(bytesToHex(this.item.toByteArray()));
   }
 
-  private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
+  private static final byte[] HEX_ARRAY = "0123456789abcdef".getBytes(StandardCharsets.UTF_8);
 
-  static String bytesToHex(byte[] bytes) {
-    char[] hexChars = new char[bytes.length * 2 + 2];
+  static byte[] bytesToHex(byte[] bytes) {
+    byte[] hexChars = new byte[bytes.length * 2 + 2];
     hexChars[0] = '\\';
     hexChars[1] = 'x';
     for (int j = 0; j < bytes.length; j++) {
@@ -80,7 +80,7 @@ public class BinaryParser extends Parser<ByteArray> {
       hexChars[j * 2 + 2] = HEX_ARRAY[v >>> 4];
       hexChars[j * 2 + 3] = HEX_ARRAY[v & 0x0F];
     }
-    return new String(hexChars);
+    return hexChars;
   }
 
   @Override
@@ -99,8 +99,7 @@ public class BinaryParser extends Parser<ByteArray> {
       case POSTGRESQL_BINARY:
         return resultSet.getBytes(position).toByteArray();
       case POSTGRESQL_TEXT:
-        return (bytesToHex(resultSet.getBytes(position).toByteArray()))
-            .getBytes(StandardCharsets.UTF_8);
+        return bytesToHex(resultSet.getBytes(position).toByteArray());
       default:
         throw new IllegalArgumentException("unknown data format: " + format);
     }
