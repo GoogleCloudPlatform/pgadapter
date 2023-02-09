@@ -39,17 +39,17 @@ psql -h localhost -p 5432 -d my-database -f drop-data-model.sql
 ## Data Types
 Cloud Spanner supports the following data types in combination with `Django`.
 
-| PostgreSQL Type                        | Django Model Field                           |
-|----------------------------------------|----------------------------------------------|
-| boolean                                | BoolField                                    |
-| bigint / int8                          | BigIntegerField                              |
-| varchar                                | CharField                                    |
-| text                                   | CharField                                    |
-| float8 / double precision              | FloatField                                   |
-| numeric(x, y)                          | DecimalField(max_digits=x, decimal_places=y) |
-| timestamptz / timestamp with time zone | DateTimeField                                |
-| bytea                                  | BinaryField                                  |
-| date                                   | DateField                                    |
+| PostgreSQL Type                        | Django Model Field |
+|----------------------------------------|--------------------|
+| boolean                                | BoolField          |
+| bigint / int8                          | BigIntegerField    |
+| varchar                                | CharField          |
+| text                                   | CharField          |
+| float8 / double precision              | FloatField         |
+| numeric                                | DecimalField       |
+| timestamptz / timestamp with time zone | DateTimeField      |
+| bytea                                  | BinaryField        |
+| date                                   | DateField          |
 
 ## Limitations
 The following limitations are currently known:
