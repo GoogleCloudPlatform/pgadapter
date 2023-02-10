@@ -74,7 +74,7 @@ for more information on choosing a good primary key. This sample uses UUIDs that
 keys.
 
 ### Savepoint
-`savepoints` are supported in the Cloud Spanner. Hence, following functions from the `django.db.transaction` are not supported
+`savepoints` are not supported in Cloud Spanner. The following functions in Django are therefore also not supported:
 
 ```python
 from django.db import  transaction
