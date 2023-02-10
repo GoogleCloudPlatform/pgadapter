@@ -10,7 +10,6 @@ PGAdapter can be used with the following drivers and clients:
 3. `pgx`: Version 4.15 and higher are supported. See [pgx support](docs/pgx.md) for more details.
 4. `psycopg2`: Version 2.9.3 and higher (but not `psycopg3`) are supported. See [psycopg2](docs/psycopg2.md) for more details.
 5. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
-6. `django`: Version 4.1.1 and higher have experimental support. See [django support](docs/django.md) for more details. See also [this directory](samples/python/django) for a sample application using `django`.
 
 ## Frameworks and Tools
 PGAdapter can be used with the following frameworks and tools:
@@ -23,6 +22,7 @@ PGAdapter can be used with the following frameworks and tools:
    application using `SQLAlchemy`.
 4. `pgbench` can be used with PGAdapter, but with some limitations. See [pgbench.md](docs/pgbench.md)
    for more details.
+5. `Django`: Version 4.1.1 and higher have experimental support. See [django support](docs/django.md) for more details. See also [this directory](samples/python/django) for a sample application using `Django`.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
