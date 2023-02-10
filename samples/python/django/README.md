@@ -85,9 +85,9 @@ transaction.clean_savepoints()
 ```
 
 ### Nested Atomic Blocks
-As mentioned earlier also, `savepoints` are not supported and hence, a code like follows might not work with PGAdapter
-because it will make use of savepoint to make sure the inner nested block is rolled back properly 
-if some error occurs over there.
+`Savepoints` are not supported in Cloud Spanner. Nested atomic blocks in `django` will by default create a
+`Savepoint` when an inner block is entered. You can suppress this behavior by adding `savepoint=False` to
+the `@transaction.atomic` annotation.
 ```python
 from django.db import transaction
 
