@@ -458,6 +458,9 @@ public class PGSetting {
     if ("utc".equalsIgnoreCase(value)) {
       return "UTC";
     }
+    if ("localtime".equalsIgnoreCase(value)) {
+      return ZoneId.systemDefault().getId();
+    }
     for (String zoneId : ZoneId.getAvailableZoneIds()) {
       if (zoneId.equalsIgnoreCase(value)) {
         return zoneId;
