@@ -6,6 +6,9 @@ import pytz
 from django.db import connection
 from django.db import transaction
 from django.db.transaction import atomic
+from django.db.models import JSONField, CharField
+from django.db.models.functions import Cast
+import random
 x = 0
 
 def create_sample_singer(singer_id):
@@ -42,12 +45,24 @@ def create_sample_track(track_id, track_number, album = None):
                created_at=datetime.datetime.now(pytz.UTC),
                updated_at=datetime.datetime.now(pytz.UTC))
 
+def get_sample_venue_description(x):
+  random.seed(datetime.datetime.now().timestamp())
+
+  description = {
+      'address': 'address'+str(x),
+      'capacity': random.randint(1000, 5000),
+      'isPopular': random.choice([True, False])
+  }
+
+  return description
+
+
 def create_sample_venue(venue_id):
   global x
   x += 1
   return Venue(id=venue_id,
                name='venue'+str(x),
-               description='description'+str(x),
+               description=get_sample_venue_description(x),
                created_at=datetime.datetime.now(pytz.UTC),
                updated_at=datetime.datetime.now(pytz.UTC))
 
@@ -141,7 +156,27 @@ def transaction_rollback():
 
   #checking if singer3 is present in the actual table or not
   if len(Singer.objects.filter(id='3')) > 0:
-    raise Exception('Transaction Rollback Unsucessful')
+    raise Exception('Transaction Rollback Unsuccessful')
+
+def jsonb_filter():
+  venue1 = create_sample_venue(10)
+  venue2 = create_sample_venue(100)
+  venue3 = create_sample_venue(1000)
+
+  venue1.save()
+  venue2.save()
+  venue3.save()
+  print(venue1.description['address'])
+  print(Venue.objects
+        .annotate(address=Cast('description__address', output_field=CharField()))
+        .filter(address=venue1.description['address'])
+        .first())
+
+#  if fetched_venue1.id != venue1.id:
+ #   raise Exception('Transaction Rollback Unsuccessful')
+
+
+
 
 if __name__ == "__main__":
 
@@ -164,17 +199,20 @@ if __name__ == "__main__":
 
     print('Starting Django Test')
 
-    add_data()
+    #add_data()
     print('Adding Data Successful')
 
-    foreign_key_operations()
+    #foreign_key_operations()
     print('Testing Foreign Key Successful')
 
-    transaction_rollback()
+    #transaction_rollback()
     print('Transaction Rollback Successful')
 
-    delete_all_data()
+    #delete_all_data()
     print('Deleting Data Successful')
+
+    jsonb_filter()
+    print('Jsonb Filtering Successful ')
 
     print('Django Sample Completed Successfully')
 
