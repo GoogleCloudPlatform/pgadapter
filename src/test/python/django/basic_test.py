@@ -86,6 +86,10 @@ def all_types_insert_all_null():
   obj.save()
   print('Insert Successful')
 
+def all_types_fetch_all_null():
+  result = all_types.objects.filter(col_bigint=None, col_bool=None, col_bytea=None, col_date=None, col_int=None, col_varchar=None, col_float8=None, col_numeric=None, col_timestamptz=None)
+  for rows in result.values():
+    print(rows)
 
 def execute(option):
   type = option[0]
@@ -99,7 +103,8 @@ def execute(option):
     all_types_insert()
   elif type == 'all_types_insert_null':
     all_types_insert_all_null()
-
+  elif type == "all_types_fetch_null":
+    all_types_fetch_all_null()
   else:
     print('Invalid Option Type')
 
