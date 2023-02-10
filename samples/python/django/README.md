@@ -88,20 +88,11 @@ transaction.clean_savepoints()
 `Savepoints` are not supported in Cloud Spanner. Nested atomic blocks in `django` will by default create a
 `Savepoint` when an inner block is entered. You can suppress this behavior by adding `savepoint=False` to
 the `@transaction.atomic` annotation.
+
 ```python
 from django.db import transaction
 
-@transaction.atomic
-def func():
-  do_stuff
-  with transaction.atomic():
-    do_some_more_stuff
-```
-
-Instead of above, always set `savepoint=False` while using nested atomic blocks
-```python
-from django.db import transaction
-
+#Always include 'savepoint=False' to ensure Django doesn't create any savepoint
 @transaction.atomic(savepoint=False)
 def func():
   do_stuff
@@ -110,9 +101,38 @@ def func():
 ```
 
 ### Interleaved Tables
-A possible workaround for Django's inability to use interleaved table with Django and PGAdapter includes 
-having a column which has unique index in the actual table while pretending to Django like it's a primary key. 
+[Interleaved tables](https://cloud.google.com/spanner/docs/schema-and-data-model#primary-keys) in Cloud Spanner require composite primary keys. Django does not support models with a composite primary key. You
+can work around these limitations and use an interleaved table with Cloud Spanner and Django as follows:
 
-One important thing to note here is that we can't use usual `save` function for creating new records for such a model 
-because that might generate an `UPDATE` statement which will try to update the unique index. 
-So, we will have to use `force_insert = True`, while creating new records. For more details, see the sample application.
+1. Manually create the interleaved table in your database by executing a `CREATE TABLE` statement. This table will use a composite primary key.
+2. Define the model in Python code so that the parent key column of the table is defined as a `ForeignKey` referencing the parent table, and the child key column is defined as the primary key of the table.
+3. Add a unique index to the child primary key column. This will ensure that the child primary key part is always globally unique, and can be used to efficiently look up a single row.
+
+Example:
+
+```sql
+CREATE TABLE tracks (
+    track_id character varying NOT NULL,
+    id character varying NOT NULL,
+    ...
+    PRIMARY KEY(id, track_number)
+) INTERLEAVE IN PARENT albums ON DELETE CASCADE;
+
+CREATE UNIQUE INDEX unique_idx_track_id ON tracks(track_id);
+```
+
+```python
+class Track(BaseModel):
+  class Meta():
+    db_table = 'tracks'
+  track_id = models.CharField(primary_key=True, null=False)
+  album = models.ForeignKey(Album, on_delete=models.DO_NOTHING, db_column='id')
+```
+
+Note that using the standard `save` function in Django is not supported for interleaved tables, as this function will also try to update the `album` column. This column is part of the primary key definition of the table and cannot be updated. Add a `force_insert=True` to create new child records:
+
+```python
+track.save(force_insert=True)
+```
+
+See the sample application for more details and a working example.
