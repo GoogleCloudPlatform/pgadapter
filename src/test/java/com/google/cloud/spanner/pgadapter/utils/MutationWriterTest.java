@@ -91,7 +91,7 @@ public class MutationWriterTest {
     CSVParser parser = CSVParser.parse(reader, format);
     // Pass in 2 complete and one incomplete record. It should be possible to parse the two first
     // records without problems.
-    String records = "1\t\"One\"\n2\t\"Two\"\n3\t";
+    String records = "1\tOne\n2\tTwo\n3\t";
     writer.write(records);
     writer.flush();
 
@@ -110,7 +110,7 @@ public class MutationWriterTest {
     // Calling iterator.hasNext() or iterator.next() would now block, as there is not enough data
     // to build another record.
     // Add the missing pieces for the last record and parse that as well.
-    writer.write("\"Three\"\n");
+    writer.write("Three\n");
     writer.close();
 
     assertTrue(iterator.hasNext());
@@ -150,8 +150,7 @@ public class MutationWriterTest {
         executor.submit(
             () -> {
               try {
-                mutationWriter.addCopyData(
-                    "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+                mutationWriter.addCopyData("1\tOne\n2\tTwo\n".getBytes(StandardCharsets.UTF_8));
                 mutationWriter.commit();
                 mutationWriter.close();
               } catch (IOException ignore) {
@@ -309,8 +308,7 @@ public class MutationWriterTest {
       executor.submit(
           () -> {
             try {
-              mutationWriter.addCopyData(
-                  "1\t\"One\"\n2\t\"Two\"\n".getBytes(StandardCharsets.UTF_8));
+              mutationWriter.addCopyData("1\tOne\n2\tTwo\n".getBytes(StandardCharsets.UTF_8));
               mutationWriter.close();
             } catch (IOException ignore) {
             }
@@ -357,8 +355,7 @@ public class MutationWriterTest {
           () -> {
             try {
               mutationWriter.addCopyData(
-                  "1\t\"One\"\n2\t\"Two\"\n3\t\"Three\"\n4\t\"Four\"\n5\t\"Five\"\n"
-                      .getBytes(StandardCharsets.UTF_8));
+                  "1\tOne\n2\tTwo\n3\tThree\n4\tFour\n5\tFive\n".getBytes(StandardCharsets.UTF_8));
               mutationWriter.commit();
               mutationWriter.close();
             } catch (IOException ignore) {
@@ -409,13 +406,12 @@ public class MutationWriterTest {
     ExecutorService executor = Executors.newFixedThreadPool(2);
     executor.submit(
         () -> {
-          mutationWriter.addCopyData("1\t\"One\"\n".getBytes(StandardCharsets.UTF_8));
-          mutationWriter.addCopyData("2\t\"Two".getBytes(StandardCharsets.UTF_8));
-          mutationWriter.addCopyData("\"".getBytes(StandardCharsets.UTF_8));
+          mutationWriter.addCopyData("1\tOne\n".getBytes(StandardCharsets.UTF_8));
+          mutationWriter.addCopyData("2\tTwo".getBytes(StandardCharsets.UTF_8));
+          mutationWriter.addCopyData("".getBytes(StandardCharsets.UTF_8));
           mutationWriter.addCopyData("\n3\t".getBytes(StandardCharsets.UTF_8));
-          mutationWriter.addCopyData(
-              "\"Three\"\n4\t\"Four\"\n5\t".getBytes(StandardCharsets.UTF_8));
-          mutationWriter.addCopyData("\"Five\"\n".getBytes(StandardCharsets.UTF_8));
+          mutationWriter.addCopyData("Three\n4\tFour\n5\t".getBytes(StandardCharsets.UTF_8));
+          mutationWriter.addCopyData("Five\n".getBytes(StandardCharsets.UTF_8));
           mutationWriter.commit();
           mutationWriter.close();
           return null;

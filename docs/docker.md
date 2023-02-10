@@ -12,6 +12,7 @@ docker run \
   -d -p 5432:5432 \
   -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
   -e GOOGLE_APPLICATION_CREDENTIALS \
+  -v /tmp:/tmp:rw \
   gcr.io/cloud-spanner-pg-adapter/pgadapter \
   -p my-project -i my-instance -d my-database \
   -x
@@ -26,6 +27,8 @@ The Docker options in the `docker run` command that are used in the above exampl
   The local file should contain the credentials that should be used by PGAdapter.
 * `-e`: Copy the value of the environment variable `GOOGLE_APPLICATION_CREDENTIALS` to the container.
   This will make the virtual file `/path/to/credentials.json` the default credentials in the container.
+* `-v /tmp:/tmp:rw`: Map the `/tmp` host directory to the `/tmp` directory in the container. PGAdapter by
+  default uses `/tmp` as the directory where it creates a Unix Domain Socket.
 
 The PGAdapter options in the `docker run` command that are used in the above example are:
 * `-p`: The Google Cloud project name where the Cloud Spanner database is located.
@@ -54,3 +57,24 @@ psql -h localhost -p 5433
 The above example starts PGAdapter in a Docker container on the default port 5432. That port is
 mapped to port 5433 on the host machine. When connecting to PGAdapter in the Docker container, you
 must specify port 5433 for the connection.
+
+## Using a different directory for Unix Domain Sockets
+
+PGAdapter by default uses `/tmp` as the directory for Unix Domain Sockets. You can change this with
+the `-dir` command line argument for PGAdapter. You must then also change the volume mapping to your
+host to ensure that you can connect to the Unix Domain Socket.
+
+```shell
+docker run \
+  -d -p 5432:5432 \
+  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
+  -e GOOGLE_APPLICATION_CREDENTIALS \
+  -v /var/pgadapter:/var/pgadapter:rw \
+  gcr.io/cloud-spanner-pg-adapter/pgadapter \
+  -p my-project -i my-instance -d my-database \
+  -dir /var/pgadapter \
+  -x
+psql -h /var/pgadapter
+```
+
+The above example uses `/var/pgadapter` as the directory for Unix Domain Sockets.

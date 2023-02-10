@@ -20,7 +20,6 @@ import com.google.cloud.spanner.DatabaseAdminClient;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.InstanceId;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.ResultSets;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.Struct;
 import com.google.cloud.spanner.Type;
@@ -31,6 +30,7 @@ import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
+import com.google.cloud.spanner.pgadapter.statements.ClientSideResultSet;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.Comparator;
@@ -74,7 +74,7 @@ public class ListDatabasesStatement implements LocalStatement {
     InstanceId defaultInstanceId =
         connectionHandler.getServer().getOptions().getDefaultInstanceId();
     ResultSet resultSet =
-        ResultSets.forRows(
+        ClientSideResultSet.forRows(
             Type.struct(
                 StructField.of("Name", Type.string()),
                 StructField.of("Owner", Type.string()),

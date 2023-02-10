@@ -64,6 +64,7 @@ public class ParseMessage extends AbstractQueryProtocolMessage {
     }
     this.statement =
         createStatement(connection, name, parsedStatement, originalStatement, parameterDataTypes);
+    connection.maybeDetermineWellKnownClient(this);
   }
 
   /**

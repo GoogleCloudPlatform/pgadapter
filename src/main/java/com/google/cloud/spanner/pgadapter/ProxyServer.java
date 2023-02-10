@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import com.google.api.core.AbstractApiService;
+import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
@@ -358,11 +359,13 @@ public class ProxyServer extends AbstractApiService {
     return String.format("ProxyServer[port: %d]", getLocalPort());
   }
 
-  ConcurrentLinkedQueue<WireMessage> getDebugMessages() {
+  @InternalApi
+  public ConcurrentLinkedQueue<WireMessage> getDebugMessages() {
     return debugMessages;
   }
 
-  void clearDebugMessages() {
+  @InternalApi
+  public void clearDebugMessages() {
     synchronized (debugMessages) {
       debugMessages.clear();
       debugMessageCount.set(0);

@@ -26,6 +26,7 @@ import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -398,6 +399,20 @@ public class ITPsqlTest implements IntegrationTest {
         output);
   }
 
+  @Test
+  public void testSetOperationWithOrderBy() throws IOException, InterruptedException {
+    // TODO: Remove
+    assumeTrue(
+        testEnv.getSpannerUrl().equals("https://staging-wrenchworks.sandbox.googleapis.com"));
+
+    Tuple<String, String> result =
+        runUsingPsql(
+            "select * from (select 1) one union all select * from (select 2) two order by 1");
+    String output = result.x(), errors = result.y();
+    assertEquals("", errors);
+    assertEquals(" ?column? \n----------\n        1\n        2\n(2 rows)\n", output);
+  }
+
   /**
    * This test copies data back and forth between PostgreSQL and Cloud Spanner and verifies that the
    * contents are equal after the COPY operation in both directions.
@@ -431,9 +446,9 @@ public class ITPsqlTest implements IntegrationTest {
       }
     }
 
-    // Execute the COPY tests in both binary and text mode.
-    for (boolean binary : new boolean[] {false, true}) {
-      logger.info("Testing binary: " + binary);
+    // Execute the COPY tests in both binary, csv and text mode.
+    for (Format format : Format.values()) {
+      logger.info("Testing format: " + format);
       // Make sure the all_types table on Cloud Spanner is empty.
       String databaseId = database.getId().getDatabase();
       testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
@@ -453,8 +468,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \" "
               + "  | psql "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
@@ -462,8 +478,9 @@ public class ITPsqlTest implements IntegrationTest {
               + testEnv.getPGAdapterPort()
               + " -d "
               + database.getId().getDatabase()
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(builder);
       Process process = builder.start();
@@ -501,8 +518,9 @@ public class ITPsqlTest implements IntegrationTest {
           "bash",
           "-c",
           "psql"
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \" "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
               + " -p "
@@ -518,8 +536,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(copyToPostgresBuilder);
       Process copyToPostgresProcess = copyToPostgresBuilder.start();
@@ -550,9 +569,9 @@ public class ITPsqlTest implements IntegrationTest {
       connection.createStatement().executeUpdate("delete from all_types");
     }
 
-    // Execute the COPY tests in both binary and text mode.
-    for (boolean binary : new boolean[] {false, true}) {
-      logger.info("Testing binary: " + binary);
+    // Execute the COPY tests in both binary, csv and text mode.
+    for (Format format : Format.values()) {
+      logger.info("Testing format: " + format);
       // Make sure the all_types table on Cloud Spanner is empty.
       String databaseId = database.getId().getDatabase();
       testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
@@ -572,8 +591,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \" "
               + "  | psql "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
@@ -581,8 +601,9 @@ public class ITPsqlTest implements IntegrationTest {
               + testEnv.getPGAdapterPort()
               + " -d "
               + database.getId().getDatabase()
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(builder);
       Process process = builder.start();
@@ -607,8 +628,9 @@ public class ITPsqlTest implements IntegrationTest {
           "bash",
           "-c",
           "psql"
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \""
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
               + " -p "
@@ -624,8 +646,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(copyToPostgresBuilder);
       Process copyToPostgresProcess = copyToPostgresBuilder.start();

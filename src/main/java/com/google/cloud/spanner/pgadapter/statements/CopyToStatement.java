@@ -57,7 +57,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
       new byte[] {'P', 'G', 'C', 'O', 'P', 'Y', '\n', -1, '\r', '\n', '\0'};
 
   private final ParsedCopyStatement parsedCopyStatement;
-  private final CSVFormat csvFormat;
+  private CSVFormat csvFormat;
   private final AtomicBoolean hasReturnedData = new AtomicBoolean(false);
 
   public CopyToStatement(
@@ -81,24 +81,28 @@ public class CopyToStatement extends IntermediatePortalStatement {
     if (parsedCopyStatement.format == CopyStatement.Format.BINARY) {
       this.csvFormat = null;
     } else {
+      CSVFormat baseFormat =
+          parsedCopyStatement.format == Format.TEXT
+              ? CSVFormat.POSTGRESQL_TEXT
+              : CSVFormat.POSTGRESQL_CSV;
       CSVFormat.Builder formatBuilder =
-          CSVFormat.Builder.create(CSVFormat.POSTGRESQL_TEXT)
+          CSVFormat.Builder.create(baseFormat)
               .setNullString(
                   parsedCopyStatement.nullString == null
-                      ? CSVFormat.POSTGRESQL_TEXT.getNullString()
+                      ? baseFormat.getNullString()
                       : parsedCopyStatement.nullString)
               .setRecordSeparator('\n')
               .setDelimiter(
                   parsedCopyStatement.delimiter == null
-                      ? CSVFormat.POSTGRESQL_TEXT.getDelimiterString().charAt(0)
+                      ? baseFormat.getDelimiterString().charAt(0)
                       : parsedCopyStatement.delimiter)
               .setQuote(
                   parsedCopyStatement.quote == null
-                      ? CSVFormat.POSTGRESQL_TEXT.getQuoteCharacter()
+                      ? baseFormat.getQuoteCharacter()
                       : parsedCopyStatement.quote)
               .setEscape(
                   parsedCopyStatement.escape == null
-                      ? CSVFormat.POSTGRESQL_TEXT.getEscapeCharacter()
+                      ? baseFormat.getEscapeCharacter()
                       : parsedCopyStatement.escape);
       if (parsedCopyStatement.format == Format.TEXT) {
         formatBuilder.setQuoteMode(QuoteMode.NONE);
@@ -272,6 +276,10 @@ public class CopyToStatement extends IntermediatePortalStatement {
       }
     }
     String row = csvFormat.format((Object[]) data);
+    // Only include the header with the first row.
+    if (!csvFormat.getSkipHeaderRecord()) {
+      csvFormat = csvFormat.builder().setSkipHeaderRecord(true).build();
+    }
     return new CopyDataResponse(this.outputStream, row, csvFormat.getRecordSeparator().charAt(0));
   }
 

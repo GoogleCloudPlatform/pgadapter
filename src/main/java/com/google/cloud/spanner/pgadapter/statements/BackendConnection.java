@@ -30,7 +30,6 @@ import com.google.cloud.spanner.Partition;
 import com.google.cloud.spanner.PartitionOptions;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.ResultSets;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerBatchUpdateException;
 import com.google.cloud.spanner.SpannerException;
@@ -59,12 +58,14 @@ import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
@@ -87,6 +88,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -208,9 +210,10 @@ public class BackendConnection {
         //  block always ends with a ROLLBACK, PGAdapter should skip the entire execution of that
         //  block.
         SessionStatement sessionStatement = getSessionManagementStatement(parsedStatement);
-        if (!localStatements.isEmpty() && localStatements.containsKey(statement.getSql())) {
+        if (!localStatements.get().isEmpty()
+            && localStatements.get().containsKey(statement.getSql())) {
           result.set(
-              Objects.requireNonNull(localStatements.get(statement.getSql()))
+              Objects.requireNonNull(localStatements.get().get(statement.getSql()))
                   .execute(BackendConnection.this));
         } else if (sessionStatement != null) {
           result.set(sessionStatement.execute(sessionState));
@@ -253,7 +256,7 @@ public class BackendConnection {
           // Potentially replace pg_catalog table references with common table expressions.
           updatedStatement =
               sessionState.isReplacePgCatalogTables()
-                  ? pgCatalog.replacePgCatalogTables(statement)
+                  ? pgCatalog.get().replacePgCatalogTables(statement)
                   : statement;
           updatedStatement = bindStatement(updatedStatement);
           result.set(analyzeOrExecute(updatedStatement));
@@ -567,8 +570,8 @@ public class BackendConnection {
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
   private final SessionState sessionState;
-  private final PgCatalog pgCatalog;
-  private final ImmutableMap<String, LocalStatement> localStatements;
+  private final Supplier<PgCatalog> pgCatalog;
+  private final Supplier<ImmutableMap<String, LocalStatement>> localStatements;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
   private final String currentSchema = "public";
@@ -581,24 +584,31 @@ public class BackendConnection {
   BackendConnection(
       DatabaseId databaseId,
       Connection spannerConnection,
+      Supplier<WellKnownClient> wellKnownClient,
       OptionsMetadata optionsMetadata,
-      ImmutableList<LocalStatement> localStatements) {
+      Supplier<ImmutableList<LocalStatement>> localStatements) {
     this.sessionState = new SessionState(optionsMetadata);
-    this.pgCatalog = new PgCatalog(this.sessionState);
+    this.pgCatalog =
+        Suppliers.memoize(
+            () -> new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get()));
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
-    if (localStatements.isEmpty()) {
-      this.localStatements = EMPTY_LOCAL_STATEMENTS;
-    } else {
-      Builder<String, LocalStatement> builder = ImmutableMap.builder();
-      for (LocalStatement localStatement : localStatements) {
-        for (String sql : localStatement.getSql()) {
-          builder.put(new SimpleImmutableEntry<>(sql, localStatement));
-        }
-      }
-      this.localStatements = builder.build();
-    }
+    this.localStatements =
+        Suppliers.memoize(
+            () -> {
+              if (localStatements.get().isEmpty()) {
+                return EMPTY_LOCAL_STATEMENTS;
+              } else {
+                Builder<String, LocalStatement> builder = ImmutableMap.builder();
+                for (LocalStatement localStatement : localStatements.get()) {
+                  for (String sql : localStatement.getSql()) {
+                    builder.put(new SimpleImmutableEntry<>(sql, localStatement));
+                  }
+                }
+                return builder.build();
+              }
+            });
   }
 
   /** Returns the current connection state. */
@@ -1302,7 +1312,7 @@ public class BackendConnection {
 
     @Override
     public ResultSet getResultSet() {
-      return ResultSets.forRows(
+      return ClientSideResultSet.forRows(
           Type.struct(StructField.of("partition", Type.bytes())),
           partitions.stream()
               .map(

@@ -136,7 +136,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   private String getExpectedInitialApplicationName() {
-    return pgVersion.equals("1.0") ? null : "PostgreSQL JDBC Driver";
+    return pgVersion.equals("1.0") ? "jdbc" : "PostgreSQL JDBC Driver";
   }
 
   @Test
@@ -163,6 +163,23 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals(sql, request.getSql());
       assertTrue(request.getTransaction().hasSingleUse());
       assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+    }
+  }
+
+  @Test
+  public void testShowApplicationName() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show application_name")) {
+        assertTrue(resultSet.next());
+        // If the PG version is 1.0, the JDBC driver thinks that the server does not support the
+        // application_name property and does not send any value. That means that PGAdapter fills it
+        // in automatically based on the client that is detected.
+        // Otherwise, the JDBC driver includes its own name, and that is not overwritten by
+        // PGAdapter.
+        assertEquals(getExpectedInitialApplicationName(), resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
     }
   }
 
