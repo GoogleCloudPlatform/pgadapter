@@ -60,7 +60,7 @@ The following limitations are currently known:
 | Generated primary keys | Cloud Spanner does not support `sequences`. Auto-increment primary key is not supported. Avoid using fields like `AutoField`, `BigAutoField`, etc. . The recommended type of primary key is a client side generated `UUID` stored as a string.                                                      |
 | Savepoint              | Cloud Spanner does not support `savepoints`. Creating or rolling back to a `Savepoint` in django is not supported in PGAdapter.                                                                                                                                                              |
 | Nested Atomic Blocks   | Nested atomic blocks make use of `savepoints`, which is currently not supported by Cloud Spanner. Hence, while using nested atomic blocks make sure to set `savepoint=False`, in the argument.                                                                                                      |
-| Interleaved Table      | Django doesn't support composite primary keys and interleaved table in cloud spanner requires a composite primary key and on the top of that, it is also not possible to create a django model without a primary key. A possible workaround around for using interleaved table is documented below. |
+| Interleaved Table      | Django does not support composite primary keys. Interleaved tables in Cloud Spanner require composite primary keys. A possible workaround for using interleaved tables is documented below. |
 
 
 ### Annotate
