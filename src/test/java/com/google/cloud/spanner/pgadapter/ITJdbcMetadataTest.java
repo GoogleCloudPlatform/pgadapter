@@ -429,7 +429,58 @@ public class ITJdbcMetadataTest implements IntegrationTest {
               assertTrue(columns.next());
               assertEquals("col_jsonb", columns.getString("COLUMN_NAME"));
               assertEquals(Types.OTHER, columns.getInt("DATA_TYPE"));
-              assertEquals("\"pg_catalog\".\"jsonb\"", columns.getString("TYPE_NAME"));
+              assertEquals("jsonb", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_bigint", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_int8", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_bool", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_bool", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_bytea", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_bytea", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_float8", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_float8", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_int", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_int8", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_numeric", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_numeric", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_timestamptz", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              name = columns.getString("TYPE_NAME");
+              assertTrue("_timestamptz".equals(name) || "_timestamp with time zone".equals(name));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_date", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_date", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_varchar", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_varchar", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_jsonb", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_jsonb", columns.getString("TYPE_NAME"));
 
               assertFalse(columns.next());
             }
@@ -471,6 +522,57 @@ public class ITJdbcMetadataTest implements IntegrationTest {
               assertEquals("col_varchar", columns.getString("COLUMN_NAME"));
               assertEquals(Types.VARCHAR, columns.getInt("DATA_TYPE"));
               assertEquals("varchar", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_bigint", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_int8", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_bool", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_bool", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_bytea", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_bytea", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_float8", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_float8", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_int", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_int8", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_numeric", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_numeric", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_timestamptz", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              name = columns.getString("TYPE_NAME");
+              assertTrue("_timestamptz".equals(name) || "_timestamp with time zone".equals(name));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_date", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_date", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_varchar", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_varchar", columns.getString("TYPE_NAME"));
+
+              assertTrue(columns.next());
+              assertEquals("col_array_jsonb", columns.getString("COLUMN_NAME"));
+              assertEquals(Types.ARRAY, columns.getInt("DATA_TYPE"));
+              assertEquals("_jsonb", columns.getString("TYPE_NAME"));
 
               assertFalse(columns.next());
             }

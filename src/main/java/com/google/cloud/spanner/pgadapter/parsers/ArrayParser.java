@@ -197,7 +197,6 @@ public class ArrayParser extends Parser<List<?>> {
 
   private List<?> toList(byte[] value, int elementOid) {
     Preconditions.checkNotNull(value);
-
     byte[] buffer = new byte[20];
     try (ByteArrayInputStream stream = new ByteArrayInputStream(value);
         DataInputStream dataStream = new DataInputStream(stream)) {

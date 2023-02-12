@@ -30,10 +30,11 @@ import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -693,8 +694,8 @@ public class ITJdbcTest implements IntegrationTest {
       CopyManager copyManager = pgConnection.getCopyAPI();
       long copyCount =
           copyManager.copyIn(
-              "copy all_types from stdin;",
-              new FileInputStream("./src/test/resources/all_types_data_small.txt"));
+              "copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin;",
+              Files.newInputStream(Paths.get("./src/test/resources/all_types_data_small.txt")));
       assertEquals(100L, copyCount);
 
       // Verify that there are actually 100 rows in the table.
@@ -718,8 +719,8 @@ public class ITJdbcTest implements IntegrationTest {
       CopyManager copyManager = pgConnection.getCopyAPI();
       long copyCount =
           copyManager.copyIn(
-              "copy all_types from stdin;",
-              new FileInputStream("./src/test/resources/all_types_data_nulls.txt"));
+              "copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin;",
+              Files.newInputStream(Paths.get("./src/test/resources/all_types_data_nulls.txt")));
       assertEquals(1L, copyCount);
 
       // Verify that there is 1 row in the table, and that the values of all columns except the
@@ -749,8 +750,8 @@ public class ITJdbcTest implements IntegrationTest {
               SQLException.class,
               () ->
                   copyManager.copyIn(
-                      "copy all_types from stdin;",
-                      new FileInputStream("./src/test/resources/all_types_data.txt")));
+                      "copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin;",
+                      Files.newInputStream(Paths.get("./src/test/resources/all_types_data.txt"))));
       assertEquals(
           "ERROR: Record count: 1819 has exceeded the limit: 1818.\n"
               + "\n"
@@ -786,8 +787,8 @@ public class ITJdbcTest implements IntegrationTest {
       CopyManager copyManager = pgConnection.getCopyAPI();
       long copyCount =
           copyManager.copyIn(
-              "copy all_types from stdin;",
-              new FileInputStream("./src/test/resources/all_types_data.txt"));
+              "copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin;",
+              Files.newInputStream(Paths.get("./src/test/resources/all_types_data.txt")));
       assertEquals(10_000L, copyCount);
 
       // Verify that there are 10,000 rows in the table.
