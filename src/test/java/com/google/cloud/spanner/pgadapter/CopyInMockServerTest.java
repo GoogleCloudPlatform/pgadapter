@@ -1735,6 +1735,39 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
                 .to(allTypesTableName)
                 .build(),
             allTypesResultSet));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.newBuilder(
+                    "SELECT column_name, data_type "
+                        + "FROM information_schema.columns "
+                        + "WHERE table_schema = $1 AND table_name = $2 "
+                        + "and column_name in ($3, $4, $5, $6, $7, $8, $9, $10, $11, $12)")
+                .bind("p1")
+                .to("public")
+                .bind("p2")
+                .to(allTypesTableName)
+                .bind("p3")
+                .to("col_bigint")
+                .bind("p4")
+                .to("col_bool")
+                .bind("p5")
+                .to("col_bytea")
+                .bind("p6")
+                .to("col_float8")
+                .bind("p7")
+                .to("col_int")
+                .bind("p8")
+                .to("col_numeric")
+                .bind("p9")
+                .to("col_timestamptz")
+                .bind("p10")
+                .to("col_date")
+                .bind("p11")
+                .to("col_varchar")
+                .bind("p12")
+                .to("col_jsonb")
+                .build(),
+            allTypesResultSet));
 
     String indexedColumnsCountSql =
         "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema=$1 and table_name=$2 and column_name in ($3, $4, $5)";
