@@ -130,8 +130,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(
-                    PG_TYPE_PREFIX
-                        + "SELECT t.oid, t.typname   "
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT t.oid, t.typname   "
                         + "FROM pg_type t  "
                         + "JOIN pg_namespace n ON t.typnamespace = n.oid "
                         + "WHERE t.typelem = (SELECT oid FROM pg_type WHERE typname = $1) AND substring(t.typname, 1, 1) = '_' AND t.typlen = -1 AND (n.nspname = $2 OR $3 AND n.nspname IN ('pg_catalog', 'public')) "
@@ -155,8 +156,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(
-                    PG_TYPE_PREFIX
-                        + "SELECT n.nspname IN ('pg_catalog', 'public'), n.nspname, t.typname "
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT n.nspname IN ('pg_catalog', 'public'), n.nspname, t.typname "
                         + "FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid "
                         + "WHERE t.oid = $1")
                 .bind("p1")
@@ -177,8 +179,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(
-                    PG_TYPE_PREFIX
-                        + "SELECT e.typdelim FROM pg_type t, pg_type e WHERE t.oid = $1 and t.typelem = e.oid")
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT e.typdelim FROM pg_type t, pg_type e WHERE t.oid = $1 and t.typelem = e.oid")
                 .bind("p1")
                 .to(3807L)
                 .build(),
@@ -193,8 +196,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(
-                    PG_TYPE_PREFIX
-                        + "SELECT e.oid, n.nspname IN ('pg_catalog', 'public'), n.nspname, e.typname "
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT e.oid, n.nspname IN ('pg_catalog', 'public'), n.nspname, e.typname "
                         + "FROM pg_type t JOIN pg_type e ON t.typelem = e.oid "
                         + "JOIN pg_namespace n ON t.typnamespace = n.oid "
                         + "WHERE t.oid = $1")
@@ -218,8 +222,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.newBuilder(
-                    PG_TYPE_PREFIX
-                        + "SELECT t.typarray, arr.typname   "
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT t.typarray, arr.typname   "
                         + "FROM pg_type t  "
                         + "JOIN pg_namespace n ON t.typnamespace = n.oid  "
                         + "JOIN pg_type arr ON arr.oid = t.typarray "
@@ -3400,7 +3405,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testSelectPgType() throws SQLException {
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(PG_TYPE_PREFIX + "select * from pg_type"), SELECT1_RESULTSET));
+            Statement.of("with " + PG_TYPE_PREFIX + "\nselect * from pg_type"), SELECT1_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet =
@@ -3419,8 +3424,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                PG_TYPE_PREFIX
-                    + "select * from pg_type join pg_namespace on pg_type.typnamespace=pg_namespace.oid"),
+                "with "
+                    + PG_TYPE_PREFIX
+                    + "\nselect * from pg_type join pg_namespace on pg_type.typnamespace=pg_namespace.oid"),
             SELECT1_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {

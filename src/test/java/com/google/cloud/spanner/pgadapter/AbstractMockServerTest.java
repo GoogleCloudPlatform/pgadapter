@@ -96,7 +96,7 @@ public abstract class AbstractMockServerTest {
   private static final Logger logger = Logger.getLogger(AbstractMockServerTest.class.getName());
 
   public static final String PG_TYPE_PREFIX =
-      "with pg_namespace as (\n"
+      "pg_namespace as (\n"
           + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
           + "        schema_name as nspname, null as nspowner, null as nspacl\n"
           + "  from information_schema.schemata\n"
@@ -130,12 +130,13 @@ public abstract class AbstractMockServerTest {
           + "  select 1185 as oid, '_timestamptz' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 1184 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
           + "  select 1231 as oid, '_numeric' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 1700 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
           + "  select 3807 as oid, 'jsonb' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'A' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 3802 as typelem, 0 as typarray, 'array_in' as typinput, 'array_out' as typoutput, 'array_recv' as typreceive, 'array_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl\n"
-          + ")\n";
+          + ")";
 
   protected static final Statement SELECT_JSONB_TYPE_BY_OID =
       Statement.newBuilder(
-              PG_TYPE_PREFIX
-                  + "SELECT substring(typname, 1, 1)='_' as is_array, typtype, typname, pg_type.oid   FROM pg_type   LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE pg_type.oid = $1  ORDER BY sp.r, pg_type.oid DESC")
+              "with "
+                  + PG_TYPE_PREFIX
+                  + "\nSELECT substring(typname, 1, 1)='_' as is_array, typtype, typname, pg_type.oid   FROM pg_type   LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE pg_type.oid = $1  ORDER BY sp.r, pg_type.oid DESC")
           .bind("p1")
           .to(Oid.JSONB)
           .build();
@@ -177,15 +178,17 @@ public abstract class AbstractMockServerTest {
           .build();
   protected static final Statement SELECT_JSONB_TYPE_BY_NAME =
       Statement.newBuilder(
-              PG_TYPE_PREFIX
-                  + "SELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = $1  ORDER BY sp.r, pg_type.oid DESC LIMIT 1")
+              "with "
+                  + PG_TYPE_PREFIX
+                  + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = $1  ORDER BY sp.r, pg_type.oid DESC LIMIT 1")
           .bind("p1")
           .to("jsonb")
           .build();
   protected static final Statement SELECT_JSONB_TYPE_BY_NAME_SIMPLE_PROTOCOL =
       Statement.of(
-          PG_TYPE_PREFIX
-              + "SELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = 'jsonb'  ORDER BY sp.r, pg_type.oid DESC LIMIT 1");
+          "with "
+              + PG_TYPE_PREFIX
+              + "\nSELECT pg_type.oid, typname   FROM pg_type   LEFT   JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  WHERE typname = 'jsonb'  ORDER BY sp.r, pg_type.oid DESC LIMIT 1");
 
   protected static final ResultSet SELECT_JSONB_TYPE_BY_NAME_RESULT_SET =
       ResultSet.newBuilder()
@@ -213,8 +216,9 @@ public abstract class AbstractMockServerTest {
           .build();
   protected static final Statement SELECT_JSONB_TYPE_INFO =
       Statement.newBuilder(
-              PG_TYPE_PREFIX
-                  + "SELECT n.nspname = 'public', n.nspname, t.typname FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = $1")
+              "with "
+                  + PG_TYPE_PREFIX
+                  + "\nSELECT n.nspname = 'public', n.nspname, t.typname FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE t.oid = $1")
           .bind("p1")
           .to(Oid.JSONB)
           .build();

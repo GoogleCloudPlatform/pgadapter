@@ -508,7 +508,9 @@ public class BackendConnectionTest {
     backendConnection.flush();
 
     verify(connection)
-        .execute(Statement.of(AbstractMockServerTest.PG_TYPE_PREFIX + "select * from pg_type"));
+        .execute(
+            Statement.of(
+                "with " + AbstractMockServerTest.PG_TYPE_PREFIX + "\nselect * from pg_type"));
   }
 
   @Test
