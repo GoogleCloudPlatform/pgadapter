@@ -30,6 +30,7 @@ import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -726,7 +727,10 @@ public class ITJdbcTest implements IntegrationTest {
       // Verify that there is 1 row in the table, and that the values of all columns except the
       // primary key are null.
       try (ResultSet resultSet =
-          connection.createStatement().executeQuery("select * from all_types")) {
+          connection
+              .createStatement()
+              .executeQuery(
+                  "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb from all_types")) {
         assertTrue(resultSet.next());
         for (int col = 2; col <= resultSet.getMetaData().getColumnCount(); col++) {
           assertNull(String.format("Col %d should be null", col), resultSet.getObject(col));
@@ -1060,6 +1064,33 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals(Oid.FLOAT8, types.getInt(1));
         assertEquals("float8", types.getString(2));
         assertTrue(types.next());
+        assertEquals(Oid.BOOL_ARRAY, types.getInt(1));
+        assertEquals("_bool", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.BYTEA_ARRAY, types.getInt(1));
+        assertEquals("_bytea", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.INT2_ARRAY, types.getInt(1));
+        assertEquals("_int2", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.INT4_ARRAY, types.getInt(1));
+        assertEquals("_int4", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.TEXT_ARRAY, types.getInt(1));
+        assertEquals("_text", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.VARCHAR_ARRAY, types.getInt(1));
+        assertEquals("_varchar", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.INT8_ARRAY, types.getInt(1));
+        assertEquals("_int8", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.FLOAT4_ARRAY, types.getInt(1));
+        assertEquals("_float4", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.FLOAT8_ARRAY, types.getInt(1));
+        assertEquals("_float8", types.getString(2));
+        assertTrue(types.next());
         assertEquals(Oid.VARCHAR, types.getInt(1));
         assertEquals("varchar", types.getString(2));
         assertTrue(types.next());
@@ -1069,14 +1100,29 @@ public class ITJdbcTest implements IntegrationTest {
         assertEquals(Oid.TIMESTAMP, types.getInt(1));
         assertEquals("timestamp", types.getString(2));
         assertTrue(types.next());
+        assertEquals(Oid.TIMESTAMP_ARRAY, types.getInt(1));
+        assertEquals("_timestamp", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.DATE_ARRAY, types.getInt(1));
+        assertEquals("_date", types.getString(2));
+        assertTrue(types.next());
         assertEquals(Oid.TIMESTAMPTZ, types.getInt(1));
         assertEquals("timestamptz", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.TIMESTAMPTZ_ARRAY, types.getInt(1));
+        assertEquals("_timestamptz", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.NUMERIC_ARRAY, types.getInt(1));
+        assertEquals("_numeric", types.getString(2));
         assertTrue(types.next());
         assertEquals(Oid.NUMERIC, types.getInt(1));
         assertEquals("numeric", types.getString(2));
         assertTrue(types.next());
         assertEquals(Oid.JSONB, types.getInt(1));
         assertEquals("jsonb", types.getString(2));
+        assertTrue(types.next());
+        assertEquals(Oid.JSONB_ARRAY, types.getInt(1));
+        assertEquals("_jsonb", types.getString(2));
 
         assertFalse(types.next());
       }
@@ -1108,6 +1154,33 @@ public class ITJdbcTest implements IntegrationTest {
                 .to("bar")
                 .set("col_jsonb")
                 .to(Value.pgJsonb("{\"key\": \"value2\"}"))
+                .set("col_array_bigint")
+                .toInt64Array(Arrays.asList(1L, null, 2L))
+                .set("col_array_bool")
+                .toBoolArray(Arrays.asList(true, null, false))
+                .set("col_array_bytea")
+                .toBytesArray(
+                    Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .set("col_array_float8")
+                .toFloat64Array(Arrays.asList(3.14d, null, -99.8))
+                .set("col_array_int")
+                .toInt64Array(Arrays.asList(-1L, null, -2L))
+                .set("col_array_numeric")
+                .toPgNumericArray(Arrays.asList("6.626", null, "-3.14"))
+                .set("col_array_timestamptz")
+                .toTimestampArray(
+                    Arrays.asList(
+                        Timestamp.parseTimestamp("2000-01-01T00:00:00Z"),
+                        null,
+                        Timestamp.parseTimestamp("1970-01-01T00:00:00Z")))
+                .set("col_array_date")
+                .toDateArray(
+                    Arrays.asList(Date.parseDate("2000-01-01"), null, Date.parseDate("1970-01-01")))
+                .set("col_array_varchar")
+                .toStringArray(Arrays.asList("string1", null, "string2"))
+                .set("col_array_jsonb")
+                .toPgJsonbArray(
+                    Arrays.asList("{\"key\": \"value1\"}", null, "{\"key\": \"value2\"}"))
                 .build(),
             Mutation.newInsertBuilder("all_types")
                 .set("col_bigint")
@@ -1130,6 +1203,26 @@ public class ITJdbcTest implements IntegrationTest {
                 .to((String) null)
                 .set("col_jsonb")
                 .to(Value.pgJsonb(null))
+                .set("col_array_bigint")
+                .toInt64Array((long[]) null)
+                .set("col_array_bool")
+                .toBoolArray((boolean[]) null)
+                .set("col_array_bytea")
+                .toBytesArray(null)
+                .set("col_array_float8")
+                .toFloat64Array((double[]) null)
+                .set("col_array_int")
+                .toInt64Array((long[]) null)
+                .set("col_array_numeric")
+                .toPgNumericArray(null)
+                .set("col_array_timestamptz")
+                .toTimestampArray(null)
+                .set("col_array_date")
+                .toDateArray(null)
+                .set("col_array_varchar")
+                .toStringArray(null)
+                .set("col_array_jsonb")
+                .toPgJsonbArray(null)
                 .build(),
             Mutation.newInsertBuilder("all_types")
                 .set("col_bigint")
@@ -1152,6 +1245,26 @@ public class ITJdbcTest implements IntegrationTest {
                 .to("")
                 .set("col_jsonb")
                 .to(Value.pgJsonb("[]"))
+                .set("col_array_bigint")
+                .toInt64Array(ImmutableList.of())
+                .set("col_array_bool")
+                .toBoolArray(ImmutableList.of())
+                .set("col_array_bytea")
+                .toBytesArray(ImmutableList.of())
+                .set("col_array_float8")
+                .toFloat64Array(ImmutableList.of())
+                .set("col_array_int")
+                .toInt64Array(ImmutableList.of())
+                .set("col_array_numeric")
+                .toPgNumericArray(ImmutableList.of())
+                .set("col_array_timestamptz")
+                .toTimestampArray(ImmutableList.of())
+                .set("col_array_date")
+                .toDateArray(ImmutableList.of())
+                .set("col_array_varchar")
+                .toStringArray(ImmutableList.of())
+                .set("col_array_jsonb")
+                .toPgJsonbArray(ImmutableList.of())
                 .build(),
             Mutation.newInsertBuilder("all_types")
                 .set("col_bigint")
@@ -1174,6 +1287,26 @@ public class ITJdbcTest implements IntegrationTest {
                 .to("")
                 .set("col_jsonb")
                 .to(Value.pgJsonb("{}"))
+                .set("col_array_bigint")
+                .toInt64Array(ImmutableList.of())
+                .set("col_array_bool")
+                .toBoolArray(ImmutableList.of())
+                .set("col_array_bytea")
+                .toBytesArray(ImmutableList.of())
+                .set("col_array_float8")
+                .toFloat64Array(ImmutableList.of())
+                .set("col_array_int")
+                .toInt64Array(ImmutableList.of())
+                .set("col_array_numeric")
+                .toPgNumericArray(ImmutableList.of())
+                .set("col_array_timestamptz")
+                .toTimestampArray(ImmutableList.of())
+                .set("col_array_date")
+                .toDateArray(ImmutableList.of())
+                .set("col_array_varchar")
+                .toStringArray(ImmutableList.of())
+                .set("col_array_jsonb")
+                .toPgJsonbArray(ImmutableList.of())
                 .build()));
   }
 }
