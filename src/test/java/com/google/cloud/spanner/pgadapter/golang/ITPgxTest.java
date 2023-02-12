@@ -104,18 +104,7 @@ public class ITPgxTest implements IntegrationTest {
   }
 
   private static Iterable<String> getDdlStatements() {
-    return Collections.singletonList(
-        "create table all_types ("
-            + "col_bigint bigint not null primary key, "
-            + "col_bool bool, "
-            + "col_bytea bytea, "
-            + "col_float8 float8, "
-            + "col_int int, "
-            + "col_numeric numeric, "
-            + "col_timestamptz timestamptz, "
-            + "col_date date, "
-            + "col_varchar varchar(100),"
-            + "col_jsonb text)");
+    return PgAdapterTestEnv.DEFAULT_DATA_MODEL;
   }
 
   private GoString createConnString() {

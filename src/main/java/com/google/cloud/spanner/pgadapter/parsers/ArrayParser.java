@@ -14,6 +14,9 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerExceptionFactory;
@@ -21,12 +24,28 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.error.PGException;
+import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.common.base.Preconditions;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.csv.QuoteMode;
+import org.apache.commons.text.StringEscapeUtils;
+import org.postgresql.core.Oid;
+import org.postgresql.util.ByteConverter;
 
 /**
  * Translate wire protocol to array. Since arrays house any other specified types (including
@@ -38,7 +57,28 @@ public class ArrayParser extends Parser<List<?>> {
   private static final String PG_ARRAY_OPEN = "{", PG_ARRAY_CLOSE = "}";
   private static final String SPANNER_ARRAY_OPEN = "[", SPANNER_ARRAY_CLOSE = "]";
 
+  private static final CSVFormat STRING_ARRAY_FORMAT =
+      CSVFormat.newFormat(',')
+          .builder()
+          .setQuoteMode(QuoteMode.ALL_NON_NULL)
+          .setQuote('"')
+          .setNullString("NULL")
+          .setEscape('\\')
+          .setIgnoreSurroundingSpaces(true)
+          .build();
+
+  private static final CSVFormat NUMERIC_ARRAY_FORMAT =
+      CSVFormat.newFormat(',')
+          .builder()
+          .setQuoteMode(QuoteMode.NONE)
+          .setQuote('"')
+          .setNullString("NULL")
+          .setEscape('\\')
+          .setIgnoreSurroundingSpaces(true)
+          .build();
+
   private final Type arrayElementType;
+  private final int elementOid;
   private final boolean isStringEquivalent;
   private final SessionState sessionState;
 
@@ -46,6 +86,7 @@ public class ArrayParser extends Parser<List<?>> {
     this.sessionState = sessionState;
     if (item != null) {
       this.arrayElementType = item.getColumnType(position).getArrayElementType();
+      this.elementOid = Parser.toOid(item.getColumnType(position).getArrayElementType());
       if (this.arrayElementType.getCode() == Code.ARRAY) {
         throw new IllegalArgumentException(
             "Spanner does not support embedded Arrays."
@@ -54,8 +95,32 @@ public class ArrayParser extends Parser<List<?>> {
       this.item = toList(item.getValue(position), this.arrayElementType.getCode());
       this.isStringEquivalent = stringEquivalence(this.arrayElementType.getCode());
     } else {
-      arrayElementType = null;
-      isStringEquivalent = false;
+      this.arrayElementType = null;
+      this.elementOid = Oid.UNSPECIFIED;
+      this.isStringEquivalent = false;
+    }
+  }
+
+  public ArrayParser(
+      byte[] item,
+      FormatCode formatCode,
+      SessionState sessionState,
+      Type arrayElementType,
+      int elementOid) {
+    this.sessionState = sessionState;
+    this.arrayElementType = arrayElementType;
+    this.elementOid = elementOid;
+    this.isStringEquivalent = stringEquivalence(elementOid);
+    if (item != null) {
+      switch (formatCode) {
+        case TEXT:
+          this.item = toList(new String(item, StandardCharsets.UTF_8), elementOid);
+          break;
+        case BINARY:
+          this.item = toList(item, elementOid);
+          break;
+        default:
+      }
     }
   }
 
@@ -90,6 +155,84 @@ public class ArrayParser extends Parser<List<?>> {
     }
   }
 
+  private List<?> toList(String value, int elementOid) {
+    Preconditions.checkNotNull(value);
+    value = value.trim();
+    if (!value.startsWith("{") || !value.endsWith("}")) {
+      throw PGExceptionFactory.newPGException(
+          "Invalid array value. Arrays must be enclosed in { and }: " + value,
+          SQLState.InvalidParameterValue);
+    }
+    value = value.substring(1, value.length() - 1);
+    try (CSVParser parser =
+        (this.isStringEquivalent ? STRING_ARRAY_FORMAT : NUMERIC_ARRAY_FORMAT)
+            .parse(new StringReader(value))) {
+      List<CSVRecord> records = parser.getRecords();
+      if (records.size() > 1) {
+        throw new IOException("Multiple array values found");
+      }
+      CSVRecord record = records.get(0);
+      ArrayList<Object> result = new ArrayList<>(record.size());
+      for (String element : record.toList()) {
+        if (element == null || "null".equalsIgnoreCase(element)) {
+          result.add(null);
+        } else {
+          result.add(
+              Parser.create(
+                      sessionState,
+                      element.getBytes(StandardCharsets.UTF_8),
+                      elementOid,
+                      FormatCode.TEXT)
+                  .item);
+        }
+      }
+      return result;
+    } catch (IOException exception) {
+      throw PGException.newBuilder("Invalid array value: " + value)
+          .setSQLState(SQLState.InvalidParameterValue)
+          .setCause(exception)
+          .build();
+    }
+  }
+
+  private List<?> toList(byte[] value, int elementOid) {
+    Preconditions.checkNotNull(value);
+
+    byte[] buffer = new byte[20];
+    try (ByteArrayInputStream stream = new ByteArrayInputStream(value);
+        DataInputStream dataStream = new DataInputStream(stream)) {
+      dataStream.readFully(buffer);
+      int dimensions = ByteConverter.int4(buffer, 0);
+      if (dimensions != 1) {
+        throw PGExceptionFactory.newPGException(
+            "Only single-dimension arrays are supported", SQLState.InvalidParameterValue);
+      }
+      int nullFlag = ByteConverter.int4(buffer, 4);
+      int oid = ByteConverter.int4(buffer, 8);
+      int size = ByteConverter.int4(buffer, 12);
+      int lowerBound = ByteConverter.int4(buffer, 16);
+      ArrayList<Object> result = new ArrayList<>(size);
+      for (int i = 0; i < size; i++) {
+        buffer = new byte[4];
+        dataStream.readFully(buffer);
+        int elementSize = ByteConverter.int4(buffer, 0);
+        if (elementSize == -1) {
+          result.add(null);
+        } else {
+          buffer = new byte[elementSize];
+          dataStream.readFully(buffer);
+          result.add(Parser.create(sessionState, buffer, oid, FormatCode.BINARY).item);
+        }
+      }
+      return result;
+    } catch (IOException exception) {
+      throw PGException.newBuilder("Invalid array value")
+          .setSQLState(SQLState.InvalidParameterValue)
+          .setCause(exception)
+          .build();
+    }
+  }
+
   @Override
   public List<?> getItem() {
     return this.item;
@@ -110,6 +253,28 @@ public class ArrayParser extends Parser<List<?>> {
   }
 
   /**
+   * Whether a type is represented as string.
+   *
+   * @param arrayElementTypeOid The type to check.
+   * @return True if the type uses strings, false otherwise.
+   */
+  private boolean stringEquivalence(int arrayElementTypeOid) {
+    switch (arrayElementTypeOid) {
+      case Oid.BYTEA:
+      case Oid.DATE:
+      case Oid.TIMESTAMPTZ:
+      case Oid.TIMESTAMP:
+      case Oid.VARCHAR:
+      case Oid.UUID:
+      case Oid.TEXT:
+      case Oid.JSONB:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /**
    * Put quotes around the item if it is string equivalent, otherwise do not modify it.
    *
    * @param value The value to stringify.
@@ -121,9 +286,7 @@ public class ArrayParser extends Parser<List<?>> {
       return "NULL";
     }
     if (this.isStringEquivalent) {
-      if (value.indexOf('\\') > -1) {
-        value = value.replace("\\", "\\\\");
-      }
+      value = StringEscapeUtils.escapeJava(value);
       return STRING_TOGGLE + value + STRING_TOGGLE;
     }
     return value;
@@ -190,9 +353,81 @@ public class ArrayParser extends Parser<List<?>> {
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Override
   public void bind(Statement.Builder statementBuilder, String name) {
-    throw SpannerExceptionFactory.newSpannerException(
-        ErrorCode.UNIMPLEMENTED, "Array parameters not yet supported");
+    switch (elementOid) {
+      case Oid.BIT:
+      case Oid.BOOL:
+        statementBuilder.bind(name).toBoolArray((List<Boolean>) this.item);
+        break;
+      case Oid.INT2:
+        if (this.item == null) {
+          statementBuilder.bind(name).toInt64Array((long[]) null);
+        } else {
+          statementBuilder
+              .bind(name)
+              .toInt64Array(
+                  ((List<Short>) this.item)
+                      .stream()
+                          .map(s -> s == null ? null : s.longValue())
+                          .collect(Collectors.toList()));
+        }
+        break;
+      case Oid.INT4:
+        if (this.item == null) {
+          statementBuilder.bind(name).toInt64Array((long[]) null);
+        } else {
+          statementBuilder
+              .bind(name)
+              .toInt64Array(
+                  ((List<Integer>) this.item)
+                      .stream()
+                          .map(i -> i == null ? null : i.longValue())
+                          .collect(Collectors.toList()));
+        }
+        break;
+      case Oid.INT8:
+        statementBuilder.bind(name).toInt64Array((List<Long>) this.item);
+        break;
+      case Oid.NUMERIC:
+        statementBuilder.bind(name).toPgNumericArray((List<String>) this.item);
+        break;
+      case Oid.FLOAT4:
+        if (this.item == null) {
+          statementBuilder.bind(name).toFloat64Array((double[]) null);
+        } else {
+          statementBuilder
+              .bind(name)
+              .toFloat64Array(
+                  ((List<Float>) this.item)
+                      .stream().map(Double::valueOf).collect(Collectors.toList()));
+        }
+        break;
+      case Oid.FLOAT8:
+        statementBuilder.bind(name).toFloat64Array((List<Double>) this.item);
+        break;
+      case Oid.UUID:
+      case Oid.VARCHAR:
+      case Oid.TEXT:
+        statementBuilder.bind(name).toStringArray((List<String>) this.item);
+        break;
+      case Oid.JSONB:
+        statementBuilder.bind(name).toPgJsonbArray((List<String>) this.item);
+        break;
+      case Oid.BYTEA:
+        statementBuilder.bind(name).toBytesArray((List<ByteArray>) this.item);
+        break;
+      case Oid.TIMESTAMPTZ:
+      case Oid.TIMESTAMP:
+        statementBuilder.bind(name).toTimestampArray((List<Timestamp>) this.item);
+        break;
+      case Oid.DATE:
+        statementBuilder.bind(name).toDateArray((List<Date>) this.item);
+        break;
+      default:
+        throw PGExceptionFactory.newPGException(
+            "Unsupported array element type: " + arrayElementType, SQLState.InvalidParameterValue);
+    }
   }
 }

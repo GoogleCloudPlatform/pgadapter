@@ -159,7 +159,8 @@ public class ArrayParserTest {
             mock(SessionState.class));
 
     assertEquals(
-        "{\"{\"key\": \"value1\"}\",NULL,\"{\"key\": \"value2\"}\"}", parser.stringParse());
+        "{\"{\\\"key\\\": \\\"value1\\\"}\",NULL,\"{\\\"key\\\": \\\"value2\\\"}\"}",
+        parser.stringParse());
   }
 
   static ResultSet createArrayResultSet(Type arrayElementType, Value value) {
