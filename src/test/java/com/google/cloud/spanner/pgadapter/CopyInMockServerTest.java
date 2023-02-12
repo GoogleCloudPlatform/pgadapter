@@ -1635,11 +1635,39 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2")
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ")
                 .bind("p1")
                 .to(usersSchema)
                 .bind("p2")
                 .to("users")
+                .build(),
+            resultSet));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.newBuilder(
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 and column_name in ($3, $4)")
+                .bind("p1")
+                .to(usersSchema)
+                .bind("p2")
+                .to("users")
+                .bind("p3")
+                .to("id")
+                .bind("p4")
+                .to("name")
+                .build(),
+            resultSet));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            com.google.cloud.spanner.Statement.newBuilder(
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 and column_name in ($3, $4)")
+                .bind("p1")
+                .to(usersSchema)
+                .bind("p2")
+                .to("users")
+                .bind("p3")
+                .to("id")
+                .bind("p4")
+                .to("foo")
                 .build(),
             resultSet));
     com.google.spanner.v1.ResultSet allTypesResultSet =
@@ -1700,7 +1728,7 @@ public class CopyInMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             com.google.cloud.spanner.Statement.newBuilder(
-                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2")
+                    "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ")
                 .bind("p1")
                 .to("public")
                 .bind("p2")
