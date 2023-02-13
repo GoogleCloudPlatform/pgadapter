@@ -35,7 +35,7 @@
     </excludedTests>
 
     <spanner.version>6.35.1</spanner.version>
-    <junixsocket.version>2.6.1</junixsocket.version>
+    <junixsocket.version>2.6.2</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
@@ -85,7 +85,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.5.1</version>
+      <version>42.5.3</version>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>
@@ -121,7 +121,7 @@
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
-      <version>3.8.7</version>
+      <version>3.9.0</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
