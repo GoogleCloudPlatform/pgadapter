@@ -6,7 +6,7 @@ import pytz
 from django.db import connection
 from django.db import transaction
 from django.db.transaction import atomic
-from django.db.models import JSONField, CharField
+from django.db.models import IntegerField, CharField, BooleanField
 from django.db.models.functions import Cast
 import random
 x = 0
@@ -50,7 +50,7 @@ def get_sample_venue_description(x):
 
   description = {
       'address': 'address'+str(x),
-      'capacity': random.randint(1000, 5000),
+      'capacity': random.randint(100*x, 500*x),
       'isPopular': random.choice([True, False])
   }
 
@@ -159,22 +159,35 @@ def transaction_rollback():
     raise Exception('Transaction Rollback Unsuccessful')
 
 def jsonb_filter():
-  venue1 = create_sample_venue(10)
-  venue2 = create_sample_venue(100)
-  venue3 = create_sample_venue(1000)
+  venue1 = create_sample_venue('10')
+  venue2 = create_sample_venue('100')
+  venue3 = create_sample_venue('1000')
 
   venue1.save()
   venue2.save()
   venue3.save()
-  print(venue1.description['address'])
-  print(Venue.objects
-        .annotate(address=Cast('description__address', output_field=CharField()))
-        .filter(address=venue1.description['address'])
-        .first())
 
-#  if fetched_venue1.id != venue1.id:
- #   raise Exception('Transaction Rollback Unsuccessful')
+  # In order to query inside the fields of a jsonb column,
+  # we first need to use annotate to cast the respective jsonb field to the relevant data type.
+  # Like in this case, 'address' field is casted to CharField
+  # and then a filter is used upon this.
+  # Also, if the field is CharField, make sure to suround the value with double quotes("")
+  # because strings in jsonb are stores along with double quotes("")
 
+  fetched_venue1 = Venue.objects.annotate(address=Cast('description__address', output_field=CharField())).filter(address='"'+venue1.description['address']+'"').first()
+
+  if fetched_venue1.id != venue1.id:
+    raise Exception('Jsonb Filtering Unsuccessful')
+
+  fetched_venue2 = Venue.objects.annotate(capacity=Cast('description__capacity', output_field=IntegerField())).filter(capacity=venue2.description['capacity']).first()
+
+  if fetched_venue2.id != venue2.id:
+    raise Exception('Jsonb Filtering Unsuccessful')
+
+
+  fetched_venues3 = Venue.objects.annotate(isPopular=Cast('description__isPopular', output_field=BooleanField())).filter(isPopular=venue3.description['isPopular']).only('id')
+  if venue3 not in fetched_venues3:
+    raise Exception('Jsonb Filtering Unsuccessful')
 
 
 
@@ -199,20 +212,20 @@ if __name__ == "__main__":
 
     print('Starting Django Test')
 
-    #add_data()
+    add_data()
     print('Adding Data Successful')
 
-    #foreign_key_operations()
+    foreign_key_operations()
     print('Testing Foreign Key Successful')
 
-    #transaction_rollback()
+    transaction_rollback()
     print('Transaction Rollback Successful')
-
-    #delete_all_data()
-    print('Deleting Data Successful')
 
     jsonb_filter()
     print('Jsonb Filtering Successful ')
+
+    delete_all_data()
+    print('Deleting Data Successful')
 
     print('Django Sample Completed Successfully')
 
