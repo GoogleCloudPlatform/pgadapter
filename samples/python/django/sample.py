@@ -181,7 +181,7 @@ def jsonb_filter():
   fetched_venue2 = Venue.objects.annotate(capacity=Cast('description__capacity', output_field=IntegerField())).filter(capacity=venue2.description['capacity']).first()
 
   if fetched_venue2.id != venue2.id:
-    raise Exception('Jsonb Filtering Unsuccessful')
+    raise Exception('No Venue found with capacity ' + venue1.description['capacity'])
 
 
   fetched_venues3 = Venue.objects.annotate(isPopular=Cast('description__isPopular', output_field=BooleanField())).filter(isPopular=venue3.description['isPopular']).only('id')
