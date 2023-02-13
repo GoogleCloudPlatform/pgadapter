@@ -169,10 +169,9 @@ def jsonb_filter():
 
   # In order to query inside the fields of a jsonb column,
   # we first need to use annotate to cast the respective jsonb field to the relevant data type.
-  # Like in this case, 'address' field is casted to CharField
-  # and then a filter is used upon this.
-  # Also, if the field is CharField, make sure to suround the value with double quotes("")
-  # because strings in jsonb are stores along with double quotes("")
+  # In this example, the 'address' field is cast to CharField
+  # and then a filter is applied to this field.
+  # Make sure to enclose the filter value in double quotes("") for string values.
 
   fetched_venue1 = Venue.objects.annotate(address=Cast('description__address', output_field=CharField())).filter(address='"'+venue1.description['address']+'"').first()
 
