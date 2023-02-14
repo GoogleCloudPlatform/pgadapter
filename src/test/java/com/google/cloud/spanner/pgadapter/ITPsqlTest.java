@@ -788,7 +788,9 @@ public class ITPsqlTest implements IntegrationTest {
           // Pangnirtung did not observer DST in 1970-1979, but not all databases agree.
           ZoneId.of("America/Pangnirtung"),
           // Niue switched from -11:30 to -11 in 1978. Not all JDKs know that.
-          ZoneId.of("Pacific/Niue"));
+          ZoneId.of("Pacific/Niue"),
+          // Ojinaga switched from Mountain to Central time in 2022. Not all JDKs know that.
+          ZoneId.of("America/Ojinaga"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));
