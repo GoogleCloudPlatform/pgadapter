@@ -28,21 +28,17 @@ import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.cloud.spanner.pgadapter.statements.SimpleParser;
 import com.google.common.base.Preconditions;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.csv.QuoteMode;
 import org.apache.commons.text.StringEscapeUtils;
 import org.postgresql.core.Oid;
 import org.postgresql.util.ByteConverter;
@@ -57,48 +53,23 @@ public class ArrayParser extends Parser<List<?>> {
   private static final String PG_ARRAY_OPEN = "{", PG_ARRAY_CLOSE = "}";
   private static final String SPANNER_ARRAY_OPEN = "[", SPANNER_ARRAY_CLOSE = "]";
 
-  private static final CSVFormat STRING_ARRAY_FORMAT =
-      CSVFormat.newFormat(',')
-          .builder()
-          .setQuoteMode(QuoteMode.ALL_NON_NULL)
-          .setQuote('"')
-          .setNullString("NULL")
-          .setEscape('\\')
-          .setIgnoreSurroundingSpaces(true)
-          .build();
-
-  private static final CSVFormat NUMERIC_ARRAY_FORMAT =
-      CSVFormat.newFormat(',')
-          .builder()
-          .setQuoteMode(QuoteMode.NONE)
-          .setQuote('"')
-          .setNullString("NULL")
-          .setEscape('\\')
-          .setIgnoreSurroundingSpaces(true)
-          .build();
-
   private final Type arrayElementType;
   private final int elementOid;
   private final boolean isStringEquivalent;
   private final SessionState sessionState;
 
   public ArrayParser(ResultSet item, int position, SessionState sessionState) {
+    Preconditions.checkArgument(!item.isNull(position));
     this.sessionState = sessionState;
-    if (item != null) {
-      this.arrayElementType = item.getColumnType(position).getArrayElementType();
-      this.elementOid = Parser.toOid(item.getColumnType(position).getArrayElementType());
-      if (this.arrayElementType.getCode() == Code.ARRAY) {
-        throw new IllegalArgumentException(
-            "Spanner does not support embedded Arrays."
-                + " If you are seeing this, something went wrong!");
-      }
-      this.item = toList(item.getValue(position), this.arrayElementType.getCode());
-      this.isStringEquivalent = stringEquivalence(this.arrayElementType.getCode());
-    } else {
-      this.arrayElementType = null;
-      this.elementOid = Oid.UNSPECIFIED;
-      this.isStringEquivalent = false;
+    this.arrayElementType = item.getColumnType(position).getArrayElementType();
+    this.elementOid = Parser.toOid(item.getColumnType(position).getArrayElementType());
+    if (this.arrayElementType.getCode() == Code.ARRAY) {
+      throw new IllegalArgumentException(
+          "Spanner does not support embedded Arrays."
+              + " If you are seeing this, something went wrong!");
     }
+    this.item = toList(item.getValue(position), this.arrayElementType.getCode());
+    this.isStringEquivalent = stringEquivalence(this.arrayElementType.getCode());
   }
 
   public ArrayParser(
@@ -114,10 +85,10 @@ public class ArrayParser extends Parser<List<?>> {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          this.item = toList(new String(item, StandardCharsets.UTF_8), elementOid);
+          this.item = stringArrayToList(new String(item, StandardCharsets.UTF_8), elementOid);
           break;
         case BINARY:
-          this.item = toList(item, elementOid);
+          this.item = binaryArrayToList(item);
           break;
         default:
       }
@@ -155,47 +126,28 @@ public class ArrayParser extends Parser<List<?>> {
     }
   }
 
-  private List<?> toList(String value, int elementOid) {
+  private List<?> stringArrayToList(String value, int elementOid) {
     Preconditions.checkNotNull(value);
-    value = value.trim();
-    if (!value.startsWith("{") || !value.endsWith("}")) {
-      throw PGExceptionFactory.newPGException(
-          "Invalid array value. Arrays must be enclosed in { and }: " + value,
-          SQLState.InvalidParameterValue);
-    }
-    value = value.substring(1, value.length() - 1);
-    try (CSVParser parser =
-        (this.isStringEquivalent ? STRING_ARRAY_FORMAT : NUMERIC_ARRAY_FORMAT)
-            .parse(new StringReader(value))) {
-      List<CSVRecord> records = parser.getRecords();
-      if (records.size() > 1) {
-        throw new IOException("Multiple array values found");
+    List<String> values =
+        SimpleParser.readArrayLiteral(value, this.isStringEquivalent, elementOid != Oid.BYTEA);
+    ArrayList<Object> result = new ArrayList<>(values.size());
+    for (String element : values) {
+      if (element == null) {
+        result.add(null);
+      } else {
+        result.add(
+            Parser.create(
+                    sessionState,
+                    element.getBytes(StandardCharsets.UTF_8),
+                    elementOid,
+                    FormatCode.TEXT)
+                .item);
       }
-      CSVRecord record = records.get(0);
-      ArrayList<Object> result = new ArrayList<>(record.size());
-      for (String element : record.toList()) {
-        if (element == null || "null".equalsIgnoreCase(element)) {
-          result.add(null);
-        } else {
-          result.add(
-              Parser.create(
-                      sessionState,
-                      element.getBytes(StandardCharsets.UTF_8),
-                      elementOid,
-                      FormatCode.TEXT)
-                  .item);
-        }
-      }
-      return result;
-    } catch (IOException exception) {
-      throw PGException.newBuilder("Invalid array value: " + value)
-          .setSQLState(SQLState.InvalidParameterValue)
-          .setCause(exception)
-          .build();
     }
+    return result;
   }
 
-  private List<?> toList(byte[] value, int elementOid) {
+  private List<?> binaryArrayToList(byte[] value) {
     Preconditions.checkNotNull(value);
     byte[] buffer = new byte[20];
     try (ByteArrayInputStream stream = new ByteArrayInputStream(value);
@@ -206,9 +158,13 @@ public class ArrayParser extends Parser<List<?>> {
         throw PGExceptionFactory.newPGException(
             "Only single-dimension arrays are supported", SQLState.InvalidParameterValue);
       }
+      // Null flag indicates whether there is at least one null element in the array. This is
+      // ignored by PGAdapter, as we check for null elements in the conversion function below.
       int nullFlag = ByteConverter.int4(buffer, 4);
       int oid = ByteConverter.int4(buffer, 8);
       int size = ByteConverter.int4(buffer, 12);
+      // Lower bound indicates whether the lower bound of the array is 1 or 0. This is irrelevant
+      // for Cloud Spanner.
       int lowerBound = ByteConverter.int4(buffer, 16);
       ArrayList<Object> result = new ArrayList<>(size);
       for (int i = 0; i < size; i++) {

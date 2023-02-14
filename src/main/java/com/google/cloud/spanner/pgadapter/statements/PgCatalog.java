@@ -68,7 +68,7 @@ public class PgCatalog {
               Suppliers.ofInstance("true"),
           Pattern.compile("pg_table_is_visible\\s*\\(.+\\)"), Suppliers.ofInstance("true"),
           Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(true\\)\\)"),
-              Suppliers.ofInstance("IN ('pg_catalog', 'public')"));
+              Suppliers.ofInstance(" IN ('pg_catalog', 'public')"));
 
   private final ImmutableSet<String> checkPrefixes;
 

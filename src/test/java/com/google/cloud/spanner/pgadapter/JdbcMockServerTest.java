@@ -135,7 +135,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         + "\nSELECT t.oid, t.typname   "
                         + "FROM pg_type t  "
                         + "JOIN pg_namespace n ON t.typnamespace = n.oid "
-                        + "WHERE t.typelem = (SELECT oid FROM pg_type WHERE typname = $1) AND substring(t.typname, 1, 1) = '_' AND t.typlen = -1 AND (n.nspname = $2 OR $3 AND n.nspname IN ('pg_catalog', 'public')) "
+                        + "WHERE t.typelem = (SELECT oid FROM pg_type WHERE typname = $1) AND substring(t.typname, 1, 1) = '_' AND t.typlen = -1 AND (n.nspname = $2 OR $3 AND n.nspname  IN ('pg_catalog', 'public')) "
                         + "ORDER BY t.typelem DESC LIMIT 1")
                 .bind("p1")
                 .to("jsonb")
@@ -158,7 +158,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             Statement.newBuilder(
                     "with "
                         + PG_TYPE_PREFIX
-                        + "\nSELECT n.nspname IN ('pg_catalog', 'public'), n.nspname, t.typname "
+                        + "\nSELECT n.nspname  IN ('pg_catalog', 'public'), n.nspname, t.typname "
                         + "FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid "
                         + "WHERE t.oid = $1")
                 .bind("p1")
@@ -198,7 +198,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             Statement.newBuilder(
                     "with "
                         + PG_TYPE_PREFIX
-                        + "\nSELECT e.oid, n.nspname IN ('pg_catalog', 'public'), n.nspname, e.typname "
+                        + "\nSELECT e.oid, n.nspname  IN ('pg_catalog', 'public'), n.nspname, e.typname "
                         + "FROM pg_type t JOIN pg_type e ON t.typelem = e.oid "
                         + "JOIN pg_namespace n ON t.typnamespace = n.oid "
                         + "WHERE t.oid = $1")
@@ -229,7 +229,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         + "JOIN pg_namespace n ON t.typnamespace = n.oid  "
                         + "JOIN pg_type arr ON arr.oid = t.typarray "
                         + "WHERE t.typname = $1 "
-                        + "AND (n.nspname = $2 OR $3 AND n.nspname IN ('pg_catalog', 'public')) "
+                        + "AND (n.nspname = $2 OR $3 AND n.nspname  IN ('pg_catalog', 'public')) "
                         + "ORDER BY t.oid DESC LIMIT 1")
                 .bind("p1")
                 .to("jsonb")

@@ -266,6 +266,46 @@ public class SimpleParser {
     return new SimpleParser(query).peekKeyword(command);
   }
 
+  public static List<String> readArrayLiteral(
+      String expression, boolean mustBeQuoted, boolean escaped) {
+    List<String> result = new ArrayList<>();
+    SimpleParser parser = new SimpleParser(expression);
+    if (!parser.eatToken("{")) {
+      throw PGExceptionFactory.newPGException(
+          "Missing '{' at start of array value: " + expression, SQLState.InvalidParameterValue);
+    }
+    do {
+      if (result.isEmpty() && parser.peekToken("}")) {
+        break;
+      } else if (parser.eatKeyword("null")) {
+        result.add(null);
+      } else if (mustBeQuoted || parser.peekToken("\"")) {
+        QuotedString quotedString = parser.readQuotedString('"', escaped);
+        if (quotedString == null) {
+          throw PGExceptionFactory.newPGException(
+              "Invalid string in array: " + expression, SQLState.InvalidParameterValue);
+        }
+        result.add(quotedString.getValue());
+      } else {
+        String unquotedString = parser.parseExpressionUntilKeyword(ImmutableList.of("}"));
+        if (unquotedString == null) {
+          throw PGExceptionFactory.newPGException(
+              "Invalid element in array: " + expression, SQLState.InvalidParameterValue);
+        }
+        result.add(unquotedString);
+      }
+    } while (parser.eatToken(","));
+    if (!parser.eatToken("}")) {
+      throw PGExceptionFactory.newPGException(
+          "Missing '}' at end of array value: " + expression, SQLState.InvalidParameterValue);
+    }
+    if (parser.hasMoreTokens()) {
+      throw PGExceptionFactory.newPGException(
+          "Unexpected characters after array value: " + expression, SQLState.InvalidParameterValue);
+    }
+    return result;
+  }
+
   /**
    * Splits the given sql string into multiple sql statements. A semi-colon (;) indicates the end of
    * a statement.
@@ -726,19 +766,23 @@ public class SimpleParser {
   }
 
   QuotedString readSingleQuotedString() {
-    return readQuotedString(SINGLE_QUOTE);
+    return readQuotedString(SINGLE_QUOTE, false);
   }
 
   QuotedString readDoubleQuotedString() {
-    return readQuotedString(DOUBLE_QUOTE);
+    return readQuotedString(DOUBLE_QUOTE, false);
   }
 
   QuotedString readQuotedString(char quote) {
+    return readQuotedString(quote, false);
+  }
+
+  QuotedString readQuotedString(char quote, boolean alwaysEscaped) {
     skipWhitespaces();
     if (pos >= sql.length()) {
       throw PGExceptionFactory.newPGException("Unexpected end of expression", SQLState.SyntaxError);
     }
-    boolean escaped = eatToken("e");
+    boolean escaped = eatToken("e") || alwaysEscaped;
     if (sql.charAt(pos) != quote) {
       throw PGExceptionFactory.newPGException(
           "Invalid quote character: " + sql.charAt(pos), SQLState.SyntaxError);
