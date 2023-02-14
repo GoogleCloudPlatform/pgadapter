@@ -147,9 +147,9 @@ public class ArrayParserTest {
     assertEquals(
         Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")),
         new ArrayParser(
-                ("{\""
+                ("{\"\\"
                         + new String(bytes1, StandardCharsets.UTF_8)
-                        + "\",null,\""
+                        + "\",null,\"\\"
                         + new String(bytes2, StandardCharsets.UTF_8)
                         + "\"}")
                     .getBytes(StandardCharsets.UTF_8),

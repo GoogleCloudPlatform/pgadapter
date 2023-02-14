@@ -129,7 +129,7 @@ public class ArrayParser extends Parser<List<?>> {
   private List<?> stringArrayToList(String value, int elementOid) {
     Preconditions.checkNotNull(value);
     List<String> values =
-        SimpleParser.readArrayLiteral(value, this.isStringEquivalent, elementOid != Oid.BYTEA);
+        SimpleParser.readArrayLiteral(value, this.isStringEquivalent, elementOid == Oid.BYTEA);
     ArrayList<Object> result = new ArrayList<>(values.size());
     for (String element : values) {
       if (element == null) {
@@ -150,8 +150,7 @@ public class ArrayParser extends Parser<List<?>> {
   private List<?> binaryArrayToList(byte[] value) {
     Preconditions.checkNotNull(value);
     byte[] buffer = new byte[20];
-    try (ByteArrayInputStream stream = new ByteArrayInputStream(value);
-        DataInputStream dataStream = new DataInputStream(stream)) {
+    try (DataInputStream dataStream = new DataInputStream(new ByteArrayInputStream(value))) {
       dataStream.readFully(buffer);
       int dimensions = ByteConverter.int4(buffer, 0);
       if (dimensions != 1) {
@@ -356,7 +355,9 @@ public class ArrayParser extends Parser<List<?>> {
               .bind(name)
               .toFloat64Array(
                   ((List<Float>) this.item)
-                      .stream().map(Double::valueOf).collect(Collectors.toList()));
+                      .stream()
+                          .map(f -> f == null ? null : f.doubleValue())
+                          .collect(Collectors.toList()));
         }
         break;
       case Oid.FLOAT8:
