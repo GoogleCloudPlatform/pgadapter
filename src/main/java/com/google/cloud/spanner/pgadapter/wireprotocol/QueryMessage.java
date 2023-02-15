@@ -30,7 +30,9 @@ public class QueryMessage extends ControlMessage {
   public static final String DEALLOCATE = "DEALLOCATE";
   public static final String VACUUM = "VACUUM";
   public static final String TRUNCATE = "TRUNCATE";
-
+  public static final String SAVEPOINT = "SAVEPOINT";
+  public static final String RELEASE = "RELEASE";
+  public static final String ROLLBACK = "ROLLBACK";
   private final Statement originalStatement;
   private final SimpleQueryStatement simpleQueryStatement;
 

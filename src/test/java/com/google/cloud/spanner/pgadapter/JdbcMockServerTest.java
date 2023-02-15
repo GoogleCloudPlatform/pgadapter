@@ -92,9 +92,11 @@ import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
+import org.postgresql.jdbc.PSQLSavepoint;
 import org.postgresql.jdbc.PgStatement;
 import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
+import org.postgresql.util.PSQLState;
 
 @RunWith(Parameterized.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
@@ -3764,6 +3766,47 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertTrue(request.getTransaction().hasBegin());
     assertEquals(1, request.getStatementsCount());
     assertEquals(sql, request.getStatements(0).getSql());
+  }
+
+  @Test
+  public void testUnnamedSavepoint() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      PSQLException exception = assertThrows(PSQLException.class, connection::setSavepoint);
+      assertEquals(PSQLState.NOT_IMPLEMENTED.getState(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testNamedSavepoint() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      PSQLException exception =
+          assertThrows(PSQLException.class, () -> connection.setSavepoint("my-savepoint"));
+      assertEquals(PSQLState.NOT_IMPLEMENTED.getState(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testReleaseSavepoint() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      PSQLSavepoint savepoint = new PSQLSavepoint("my-savepoint");
+      PSQLException exception =
+          assertThrows(PSQLException.class, () -> connection.releaseSavepoint(savepoint));
+      assertEquals(PSQLState.NOT_IMPLEMENTED.getState(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testRollbackToSavepoint() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      PSQLSavepoint savepoint = new PSQLSavepoint("my-savepoint");
+      PSQLException exception =
+          assertThrows(PSQLException.class, () -> connection.rollback(savepoint));
+      assertEquals(PSQLState.NOT_IMPLEMENTED.getState(), exception.getSQLState());
+    }
   }
 
   @Ignore("Only used for manual performance testing")
