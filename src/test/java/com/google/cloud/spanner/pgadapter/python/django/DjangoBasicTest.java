@@ -294,16 +294,17 @@ public class DjangoBasicTest extends DjangoTestSetup {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sqlQuery), ALL_TYPES_NULLS_RESULTSET));
 
-    String expectedOutput = "{'col_bigint': None, "
-        + "'col_bool': None, "
-        + "'col_bytea': None, "
-        + "'col_float8': None, "
-        + "'col_int': None, "
-        + "'col_numeric': None, "
-        + "'col_timestamptz': None, "
-        + "'col_date': None, "
-        + "'col_varchar': None, "
-        + "'col_jsonb': None}\n";
+    String expectedOutput =
+        "{'col_bigint': None, "
+            + "'col_bool': None, "
+            + "'col_bytea': None, "
+            + "'col_float8': None, "
+            + "'col_int': None, "
+            + "'col_numeric': None, "
+            + "'col_timestamptz': None, "
+            + "'col_date': None, "
+            + "'col_varchar': None, "
+            + "'col_jsonb': None}\n";
     List<String> options = new ArrayList<>(Arrays.asList("select_all_null"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
     assertEquals(expectedOutput, actualOutput);
@@ -331,15 +332,16 @@ public class DjangoBasicTest extends DjangoTestSetup {
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sqlQuery), ALL_TYPES_RESULTSET));
 
-    String expectedOutput = "col_bigint : 1 , "
-        + "col_bool : True , "
-        + "col_bytea : b'test' , "
-        + "col_float8 : 3.14 , "
-        + "col_int : 100 , "
-        + "col_numeric : 6.626 , "
-        + "col_timestamptz : 2022-02-16 13:18:02.123456+00:00 , "
-        + "col_date : 2022-03-29 , col_varchar : test , "
-        + "col_jsonb : {'key': 'value'} , \n";
+    String expectedOutput =
+        "col_bigint : 1 , "
+            + "col_bool : True , "
+            + "col_bytea : b'test' , "
+            + "col_float8 : 3.14 , "
+            + "col_int : 100 , "
+            + "col_numeric : 6.626 , "
+            + "col_timestamptz : 2022-02-16 13:18:02.123456+00:00 , "
+            + "col_date : 2022-03-29 , col_varchar : test , "
+            + "col_jsonb : {'key': 'value'} , \n";
     List<String> options = new ArrayList<>(Arrays.asList("select_all_types"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
     assertEquals(expectedOutput, actualOutput);
