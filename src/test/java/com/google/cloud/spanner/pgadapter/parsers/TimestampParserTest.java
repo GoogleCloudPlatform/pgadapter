@@ -134,5 +134,8 @@ public class TimestampParserTest {
     assertEquals(
         Timestamp.parseTimestamp("2022-12-28T07:30Z"),
         TimestampParser.toTimestamp("2022-12-28 10:00+02:30", ZoneId.of("CET")));
+    assertEquals(
+        Timestamp.parseTimestamp("2011-11-04T00:05:23.123456Z"),
+        TimestampParser.toTimestamp("(\"2011-11-04 00:05:23.123456+00:00\")", ZoneId.of("UTC")));
   }
 }

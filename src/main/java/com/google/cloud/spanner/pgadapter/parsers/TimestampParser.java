@@ -125,6 +125,7 @@ public class TimestampParser extends Parser<Timestamp> {
    * the actual point in time if the timestamp string itself does not contain a timezone offset.
    */
   public static Timestamp toTimestamp(String value, ZoneId timezone) {
+    value = stripBracketsAndQuotes(value);
     try {
       String stringValue = toPGString(value);
       TemporalAccessor temporalAccessor = TIMESTAMPTZ_INPUT_FORMATTER.parse(stringValue);
@@ -156,6 +157,23 @@ public class TimestampParser extends Parser<Timestamp> {
         throw PGExceptionFactory.newPGException("Invalid timestamp value: " + value);
       }
     }
+  }
+
+  static String stripBracketsAndQuotes(String value) {
+    if (value == null) {
+      return null;
+    }
+    while (value.length() > 1
+        && (value.charAt(0) == '(' || value.charAt(0) == '"' || value.charAt(0) == '\'')) {
+      if (value.charAt(value.length() - 1) == value.charAt(0)) {
+        value = value.substring(1, value.length() - 1);
+      } else if (value.charAt(0) == '(' && value.charAt(value.length() - 1) == ')') {
+        value = value.substring(1, value.length() - 1);
+      } else {
+        break;
+      }
+    }
+    return value;
   }
 
   @Override
