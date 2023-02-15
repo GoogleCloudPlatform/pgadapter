@@ -77,7 +77,15 @@ def get_filtered_data(filters):
     print(rows)
 
 def all_types_insert():
-  obj = all_types(col_bigint=6, col_bool=True, col_bytea=b'hello', col_date=datetime.date(1998, 10, 2), col_int=13, col_varchar='some text', col_float8=26.8, col_numeric=95.6, col_timestamptz=datetime.datetime.fromtimestamp(1545730176, pytz.UTC))
+  obj = all_types(col_bigint=6,
+                  col_bool=True,
+                  col_bytea=b'hello',
+                  col_date=datetime.date(1998, 10, 2), col_int=13,
+                  col_varchar='some text',
+                  col_float8=26.8,
+                  col_numeric=95.6,
+                  col_timestamptz=datetime.datetime.fromtimestamp(1545730176, pytz.UTC),
+                  col_jsonb={'key':'value'})
   obj.save()
   print('Insert Successful')
 
@@ -87,9 +95,31 @@ def all_types_insert_all_null():
   print('Insert Successful')
 
 def select_all_null():
-  result = Singer.objects.filter(singerid=None, firstname=None, lastname=None)
+  result = all_types.objects\
+    .filter(col_bigint=None,
+            col_bool=None,
+            col_bytea=None,
+            col_float8=None,
+            col_int=None,
+            col_numeric=None,
+            col_timestamptz=None,
+            col_date=None,
+            col_varchar=None,
+            col_jsonb=None)
   for rows in result.values():
     print(rows)
+
+def select_all_types():
+  result = all_types.objects
+
+  for row in result.values():
+    for key in row:
+      print(key,":",end=' ')
+      if key == 'col_bytea':
+        print(bytes(row[key]),end=' ')
+      else:
+        print(row[key],end=' ')
+      print(',', end=' ')
 
 def execute(option):
   type = option[0]
@@ -105,6 +135,8 @@ def execute(option):
     all_types_insert_all_null()
   elif type == "select_all_null":
     select_all_null()
+  elif type == "select_all_types":
+    select_all_types()
   else:
     print('Invalid Option Type')
 

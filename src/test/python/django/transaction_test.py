@@ -88,7 +88,6 @@ def test_error_during_transaction():
     singer2 = Singer(singerid=2, firstname='hello', lastname='python')
 
     singer.save()
-    transaction.commit()
   except Exception:
     try:
       singer2.save()

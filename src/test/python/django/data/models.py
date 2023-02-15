@@ -34,3 +34,4 @@ class all_types(models.Model):
   col_timestamptz = models.DateTimeField()
   col_date = models.DateField()
   col_varchar = models.CharField(null=True)
+  col_jsonb = models.JSONField()
