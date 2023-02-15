@@ -49,6 +49,27 @@ public class SimpleParser {
     /** Name is the actual object name. */
     final String name;
 
+    /**
+     * Parses an unquoted, qualified identifier. Use this to quickly parse strings like 'foo' and
+     * 'foo.bar' as an identifier.
+     */
+    static TableOrIndexName parse(String qualifiedName) {
+      SimpleParser parser = new SimpleParser(qualifiedName);
+      TableOrIndexName result = parser.readTableOrIndexName();
+      if (result == null || parser.hasMoreTokens()) {
+        throw new IllegalArgumentException("Invalid identifier: " + qualifiedName);
+      }
+      return result;
+    }
+
+    static TableOrIndexName of(String name) {
+      return new TableOrIndexName(name);
+    }
+
+    static TableOrIndexName of(String schema, String name) {
+      return new TableOrIndexName(schema, name);
+    }
+
     TableOrIndexName(String name) {
       this.schema = null;
       this.name = name;
@@ -346,6 +367,15 @@ public class SimpleParser {
       ImmutableList<String> keywords,
       boolean sameParensLevelAsStart,
       boolean stopAtEndOfExpression) {
+    return parseExpressionUntilKeyword(
+        keywords, sameParensLevelAsStart, stopAtEndOfExpression, true);
+  }
+
+  String parseExpressionUntilKeyword(
+      ImmutableList<String> keywords,
+      boolean sameParensLevelAsStart,
+      boolean stopAtEndOfExpression,
+      boolean stopAtComma) {
     skipWhitespaces();
     int start = pos;
     boolean valid;
@@ -358,7 +388,7 @@ public class SimpleParser {
         if (stopAtEndOfExpression && parens < 0) {
           break;
         }
-      } else if (stopAtEndOfExpression && parens == 0 && sql.charAt(pos) == ',') {
+      } else if (stopAtEndOfExpression && parens == 0 && stopAtComma && sql.charAt(pos) == ',') {
         break;
       }
       if ((!sameParensLevelAsStart || parens == 0)
@@ -378,6 +408,10 @@ public class SimpleParser {
   }
 
   List<TableOrIndexName> readColumnListInParentheses(String name) {
+    return readColumnListInParentheses(name, true);
+  }
+
+  List<TableOrIndexName> readColumnListInParentheses(String name, boolean required) {
     if (eatToken("(")) {
       List<String> expressions = parseExpressionListUntilKeyword(")", true);
       if (!eatToken(")")) {
@@ -386,9 +420,11 @@ public class SimpleParser {
             SQLState.SyntaxError);
       }
       return expressionListToColumnNames(name, expressions);
-    } else {
+    } else if (required) {
       throw PGExceptionFactory.newPGException(
           String.format("missing opening parentheses for %s", name), SQLState.SyntaxError);
+    } else {
+      return null;
     }
   }
 

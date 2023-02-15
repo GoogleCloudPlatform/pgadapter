@@ -26,6 +26,9 @@ jobs:
           python-version: '3.9'
       - run: python --version
       - run: pip install -r ./src/test/python/requirements.txt
+      - run: pip install -r ./src/test/python/sqlalchemy/requirements.txt
+      - run: pip install -r ./src/test/python/pg8000/requirements.txt
+      - run: pip install -r ./src/test/python/psycopg3/requirements.txt
       - uses: actions/setup-node@v3
         with:
           node-version: 16
@@ -45,11 +48,6 @@ jobs:
           distribution: zulu
           java-version: ${{matrix.java}}
       - run: java -version
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-      - run: python --version
-      - run: pip install -r ./src/test/python/requirements.txt
       - run: mvn -B test
   macos:
     runs-on: macos-latest
@@ -75,6 +73,9 @@ jobs:
           python-version: '3.9'
       - run: python --version
       - run: pip install -r ./src/test/python/requirements.txt
+      - run: pip install -r ./src/test/python/sqlalchemy/requirements.txt
+      - run: pip install -r ./src/test/python/pg8000/requirements.txt
+      - run: pip install -r ./src/test/python/psycopg3/requirements.txt
       - uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '6.0.x'

@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,18 +11,36 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+package com.google.cloud.postgres.models;
 
-package com.google.cloud.spanner.pgadapter.metadata;
+import java.io.Serializable;
 
-import com.google.api.core.InternalApi;
+public class VenueDescription implements Serializable {
 
-/** Simple POJO superclass to hold results from a describe statement. */
-@InternalApi
-public abstract class DescribeMetadata<T> {
+  private String name;
+  private String val;
 
-  protected T metadata;
+  public VenueDescription() {
+  }
 
-  public T getMetadata() {
-    return this.metadata;
+  public VenueDescription(String name, String val) {
+    this.name = name;
+    this.val = val;
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public void setName(String name) {
+    this.name = name;
+  }
+
+  public String getVal() {
+    return val;
+  }
+
+  public void setVal(String val) {
+    this.val = val;
   }
 }

@@ -24,6 +24,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -80,7 +81,17 @@ public class CopyStatement extends IntermediatePortalStatement {
   public enum Format {
     CSV,
     TEXT,
-    BINARY,
+    BINARY {
+      @Override
+      public DataFormat getDataFormat() {
+        return DataFormat.POSTGRESQL_BINARY;
+      }
+    };
+
+    /** Returns the (default) data format that should be used for this copy format. */
+    public DataFormat getDataFormat() {
+      return DataFormat.POSTGRESQL_TEXT;
+    }
   }
 
   private static final String COLUMN_NAME = "column_name";
@@ -108,7 +119,18 @@ public class CopyStatement extends IntermediatePortalStatement {
       ParsedStatement parsedStatement,
       Statement originalStatement,
       ParsedCopyStatement parsedCopyStatement) {
-    super(connectionHandler, options, name, parsedStatement, originalStatement);
+    super(
+        name,
+        new IntermediatePreparedStatement(
+            connectionHandler,
+            options,
+            name,
+            NO_PARAMETER_TYPES,
+            parsedStatement,
+            originalStatement),
+        NO_PARAMS,
+        ImmutableList.of(),
+        ImmutableList.of());
     this.parsedCopyStatement = parsedCopyStatement;
   }
 
@@ -219,8 +241,8 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   /** @return 0 for text/csv formatting and 1 for binary */
-  public int getFormatCode() {
-    return (parsedCopyStatement.format == Format.BINARY) ? 1 : 0;
+  public byte getFormatCode() {
+    return (parsedCopyStatement.format == Format.BINARY) ? (byte) 1 : (byte) 0;
   }
 
   private void verifyCopyColumns() {
@@ -349,7 +371,7 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   @Override
-  public IntermediatePortalStatement bind(
+  public IntermediatePortalStatement createPortal(
       String name,
       byte[][] parameters,
       List<Short> parameterFormatCodes,
@@ -541,7 +563,7 @@ public class CopyStatement extends IntermediatePortalStatement {
     }
     ParsedCopyStatement.Builder builder = new ParsedCopyStatement.Builder();
     if (parser.eatToken("(")) {
-      builder.query = parser.parseExpressionUntilKeyword(ImmutableList.of(), true, true);
+      builder.query = parser.parseExpressionUntilKeyword(ImmutableList.of(), true, true, false);
       if (!parser.eatToken(")")) {
         throw PGExceptionFactory.newPGException(
             "missing closing parentheses after query", SQLState.SyntaxError);

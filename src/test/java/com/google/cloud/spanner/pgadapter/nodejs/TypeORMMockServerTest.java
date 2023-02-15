@@ -18,16 +18,22 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
+import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
@@ -89,6 +95,22 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.of(sql),
             ResultSet.newBuilder()
+                .setMetadata(
+                    USERS_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build()))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(),
+            ResultSet.newBuilder()
                 .setMetadata(USERS_METADATA)
                 .addRows(
                     ListValue.newBuilder()
@@ -107,21 +129,34 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(sql))
             .collect(Collectors.toList());
-    assertEquals(1, executeSqlRequests.size());
-    ExecuteSqlRequest request = executeSqlRequests.get(0);
+    assertEquals(2, executeSqlRequests.size());
+    ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
+    ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     // The TypeORM PostgreSQL driver sends both a Flush and a Sync message. The Flush message does
     // a look-ahead to determine if the next message is a Sync, and if it is, executes a Sync on the
-    // backend connection. This is a lot more efficient, as it means that we can use single-use
-    // read-only transactions for single queries.
+    // backend connection. This is a lot more efficient, as it means that we can use a read-only
+    // transaction for transactions that only contains queries.
     // There is however no guarantee that the server will see the Sync message in time to do this
-    // optimization, so in some cases the single query will be using a read/write transaction.
+    // optimization, so in some cases the single query will be using a read/write transaction, as we
+    // don't know what might be following the current query.
+    // This behavior in node-postgres has been fixed in
+    // https://github.com/brianc/node-postgres/pull/2842,
+    // but has not yet been released.
     int commitRequestCount = mockSpanner.countRequestsOfType(CommitRequest.class);
     if (commitRequestCount == 0) {
-      assertTrue(request.getTransaction().hasSingleUse());
-      assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+      assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+      assertTrue(
+          mockSpanner
+              .getRequestsOfType(BeginTransactionRequest.class)
+              .get(0)
+              .getOptions()
+              .hasReadOnly());
+      assertTrue(describeRequest.getTransaction().hasId());
+      assertTrue(executeRequest.getTransaction().hasId());
     } else if (commitRequestCount == 1) {
-      assertTrue(request.getTransaction().hasBegin());
-      assertTrue(request.getTransaction().getBegin().hasReadWrite());
+      assertTrue(describeRequest.getTransaction().hasBegin());
+      assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+      assertTrue(executeRequest.getTransaction().hasId());
     } else {
       fail("Invalid commit count: " + commitRequestCount);
     }
@@ -135,22 +170,79 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "FROM \"user\" \"User\" WHERE \"User\".\"id\" IN ($1)";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(existsSql), ResultSet.newBuilder().setMetadata(USERS_METADATA).build()));
+            Statement.of(existsSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    USERS_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build()))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(existsSql).bind("p1").to(1L).build(),
+            ResultSet.newBuilder().setMetadata(USERS_METADATA).build()));
     String insertSql =
         "INSERT INTO \"user\"(\"id\", \"firstName\", \"lastName\", \"age\") VALUES ($1, $2, $3, $4)";
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.STRING, TypeCode.STRING, TypeCode.INT64)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(insertSql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to("Timber")
+                .bind("p3")
+                .to("Saw")
+                .bind("p4")
+                .to(25L)
+                .build(),
+            1L));
 
     String sql =
         "SELECT \"User\".\"id\" AS \"User_id\", \"User\".\"firstName\" AS \"User_firstName\", "
             + "\"User\".\"lastName\" AS \"User_lastName\", \"User\".\"age\" AS \"User_age\" "
             + "FROM \"user\" \"User\" WHERE (\"User\".\"firstName\" = $1 AND \"User\".\"lastName\" = $2) "
             + "LIMIT 1";
-    // The parameter is sent as an untyped parameter, and therefore not included in the statement
-    // lookup on the mock server, hence the Statement.of(sql) instead of building a statement that
-    // does include the parameter value.
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    USERS_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p2")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .build()))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to("Timber").bind("p2").to("Saw").build(),
             ResultSet.newBuilder()
                 .setMetadata(USERS_METADATA)
                 .addRows(
@@ -174,25 +266,27 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(existsSql))
             .collect(Collectors.toList());
-    assertEquals(1, checkExistsRequests.size());
-    ExecuteSqlRequest checkExistsRequest = checkExistsRequests.get(0);
-    if (checkExistsRequest.getTransaction().hasSingleUse()) {
-      assertTrue(checkExistsRequest.getTransaction().getSingleUse().hasReadOnly());
-    } else if (checkExistsRequest.getTransaction().hasBegin()) {
-      assertTrue(checkExistsRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, checkExistsRequests.size());
+    ExecuteSqlRequest describeCheckExistsRequest = checkExistsRequests.get(0);
+    ExecuteSqlRequest executeCheckExistsRequest = checkExistsRequests.get(1);
+    assertEquals(QueryMode.PLAN, describeCheckExistsRequest.getQueryMode());
+    assertEquals(QueryMode.NORMAL, executeCheckExistsRequest.getQueryMode());
+    if (describeCheckExistsRequest.getTransaction().hasBegin()) {
       expectedCommitCount++;
-    } else {
-      fail("missing or invalid transaction option: " + checkExistsRequest.getTransaction());
     }
 
     List<ExecuteSqlRequest> insertRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(insertSql))
             .collect(Collectors.toList());
-    assertEquals(1, insertRequests.size());
-    ExecuteSqlRequest insertRequest = insertRequests.get(0);
-    assertTrue(insertRequest.getTransaction().hasBegin());
-    assertTrue(insertRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, insertRequests.size());
+    ExecuteSqlRequest describeInsertRequest = insertRequests.get(0);
+    assertEquals(QueryMode.PLAN, describeInsertRequest.getQueryMode());
+    assertTrue(describeInsertRequest.getTransaction().hasBegin());
+    assertTrue(describeInsertRequest.getTransaction().getBegin().hasReadWrite());
+    ExecuteSqlRequest executeInsertRequest = insertRequests.get(1);
+    assertEquals(QueryMode.NORMAL, executeInsertRequest.getQueryMode());
+    assertTrue(executeInsertRequest.getTransaction().hasId());
     expectedCommitCount++;
 
     // Loading the user after having saved it will be done in a single-use read-only transaction.
@@ -200,15 +294,13 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(sql))
             .collect(Collectors.toList());
-    assertEquals(1, loadRequests.size());
-    ExecuteSqlRequest loadRequest = loadRequests.get(0);
-    if (loadRequest.getTransaction().hasSingleUse()) {
-      assertTrue(loadRequest.getTransaction().getSingleUse().hasReadOnly());
-    } else if (loadRequest.getTransaction().hasBegin()) {
-      assertTrue(loadRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, loadRequests.size());
+    ExecuteSqlRequest describeLoadRequest = loadRequests.get(0);
+    assertEquals(QueryMode.PLAN, describeLoadRequest.getQueryMode());
+    ExecuteSqlRequest executeLoadRequest = loadRequests.get(1);
+    assertEquals(QueryMode.NORMAL, executeLoadRequest.getQueryMode());
+    if (describeLoadRequest.getTransaction().hasBegin()) {
       expectedCommitCount++;
-    } else {
-      fail("missing or invalid transaction option: " + loadRequest.getTransaction());
     }
     assertEquals(expectedCommitCount, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
@@ -223,6 +315,23 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.of(loadSql),
             ResultSet.newBuilder()
+                .setMetadata(
+                    USERS_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(loadSql).bind("p1").to(1L).build(),
+            ResultSet.newBuilder()
                 .setMetadata(USERS_METADATA)
                 .addRows(
                     ListValue.newBuilder()
@@ -232,6 +341,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("25").build())
                         .build())
                 .build()));
+
     String existsSql =
         "SELECT \"User\".\"id\" AS \"User_id\", \"User\".\"firstName\" AS \"User_firstName\", "
             + "\"User\".\"lastName\" AS \"User_lastName\", \"User\".\"age\" AS \"User_age\" "
@@ -239,6 +349,23 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(existsSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    USERS_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(existsSql).bind("p1").to(1L).build(),
             ResultSet.newBuilder()
                 .setMetadata(USERS_METADATA)
                 .addRows(
@@ -252,7 +379,29 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
 
     String updateSql =
         "UPDATE \"user\" SET \"firstName\" = $1, \"lastName\" = $2, \"age\" = $3 WHERE \"id\" IN ($4)";
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(updateSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.STRING, TypeCode.STRING, TypeCode.INT64, TypeCode.INT64)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(updateSql)
+                .bind("p1")
+                .to("Lumber")
+                .bind("p2")
+                .to("Jack")
+                .bind("p3")
+                .to(45L)
+                .bind("p4")
+                .to(1L)
+                .build(),
+            1L));
 
     String output = runTest("updateUser", pgServer.getLocalPort());
 
@@ -266,40 +415,38 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(loadSql))
             .collect(Collectors.toList());
-    assertEquals(1, loadRequests.size());
-    ExecuteSqlRequest loadRequest = loadRequests.get(0);
-    if (loadRequest.getTransaction().hasSingleUse()) {
-      assertTrue(loadRequest.getTransaction().getSingleUse().hasReadOnly());
-    } else if (loadRequest.getTransaction().hasBegin()) {
-      assertTrue(loadRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, loadRequests.size());
+    ExecuteSqlRequest describeLoadRequest = loadRequests.get(0);
+    assertEquals(QueryMode.PLAN, describeLoadRequest.getQueryMode());
+    ExecuteSqlRequest executeLoadRequest = loadRequests.get(1);
+    assertEquals(QueryMode.NORMAL, executeLoadRequest.getQueryMode());
+    if (describeLoadRequest.getTransaction().hasBegin()) {
       expectedCommitCount++;
-    } else {
-      fail("missing or invalid transaction option: " + loadRequest.getTransaction());
     }
 
     List<ExecuteSqlRequest> checkExistsRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(existsSql))
             .collect(Collectors.toList());
-    assertEquals(1, checkExistsRequests.size());
-    ExecuteSqlRequest checkExistsRequest = checkExistsRequests.get(0);
-    if (checkExistsRequest.getTransaction().hasSingleUse()) {
-      assertTrue(checkExistsRequest.getTransaction().getSingleUse().hasReadOnly());
-    } else if (checkExistsRequest.getTransaction().hasBegin()) {
-      assertTrue(checkExistsRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, checkExistsRequests.size());
+    ExecuteSqlRequest describeCheckExistsRequest = checkExistsRequests.get(0);
+    assertEquals(QueryMode.PLAN, describeCheckExistsRequest.getQueryMode());
+    ExecuteSqlRequest executeCheckExistsRequest = checkExistsRequests.get(1);
+    assertEquals(QueryMode.NORMAL, executeCheckExistsRequest.getQueryMode());
+    if (describeCheckExistsRequest.getTransaction().hasBegin()) {
       expectedCommitCount++;
-    } else {
-      fail("missing or invalid transaction option: " + checkExistsRequest.getTransaction());
     }
 
     List<ExecuteSqlRequest> updateRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(updateSql))
             .collect(Collectors.toList());
-    assertEquals(1, updateRequests.size());
-    ExecuteSqlRequest updateRequest = updateRequests.get(0);
-    assertTrue(updateRequest.getTransaction().hasBegin());
-    assertTrue(updateRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, updateRequests.size());
+    ExecuteSqlRequest describeUpdateRequest = updateRequests.get(0);
+    ExecuteSqlRequest executeUpdateRequest = updateRequests.get(1);
+    assertTrue(describeUpdateRequest.getTransaction().hasBegin());
+    assertTrue(describeUpdateRequest.getTransaction().getBegin().hasReadWrite());
+    assertTrue(executeUpdateRequest.getTransaction().hasId());
     expectedCommitCount++;
 
     assertEquals(expectedCommitCount, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -315,6 +462,22 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.of(loadSql),
             ResultSet.newBuilder()
+                .setMetadata(
+                    USERS_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build()))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(loadSql).bind("p1").to(1L).build(),
+            ResultSet.newBuilder()
                 .setMetadata(USERS_METADATA)
                 .addRows(
                     ListValue.newBuilder()
@@ -324,6 +487,7 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("25").build())
                         .build())
                 .build()));
+
     String existsSql =
         "SELECT \"User\".\"id\" AS \"User_id\", \"User\".\"firstName\" AS \"User_firstName\", "
             + "\"User\".\"lastName\" AS \"User_lastName\", \"User\".\"age\" AS \"User_age\" "
@@ -331,6 +495,22 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(existsSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    USERS_METADATA
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build()))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(existsSql).bind("p1").to(1L).build(),
             ResultSet.newBuilder()
                 .setMetadata(USERS_METADATA)
                 .addRows(
@@ -343,7 +523,15 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
                 .build()));
 
     String deleteSql = "DELETE FROM \"user\" WHERE \"id\" = $1";
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(deleteSql), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(deleteSql),
+            ResultSet.newBuilder()
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.newBuilder(deleteSql).bind("p1").to(1L).build(), 1L));
 
     String output = runTest("deleteUser", pgServer.getLocalPort());
 
@@ -357,40 +545,39 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(loadSql))
             .collect(Collectors.toList());
-    assertEquals(1, loadRequests.size());
-    ExecuteSqlRequest loadRequest = loadRequests.get(0);
-    if (loadRequest.getTransaction().hasSingleUse()) {
-      assertTrue(loadRequest.getTransaction().getSingleUse().hasReadOnly());
-    } else if (loadRequest.getTransaction().hasBegin()) {
-      assertTrue(loadRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, loadRequests.size());
+    ExecuteSqlRequest describeLoadRequest = loadRequests.get(0);
+    assertEquals(QueryMode.PLAN, describeLoadRequest.getQueryMode());
+    ExecuteSqlRequest executeLoadRequest = loadRequests.get(1);
+    assertEquals(QueryMode.NORMAL, executeLoadRequest.getQueryMode());
+    if (describeLoadRequest.getTransaction().hasBegin()) {
       expectedCommitCount++;
-    } else {
-      fail("missing or invalid transaction option: " + loadRequest.getTransaction());
     }
 
     List<ExecuteSqlRequest> checkExistsRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(existsSql))
             .collect(Collectors.toList());
-    assertEquals(1, checkExistsRequests.size());
-    ExecuteSqlRequest checkExistsRequest = checkExistsRequests.get(0);
-    if (checkExistsRequest.getTransaction().hasSingleUse()) {
-      assertTrue(checkExistsRequest.getTransaction().getSingleUse().hasReadOnly());
-    } else if (checkExistsRequest.getTransaction().hasBegin()) {
-      assertTrue(checkExistsRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, checkExistsRequests.size());
+    ExecuteSqlRequest describeCheckExistsRequest = checkExistsRequests.get(0);
+    assertEquals(QueryMode.PLAN, describeCheckExistsRequest.getQueryMode());
+    ExecuteSqlRequest executeCheckExistsRequest = checkExistsRequests.get(1);
+    assertEquals(QueryMode.NORMAL, executeCheckExistsRequest.getQueryMode());
+    if (describeCheckExistsRequest.getTransaction().hasBegin()) {
       expectedCommitCount++;
-    } else {
-      fail("missing or invalid transaction option: " + checkExistsRequest.getTransaction());
     }
 
     List<ExecuteSqlRequest> deleteRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(deleteSql))
             .collect(Collectors.toList());
-    assertEquals(1, deleteRequests.size());
-    ExecuteSqlRequest deleteRequest = deleteRequests.get(0);
-    assertTrue(deleteRequest.getTransaction().hasBegin());
-    assertTrue(deleteRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, deleteRequests.size());
+    ExecuteSqlRequest describeDeleteRequest = deleteRequests.get(0);
+    assertEquals(QueryMode.PLAN, describeDeleteRequest.getQueryMode());
+    ExecuteSqlRequest executeDeleteRequest = deleteRequests.get(1);
+    assertEquals(QueryMode.NORMAL, executeDeleteRequest.getQueryMode());
+    assertTrue(describeDeleteRequest.getTransaction().hasBegin());
+    assertTrue(describeDeleteRequest.getTransaction().getBegin().hasReadWrite());
     expectedCommitCount++;
 
     assertEquals(expectedCommitCount, mockSpanner.countRequestsOfType(CommitRequest.class));
@@ -407,7 +594,26 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
             + "FROM \"all_types\" \"AllTypes\" "
             + "WHERE (\"AllTypes\".\"col_bigint\" = $1) LIMIT 1";
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql), createAllTypesResultSet("AllTypes_")));
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createAllTypesResultSetMetadata("AllTypes_")
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(1L).build(),
+            createAllTypesResultSet("AllTypes_")));
 
     String output = runTest("findOneAllTypes", pgServer.getLocalPort());
 
@@ -432,15 +638,13 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(sql))
             .collect(Collectors.toList());
-    assertEquals(1, executeSqlRequests.size());
-    ExecuteSqlRequest request = executeSqlRequests.get(0);
-    if (request.getTransaction().hasSingleUse()) {
-      assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
-    } else if (request.getTransaction().hasBegin()) {
-      assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, executeSqlRequests.size());
+    ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
+    assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    if (describeRequest.getTransaction().hasBegin()) {
       expectedCommitCount++;
-    } else {
-      fail("missing or invalid transaction option: " + request.getTransaction());
     }
     assertEquals(expectedCommitCount, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
@@ -459,6 +663,23 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.of(existsSql),
             ResultSet.newBuilder()
+                .setMetadata(
+                    createAllTypesResultSetMetadata("AllTypes_")
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("p1")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(existsSql).bind("p1").to(2L).build(),
+            ResultSet.newBuilder()
                 .setMetadata(createAllTypesResultSetMetadata("AllTypes_"))
                 .build()));
 
@@ -466,7 +687,50 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         "INSERT INTO \"all_types\""
             + "(\"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\", \"col_jsonb\") "
             + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSql), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING,
+                            TypeCode.JSON)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(insertSql)
+                .bind("p1")
+                .to(2L)
+                .bind("p2")
+                .to(true)
+                .bind("p3")
+                .to(ByteArray.copyFrom("some random string"))
+                .bind("p4")
+                .to(0.123456789d)
+                .bind("p5")
+                .to(123456789L)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric("234.54235"))
+                .bind("p7")
+                .to(Timestamp.parseTimestamp("2022-07-22T18:15:42.011Z"))
+                .bind("p8")
+                .to(Date.parseDate("2022-07-22"))
+                .bind("p9")
+                .to("some random string")
+                .bind("p10")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value\"}"))
+                .build(),
+            1L));
 
     String output = runTest("createAllTypes", pgServer.getLocalPort());
 
@@ -476,34 +740,42 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(insertSql))
             .collect(Collectors.toList());
-    assertEquals(1, insertRequests.size());
-    ExecuteSqlRequest insertRequest = insertRequests.get(0);
-    assertTrue(insertRequest.getTransaction().hasBegin());
-    assertTrue(insertRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, insertRequests.size());
+    ExecuteSqlRequest describeInsertRequest = insertRequests.get(0);
+    assertEquals(QueryMode.PLAN, describeInsertRequest.getQueryMode());
+    ExecuteSqlRequest executeInsertRequest = insertRequests.get(1);
+    assertEquals(QueryMode.NORMAL, executeInsertRequest.getQueryMode());
+    assertTrue(describeInsertRequest.getTransaction().hasBegin());
+    assertTrue(describeInsertRequest.getTransaction().getBegin().hasReadWrite());
+    assertTrue(executeInsertRequest.getTransaction().hasId());
 
-    // The NodeJS PostgreSQL driver sends parameters without any type information to the backend.
-    // This means that all parameters are sent as untyped string values.
-    assertEquals(0, insertRequest.getParamTypesMap().size());
-    assertEquals(10, insertRequest.getParams().getFieldsCount());
-    assertEquals("2", insertRequest.getParams().getFieldsMap().get("p1").getStringValue());
-    assertEquals("true", insertRequest.getParams().getFieldsMap().get("p2").getStringValue());
+    assertEquals(10, executeInsertRequest.getParamTypesMap().size());
+    assertEquals(10, executeInsertRequest.getParams().getFieldsCount());
+    assertEquals("2", executeInsertRequest.getParams().getFieldsMap().get("p1").getStringValue());
+    assertTrue(executeInsertRequest.getParams().getFieldsMap().get("p2").getBoolValue());
     assertEquals(
         "c29tZSByYW5kb20gc3RyaW5n",
-        insertRequest.getParams().getFieldsMap().get("p3").getStringValue());
+        executeInsertRequest.getParams().getFieldsMap().get("p3").getStringValue());
     assertEquals(
-        "0.123456789", insertRequest.getParams().getFieldsMap().get("p4").getStringValue());
-    assertEquals("123456789", insertRequest.getParams().getFieldsMap().get("p5").getStringValue());
-    assertEquals("234.54235", insertRequest.getParams().getFieldsMap().get("p6").getStringValue());
+        0.123456789d,
+        executeInsertRequest.getParams().getFieldsMap().get("p4").getNumberValue(),
+        0.0d);
+    assertEquals(
+        "123456789", executeInsertRequest.getParams().getFieldsMap().get("p5").getStringValue());
+    assertEquals(
+        "234.54235", executeInsertRequest.getParams().getFieldsMap().get("p6").getStringValue());
     assertEquals(
         Timestamp.parseTimestamp("2022-07-22T20:15:42.011+02:00"),
         Timestamp.parseTimestamp(
-            insertRequest.getParams().getFieldsMap().get("p7").getStringValue()));
-    assertEquals("2022-07-22", insertRequest.getParams().getFieldsMap().get("p8").getStringValue());
+            executeInsertRequest.getParams().getFieldsMap().get("p7").getStringValue()));
     assertEquals(
-        "some random string", insertRequest.getParams().getFieldsMap().get("p9").getStringValue());
+        "2022-07-22", executeInsertRequest.getParams().getFieldsMap().get("p8").getStringValue());
+    assertEquals(
+        "some random string",
+        executeInsertRequest.getParams().getFieldsMap().get("p9").getStringValue());
     assertEquals(
         "{\"key\":\"value\"}",
-        insertRequest.getParams().getFieldsMap().get("p10").getStringValue());
+        executeInsertRequest.getParams().getFieldsMap().get("p10").getStringValue());
   }
 
   @Test
@@ -520,13 +792,62 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
         StatementResult.query(Statement.of(sql), createAllTypesResultSet("AllTypes_")));
     String updateSql =
         "UPDATE \"all_types\" SET \"col_bigint\" = $1, \"col_bool\" = $2, \"col_bytea\" = $3, \"col_float8\" = $4, \"col_int\" = $5, \"col_numeric\" = $6, \"col_timestamptz\" = $7, \"col_date\" = $8, \"col_varchar\" = $9, \"col_jsonb\" = $10 WHERE \"col_bigint\" IN ($11)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(updateSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING,
+                            TypeCode.JSON)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(updateSql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(false)
+                .bind("p3")
+                .to(ByteArray.copyFrom("updated string"))
+                .bind("p4")
+                .to(1.23456789)
+                .bind("p5")
+                .to(987654321L)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .bind("p7")
+                .to(Timestamp.parseTimestamp("2022-11-16T10:03:42.999Z"))
+                .bind("p8")
+                .to(Date.parseDate("2022-11-16"))
+                .bind("p9")
+                .to("some updated string")
+                // TODO: Change to JSONB
+                .bind("p10")
+                .to("{\"key\":\"updated-value\"}")
+                .build(),
+            1L));
+
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 1L));
 
     String output = runTest("updateAllTypes", pgServer.getLocalPort());
 
     assertEquals("Updated one record\n", output);
 
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    // We get two commit requests, because the statement is auto-described the first time the update
+    // is executed. The auto-describe also runs in autocommit mode.
+    // TODO: Enable when node-postgres 8.9 has been released.
+    //    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
     assertEquals(4, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest updateRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(3);
     assertEquals(updateSql, updateRequest.getSql());

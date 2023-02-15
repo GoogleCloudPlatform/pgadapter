@@ -40,15 +40,16 @@ func main() {
 
 type User struct {
 	// Prevent gorm from using an auto-generated key.
-	ID           int64 `gorm:"primaryKey;autoIncrement:false"`
-	Name         string
-	Email        *string
-	Age          int64
-	Birthday     *time.Time
-	MemberNumber sql.NullString
-	ActivatedAt  sql.NullTime
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID            int64 `gorm:"primaryKey;autoIncrement:false"`
+	Name          string
+	Email         *string
+	Age           int64
+	Birthday      *time.Time
+	MemberNumber  sql.NullString
+	NameAndNumber string `gorm:"->;type:GENERATED ALWAYS AS (coalesce(concat(name,' '::varchar,member_number))) STORED;default:(-);"`
+	ActivatedAt   sql.NullTime
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type Blog struct {
@@ -96,6 +97,9 @@ func TestCreateBlogAndUser(connString string) *C.char {
 	res := tx.Create(&user)
 	if res.Error != nil {
 		return C.CString(fmt.Sprintf("failed to create User: %v", res.Error))
+	}
+	if g, w := user.NameAndNumber, "User Name null"; g != w {
+		return C.CString(fmt.Sprintf("Name and number mismatch for User\nGot:  %v\nWant: %v", g, w))
 	}
 	if g, w := res.RowsAffected, int64(1); g != w {
 		return C.CString(fmt.Sprintf("affected row count mismatch for User\nGot:  %v\nWant: %v", g, w))

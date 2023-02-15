@@ -54,11 +54,12 @@ import org.junit.runners.Parameterized.Parameters;
 public class ITJdbcMetadataTest implements IntegrationTest {
   private static final String[] VERSIONS =
       new String[] {
-        "42.5.0", "42.4.2", "42.4.1", "42.4.0", "42.3.6", "42.3.5", "42.3.4", "42.3.3", "42.3.2",
-        "42.3.1", "42.3.0", "42.2.25", "42.2.24", "42.2.23", "42.2.22", "42.2.21", "42.2.20",
-        "42.2.19", "42.2.18", "42.2.17", "42.2.16", "42.2.15", "42.2.14", "42.2.13", "42.2.12",
-        "42.2.11", "42.2.10", "42.2.9", "42.2.8", "42.2.7", "42.2.6", "42.2.5", "42.2.4", "42.2.3",
-        "42.2.2", "42.2.1", "42.2.0", "42.1.4", "42.1.3", "42.1.2", "42.1.1", "42.1.0", "42.0.0"
+        "42.5.3", "42.5.2", "42.5.1", "42.5.0", "42.4.2", "42.4.1", "42.4.0", "42.3.6", "42.3.5",
+        "42.3.4", "42.3.3", "42.3.2", "42.3.1", "42.3.0", "42.2.25", "42.2.24", "42.2.23",
+        "42.2.22", "42.2.21", "42.2.20", "42.2.19", "42.2.18", "42.2.17", "42.2.16", "42.2.15",
+        "42.2.14", "42.2.13", "42.2.12", "42.2.11", "42.2.10", "42.2.9", "42.2.8", "42.2.7",
+        "42.2.6", "42.2.5", "42.2.4", "42.2.3", "42.2.2", "42.2.1", "42.2.0", "42.1.4", "42.1.3",
+        "42.1.2", "42.1.1", "42.1.0", "42.0.0"
       };
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
@@ -428,9 +429,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
 
               assertTrue(columns.next());
               assertEquals("col_jsonb", columns.getString("COLUMN_NAME"));
-              // TODO: Change to jsonb when available.
-              assertEquals(Types.VARCHAR, columns.getInt("DATA_TYPE"));
-              assertEquals("varchar", columns.getString("TYPE_NAME"));
+              assertEquals(Types.OTHER, columns.getInt("DATA_TYPE"));
+              assertEquals("\"pg_catalog\".\"jsonb\"", columns.getString("TYPE_NAME"));
 
               assertFalse(columns.next());
             }
@@ -758,6 +758,8 @@ public class ITJdbcMetadataTest implements IntegrationTest {
             assertEquals(Types.DATE, results.get("date").intValue());
             assertTrue(results.containsKey("varchar"));
             assertEquals(Types.VARCHAR, results.get("varchar").intValue());
+            assertTrue(results.containsKey("jsonb"));
+            assertEquals(Types.OTHER, results.get("jsonb").intValue());
           } catch (SQLException e) {
             throw SpannerExceptionFactory.asSpannerException(e);
           }

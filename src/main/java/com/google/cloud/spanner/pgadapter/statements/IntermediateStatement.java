@@ -26,13 +26,13 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.PostgreSQLStatementParser;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ClientSideStatementType;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.DataRowResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
@@ -75,6 +75,7 @@ public class IntermediateStatement {
   protected final Statement originalStatement;
   protected final String command;
   protected String commandTag;
+  protected boolean described;
   protected boolean executed;
   protected final Connection connection;
   protected final ConnectionHandler connectionHandler;
@@ -136,7 +137,11 @@ public class IntermediateStatement {
 
   /** @return True if this is a select statement, false otherwise. */
   public boolean containsResultSet() {
-    return this.parsedStatement.isQuery();
+    return this.parsedStatement.isQuery()
+        || (this.parsedStatement.getType() == StatementType.CLIENT_SIDE
+            && this.parsedStatement.getClientSideStatementType()
+                == ClientSideStatementType.RUN_BATCH)
+        || (this.parsedStatement.isUpdate() && this.parsedStatement.hasReturningClause());
   }
 
   /** @return True if this statement was executed, False otherwise. */
@@ -167,7 +172,8 @@ public class IntermediateStatement {
       case QUERY:
         return -1L;
       case UPDATE:
-        return this.statementResult.getUpdateCount();
+        long res = this.statementResult.getUpdateCount();
+        return Math.max(res, 0L);
       case CLIENT_SIDE:
       case DDL:
       case UNKNOWN:
@@ -244,14 +250,6 @@ public class IntermediateStatement {
 
   public void setStatementResult(StatementResult statementResult) {
     this.statementResult = statementResult;
-    if (statementResult != null) {
-      if (statementResult.getResultType() == ResultType.RESULT_SET) {
-        this.hasMoreData = statementResult.getResultSet().next();
-      } else if (statementResult instanceof NoResult
-          && ((NoResult) statementResult).hasCommandTag()) {
-        this.commandTag = ((NoResult) statementResult).getCommandTag();
-      }
-    }
   }
 
   protected void setFutureStatementResult(Future<StatementResult> result) {
@@ -290,6 +288,10 @@ public class IntermediateStatement {
     this.hasMoreData = false;
   }
 
+  public boolean isDescribed() {
+    return this.described;
+  }
+
   public void executeAsync(BackendConnection backendConnection) {
     throw new UnsupportedOperationException();
   }
@@ -298,12 +300,12 @@ public class IntermediateStatement {
    * Moreso meant for inherited classes, allows one to call describe on a statement. Since raw
    * statements cannot be described, throw an error.
    */
-  public DescribeMetadata<?> describe() {
+  public DescribeResult describe() {
     throw new IllegalStateException(
         "Cannot describe a simple statement " + "(only prepared statements and portals)");
   }
 
-  public Future<? extends DescribeMetadata<?>> describeAsync(BackendConnection backendConnection) {
+  public Future<StatementResult> describeAsync(BackendConnection backendConnection) {
     throw new UnsupportedOperationException();
   }
 

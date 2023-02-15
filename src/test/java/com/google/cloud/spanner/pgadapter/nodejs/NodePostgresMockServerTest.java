@@ -15,7 +15,6 @@
 package com.google.cloud.spanner.pgadapter.nodejs;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
@@ -36,6 +35,8 @@ import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.ResultSet;
+import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
@@ -100,12 +101,12 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     // The result of the describe statement call is cached for that connection, so executing the
     // same statement once more will not cause another describe-statement round-trip.
     String sql = "INSERT INTO users(name) VALUES($1)";
-    String describeParamsSql = "select $1 from (select name=$1 from users) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeParamsSql),
-            com.google.spanner.v1.ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("foo").build(), 1L));
@@ -116,31 +117,31 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(
-                request ->
-                    request.getSql().equals(sql) || request.getSql().equals(describeParamsSql))
+            .filter(request -> request.getSql().equals(sql))
             .collect(Collectors.toList());
     assertEquals(2, executeSqlRequests.size());
     ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
-    assertEquals(describeParamsSql, describeRequest.getSql());
-    assertFalse(describeRequest.hasTransaction());
+    assertEquals(sql, describeRequest.getSql());
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(1, executeRequest.getParamTypesCount());
-    assertTrue(executeRequest.getTransaction().hasBegin());
-    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    assertTrue(executeRequest.getTransaction().hasId());
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
   public void testInsertExecutedTwice() throws Exception {
     String sql = "INSERT INTO users(name) VALUES($1)";
-    String describeParamsSql = "select $1 from (select name=$1 from users) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeParamsSql),
-            com.google.spanner.v1.ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("foo").build(), 1L));
@@ -153,20 +154,19 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(
-                request ->
-                    request.getSql().equals(sql) || request.getSql().equals(describeParamsSql))
+            .filter(request -> request.getSql().equals(sql))
             .collect(Collectors.toList());
     assertEquals(3, executeSqlRequests.size());
     ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
-    assertEquals(describeParamsSql, describeRequest.getSql());
-    assertFalse(describeRequest.hasTransaction());
+    assertEquals(sql, describeRequest.getSql());
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
 
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(1, executeRequest.getParamTypesCount());
-    assertTrue(executeRequest.getTransaction().hasBegin());
-    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    assertTrue(executeRequest.getTransaction().hasId());
 
     executeRequest = executeSqlRequests.get(2);
     assertEquals(sql, executeRequest.getSql());
@@ -178,12 +178,12 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   @Test
   public void testInsertAutoCommit() throws IOException, InterruptedException {
     String sql = "INSERT INTO users(name) VALUES($1)";
-    String describeParamsSql = "select $1 from (select name=$1 from users) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeParamsSql),
-            com.google.spanner.v1.ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("foo").build(), 1L));
@@ -194,20 +194,22 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(
-                request ->
-                    request.getSql().equals(sql) || request.getSql().equals(describeParamsSql))
+            .filter(request -> request.getSql().equals(sql))
             .collect(Collectors.toList());
     assertEquals(2, executeSqlRequests.size());
     ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
-    assertEquals(describeParamsSql, describeRequest.getSql());
-    assertFalse(describeRequest.hasTransaction());
+    assertEquals(sql, describeRequest.getSql());
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(1, executeRequest.getParamTypesCount());
-    assertTrue(executeRequest.getTransaction().hasBegin());
-    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    // TODO: Enable when node-postgres 8.9 has been released.
+    //    assertTrue(executeRequest.getTransaction().hasBegin());
+    //    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    //    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -216,15 +218,12 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
         "INSERT INTO AllTypes "
             + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
-    String describeParamsSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from "
-            + "(select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from AllTypes) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeParamsSql),
-            com.google.spanner.v1.ResultSet.newBuilder()
+            Statement.of(sql),
+            ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -236,6 +235,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                             TypeCode.DATE,
                             TypeCode.STRING,
                             TypeCode.JSON)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     StatementResult updateResult =
         StatementResult.update(
@@ -259,7 +259,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("some-random-string")
                 .bind("p10")
-                .to("{\"my_key\":\"my-value\"}")
+                .to(Value.pgJsonb("{\"my_key\":\"my-value\"}"))
                 .build(),
             1L);
     mockSpanner.putStatementResult(updateResult);
@@ -270,20 +270,22 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(
-                request ->
-                    request.getSql().equals(sql) || request.getSql().equals(describeParamsSql))
+            .filter(request -> request.getSql().equals(sql))
             .collect(Collectors.toList());
     assertEquals(2, executeSqlRequests.size());
     ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
-    assertEquals(describeParamsSql, describeRequest.getSql());
-    assertFalse(describeRequest.hasTransaction());
+    assertEquals(sql, describeRequest.getSql());
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(10, executeRequest.getParamTypesCount());
-    assertTrue(executeRequest.getTransaction().hasBegin());
-    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    // TODO: Enable once node-postgres 8.9 is released.
+    //    assertTrue(executeRequest.getTransaction().hasBegin());
+    //    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    //    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -341,15 +343,12 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
         "INSERT INTO AllTypes "
             + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
-    String describeParamsSql =
-        "select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10 from "
-            + "(select col_bigint=$1, col_bool=$2, col_bytea=$3, col_float8=$4, col_int=$5, col_numeric=$6, col_timestamptz=$7, col_date=$8, col_varchar=$9, col_jsonb=$10 from AllTypes) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeParamsSql),
-            com.google.spanner.v1.ResultSet.newBuilder()
+            Statement.of(sql),
+            ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(
+                    createParameterTypesMetadata(
                         ImmutableList.of(
                             TypeCode.INT64,
                             TypeCode.BOOL,
@@ -361,6 +360,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                             TypeCode.DATE,
                             TypeCode.STRING,
                             TypeCode.JSON)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     StatementResult updateResult =
         StatementResult.update(
@@ -384,7 +384,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("some-random-string")
                 .bind("p10")
-                .to("{\"my_key\":\"my-value\"}")
+                .to(Value.pgJsonb("{\"my_key\":\"my-value\"}"))
                 .build(),
             1L);
     mockSpanner.putStatementResult(updateResult);
@@ -412,7 +412,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to((String) null)
                 .bind("p10")
-                .to((String) null)
+                .to(Value.pgJsonb(null))
                 .build(),
             1L));
 
@@ -436,20 +436,22 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(
-                request ->
-                    request.getSql().equals(sql) || request.getSql().equals(describeParamsSql))
+            .filter(request -> request.getSql().equals(sql))
             .collect(Collectors.toList());
     assertEquals(3, executeSqlRequests.size());
     ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
-    assertEquals(describeParamsSql, describeRequest.getSql());
-    assertFalse(describeRequest.hasTransaction());
+    assertEquals(sql, describeRequest.getSql());
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
+
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(10, executeRequest.getParamTypesCount());
-    assertTrue(executeRequest.getTransaction().hasBegin());
-    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
-    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    // TODO: Enable once node-postgres 8.9 is released.
+    //    assertTrue(executeRequest.getTransaction().hasBegin());
+    //    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    //    assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -587,7 +589,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testCopyTo", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456789+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
         output);
   }
 
@@ -603,12 +605,12 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
   @Test
   public void testDmlBatch() throws Exception {
     String sql = "INSERT INTO users(name) VALUES($1)";
-    String describeParamsSql = "select $1 from (select name=$1 from users) p";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(describeParamsSql),
-            com.google.spanner.v1.ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("foo").build(), 1L));
@@ -621,14 +623,14 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
 
     List<ExecuteSqlRequest> executeSqlRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
-            .filter(
-                request ->
-                    request.getSql().equals(sql) || request.getSql().equals(describeParamsSql))
+            .filter(request -> request.getSql().equals(sql))
             .collect(Collectors.toList());
     assertEquals(1, executeSqlRequests.size());
     ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
-    assertEquals(describeParamsSql, describeRequest.getSql());
-    assertFalse(describeRequest.hasTransaction());
+    assertEquals(sql, describeRequest.getSql());
+    assertTrue(describeRequest.hasTransaction());
+    assertTrue(describeRequest.getTransaction().hasBegin());
+    assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
 
     List<ExecuteBatchDmlRequest> batchDmlRequests =
         mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class);
@@ -645,7 +647,9 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
           expectedValues[i],
           request.getStatements(i).getParams().getFieldsMap().get("p1").getStringValue());
     }
-    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    // We get two commits, because PGAdapter auto-describes the DML statement in a separate
+    // transaction if the auto-describe happens during a DML batch.
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test

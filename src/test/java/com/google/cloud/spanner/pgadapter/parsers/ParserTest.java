@@ -14,12 +14,11 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import static com.google.cloud.spanner.pgadapter.parsers.Parser.toOid;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -32,8 +31,10 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
+import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.spanner.v1.TypeCode;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import org.junit.Test;
@@ -211,20 +212,6 @@ public class ParserTest {
   }
 
   @Test
-  public void testDateParsingDateValidityChecks() {
-    assertTrue(DateParser.isDate("1998-09-01 00:00"));
-    assertTrue(DateParser.isDate("1998-09-01 +00:00"));
-    assertTrue(DateParser.isDate("1998-09-01 -00:00"));
-    assertFalse(DateParser.isDate("This is not a date right?"));
-    assertFalse(DateParser.isDate("1998-09-01 *00:00"));
-    assertFalse(DateParser.isDate("1998-a-01 00:00"));
-    assertFalse(DateParser.isDate("1998-01-a 00:00"));
-    assertFalse(DateParser.isDate("1998-01-01 a:00"));
-    assertFalse(DateParser.isDate("1998-01-01 00:a"));
-    assertFalse(DateParser.isDate("1998-01 00:00"));
-  }
-
-  @Test
   public void testStringParsing() {
     String value = "This is a String.";
 
@@ -249,34 +236,6 @@ public class ParserTest {
 
     assertArrayEquals(byteResult, parsedValue.parse(DataFormat.POSTGRESQL_BINARY));
     validateCreateBinary(byteResult, Oid.TIMESTAMP, value);
-  }
-
-  @Test
-  public void testTimestampParsingTimestampValidityChecks() {
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.0"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000Z"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000z"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000+00"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000+00:00"));
-    assertTrue(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000-00:00"));
-    assertFalse(TimestampParser.isTimestamp("This is not a timestamp right?"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000z00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000z00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000+"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000-"));
-    assertFalse(TimestampParser.isTimestamp("99999-09-01 00:00:00.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("aaaa-09-01 00:00:00.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-aa-01 00:00:00.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-aa 00:00:00.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 aa:00:00.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:aa:00.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:aa.000000000+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.a+00:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000+aa:00"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000+00:aa"));
-    assertFalse(TimestampParser.isTimestamp("1998-09-01 00:00:00.000000000*00:00"));
   }
 
   @Test
@@ -408,5 +367,43 @@ public class ParserTest {
     validate(parser, byteResult, stringResult, stringResult);
     assertEquals(value, parser.getItem());
     validateCreateText(stringResult, Oid.NUMERIC, value);
+  }
+
+  @Test
+  public void testTypeToOid() {
+    assertEquals(Oid.INT8, toOid(createType(TypeCode.INT64)));
+    assertEquals(Oid.BOOL, toOid(createType(TypeCode.BOOL)));
+    assertEquals(Oid.VARCHAR, toOid(createType(TypeCode.STRING)));
+    assertEquals(Oid.JSONB, toOid(createType(TypeCode.JSON)));
+    assertEquals(Oid.FLOAT8, toOid(createType(TypeCode.FLOAT64)));
+    assertEquals(Oid.TIMESTAMPTZ, toOid(createType(TypeCode.TIMESTAMP)));
+    assertEquals(Oid.DATE, toOid(createType(TypeCode.DATE)));
+    assertEquals(Oid.NUMERIC, toOid(createType(TypeCode.NUMERIC)));
+    assertEquals(Oid.BYTEA, toOid(createType(TypeCode.BYTES)));
+
+    assertEquals(Oid.INT8_ARRAY, toOid(createArrayType(TypeCode.INT64)));
+    assertEquals(Oid.BOOL_ARRAY, toOid(createArrayType(TypeCode.BOOL)));
+    assertEquals(Oid.VARCHAR_ARRAY, toOid(createArrayType(TypeCode.STRING)));
+    assertEquals(Oid.JSONB_ARRAY, toOid(createArrayType(TypeCode.JSON)));
+    assertEquals(Oid.FLOAT8_ARRAY, toOid(createArrayType(TypeCode.FLOAT64)));
+    assertEquals(Oid.TIMESTAMPTZ_ARRAY, toOid(createArrayType(TypeCode.TIMESTAMP)));
+    assertEquals(Oid.DATE_ARRAY, toOid(createArrayType(TypeCode.DATE)));
+    assertEquals(Oid.NUMERIC_ARRAY, toOid(createArrayType(TypeCode.NUMERIC)));
+    assertEquals(Oid.BYTEA_ARRAY, toOid(createArrayType(TypeCode.BYTES)));
+
+    assertThrows(PGException.class, () -> toOid(createType(TypeCode.STRUCT)));
+    assertThrows(PGException.class, () -> toOid(createArrayType(TypeCode.ARRAY)));
+    assertThrows(PGException.class, () -> toOid(createArrayType(TypeCode.STRUCT)));
+  }
+
+  static com.google.spanner.v1.Type createType(TypeCode code) {
+    return com.google.spanner.v1.Type.newBuilder().setCode(code).build();
+  }
+
+  static com.google.spanner.v1.Type createArrayType(TypeCode code) {
+    return com.google.spanner.v1.Type.newBuilder()
+        .setCode(TypeCode.ARRAY)
+        .setArrayElementType(com.google.spanner.v1.Type.newBuilder().setCode(code).build())
+        .build();
   }
 }

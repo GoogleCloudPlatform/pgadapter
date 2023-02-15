@@ -21,7 +21,7 @@
     <skipTests>false</skipTests>
     <skipUnits>${skipTests}</skipUnits>
     <skipITs>true</skipITs>
-    <it.forkCount>8</it.forkCount>
+    <it.forkCount>16</it.forkCount>
     <clirr.skip>true</clirr.skip>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -34,13 +34,13 @@
       com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest
     </excludedTests>
 
-    <spanner.version>6.31.2</spanner.version>
-    <junixsocket.version>2.6.1</junixsocket.version>
+    <spanner.version>6.35.1</spanner.version>
+    <junixsocket.version>2.6.2</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.12.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.16.1-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -73,6 +73,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.google.auto.value</groupId>
+      <artifactId>auto-value-annotations</artifactId>
+      <version>1.10.1</version>
+    </dependency>
+    <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-spanner</artifactId>
       <version>${spanner.version}</version>
@@ -80,7 +85,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.5.1</version>
+      <version>42.5.3</version>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>
@@ -106,7 +111,7 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-csv</artifactId>
-      <version>1.9.0</version>
+      <version>1.10.0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -116,7 +121,7 @@
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
-      <version>3.8.6</version>
+      <version>3.9.0</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
@@ -142,7 +147,7 @@
     <dependency>
       <groupId>net.java.dev.jna</groupId>
       <artifactId>jna</artifactId>
-      <version>5.12.1</version>
+      <version>5.13.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -154,7 +159,7 @@
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
-      <version>4.9.0</version>
+      <version>4.11.0</version>
       <scope>test</scope>
     </dependency>
   </dependencies>

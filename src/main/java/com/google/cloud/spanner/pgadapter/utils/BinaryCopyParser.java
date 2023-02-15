@@ -24,6 +24,7 @@ import com.google.cloud.spanner.pgadapter.parsers.BinaryParser;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.parsers.DateParser;
 import com.google.cloud.spanner.pgadapter.parsers.DoubleParser;
+import com.google.cloud.spanner.pgadapter.parsers.JsonbParser;
 import com.google.cloud.spanner.pgadapter.parsers.LongParser;
 import com.google.cloud.spanner.pgadapter.parsers.NumericParser;
 import com.google.cloud.spanner.pgadapter.parsers.StringParser;
@@ -230,8 +231,21 @@ class BinaryCopyParser implements CopyInParser {
     }
 
     @Override
+    public boolean isEndRecord() {
+      return false;
+    }
+
+    @Override
     public boolean hasColumnNames() {
       return false;
+    }
+
+    @Override
+    public boolean isNull(int columnIndex) {
+      Preconditions.checkArgument(
+          columnIndex >= 0 && columnIndex < numColumns(),
+          "columnIndex must be >= 0 && < numColumns");
+      return fields[columnIndex].data == null;
     }
 
     @Override
@@ -259,7 +273,7 @@ class BinaryCopyParser implements CopyInParser {
         case STRING:
           return Value.string(field.data == null ? null : StringParser.toString(field.data));
         case PG_JSONB:
-          return Value.pgJsonb(field.data == null ? null : StringParser.toString(field.data));
+          return Value.pgJsonb(field.data == null ? null : JsonbParser.toString(field.data));
         case BYTES:
           return Value.bytes(field.data == null ? null : BinaryParser.toByteArray(field.data));
         case TIMESTAMP:

@@ -28,6 +28,7 @@ import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.ConnectionStatus;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
@@ -37,6 +38,7 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.error.Severity;
 import com.google.cloud.spanner.pgadapter.metadata.SendResultSetState;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.PartitionQueryResult;
+import com.google.cloud.spanner.pgadapter.statements.CopyToStatement;
 import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.utils.Converter;
 import com.google.cloud.spanner.pgadapter.wireoutput.CommandCompleteResponse;
@@ -50,7 +52,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.google.common.util.concurrent.SettableFuture;
 import io.grpc.Context;
 import io.grpc.MethodDescriptor;
 import java.io.DataInputStream;
@@ -58,6 +59,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
@@ -177,7 +179,7 @@ public abstract class ControlMessage extends WireMessage {
         connection.increaseInvalidMessageCount();
         if (connection.getInvalidMessageCount() > MAX_INVALID_MESSAGE_COUNT) {
           new ErrorResponse(
-                  connection.getConnectionMetadata().getOutputStream(),
+                  connection,
                   PGException.newBuilder(
                           String.format(
                               "Received %d invalid/unexpected messages. Last received message: '%c'",
@@ -231,7 +233,7 @@ public abstract class ControlMessage extends WireMessage {
    * @throws Exception if there is some issue in the sending of the error messages.
    */
   protected void handleError(Exception exception) throws Exception {
-    new ErrorResponse(this.outputStream, PGExceptionFactory.toPGException(exception)).send(false);
+    new ErrorResponse(this.connection, PGExceptionFactory.toPGException(exception)).send(false);
   }
 
   /**
@@ -243,7 +245,7 @@ public abstract class ControlMessage extends WireMessage {
    *
    * <p>NOTE: This method does not flush the output stream.
    */
-  public void sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
+  void sendSpannerResult(IntermediateStatement statement, QueryMode mode, long maxRows)
       throws Exception {
     String command = statement.getCommandTag();
     if (Strings.isNullOrEmpty(command)) {
@@ -253,30 +255,37 @@ public abstract class ControlMessage extends WireMessage {
     if (statement.getStatementResult() == null) {
       return;
     }
-
     switch (statement.getStatementType()) {
       case DDL:
-      case CLIENT_SIDE:
       case UNKNOWN:
         new CommandCompleteResponse(this.outputStream, command).send(false);
         break;
-      case QUERY:
-        SendResultSetState state = sendResultSet(statement, mode, maxRows);
-        statement.setHasMoreData(state.hasMoreRows());
-        if (state.hasMoreRows()) {
-          new PortalSuspendedResponse(this.outputStream).send(false);
-        } else {
-          statement.close();
-          new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows()).send(false);
+      case CLIENT_SIDE:
+        if (statement.getStatementResult().getResultType() != ResultType.RESULT_SET) {
+          new CommandCompleteResponse(this.outputStream, command).send(false);
+          break;
         }
-        break;
+        // fallthrough to QUERY
+      case QUERY:
       case UPDATE:
-        // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
-        // inserted. oid used to be the object ID of the inserted row if rows was 1 and the target
-        // table had OIDs, but OIDs system columns are not supported anymore; therefore oid is
-        // always 0.
-        command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
-        new CommandCompleteResponse(this.outputStream, command).send(false);
+        if (statement.getStatementResult().getResultType() == ResultType.RESULT_SET) {
+          SendResultSetState state = sendResultSet(statement, mode, maxRows);
+          statement.setHasMoreData(state.hasMoreRows());
+          if (state.hasMoreRows()) {
+            new PortalSuspendedResponse(this.outputStream).send(false);
+          } else {
+            statement.close();
+            new CommandCompleteResponse(this.outputStream, state.getCommandAndNumRows())
+                .send(false);
+          }
+        } else {
+          // For an INSERT command, the tag is INSERT oid rows, where rows is the number of rows
+          // inserted. oid used to be the object ID of the inserted row if rows was 1 and the target
+          // table had OIDs, but OIDs system columns are not supported anymore; therefore oid is
+          // always 0.
+          command += ("INSERT".equals(command) ? " 0 " : " ") + statement.getUpdateCount();
+          new CommandCompleteResponse(this.outputStream, command).send(false);
+        }
         break;
       default:
         throw new IllegalStateException("Unknown statement type: " + statement.getStatement());
@@ -293,16 +302,18 @@ public abstract class ControlMessage extends WireMessage {
    * @return An adapted representation with specific metadata which PG wire requires.
    * @throws com.google.cloud.spanner.SpannerException if traversing the {@link ResultSet} fails.
    */
-  public SendResultSetState sendResultSet(
+  SendResultSetState sendResultSet(
       IntermediateStatement describedResult, QueryMode mode, long maxRows) throws Exception {
-    Preconditions.checkArgument(
-        describedResult.containsResultSet(), "The statement result must be a result set");
-    long rows;
     StatementResult statementResult = describedResult.getStatementResult();
+    Preconditions.checkArgument(
+        statementResult.getResultType() == ResultType.RESULT_SET,
+        "The statement result must be a result set");
+    long rows;
     boolean hasData;
     if (statementResult instanceof PartitionQueryResult) {
       hasData = false;
       PartitionQueryResult partitionQueryResult = (PartitionQueryResult) statementResult;
+      sendPrefix(describedResult, ((PartitionQueryResult) statementResult).getMetadataResultSet());
       rows =
           sendPartitionedQuery(
               describedResult,
@@ -312,17 +323,28 @@ public abstract class ControlMessage extends WireMessage {
     } else {
       hasData = describedResult.isHasMoreData();
       ResultSet resultSet = describedResult.getStatementResult().getResultSet();
+      sendPrefix(describedResult, resultSet);
       SendResultSetRunnable runnable =
-          SendResultSetRunnable.forResultSet(
-              describedResult, resultSet, maxRows, mode, SettableFuture.create(), hasData);
+          SendResultSetRunnable.forResultSet(describedResult, resultSet, maxRows, mode, hasData);
       rows = runnable.call();
       hasData = runnable.hasData;
     }
 
+    sendSuffix(describedResult);
+    return new SendResultSetState(describedResult.getCommandTag(), rows, hasData);
+  }
+
+  private void sendPrefix(IntermediateStatement describedResult, ResultSet resultSet)
+      throws Exception {
+    for (WireOutput prefix : describedResult.createResultPrefix(resultSet)) {
+      prefix.send(false);
+    }
+  }
+
+  private void sendSuffix(IntermediateStatement describedResult) throws Exception {
     for (WireOutput suffix : describedResult.createResultSuffix()) {
       suffix.send(false);
     }
-    return new SendResultSetState(describedResult.getCommandTag(), rows, hasData);
   }
 
   long sendPartitionedQuery(
@@ -335,7 +357,6 @@ public abstract class ControlMessage extends WireMessage {
             Executors.newFixedThreadPool(
                 Math.min(8 * Runtime.getRuntime().availableProcessors(), partitions.size())));
     List<ListenableFuture<Long>> futures = new ArrayList<>(partitions.size());
-    SettableFuture<Boolean> prefixSent = SettableFuture.create();
     Connection spannerConnection = connection.getSpannerConnection();
     Spanner spanner = ConnectionOptionsHelper.getSpanner(spannerConnection);
     BatchClient batchClient = spanner.getBatchClient(connection.getDatabaseId());
@@ -352,6 +373,10 @@ public abstract class ControlMessage extends WireMessage {
                     return GrpcCallContext.createDefault().withTimeout(Duration.ofHours(24L));
                   }
                 });
+    CountDownLatch binaryCopyHeaderSentLatch =
+        describedResult instanceof CopyToStatement && ((CopyToStatement) describedResult).isBinary()
+            ? new CountDownLatch(1)
+            : new CountDownLatch(0);
     for (int i = 0; i < partitions.size(); i++) {
       futures.add(
           executorService.submit(
@@ -361,8 +386,7 @@ public abstract class ControlMessage extends WireMessage {
                       batchReadOnlyTransaction,
                       partitions.get(i),
                       mode,
-                      i == 0,
-                      prefixSent))));
+                      binaryCopyHeaderSentLatch))));
     }
     executorService.shutdown();
     try {
@@ -394,8 +418,7 @@ public abstract class ControlMessage extends WireMessage {
     private final Partition partition;
     private final long maxRows;
     private final QueryMode mode;
-    private final boolean includePrefix;
-    private final SettableFuture<Boolean> prefixSent;
+    private final CountDownLatch binaryCopyHeaderSentLatch;
     private boolean hasData;
 
     static SendResultSetRunnable forResultSet(
@@ -403,10 +426,8 @@ public abstract class ControlMessage extends WireMessage {
         ResultSet resultSet,
         long maxRows,
         QueryMode mode,
-        SettableFuture<Boolean> prefixSent,
         boolean hasData) {
-      return new SendResultSetRunnable(
-          describedResult, resultSet, maxRows, mode, true, prefixSent, hasData);
+      return new SendResultSetRunnable(describedResult, resultSet, maxRows, mode, true, hasData);
     }
 
     static SendResultSetRunnable forPartition(
@@ -414,10 +435,9 @@ public abstract class ControlMessage extends WireMessage {
         BatchReadOnlyTransaction batchReadOnlyTransaction,
         Partition partition,
         QueryMode mode,
-        boolean includePrefix,
-        SettableFuture<Boolean> prefixSent) {
+        CountDownLatch binaryCopyHeaderSentLatch) {
       return new SendResultSetRunnable(
-          describedResult, batchReadOnlyTransaction, partition, mode, includePrefix, prefixSent);
+          describedResult, batchReadOnlyTransaction, partition, mode, binaryCopyHeaderSentLatch);
     }
 
     private SendResultSetRunnable(
@@ -426,7 +446,6 @@ public abstract class ControlMessage extends WireMessage {
         long maxRows,
         QueryMode mode,
         boolean includePrefix,
-        SettableFuture<Boolean> prefixSent,
         boolean hasData) {
       this.describedResult = describedResult;
       this.resultSet = resultSet;
@@ -435,13 +454,15 @@ public abstract class ControlMessage extends WireMessage {
               describedResult,
               mode,
               describedResult.getConnectionHandler().getServer().getOptions(),
-              resultSet);
+              resultSet,
+              includePrefix
+                  && describedResult instanceof CopyToStatement
+                  && ((CopyToStatement) describedResult).isBinary());
       this.batchReadOnlyTransaction = null;
       this.partition = null;
       this.maxRows = maxRows;
       this.mode = mode;
-      this.includePrefix = includePrefix;
-      this.prefixSent = prefixSent;
+      this.binaryCopyHeaderSentLatch = new CountDownLatch(0);
       this.hasData = hasData;
     }
 
@@ -450,16 +471,14 @@ public abstract class ControlMessage extends WireMessage {
         BatchReadOnlyTransaction batchReadOnlyTransaction,
         Partition partition,
         QueryMode mode,
-        boolean includePrefix,
-        SettableFuture<Boolean> prefixSent) {
+        CountDownLatch binaryCopyHeaderSentLatch) {
       this.describedResult = describedResult;
       this.resultSet = null;
       this.batchReadOnlyTransaction = batchReadOnlyTransaction;
       this.partition = partition;
       this.maxRows = 0L;
       this.mode = mode;
-      this.includePrefix = includePrefix;
-      this.prefixSent = prefixSent;
+      this.binaryCopyHeaderSentLatch = binaryCopyHeaderSentLatch;
       this.hasData = false;
     }
 
@@ -469,46 +488,30 @@ public abstract class ControlMessage extends WireMessage {
         if (resultSet == null && batchReadOnlyTransaction != null && partition != null) {
           // Note: It is OK not to close this result set, as the underlying transaction and session
           // will be cleaned up at a later moment.
-          try {
-            resultSet = batchReadOnlyTransaction.execute(partition);
-            converter =
-                new Converter(
-                    describedResult,
-                    mode,
-                    describedResult.getConnectionHandler().getServer().getOptions(),
-                    resultSet);
-            hasData = resultSet.next();
-          } catch (Throwable t) {
-            if (includePrefix) {
-              synchronized (describedResult) {
-                prefixSent.setException(t);
-              }
-            }
-            throw t;
-          }
+          resultSet = batchReadOnlyTransaction.execute(partition);
+          hasData = resultSet.next();
+          converter =
+              new Converter(
+                  describedResult,
+                  mode,
+                  describedResult.getConnectionHandler().getServer().getOptions(),
+                  resultSet,
+                  false);
         }
-        if (includePrefix) {
-          try {
-            for (WireOutput prefix : describedResult.createResultPrefix(resultSet)) {
-              prefix.send(false);
-            }
-            prefixSent.set(true);
-          } catch (Throwable t) {
-            prefixSent.setException(t);
-            throw t;
-          }
-        }
-        // Wait until the prefix (if any) has been sent.
-        prefixSent.get();
         long rows = 0L;
         while (hasData) {
-          if (Thread.interrupted()) {
-            throw PGExceptionFactory.newQueryCancelledException();
-          }
           WireOutput wireOutput = describedResult.createDataRowResponse(converter);
+          if (!converter.isIncludeBinaryCopyHeaderInFirstRow()) {
+            binaryCopyHeaderSentLatch.await();
+          }
           synchronized (describedResult) {
             wireOutput.send(false);
           }
+          binaryCopyHeaderSentLatch.countDown();
+          if (Thread.interrupted()) {
+            throw PGExceptionFactory.newQueryCancelledException();
+          }
+
           rows++;
           hasData = resultSet.next();
           if (rows % 1000 == 0) {

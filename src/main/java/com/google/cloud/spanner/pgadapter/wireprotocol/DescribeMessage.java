@@ -16,12 +16,12 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
-import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
-import com.google.cloud.spanner.pgadapter.metadata.DescribeStatementMetadata;
+import com.google.cloud.spanner.pgadapter.metadata.DescribeResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
-import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
+import com.google.cloud.spanner.pgadapter.statements.IntermediateStatement;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoDataResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ParameterDescriptionResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.RowDescriptionResponse;
@@ -38,8 +38,8 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
 
   private final PreparedType type;
   private final String name;
-  private final IntermediatePreparedStatement statement;
-  private Future<DescribePortalMetadata> describePortalMetadata;
+  private final IntermediateStatement statement;
+  private Future<StatementResult> describePortalMetadata;
 
   public DescribeMessage(ConnectionHandler connection) throws Exception {
     super(connection);
@@ -77,10 +77,9 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   @Override
   void buffer(BackendConnection backendConnection) {
     if (this.type == PreparedType.Portal && this.statement.containsResultSet()) {
-      describePortalMetadata =
-          (Future<DescribePortalMetadata>) this.statement.describeAsync(backendConnection);
+      describePortalMetadata = this.statement.describeAsync(backendConnection);
     } else if (this.type == PreparedType.Statement) {
-      this.statement.setDescribed();
+      describePortalMetadata = this.statement.describeAsync(backendConnection);
     }
   }
 
@@ -148,7 +147,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
             new RowDescriptionResponse(
                     this.outputStream,
                     this.statement,
-                    getPortalMetadata().getMetadata(),
+                    getPortalMetadata().getResultSet().getType(),
                     this.connection.getServer().getOptions(),
                     this.queryMode)
                 .send(false);
@@ -167,7 +166,7 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
   }
 
   @VisibleForTesting
-  DescribePortalMetadata getPortalMetadata() {
+  StatementResult getPortalMetadata() {
     if (!this.describePortalMetadata.isDone()) {
       throw new IllegalStateException("Trying to get Portal Metadata before it has been described");
     }
@@ -186,15 +185,17 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
    * @throws Exception if sending the message back to the client causes an error.
    */
   public void handleDescribeStatement() throws Exception {
-    try (DescribeStatementMetadata metadata =
-        (DescribeStatementMetadata) this.statement.describe()) {
+    if (this.statement.hasException()) {
+      throw this.statement.getException();
+    } else {
       if (isExtendedProtocol()) {
+        DescribeResult metadata = this.statement.describe();
         new ParameterDescriptionResponse(this.outputStream, metadata.getParameters()).send(false);
-        if (metadata.getResultSet() != null) {
+        if (metadata.getColumns() != null && metadata.getColumns().getStructFields().size() > 0) {
           new RowDescriptionResponse(
                   this.outputStream,
                   this.statement,
-                  metadata.getResultSet(),
+                  metadata.getColumns(),
                   this.connection.getServer().getOptions(),
                   this.queryMode)
               .send(false);
@@ -202,8 +203,6 @@ public class DescribeMessage extends AbstractQueryProtocolMessage {
           new NoDataResponse(this.outputStream).send(false);
         }
       }
-    } catch (Exception exception) {
-      this.handleError(exception);
     }
   }
 }

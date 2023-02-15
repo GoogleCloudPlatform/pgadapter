@@ -1,5 +1,122 @@
 # Changelog
 
+## [0.16.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.15.0...v0.16.0) (2023-02-05)
+
+
+### Features
+
+* allow unsupported OIDs as param types ([#604](https://github.com/GoogleCloudPlatform/pgadapter/issues/604)) ([5e9f95a](https://github.com/GoogleCloudPlatform/pgadapter/commit/5e9f95a720f1648236b39167b227cc70bd40e323))
+* make table and function replacements client-aware ([#605](https://github.com/GoogleCloudPlatform/pgadapter/issues/605)) ([ad49e99](https://github.com/GoogleCloudPlatform/pgadapter/commit/ad49e990298d0e91736d4f5afe581d2f1411b5ca))
+
+
+### Bug Fixes
+
+* binary copy header should be included in first data message ([#609](https://github.com/GoogleCloudPlatform/pgadapter/issues/609)) ([2fbf89e](https://github.com/GoogleCloudPlatform/pgadapter/commit/2fbf89e6a6b3ba0b66f126abf019e386e9276d4c))
+* copy to for a query would fail with a column list ([#616](https://github.com/GoogleCloudPlatform/pgadapter/issues/616)) ([16f030e](https://github.com/GoogleCloudPlatform/pgadapter/commit/16f030e3f6b93ae0a243b6c495b0c906403c5e16))
+* CopyResponse did not return correct column format ([#633](https://github.com/GoogleCloudPlatform/pgadapter/issues/633)) ([dc0d482](https://github.com/GoogleCloudPlatform/pgadapter/commit/dc0d482ffb61d1857a3f49fc424a07d72886b460))
+* csv copy header was repeated for each row ([#619](https://github.com/GoogleCloudPlatform/pgadapter/issues/619)) ([622c49a](https://github.com/GoogleCloudPlatform/pgadapter/commit/622c49a02cf2a865874764f44a77b96539382be0))
+* empty copy from stdin statements could be unresponsive ([#617](https://github.com/GoogleCloudPlatform/pgadapter/issues/617)) ([c576124](https://github.com/GoogleCloudPlatform/pgadapter/commit/c576124e40ad7f07ee0d1e2f3090886896c70dc3))
+* empty partitions could skip binary copy header ([#615](https://github.com/GoogleCloudPlatform/pgadapter/issues/615)) ([e7dd650](https://github.com/GoogleCloudPlatform/pgadapter/commit/e7dd6508015ed45147af59c25f95e18628461d85))
+* show statements failed in pgx ([#629](https://github.com/GoogleCloudPlatform/pgadapter/issues/629)) ([734f521](https://github.com/GoogleCloudPlatform/pgadapter/commit/734f52176f75e4ccb0b8bddc96eae49ace9ab19e))
+* support end-of-data record in COPY ([#602](https://github.com/GoogleCloudPlatform/pgadapter/issues/602)) ([8b705e8](https://github.com/GoogleCloudPlatform/pgadapter/commit/8b705e8f917035cbabe9e6751008e93692355158))
+
+
+### Dependencies
+
+* update Spanner client to 6.35.1 ([#607](https://github.com/GoogleCloudPlatform/pgadapter/issues/607)) ([0c607c7](https://github.com/GoogleCloudPlatform/pgadapter/commit/0c607c7c1bce48139f28688a5d7f1e202d839860))
+
+
+### Documentation
+
+* document pgbench usage ([#603](https://github.com/GoogleCloudPlatform/pgadapter/issues/603)) ([5a62bf6](https://github.com/GoogleCloudPlatform/pgadapter/commit/5a62bf64c56a976625e2c707b6d049e593cddc96))
+* document unix domain sockets with Docker ([#622](https://github.com/GoogleCloudPlatform/pgadapter/issues/622)) ([e4e41f7](https://github.com/GoogleCloudPlatform/pgadapter/commit/e4e41f70e5ad23d8e7d6f2a1bc1851458466bbb6))
+
+## [0.15.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.14.1...v0.15.0) (2023-01-18)
+
+
+### Features
+
+* allow decimal values to be used for int params ([#564](https://github.com/GoogleCloudPlatform/pgadapter/issues/564)) ([3aecf34](https://github.com/GoogleCloudPlatform/pgadapter/commit/3aecf34aa1500fc593c3a33d4eab132f24fbb2d8))
+* auto-detect npgsql ([#559](https://github.com/GoogleCloudPlatform/pgadapter/issues/559)) ([e1e8526](https://github.com/GoogleCloudPlatform/pgadapter/commit/e1e85267b8b77a853916b911b37548bd3f5f97c7))
+* support more timestamp values for query parameters ([#565](https://github.com/GoogleCloudPlatform/pgadapter/issues/565)) ([5905213](https://github.com/GoogleCloudPlatform/pgadapter/commit/5905213b9b662b1f1bb8afc1ef0ca4a5cdaf7097))
+* support TRUNCATE ([#533](https://github.com/GoogleCloudPlatform/pgadapter/issues/533)) ([293aaaa](https://github.com/GoogleCloudPlatform/pgadapter/commit/293aaaa9f0db0dada42e246708678501aba39ea6))
+* support VACUUM as a no-op ([#532](https://github.com/GoogleCloudPlatform/pgadapter/issues/532)) ([20dc062](https://github.com/GoogleCloudPlatform/pgadapter/commit/20dc062c1d10b69377c5d7da26c2bf12dc7fd00d))
+
+
+### Bug Fixes
+
+* potential session leak when using prepared statements in autocommit mode ([#591](https://github.com/GoogleCloudPlatform/pgadapter/issues/591)) ([185dcd5](https://github.com/GoogleCloudPlatform/pgadapter/commit/185dcd5635d0a8c042cc8975ccb58b331dd29eb7))
+* support ([#586](https://github.com/GoogleCloudPlatform/pgadapter/issues/586)) ([c91fe66](https://github.com/GoogleCloudPlatform/pgadapter/commit/c91fe6651d7040680211db4b2fecea6c26a69e31)), closes [#581](https://github.com/GoogleCloudPlatform/pgadapter/issues/581)
+
+
+### Performance Improvements
+
+* keep converted bytes ([#584](https://github.com/GoogleCloudPlatform/pgadapter/issues/584)) ([1486bc4](https://github.com/GoogleCloudPlatform/pgadapter/commit/1486bc4a57ac70155f67823ca82063956122d772))
+
+## [0.14.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.14.0...v0.14.1) (2023-01-06)
+
+
+### Bug Fixes
+
+* enable gracefully stopping Docker container ([#554](https://github.com/GoogleCloudPlatform/pgadapter/issues/554)) ([80e9c8b](https://github.com/GoogleCloudPlatform/pgadapter/commit/80e9c8b988a168b30d44335b5de3c09e57c18d76))
+
+
+### Performance Improvements
+
+* reduce conversion time for timestamptz, date and bytea ([#572](https://github.com/GoogleCloudPlatform/pgadapter/issues/572)) ([bb73990](https://github.com/GoogleCloudPlatform/pgadapter/commit/bb739901bd875a7c706377dc065c1936db56e5d7))
+
+## [0.14.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.13.1...v0.14.0) (2022-12-16)
+
+
+### Features
+
+* support Connection API options in connection string ([#542](https://github.com/GoogleCloudPlatform/pgadapter/issues/542)) ([6247412](https://github.com/GoogleCloudPlatform/pgadapter/commit/6247412b4b0d578f638d763c6470c44db9ddf246))
+* support force_autocommit ([#541](https://github.com/GoogleCloudPlatform/pgadapter/issues/541)) ([52fba80](https://github.com/GoogleCloudPlatform/pgadapter/commit/52fba801f20c2bcdc1fa9e78e29bd3d25b18eeb0))
+
+
+### Documentation
+
+* added sample application model for Django ([#539](https://github.com/GoogleCloudPlatform/pgadapter/issues/539)) ([72b173a](https://github.com/GoogleCloudPlatform/pgadapter/commit/72b173af7130e24a6e3309535a117aaa90df17d6))
+
+## [0.13.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.13.0...v0.13.1) (2022-12-09)
+
+
+### Bug Fixes
+
+* allow start ddl batch / run batch in one query string ([#529](https://github.com/GoogleCloudPlatform/pgadapter/issues/529)) ([2ffb290](https://github.com/GoogleCloudPlatform/pgadapter/commit/2ffb290bf661d99bba6648460c25d73b47fc2bf4))
+* always return timestamp in microsecond precision ([#513](https://github.com/GoogleCloudPlatform/pgadapter/issues/513)) ([e385dd3](https://github.com/GoogleCloudPlatform/pgadapter/commit/e385dd3a7fb2cef2d02616853c283d4869d0f32d))
+
+
+### Documentation
+
+* document node-postgres support ([#489](https://github.com/GoogleCloudPlatform/pgadapter/issues/489)) ([61c6459](https://github.com/GoogleCloudPlatform/pgadapter/commit/61c64593f08899653cfdbddab8b8b5705cd2be0c))
+
+## [0.13.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.12.0...v0.13.0) (2022-12-07)
+
+
+### Features
+
+* accept UUID as a parameter value ([#518](https://github.com/GoogleCloudPlatform/pgadapter/issues/518)) ([46941ab](https://github.com/GoogleCloudPlatform/pgadapter/commit/46941ab318e4269061336e2ecb95a4402cf2a5e5))
+* support 'select version()' and similar ([#495](https://github.com/GoogleCloudPlatform/pgadapter/issues/495)) ([fbd16ec](https://github.com/GoogleCloudPlatform/pgadapter/commit/fbd16ecd44d12ffb65b85555d2ddef0cc533b4be))
+* Support Describe message for DDL statements and other no-result statements ([#501](https://github.com/GoogleCloudPlatform/pgadapter/issues/501)) ([cb616d8](https://github.com/GoogleCloudPlatform/pgadapter/commit/cb616d8f64c6aabe0422020d7ce2bc90734ff837))
+* support DML RETURNING clause ([#498](https://github.com/GoogleCloudPlatform/pgadapter/issues/498)) ([c1d7e4e](https://github.com/GoogleCloudPlatform/pgadapter/commit/c1d7e4eff240449245f223bc17793f393cafea2f))
+* support more than 50 query parameters ([#527](https://github.com/GoogleCloudPlatform/pgadapter/issues/527)) ([9fca9ba](https://github.com/GoogleCloudPlatform/pgadapter/commit/9fca9ba487515d63b586bb4ed6329f2d84d98996))
+* use session timezone to format timestamps ([#470](https://github.com/GoogleCloudPlatform/pgadapter/issues/470)) ([d84564d](https://github.com/GoogleCloudPlatform/pgadapter/commit/d84564dc45a4259c3b8246d05c66a2645cb92f2d))
+
+
+### Bug Fixes
+
+* client side results were not returned ([#493](https://github.com/GoogleCloudPlatform/pgadapter/issues/493)) ([5e9e85e](https://github.com/GoogleCloudPlatform/pgadapter/commit/5e9e85e72b7d51bb6426ad963521fb3e24fa36bb))
+* pg_catalog tables were not replaced for information_schema queries ([#494](https://github.com/GoogleCloudPlatform/pgadapter/issues/494)) ([e1f02fe](https://github.com/GoogleCloudPlatform/pgadapter/commit/e1f02fed232c09c96adb426b9f8ce91d61c6659d))
+
+
+### Documentation
+
+* [WIP] Hibernate sample ([#373](https://github.com/GoogleCloudPlatform/pgadapter/issues/373)) ([7125c91](https://github.com/GoogleCloudPlatform/pgadapter/commit/7125c9110eab429ea311676445c71308c1018aac))
+* document Liquibase Pilot Support ([#485](https://github.com/GoogleCloudPlatform/pgadapter/issues/485)) ([745089f](https://github.com/GoogleCloudPlatform/pgadapter/commit/745089f8d7f6df2401eb0fb15cca80c85dc18437))
+* document Support for gorm ([#469](https://github.com/GoogleCloudPlatform/pgadapter/issues/469)) ([0b962af](https://github.com/GoogleCloudPlatform/pgadapter/commit/0b962af9f0037b7fb86225ed0b3f89c072bf7bcf))
+* remove limitation for RETURNING and generated columns for gorm ([#526](https://github.com/GoogleCloudPlatform/pgadapter/issues/526)) ([0420e99](https://github.com/GoogleCloudPlatform/pgadapter/commit/0420e997fb1c334bd08ee2507ca73ad11426e370))
+
 ## [0.12.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.11.0...v0.12.0) (2022-11-02)
 
 

@@ -32,15 +32,14 @@ import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.DdlTransactionMode;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.postgresql.core.Oid;
 
 @RunWith(JUnit4.class)
 public class SessionStateTest {
@@ -162,7 +161,7 @@ public class SessionStateTest {
   public void testGetAll() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(357, allSettings.size());
+    assertEquals(358, allSettings.size());
   }
 
   @Test
@@ -200,7 +199,7 @@ public class SessionStateTest {
     state.setLocal("spanner", "custom_local_setting", "value2");
 
     List<PGSetting> allSettings = state.getAll();
-    assertEquals(359, allSettings.size());
+    assertEquals(360, allSettings.size());
 
     PGSetting applicationName =
         allSettings.stream()
@@ -465,7 +464,7 @@ public class SessionStateTest {
   @Test
   public void testAddSessionState() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
-    PgCatalog pgCatalog = new PgCatalog(state);
+    PgCatalog pgCatalog = new PgCatalog(state, WellKnownClient.UNSPECIFIED);
     Statement statement = Statement.of("select * from pg_settings");
 
     Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
@@ -478,7 +477,7 @@ public class SessionStateTest {
   @Test
   public void testAddSessionStateWithParameters() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
-    PgCatalog pgCatalog = new PgCatalog(state);
+    PgCatalog pgCatalog = new PgCatalog(state, WellKnownClient.UNSPECIFIED);
     Statement statement =
         Statement.newBuilder("select * from pg_settings where name=$1")
             .bind("p1")
@@ -499,7 +498,7 @@ public class SessionStateTest {
   @Test
   public void testAddSessionStateWithoutPgSettings() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
-    PgCatalog pgCatalog = new PgCatalog(state);
+    PgCatalog pgCatalog = new PgCatalog(state, WellKnownClient.UNSPECIFIED);
     Statement statement = Statement.of("select * from some_table");
 
     Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
@@ -510,7 +509,7 @@ public class SessionStateTest {
   @Test
   public void testAddSessionStateWithComments() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
-    PgCatalog pgCatalog = new PgCatalog(state);
+    PgCatalog pgCatalog = new PgCatalog(state, WellKnownClient.UNSPECIFIED);
     Statement statement = Statement.of("/* This comment is preserved */ select * from pg_settings");
 
     Statement withSessionState = pgCatalog.replacePgCatalogTables(statement);
@@ -523,7 +522,7 @@ public class SessionStateTest {
   @Test
   public void testAddSessionStateWithExistingCTE() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
-    PgCatalog pgCatalog = new PgCatalog(state);
+    PgCatalog pgCatalog = new PgCatalog(state, WellKnownClient.UNSPECIFIED);
     Statement statement =
         Statement.of(
             "with my_cte as (select col1, col2 from foo) select * from pg_settings inner join my_cte on my_cte.col1=pg_settings.name");
@@ -540,7 +539,7 @@ public class SessionStateTest {
   @Test
   public void testAddSessionStateWithCommentsAndExistingCTE() {
     SessionState state = new SessionState(mock(OptionsMetadata.class));
-    PgCatalog pgCatalog = new PgCatalog(state);
+    PgCatalog pgCatalog = new PgCatalog(state, WellKnownClient.UNSPECIFIED);
     Statement statement =
         Statement.of(
             "/* This comment is preserved */ with foo as (select * from bar)\nselect * from pg_settings");
@@ -826,29 +825,6 @@ public class SessionStateTest {
     state.set("spanner", "ddl_transaction_mode", null);
 
     assertEquals(DdlTransactionMode.Single, state.getDdlTransactionMode());
-  }
-
-  @Test
-  public void testGuessTypes_defaultNonJdbc() {
-    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
-    SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
-    assertEquals(ImmutableSet.of(), state.getGuessTypes());
-  }
-
-  @Test
-  public void testGuessTypes_defaultJdbc() {
-    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
-    SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
-    state.set("spanner", "guess_types", String.format("%d,%d", Oid.TIMESTAMPTZ, Oid.DATE));
-    assertEquals(ImmutableSet.of(Oid.TIMESTAMPTZ, Oid.DATE), state.getGuessTypes());
-  }
-
-  @Test
-  public void testGuessTypes_invalidOids() {
-    OptionsMetadata optionsMetadata = mock(OptionsMetadata.class);
-    SessionState state = new SessionState(ImmutableMap.of(), optionsMetadata);
-    state.set("spanner", "guess_types", String.format("%d,%d,foo", Oid.TIMESTAMPTZ, Oid.DATE));
-    assertEquals(ImmutableSet.of(Oid.TIMESTAMPTZ, Oid.DATE), state.getGuessTypes());
   }
 
   @Test

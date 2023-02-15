@@ -3,14 +3,28 @@
 PGAdapter is a proxy which translates the PostgreSQL wire-protocol into the
 equivalent for Spanner databases [that use the PostgreSQL interface](https://cloud.google.com/spanner/docs/postgresql-interface).
 
-PGAdapter can be used with the following clients:
+## Drivers and Clients
+PGAdapter can be used with the following drivers and clients:
 1. `psql`: Versions 11, 12, 13 and 14 are supported. See [psql support](docs/psql.md) for more details.
 2. `JDBC`: Versions 42.x and higher are supported. See [JDBC support](docs/jdbc.md) for more details.
 3. `pgx`: Version 4.15 and higher are supported. See [pgx support](docs/pgx.md) for more details.
-4. `psycopg2`: Version 2.9.3 and higher (but not `psycopg3`) are supported. See [psycopg2](docs/psycopg2.md) for more details.
-5. `node-postgres`: Version 8.8.0 and higher have __experimental support__.
-   See [node-postgres support](docs/node-postgres.md) for more details.
-6. `hibernate`: Version 5.3.20. Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
+4. `psycopg2`: Version 2.9.3 and higher are supported. See [psycopg2](docs/psycopg2.md) for more details.
+5. `psycopg3`: Version 3.1.x and higher have experimental support. See [psycopg3 support](docs/psycopg3.md) for more details.
+6. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
+7. `npgsql`: Version 6.0.x and higher have experimental support. See [npgsql support](docs/npgsql.md) for more details.
+8. `hibernate`: Version 5.3.20. Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
+
+## Frameworks and Tools
+PGAdapter can be used with the following frameworks and tools:
+1. `Liquibase`: Version 4.12.0 and higher are supported. See [Liquibase support](docs/liquibase.md)
+   for more details. See also [this directory](samples/java/liquibase) for a sample application using `Liquibase`.
+2. `gorm`: Version 1.23.8 and higher are supported. See [gorm support](docs/gorm.md) for more details.
+   See also [this directory](samples/golang/gorm) for a sample application using `gorm`.
+3. `SQLAlchemy`: Version 1.4.45 has _experimental support_. See [SQLAlchemy support](docs/sqlalchemy.md)
+   for more details. See also [this directory](samples/python/sqlalchemy-sample) for a sample
+   application using `SQLAlchemy`.
+4. `pgbench` can be used with PGAdapter, but with some limitations. See [pgbench.md](docs/pgbench.md)
+   for more details.
 
 ## FAQ
 See [Frequently Asked Questions](docs/faq.md) for answers to frequently asked questions.
@@ -57,9 +71,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.12.0` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.16.0` with the version you want to download):
 ```shell
-VERSION=v0.12.0
+VERSION=v0.16.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -94,7 +108,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.12.0</version>
+  <version>0.16.0</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```
@@ -265,8 +279,6 @@ Other `psql` meta-commands are __not__ supported.
 ## Limitations
 
 PGAdapter has the following known limitations at this moment:
-- Server side [prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) are limited to at most 50 parameters.
-- SSL connections are not supported.
 - Only [password authentication](https://www.postgresql.org/docs/current/auth-password.html) using
   the `password` method is supported. All other authentication methods are not supported.
 - The COPY protocol only supports COPY TO|FROM STDOUT|STDIN [BINARY]. COPY TO|FROM <FILE|PROGRAM> is not supported.

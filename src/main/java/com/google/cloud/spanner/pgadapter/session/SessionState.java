@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.session;
 
 import static com.google.cloud.spanner.pgadapter.session.CopySettings.initCopySettings;
 
-import com.google.api.client.util.Strings;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
@@ -30,7 +29,6 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableSet.Builder;
 import com.google.common.collect.Sets;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -45,7 +43,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 
 /** {@link SessionState} contains all session variables for a connection. */
 @InternalApi
@@ -234,6 +231,7 @@ public class SessionState {
 
   private void internalSet(
       String extension, String name, String setting, Map<String, PGSetting> currentSettings) {
+    clearCachedValues();
     String key = toKey(extension, name);
     PGSetting newSetting = currentSettings.get(key);
     if (newSetting == null) {
@@ -253,6 +251,10 @@ public class SessionState {
     // Consider all users as SUPERUSER.
     newSetting.setSetting(Context.SUPERUSER, setting);
     currentSettings.put(key, newSetting);
+  }
+
+  private void clearCachedValues() {
+    cachedZoneId = null;
   }
 
   /** Returns the current value of the specified setting. */
@@ -372,6 +374,19 @@ public class SessionState {
     this.transactionSettings = null;
   }
 
+  /** Returns the PostgreSQL version. */
+  public String getServerVersion() {
+    return getStringSetting(null, "server_version", OptionsMetadata.DEFAULT_SERVER_VERSION);
+  }
+
+  /**
+   * Returns whether transaction statements should be ignored and all statements should be executed
+   * in autocommit mode.
+   */
+  public boolean isForceAutocommit() {
+    return getBoolSetting("spanner", "force_autocommit", false);
+  }
+
   /** Returns the current setting for replacing pg_catalog tables with common table expressions. */
   public boolean isReplacePgCatalogTables() {
     PGSetting setting = internalGet(toKey("spanner", "replace_pg_catalog_tables"), false);
@@ -398,8 +413,13 @@ public class SessionState {
         () -> DdlTransactionMode.valueOf(setting.getBootVal()));
   }
 
+  private ZoneId cachedZoneId;
+
   /** Returns the {@link ZoneId} of the current timezone for this session. */
   public ZoneId getTimezone() {
+    if (cachedZoneId != null) {
+      return cachedZoneId;
+    }
     PGSetting setting = internalGet(toKey(null, "timezone"), false);
     if (setting == null) {
       return ZoneId.systemDefault();
@@ -411,7 +431,7 @@ public class SessionState {
             setting::getResetVal,
             setting::getBootVal);
 
-    return zoneIdFromString(id);
+    return (cachedZoneId = zoneIdFromString(id));
   }
 
   private ZoneId zoneIdFromString(String value) {
@@ -420,43 +440,6 @@ public class SessionState {
     } catch (Throwable ignore) {
       return ZoneId.systemDefault();
     }
-  }
-
-  /**
-   * Returns a set of OIDs that PGAdapter should try to guess if it receives an untyped parameter
-   * value. This is needed because some clients (JDBC) deliberately send parameters without a type
-   * code to force the server to infer the type. This specifically applies to date/timestamp
-   * parameters.
-   */
-  public Set<Integer> getGuessTypes() {
-    PGSetting setting = internalGet(toKey("spanner", "guess_types"), false);
-    if (setting == null || Strings.isNullOrEmpty(setting.getSetting())) {
-      return ImmutableSet.of();
-    }
-    return convertOidListToSet(setting.getSetting());
-  }
-
-  /** Keep a cache of 1 element ready as the setting is not likely to change often. */
-  private final Map<String, Set<Integer>> cachedGuessTypes = new HashMap<>(1);
-
-  Set<Integer> convertOidListToSet(@Nonnull String value) {
-    if (cachedGuessTypes.containsKey(value)) {
-      return cachedGuessTypes.get(value);
-    }
-
-    Builder<Integer> builder = ImmutableSet.builder();
-    String[] oids = value.split(",");
-    for (String oid : oids) {
-      try {
-        builder.add(Integer.valueOf(oid));
-      } catch (Exception ignore) {
-        // ignore invalid oids.
-      }
-    }
-    cachedGuessTypes.clear();
-    cachedGuessTypes.put(value, builder.build());
-
-    return cachedGuessTypes.get(value);
   }
 
   @SafeVarargs

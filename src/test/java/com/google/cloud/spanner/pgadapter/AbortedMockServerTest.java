@@ -39,6 +39,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
@@ -91,7 +92,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   }
 
   private String getExpectedInitialApplicationName() {
-    return null;
+    return "PostgreSQL JDBC Driver";
   }
 
   /**
@@ -318,13 +319,8 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
             assertEquals(3.14d, resultSet.getDouble(++index), 0.0d);
             assertEquals(100, resultSet.getInt(++index));
             assertEquals(new BigDecimal("6.626"), resultSet.getBigDecimal(++index));
-            if (preparedThreshold < 0) {
-              // The binary format will truncate the timestamp value to microseconds.
-              assertEquals(
-                  truncatedOffsetDateTime, resultSet.getObject(++index, OffsetDateTime.class));
-            } else {
-              assertEquals(offsetDateTime, resultSet.getObject(++index, OffsetDateTime.class));
-            }
+            assertEquals(
+                truncatedOffsetDateTime, resultSet.getObject(++index, OffsetDateTime.class));
             assertEquals(LocalDate.of(2022, 3, 29), resultSet.getObject(++index, LocalDate.class));
             assertEquals("test", resultSet.getString(++index));
             assertEquals("{\"key\": \"value\"}", resultSet.getString(++index));
@@ -561,12 +557,14 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   @Test
   public void testDescribeDmlWithSchemaPrefix() throws SQLException {
     String sql = "update public.my_table set value=? where id=?";
-    String describeSql = "select $1, $2 from (select value=$1 from public.my_table where id=$2) p";
+    String describeSql = "update public.my_table set value=$1 where id=$2";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(describeSql),
             com.google.spanner.v1.ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.INT64)))
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.INT64)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     try (Connection connection = createConnection()) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
@@ -580,13 +578,14 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
   @Test
   public void testDescribeDmlWithQuotedSchemaPrefix() throws SQLException {
     String sql = "update \"public\".\"my_table\" set value=? where id=?";
-    String describeSql =
-        "select $1, $2 from (select value=$1 from \"public\".\"my_table\" where id=$2) p";
+    String describeSql = "update \"public\".\"my_table\" set value=$1 where id=$2";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(describeSql),
             com.google.spanner.v1.ResultSet.newBuilder()
-                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.INT64)))
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.INT64)))
+                .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     try (Connection connection = createConnection()) {
       try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
@@ -1317,7 +1316,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(358, count);
+        assertEquals(359, count);
       }
     }
   }

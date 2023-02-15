@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter.parsers;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -41,21 +42,10 @@ public class JsonbParser extends Parser<String> {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          this.item = toString(item);
+          this.item = new String(item, UTF8);
           break;
         case BINARY:
-          if (item.length > 0) {
-            if (item[0] == 1) {
-              this.item = toString(Arrays.copyOfRange(item, 1, item.length));
-            } else {
-              throw PGException.newBuilder("Unknown version in binary jsonb value: " + item[0])
-                  .setSQLState(SQLState.RaiseException)
-                  .setSeverity(Severity.ERROR)
-                  .build();
-            }
-          } else {
-            this.item = "";
-          }
+          this.item = toString(item);
           break;
         default:
       }
@@ -64,7 +54,18 @@ public class JsonbParser extends Parser<String> {
 
   /** Converts the binary data to an UTF8 string. */
   public static String toString(@Nonnull byte[] data) {
-    return new String(data, UTF8);
+    if (data.length > 0) {
+      if (data[0] == 1) {
+        return new String(Arrays.copyOfRange(data, 1, data.length), StandardCharsets.UTF_8);
+      } else {
+        throw PGException.newBuilder("Unknown version in binary jsonb value: " + data[0])
+            .setSQLState(SQLState.RaiseException)
+            .setSeverity(Severity.ERROR)
+            .build();
+      }
+    } else {
+      return "";
+    }
   }
 
   @Override
@@ -104,6 +105,6 @@ public class JsonbParser extends Parser<String> {
 
   @Override
   public void bind(Statement.Builder statementBuilder, String name) {
-    statementBuilder.bind(name).to(this.item);
+    statementBuilder.bind(name).to(Value.pgJsonb(this.item));
   }
 }

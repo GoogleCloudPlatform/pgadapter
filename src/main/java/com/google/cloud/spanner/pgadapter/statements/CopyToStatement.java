@@ -21,11 +21,10 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
+import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
-import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
-import com.google.cloud.spanner.pgadapter.metadata.DescribePortalMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
@@ -38,9 +37,11 @@ import com.google.cloud.spanner.pgadapter.wireoutput.CopyDoneResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.CopyOutResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.WireOutput;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import java.util.List;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.QuoteMode;
@@ -56,7 +57,8 @@ public class CopyToStatement extends IntermediatePortalStatement {
       new byte[] {'P', 'G', 'C', 'O', 'P', 'Y', '\n', -1, '\r', '\n', '\0'};
 
   private final ParsedCopyStatement parsedCopyStatement;
-  private final CSVFormat csvFormat;
+  private CSVFormat csvFormat;
+  private final AtomicBoolean hasReturnedData = new AtomicBoolean(false);
 
   public CopyToStatement(
       ConnectionHandler connectionHandler,
@@ -64,33 +66,43 @@ public class CopyToStatement extends IntermediatePortalStatement {
       String name,
       ParsedCopyStatement parsedCopyStatement) {
     super(
-        connectionHandler,
-        options,
         name,
-        createParsedStatement(parsedCopyStatement),
-        createSelectStatement(parsedCopyStatement));
+        new IntermediatePreparedStatement(
+            connectionHandler,
+            options,
+            name,
+            NO_PARAMETER_TYPES,
+            createParsedStatement(parsedCopyStatement),
+            createSelectStatement(parsedCopyStatement)),
+        NO_PARAMS,
+        ImmutableList.of(),
+        ImmutableList.of());
     this.parsedCopyStatement = parsedCopyStatement;
     if (parsedCopyStatement.format == CopyStatement.Format.BINARY) {
       this.csvFormat = null;
     } else {
+      CSVFormat baseFormat =
+          parsedCopyStatement.format == Format.TEXT
+              ? CSVFormat.POSTGRESQL_TEXT
+              : CSVFormat.POSTGRESQL_CSV;
       CSVFormat.Builder formatBuilder =
-          CSVFormat.Builder.create(CSVFormat.POSTGRESQL_TEXT)
+          CSVFormat.Builder.create(baseFormat)
               .setNullString(
                   parsedCopyStatement.nullString == null
-                      ? CSVFormat.POSTGRESQL_TEXT.getNullString()
+                      ? baseFormat.getNullString()
                       : parsedCopyStatement.nullString)
               .setRecordSeparator('\n')
               .setDelimiter(
                   parsedCopyStatement.delimiter == null
-                      ? CSVFormat.POSTGRESQL_TEXT.getDelimiterString().charAt(0)
+                      ? baseFormat.getDelimiterString().charAt(0)
                       : parsedCopyStatement.delimiter)
               .setQuote(
                   parsedCopyStatement.quote == null
-                      ? CSVFormat.POSTGRESQL_TEXT.getQuoteCharacter()
+                      ? baseFormat.getQuoteCharacter()
                       : parsedCopyStatement.quote)
               .setEscape(
                   parsedCopyStatement.escape == null
-                      ? CSVFormat.POSTGRESQL_TEXT.getEscapeCharacter()
+                      ? baseFormat.getEscapeCharacter()
                       : parsedCopyStatement.escape);
       if (parsedCopyStatement.format == Format.TEXT) {
         formatBuilder.setQuoteMode(QuoteMode.NONE);
@@ -195,14 +207,14 @@ public class CopyToStatement extends IntermediatePortalStatement {
   }
 
   @Override
-  public Future<DescribePortalMetadata> describeAsync(BackendConnection backendConnection) {
+  public Future<StatementResult> describeAsync(BackendConnection backendConnection) {
     // Return null to indicate that this COPY TO STDOUT statement does not return any
     // RowDescriptionResponse.
     return Futures.immediateFuture(null);
   }
 
   @Override
-  public IntermediatePortalStatement bind(
+  public IntermediatePortalStatement createPortal(
       String name,
       byte[][] parameters,
       List<Short> parameterFormatCodes,
@@ -213,22 +225,25 @@ public class CopyToStatement extends IntermediatePortalStatement {
 
   @Override
   public WireOutput[] createResultPrefix(ResultSet resultSet) {
-    return this.parsedCopyStatement.format == CopyStatement.Format.BINARY
-        ? new WireOutput[] {
-          new CopyOutResponse(
-              this.outputStream,
-              resultSet.getColumnCount(),
-              DataFormat.POSTGRESQL_BINARY.getCode()),
-          CopyDataResponse.createBinaryHeader(this.outputStream)
-        }
-        : new WireOutput[] {
-          new CopyOutResponse(
-              this.outputStream, resultSet.getColumnCount(), DataFormat.POSTGRESQL_TEXT.getCode())
-        };
+    return new WireOutput[] {
+      new CopyOutResponse(
+          this.outputStream,
+          resultSet.getColumnCount(),
+          this.parsedCopyStatement.format.getDataFormat().getCode())
+    };
   }
 
   @Override
   public CopyDataResponse createDataRowResponse(Converter converter) {
+    // Keep track of whether this COPY statement has returned at least one row. This is necessary to
+    // know whether we need to include the header in the current row and/or in the trailer.
+    // PostgreSQL includes the header in either the first data row or in the trailer if there are no
+    // rows. This is not specifically mentioned in the protocol description, but some clients assume
+    // this behavior. See
+    // https://github.com/npgsql/npgsql/blob/7f97dbad28c71b2202dd7bcccd05fc42a7de23c8/src/Npgsql/NpgsqlBinaryExporter.cs#L156
+    if (parsedCopyStatement.format == Format.BINARY && !hasReturnedData.getAndSet(true)) {
+      converter = converter.includeBinaryCopyHeader();
+    }
     return parsedCopyStatement.format == CopyStatement.Format.BINARY
         ? createBinaryDataResponse(converter)
         : createDataResponse(converter.getResultSet());
@@ -238,7 +253,7 @@ public class CopyToStatement extends IntermediatePortalStatement {
   public WireOutput[] createResultSuffix() {
     return this.parsedCopyStatement.format == Format.BINARY
         ? new WireOutput[] {
-          CopyDataResponse.createBinaryTrailer(this.outputStream),
+          CopyDataResponse.createBinaryTrailer(this.outputStream, !hasReturnedData.get()),
           new CopyDoneResponse(this.outputStream)
         }
         : new WireOutput[] {new CopyDoneResponse(this.outputStream)};
@@ -261,6 +276,10 @@ public class CopyToStatement extends IntermediatePortalStatement {
       }
     }
     String row = csvFormat.format((Object[]) data);
+    // Only include the header with the first row.
+    if (!csvFormat.getSkipHeaderRecord()) {
+      csvFormat = csvFormat.builder().setSkipHeaderRecord(true).build();
+    }
     return new CopyDataResponse(this.outputStream, row, csvFormat.getRecordSeparator().charAt(0));
   }
 
