@@ -82,7 +82,8 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
 
   private String createConnectionString() {
     return String.format(
-        "Host=%s;Port=%d;Database=d;SSL Mode=Disable", host, pgServer.getLocalPort());
+        "Host=%s;Port=%d;Database=d;SSL Mode=Disable;Timeout=60;Command Timeout=60",
+        host, pgServer.getLocalPort());
   }
 
   @Test
