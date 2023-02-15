@@ -195,4 +195,35 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
     assertEquals(expectedOutput, actualOutput);
     assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
+
+  @Test
+  public void transactionErrorTest() throws IOException, InterruptedException {
+
+    String updateSQL1 =
+        "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
+    String insertSQL1 =
+        "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (1, 'hello', 'world')";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSQL1), 0));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSQL1), 1));
+
+    String updateSQL2 =
+        "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'python' WHERE \"singers\".\"singerid\" = 2";
+    String insertSQL2 =
+        "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (2, 'hello', 'python')";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSQL2), 0));
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(insertSQL2), 1));
+
+    List<String> options = new ArrayList<>();
+    options.add("error_during_transaction");
+
+    String actualOutput = executeTransactionTests(pgServer.getLocalPort(), host, options);
+    String expectedOutput = "Some error has occurred\n";
+
+    assertEquals(expectedOutput, actualOutput);
+    // since the error has occurred in between the transaction,
+    // it will be rolled back
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
 }
+

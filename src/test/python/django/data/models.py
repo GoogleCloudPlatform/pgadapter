@@ -24,13 +24,13 @@ class Singer(models.Model):
 
 class all_types(models.Model):
   class Meta():
-    db_table = 'all_types3'
-  col_bigint = models.BigIntegerField(primary_key=True, null=True)
-  col_bool = models.BooleanField(null=True)
+    db_table = 'all_types'
+  col_bigint = models.BigIntegerField(primary_key=True)
+  col_bool = models.BooleanField()
   col_bytea = models.BinaryField(null=True)
-  col_float8 = models.FloatField(null=True)
-  col_int = models.IntegerField(null=True)
-  col_numeric = models.DecimalField(max_digits=15, decimal_places=5, null=True)
-  col_timestamptz = models.DateTimeField(null=True)
-  col_date = models.DateField(null=True)
+  col_float8 = models.FloatField()
+  col_int = models.IntegerField()
+  col_numeric = models.DecimalField(max_digits=15, decimal_places=5)
+  col_timestamptz = models.DateTimeField()
+  col_date = models.DateField()
   col_varchar = models.CharField(null=True)

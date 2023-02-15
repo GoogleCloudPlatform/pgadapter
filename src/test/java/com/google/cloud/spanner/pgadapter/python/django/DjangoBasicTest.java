@@ -21,6 +21,7 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
+import com.google.protobuf.NullValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
@@ -84,6 +85,40 @@ public class DjangoBasicTest extends DjangoTestSetup {
               .addValues(Value.newBuilder().setStringValue(lastname).build())
               .build());
     }
+    return resultSetBuilder.build();
+  }
+
+  private ResultSet createAllNullResultSet(){
+    ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();
+
+    resultSetBuilder.setMetadata(
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                            .setName("singerid")
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .setName("firstname")
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .setName("lastname")
+                            .build())
+                    .build())
+            .build());
+    resultSetBuilder.addRows(
+        ListValue.newBuilder()
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .build());
+
     return resultSetBuilder.build();
   }
 
@@ -232,21 +267,24 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testFetchAllTypesAllNull() throws IOException, InterruptedException {
+  public void testSelectAllNull() throws IOException, InterruptedException {
 
-    String sqlInsert =
-        "INSERT INTO \"all_types\" (\"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\") VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)";
+    String sqlQuery =
+        "SELECT \"singers\".\"singerid\", \"singers\".\"firstname\", \"singers\".\"lastname\" FROM \"singers\" WHERE (\"singers\".\"firstname\" IS NULL AND \"singers\".\"lastname\" IS NULL AND \"singers\".\"singerid\" IS NULL)";
 
     List<String> result =
-        new ArrayList<>(Arrays.asList("1", "hello", "world", "2", "hello", "django"));
+        new ArrayList<>(Arrays.asList("1", "null", "null"));
 
-    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlInsert), 1));
-    String expectedOutput = "Insert Successful\n";
-    List<String> options = new ArrayList<>(Arrays.asList("all_types_insert_null"));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sqlQuery), createAllNullResultSet()));
+
+    String expectedOutput = "{'singerid': None, 'firstname': None, 'lastname': None}\n";
+    List<String> options = new ArrayList<>(Arrays.asList("select_all_null"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(sqlInsert, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+    assertEquals(sqlQuery, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
   }
 }
