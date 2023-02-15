@@ -88,11 +88,13 @@ def test_error_during_transaction():
     singer2 = Singer(singerid=2, firstname='hello', lastname='python')
 
     singer.save()
+    transaction.commit()
+  except Exception:
+    try:
+      singer2.save()
+    except Exception as e:
+      print(e)
 
-    raise Exception("Some error has occurred")
-    singer2.save()
-  except Exception as e:
-    print(e)
 
 
 if __name__ == '__main__':
