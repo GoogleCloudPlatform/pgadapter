@@ -38,7 +38,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_idx_id ON tracks(track_id);
 CREATE TABLE IF NOT EXISTS venues (
   id character varying NOT NULL,
   name character varying NOT NULL,
-  description character varying NOT NULL,
+  description jsonb NOT NULL,
   created_at timestamp with time zone,
   updated_at timestamp with time zone,
   PRIMARY KEY(id)

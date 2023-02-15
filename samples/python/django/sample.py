@@ -6,6 +6,9 @@ import pytz
 from django.db import connection
 from django.db import transaction
 from django.db.transaction import atomic
+from django.db.models import IntegerField, CharField, BooleanField
+from django.db.models.functions import Cast
+import random
 x = 0
 
 def create_sample_singer(singer_id):
@@ -42,12 +45,24 @@ def create_sample_track(track_id, track_number, album = None):
                created_at=datetime.datetime.now(pytz.UTC),
                updated_at=datetime.datetime.now(pytz.UTC))
 
+def get_sample_venue_description(x):
+  random.seed(datetime.datetime.now().timestamp())
+
+  description = {
+      'address': 'address'+str(x),
+      'capacity': random.randint(100*x, 500*x),
+      'isPopular': random.choice([True, False])
+  }
+
+  return description
+
+
 def create_sample_venue(venue_id):
   global x
   x += 1
   return Venue(id=venue_id,
                name='venue'+str(x),
-               description='description'+str(x),
+               description=get_sample_venue_description(x),
                created_at=datetime.datetime.now(pytz.UTC),
                updated_at=datetime.datetime.now(pytz.UTC))
 
@@ -141,7 +156,39 @@ def transaction_rollback():
 
   #checking if singer3 is present in the actual table or not
   if len(Singer.objects.filter(id='3')) > 0:
-    raise Exception('Transaction Rollback Unsucessful')
+    raise Exception('Transaction Rollback Unsuccessful')
+
+def jsonb_filter():
+  venue1 = create_sample_venue('10')
+  venue2 = create_sample_venue('100')
+  venue3 = create_sample_venue('1000')
+
+  venue1.save()
+  venue2.save()
+  venue3.save()
+
+  # In order to query inside the fields of a jsonb column,
+  # we first need to use annotate to cast the respective jsonb field to the relevant data type.
+  # In this example, the 'address' field is cast to CharField
+  # and then a filter is applied to this field.
+  # Make sure to enclose the filter value in double quotes("") for string values.
+
+  fetched_venue1 = Venue.objects.annotate(address=Cast('description__address', output_field=CharField())).filter(address='"'+venue1.description['address']+'"').first()
+
+  if fetched_venue1.id != venue1.id:
+    raise Exception('No Venue found with address ' + venue1.description['address'])
+
+  fetched_venue2 = Venue.objects.annotate(capacity=Cast('description__capacity', output_field=IntegerField())).filter(capacity=venue2.description['capacity']).first()
+
+  if fetched_venue2.id != venue2.id:
+    raise Exception('No Venue found with capacity ' + venue1.description['capacity'])
+
+
+  fetched_venues3 = Venue.objects.annotate(isPopular=Cast('description__isPopular', output_field=BooleanField())).filter(isPopular=venue3.description['isPopular']).only('id')
+  if venue3 not in fetched_venues3:
+    raise Exception('No Venue found with popularity ' + venue1.description['isPopular'])
+
+
 
 if __name__ == "__main__":
 
@@ -172,6 +219,9 @@ if __name__ == "__main__":
 
     transaction_rollback()
     print('Transaction Rollback Successful')
+
+    jsonb_filter()
+    print('Jsonb Filtering Successful ')
 
     delete_all_data()
     print('Deleting Data Successful')
