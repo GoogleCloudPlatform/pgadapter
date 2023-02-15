@@ -206,10 +206,9 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(1, executeRequest.getParamTypesCount());
-    // TODO: Enable when node-postgres 8.9 has been released.
-    //    assertTrue(executeRequest.getTransaction().hasBegin());
-    //    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
-    //    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -282,10 +281,9 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(10, executeRequest.getParamTypesCount());
-    // TODO: Enable once node-postgres 8.9 is released.
-    //    assertTrue(executeRequest.getTransaction().hasBegin());
-    //    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
-    //    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -448,10 +446,9 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(10, executeRequest.getParamTypesCount());
-    // TODO: Enable once node-postgres 8.9 is released.
-    //    assertTrue(executeRequest.getTransaction().hasBegin());
-    //    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
-    //    assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
