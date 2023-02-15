@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.python.psycopg3;
 
 import static com.google.cloud.spanner.pgadapter.python.psycopg3.Psycopg3MockServerTest.DIRECTORY_NAME;
+import static com.google.cloud.spanner.pgadapter.python.psycopg3.Psycopg3MockServerTest.execute;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;

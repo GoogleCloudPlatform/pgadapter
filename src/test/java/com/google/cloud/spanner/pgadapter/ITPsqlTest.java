@@ -26,6 +26,7 @@ import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -445,9 +446,9 @@ public class ITPsqlTest implements IntegrationTest {
       }
     }
 
-    // Execute the COPY tests in both binary and text mode.
-    for (boolean binary : new boolean[] {false, true}) {
-      logger.info("Testing binary: " + binary);
+    // Execute the COPY tests in both binary, csv and text mode.
+    for (Format format : Format.values()) {
+      logger.info("Testing format: " + format);
       // Make sure the all_types table on Cloud Spanner is empty.
       String databaseId = database.getId().getDatabase();
       testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
@@ -467,8 +468,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \" "
               + "  | psql "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
@@ -476,8 +478,9 @@ public class ITPsqlTest implements IntegrationTest {
               + testEnv.getPGAdapterPort()
               + " -d "
               + database.getId().getDatabase()
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(builder);
       Process process = builder.start();
@@ -515,8 +518,9 @@ public class ITPsqlTest implements IntegrationTest {
           "bash",
           "-c",
           "psql"
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \" "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
               + " -p "
@@ -532,8 +536,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(copyToPostgresBuilder);
       Process copyToPostgresProcess = copyToPostgresBuilder.start();
@@ -564,9 +569,9 @@ public class ITPsqlTest implements IntegrationTest {
       connection.createStatement().executeUpdate("delete from all_types");
     }
 
-    // Execute the COPY tests in both binary and text mode.
-    for (boolean binary : new boolean[] {false, true}) {
-      logger.info("Testing binary: " + binary);
+    // Execute the COPY tests in both binary, csv and text mode.
+    for (Format format : Format.values()) {
+      logger.info("Testing format: " + format);
       // Make sure the all_types table on Cloud Spanner is empty.
       String databaseId = database.getId().getDatabase();
       testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
@@ -586,8 +591,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \" "
               + "  | psql "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
@@ -595,8 +601,9 @@ public class ITPsqlTest implements IntegrationTest {
               + testEnv.getPGAdapterPort()
               + " -d "
               + database.getId().getDatabase()
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(builder);
       Process process = builder.start();
@@ -621,8 +628,9 @@ public class ITPsqlTest implements IntegrationTest {
           "bash",
           "-c",
           "psql"
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \""
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
               + " -p "
@@ -638,8 +646,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(copyToPostgresBuilder);
       Process copyToPostgresProcess = copyToPostgresBuilder.start();
@@ -779,7 +788,9 @@ public class ITPsqlTest implements IntegrationTest {
           // Pangnirtung did not observer DST in 1970-1979, but not all databases agree.
           ZoneId.of("America/Pangnirtung"),
           // Niue switched from -11:30 to -11 in 1978. Not all JDKs know that.
-          ZoneId.of("Pacific/Niue"));
+          ZoneId.of("Pacific/Niue"),
+          // Ojinaga switched from Mountain to Central time in 2022. Not all JDKs know that.
+          ZoneId.of("America/Ojinaga"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));

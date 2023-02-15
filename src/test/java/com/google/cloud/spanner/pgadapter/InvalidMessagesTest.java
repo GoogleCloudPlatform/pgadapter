@@ -26,6 +26,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.Test;
@@ -129,6 +130,8 @@ public class InvalidMessagesTest extends AbstractMockServerTest {
         } catch (IOException ignore) {
         }
       }
+    } catch (SocketException ignore) {
+      // Sending non-sense messages sometimes fails the entire socket.
     }
   }
 

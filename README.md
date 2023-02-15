@@ -12,6 +12,7 @@ PGAdapter can be used with the following drivers and clients:
 5. `psycopg3`: Version 3.1.x and higher have experimental support. See [psycopg3 support](docs/psycopg3.md) for more details.
 6. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
 7. `npgsql`: Version 6.0.x and higher have experimental support. See [npgsql support](docs/npgsql.md) for more details.
+8. `hibernate`: Version 5.3.20. Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
 
 ## Frameworks and Tools
 PGAdapter can be used with the following frameworks and tools:
@@ -70,9 +71,9 @@ Use the `-s` option to specify a different local port than the default 5432 if y
 PostgreSQL running on your local system.
 
 <!--- {x-version-update-start:google-cloud-spanner-pgadapter:released} -->
-You can also download a specific version of the jar. Example (replace `v0.15.0` with the version you want to download):
+You can also download a specific version of the jar. Example (replace `v0.16.0` with the version you want to download):
 ```shell
-VERSION=v0.15.0
+VERSION=v0.16.0
 wget https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-${VERSION}.tar.gz \
   && tar -xzvf pgadapter-${VERSION}.tar.gz
 java -jar pgadapter.jar -p my-project -i my-instance -d my-database
@@ -107,7 +108,7 @@ This option is only available for Java/JVM-based applications.
 <dependency>
   <groupId>com.google.cloud</groupId>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.15.0</version>
+  <version>0.16.0</version>
 </dependency>
 <!-- [END pgadapter_dependency] -->
 ```
