@@ -144,15 +144,11 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     // but has not yet been released.
     int commitRequestCount = mockSpanner.countRequestsOfType(CommitRequest.class);
     if (commitRequestCount == 0) {
-      assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
-      assertTrue(
-          mockSpanner
-              .getRequestsOfType(BeginTransactionRequest.class)
-              .get(0)
-              .getOptions()
-              .hasReadOnly());
-      assertTrue(describeRequest.getTransaction().hasId());
-      assertTrue(executeRequest.getTransaction().hasId());
+      // PGAdapter does not start a (read-only) transaction if all that is in the pipeline are one
+      // DESCRIBE and one EXECUTE message for the same statement.
+      assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+      assertTrue(describeRequest.getTransaction().hasSingleUse());
+      assertTrue(executeRequest.getTransaction().hasSingleUse());
     } else if (commitRequestCount == 1) {
       assertTrue(describeRequest.getTransaction().hasBegin());
       assertTrue(describeRequest.getTransaction().getBegin().hasReadWrite());
