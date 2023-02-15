@@ -223,7 +223,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "'2018-12-25T09:29:36+00:00'::timestamptz, '1998-10-02'::date, "
             + "'some text', "
             + "'{\"key\": \"value\"}')";
-    
+
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlUpdate), 0));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlInsert), 1));
     String expectedOutput = "Insert Successful\n";
