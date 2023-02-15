@@ -205,9 +205,10 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
     String insertSQL1 =
         "INSERT INTO \"singers\" (\"singerid\", \"firstname\", \"lastname\") VALUES (1, 'hello', 'world')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSQL1), 0));
-    mockSpanner.putStatementResult(StatementResult.exception(
-        Statement.of(insertSQL1),
-        Status.ALREADY_EXISTS.withDescription("Row [1] already exists").asRuntimeException()));
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(insertSQL1),
+            Status.ALREADY_EXISTS.withDescription("Row [1] already exists").asRuntimeException()));
 
     String updateSQL2 =
         "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'python' WHERE \"singers\".\"singerid\" = 2";
@@ -220,8 +221,8 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
     options.add("error_during_transaction");
 
     String actualOutput = executeTransactionTests(pgServer.getLocalPort(), host, options);
-    String expectedOutput = "current transaction is aborted, commands ignored until end of transaction block\n"
-        + "\n";
+    String expectedOutput =
+        "current transaction is aborted, commands ignored until end of transaction block\n" + "\n";
 
     assertEquals(expectedOutput, actualOutput);
     // since the error has occurred in between the transaction,
