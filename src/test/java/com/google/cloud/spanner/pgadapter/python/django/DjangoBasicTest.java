@@ -88,7 +88,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
     return resultSetBuilder.build();
   }
 
-  private ResultSet createAllNullResultSet(){
+  private ResultSet createAllNullResultSet() {
     ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();
 
     resultSetBuilder.setMetadata(
@@ -272,9 +272,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
     String sqlQuery =
         "SELECT \"singers\".\"singerid\", \"singers\".\"firstname\", \"singers\".\"lastname\" FROM \"singers\" WHERE (\"singers\".\"firstname\" IS NULL AND \"singers\".\"lastname\" IS NULL AND \"singers\".\"singerid\" IS NULL)";
 
-    List<String> result =
-        new ArrayList<>(Arrays.asList("1", "null", "null"));
-
+    List<String> result = new ArrayList<>(Arrays.asList("1", "null", "null"));
 
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sqlQuery), createAllNullResultSet()));

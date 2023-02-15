@@ -226,4 +226,3 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 }
-
