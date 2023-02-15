@@ -851,6 +851,20 @@ public class BackendConnection {
     if (spannerConnection.isDdlBatchActive() || spannerConnection.isDmlBatchActive()) {
       return;
     }
+    // Do not start an implicit transaction if all that is in the buffer is a DESCRIBE and an
+    // EXECUTE message for the same statement.
+    if (bufferedStatements.size() == 2
+        && bufferedStatements.get(0) instanceof Execute
+        && bufferedStatements.get(1) instanceof Execute
+        && ((Execute) bufferedStatements.get(0)).analyze
+        && !((Execute) bufferedStatements.get(1)).analyze
+        && bufferedStatements
+            .get(0)
+            .statement
+            .getSql()
+            .equals(bufferedStatements.get(1).statement.getSql())) {
+      return;
+    }
 
     // We need to start an implicit transaction.
     // Check if a read-only transaction suffices.

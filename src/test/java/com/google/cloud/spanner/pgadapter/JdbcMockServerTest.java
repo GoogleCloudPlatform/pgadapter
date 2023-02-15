@@ -734,6 +734,15 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
         if (attempt == 1) {
           assertEquals(2, requests.size());
+          ExecuteSqlRequest describeRequest = requests.get(0);
+          assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+          assertEquals(pgSql, describeRequest.getSql());
+          // Even though we are sending two requests to Cloud Spanner, we should not start a
+          // transaction for these two statements, as the first statement is only used to describe
+          // the parameters, and not to get any actual data.
+          assertTrue(describeRequest.hasTransaction());
+          assertTrue(describeRequest.getTransaction().hasSingleUse());
+          assertTrue(describeRequest.getTransaction().getSingleUse().hasReadOnly());
         } else {
           assertEquals(1, requests.size());
         }
@@ -741,12 +750,18 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         ExecuteSqlRequest executeRequest = requests.get(requests.size() - 1);
         assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
         assertEquals(pgSql, executeRequest.getSql());
+        assertTrue(executeRequest.hasTransaction());
+        assertTrue(executeRequest.getTransaction().hasSingleUse());
+        assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
 
         Map<String, Value> params = executeRequest.getParams().getFieldsMap();
         Map<String, Type> types = executeRequest.getParamTypesMap();
 
         assertEquals(TypeCode.DATE, types.get("p1").getCode());
         assertEquals("2022-03-29", params.get("p1").getStringValue());
+
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
 
         mockSpanner.clearRequests();
       }
@@ -3747,6 +3762,27 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testDescribeTruncate() throws SQLException {
+    String sql = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (PreparedStatement preparedStatement = connection.prepareStatement("truncate foo")) {
+        assertEquals(0, preparedStatement.executeUpdate());
+      }
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertEquals(1, request.getStatementsCount());
+    assertEquals(sql, request.getStatements(0).getSql());
+  }
+
+  @Test
+  public void testDescribeAndExecute() throws SQLException {
     String sql = "delete from foo";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
 
