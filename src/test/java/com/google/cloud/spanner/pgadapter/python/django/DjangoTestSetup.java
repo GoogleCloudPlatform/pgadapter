@@ -14,7 +14,6 @@
 
 package com.google.cloud.spanner.pgadapter.python.django;
 
-
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
@@ -178,21 +177,6 @@ public class DjangoTestSetup extends AbstractMockServerTest {
         new ArrayList<>(Arrays.asList("python3", testFileName, host, Integer.toString(port)));
     runCommand.addAll(options);
     return PythonTestUtil.run(runCommand.toArray(new String[0]), djangoPath);
-
-    //    ProcessBuilder builder = new ProcessBuilder();
-    //    builder.command(runCommand);
-    //    builder.directory(new File(djangoPath));
-    //    Process process = builder.start();
-    //    Scanner scanner = new Scanner(process.getInputStream());
-    //
-    //    StringBuilder output = new StringBuilder();
-    //    while (scanner.hasNextLine()) {
-    //      output.append(scanner.nextLine()).append("\n");
-    //    }
-    //    int result = process.waitFor();
-    //    assertEquals(output.toString(), 0, result);
-    //
-    //    return output.toString();
   }
 
   public String executeBasicTests(int port, String host, List<String> options) throws Exception {
