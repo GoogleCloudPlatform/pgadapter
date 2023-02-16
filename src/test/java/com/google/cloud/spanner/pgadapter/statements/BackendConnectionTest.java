@@ -697,7 +697,7 @@ public class BackendConnectionTest {
   }
 
   @Test
-  public void testVacuumAndExecute_startsTransaction() {
+  public void testTruncateAndExecute_startsTransaction() {
     Connection connection = mock(Connection.class);
     Statement statement = Statement.of("select * from foo where id=$1");
     ParsedStatement parsedStatement =
@@ -729,6 +729,41 @@ public class BackendConnectionTest {
 
     verify(connection).execute(statement);
     verify(connection, never()).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).beginTransaction();
+  }
+
+  @Test
+  public void testExecuteAndVacuum_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement statement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    String vacuumSql = "vacuum foo";
+    VacuumStatement vacuumStatement =
+        new VacuumStatement(
+            connectionHandler,
+            mock(OptionsMetadata.class),
+            "",
+            AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(Statement.of(vacuumSql)),
+            Statement.of(vacuumSql));
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.execute(vacuumStatement);
+    backendConnection.sync();
+
+    verify(connection).execute(statement);
+    verify(connection).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
     verify(connection).beginTransaction();
   }
 }
