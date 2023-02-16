@@ -99,11 +99,7 @@ public class SavepointStatement extends IntermediatePortalStatement {
   @Override
   public void executeAsync(BackendConnection backendConnection) {
     this.executed = true;
-    setFutureStatementResult(
-        Futures.immediateFailedFuture(
-            PGExceptionFactory.newPGException(
-                "Statement 'SAVEPOINT savepoint_name' is not supported",
-                SQLState.FeatureNotSupported)));
+    setFutureStatementResult(backendConnection.execute(this));
   }
 
   @Override

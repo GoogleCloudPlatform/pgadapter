@@ -111,11 +111,7 @@ public class RollbackToStatement extends IntermediatePortalStatement {
   @Override
   public void executeAsync(BackendConnection backendConnection) {
     this.executed = true;
-    setFutureStatementResult(
-        Futures.immediateFailedFuture(
-            PGExceptionFactory.newPGException(
-                "Statement 'ROLLBACK [WORK | TRANSACTION] TO [SAVEPOINT] savepoint_name' is not supported",
-                SQLState.FeatureNotSupported)));
+    setFutureStatementResult(backendConnection.execute(this));
   }
 
   @Override
