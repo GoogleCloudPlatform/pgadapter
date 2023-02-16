@@ -37,9 +37,9 @@ public class ITDjangoTest extends DjangoTestSetup {
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
-  private static String DJANGO_SETTING_FILE = "samples/python/django/setting.py";
+  private static final String DJANGO_SETTING_FILE = "samples/python/django/setting.py";
   private static String originalDjangoSetting = "";
-  private static String DEFAULT_PORT = "5432";
+  private static final String DEFAULT_PORT = "5432";
 
   @BeforeClass
   public static void setup() throws Exception {

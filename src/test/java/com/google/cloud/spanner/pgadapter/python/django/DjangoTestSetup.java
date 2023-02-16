@@ -26,6 +26,7 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -172,9 +173,14 @@ public class DjangoTestSetup extends AbstractMockServerTest {
   private static String execute(
       int port, String host, List<String> options, String testFileName, String djangoPath)
       throws Exception {
-
+    File directory = new File(djangoPath);
     List<String> runCommand =
-        new ArrayList<>(Arrays.asList("python3", testFileName, host, Integer.toString(port)));
+        new ArrayList<>(
+            Arrays.asList(
+                directory.getAbsolutePath() + "/venv/bin/python3",
+                testFileName,
+                host,
+                Integer.toString(port)));
     runCommand.addAll(options);
     return PythonTestUtil.run(runCommand.toArray(new String[0]), djangoPath);
   }
