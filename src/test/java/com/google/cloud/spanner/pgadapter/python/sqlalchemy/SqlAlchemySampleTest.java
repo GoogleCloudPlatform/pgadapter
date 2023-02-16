@@ -54,7 +54,7 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
 
   @BeforeClass
   public static void setupBaseResults() throws Exception {
-    SqlAlchemyBasicsTest.setupBaseResults();
+    SqlAlchemyBasicsTest.setupBaseResults(SAMPLE_DIR);
   }
 
   @Test
