@@ -340,7 +340,8 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "col_int : 100 , "
             + "col_numeric : 6.626 , "
             + "col_timestamptz : 2022-02-16 13:18:02.123456+00:00 , "
-            + "col_date : 2022-03-29 , col_varchar : test , "
+            + "col_date : 2022-03-29 , "
+            + "col_varchar : test , "
             + "col_jsonb : {'key': 'value'} , \n";
     List<String> options = new ArrayList<>(Arrays.asList("select_all_types"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
