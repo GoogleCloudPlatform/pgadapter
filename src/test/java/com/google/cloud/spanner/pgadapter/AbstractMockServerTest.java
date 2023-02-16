@@ -394,8 +394,8 @@ public abstract class AbstractMockServerTest {
                     Value.newBuilder()
                         .setStringValue(
                             microsTimestamp
-                                ? "2022-02-16T13:18:02.123456+00:00"
-                                : "2022-02-16T13:18:02.123456789+00:00")
+                                ? "2022-02-16T13:18:02.123456Z"
+                                : "2022-02-16T13:18:02.123456789Z")
                         .build())
                 .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
                 .addValues(Value.newBuilder().setStringValue("test").build())
