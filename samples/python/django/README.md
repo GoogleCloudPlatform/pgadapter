@@ -50,17 +50,20 @@ Cloud Spanner supports the following data types in combination with `Django`.
 | timestamptz / timestamp with time zone | DateTimeField      |
 | bytea                                  | BinaryField        |
 | date                                   | DateField          |
+| jsonb                                  | JSONField          |
+  
 
 ## Limitations
 The following limitations are currently known:
 
-| Limitation             | Workaround                                                                                                                                                                                                                                                             |
-|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Annotate               | Cloud Spanner does not support selecting columns in an aggregation query that are not included in the aggregation functions or `GROUP BY` clause. Adding an aggregation on a query using `annotate` will therefore often generate an unsupported query.                |
-| Generated primary keys | Cloud Spanner does not support `sequences`. Auto-increment primary key is not supported. Avoid using fields like `AutoField`, `BigAutoField`, etc. . The recommended type of primary key is a client side generated `UUID` stored as a string.                         |
-| Savepoint              | Cloud Spanner does not support `savepoints`. Creating or rolling back to a `Savepoint` in django is not supported in PGAdapter.                                                                                                                                        |
-| Nested Atomic Blocks   | Nested atomic blocks use `savepoints`, which is currently not supported by Cloud Spanner. Ensure to set `savepoint=False` when using nested atomic blocks.                                                                                                             |
-| Interleaved Table      | Django does not support composite primary keys. Interleaved tables in Cloud Spanner require composite primary keys. A possible workaround for using interleaved tables is documented below.                                                                            |
+| Limitation             | Workaround                                                                                                                                                                                                                                              |
+|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Annotate               | Cloud Spanner does not support selecting columns in an aggregation query that are not included in the aggregation functions or `GROUP BY` clause. Adding an aggregation on a query using `annotate` will therefore often generate an unsupported query. |
+| Generated primary keys | Cloud Spanner does not support `sequences`. Auto-increment primary key is not supported. Avoid using fields like `AutoField`, `BigAutoField`, etc. . The recommended type of primary key is a client side generated `UUID` stored as a string.          |
+| Savepoint              | Cloud Spanner does not support `savepoints`. Creating or rolling back to a `Savepoint` in django is not supported in PGAdapter.                                                                                                                         |
+| Nested Atomic Blocks   | Nested atomic blocks use `savepoints`, which is currently not supported by Cloud Spanner. Ensure to set `savepoint=False` when using nested atomic blocks.                                                                                              |
+| Interleaved Table      | Django does not support composite primary keys. Interleaved tables in Cloud Spanner require composite primary keys. A possible workaround for using interleaved tables is documented below.                                                             |
+| Jsonb Query            | Cloud Spanner does not support queries on JSONB fields that are not explicitly casted to respective data type of that field while Django originally generates queries without Casting. A possible workaround for the same is documented below.          |
 
 
 ### Annotate
@@ -133,6 +136,34 @@ Note that using the standard `save` function in Django is not supported for inte
 
 ```python
 track.save(force_insert=True)
+```
+
+See the sample application for more details and a working example.
+
+### Query on JSONB Field
+In order to make a query involving the fields inside JSONB column, Cloud Spanner requires us to typecast the field to the corresponding data type(See [this](https://cloud.google.com/spanner/docs/working-with-jsonb#query)). Django doesn't do this by default and hence, using filter directly would fail. 
+In order to make sure Django generates queries that have this typecasting present, you should first annotate the respective field and then apply filter to it.
+
+Example:
+```python
+#this will make sure that the rating field in the venue_feature jsonb column is typecasted to Float
+typecasted_queryset = Venue.objects.annotate(rating=Cast(venue_feature__rating, output_field=FloatField()))
+
+#now you filter based on rating
+filtered_queryset = typecasted_queryset.filter(rating__gte=3.5)
+```
+
+Note that comparing a `string` jsonb field using this method will require you to add additional double quotes `""` around the value because the string fields in JSONB are stored with quotes in the table.
+
+```python
+#here country is a string field inside the JSONB column venue_feature
+typecasted_queryset = Venue.objects.annotate(country=Cast(venue_feature__country, output_field=CharField()))
+
+#in order to compare the country with some value,
+#you need to apply double quotes surrounding the actual value
+india_queryset = typecasted_queryset.filter(country='"India"')
+req_country = 'USA'
+usa_queryset = typecasted_queryset.filter(country='"'+req_country+'"')
 ```
 
 See the sample application for more details and a working example.
