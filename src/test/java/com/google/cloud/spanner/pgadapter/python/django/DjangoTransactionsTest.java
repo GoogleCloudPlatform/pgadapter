@@ -31,7 +31,6 @@ import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
@@ -89,7 +88,7 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void transactionCommitTest() throws IOException, InterruptedException {
+  public void transactionCommitTest() throws Exception {
 
     String updateSQL1 =
         "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
@@ -116,7 +115,7 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void transactionRollbackTest() throws IOException, InterruptedException {
+  public void transactionRollbackTest() throws Exception {
 
     String updateSQL1 =
         "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
@@ -144,7 +143,7 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void transactionAtomicTest() throws IOException, InterruptedException {
+  public void transactionAtomicTest() throws Exception {
 
     String updateSQL1 =
         "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
@@ -171,7 +170,7 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void transactionNestedAtomicTest() throws IOException, InterruptedException {
+  public void transactionNestedAtomicTest() throws Exception {
 
     String updateSQL1 =
         "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
@@ -198,7 +197,7 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void transactionErrorTest() throws IOException, InterruptedException {
+  public void transactionErrorTest() throws Exception {
 
     String updateSQL1 =
         "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";

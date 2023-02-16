@@ -22,7 +22,6 @@ import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
@@ -44,7 +43,7 @@ public class DjangoPgAggregatesTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testStrAgg() throws IOException, InterruptedException {
+  public void testStrAgg() throws Exception {
 
     String sql =
         "SELECT \"singers\".\"firstname\", STRING_AGG(\"singers\".\"firstname\", '|' ) AS \"str\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
@@ -80,7 +79,7 @@ public class DjangoPgAggregatesTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testArrAgg() throws IOException, InterruptedException {
+  public void testArrAgg() throws Exception {
 
     String sql = "SELECT ARRAY_AGG(\"singers\".\"firstname\" ) AS \"arr\" FROM \"singers\"";
 

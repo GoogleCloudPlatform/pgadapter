@@ -32,7 +32,6 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -91,7 +90,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testSelectAll() throws IOException, InterruptedException {
+  public void testSelectAll() throws Exception {
     String sqlSelectAll =
         "SELECT \"singers\".\"singerid\", \"singers\".\"firstname\", \"singers\".\"lastname\" FROM \"singers\"";
 
@@ -113,7 +112,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testInsert() throws IOException, InterruptedException {
+  public void testInsert() throws Exception {
     String sqlUpdate =
         "UPDATE \"singers\" SET \"firstname\" = 'john', \"lastname\" = 'doe' WHERE \"singers\".\"singerid\" = 4";
     String sqlInsert =
@@ -134,7 +133,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testUpdate() throws IOException, InterruptedException {
+  public void testUpdate() throws Exception {
     String sqlUpdate =
         "UPDATE \"singers\" SET \"firstname\" = 'john', \"lastname\" = 'doe' WHERE \"singers\".\"singerid\" = 4";
 
@@ -153,7 +152,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testSimpleFilter() throws IOException, InterruptedException {
+  public void testSimpleFilter() throws Exception {
     String sqlSelect =
         "SELECT \"singers\".\"singerid\", \"singers\".\"firstname\", \"singers\".\"lastname\" FROM \"singers\" WHERE \"singers\".\"firstname\" = 'hello'";
 
@@ -193,7 +192,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testInsertAllTypes() throws IOException, InterruptedException {
+  public void testInsertAllTypes() throws Exception {
 
     String sqlUpdate =
         "UPDATE \"all_types\" "
@@ -240,7 +239,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testInsertAllTypesAllNull() throws IOException, InterruptedException {
+  public void testInsertAllTypesAllNull() throws Exception {
 
     String sqlInsert =
         "INSERT INTO \"all_types\" "
@@ -273,7 +272,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testSelectAllNull() throws IOException, InterruptedException {
+  public void testSelectAllNull() throws Exception {
 
     String sqlQuery =
         "SELECT "
@@ -323,7 +322,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testSelectAllTypes() throws IOException, InterruptedException {
+  public void testSelectAllTypes() throws Exception {
 
     String sqlQuery =
         "SELECT \"all_types\".\"col_bigint\", "
