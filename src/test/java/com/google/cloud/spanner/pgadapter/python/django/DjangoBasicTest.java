@@ -21,6 +21,7 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
+import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
@@ -35,6 +36,7 @@ import com.google.spanner.v1.TypeCode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -353,6 +355,14 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "col_jsonb : {'key': 'value'} , \n";
     List<String> options = new ArrayList<>(Arrays.asList("select_all_types"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
+    List<QueryMessage> queryMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(message -> message instanceof QueryMessage)
+            .map(message -> (QueryMessage) message)
+            .collect(Collectors.toList());
+    assertEquals(2, queryMessages.size());
+    assertEquals(
+        "SET TIME ZONE 'UTC'", queryMessages.get(0).getSimpleQueryStatement().getStatement(0));
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
