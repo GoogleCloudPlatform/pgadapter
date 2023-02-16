@@ -12,6 +12,7 @@ PGAdapter can be used with the following drivers and clients:
 5. `psycopg3`: Version 3.1.x and higher have experimental support. See [psycopg3 support](docs/psycopg3.md) for more details.
 6. `node-postgres`: Version 8.8.0 and higher are supported. See [node-postgres support](docs/node-postgres.md) for more details.
 7. `npgsql`: Version 6.0.x and higher have experimental support. See [npgsql support](docs/npgsql.md) for more details.
+8. `hibernate`: Version 5.3.20. Final and higher are supported. See [hibernate support](samples/java/hibernate/README.md) for more details.
 
 ## Frameworks and Tools
 PGAdapter can be used with the following frameworks and tools:

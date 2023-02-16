@@ -94,7 +94,8 @@ public class ITNpgsqlTest implements IntegrationTest {
 
   private String createConnectionString() {
     return String.format(
-        "Host=%s;Port=%d;Database=d;SSL Mode=Disable", host, testEnv.getServer().getLocalPort());
+        "Host=%s;Port=%d;Database=d;SSL Mode=Disable;Timeout=60;Command Timeout=60",
+        host, testEnv.getServer().getLocalPort());
   }
 
   @Before
