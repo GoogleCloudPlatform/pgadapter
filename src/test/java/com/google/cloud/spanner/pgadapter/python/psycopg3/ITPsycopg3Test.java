@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.python.psycopg3;
 
+import static com.google.cloud.spanner.pgadapter.python.psycopg3.Psycopg3MockServerTest.DIRECTORY_NAME;
 import static com.google.cloud.spanner.pgadapter.python.psycopg3.Psycopg3MockServerTest.execute;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -35,7 +36,7 @@ import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
 import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
-import java.io.IOException;
+import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -68,6 +69,7 @@ public class ITPsycopg3Test {
 
   @BeforeClass
   public static void setup() throws Exception {
+    PythonTestUtil.createVirtualEnv(DIRECTORY_NAME);
     testEnv.setUp();
     database = testEnv.createDatabase(getDdlStatements());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
@@ -136,24 +138,24 @@ public class ITPsycopg3Test {
         databaseId, Collections.singletonList(Mutation.delete("all_types", KeySet.all())));
   }
 
-  String execute(String method) throws IOException, InterruptedException {
+  String execute(String method) throws Exception {
     return Psycopg3MockServerTest.execute(method, createConnectionString());
   }
 
   @Test
-  public void testShowServerVersion() throws IOException, InterruptedException {
+  public void testShowServerVersion() throws Exception {
     String result = execute("show_server_version");
     assertEquals("14.1\n", result);
   }
 
   @Test
-  public void testShowApplicationName() throws IOException, InterruptedException {
+  public void testShowApplicationName() throws Exception {
     String actualOutput = execute("show_application_name");
     assertEquals("None\n", actualOutput);
   }
 
   @Test
-  public void testSelect1() throws IOException, InterruptedException {
+  public void testSelect1() throws Exception {
     String sql = "SELECT 1";
 
     String actualOutput = execute("select1");
@@ -162,7 +164,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testQueryAllDataTypes() throws IOException, InterruptedException {
+  public void testQueryAllDataTypes() throws Exception {
     String result = execute("query_all_data_types");
     assertEquals(
         "col_bigint: 1\n"
@@ -179,7 +181,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testQueryAllDataTypesWithParameter() throws IOException, InterruptedException {
+  public void testQueryAllDataTypesWithParameter() throws Exception {
     String result = execute("query_all_data_types_with_parameter");
     assertEquals(
         "col_bigint: 1\n"
@@ -196,17 +198,16 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testQueryAllDataTypesText() throws IOException, InterruptedException {
+  public void testQueryAllDataTypesText() throws Exception {
     testQueryAllDataTypesWithFixedFormat(DataFormat.POSTGRESQL_TEXT);
   }
 
   @Test
-  public void testQueryAllDataTypesBinary() throws IOException, InterruptedException {
+  public void testQueryAllDataTypesBinary() throws Exception {
     testQueryAllDataTypesWithFixedFormat(DataFormat.POSTGRESQL_BINARY);
   }
 
-  private void testQueryAllDataTypesWithFixedFormat(DataFormat format)
-      throws IOException, InterruptedException {
+  private void testQueryAllDataTypesWithFixedFormat(DataFormat format) throws Exception {
     String result =
         execute(
             "query_all_data_types_" + (format == DataFormat.POSTGRESQL_BINARY ? "binary" : "text"));
@@ -225,13 +226,13 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testUpdateAllDataTypes() throws IOException, InterruptedException {
+  public void testUpdateAllDataTypes() throws Exception {
     String result = execute("update_all_data_types");
     assertEquals("Update count: 1\n", result);
   }
 
   @Test
-  public void testInsertAllDataTypes() throws IOException, InterruptedException {
+  public void testInsertAllDataTypes() throws Exception {
     // Make sure there is no row that already exists with col_bigint=100
     String databaseId = database.getId().getDatabase();
     testEnv.write(
@@ -242,7 +243,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testInsertAllDataTypesBinary() throws IOException, InterruptedException {
+  public void testInsertAllDataTypesBinary() throws Exception {
     // Make sure there is no row that already exists with col_bigint=100
     String databaseId = database.getId().getDatabase();
     testEnv.write(
@@ -253,7 +254,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testInsertAllDataTypesText() throws IOException, InterruptedException {
+  public void testInsertAllDataTypesText() throws Exception {
     // Make sure there is no row that already exists with col_bigint=100
     String databaseId = database.getId().getDatabase();
     testEnv.write(
@@ -264,7 +265,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testInsertNullsAllDataTypes() throws IOException, InterruptedException {
+  public void testInsertNullsAllDataTypes() throws Exception {
     // Make sure there is no row that already exists with col_bigint=100
     String databaseId = database.getId().getDatabase();
     testEnv.write(
@@ -275,7 +276,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testInsertAllDataTypesReturning() throws IOException, InterruptedException {
+  public void testInsertAllDataTypesReturning() throws Exception {
     String databaseId = database.getId().getDatabase();
     testEnv.write(
         databaseId, Collections.singletonList(Mutation.delete("all_types", KeySet.all())));
@@ -296,7 +297,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testInsertBatch() throws IOException, InterruptedException {
+  public void testInsertBatch() throws Exception {
     // Make sure the table is empty before we execute the test.
     String databaseId = database.getId().getDatabase();
     testEnv.write(
@@ -323,7 +324,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testMixedBatch() throws IOException, InterruptedException {
+  public void testMixedBatch() throws Exception {
     // Make sure the table is empty before we execute the test.
     String databaseId = database.getId().getDatabase();
     testEnv.write(
@@ -357,7 +358,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testBatchExecutionError() throws IOException, InterruptedException {
+  public void testBatchExecutionError() throws Exception {
     // Add a new record to cause the batch insert to fail with an ALREADY_EXISTS error.
     String databaseId = database.getId().getDatabase();
     testEnv.write(
@@ -392,16 +393,16 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testBinaryCopyIn() throws IOException, InterruptedException {
+  public void testBinaryCopyIn() throws Exception {
     testCopyIn("binary_copy_in");
   }
 
   @Test
-  public void testTextCopyIn() throws IOException, InterruptedException {
+  public void testTextCopyIn() throws Exception {
     testCopyIn("text_copy_in");
   }
 
-  private void testCopyIn(String testMethod) throws IOException, InterruptedException {
+  private void testCopyIn(String testMethod) throws Exception {
     // Make sure the table is empty before we execute the test.
     String databaseId = database.getId().getDatabase();
     testEnv.write(
@@ -444,7 +445,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testBinaryCopyOut() throws IOException, InterruptedException {
+  public void testBinaryCopyOut() throws Exception {
     // Add an extra NULL-row to the table.
     addNullRow();
 
@@ -474,7 +475,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testTextCopyOut() throws IOException, InterruptedException {
+  public void testTextCopyOut() throws Exception {
     // Add an extra NULL-row to the table.
     addNullRow();
 
@@ -504,7 +505,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testPrepareQuery() throws IOException, InterruptedException {
+  public void testPrepareQuery() throws Exception {
     String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
     addNullRow();
 
@@ -534,7 +535,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testReadWriteTransaction() throws IOException, InterruptedException {
+  public void testReadWriteTransaction() throws Exception {
     String result = execute("read_write_transaction");
     assertEquals("(1,)\n" + "Insert count: 1\n" + "Insert count: 1\n", result);
 
@@ -548,7 +549,7 @@ public class ITPsycopg3Test {
   }
 
   @Test
-  public void testReadOnlyTransaction() throws IOException, InterruptedException {
+  public void testReadOnlyTransaction() throws Exception {
     String result = execute("read_only_transaction");
     assertEquals("(1,)\n" + "(2,)\n", result);
   }
