@@ -146,8 +146,12 @@ public class TimestampParserTest {
     assertThrows(PGException.class, () -> TimestampParser.toTimestamp("", ZoneId.of("UTC")));
     assertThrows(PGException.class, () -> TimestampParser.toTimestamp("(", ZoneId.of("UTC")));
     assertThrows(PGException.class, () -> TimestampParser.toTimestamp(")", ZoneId.of("UTC")));
-    assertThrows(PGException.class, () -> TimestampParser.toTimestamp("'2011-11-04 00:05:23.123456+00:00')", ZoneId.of("UTC")));
-    assertThrows(PGException.class, () -> TimestampParser.toTimestamp("('2011-11-04 00:05:23.123456+00:00'", ZoneId.of("UTC")));
+    assertThrows(
+        PGException.class,
+        () -> TimestampParser.toTimestamp("'2011-11-04 00:05:23.123456+00:00')", ZoneId.of("UTC")));
+    assertThrows(
+        PGException.class,
+        () -> TimestampParser.toTimestamp("('2011-11-04 00:05:23.123456+00:00'", ZoneId.of("UTC")));
     assertThrows(PGException.class, () -> TimestampParser.toTimestamp("()", ZoneId.of("UTC")));
     assertThrows(PGException.class, () -> TimestampParser.toTimestamp("''", ZoneId.of("UTC")));
     assertThrows(PGException.class, () -> TimestampParser.toTimestamp("'2000'", ZoneId.of("UTC")));
