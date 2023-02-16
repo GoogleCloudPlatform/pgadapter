@@ -49,6 +49,7 @@ public class RollbackToStatementTest {
     assertEquals(
         "foo", parse("/* this will rollback a savepoint */ rollback to savepoint foo").name);
 
+    assertThrows(PGException.class, () -> parse("rollbak to my_savepoint"));
     assertThrows(PGException.class, () -> parse("rollback"));
     assertThrows(PGException.class, () -> parse("rollback to"));
     assertThrows(PGException.class, () -> parse("rollback to my_savepoint foo"));

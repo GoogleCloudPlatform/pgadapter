@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.wireprotocol;
 
 import static com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage.createStatement;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +30,7 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.ProxyServer;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.IntermediatePreparedStatement;
 import com.google.cloud.spanner.pgadapter.statements.ReleaseStatement;
 import com.google.cloud.spanner.pgadapter.statements.RollbackToStatement;
@@ -57,33 +59,42 @@ public class ParseMessageTest {
   }
 
   @Test
-  public void testCreateStatementSavepoint() {
+  public void testCreateStatementSavepoint() throws Exception {
     Statement statement = Statement.of("savepoint foo");
     IntermediatePreparedStatement preparedStatement =
         createStatement(connectionHandler, "", PARSER.parse(statement), statement, new int[] {});
     assertEquals(SavepointStatement.class, preparedStatement.getClass());
     SavepointStatement savepointStatement = (SavepointStatement) preparedStatement;
     assertEquals("foo", savepointStatement.getSavepointName());
+    assertEquals("SAVEPOINT", savepointStatement.getCommandTag());
+    assertEquals(StatementType.CLIENT_SIDE, savepointStatement.getStatementType());
+    assertNull(savepointStatement.describeAsync(mock(BackendConnection.class)).get());
   }
 
   @Test
-  public void testCreateStatementRelease() {
+  public void testCreateStatementRelease() throws Exception {
     Statement statement = Statement.of("release foo");
     IntermediatePreparedStatement preparedStatement =
         createStatement(connectionHandler, "", PARSER.parse(statement), statement, new int[] {});
     assertEquals(ReleaseStatement.class, preparedStatement.getClass());
     ReleaseStatement releaseStatement = (ReleaseStatement) preparedStatement;
     assertEquals("foo", releaseStatement.getSavepointName());
+    assertEquals("RELEASE", releaseStatement.getCommandTag());
+    assertEquals(StatementType.CLIENT_SIDE, releaseStatement.getStatementType());
+    assertNull(releaseStatement.describeAsync(mock(BackendConnection.class)).get());
   }
 
   @Test
-  public void testCreateStatementRollbackTo() {
+  public void testCreateStatementRollbackTo() throws Exception {
     Statement statement = Statement.of("rollback to foo");
     IntermediatePreparedStatement preparedStatement =
         createStatement(connectionHandler, "", PARSER.parse(statement), statement, new int[] {});
     assertEquals(RollbackToStatement.class, preparedStatement.getClass());
     RollbackToStatement rollbackToStatement = (RollbackToStatement) preparedStatement;
     assertEquals("foo", rollbackToStatement.getSavepointName());
+    assertEquals("ROLLBACK", rollbackToStatement.getCommandTag());
+    assertEquals(StatementType.CLIENT_SIDE, rollbackToStatement.getStatementType());
+    assertNull(rollbackToStatement.describeAsync(mock(BackendConnection.class)).get());
   }
 
   @Test

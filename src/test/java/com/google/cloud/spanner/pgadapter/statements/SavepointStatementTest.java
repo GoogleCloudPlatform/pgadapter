@@ -38,6 +38,7 @@ public class SavepointStatementTest {
     assertEquals("savepoint", parse("savepoint \"savepoint\"").name);
     assertEquals("foo", parse("/* this will set a savepoint */ savepoint foo").name);
 
+    assertThrows(PGException.class, () -> parse("svepoint foo"));
     assertThrows(PGException.class, () -> parse("savepoint"));
     assertThrows(PGException.class, () -> parse("savepoint my_savepoint foo"));
     assertThrows(PGException.class, () -> parse("savepoint foo.bar"));

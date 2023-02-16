@@ -48,6 +48,7 @@ public class ReleaseStatementTest {
     assertEquals("savepoint", parse("release savepoint \"savepoint\"").name);
     assertEquals("foo", parse("/* this will release a savepoint */ release savepoint foo").name);
 
+    assertThrows(PGException.class, () -> parse("releas my_savepoint"));
     assertThrows(PGException.class, () -> parse("release"));
     assertThrows(PGException.class, () -> parse("release my_savepoint foo"));
     assertThrows(PGException.class, () -> parse("release foo.bar"));
