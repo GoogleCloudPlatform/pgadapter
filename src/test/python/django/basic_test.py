@@ -40,7 +40,6 @@ def create_django_setup(host, port):
   conf['DATABASES']['default']['PORT'] = port
   conf['DATABASES']['default']['HOST'] = host
   conf['USE_TZ'] = True
-  conf['TIME_ZONE'] = 'UTC'
   settings.configure(**conf)
   apps.populate(settings.INSTALLED_APPS)
 

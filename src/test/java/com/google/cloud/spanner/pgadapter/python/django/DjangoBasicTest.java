@@ -338,9 +338,9 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "\"all_types\".\"col_jsonb\" "
             + "FROM \"all_types\"";
 
-    mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sqlQuery), ALL_TYPES_RESULTSET));
-    System.out.println(ALL_TYPES_RESULTSET.getRows(0).getValues(6).getStringValue());
+    ResultSet resultSet = createAllTypesResultSet("", false);
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sqlQuery), resultSet));
+    System.out.println(resultSet.getRows(0).getValues(6).getStringValue());
     String expectedOutput =
         "col_bigint : 1 , "
             + "col_bool : True , "
