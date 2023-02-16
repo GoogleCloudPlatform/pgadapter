@@ -15,6 +15,7 @@
 
 from django.db import models
 from django.db.models import Q, F
+from django.contrib.postgres.fields import JSONField
 
 class BaseModel(models.Model):
   class Meta():
@@ -66,7 +67,7 @@ class Venue(BaseModel):
     db_table = 'venues'
   id = models.CharField(primary_key=True, null=False)
   name = models.CharField(null=False)
-  description = models.CharField(null=False)
+  description = models.JSONField()
 
 
 class Concert(BaseModel):
