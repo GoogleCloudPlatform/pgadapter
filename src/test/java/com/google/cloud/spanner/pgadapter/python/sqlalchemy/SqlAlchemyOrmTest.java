@@ -36,7 +36,6 @@ import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
-import java.io.IOException;
 import java.util.List;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -59,12 +58,12 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @BeforeClass
-  public static void setupBaseResults() {
+  public static void setupBaseResults() throws Exception {
     SqlAlchemyBasicsTest.setupBaseResults();
   }
 
   @Test
-  public void testInsertAllTypes() throws IOException, InterruptedException {
+  public void testInsertAllTypes() throws Exception {
     String sql =
         "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "VALUES (1, true, '\\x74657374206279746573'::bytea, 3.14, 100, 6.626, '2011-11-04T00:05:23.123456+00:00'::timestamptz, '2011-11-04'::date, 'test string', '{\"key1\": \"value1\", \"key2\": \"value2\"}')";
@@ -83,7 +82,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testInsertAllTypes_NullValues() throws IOException, InterruptedException {
+  public void testInsertAllTypes_NullValues() throws Exception {
     // Note that the JSONB column is 'null' instead of NULL. That means that SQLAlchemy is inserting
     // a JSON null values instead of a SQL NULL value into the column. This can be changed by
     // creating the columns as Column(JSONB(none_as_null=True)) in the SQLAlchemy model.
@@ -106,7 +105,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
 
   @Ignore("requires support for literals like '2022-12-16 10:11:12+01:00'::timestamptz")
   @Test
-  public void testInsertAllTypesWithPreparedStatement() throws IOException, InterruptedException {
+  public void testInsertAllTypesWithPreparedStatement() throws Exception {
     String sql =
         "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
@@ -144,7 +143,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testSelectAllTypes() throws IOException, InterruptedException {
+  public void testSelectAllTypes() throws Exception {
     String sql =
         "SELECT all_types.col_bigint, all_types.col_bool, all_types.col_bytea, all_types.col_float8, all_types.col_int, all_types.col_numeric, all_types.col_timestamptz, all_types.col_date, all_types.col_varchar, all_types.col_jsonb \n"
             + "FROM all_types";
@@ -166,7 +165,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testGetAllTypes() throws IOException, InterruptedException {
+  public void testGetAllTypes() throws Exception {
     String sql =
         "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb \n"
             + "FROM all_types \n"
@@ -189,7 +188,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testGetAllTypes_NullValues() throws IOException, InterruptedException {
+  public void testGetAllTypes_NullValues() throws Exception {
     String sql =
         "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb \n"
             + "FROM all_types \n"
@@ -212,7 +211,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testGetAllTypesWithPreparedStatement() throws IOException, InterruptedException {
+  public void testGetAllTypesWithPreparedStatement() throws Exception {
     String sql = "select * from all_types where col_bigint=$1";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -258,7 +257,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testOrmReadOnlyTransaction() throws IOException, InterruptedException {
+  public void testOrmReadOnlyTransaction() throws Exception {
     String sql =
         "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb \n"
             + "FROM all_types \n"
@@ -289,7 +288,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testStaleRead() throws IOException, InterruptedException {
+  public void testStaleRead() throws Exception {
     String sql =
         "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb \n"
             + "FROM all_types \n"
@@ -321,7 +320,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testUpdateAllTypes() throws IOException, InterruptedException {
+  public void testUpdateAllTypes() throws Exception {
     String sql =
         "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb \n"
             + "FROM all_types \n"
@@ -352,7 +351,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testDeleteAllTypes() throws IOException, InterruptedException {
+  public void testDeleteAllTypes() throws Exception {
     String sql =
         "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb \n"
             + "FROM all_types \n"
@@ -381,7 +380,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testRollback() throws IOException, InterruptedException {
+  public void testRollback() throws Exception {
     String sql =
         "SELECT all_types.col_bigint AS all_types_col_bigint, all_types.col_bool AS all_types_col_bool, all_types.col_bytea AS all_types_col_bytea, all_types.col_float8 AS all_types_col_float8, all_types.col_int AS all_types_col_int, all_types.col_numeric AS all_types_col_numeric, all_types.col_timestamptz AS all_types_col_timestamptz, all_types.col_date AS all_types_col_date, all_types.col_varchar AS all_types_col_varchar, all_types.col_jsonb AS all_types_col_jsonb \n"
             + "FROM all_types \n"
@@ -419,7 +418,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCreateRelationships() throws IOException, InterruptedException {
+  public void testCreateRelationships() throws Exception {
     String insertUserSql =
         "INSERT INTO user_account (name, fullname) "
             + "VALUES ('pkrabs', 'Pearl Krabs') "
@@ -473,7 +472,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testLoadRelationships() throws IOException, InterruptedException {
+  public void testLoadRelationships() throws Exception {
     String selectUsersSql =
         "SELECT user_account.id, user_account.name, user_account.fullname \n"
             + "FROM user_account ORDER BY user_account.id";
@@ -589,7 +588,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testErrorInReadWriteTransaction() throws IOException, InterruptedException {
+  public void testErrorInReadWriteTransaction() throws Exception {
     String sql =
         "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "VALUES (1, true, '\\x74657374206279746573'::bytea, 3.14, 100, 6.626, '2011-11-04T00:05:23.123456+00:00'::timestamptz, '2011-11-04'::date, 'test string', '{\"key1\": \"value1\", \"key2\": \"value2\"}')";
@@ -616,7 +615,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testErrorInReadWriteTransactionContinue() throws IOException, InterruptedException {
+  public void testErrorInReadWriteTransactionContinue() throws Exception {
     String sql =
         "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
             + "VALUES (1, true, '\\x74657374206279746573'::bytea, 3.14, 100, 6.626, '2011-11-04T00:05:23.123456+00:00'::timestamptz, '2011-11-04'::date, 'test string', '{\"key1\": \"value1\", \"key2\": \"value2\"}')";
