@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.parsers;
 
+import static com.google.cloud.spanner.pgadapter.parsers.Parser.getArrayElementOid;
 import static com.google.cloud.spanner.pgadapter.parsers.Parser.toOid;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -690,6 +691,26 @@ public class ParserTest {
             () -> Parser.create(mock(SessionState.class), data, Oid.INT8_ARRAY, FormatCode.BINARY));
     assertEquals("Invalid array value", exception.getMessage());
     assertEquals(EOFException.class, exception.getCause().getClass());
+  }
+
+  @Test
+  public void testGetArrayElementOid() {
+    assertEquals(Oid.BOOL, getArrayElementOid(Oid.BOOL_ARRAY));
+    assertEquals(Oid.BYTEA, getArrayElementOid(Oid.BYTEA_ARRAY));
+    assertEquals(Oid.DATE, getArrayElementOid(Oid.DATE_ARRAY));
+    assertEquals(Oid.FLOAT4, getArrayElementOid(Oid.FLOAT4_ARRAY));
+    assertEquals(Oid.FLOAT8, getArrayElementOid(Oid.FLOAT8_ARRAY));
+    assertEquals(Oid.INT2, getArrayElementOid(Oid.INT2_ARRAY));
+    assertEquals(Oid.INT4, getArrayElementOid(Oid.INT4_ARRAY));
+    assertEquals(Oid.INT8, getArrayElementOid(Oid.INT8_ARRAY));
+    assertEquals(Oid.JSONB, getArrayElementOid(Oid.JSONB_ARRAY));
+    assertEquals(Oid.NUMERIC, getArrayElementOid(Oid.NUMERIC_ARRAY));
+    assertEquals(Oid.VARCHAR, getArrayElementOid(Oid.VARCHAR_ARRAY));
+    assertEquals(Oid.TEXT, getArrayElementOid(Oid.TEXT_ARRAY));
+    assertEquals(Oid.UUID, getArrayElementOid(Oid.UUID_ARRAY));
+    assertEquals(Oid.TIMESTAMP, getArrayElementOid(Oid.TIMESTAMP_ARRAY));
+    assertEquals(Oid.TIMESTAMPTZ, getArrayElementOid(Oid.TIMESTAMPTZ_ARRAY));
+    assertEquals(Oid.UNSPECIFIED, getArrayElementOid(Integer.MAX_VALUE));
   }
 
   static com.google.spanner.v1.Type createType(TypeCode code) {
