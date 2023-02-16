@@ -340,7 +340,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
 
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sqlQuery), ALL_TYPES_RESULTSET));
-
+    System.out.println(ALL_TYPES_RESULTSET.getRows(0).getValues(6).getStringValue());
     String expectedOutput =
         "col_bigint : 1 , "
             + "col_bool : True , "
