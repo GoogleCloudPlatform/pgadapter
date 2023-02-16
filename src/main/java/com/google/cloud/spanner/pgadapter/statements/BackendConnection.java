@@ -15,8 +15,6 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
-import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
-import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
@@ -162,6 +160,8 @@ public class BackendConnection {
       return false;
     }
 
+    abstract boolean isUpdate();
+
     abstract void execute();
 
     void checkConnectionState() {
@@ -197,6 +197,11 @@ public class BackendConnection {
     @Override
     boolean isBatchingPossible() {
       return !analyze;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return this.parsedStatement.isUpdate();
     }
 
     @Override
@@ -385,6 +390,11 @@ public class BackendConnection {
     }
 
     @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
     void execute() {
       checkConnectionState();
       try {
@@ -455,6 +465,11 @@ public class BackendConnection {
     }
 
     @Override
+    boolean isUpdate() {
+      return true;
+    }
+
+    @Override
     void execute() {
       try {
         checkConnectionState();
@@ -491,6 +506,11 @@ public class BackendConnection {
     Vacuum(VacuumStatement vacuumStatement) {
       super(vacuumStatement.parsedStatement, vacuumStatement.originalStatement);
       this.vacuumStatement = vacuumStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
     }
 
     @Override
@@ -532,6 +552,11 @@ public class BackendConnection {
     Truncate(TruncateStatement truncateStatement) {
       super(truncateStatement.parsedStatement, truncateStatement.originalStatement);
       this.truncateStatement = truncateStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return true;
     }
 
     @Override
@@ -869,7 +894,7 @@ public class BackendConnection {
     // We need to start an implicit transaction.
     // Check if a read-only transaction suffices.
     spannerConnection.beginTransaction();
-    if (isSync && !hasDmlOrCopyStatementsAfter(index)) {
+    if (isSync && !hasUpdateStatementsAfter(index)) {
       spannerConnection.setTransactionMode(
           com.google.cloud.spanner.connection.TransactionMode.READ_ONLY_TRANSACTION);
     }
@@ -1042,13 +1067,9 @@ public class BackendConnection {
   }
 
   @VisibleForTesting
-  boolean hasDmlOrCopyStatementsAfter(int index) {
+  boolean hasUpdateStatementsAfter(int index) {
     return bufferedStatements.subList(index, bufferedStatements.size()).stream()
-        .anyMatch(
-            statement ->
-                statement.parsedStatement.getType() == StatementType.UPDATE
-                    || statement.parsedStatement.getType() == StatementType.UNKNOWN
-                        && isCommand(COPY, statement.parsedStatement.getSqlWithoutComments()));
+        .anyMatch(BufferedStatement::isUpdate);
   }
 
   private int getStatementCount() {

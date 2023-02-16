@@ -46,9 +46,11 @@ import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.connection.TransactionMode;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
@@ -216,8 +218,8 @@ public class BackendConnectionTest {
             ImmutableList::of);
     onlyDmlStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
     onlyDmlStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
-    assertTrue(onlyDmlStatements.hasDmlOrCopyStatementsAfter(0));
-    assertTrue(onlyDmlStatements.hasDmlOrCopyStatementsAfter(1));
+    assertTrue(onlyDmlStatements.hasUpdateStatementsAfter(0));
+    assertTrue(onlyDmlStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection onlyCopyStatements =
         new BackendConnection(
@@ -228,8 +230,8 @@ public class BackendConnectionTest {
             ImmutableList::of);
     onlyCopyStatements.executeCopy(parsedCopyStatement, copyStatement, receiver, writer, executor);
     onlyCopyStatements.executeCopy(parsedCopyStatement, copyStatement, receiver, writer, executor);
-    assertTrue(onlyCopyStatements.hasDmlOrCopyStatementsAfter(0));
-    assertTrue(onlyCopyStatements.hasDmlOrCopyStatementsAfter(1));
+    assertTrue(onlyCopyStatements.hasUpdateStatementsAfter(0));
+    assertTrue(onlyCopyStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection dmlAndCopyStatements =
         new BackendConnection(
@@ -241,8 +243,8 @@ public class BackendConnectionTest {
     dmlAndCopyStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
     dmlAndCopyStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
-    assertTrue(dmlAndCopyStatements.hasDmlOrCopyStatementsAfter(0));
-    assertTrue(dmlAndCopyStatements.hasDmlOrCopyStatementsAfter(1));
+    assertTrue(dmlAndCopyStatements.hasUpdateStatementsAfter(0));
+    assertTrue(dmlAndCopyStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection onlySelectStatements =
         new BackendConnection(
@@ -253,8 +255,8 @@ public class BackendConnectionTest {
             ImmutableList::of);
     onlySelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
     onlySelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
-    assertFalse(onlySelectStatements.hasDmlOrCopyStatementsAfter(0));
-    assertFalse(onlySelectStatements.hasDmlOrCopyStatementsAfter(1));
+    assertFalse(onlySelectStatements.hasUpdateStatementsAfter(0));
+    assertFalse(onlySelectStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection onlyClientSideStatements =
         new BackendConnection(
@@ -267,8 +269,8 @@ public class BackendConnectionTest {
         parsedClientSideStatement, clientSideStatement, Function.identity());
     onlyClientSideStatements.execute(
         parsedClientSideStatement, clientSideStatement, Function.identity());
-    assertFalse(onlyClientSideStatements.hasDmlOrCopyStatementsAfter(0));
-    assertFalse(onlyClientSideStatements.hasDmlOrCopyStatementsAfter(1));
+    assertFalse(onlyClientSideStatements.hasUpdateStatementsAfter(0));
+    assertFalse(onlyClientSideStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection onlyUnknownStatements =
         new BackendConnection(
@@ -279,8 +281,8 @@ public class BackendConnectionTest {
             ImmutableList::of);
     onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
     onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
-    assertFalse(onlyUnknownStatements.hasDmlOrCopyStatementsAfter(0));
-    assertFalse(onlyUnknownStatements.hasDmlOrCopyStatementsAfter(1));
+    assertFalse(onlyUnknownStatements.hasUpdateStatementsAfter(0));
+    assertFalse(onlyUnknownStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection dmlAndSelectStatements =
         new BackendConnection(
@@ -291,8 +293,8 @@ public class BackendConnectionTest {
             ImmutableList::of);
     dmlAndSelectStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
     dmlAndSelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
-    assertTrue(dmlAndSelectStatements.hasDmlOrCopyStatementsAfter(0));
-    assertFalse(dmlAndSelectStatements.hasDmlOrCopyStatementsAfter(1));
+    assertTrue(dmlAndSelectStatements.hasUpdateStatementsAfter(0));
+    assertFalse(dmlAndSelectStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection copyAndSelectStatements =
         new BackendConnection(
@@ -304,8 +306,8 @@ public class BackendConnectionTest {
     copyAndSelectStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
     copyAndSelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
-    assertTrue(copyAndSelectStatements.hasDmlOrCopyStatementsAfter(0));
-    assertFalse(copyAndSelectStatements.hasDmlOrCopyStatementsAfter(1));
+    assertTrue(copyAndSelectStatements.hasUpdateStatementsAfter(0));
+    assertFalse(copyAndSelectStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection copyAndUnknownStatements =
         new BackendConnection(
@@ -317,8 +319,8 @@ public class BackendConnectionTest {
     copyAndUnknownStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
     copyAndUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
-    assertTrue(copyAndUnknownStatements.hasDmlOrCopyStatementsAfter(0));
-    assertFalse(copyAndUnknownStatements.hasDmlOrCopyStatementsAfter(1));
+    assertTrue(copyAndUnknownStatements.hasUpdateStatementsAfter(0));
+    assertFalse(copyAndUnknownStatements.hasUpdateStatementsAfter(1));
   }
 
   @Test
@@ -691,6 +693,42 @@ public class BackendConnectionTest {
 
     verify(connection).execute(statement);
     verify(connection).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).beginTransaction();
+  }
+
+  @Test
+  public void testVacuumAndExecute_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement statement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    String truncateSql = "truncate foo";
+    TruncateStatement truncateStatement =
+        new TruncateStatement(
+            connectionHandler,
+            mock(OptionsMetadata.class),
+            "",
+            AbstractStatementParser.getInstance(Dialect.POSTGRESQL)
+                .parse(Statement.of(truncateSql)),
+            Statement.of(truncateSql));
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(truncateStatement);
+    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).execute(statement);
+    verify(connection, never()).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
     verify(connection).beginTransaction();
   }
 }
