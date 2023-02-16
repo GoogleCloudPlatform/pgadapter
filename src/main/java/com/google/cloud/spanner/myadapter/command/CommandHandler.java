@@ -49,7 +49,8 @@ public class CommandHandler {
     this.sessionState = sessionState;
     this.backendConnection = backendConnection;
 
-    this.serverGreetingsMessage = new ServerGreetingsMessage(connectionMetadata, sessionState);
+    this.serverGreetingsMessage = new ServerGreetingsMessage(connectionMetadata, sessionState,
+        optionsMetadata.getServerVersion());
     this.clientHandShakeMessageProcessor =
         new ClientHandShakeMessageProcessor(connectionMetadata, sessionState);
     this.queryMessageProcessor =

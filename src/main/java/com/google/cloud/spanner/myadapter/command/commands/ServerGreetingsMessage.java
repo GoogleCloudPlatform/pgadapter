@@ -21,12 +21,17 @@ import com.google.cloud.spanner.myadapter.wireoutput.ServerGreetingResponse;
 
 public class ServerGreetingsMessage extends MessageProcessor {
 
-  public ServerGreetingsMessage(ConnectionMetadata connectionMetadata, SessionState sessionState) {
+  private final String serverVersion;
+
+  public ServerGreetingsMessage(ConnectionMetadata connectionMetadata, SessionState sessionState,
+      String serverVersion) {
     super(connectionMetadata, sessionState);
+    this.serverVersion = serverVersion;
   }
 
   @Override
   public void processMessage(WireMessage message) throws Exception {
-    new ServerGreetingResponse(message.getMessageSequenceNumber(), connectionMetadata).send(true);
+    new ServerGreetingResponse(message.getMessageSequenceNumber(), connectionMetadata,
+        serverVersion).send(true);
   }
 }

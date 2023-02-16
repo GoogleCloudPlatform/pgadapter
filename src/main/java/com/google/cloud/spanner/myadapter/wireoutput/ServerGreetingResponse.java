@@ -21,37 +21,38 @@ import java.nio.charset.StandardCharsets;
 
 public class ServerGreetingResponse extends WireOutput {
 
-  public ServerGreetingResponse(int currentSequenceNumber, ConnectionMetadata connectionMetadata)
+  public ServerGreetingResponse(int currentSequenceNumber, ConnectionMetadata connectionMetadata,
+      String serverVersion)
       throws IOException {
     super(currentSequenceNumber, connectionMetadata);
 
-    byte[] protocol = new byte[] {(byte) 10};
+    byte[] protocol = new byte[]{(byte) 10};
     writePayload(protocol);
-    String serverVersion = "8.0.31\0";
+    serverVersion = serverVersion + "\0";
     writePayload(serverVersion.getBytes(StandardCharsets.UTF_8));
     int threadId = 0;
     writePayload(IntegerParser.binaryParse(threadId));
     byte[] salt = new byte[8];
     writePayload(salt); // salt
-    byte[] filler = new byte[] {(byte) 0x00}; // ???
+    byte[] filler = new byte[]{(byte) 0x00}; // ???
     writePayload(filler);
     byte[] serverCapabilities = {(byte) 255, (byte) 255};
     writePayload(serverCapabilities);
-    byte[] charSet = new byte[] {(byte) 255};
+    byte[] charSet = new byte[]{(byte) 255};
     writePayload(charSet);
     byte[] serverStatus = {(byte) 2, (byte) 0};
     writePayload(serverStatus);
     byte[] eServerCapabilities = {(byte) 255, (byte) 223};
     writePayload(eServerCapabilities);
     int authPluginDataLength = 21;
-    writePayload(new byte[] {(byte) authPluginDataLength});
+    writePayload(new byte[]{(byte) authPluginDataLength});
     byte[] reserved = new byte[10];
     writePayload(reserved);
     byte[] extendedSalt = new byte[13];
     writePayload(extendedSalt);
     byte[] authPluginName = "caching_sha2_password".getBytes(StandardCharsets.UTF_8);
     writePayload(authPluginName);
-    byte[] nullTerminator = new byte[] {(byte) 0x00};
+    byte[] nullTerminator = new byte[]{(byte) 0x00};
     writePayload(nullTerminator);
   }
 
