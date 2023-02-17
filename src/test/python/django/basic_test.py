@@ -35,6 +35,9 @@ def create_django_setup(host, port):
               'NAME': 'postgres',
               'USER': 'postgres',
               'PASSWORD': 'postgres',
+              'OPTIONS': {
+                'options': '-c TimeZone=UTC',
+              },
               'TIME_ZONE': 'UTC'
           }
       },
