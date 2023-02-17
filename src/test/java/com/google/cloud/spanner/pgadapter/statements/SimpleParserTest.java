@@ -472,4 +472,31 @@ public class SimpleParserTest {
     assertThrows(IllegalArgumentException.class, () -> TableOrIndexName.parse(""));
     assertThrows(IllegalArgumentException.class, () -> TableOrIndexName.parse("foo.bar baz"));
   }
+
+  @Test
+  public void testReadArrayLiteral() {
+    assertEquals(ImmutableList.of(), SimpleParser.readArrayLiteral("{}", true, true));
+    assertEquals(ImmutableList.of("foo"), SimpleParser.readArrayLiteral("{\"foo\"}", true, true));
+    assertEquals(
+        ImmutableList.of("foo", "bar"),
+        SimpleParser.readArrayLiteral("{\"foo\", \"bar\"}", true, true));
+    assertEquals(
+        Arrays.asList("foo", "bar", null),
+        SimpleParser.readArrayLiteral("{\"foo\", \"bar\", null}", true, true));
+    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("{1, 2}", false, true));
+    assertEquals(
+        ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("{\"1\", \"2\"}", false, true));
+    assertEquals(
+        ImmutableList.of("{\"foo\": \"bar\"}"),
+        SimpleParser.readArrayLiteral("{\"{\\\"foo\\\": \\\"bar\\\"}\"}", true, true));
+
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("1, 2", false, true));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{1, 2", false, true));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("1, 2}", false, true));
+    assertThrows(
+        PGException.class, () -> SimpleParser.readArrayLiteral("{1, 2} extra token", false, true));
+    assertThrows(
+        PGException.class,
+        () -> SimpleParser.readArrayLiteral("{foo, bar}", /* mustBeQuoted = */ true, true));
+  }
 }
