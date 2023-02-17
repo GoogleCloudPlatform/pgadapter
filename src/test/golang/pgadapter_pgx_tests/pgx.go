@@ -152,9 +152,9 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 			formats[o] = conn.ConnInfo().ResultFormatCodeForOID(o)
 		}
 		formats[uint32(oid)] = format
-		row = conn.QueryRow(ctx, "SELECT * FROM all_types WHERE col_bigint=1", formats)
+		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb FROM all_types WHERE col_bigint=1", formats)
 	} else {
-		row = conn.QueryRow(ctx, "SELECT * FROM all_types WHERE col_bigint=1")
+		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb FROM all_types WHERE col_bigint=1")
 	}
 	err = row.Scan(
 		&bigintValue,
@@ -218,20 +218,35 @@ func TestInsertAllDataTypes(connString string) *C.char {
 	}
 	defer conn.Close(ctx)
 
-	sql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"
+	insertSql := "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, " +
+		"col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) " +
+		"values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)"
 	numeric := pgtype.Numeric{}
 	_ = numeric.Set("6.626")
+	numeric1 := pgtype.Numeric{}
+	_ = numeric1.Set("-6.626")
+	numeric2 := pgtype.Numeric{}
+	_ = numeric2.Set("3.14")
 	timestamptz, _ := time.Parse(time.RFC3339Nano, "2022-03-24T07:39:10.123456789+01:00")
+	timestamptz2, _ := time.Parse(time.RFC3339Nano, "2000-01-01T00:00:00Z")
 	var tag pgconn.CommandTag
 	date := pgtype.Date{}
 	_ = date.Set("2022-04-02")
-	if strings.Contains(connString, "prefer_simple_protocol=true") {
-		// Simple mode will format the date as '2022-04-02 00:00:00Z', which is not supported by the
-		// backend yet.
-		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, "2022-04-02", "test_string", "{\"key\": \"value\"}")
-	} else {
-		tag, err = conn.Exec(ctx, sql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}")
-	}
+	date2 := pgtype.Date{}
+	_ = date2.Set("1970-01-01")
+
+	tag, err = conn.Exec(ctx, insertSql, 100, true, []byte("test_bytes"), 3.14, 1, numeric, timestamptz, date, "test_string", "{\"key\": \"value\"}",
+		pgtype.Int8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Int8{{Int: 100, Status: pgtype.Present}, {Status: pgtype.Null}, {Int: 200, Status: pgtype.Present}}},
+		pgtype.BoolArray{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Bool{{Bool: true, Status: pgtype.Present}, {Status: pgtype.Null}, {Bool: false, Status: pgtype.Present}}},
+		[][]byte{[]byte("bytes1"), nil, []byte("bytes2")},
+		pgtype.Float8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Float8{{Float: 3.14, Status: pgtype.Present}, {Status: pgtype.Null}, {Float: 6.626, Status: pgtype.Present}}},
+		pgtype.Int8Array{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Int8{{Int: -1, Status: pgtype.Present}, {Status: pgtype.Null}, {Int: -2, Status: pgtype.Present}}},
+		pgtype.NumericArray{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Numeric{numeric1, {Status: pgtype.Null}, numeric2}},
+		pgtype.TimestamptzArray{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Timestamptz{{Time: timestamptz, Status: pgtype.Present}, {Status: pgtype.Null}, {Time: timestamptz2, Status: pgtype.Present}}},
+		pgtype.DateArray{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Date{date, {Status: pgtype.Null}, date2}},
+		pgtype.VarcharArray{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.Varchar{{String: "string1", Status: pgtype.Present}, {Status: pgtype.Null}, {String: "string2", Status: pgtype.Present}}},
+		pgtype.JSONBArray{Dimensions: []pgtype.ArrayDimension{{3, 1}}, Status: pgtype.Present, Elements: []pgtype.JSONB{{Bytes: []byte("{\"key\": \"value1\"}"), Status: pgtype.Present}, {Status: pgtype.Null}, {Bytes: []byte("{\"key\": \"value2\"}"), Status: pgtype.Present}}},
+	)
 	if err != nil {
 		return C.CString(fmt.Sprintf("failed to execute insert statement: %v", err))
 	}
@@ -422,7 +437,7 @@ func TestPrepareStatement(connString string) *C.char {
 		pgtype.TimestamptzOID,
 		pgtype.DateOID,
 		pgtype.VarcharOID,
-		pgtype.VarcharOID,
+		pgtype.JSONBOID,
 		pgtype.Int8OID,
 	}
 	for i, tp := range wantParamTypes {
@@ -446,9 +461,11 @@ func TestPrepareSelectStatement(connString string) *C.char {
 	}
 	defer conn.Close(ctx)
 
-	sql := "SELECT * FROM all_types WHERE col_int=$1 AND col_bool=$2 AND col_bytea=$3 AND col_float8=$4 AND " +
-		"col_numeric=$5 AND col_timestamptz=$6 AND col_date=$7 AND col_varchar=$8 AND col_jsonb=$9 AND col_bigint=$10"
-	sd, err := conn.Prepare(ctx, "update_all_types", sql)
+	sql := "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb " +
+		"FROM all_types " +
+		"WHERE col_int=$1 AND col_bool=$2 AND col_bytea=$3 AND col_float8=$4 AND " +
+		"col_numeric=$5 AND col_timestamptz=$6 AND col_date=$7 AND col_varchar=$8 AND col_jsonb::text=$9 AND col_bigint=$10"
+	sd, err := conn.Prepare(ctx, "select_all_types", sql)
 	if err != nil {
 		return C.CString(err.Error())
 	}
@@ -482,7 +499,7 @@ func TestPrepareSelectStatement(connString string) *C.char {
 		pgtype.NumericOID,
 		pgtype.TimestamptzOID,
 		pgtype.DateOID,
-		pgtype.VarcharOID,
+		pgtype.JSONBOID,
 		pgtype.VarcharOID,
 	}
 	if g, w := len(sd.Fields), len(wantFieldTypes); g != w {
