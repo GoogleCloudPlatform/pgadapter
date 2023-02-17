@@ -35,6 +35,7 @@ import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.Test;
@@ -341,9 +342,9 @@ public class DjangoBasicTest extends DjangoTestSetup {
 
     ResultSet resultSet = createAllTypesResultSet("", true);
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sqlQuery), resultSet));
-    System.out.println(resultSet.getRows(0).getValues(6).getStringValue());
     String expectedOutput =
-        "col_bigint : 1 , "
+        "Time zone:  ('UTC',)\n"
+            + "col_bigint : 1 , "
             + "col_bool : True , "
             + "col_bytea : b'test' , "
             + "col_float8 : 3.14 , "
@@ -353,14 +354,15 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "col_date : 2022-03-29 , "
             + "col_varchar : test , "
             + "col_jsonb : {'key': 'value'} , \n";
-    List<String> options = new ArrayList<>(Arrays.asList("select_all_types"));
+    List<String> options = new ArrayList<>(Collections.singletonList("select_all_types"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
+    System.out.printf("Output from Python:\n%s\n", actualOutput);
     List<QueryMessage> queryMessages =
         pgServer.getDebugMessages().stream()
             .filter(message -> message instanceof QueryMessage)
             .map(message -> (QueryMessage) message)
             .collect(Collectors.toList());
-    assertEquals(2, queryMessages.size());
+    assertEquals(3, queryMessages.size());
     assertEquals(
         "SET TIME ZONE 'UTC'", queryMessages.get(0).getSimpleQueryStatement().getStatement(0));
     assertEquals(expectedOutput, actualOutput);
