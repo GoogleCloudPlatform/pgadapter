@@ -241,8 +241,8 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   /** @return 0 for text/csv formatting and 1 for binary */
-  public int getFormatCode() {
-    return (parsedCopyStatement.format == Format.BINARY) ? 1 : 0;
+  public byte getFormatCode() {
+    return (parsedCopyStatement.format == Format.BINARY) ? (byte) 1 : (byte) 0;
   }
 
   private void verifyCopyColumns() {
@@ -298,23 +298,39 @@ public class CopyStatement extends IntermediatePortalStatement {
 
   private void queryInformationSchema(BackendConnection backendConnection) {
     Map<String, Type> tableColumns = new LinkedHashMap<>();
-    Statement statement =
-        Statement.newBuilder(
-                "SELECT "
-                    + COLUMN_NAME
-                    + ", "
-                    + DATA_TYPE
-                    + " FROM information_schema.columns "
-                    + "WHERE table_schema = $1 "
-                    + "AND table_name = $2")
+    String sql =
+        "SELECT "
+            + COLUMN_NAME
+            + ", "
+            + DATA_TYPE
+            + " FROM information_schema.columns "
+            + "WHERE table_schema = $1 "
+            + "AND table_name = $2 ";
+    // We can't use ANY (and similar) with an array parameter (yet).
+    if (getCopyColumnNames() != null && !getCopyColumnNames().isEmpty()) {
+      sql +=
+          "and column_name in "
+              + IntStream.rangeClosed(3, getCopyColumnNames().size() + 2)
+                  .mapToObj(i -> String.format("$%d", i))
+                  .collect(Collectors.joining(", ", "(", ")"));
+    }
+    Statement.Builder builder =
+        Statement.newBuilder(sql)
             .bind("p1")
             .to(
                 getTableName().schema == null
                     ? backendConnection.getCurrentSchema()
                     : getTableName().getUnquotedSchema())
             .bind("p2")
-            .to(getTableName().getUnquotedName())
-            .build();
+            .to(getTableName().getUnquotedName());
+    if (getCopyColumnNames() != null && !getCopyColumnNames().isEmpty()) {
+      int paramIndex = 3;
+      for (TableOrIndexName columnName : getCopyColumnNames()) {
+        builder.bind(String.format("p%d", paramIndex)).to(columnName.getUnquotedName());
+        paramIndex++;
+      }
+    }
+    Statement statement = builder.build();
     try (ResultSet result = connection.getDatabaseClient().singleUse().executeQuery(statement)) {
       while (result.next()) {
         String columnName = result.getString(COLUMN_NAME);

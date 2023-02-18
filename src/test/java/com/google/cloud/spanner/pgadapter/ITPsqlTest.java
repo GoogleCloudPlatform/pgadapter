@@ -26,6 +26,7 @@ import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -329,8 +330,8 @@ public class ITPsqlTest implements IntegrationTest {
 
     assertEquals("", errors);
     assertEquals(
-        "   typname   \n"
-            + "-------------\n"
+        "   typname    \n"
+            + "--------------\n"
             + " bool\n"
             + " bytea\n"
             + " int8\n"
@@ -339,13 +340,27 @@ public class ITPsqlTest implements IntegrationTest {
             + " text\n"
             + " float4\n"
             + " float8\n"
+            + " _bool\n"
+            + " _bytea\n"
+            + " _int2\n"
+            + " _int4\n"
+            + " _text\n"
+            + " _varchar\n"
+            + " _int8\n"
+            + " _float4\n"
+            + " _float8\n"
             + " varchar\n"
             + " date\n"
             + " timestamp\n"
+            + " _timestamp\n"
+            + " _date\n"
             + " timestamptz\n"
+            + " _timestamptz\n"
+            + " _numeric\n"
             + " numeric\n"
             + " jsonb\n"
-            + "(14 rows)\n",
+            + " _jsonb\n"
+            + "(28 rows)\n",
         output);
   }
 
@@ -356,9 +371,11 @@ public class ITPsqlTest implements IntegrationTest {
             ImmutableList.of(
                 "set time zone 'UTC';\n",
                 "prepare insert_row as "
-                    + "insert into all_types values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);\n",
+                    + "insert into all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+                    + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);\n",
                 "prepare find_row as "
-                    + "select * from all_types "
+                    + "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+                    + "from all_types "
                     + "where col_bigint=$1 "
                     + "and col_bool=$2 "
                     + "and col_bytea=$3 "
@@ -398,6 +415,23 @@ public class ITPsqlTest implements IntegrationTest {
         output);
   }
 
+  @Test
+  public void testSetOperationWithOrderBy() throws IOException, InterruptedException {
+    // TODO: Remove
+    assumeTrue(
+        testEnv.getSpannerUrl() != null
+            && testEnv
+                .getSpannerUrl()
+                .equals("https://staging-wrenchworks.sandbox.googleapis.com"));
+
+    Tuple<String, String> result =
+        runUsingPsql(
+            "select * from (select 1) one union all select * from (select 2) two order by 1");
+    String output = result.x(), errors = result.y();
+    assertEquals("", errors);
+    assertEquals(" ?column? \n----------\n        1\n        2\n(2 rows)\n", output);
+  }
+
   /**
    * This test copies data back and forth between PostgreSQL and Cloud Spanner and verifies that the
    * contents are equal after the COPY operation in both directions.
@@ -431,9 +465,9 @@ public class ITPsqlTest implements IntegrationTest {
       }
     }
 
-    // Execute the COPY tests in both binary and text mode.
-    for (boolean binary : new boolean[] {false, true}) {
-      logger.info("Testing binary: " + binary);
+    // Execute the COPY tests in both binary, csv and text mode.
+    for (Format format : Format.values()) {
+      logger.info("Testing format: " + format);
       // Make sure the all_types table on Cloud Spanner is empty.
       String databaseId = database.getId().getDatabase();
       testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
@@ -453,8 +487,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) to stdout (format "
+              + format
+              + ") \" "
               + "  | psql "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
@@ -462,8 +497,9 @@ public class ITPsqlTest implements IntegrationTest {
               + testEnv.getPGAdapterPort()
               + " -d "
               + database.getId().getDatabase()
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(builder);
       Process process = builder.start();
@@ -501,8 +537,9 @@ public class ITPsqlTest implements IntegrationTest {
           "bash",
           "-c",
           "psql"
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) to stdout (format "
+              + format
+              + ") \" "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
               + " -p "
@@ -518,8 +555,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(copyToPostgresBuilder);
       Process copyToPostgresProcess = copyToPostgresBuilder.start();
@@ -550,9 +588,9 @@ public class ITPsqlTest implements IntegrationTest {
       connection.createStatement().executeUpdate("delete from all_types");
     }
 
-    // Execute the COPY tests in both binary and text mode.
-    for (boolean binary : new boolean[] {false, true}) {
-      logger.info("Testing binary: " + binary);
+    // Execute the COPY tests in both binary, csv and text mode.
+    for (Format format : Format.values()) {
+      logger.info("Testing format: " + format);
       // Make sure the all_types table on Cloud Spanner is empty.
       String databaseId = database.getId().getDatabase();
       testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
@@ -572,8 +610,10 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "to stdout (format "
+              + format
+              + ") \" "
               + "  | psql "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
@@ -581,8 +621,10 @@ public class ITPsqlTest implements IntegrationTest {
               + testEnv.getPGAdapterPort()
               + " -d "
               + database.getId().getDatabase()
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(builder);
       Process process = builder.start();
@@ -607,8 +649,10 @@ public class ITPsqlTest implements IntegrationTest {
           "bash",
           "-c",
           "psql"
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "to stdout (format "
+              + format
+              + ") \""
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
               + " -p "
@@ -624,8 +668,10 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(copyToPostgresBuilder);
       Process copyToPostgresProcess = copyToPostgresBuilder.start();
@@ -765,7 +811,11 @@ public class ITPsqlTest implements IntegrationTest {
           // Pangnirtung did not observer DST in 1970-1979, but not all databases agree.
           ZoneId.of("America/Pangnirtung"),
           // Niue switched from -11:30 to -11 in 1978. Not all JDKs know that.
-          ZoneId.of("Pacific/Niue"));
+          ZoneId.of("Pacific/Niue"),
+          // Ojinaga switched from Mountain to Central time in 2022. Not all JDKs know that.
+          ZoneId.of("America/Ojinaga"),
+          // Nuuk stopped using DST in 2023. This is unknown to older JDKs.
+          ZoneId.of("America/Nuuk"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));
@@ -875,7 +925,8 @@ public class ITPsqlTest implements IntegrationTest {
             + POSTGRES_USER
             + " -d "
             + POSTGRES_DATABASE
-            + " -c \"copy all_types from stdin;\"\n");
+            + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "from stdin;\"\n");
     setPgPassword(builder);
     Process process = builder.start();
     StringBuilder errors = new StringBuilder();

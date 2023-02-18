@@ -81,24 +81,28 @@ public class CopyToStatement extends IntermediatePortalStatement {
     if (parsedCopyStatement.format == CopyStatement.Format.BINARY) {
       this.csvFormat = null;
     } else {
+      CSVFormat baseFormat =
+          parsedCopyStatement.format == Format.TEXT
+              ? CSVFormat.POSTGRESQL_TEXT
+              : CSVFormat.POSTGRESQL_CSV;
       CSVFormat.Builder formatBuilder =
-          CSVFormat.Builder.create(CSVFormat.POSTGRESQL_TEXT)
+          CSVFormat.Builder.create(baseFormat)
               .setNullString(
                   parsedCopyStatement.nullString == null
-                      ? CSVFormat.POSTGRESQL_TEXT.getNullString()
+                      ? baseFormat.getNullString()
                       : parsedCopyStatement.nullString)
               .setRecordSeparator('\n')
               .setDelimiter(
                   parsedCopyStatement.delimiter == null
-                      ? CSVFormat.POSTGRESQL_TEXT.getDelimiterString().charAt(0)
+                      ? baseFormat.getDelimiterString().charAt(0)
                       : parsedCopyStatement.delimiter)
               .setQuote(
                   parsedCopyStatement.quote == null
-                      ? CSVFormat.POSTGRESQL_TEXT.getQuoteCharacter()
+                      ? baseFormat.getQuoteCharacter()
                       : parsedCopyStatement.quote)
               .setEscape(
                   parsedCopyStatement.escape == null
-                      ? CSVFormat.POSTGRESQL_TEXT.getEscapeCharacter()
+                      ? baseFormat.getEscapeCharacter()
                       : parsedCopyStatement.escape);
       if (parsedCopyStatement.format == Format.TEXT) {
         formatBuilder.setQuoteMode(QuoteMode.NONE);
