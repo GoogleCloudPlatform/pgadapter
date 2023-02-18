@@ -30,11 +30,16 @@ def create_django_setup(host, port):
               'NAME': 'postgres',
               'USER': 'postgres',
               'PASSWORD': 'postgres',
+              'OPTIONS': {
+                'options': '-c TimeZone=UTC',
+              },
+              'TIME_ZONE': 'UTC'
           }
       },
   }
   conf['DATABASES']['default']['PORT'] = port
   conf['DATABASES']['default']['HOST'] = host
+  conf['USE_TZ'] = True
   settings.configure(**conf)
   apps.populate(settings.INSTALLED_APPS)
 
@@ -80,6 +85,21 @@ def test_nested_atomic():
     singer2.save()
   print('Atomic Successful')
 
+def test_error_during_transaction():
+  try:
+    transaction.set_autocommit(False)
+
+    singer = Singer(singerid=1, firstname='hello', lastname='world')
+    singer2 = Singer(singerid=2, firstname='hello', lastname='python')
+
+    singer.save()
+  except Exception:
+    try:
+      singer2.save()
+    except Exception as e:
+      print(e)
+
+
 
 if __name__ == '__main__':
   if len(sys.argv) < 4:
@@ -106,6 +126,8 @@ if __name__ == '__main__':
       test_atomic()
     elif option == 'nested_atomic':
       test_nested_atomic()
+    elif option == 'error_during_transaction':
+      test_error_during_transaction()
     else:
       print('Invalid Option')
   except Exception as e:

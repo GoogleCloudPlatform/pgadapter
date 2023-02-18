@@ -11,3 +11,8 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+
+  - package-ecosystem: "nuget"
+    directory: "/src/test/csharp/pgadapter_npgsql_tests"
+    schedule:
+      interval: "daily"
