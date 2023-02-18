@@ -174,7 +174,7 @@ public class PythonCopyTests extends PythonTestSetup {
     String copyType = "SIMPLE_FROM";
     String file = "1\thello\n2\tworld\n";
     String sql1 =
-        "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2";
+        "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ";
     String sql2 =
         "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema=$1 and table_name=$2 and column_name in ($3, $4)";
     Statement s1 = Statement.newBuilder(sql1).bind("p1").to("public").bind("p2").to("test").build();
