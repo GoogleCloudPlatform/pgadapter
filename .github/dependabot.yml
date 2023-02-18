@@ -16,3 +16,7 @@ updates:
     directory: "/src/test/csharp/pgadapter_npgsql_tests"
     schedule:
       interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/samples/golang/gorm"
+    schedule:
+      interval: "daily"
