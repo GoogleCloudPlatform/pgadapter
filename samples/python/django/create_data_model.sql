@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS tracks (
     PRIMARY KEY(id, track_number)
 ) INTERLEAVE IN PARENT albums ON DELETE CASCADE;
 
-CREATE UNIQUE INDEX IF NOT EXISTS unique_idx_id ON tracks(track_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tracks_track_id ON tracks(track_id);
 
 CREATE TABLE IF NOT EXISTS venues (
   id character varying NOT NULL,
