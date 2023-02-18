@@ -137,6 +137,25 @@ with psycopg.connect("host=localhost port=5432 dbname=my-database") as conn:
   conn.commit()
 ```
 
+#### Stale Reads
+Read-only transactions and connections using AUTOCOMMIT will by default use strong reads for queries.
+Cloud Spanner also supports stale reads. A strong read is a read at a current timestamp and is
+guaranteed to see all data that has been committed up until the start of this read. Cloud Spanner
+defaults to using strong reads to serve read requests.
+
+A stale read is read at a timestamp in the past. If your application is latency sensitive but
+tolerant of stale data, then stale reads can provide performance benefits.
+See also https://cloud.google.com/spanner/docs/reads#read_types
+
+You can create a connection that will use stale reads in autocommit mode by adding the following to
+the connection string:
+
+```python
+with psycopg.connect("host=localhost port=5432 dbname=my-database options='-c spanner.read_only_staleness=\\'MAX_STALENESS\\ 10s\\''", autocommit=True) as conn:
+  # This connection will read data that is up to 10 seconds stale.
+  conn.execute("SELECT * FROM my_table WHERE key='my-key'")
+```
+
 ### Batching / Pipelining
 Use [batching / pipelining](https://www.psycopg.org/psycopg3/docs/advanced/pipeline.html) for
 optimal performance when executing multiple statements. This both saves round-trips between your
