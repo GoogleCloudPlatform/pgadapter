@@ -20,6 +20,7 @@ import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.parsers.ArrayParser;
 import com.google.cloud.spanner.pgadapter.parsers.BinaryParser;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.parsers.DateParser;
@@ -38,6 +39,7 @@ import java.io.PipedInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -282,6 +284,53 @@ class BinaryCopyParser implements CopyInParser {
         case DATE:
           return Value.date(field.data == null ? null : DateParser.toDate(field.data));
         case ARRAY:
+          switch (type.getArrayElementType().getCode()) {
+            case STRING:
+              return Value.stringArray(
+                  field.data == null
+                      ? null
+                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+            case PG_JSONB:
+              return Value.pgJsonbArray(
+                  field.data == null
+                      ? null
+                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+            case BOOL:
+              return Value.boolArray(
+                  field.data == null
+                      ? null
+                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+            case INT64:
+              return Value.int64Array(
+                  field.data == null
+                      ? null
+                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+            case FLOAT64:
+              return Value.float64Array(
+                  field.data == null
+                      ? null
+                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+            case PG_NUMERIC:
+              return Value.pgNumericArray(
+                  field.data == null
+                      ? null
+                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+            case BYTES:
+              return Value.bytesArray(
+                  field.data == null
+                      ? null
+                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+            case DATE:
+              return Value.dateArray(
+                  field.data == null
+                      ? null
+                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+            case TIMESTAMP:
+              return Value.timestampArray(
+                  field.data == null
+                      ? null
+                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+          }
         case STRUCT:
         case NUMERIC:
         default:
@@ -290,5 +339,10 @@ class BinaryCopyParser implements CopyInParser {
           throw SpannerExceptionFactory.newSpannerException(ErrorCode.INVALID_ARGUMENT, message);
       }
     }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> List<T> cast(List<?> list) {
+    return (List<T>) list;
   }
 }

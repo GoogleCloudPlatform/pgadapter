@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.statements.CopyStatement.parse;
+import static com.google.cloud.spanner.pgadapter.statements.CopyStatement.parsePostgreSQLDataType;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -23,6 +24,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Dialect;
+import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
@@ -1134,6 +1136,55 @@ public class CopyStatementTest {
               "COPY u&\"\\0441\\043B\\043E\\043D\" FROM STDIN;".getBytes(), StandardCharsets.UTF_8);
       assertThrows(PGException.class, () -> parse(text));
     }
+  }
+
+  @Test
+  public void testParsePostgreSQLDataType() {
+    assertEquals(Type.bool(), parsePostgreSQLDataType("boolean"));
+    assertEquals(Type.bytes(), parsePostgreSQLDataType("bytea"));
+    assertEquals(Type.int64(), parsePostgreSQLDataType("bigint"));
+    assertEquals(Type.float64(), parsePostgreSQLDataType("double precision"));
+    assertEquals(Type.float64(), parsePostgreSQLDataType("float8"));
+    assertEquals(Type.pgNumeric(), parsePostgreSQLDataType("numeric"));
+    assertEquals(Type.string(), parsePostgreSQLDataType("character varying"));
+    assertEquals(Type.string(), parsePostgreSQLDataType("text"));
+    assertEquals(Type.string(), parsePostgreSQLDataType("character varying(100)"));
+    assertEquals(Type.date(), parsePostgreSQLDataType("date"));
+    assertEquals(Type.timestamp(), parsePostgreSQLDataType("timestamptz"));
+    assertEquals(Type.timestamp(), parsePostgreSQLDataType("timestamp with time zone"));
+    assertEquals(Type.pgJsonb(), parsePostgreSQLDataType("jsonb"));
+
+    assertEquals(Type.array(Type.bool()), parsePostgreSQLDataType("boolean[]"));
+    assertEquals(Type.array(Type.bytes()), parsePostgreSQLDataType("bytea[]"));
+    assertEquals(Type.array(Type.int64()), parsePostgreSQLDataType("bigint[]"));
+    assertEquals(Type.array(Type.float64()), parsePostgreSQLDataType("double precision[]"));
+    assertEquals(Type.array(Type.float64()), parsePostgreSQLDataType("float8[]"));
+    assertEquals(Type.array(Type.pgNumeric()), parsePostgreSQLDataType("numeric[]"));
+    assertEquals(Type.array(Type.string()), parsePostgreSQLDataType("character varying[]"));
+    assertEquals(Type.array(Type.string()), parsePostgreSQLDataType("text[]"));
+    assertEquals(Type.array(Type.string()), parsePostgreSQLDataType("character varying(100)[]"));
+    assertEquals(Type.array(Type.date()), parsePostgreSQLDataType("date[]"));
+    assertEquals(Type.array(Type.timestamp()), parsePostgreSQLDataType("timestamptz[]"));
+    assertEquals(
+        Type.array(Type.timestamp()), parsePostgreSQLDataType("timestamp with time zone[]"));
+    assertEquals(Type.array(Type.pgJsonb()), parsePostgreSQLDataType("jsonb[]"));
+
+    IllegalArgumentException exception;
+    exception = assertThrows(IllegalArgumentException.class, () -> parsePostgreSQLDataType("foo"));
+    assertEquals("Unrecognized or unsupported column data type: foo", exception.getMessage());
+
+    exception =
+        assertThrows(IllegalArgumentException.class, () -> parsePostgreSQLDataType("foo[]"));
+    assertEquals("Unrecognized or unsupported column data type: foo[]", exception.getMessage());
+
+    exception =
+        assertThrows(IllegalArgumentException.class, () -> parsePostgreSQLDataType("foo(100)"));
+    assertEquals("Unrecognized or unsupported column data type: foo", exception.getMessage());
+
+    exception =
+        assertThrows(IllegalArgumentException.class, () -> parsePostgreSQLDataType("foo(100)[]"));
+    assertEquals(
+        "Unrecognized or unsupported column data type: foo(100)[]", exception.getMessage());
   }
 
   static ImmutableList<TableOrIndexName> identifierList(String... identifiers) {

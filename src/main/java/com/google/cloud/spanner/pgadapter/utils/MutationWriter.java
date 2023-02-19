@@ -485,18 +485,18 @@ public class MutationWriter implements Callable<StatementResult>, Closeable {
               break;
             case PG_NUMERIC:
               for (String s : value.getStringArray()) {
-                size += s.length();
+                size += s == null ? 8 : s.length();
               }
               break;
             case PG_JSONB:
             case STRING:
               for (String s : value.getStringArray()) {
-                size += s.length() * 4;
+                size += s == null ? 8 : s.length() * 4;
               }
               break;
             case BYTES:
               for (ByteArray b : value.getBytesArray()) {
-                size += b.length();
+                size += b == null ? 8 : b.length();
               }
               break;
             case TIMESTAMP:
