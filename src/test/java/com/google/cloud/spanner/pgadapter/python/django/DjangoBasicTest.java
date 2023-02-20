@@ -103,7 +103,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
     String expectedOutput =
         "{'singerid': 1, 'firstname': 'hello', 'lastname': 'world'}\n"
             + "{'singerid': 2, 'firstname': 'hello', 'lastname': 'django'}\n";
-    List<String> options = new ArrayList<>(Arrays.asList("all"));
+    List<String> options = new ArrayList<>(Collections.singletonList("all"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
     assertEquals(expectedOutput, actualOutput);
 
@@ -230,7 +230,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlUpdate), 0));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlInsert), 1));
     String expectedOutput = "Insert Successful\n";
-    List<String> options = new ArrayList<>(Arrays.asList("all_types_insert"));
+    List<String> options = new ArrayList<>(Collections.singletonList("all_types_insert"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
     assertEquals(expectedOutput, actualOutput);
 
@@ -258,7 +258,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlInsert), 1));
     String expectedOutput = "Insert Successful\n";
-    List<String> options = new ArrayList<>(Arrays.asList("all_types_insert_null"));
+    List<String> options = new ArrayList<>(Collections.singletonList("all_types_insert_null"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
     assertEquals(expectedOutput, actualOutput);
 
@@ -314,7 +314,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "'col_date': None, "
             + "'col_varchar': None, "
             + "'col_jsonb': None}\n";
-    List<String> options = new ArrayList<>(Arrays.asList("select_all_null"));
+    List<String> options = new ArrayList<>(Collections.singletonList("select_all_null"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
     assertEquals(expectedOutput, actualOutput);
 

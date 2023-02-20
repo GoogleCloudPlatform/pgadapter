@@ -21,7 +21,6 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.ExecuteSqlRequest;
-import com.google.spanner.v1.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
@@ -89,7 +88,6 @@ public class DjangoPgAggregatesTest extends DjangoTestSetup {
     result.add("arr");
 
     result.add("[hello,beautiful,world,]");
-    ResultSet rs = createResultSet(result, 2);
 
     mockSpanner.putStatementResult(
         StatementResult.query(Statement.of(sql), createResultSet(result, 1)));

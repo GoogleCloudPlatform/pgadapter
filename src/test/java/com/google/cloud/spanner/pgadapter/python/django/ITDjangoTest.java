@@ -36,7 +36,6 @@ import org.junit.runners.JUnit4;
 public class ITDjangoTest extends DjangoTestSetup {
 
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
-  private static Database database;
   private static final String DJANGO_SETTING_FILE = "samples/python/django/setting.py";
   private static String originalDjangoSetting = "";
   private static final String DEFAULT_PORT = "5432";
@@ -51,7 +50,7 @@ public class ITDjangoTest extends DjangoTestSetup {
     }
 
     testEnv.setUp();
-    database = testEnv.createDatabase(Collections.emptyList());
+    Database database = testEnv.createDatabase(Collections.emptyList());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
 
     // Update Django setting.py fiel with the PG Adapter Port.properties
