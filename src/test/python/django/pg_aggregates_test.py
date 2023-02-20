@@ -33,11 +33,16 @@ def create_django_setup(host, port):
               'NAME': 'postgres',
               'USER': 'postgres',
               'PASSWORD': 'postgres',
+              'OPTIONS': {
+                'options': '-c TimeZone=UTC',
+              },
+              'TIME_ZONE': 'UTC'
           }
       },
   }
   conf['DATABASES']['default']['PORT'] = port
   conf['DATABASES']['default']['HOST'] = host
+  conf['USE_TZ'] = True
   settings.configure(**conf)
   apps.populate(settings.INSTALLED_APPS)
 

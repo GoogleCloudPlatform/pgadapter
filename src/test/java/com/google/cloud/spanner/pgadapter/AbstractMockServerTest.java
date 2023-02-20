@@ -638,7 +638,8 @@ public abstract class AbstractMockServerTest {
       argsListBuilder.add("-d", defaultDatabase);
     }
     argsListBuilder.add(
-        "-debug",
+        "-internal_debug",
+        "-skip_internal_debug_warning",
         "-c",
         "", // empty credentials file, as we are using a plain text connection.
         "-s",

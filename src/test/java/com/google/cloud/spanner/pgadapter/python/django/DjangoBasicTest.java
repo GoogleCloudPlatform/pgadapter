@@ -341,8 +341,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
     ResultSet resultSet = createAllTypesResultSet("", true);
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sqlQuery), resultSet));
     String expectedOutput =
-        "Time zone:  ('UTC',)\n"
-            + "col_bigint : 1 , "
+        "col_bigint : 1 , "
             + "col_bool : True , "
             + "col_bytea : b'test' , "
             + "col_float8 : 3.14 , "

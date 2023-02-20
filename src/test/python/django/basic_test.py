@@ -17,7 +17,6 @@ import sys
 import datetime
 
 import pytz
-from django.db import connection
 
 
 def create_django_setup(host, port):
@@ -40,7 +39,7 @@ def create_django_setup(host, port):
               },
               'TIME_ZONE': 'UTC'
           }
-      },
+      }
   }
   conf['DATABASES']['default']['PORT'] = port
   conf['DATABASES']['default']['HOST'] = host
@@ -116,10 +115,6 @@ def select_all_null():
 
 def select_all_types():
   result = all_types.objects
-  with connection.cursor() as cursor:
-    cursor.execute("show time zone")
-    row = cursor.fetchone()
-    print('Time zone: ', row)
 
   for row in result.values():
     for key in row:
