@@ -38,7 +38,7 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
 @Category(PythonTest.class)
-public class Psycopg2CopyTests extends AbstractPsycopg2Test {
+public class PythonCopyTests extends AbstractPsycopg2Test {
 
   private static ResultSet createResultSet() {
     ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();

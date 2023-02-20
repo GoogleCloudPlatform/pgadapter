@@ -52,7 +52,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 @Category(PythonTest.class)
 @RunWith(Parameterized.class)
-public class Psycopg2TransactionTests extends AbstractPsycopg2Test {
+public class PythonTransactionTests extends AbstractPsycopg2Test {
 
   private static ResultSet createResultSet(int id, String name) {
     ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();

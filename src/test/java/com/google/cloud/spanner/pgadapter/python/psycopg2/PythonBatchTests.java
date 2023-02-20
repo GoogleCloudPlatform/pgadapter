@@ -33,7 +33,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 @Category(PythonTest.class)
 @RunWith(Parameterized.class)
-public class Psycopg2BatchTests extends AbstractPsycopg2Test {
+public class PythonBatchTests extends AbstractPsycopg2Test {
 
   @Parameter public String pgVersion;
 

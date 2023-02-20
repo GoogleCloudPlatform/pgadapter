@@ -46,7 +46,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 @RunWith(Parameterized.class)
 @Category(PythonTest.class)
-public class Psycopg2BasicTests extends AbstractPsycopg2Test {
+public class PythonBasicTests extends AbstractPsycopg2Test {
 
   private ResultSet createResultSet() {
     ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();
