@@ -15,14 +15,13 @@
 
 from connect import create_test_engine
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import text, func, or_
+from sqlalchemy import text, func, or_, Integer
 from model import Singer, Album, Track, Venue, Concert
 from util_random_names import random_first_name, random_last_name, \
   random_album_title, random_release_date, random_marketing_budget, \
   random_cover_picture
 from uuid import uuid4
 from datetime import datetime, date
-
 
 # This is the default engine that is connected to PostgreSQL (PGAdapter).
 # This engine will by default use read/write transactions.
@@ -64,6 +63,9 @@ def run_sample():
   # Execute a query to get all albums that start with the same letter as the
   # first name or last name of the singer.
   print_albums_first_character_of_title_equal_to_first_or_last_name()
+  # Search for all venues with a capacity of at least 5,000.
+  # This query will filter on a specific element in a JSONB column.
+  print_venues_with_capacity_at_least_5000()
 
   # Delete an album. This will automatically also delete all related tracks, as
   # Tracks is interleaved in Albums with the option ON DELETE CASCADE.
@@ -77,7 +79,8 @@ def run_sample():
     if album is None:
       print("No album found using a stale read.")
     else:
-      print("Album was found using a stale read, even though it has already been deleted.")
+      print("Album was found using a stale read, even though it has already "
+            "been deleted.")
 
   print()
   print("Finished running sample")
@@ -86,8 +89,7 @@ def run_sample():
 def create_tables_if_not_exists():
   # Cloud Spanner does not support DDL in transactions. We therefore turn on
   # autocommit for this connection.
-  with engine.execution_options(
-      isolation_level="AUTOCOMMIT").connect() as connection:
+  with engine.execution_options(isolation_level="AUTOCOMMIT").connect() as connection:
     with open("create_data_model.sql") as file:
       print("Reading sample data model from file")
       ddl_script = text(file.read())
@@ -224,6 +226,24 @@ def print_albums_first_character_of_title_equal_to_first_or_last_name():
     )
     for album in albums:
       print("  '{}' by {}".format(album.title, album.singer.full_name))
+
+
+# Searches for all venues with a capacity of at least 5,000. Capacity is encoded
+# in the `Description` JSONB columns. This function shows how you can filter on
+# a specific element in a JSONB column.
+def print_venues_with_capacity_at_least_5000():
+  print()
+  print("Searching for venues that have a capacity of at least 5,000")
+  with Session(read_only_engine) as session:
+    venues = (
+      session
+        .query(Venue)
+        .filter(Venue.description['Capacity'].astext.cast(Integer) >= 5000)
+        .all()
+    )
+    for venue in venues:
+      print("  '{}' has capacity {}".format(venue.name,
+                                            venue.description['Capacity']))
 
 
 # Creates a random singer row with `num_albums` random albums.

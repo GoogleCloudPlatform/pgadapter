@@ -157,6 +157,52 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testPrintVenuesWithCapacityAtLeast5000() throws Exception {
+    String sql =
+        "SELECT venues.name AS venues_name, venues.description AS venues_description, venues.id AS venues_id, venues.version_id AS venues_version_id, venues.created_at AS venues_created_at, venues.updated_at AS venues_updated_at \n"
+            + "FROM venues \n"
+            + "WHERE CAST((venues.description ->> $1::TEXT) AS INTEGER) >= $2::INTEGER";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createVenuesMetadata("venues_")
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            createParameterTypesMetadata(
+                                    ImmutableList.of(TypeCode.STRING, TypeCode.INT64))
+                                .getUndeclaredParameters())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to("Capacity").bind("p2").to(5000L).build(),
+            ResultSet.newBuilder()
+                .setMetadata(createVenuesMetadata("venues_"))
+                .addRows(
+                    createVenueRow(
+                        "123",
+                        "Avenue Park",
+                        "{\"Capacity\": 5000, \"Location\": \"New York\"}",
+                        Timestamp.parseTimestamp("2000-01-01T00:00:00Z"),
+                        Timestamp.parseTimestamp("2000-01-01T00:00:00Z")))
+                .build()));
+
+    String output =
+        execute(
+            SAMPLE_DIR,
+            "test_print_venues_with_capacity_at_least_5000.py",
+            "localhost",
+            pgServer.getLocalPort());
+    assertEquals(
+        "\n"
+            + "Searching for venues that have a capacity of at least 5,000\n"
+            + "  'Avenue Park' has capacity 5000\n",
+        output);
+  }
+
+  @Test
   public void testSingersWithLimitAndOffset() throws Exception {
     String sql =
         "SELECT singers.first_name AS singers_first_name, singers.last_name AS singers_last_name, singers.full_name AS singers_full_name, singers.active AS singers_active, singers.id AS singers_id, singers.version_id AS singers_version_id, singers.created_at AS singers_created_at, singers.updated_at AS singers_updated_at \n"
@@ -1732,7 +1778,11 @@ public class SqlAlchemy2SampleTest extends AbstractMockServerTest {
                         .build())
                 .addFields(
                     Field.newBuilder()
-                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.JSON)
+                                .setTypeAnnotation(TypeAnnotationCode.PG_JSONB)
+                                .build())
                         .setName(prefix + "description")
                         .build())
                 .addFields(
