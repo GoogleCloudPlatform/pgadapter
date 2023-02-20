@@ -53,6 +53,7 @@ import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -233,7 +234,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testQueryAllDataTypes() {
-    String sql = "SELECT * FROM all_types WHERE col_bigint=1";
+    String sql =
+        "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb FROM all_types WHERE col_bigint=1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
     // Request the data of each column once in both text and binary format to ensure that we support
@@ -294,7 +296,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING,
-                            TypeCode.STRING,
+                            TypeCode.JSON,
                             TypeCode.STRING)))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
@@ -320,7 +322,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("test_string")
                 .bind("p10")
-                .to("{\"key\": \"value\"}")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .bind("p11")
                 .to("test")
                 .build(),
@@ -347,8 +349,9 @@ public class PgxMockServerTest extends AbstractMockServerTest {
   public void testInsertAllDataTypes() {
     String sql =
         "INSERT INTO all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)";
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+            + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)";
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
@@ -365,7 +368,8 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING,
-                            TypeCode.STRING)))
+                            TypeCode.JSON),
+                        true))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     mockSpanner.putStatementResult(
@@ -390,7 +394,34 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("test_string")
                 .bind("p10")
-                .to("{\"key\": \"value\"}")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
+                .bind("p11")
+                .toInt64Array(Arrays.asList(100L, null, 200L))
+                .bind("p12")
+                .toBoolArray(Arrays.asList(true, null, false))
+                .bind("p13")
+                .toBytesArray(
+                    Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .bind("p14")
+                .toFloat64Array(Arrays.asList(3.14d, null, 6.626d))
+                .bind("p15")
+                .toInt64Array(Arrays.asList(-1L, null, -2L))
+                .bind("p16")
+                .toPgNumericArray(Arrays.asList("-6.626", null, "3.14"))
+                .bind("p17")
+                .toTimestampArray(
+                    Arrays.asList(
+                        Timestamp.parseTimestamp("2022-03-24T06:39:10.123456000Z"),
+                        null,
+                        Timestamp.parseTimestamp("2000-01-01T00:00:00Z")))
+                .bind("p18")
+                .toDateArray(
+                    Arrays.asList(Date.parseDate("2022-04-02"), null, Date.parseDate("1970-01-01")))
+                .bind("p19")
+                .toStringArray(Arrays.asList("string1", null, "string2"))
+                .bind("p20")
+                .toPgJsonbArray(
+                    Arrays.asList("{\"key\": \"value1\"}", null, "{\"key\": \"value2\"}"))
                 .build(),
             1L));
 
@@ -436,7 +467,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                                         TypeCode.TIMESTAMP,
                                         TypeCode.DATE,
                                         TypeCode.STRING,
-                                        TypeCode.STRING))
+                                        TypeCode.JSON))
                                 .getUndeclaredParameters()))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
@@ -462,7 +493,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("test_string")
                 .bind("p10")
-                .to("{\"key\": \"value\"}")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(
@@ -480,7 +511,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                                         TypeCode.TIMESTAMP,
                                         TypeCode.DATE,
                                         TypeCode.STRING,
-                                        TypeCode.STRING))
+                                        TypeCode.JSON))
                                 .getUndeclaredParameters()))
                 .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
                 .addRows(ALL_TYPES_RESULTSET.getRows(0))
@@ -525,7 +556,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING,
-                            TypeCode.STRING)))
+                            TypeCode.JSON)))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     int batchSize = 10;
@@ -554,7 +585,9 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                   .bind("p9")
                   .to("test_string" + i)
                   .bind("p10")
-                  .to(String.format("{\"key\": \"value%d\"}", i))
+                  .to(
+                      com.google.cloud.spanner.Value.pgJsonb(
+                          String.format("{\"key\": \"value%d\"}", i)))
                   .build(),
               1L));
     }
@@ -609,7 +642,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING,
-                            TypeCode.STRING)))
+                            TypeCode.JSON)))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
 
@@ -691,7 +724,9 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                   .bind("p9")
                   .to("test_string" + i)
                   .bind("p10")
-                  .to(String.format("{\"key\": \"value%d\"}", i))
+                  .to(
+                      com.google.cloud.spanner.Value.pgJsonb(
+                          String.format("{\"key\": \"value%d\"}", i)))
                   .build(),
               1L));
     }
@@ -849,7 +884,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING,
-                            TypeCode.STRING)))
+                            TypeCode.JSON)))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     // This select statement will fail during the PREPARE phase that pgx executes for all statements
@@ -909,7 +944,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING,
-                            TypeCode.STRING)))
+                            TypeCode.JSON)))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     int batchSize = 3;
@@ -935,7 +970,9 @@ public class PgxMockServerTest extends AbstractMockServerTest {
               .bind("p9")
               .to("test_string" + i)
               .bind("p10")
-              .to(String.format("{\"key\": \"value%d\"}", i))
+              .to(
+                  com.google.cloud.spanner.Value.pgJsonb(
+                      String.format("{\"key\": \"value%d\"}", i)))
               .build();
       if (i == 1) {
         mockSpanner.putStatementResult(
@@ -987,7 +1024,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING,
-                            TypeCode.STRING)))
+                            TypeCode.JSON)))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     mockSpanner.putStatementResult(
@@ -1012,7 +1049,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to((String) null)
                 .bind("p10")
-                .to((String) null)
+                .to(com.google.cloud.spanner.Value.pgJsonb(null))
                 .build(),
             1L));
 
@@ -1134,7 +1171,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING,
-                            TypeCode.STRING)))
+                            TypeCode.JSON)))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
     for (long id : new Long[] {10L, 20L}) {
@@ -1160,7 +1197,7 @@ public class PgxMockServerTest extends AbstractMockServerTest {
                   .bind("p9")
                   .to("test_string")
                   .bind("p10")
-                  .to("{\"key\": \"value\"}")
+                  .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                   .build(),
               1L));
     }

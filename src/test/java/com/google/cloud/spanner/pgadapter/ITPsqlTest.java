@@ -330,8 +330,8 @@ public class ITPsqlTest implements IntegrationTest {
 
     assertEquals("", errors);
     assertEquals(
-        "   typname   \n"
-            + "-------------\n"
+        "   typname    \n"
+            + "--------------\n"
             + " bool\n"
             + " bytea\n"
             + " int8\n"
@@ -340,13 +340,27 @@ public class ITPsqlTest implements IntegrationTest {
             + " text\n"
             + " float4\n"
             + " float8\n"
+            + " _bool\n"
+            + " _bytea\n"
+            + " _int2\n"
+            + " _int4\n"
+            + " _text\n"
+            + " _varchar\n"
+            + " _int8\n"
+            + " _float4\n"
+            + " _float8\n"
             + " varchar\n"
             + " date\n"
             + " timestamp\n"
+            + " _timestamp\n"
+            + " _date\n"
             + " timestamptz\n"
+            + " _timestamptz\n"
+            + " _numeric\n"
             + " numeric\n"
             + " jsonb\n"
-            + "(14 rows)\n",
+            + " _jsonb\n"
+            + "(28 rows)\n",
         output);
   }
 
@@ -357,9 +371,11 @@ public class ITPsqlTest implements IntegrationTest {
             ImmutableList.of(
                 "set time zone 'UTC';\n",
                 "prepare insert_row as "
-                    + "insert into all_types values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);\n",
+                    + "insert into all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+                    + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);\n",
                 "prepare find_row as "
-                    + "select * from all_types "
+                    + "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+                    + "from all_types "
                     + "where col_bigint=$1 "
                     + "and col_bool=$2 "
                     + "and col_bytea=$3 "
@@ -403,7 +419,10 @@ public class ITPsqlTest implements IntegrationTest {
   public void testSetOperationWithOrderBy() throws IOException, InterruptedException {
     // TODO: Remove
     assumeTrue(
-        testEnv.getSpannerUrl().equals("https://staging-wrenchworks.sandbox.googleapis.com"));
+        testEnv.getSpannerUrl() != null
+            && testEnv
+                .getSpannerUrl()
+                .equals("https://staging-wrenchworks.sandbox.googleapis.com"));
 
     Tuple<String, String> result =
         runUsingPsql(
@@ -468,7 +487,7 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types to stdout (format "
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) to stdout (format "
               + format
               + ") \" "
               + "  | psql "
@@ -478,7 +497,7 @@ public class ITPsqlTest implements IntegrationTest {
               + testEnv.getPGAdapterPort()
               + " -d "
               + database.getId().getDatabase()
-              + " -c \"copy all_types from stdin (format "
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin (format "
               + format
               + ")"
               + ";\"\n");
@@ -518,7 +537,7 @@ public class ITPsqlTest implements IntegrationTest {
           "bash",
           "-c",
           "psql"
-              + " -c \"copy all_types to stdout (format "
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) to stdout (format "
               + format
               + ") \" "
               + " -h "
@@ -536,7 +555,7 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types from stdin (format "
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin (format "
               + format
               + ")"
               + ";\"\n");
@@ -591,7 +610,8 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types to stdout (format "
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "to stdout (format "
               + format
               + ") \" "
               + "  | psql "
@@ -601,7 +621,8 @@ public class ITPsqlTest implements IntegrationTest {
               + testEnv.getPGAdapterPort()
               + " -d "
               + database.getId().getDatabase()
-              + " -c \"copy all_types from stdin (format "
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "from stdin (format "
               + format
               + ")"
               + ";\"\n");
@@ -628,7 +649,8 @@ public class ITPsqlTest implements IntegrationTest {
           "bash",
           "-c",
           "psql"
-              + " -c \"copy all_types to stdout (format "
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "to stdout (format "
               + format
               + ") \""
               + " -h "
@@ -646,7 +668,8 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types from stdin (format "
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "from stdin (format "
               + format
               + ")"
               + ";\"\n");
@@ -790,7 +813,9 @@ public class ITPsqlTest implements IntegrationTest {
           // Niue switched from -11:30 to -11 in 1978. Not all JDKs know that.
           ZoneId.of("Pacific/Niue"),
           // Ojinaga switched from Mountain to Central time in 2022. Not all JDKs know that.
-          ZoneId.of("America/Ojinaga"));
+          ZoneId.of("America/Ojinaga"),
+          // Nuuk stopped using DST in 2023. This is unknown to older JDKs.
+          ZoneId.of("America/Nuuk"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));
@@ -900,7 +925,8 @@ public class ITPsqlTest implements IntegrationTest {
             + POSTGRES_USER
             + " -d "
             + POSTGRES_DATABASE
-            + " -c \"copy all_types from stdin;\"\n");
+            + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + "from stdin;\"\n");
     setPgPassword(builder);
     Process process = builder.start();
     StringBuilder errors = new StringBuilder();
