@@ -18,13 +18,14 @@ import "C"
 import (
 	"context"
 	"fmt"
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v4"
 )
 
 // This file defines tests that can be called from Java and that will connect to any PGAdapter
@@ -156,6 +157,7 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 	} else {
 		row = conn.QueryRow(ctx, "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb FROM all_types WHERE col_bigint=1")
 	}
+	var arrayBigint, arrayBool, arrayBytea, arrayFloat8, arrayInt, arrayNumeric, arrayTimestamptz, arrayDate, arrayVarchar, arrayJsonb interface{}
 	err = row.Scan(
 		&bigintValue,
 		&boolValue,
@@ -167,6 +169,16 @@ func TestQueryAllDataTypes(connString string, oid, format int16) *C.char {
 		&dateValue,
 		&varcharValue,
 		&jsonbValue,
+		&arrayBigint,
+		&arrayBool,
+		&arrayBytea,
+		&arrayFloat8,
+		&arrayInt,
+		&arrayNumeric,
+		&arrayTimestamptz,
+		&arrayDate,
+		&arrayVarchar,
+		&arrayJsonb,
 	)
 	if err != nil {
 		return C.CString(fmt.Sprintf("Failed to execute query: %v", err.Error()))
@@ -319,6 +331,7 @@ func TestInsertAllDataTypesReturning(connString string) *C.char {
 	var dateValue time.Time
 	var varcharValue string
 	var jsonbValue string
+	var arrayBigint, arrayBool, arrayBytea, arrayFloat8, arrayInt, arrayNumeric, arrayTimestamptz, arrayDate, arrayVarchar, arrayJsonb interface{}
 
 	err = row.Scan(
 		&bigintValue,
@@ -331,6 +344,16 @@ func TestInsertAllDataTypesReturning(connString string) *C.char {
 		&dateValue,
 		&varcharValue,
 		&jsonbValue,
+		&arrayBigint,
+		&arrayBool,
+		&arrayBytea,
+		&arrayFloat8,
+		&arrayInt,
+		&arrayNumeric,
+		&arrayTimestamptz,
+		&arrayDate,
+		&arrayVarchar,
+		&arrayJsonb,
 	)
 	if err != nil {
 		return C.CString(fmt.Sprintf("Failed to execute insert: %v", err.Error()))

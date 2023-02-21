@@ -472,8 +472,17 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_timestamptz\":\"2022-02-16T13:18:02.123Z\","
             + "\"col_date\":\"2022-03-29\","
             + "\"col_varchar\":\"test\","
-            + "\"col_jsonb\":{\"key\":\"value\"}"
-            + "}\n",
+            + "\"col_jsonb\":{\"key\":\"value\"},"
+            + "\"col_array_bigint\":[\"1\",null,\"2\"],"
+            + "\"col_array_bool\":[true,null,false],"
+            + "\"col_array_bytea\":[{\"type\":\"Buffer\",\"data\":[98,121,116,101,115,49]},null,{\"type\":\"Buffer\",\"data\":[98,121,116,101,115,50]}],"
+            + "\"col_array_float8\":[3.14,null,-99.99],"
+            + "\"col_array_int\":[\"-100\",null,\"-200\"],"
+            + "\"col_array_numeric\":[6.626,null,-3.14],"
+            + "\"col_array_timestamptz\":[\"2022-02-16T16:18:02.123Z\",null,\"2000-01-01T00:00:00.000Z\"],"
+            + "\"col_array_date\":[\"2023-02-19T23:00:00.000Z\",null,\"1999-12-31T23:00:00.000Z\"],"
+            + "\"col_array_varchar\":[\"string1\",null,\"string2\"],"
+            + "\"col_array_jsonb\":[{\"key\":\"value1\"},null,{\"key\":\"value2\"}]}\n",
         output);
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
@@ -503,8 +512,17 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_timestamptz\":null,"
             + "\"col_date\":null,"
             + "\"col_varchar\":null,"
-            + "\"col_jsonb\":null"
-            + "}\n",
+            + "\"col_jsonb\":null,"
+            + "\"col_array_bigint\":null,"
+            + "\"col_array_bool\":null,"
+            + "\"col_array_bytea\":null,"
+            + "\"col_array_float8\":null,"
+            + "\"col_array_int\":null,"
+            + "\"col_array_numeric\":null,"
+            + "\"col_array_timestamptz\":null,"
+            + "\"col_array_date\":null,"
+            + "\"col_array_varchar\":null,"
+            + "\"col_array_jsonb\":null}\n",
         output);
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
     ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
@@ -586,7 +604,13 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     String output = runTest("testCopyTo", getHost(), pgServer.getLocalPort());
 
     assertEquals(
-        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\n",
+        "1\tt\t\\\\x74657374\t3.14\t100\t6.626\t2022-02-16 13:18:02.123456+00\t2022-03-29\ttest\t{\"key\": \"value\"}\t"
+            + "{1,NULL,2}\t{t,NULL,f}\t{\"\\\\\\\\x627974657331\",NULL,\"\\\\\\\\x627974657332\"}\t"
+            + "{3.14,NULL,-99.99}\t{-100,NULL,-200}\t{6.626,NULL,-3.14}\t"
+            + "{\"2022-02-16 16:18:02.123456+00\",NULL,\"2000-01-01 00:00:00+00\"}\t"
+            + "{\"2023-02-20\",NULL,\"2000-01-01\"}\t"
+            + "{\"string1\",NULL,\"string2\"}\t"
+            + "{\"{\\\\\"key\\\\\": \\\\\"value1\\\\\"}\",NULL,\"{\\\\\"key\\\\\": \\\\\"value2\\\\\"}\"}\n",
         output);
   }
 

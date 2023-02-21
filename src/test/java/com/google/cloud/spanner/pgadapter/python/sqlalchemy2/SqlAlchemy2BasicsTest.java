@@ -27,7 +27,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
-import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
@@ -636,10 +635,6 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
 
   @Test
   public void testAutoCommit() throws Exception {
-    //    String sql =
-    //        "SELECT user_account.id, user_account.name, user_account.fullname \n"
-    //            + "FROM user_account \n"
-    //            + "WHERE user_account.name = 'spongebob'";
     String sql =
         "SELECT user_account.id, user_account.name, user_account.fullname \n"
             + "FROM user_account \n"
@@ -676,9 +671,6 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("Bob Test2"))
                         .build())
                 .build()));
-    //    String insertSql1 =
-    //        "INSERT INTO user_account (name, fullname) VALUES "
-    //            + "('sandy', 'Sandy Cheeks') RETURNING user_account.id";
     String insertSql =
         "INSERT INTO user_account (name, fullname) "
             + "VALUES ($1::VARCHAR(30), $2::VARCHAR) RETURNING user_account.id";
@@ -737,22 +729,13 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
     // 1 for DESCRIBE INSERT.
     // 2 for EXECUTE INSERT.
     assertEquals(7, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    // The SELECT statement is auto-described. As the connection is in autocommit mode, PGAdapter
-    // will execute the DESCRIBE and EXECUTE steps as a single read-only transaction.
-    assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
-    assertTrue(
-        mockSpanner
-            .getRequestsOfType(BeginTransactionRequest.class)
-            .get(0)
-            .getOptions()
-            .hasReadOnly());
     ExecuteSqlRequest describeSelectRequest =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(2);
     assertEquals(QueryMode.PLAN, describeSelectRequest.getQueryMode());
-    assertTrue(describeSelectRequest.getTransaction().hasId());
+    assertTrue(describeSelectRequest.getTransaction().hasSingleUse());
     ExecuteSqlRequest selectRequest = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(3);
     assertEquals(QueryMode.NORMAL, selectRequest.getQueryMode());
-    assertTrue(selectRequest.getTransaction().hasId());
+    assertTrue(selectRequest.getTransaction().hasSingleUse());
 
     ExecuteSqlRequest describeInsertRequest =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(4);

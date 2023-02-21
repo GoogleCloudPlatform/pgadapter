@@ -911,6 +911,112 @@ public class NpgsqlTest
                 {
                     Console.Write(reader.Read<string>(NpgsqlDbType.Jsonb));
                 }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write("[" + string.Join(", ", reader.Read<long?[]>(NpgsqlDbType.Array | NpgsqlDbType.Bigint)) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write("[" + string.Join(", ", reader.Read<bool?[]>(NpgsqlDbType.Array | NpgsqlDbType.Boolean)) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    var bytes = reader.Read<List<byte[]?>>(NpgsqlDbType.Array | NpgsqlDbType.Bytea);
+                    Console.Write("[" + string.Join(", ", bytes.Select(b => b == null ? null : Convert.ToBase64String(b))) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    var doubles = reader.Read<List<Double?>>(NpgsqlDbType.Array | NpgsqlDbType.Double);
+                    Console.Write("[" + string.Join(", ", doubles.Select(d => d?.ToString(nfi))) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write("[" + string.Join(", ", reader.Read<long?[]>(NpgsqlDbType.Array | NpgsqlDbType.Bigint)) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    var decimals = reader.Read<Decimal?[]>(NpgsqlDbType.Array | NpgsqlDbType.Numeric);
+                    Console.Write("[" + string.Join(", ", decimals.Select(d => d?.ToString(nfi))) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    var timestamps = reader.Read<List<DateTime?>>(NpgsqlDbType.Array | NpgsqlDbType.TimestampTz);
+                    Console.Write("[" + string.Join(", ",
+                        timestamps.Select(t => t?.ToUniversalTime().ToString("yyyyMMddTHHmmssFFFFFFF"))) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    var dates = reader.Read<List<DateTime?>>(NpgsqlDbType.Array | NpgsqlDbType.Date);
+                    Console.Write("[" + string.Join(", ", dates.Select(d => d?.ToString("yyyyMMdd"))) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write("[" + string.Join(", ", reader.Read<string?[]>(NpgsqlDbType.Array | NpgsqlDbType.Varchar)) + "]");
+                }
+                Console.Write("\t");
+                if (reader.IsNull)
+                {
+                    Console.Write("NULL");
+                    reader.Skip();
+                }
+                else
+                {
+                    Console.Write("[" + string.Join(", ", reader.Read<string?[]>(NpgsqlDbType.Array | NpgsqlDbType.Jsonb)) + "]");
+                }
                 Console.Write("\n");
             }
         }
