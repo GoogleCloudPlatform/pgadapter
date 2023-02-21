@@ -11,3 +11,35 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+
+  # ecosystem test packages
+  - package-ecosystem: "nuget"
+    directory: "/src/test/csharp/pgadapter_npgsql_tests"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/src/test/golang/pgadapter_gorm_tests"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/src/test/golang/pgadapter_pgx_tests"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "npm"
+    directory: "/src/test/nodejs/node-postgres"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "npm"
+    directory: "/src/test/nodejs/typeorm/data-test"
+    schedule:
+      interval: "daily"
+
+  # ecosystem sample packages
+  - package-ecosystem: "gomod"
+    directory: "/samples/golang/gorm"
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "maven"
+    directory: "/samples/java/liquibase"
+    schedule:
+      interval: "daily"
