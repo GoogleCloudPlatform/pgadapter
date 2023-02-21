@@ -21,7 +21,7 @@ from util_random_names import random_first_name, random_last_name, \
   random_album_title, random_release_date, random_marketing_budget, \
   random_cover_picture
 from uuid import uuid4
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 # This is the default engine that is connected to PostgreSQL (PGAdapter).
 # This engine will by default use read/write transactions.
@@ -166,7 +166,7 @@ def print_concerts():
     for concert in concerts:
       print("Concert '{}' starting at {} with {} will be held at {}"
             .format(concert.name,
-                    concert.start_time,
+                    concert.start_time.astimezone(timezone.utc).isoformat(),
                     concert.singer.full_name,
                     concert.venue.name))
 

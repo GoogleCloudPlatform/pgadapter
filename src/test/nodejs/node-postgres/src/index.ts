@@ -159,6 +159,9 @@ async function testSelectAllTypes(client) {
   pg.types.setTypeParser(1082, function(stringValue) {
     return stringValue;
   });
+  pg.types.setTypeParser(1182, function(stringValue) {
+    return stringValue;
+  });
   try {
     const queryText = 'SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb ' +
         'FROM AllTypes';

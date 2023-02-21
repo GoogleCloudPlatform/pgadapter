@@ -480,7 +480,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
             + "\"col_array_int\":[\"-100\",null,\"-200\"],"
             + "\"col_array_numeric\":[6.626,null,-3.14],"
             + "\"col_array_timestamptz\":[\"2022-02-16T16:18:02.123Z\",null,\"2000-01-01T00:00:00.000Z\"],"
-            + "\"col_array_date\":[\"2023-02-19T23:00:00.000Z\",null,\"1999-12-31T23:00:00.000Z\"],"
+            + "\"col_array_date\":\"{\\\"2023-02-20\\\",NULL,\\\"2000-01-01\\\"}\","
             + "\"col_array_varchar\":[\"string1\",null,\"string2\"],"
             + "\"col_array_jsonb\":[{\"key\":\"value1\"},null,{\"key\":\"value2\"}]}\n",
         output);
