@@ -65,10 +65,15 @@ public class PgCatalog {
   private static final ImmutableMap<Pattern, Supplier<String>> DEFAULT_FUNCTION_REPLACEMENTS =
       ImmutableMap.of(
           Pattern.compile("pg_catalog.pg_table_is_visible\\s*\\(.+\\)"),
-              Suppliers.ofInstance("true"),
-          Pattern.compile("pg_table_is_visible\\s*\\(.+\\)"), Suppliers.ofInstance("true"),
+          Suppliers.ofInstance("true"),
+          Pattern.compile("pg_table_is_visible\\s*\\(.+\\)"),
+          Suppliers.ofInstance("true"),
           Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(true\\)\\)"),
-              Suppliers.ofInstance(" IN ('pg_catalog', 'public')"));
+          Suppliers.ofInstance(" IN ('pg_catalog', 'public')"),
+          Pattern.compile("oid::regtype::text AS regtype"),
+          Suppliers.ofInstance("'' as regtype"),
+          Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
+          Suppliers.ofInstance("WHERE t.typname = \\$1"));
 
   private final ImmutableSet<String> checkPrefixes;
 

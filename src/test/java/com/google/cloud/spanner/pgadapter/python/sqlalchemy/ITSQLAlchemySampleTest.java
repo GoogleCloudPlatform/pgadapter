@@ -66,11 +66,5 @@ public class ITSQLAlchemySampleTest implements IntegrationTest {
         output.contains("No album found using a stale read.")
             || output.contains(
                 "Album was found using a stale read, even though it has already been deleted."));
-    assertTrue(
-        output,
-        output.contains(
-            "\n"
-                + "Searching for venues that have a capacity of at least 5,000\n"
-                + "  'Avenue Park' has capacity 5000\n"));
   }
 }

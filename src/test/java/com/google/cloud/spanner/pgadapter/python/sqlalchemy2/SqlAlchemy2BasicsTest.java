@@ -94,7 +94,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
             + PG_TYPE_PREFIX
             + "\nSELECT\n"
             + "    typname AS name, oid, typarray AS array_oid,\n"
-            + "    oid::regtype::text AS regtype, typdelim AS delimiter\n"
+            + "    '' as regtype, typdelim AS delimiter\n"
             + "FROM pg_type t\n"
             + "WHERE t.oid = to_regtype($1)\n"
             + "ORDER BY t.oid\n";
