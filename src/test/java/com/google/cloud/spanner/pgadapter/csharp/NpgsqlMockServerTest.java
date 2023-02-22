@@ -569,8 +569,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   public void testBinaryCopyOut() throws IOException, InterruptedException {
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(
-                "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb from all_types"),
+            Statement.of("select * from all_types"),
             ALL_TYPES_RESULTSET
                 .toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
@@ -588,8 +587,7 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   public void testTextCopyOut() throws IOException, InterruptedException {
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(
-                "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb from all_types"),
+            Statement.of("select * from all_types"),
             ALL_TYPES_RESULTSET
                 .toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
