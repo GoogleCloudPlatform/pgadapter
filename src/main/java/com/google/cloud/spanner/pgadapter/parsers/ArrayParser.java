@@ -40,6 +40,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.text.StringEscapeUtils;
 import org.postgresql.core.Oid;
 import org.postgresql.util.ByteConverter;
@@ -165,8 +166,11 @@ public class ArrayParser extends Parser<List<?>> {
   }
 
   /** Converts the given binary array value into a list of objects. */
-  public static List<?> binaryArrayToList(byte[] value, boolean convertToValidSpannerElements) {
-    Preconditions.checkNotNull(value);
+  public static List<?> binaryArrayToList(
+      @Nullable byte[] value, boolean convertToValidSpannerElements) {
+    if (value == null) {
+      return null;
+    }
     byte[] buffer = new byte[20];
     try (DataInputStream dataStream = new DataInputStream(new ByteArrayInputStream(value))) {
       dataStream.readFully(buffer);
