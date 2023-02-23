@@ -448,6 +448,21 @@ public class ArrayParserTest {
     assertNull(ArrayParser.binaryArrayToList(null, true));
   }
 
+  @Test
+  public void testNullTextArray() {
+    assertNull(
+        ArrayParser.stringArrayToList(
+            null, Oid.UNSPECIFIED, false, mock(SessionState.class), false));
+    assertNull(
+        ArrayParser.stringArrayToList(
+            null, Oid.UNSPECIFIED, false, mock(SessionState.class), true));
+    assertNull(
+        ArrayParser.stringArrayToList(
+            null, Oid.UNSPECIFIED, true, mock(SessionState.class), false));
+    assertNull(
+        ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, true, mock(SessionState.class), true));
+  }
+
   static ResultSet createArrayResultSet(Type arrayElementType, Value value) {
     ResultSet resultSet =
         ResultSets.forRows(

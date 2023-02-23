@@ -136,12 +136,14 @@ public class ArrayParser extends Parser<List<?>> {
 
   /** Converts an array literal to the corresponding list of objects. */
   public static List<?> stringArrayToList(
-      String value,
+      @Nullable String value,
       int elementOid,
       boolean isStringEquivalent,
       SessionState sessionState,
       boolean convertToValidSpannerElements) {
-    Preconditions.checkNotNull(value);
+    if (value == null) {
+      return null;
+    }
     List<String> values =
         SimpleParser.readArrayLiteral(value, isStringEquivalent, elementOid == Oid.BYTEA);
     ArrayList<Object> result = new ArrayList<>(values.size());

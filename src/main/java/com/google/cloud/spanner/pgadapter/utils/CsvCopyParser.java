@@ -170,67 +170,49 @@ class CsvCopyParser implements CopyInParser {
             switch (type.getArrayElementType().getCode()) {
               case STRING:
                 return Value.stringArray(
-                    recordValue == null
-                        ? null
-                        : cast(
-                            ArrayParser.stringArrayToList(
-                                recordValue, Oid.TEXT, false, sessionState, true)));
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.TEXT, false, sessionState, true)));
               case PG_JSONB:
                 return Value.pgJsonbArray(
-                    recordValue == null
-                        ? null
-                        : cast(
-                            ArrayParser.stringArrayToList(
-                                recordValue, Oid.JSONB, false, sessionState, true)));
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.JSONB, false, sessionState, true)));
               case BOOL:
                 return Value.boolArray(
-                    recordValue == null
-                        ? null
-                        : cast(
-                            ArrayParser.stringArrayToList(
-                                recordValue, Oid.BOOL, false, sessionState, true)));
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.BOOL, false, sessionState, true)));
               case INT64:
                 return Value.int64Array(
-                    recordValue == null
-                        ? null
-                        : cast(
-                            ArrayParser.stringArrayToList(
-                                recordValue, Oid.INT8, false, sessionState, true)));
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.INT8, false, sessionState, true)));
               case FLOAT64:
                 return Value.float64Array(
-                    recordValue == null
-                        ? null
-                        : cast(
-                            ArrayParser.stringArrayToList(
-                                recordValue, Oid.FLOAT8, false, sessionState, true)));
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.FLOAT8, false, sessionState, true)));
               case PG_NUMERIC:
                 return Value.pgNumericArray(
-                    recordValue == null
-                        ? null
-                        : cast(
-                            ArrayParser.stringArrayToList(
-                                recordValue, Oid.NUMERIC, false, sessionState, true)));
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.NUMERIC, false, sessionState, true)));
               case BYTES:
                 return Value.bytesArray(
-                    recordValue == null
-                        ? null
-                        : cast(
-                            ArrayParser.stringArrayToList(
-                                recordValue, Oid.BYTEA, false, sessionState, true)));
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.BYTEA, false, sessionState, true)));
               case DATE:
                 return Value.dateArray(
-                    recordValue == null
-                        ? null
-                        : cast(
-                            ArrayParser.stringArrayToList(
-                                recordValue, Oid.DATE, false, sessionState, true)));
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.DATE, false, sessionState, true)));
               case TIMESTAMP:
                 return Value.timestampArray(
-                    recordValue == null
-                        ? null
-                        : cast(
-                            ArrayParser.stringArrayToList(
-                                recordValue, Oid.TIMESTAMPTZ, false, sessionState, true)));
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.TIMESTAMPTZ, false, sessionState, true)));
             }
           default:
             SpannerException spannerException =
