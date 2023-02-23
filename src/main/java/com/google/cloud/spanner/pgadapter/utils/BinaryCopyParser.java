@@ -286,50 +286,23 @@ class BinaryCopyParser implements CopyInParser {
         case ARRAY:
           switch (type.getArrayElementType().getCode()) {
             case STRING:
-              return Value.stringArray(
-                  field.data == null
-                      ? null
-                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+              return Value.stringArray(cast(ArrayParser.binaryArrayToList(field.data, true)));
             case PG_JSONB:
-              return Value.pgJsonbArray(
-                  field.data == null
-                      ? null
-                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+              return Value.pgJsonbArray(cast(ArrayParser.binaryArrayToList(field.data, true)));
             case BOOL:
-              return Value.boolArray(
-                  field.data == null
-                      ? null
-                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+              return Value.boolArray(cast(ArrayParser.binaryArrayToList(field.data, true)));
             case INT64:
-              return Value.int64Array(
-                  field.data == null
-                      ? null
-                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+              return Value.int64Array(cast(ArrayParser.binaryArrayToList(field.data, true)));
             case FLOAT64:
-              return Value.float64Array(
-                  field.data == null
-                      ? null
-                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+              return Value.float64Array(cast(ArrayParser.binaryArrayToList(field.data, true)));
             case PG_NUMERIC:
-              return Value.pgNumericArray(
-                  field.data == null
-                      ? null
-                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+              return Value.pgNumericArray(cast(ArrayParser.binaryArrayToList(field.data, true)));
             case BYTES:
-              return Value.bytesArray(
-                  field.data == null
-                      ? null
-                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+              return Value.bytesArray(cast(ArrayParser.binaryArrayToList(field.data, true)));
             case DATE:
-              return Value.dateArray(
-                  field.data == null
-                      ? null
-                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+              return Value.dateArray(cast(ArrayParser.binaryArrayToList(field.data, true)));
             case TIMESTAMP:
-              return Value.timestampArray(
-                  field.data == null
-                      ? null
-                      : cast(ArrayParser.binaryArrayToList(field.data, true)));
+              return Value.timestampArray(cast(ArrayParser.binaryArrayToList(field.data, true)));
           }
         case STRUCT:
         case NUMERIC:
