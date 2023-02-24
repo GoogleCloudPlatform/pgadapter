@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.17.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.16.0...v0.17.0) (2023-02-24)
+
+
+### Features
+
+* allow timestamp param values in brackets ([#661](https://github.com/GoogleCloudPlatform/pgadapter/issues/661)) ([f84235f](https://github.com/GoogleCloudPlatform/pgadapter/commit/f84235ff5bfc372a1d11c191b1743ac3a29ba41b))
+* support ARRAY typed query parameters ([#653](https://github.com/GoogleCloudPlatform/pgadapter/issues/653)) ([104c200](https://github.com/GoogleCloudPlatform/pgadapter/commit/104c20035c93060352f4832d4d2e6be876fa11c7))
+
+
+### Bug Fixes
+
+* support 'localtime' as a timezone ([#625](https://github.com/GoogleCloudPlatform/pgadapter/issues/625)) ([f9973f1](https://github.com/GoogleCloudPlatform/pgadapter/commit/f9973f1e51946b6635b224bd8ebdeb9099cb53ce))
+
+
+### Performance Improvements
+
+* do not create a transaction for describe+execute ([#660](https://github.com/GoogleCloudPlatform/pgadapter/issues/660)) ([e3856ce](https://github.com/GoogleCloudPlatform/pgadapter/commit/e3856ce0e8963cf16cb84ce48e79a3ea39aebd0c))
+
+
+### Documentation
+
+* add example for using stale reads ([#643](https://github.com/GoogleCloudPlatform/pgadapter/issues/643)) ([a8022c2](https://github.com/GoogleCloudPlatform/pgadapter/commit/a8022c2063a102bf0c0471f399ed610c797301de))
+* added jsonb in the sample ([#647](https://github.com/GoogleCloudPlatform/pgadapter/issues/647)) ([01785fa](https://github.com/GoogleCloudPlatform/pgadapter/commit/01785fabd5d556da7237cf9d368cbd168eeea690))
+* emphasize that internal debugging is for internal use ([#612](https://github.com/GoogleCloudPlatform/pgadapter/issues/612)) ([005b7f0](https://github.com/GoogleCloudPlatform/pgadapter/commit/005b7f049a69d86986501d8688c8cd2af7a6de49))
+
+
+### Dependencies
+
+* add dependabot for ecosystem tests and samples ([#675](https://github.com/GoogleCloudPlatform/pgadapter/issues/675)) ([3a6ee4e](https://github.com/GoogleCloudPlatform/pgadapter/commit/3a6ee4e5733e03c0db8c6b968b778224b935b380))
+* bump node-postgres to 8.9.0 ([#663](https://github.com/GoogleCloudPlatform/pgadapter/issues/663)) ([ee436f0](https://github.com/GoogleCloudPlatform/pgadapter/commit/ee436f074f3d8aa28244deab9fd375de47b37b45))
+* setup dependabot for npgsql tests ([#668](https://github.com/GoogleCloudPlatform/pgadapter/issues/668)) ([e85d38c](https://github.com/GoogleCloudPlatform/pgadapter/commit/e85d38c881c38bb0faa8d41c0778f1f53dd92b73))
+
 ## [0.16.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.15.0...v0.16.0) (2023-02-05)
 
 
