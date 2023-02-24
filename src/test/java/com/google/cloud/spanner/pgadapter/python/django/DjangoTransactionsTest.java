@@ -20,18 +20,9 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
-import com.google.protobuf.ListValue;
-import com.google.protobuf.Value;
 import com.google.spanner.v1.CommitRequest;
-import com.google.spanner.v1.ResultSet;
-import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.RollbackRequest;
-import com.google.spanner.v1.StructType;
-import com.google.spanner.v1.StructType.Field;
-import com.google.spanner.v1.Type;
-import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
@@ -52,44 +43,8 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
     return ImmutableList.of(new Object[] {"localhost"}, new Object[] {"/tmp"});
   }
 
-  private ResultSet createResultSet(List<String> rows) {
-    ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();
-
-    resultSetBuilder.setMetadata(
-        ResultSetMetadata.newBuilder()
-            .setRowType(
-                StructType.newBuilder()
-                    .addFields(
-                        Field.newBuilder()
-                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
-                            .setName("singerid")
-                            .build())
-                    .addFields(
-                        Field.newBuilder()
-                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                            .setName("firstname")
-                            .build())
-                    .addFields(
-                        Field.newBuilder()
-                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                            .setName("lastname")
-                            .build())
-                    .build())
-            .build());
-    for (int i = 0; i < rows.size(); i += 3) {
-      String singerid = rows.get(i), firstname = rows.get(i + 1), lastname = rows.get(i + 2);
-      resultSetBuilder.addRows(
-          ListValue.newBuilder()
-              .addValues(Value.newBuilder().setStringValue(singerid).build())
-              .addValues(Value.newBuilder().setStringValue(firstname).build())
-              .addValues(Value.newBuilder().setStringValue(lastname).build())
-              .build());
-    }
-    return resultSetBuilder.build();
-  }
-
   @Test
-  public void transactionCommitTest() throws IOException, InterruptedException {
+  public void transactionCommitTest() throws Exception {
 
     String updateSQL1 =
         "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
@@ -116,7 +71,7 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void transactionRollbackTest() throws IOException, InterruptedException {
+  public void transactionRollbackTest() throws Exception {
 
     String updateSQL1 =
         "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
@@ -144,7 +99,7 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void transactionAtomicTest() throws IOException, InterruptedException {
+  public void transactionAtomicTest() throws Exception {
 
     String updateSQL1 =
         "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
@@ -171,7 +126,7 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void transactionNestedAtomicTest() throws IOException, InterruptedException {
+  public void transactionNestedAtomicTest() throws Exception {
 
     String updateSQL1 =
         "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
@@ -198,7 +153,7 @@ public class DjangoTransactionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void transactionErrorTest() throws IOException, InterruptedException {
+  public void transactionErrorTest() throws Exception {
 
     String updateSQL1 =
         "UPDATE \"singers\" SET \"firstname\" = 'hello', \"lastname\" = 'world' WHERE \"singers\".\"singerid\" = 1";
