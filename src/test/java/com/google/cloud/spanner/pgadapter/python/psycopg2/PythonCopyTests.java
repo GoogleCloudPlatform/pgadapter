@@ -33,13 +33,12 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
-import java.io.IOException;
 import java.util.List;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
 @Category(PythonTest.class)
-public class PythonCopyTests extends PythonTestSetup {
+public class PythonCopyTests extends AbstractPsycopg2Test {
 
   private static ResultSet createResultSet() {
     ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();
@@ -125,7 +124,7 @@ public class PythonCopyTests extends PythonTestSetup {
   }
 
   @Test
-  public void copyFromTest() throws IOException, InterruptedException {
+  public void copyFromTest() throws Exception {
     String sql = "COPY test from STDIN CSV DELIMITER ','";
     String copyType = "FROM";
     String file = "1,hello\n2,world\n";
@@ -168,13 +167,13 @@ public class PythonCopyTests extends PythonTestSetup {
   }
 
   @Test
-  public void copySimpleFromTest() throws IOException, InterruptedException {
+  public void copySimpleFromTest() throws Exception {
     // Python copy_from generates this statement:
     String sql = "COPY \"test\" FROM stdin WITH DELIMITER AS '\t' NULL AS '\\N'";
     String copyType = "SIMPLE_FROM";
     String file = "1\thello\n2\tworld\n";
     String sql1 =
-        "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2";
+        "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ";
     String sql2 =
         "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema=$1 and table_name=$2 and column_name in ($3, $4)";
     Statement s1 = Statement.newBuilder(sql1).bind("p1").to("public").bind("p2").to("test").build();
@@ -214,7 +213,7 @@ public class PythonCopyTests extends PythonTestSetup {
   }
 
   @Test
-  public void copySimpleToTest() throws IOException, InterruptedException {
+  public void copySimpleToTest() throws Exception {
     // Python copy_to generates this statement:
     String sql = "COPY \"test\" TO stdout WITH DELIMITER AS '\t' NULL AS '\\N'";
     String copyType = "SIMPLE_TO";
@@ -251,7 +250,7 @@ public class PythonCopyTests extends PythonTestSetup {
   }
 
   @Test
-  public void copyToTest() throws IOException, InterruptedException {
+  public void copyToTest() throws Exception {
     String sql = "COPY test TO STDOUT DELIMITER ','";
     String copyType = "TO";
     String file = "does not matter";

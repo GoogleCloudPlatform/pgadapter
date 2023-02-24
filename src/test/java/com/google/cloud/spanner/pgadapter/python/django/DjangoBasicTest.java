@@ -15,6 +15,8 @@
 package com.google.cloud.spanner.pgadapter.python.django;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
@@ -22,6 +24,7 @@ import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
@@ -193,12 +196,36 @@ public class DjangoBasicTest extends DjangoTestSetup {
   public void testInsertAllTypes() throws IOException, InterruptedException {
 
     String sqlUpdate =
-        "UPDATE \"all_types\" SET \"col_bool\" = true, \"col_bytea\" = '\\x68656c6c6f'::bytea, \"col_float8\" = 26.8, \"col_int\" = 13, \"col_numeric\" = 95.6000000000000, \"col_timestamptz\" = '2018-12-25T09:29:36+00:00'::timestamptz, \"col_date\" = '1998-10-02'::date, \"col_varchar\" = 'some text' WHERE \"all_types\".\"col_bigint\" = 6";
+        "UPDATE \"all_types\" "
+            + "SET \"col_bool\" = true, "
+            + "\"col_bytea\" = '\\x68656c6c6f'::bytea, "
+            + "\"col_float8\" = 26.8, "
+            + "\"col_int\" = 13, "
+            + "\"col_numeric\" = 95.6000000000000, "
+            + "\"col_timestamptz\" = '2018-12-25T09:29:36+00:00'::timestamptz, "
+            + "\"col_date\" = '1998-10-02'::date, "
+            + "\"col_varchar\" = 'some text', "
+            + "\"col_jsonb\" = '{\"key\": \"value\"}' "
+            + "WHERE \"all_types\".\"col_bigint\" = 6";
     String sqlInsert =
-        "INSERT INTO \"all_types\" (\"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\") VALUES (6, true, '\\x68656c6c6f'::bytea, 26.8, 13, 95.6000000000000, '2018-12-25T09:29:36+00:00'::timestamptz, '1998-10-02'::date, 'some text')";
-
-    List<String> result =
-        new ArrayList<>(Arrays.asList("1", "hello", "world", "2", "hello", "django"));
+        "INSERT INTO \"all_types\" "
+            + "(\"col_bigint\", "
+            + "\"col_bool\", "
+            + "\"col_bytea\", "
+            + "\"col_float8\", "
+            + "\"col_int\", "
+            + "\"col_numeric\", "
+            + "\"col_timestamptz\", "
+            + "\"col_date\", "
+            + "\"col_varchar\", "
+            + "\"col_jsonb\") "
+            + "VALUES (6, "
+            + "true, "
+            + "'\\x68656c6c6f'::bytea, 26.8, 13, "
+            + "95.6000000000000, "
+            + "'2018-12-25T09:29:36+00:00'::timestamptz, '1998-10-02'::date, "
+            + "'some text', "
+            + "'{\"key\": \"value\"}')";
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlUpdate), 0));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlInsert), 1));
@@ -216,10 +243,18 @@ public class DjangoBasicTest extends DjangoTestSetup {
   public void testInsertAllTypesAllNull() throws IOException, InterruptedException {
 
     String sqlInsert =
-        "INSERT INTO \"all_types\" (\"col_bigint\", \"col_bool\", \"col_bytea\", \"col_float8\", \"col_int\", \"col_numeric\", \"col_timestamptz\", \"col_date\", \"col_varchar\") VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)";
-
-    List<String> result =
-        new ArrayList<>(Arrays.asList("1", "hello", "world", "2", "hello", "django"));
+        "INSERT INTO \"all_types\" "
+            + "(\"col_bigint\", "
+            + "\"col_bool\", "
+            + "\"col_bytea\", "
+            + "\"col_float8\", "
+            + "\"col_int\", "
+            + "\"col_numeric\", "
+            + "\"col_timestamptz\", "
+            + "\"col_date\", "
+            + "\"col_varchar\", "
+            + "\"col_jsonb\") "
+            + "VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)";
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlInsert), 1));
     String expectedOutput = "Insert Successful\n";
@@ -228,6 +263,102 @@ public class DjangoBasicTest extends DjangoTestSetup {
     assertEquals(expectedOutput, actualOutput);
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
-    assertEquals(sqlInsert, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+
+    assertNotNull(request.getTransaction().getBegin());
+    assertTrue(request.getTransaction().hasBegin());
+    assertTrue(request.getTransaction().getBegin().hasReadWrite());
+    assertEquals(sqlInsert, request.getSql());
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testSelectAllNull() throws IOException, InterruptedException {
+
+    String sqlQuery =
+        "SELECT "
+            + "\"all_types\".\"col_bigint\", "
+            + "\"all_types\".\"col_bool\", "
+            + "\"all_types\".\"col_bytea\", "
+            + "\"all_types\".\"col_float8\", "
+            + "\"all_types\".\"col_int\", "
+            + "\"all_types\".\"col_numeric\", "
+            + "\"all_types\".\"col_timestamptz\", "
+            + "\"all_types\".\"col_date\", "
+            + "\"all_types\".\"col_varchar\", "
+            + "\"all_types\".\"col_jsonb\" "
+            + "FROM \"all_types\" "
+            + "WHERE "
+            + "(\"all_types\".\"col_bigint\" IS NULL AND "
+            + "\"all_types\".\"col_bool\" IS NULL AND "
+            + "\"all_types\".\"col_bytea\" IS NULL AND "
+            + "\"all_types\".\"col_date\" IS NULL AND "
+            + "\"all_types\".\"col_float8\" IS NULL AND "
+            + "\"all_types\".\"col_int\" IS NULL AND "
+            + "\"all_types\".\"col_jsonb\" = 'null' AND "
+            + "\"all_types\".\"col_numeric\" IS NULL AND "
+            + "\"all_types\".\"col_timestamptz\" IS NULL AND "
+            + "\"all_types\".\"col_varchar\" IS NULL)";
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(sqlQuery), ALL_TYPES_NULLS_RESULTSET));
+
+    String expectedOutput =
+        "{'col_bigint': None, "
+            + "'col_bool': None, "
+            + "'col_bytea': None, "
+            + "'col_float8': None, "
+            + "'col_int': None, "
+            + "'col_numeric': None, "
+            + "'col_timestamptz': None, "
+            + "'col_date': None, "
+            + "'col_varchar': None, "
+            + "'col_jsonb': None}\n";
+    List<String> options = new ArrayList<>(Arrays.asList("select_all_null"));
+    String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    assertEquals(sqlQuery, mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0).getSql());
+  }
+
+  @Test
+  public void testSelectAllTypes() throws IOException, InterruptedException {
+
+    String sqlQuery =
+        "SELECT \"all_types\".\"col_bigint\", "
+            + "\"all_types\".\"col_bool\", "
+            + "\"all_types\".\"col_bytea\", "
+            + "\"all_types\".\"col_float8\", "
+            + "\"all_types\".\"col_int\", "
+            + "\"all_types\".\"col_numeric\", "
+            + "\"all_types\".\"col_timestamptz\", "
+            + "\"all_types\".\"col_date\", "
+            + "\"all_types\".\"col_varchar\", "
+            + "\"all_types\".\"col_jsonb\" "
+            + "FROM \"all_types\"";
+
+    ResultSet resultSet = createAllTypesResultSet("", true);
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sqlQuery), resultSet));
+    System.out.println(resultSet.getRows(0).getValues(6).getStringValue());
+    String expectedOutput =
+        "col_bigint : 1 , "
+            + "col_bool : True , "
+            + "col_bytea : b'test' , "
+            + "col_float8 : 3.14 , "
+            + "col_int : 100 , "
+            + "col_numeric : 6.626 , "
+            + "col_timestamptz : 2022-02-16 13:18:02.123456+00:00 , "
+            + "col_date : 2022-03-29 , "
+            + "col_varchar : test , "
+            + "col_jsonb : {'key': 'value'} , \n";
+    List<String> options = new ArrayList<>(Arrays.asList("select_all_types"));
+    String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasSingleUse());
+    assertEquals(sqlQuery, request.getSql());
   }
 }
