@@ -19,6 +19,7 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
+import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -49,11 +50,12 @@ public class ITDjangoTest extends DjangoTestSetup {
           "python has not been set up on this system and allowSkipUnsupportedEcosystemTest has not been set");
     }
 
+    PythonTestUtil.createVirtualEnv(DJANGO_SAMPLES_PATH);
     testEnv.setUp();
     Database database = testEnv.createDatabase(Collections.emptyList());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
 
-    // Update Django setting.py fiel with the PG Adapter Port.properties
+    // Update Django setting.py file with the PG Adapter Port.properties
     StringBuilder original = new StringBuilder();
     try (Scanner scanner = new Scanner(new FileReader(DJANGO_SETTING_FILE))) {
       while (scanner.hasNextLine()) {
@@ -79,7 +81,7 @@ public class ITDjangoTest extends DjangoTestSetup {
   }
 
   @Test
-  public void test() throws Exception {
+  public void testRunSample() throws Exception {
     String actualOutput = executeIntegrationTests();
     String expectedOutput = "Django Sample Completed Successfully\n";
     assertTrue(actualOutput, actualOutput.contains(expectedOutput));

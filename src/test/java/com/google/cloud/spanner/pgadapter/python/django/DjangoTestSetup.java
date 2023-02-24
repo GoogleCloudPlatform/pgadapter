@@ -128,7 +128,7 @@ public class DjangoTestSetup extends AbstractMockServerTest {
   }
 
   static final String DJANGO_UNIT_PATH = "./src/test/python/django";
-  private static final String DJANGO_IT_PATH = "./samples/python/django";
+  static final String DJANGO_SAMPLES_PATH = "./samples/python/django";
 
   private static String execute(
       int port, String host, List<String> options, String testFileName, String djangoPath)
@@ -170,6 +170,6 @@ public class DjangoTestSetup extends AbstractMockServerTest {
   }
 
   public String executeIntegrationTests() throws Exception {
-    return execute(0, "", Collections.emptyList(), "sample.py", DJANGO_IT_PATH);
+    return execute(0, "", Collections.emptyList(), "sample.py", DJANGO_SAMPLES_PATH);
   }
 }
