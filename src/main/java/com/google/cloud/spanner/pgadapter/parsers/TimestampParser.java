@@ -161,11 +161,19 @@ public class TimestampParser extends Parser<Timestamp> {
 
   static String stripBracketsAndQuotes(@Nonnull String value) {
     while (value.length() > 1
-        && (value.charAt(0) == '(' || value.charAt(0) == '"' || value.charAt(0) == '\'')) {
+        && (value.charAt(0) == '('
+            || value.charAt(0) == '"'
+            || value.charAt(0) == '\''
+            || Character.isWhitespace(value.charAt(0))
+            || Character.isWhitespace(value.charAt(value.length() - 1)))) {
       if (value.charAt(value.length() - 1) == value.charAt(0)) {
         value = value.substring(1, value.length() - 1);
       } else if (value.charAt(0) == '(' && value.charAt(value.length() - 1) == ')') {
         value = value.substring(1, value.length() - 1);
+      } else if (Character.isWhitespace(value.charAt(0))) {
+        value = value.substring(1);
+      } else if (Character.isWhitespace(value.charAt(value.length() - 1))) {
+        value = value.substring(0, value.length() - 1);
       } else {
         break;
       }
