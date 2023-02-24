@@ -22,6 +22,7 @@ import com.google.cloud.spanner.RandomResultSetGenerator;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
+import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
@@ -33,9 +34,7 @@ import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
-import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -49,6 +48,7 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 @Category(PythonTest.class)
 public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
+  static final String DIRECTORY_NAME = "./src/test/python/sqlalchemy";
 
   @Parameter public String host;
 
@@ -57,68 +57,40 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
     return ImmutableList.of(new Object[] {"localhost"}, new Object[] {""});
   }
 
-  static String execute(String script, String host, int port)
-      throws IOException, InterruptedException {
-    return execute("./src/test/python/sqlalchemy", script, host, port);
+  static String execute(String script, String host, int port) throws Exception {
+    return execute(DIRECTORY_NAME, script, host, port, null);
   }
 
-  static String execute(String directory, String script, String host, int port)
-      throws IOException, InterruptedException {
-    return execute(directory, script, host, port, null);
+  static String execute(String directoryName, String script, String host, int port)
+      throws Exception {
+    return execute(directoryName, script, host, port, null);
   }
 
-  static String execute(String directory, String script, String host, int port, String database)
-      throws IOException, InterruptedException {
-    String[] runCommand =
+  static String execute(String directoryName, String script, String host, int port, String database)
+      throws Exception {
+    File directory = new File(directoryName);
+    return PythonTestUtil.run(
         new String[] {
-          "python3", script, host, Integer.toString(port), database == null ? "d" : database
-        };
-    ProcessBuilder builder = new ProcessBuilder();
-    builder.command(runCommand);
-    builder.directory(new File(directory));
-    Process process = builder.start();
-    Scanner scanner = new Scanner(process.getInputStream());
-    Scanner errorScanner = new Scanner(process.getErrorStream());
-
-    StringBuilder output = new StringBuilder();
-    while (scanner.hasNextLine()) {
-      output.append(scanner.nextLine()).append("\n");
-    }
-    StringBuilder error = new StringBuilder();
-    while (errorScanner.hasNextLine()) {
-      error.append(errorScanner.nextLine()).append("\n");
-    }
-    int result = process.waitFor();
-    assertEquals(error.toString(), 0, result);
-
-    return output.toString();
+          directory.getAbsolutePath() + "/venv/bin/python",
+          script,
+          host,
+          Integer.toString(port),
+          database == null ? "d" : database
+        },
+        directoryName);
   }
 
   @BeforeClass
-  public static void setupBaseResults() {
+  public static void setupBaseResults() throws Exception {
+    setupBaseResults(DIRECTORY_NAME);
+  }
+
+  public static void setupBaseResults(String directory) throws Exception {
+    PythonTestUtil.createVirtualEnv(directory);
     String selectHstoreType =
-        "with pg_namespace as (\n"
-            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-            + "  from information_schema.schemata\n"
-            + "),\n"
-            + "pg_type as (\n"
-            + "  select 16 as oid, 'bool' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 1 as typlen, true as typbyval, 'b' as typtype, 'B' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1000 as typarray, 'boolin' as typinput, 'boolout' as typoutput, 'boolrecv' as typreceive, 'boolsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 17 as oid, 'bytea' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1001 as typarray, 'byteain' as typinput, 'byteaout' as typoutput, 'bytearecv' as typreceive, 'byteasend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 20 as oid, 'int8' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1016 as typarray, 'int8in' as typinput, 'int8out' as typoutput, 'int8recv' as typreceive, 'int8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 21 as oid, 'int2' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 2 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1005 as typarray, 'int2in' as typinput, 'int2out' as typoutput, 'int2recv' as typreceive, 'int2send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 's' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 23 as oid, 'int4' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1007 as typarray, 'int4in' as typinput, 'int4out' as typoutput, 'int4recv' as typreceive, 'int4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 25 as oid, 'text' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1009 as typarray, 'textin' as typinput, 'textout' as typoutput, 'textrecv' as typreceive, 'textsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 700 as oid, 'float4' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1021 as typarray, 'float4in' as typinput, 'float4out' as typoutput, 'float4recv' as typreceive, 'float4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 701 as oid, 'float8' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1022 as typarray, 'float8in' as typinput, 'float8out' as typoutput, 'float8recv' as typreceive, 'float8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 1043 as oid, 'varchar' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1015 as typarray, 'varcharin' as typinput, 'varcharout' as typoutput, 'varcharrecv' as typreceive, 'varcharsend' as typsend, 'varchartypmodin' as typmodin, 'varchartypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 1082 as oid, 'date' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1182 as typarray, 'date_in' as typinput, 'date_out' as typoutput, 'date_recv' as typreceive, 'date_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 1114 as oid, 'timestamp' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1115 as typarray, 'timestamp_in' as typinput, 'timestamp_out' as typoutput, 'timestamp_recv' as typreceive, 'timestamp_send' as typsend, 'timestamptypmodin' as typmodin, 'timestamptypmodout' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 1184 as oid, 'timestamptz' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1185 as typarray, 'timestamptz_in' as typinput, 'timestamptz_out' as typoutput, 'timestamptz_recv' as typreceive, 'timestamptz_send' as typsend, 'timestamptztypmodin' as typmodin, 'timestamptztypmodout' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 1700 as oid, 'numeric' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1231 as typarray, 'numeric_in' as typinput, 'numeric_out' as typoutput, 'numeric_recv' as typreceive, 'numeric_send' as typsend, 'numerictypmodin' as typmodin, 'numerictypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'm' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-            + "  select 3802 as oid, 'jsonb' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 3807 as typarray, 'jsonb_in' as typinput, 'jsonb_out' as typoutput, 'jsonb_recv' as typreceive, 'jsonb_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl\n"
-            + ")\n"
-            + "SELECT t.oid, typarray\n"
+        "with "
+            + PG_TYPE_PREFIX
+            + "\nSELECT t.oid, typarray\n"
             + "FROM pg_type t JOIN pg_namespace ns\n"
             + "    ON typnamespace = ns.oid\n"
             + "WHERE typname = 'hstore'";
@@ -131,7 +103,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testHelloWorld() throws IOException, InterruptedException {
+  public void testHelloWorld() throws Exception {
     String sql = "select 'hello world'";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -156,7 +128,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testSimpleInsert() throws IOException, InterruptedException {
+  public void testSimpleInsert() throws Exception {
     String sql1 = "INSERT INTO test VALUES (1, 'One')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 1L));
     String sql2 = "INSERT INTO test VALUES (2, 'Two')";
@@ -178,7 +150,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testEngineBegin() throws IOException, InterruptedException {
+  public void testEngineBegin() throws Exception {
     String sql1 = "INSERT INTO test VALUES (3, 'Three')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 1L));
     String sql2 = "INSERT INTO test VALUES (4, 'Four')";
@@ -200,7 +172,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testSessionExecute() throws IOException, InterruptedException {
+  public void testSessionExecute() throws Exception {
     String sql1 = "UPDATE test SET value='one' WHERE id=1";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 1L));
     String sql2 = "UPDATE test SET value='two' WHERE id=2";
@@ -353,7 +325,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCoreInsert() throws IOException, InterruptedException {
+  public void testCoreInsert() throws Exception {
     String sql =
         "INSERT INTO user_account (name, fullname) VALUES "
             + "('spongebob', 'Spongebob Squarepants') RETURNING user_account.id";
@@ -385,7 +357,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCoreInsertFromSelect() throws IOException, InterruptedException {
+  public void testCoreInsertFromSelect() throws Exception {
     String sql =
         "INSERT INTO address (user_id, email_address) "
             + "SELECT user_account.id, user_account.name || '@aol.com' AS anon_1 \n"
@@ -419,7 +391,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCoreSelect() throws IOException, InterruptedException {
+  public void testCoreSelect() throws Exception {
     String sql =
         "SELECT user_account.id, user_account.name, user_account.fullname \n"
             + "FROM user_account \n"
@@ -463,7 +435,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testAutoCommit() throws IOException, InterruptedException {
+  public void testAutoCommit() throws Exception {
     String sql =
         "SELECT user_account.id, user_account.name, user_account.fullname \n"
             + "FROM user_account \n"
@@ -539,7 +511,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
 
   @Ignore("requires DECLARE support, https://github.com/GoogleCloudPlatform/pgadapter/issues/510")
   @Test
-  public void testServerSideCursors() throws IOException, InterruptedException {
+  public void testServerSideCursors() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of("select * from random"), new RandomResultSetGenerator(100).generate()));

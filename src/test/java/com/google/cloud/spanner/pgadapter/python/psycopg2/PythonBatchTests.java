@@ -22,7 +22,6 @@ import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
@@ -34,7 +33,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 @Category(PythonTest.class)
 @RunWith(Parameterized.class)
-public class PythonBatchTests extends PythonTestSetup {
+public class PythonBatchTests extends AbstractPsycopg2Test {
 
   @Parameter public String pgVersion;
 
@@ -51,7 +50,7 @@ public class PythonBatchTests extends PythonTestSetup {
   }
 
   @Test
-  public void testInsertUsingExecuteMany() throws IOException, InterruptedException {
+  public void testInsertUsingExecuteMany() throws Exception {
     String sql = "INSERT INTO SOME_TABLE VALUES(%s, %s)";
     ArrayList<String> parameters = new ArrayList<>();
 
@@ -78,7 +77,7 @@ public class PythonBatchTests extends PythonTestSetup {
   }
 
   @Test
-  public void testInsertUsingExecuteBatch() throws IOException, InterruptedException {
+  public void testInsertUsingExecuteBatch() throws Exception {
     String sql = "INSERT INTO SOME_TABLE VALUES(%s, %s)";
     ArrayList<String> parameters = new ArrayList<>();
 
@@ -119,7 +118,7 @@ public class PythonBatchTests extends PythonTestSetup {
   }
 
   @Test
-  public void testInsertUsingExecuteValues() throws IOException, InterruptedException {
+  public void testInsertUsingExecuteValues() throws Exception {
     String sql = "INSERT INTO SOME_TABLE VALUES(%s)";
     ArrayList<String> parameters = new ArrayList<>();
 
@@ -143,8 +142,7 @@ public class PythonBatchTests extends PythonTestSetup {
   }
 
   @Test
-  public void testInsertUsingExecuteManyWithNamedParameters()
-      throws IOException, InterruptedException {
+  public void testInsertUsingExecuteManyWithNamedParameters() throws Exception {
     String sql = "INSERT INTO SOME_TABLE VALUES(%(VALUE1)s, %(VALUE2)s)";
     ArrayList<String> parameters = new ArrayList<>();
 
@@ -175,8 +173,7 @@ public class PythonBatchTests extends PythonTestSetup {
   }
 
   @Test
-  public void testInsertUsingExecuteBatchWithNamedParameters()
-      throws IOException, InterruptedException {
+  public void testInsertUsingExecuteBatchWithNamedParameters() throws Exception {
     String sql = "INSERT INTO SOME_TABLE VALUES(%(VALUE1)s, %(VALUE2)s)";
     ArrayList<String> parameters = new ArrayList<>();
 
