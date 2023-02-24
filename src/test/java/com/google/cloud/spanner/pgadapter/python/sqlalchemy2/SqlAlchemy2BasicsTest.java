@@ -96,7 +96,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
             + "    typname AS name, oid, typarray AS array_oid,\n"
             + "    '' as regtype, typdelim AS delimiter\n"
             + "FROM pg_type t\n"
-            + "WHERE t.oid = to_regtype($1)\n"
+            + "WHERE t.typname = $1\n"
             + "ORDER BY t.oid\n";
     ResultSet hstoreResultSet =
         ResultSet.newBuilder()
