@@ -22,6 +22,7 @@ import com.google.cloud.spanner.RandomResultSetGenerator;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
+import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
@@ -33,9 +34,7 @@ import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
-import java.util.Scanner;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -49,6 +48,7 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 @Category(PythonTest.class)
 public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
+  static final String DIRECTORY_NAME = "./src/test/python/sqlalchemy";
 
   @Parameter public String host;
 
@@ -57,45 +57,36 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
     return ImmutableList.of(new Object[] {"localhost"}, new Object[] {""});
   }
 
-  static String execute(String script, String host, int port)
-      throws IOException, InterruptedException {
-    return execute("./src/test/python/sqlalchemy", script, host, port);
+  static String execute(String script, String host, int port) throws Exception {
+    return execute(DIRECTORY_NAME, script, host, port, null);
   }
 
-  static String execute(String directory, String script, String host, int port)
-      throws IOException, InterruptedException {
-    return execute(directory, script, host, port, null);
+  static String execute(String directoryName, String script, String host, int port)
+      throws Exception {
+    return execute(directoryName, script, host, port, null);
   }
 
-  static String execute(String directory, String script, String host, int port, String database)
-      throws IOException, InterruptedException {
-    String[] runCommand =
+  static String execute(String directoryName, String script, String host, int port, String database)
+      throws Exception {
+    File directory = new File(directoryName);
+    return PythonTestUtil.run(
         new String[] {
-          "python3", script, host, Integer.toString(port), database == null ? "d" : database
-        };
-    ProcessBuilder builder = new ProcessBuilder();
-    builder.command(runCommand);
-    builder.directory(new File(directory));
-    Process process = builder.start();
-    Scanner scanner = new Scanner(process.getInputStream());
-    Scanner errorScanner = new Scanner(process.getErrorStream());
-
-    StringBuilder output = new StringBuilder();
-    while (scanner.hasNextLine()) {
-      output.append(scanner.nextLine()).append("\n");
-    }
-    StringBuilder error = new StringBuilder();
-    while (errorScanner.hasNextLine()) {
-      error.append(errorScanner.nextLine()).append("\n");
-    }
-    int result = process.waitFor();
-    assertEquals(error.toString(), 0, result);
-
-    return output.toString();
+          directory.getAbsolutePath() + "/venv/bin/python",
+          script,
+          host,
+          Integer.toString(port),
+          database == null ? "d" : database
+        },
+        directoryName);
   }
 
   @BeforeClass
-  public static void setupBaseResults() {
+  public static void setupBaseResults() throws Exception {
+    setupBaseResults(DIRECTORY_NAME);
+  }
+
+  public static void setupBaseResults(String directory) throws Exception {
+    PythonTestUtil.createVirtualEnv(directory);
     String selectHstoreType =
         "with "
             + PG_TYPE_PREFIX
@@ -112,7 +103,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testHelloWorld() throws IOException, InterruptedException {
+  public void testHelloWorld() throws Exception {
     String sql = "select 'hello world'";
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -137,7 +128,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testSimpleInsert() throws IOException, InterruptedException {
+  public void testSimpleInsert() throws Exception {
     String sql1 = "INSERT INTO test VALUES (1, 'One')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 1L));
     String sql2 = "INSERT INTO test VALUES (2, 'Two')";
@@ -159,7 +150,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testEngineBegin() throws IOException, InterruptedException {
+  public void testEngineBegin() throws Exception {
     String sql1 = "INSERT INTO test VALUES (3, 'Three')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 1L));
     String sql2 = "INSERT INTO test VALUES (4, 'Four')";
@@ -181,7 +172,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testSessionExecute() throws IOException, InterruptedException {
+  public void testSessionExecute() throws Exception {
     String sql1 = "UPDATE test SET value='one' WHERE id=1";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql1), 1L));
     String sql2 = "UPDATE test SET value='two' WHERE id=2";
@@ -334,7 +325,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCoreInsert() throws IOException, InterruptedException {
+  public void testCoreInsert() throws Exception {
     String sql =
         "INSERT INTO user_account (name, fullname) VALUES "
             + "('spongebob', 'Spongebob Squarepants') RETURNING user_account.id";
@@ -366,7 +357,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCoreInsertFromSelect() throws IOException, InterruptedException {
+  public void testCoreInsertFromSelect() throws Exception {
     String sql =
         "INSERT INTO address (user_id, email_address) "
             + "SELECT user_account.id, user_account.name || '@aol.com' AS anon_1 \n"
@@ -400,7 +391,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testCoreSelect() throws IOException, InterruptedException {
+  public void testCoreSelect() throws Exception {
     String sql =
         "SELECT user_account.id, user_account.name, user_account.fullname \n"
             + "FROM user_account \n"
@@ -444,7 +435,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testAutoCommit() throws IOException, InterruptedException {
+  public void testAutoCommit() throws Exception {
     String sql =
         "SELECT user_account.id, user_account.name, user_account.fullname \n"
             + "FROM user_account \n"
@@ -520,7 +511,7 @@ public class SqlAlchemyBasicsTest extends AbstractMockServerTest {
 
   @Ignore("requires DECLARE support, https://github.com/GoogleCloudPlatform/pgadapter/issues/510")
   @Test
-  public void testServerSideCursors() throws IOException, InterruptedException {
+  public void testServerSideCursors() throws Exception {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of("select * from random"), new RandomResultSetGenerator(100).generate()));

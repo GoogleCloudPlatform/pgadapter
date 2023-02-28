@@ -14,10 +14,10 @@
 
 package com.google.cloud.spanner.pgadapter.python.django;
 
-import static org.junit.Assert.assertEquals;
-
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
+import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.ResultSet;
@@ -27,15 +27,13 @@ import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Scanner;
 import org.junit.BeforeClass;
 
-public class DjangoTestSetup extends DjangoMockServerTest {
+public class DjangoTestSetup extends AbstractMockServerTest {
 
   public static ResultSet createResultSet(List<String> rows, int numCols) {
     ResultSet.Builder resultSetBuilder = ResultSet.newBuilder();
@@ -91,6 +89,11 @@ public class DjangoTestSetup extends DjangoMockServerTest {
   }
 
   @BeforeClass
+  public static void createVirtualEnv() throws Exception {
+    PythonTestUtil.createVirtualEnv(DJANGO_UNIT_PATH);
+  }
+
+  @BeforeClass
   public static void mockDriverInternalSql() {
     String unnecessarySql =
         "with "
@@ -124,63 +127,49 @@ public class DjangoTestSetup extends DjangoMockServerTest {
     }
   }
 
-  private static String DJANGO_UNIT_PATH = "./src/test/python/django";
-  private static String DJANGO_IT_PATH = "./samples/python/django";
+  static final String DJANGO_UNIT_PATH = "./src/test/python/django";
+  static final String DJANGO_SAMPLES_PATH = "./samples/python/django";
 
   private static String execute(
       int port, String host, List<String> options, String testFileName, String djangoPath)
-      throws IOException, InterruptedException {
+      throws Exception {
+    File directory = new File(djangoPath);
     List<String> runCommand =
-        new ArrayList<>(Arrays.asList("python3", testFileName, host, Integer.toString(port)));
+        new ArrayList<>(
+            Arrays.asList(
+                directory.getAbsolutePath() + "/venv/bin/python3",
+                testFileName,
+                host,
+                Integer.toString(port)));
     runCommand.addAll(options);
-    ProcessBuilder builder = new ProcessBuilder();
-    builder.command(runCommand);
-    builder.directory(new File(djangoPath));
-    Process process = builder.start();
-
-    Scanner errorScanner = new Scanner(process.getErrorStream());
-    StringBuilder error = new StringBuilder();
-    while (errorScanner.hasNextLine()) {
-      error.append(errorScanner.nextLine()).append("\n");
-    }
-
-    Scanner scanner = new Scanner(process.getInputStream());
-    StringBuilder output = new StringBuilder();
-    while (scanner.hasNextLine()) {
-      output.append(scanner.nextLine()).append("\n");
-    }
-    int result = process.waitFor();
-    assertEquals(error.toString(), 0, result);
-
-    return output.toString();
+    return PythonTestUtil.run(runCommand.toArray(new String[0]), djangoPath);
   }
 
-  public String executeBasicTests(int port, String host, List<String> options)
-      throws IOException, InterruptedException {
+  public String executeBasicTests(int port, String host, List<String> options) throws Exception {
     return execute(port, host, options, "basic_test.py", DJANGO_UNIT_PATH);
   }
 
   public String executeTransactionTests(int port, String host, List<String> options)
-      throws IOException, InterruptedException {
+      throws Exception {
     return execute(port, host, options, "transaction_test.py", DJANGO_UNIT_PATH);
   }
 
   public String executePgAggregateTests(int port, String host, List<String> options)
-      throws IOException, InterruptedException {
+      throws Exception {
     return execute(port, host, options, "pg_aggregates_test.py", DJANGO_UNIT_PATH);
   }
 
   public String executeConditionalTests(int port, String host, List<String> options)
-      throws IOException, InterruptedException {
+      throws Exception {
     return execute(port, host, options, "conditional_expressions_test.py", DJANGO_UNIT_PATH);
   }
 
   public String executeAggregationTests(int port, String host, List<String> options)
-      throws IOException, InterruptedException {
+      throws Exception {
     return execute(port, host, options, "aggregation_tests.py", DJANGO_UNIT_PATH);
   }
 
-  public String executeIntegrationTests() throws IOException, InterruptedException {
-    return execute(0, "", Collections.emptyList(), "sample.py", DJANGO_IT_PATH);
+  public String executeIntegrationTests() throws Exception {
+    return execute(0, "", Collections.emptyList(), "sample.py", DJANGO_SAMPLES_PATH);
   }
 }

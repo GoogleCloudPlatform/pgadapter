@@ -134,5 +134,49 @@ public class TimestampParserTest {
     assertEquals(
         Timestamp.parseTimestamp("2022-12-28T07:30Z"),
         TimestampParser.toTimestamp("2022-12-28 10:00+02:30", ZoneId.of("CET")));
+    assertEquals(
+        Timestamp.parseTimestamp("2011-11-04T00:05:23.123456Z"),
+        TimestampParser.toTimestamp("(\"2011-11-04 00:05:23.123456+00:00\")", ZoneId.of("UTC")));
+    assertEquals(
+        Timestamp.parseTimestamp("2011-11-04T00:05:23.123456Z"),
+        TimestampParser.toTimestamp("('2011-11-04 00:05:23.123456+00:00')", ZoneId.of("UTC")));
+    assertEquals(
+        Timestamp.parseTimestamp("2011-11-04T00:05:23.123456Z"),
+        TimestampParser.toTimestamp("'2011-11-04 00:05:23.123456+00:00'", ZoneId.of("UTC")));
+    assertThrows(PGException.class, () -> TimestampParser.toTimestamp("", ZoneId.of("UTC")));
+    assertThrows(PGException.class, () -> TimestampParser.toTimestamp("(", ZoneId.of("UTC")));
+    assertThrows(PGException.class, () -> TimestampParser.toTimestamp(")", ZoneId.of("UTC")));
+    assertThrows(
+        PGException.class,
+        () -> TimestampParser.toTimestamp("'2011-11-04 00:05:23.123456+00:00')", ZoneId.of("UTC")));
+    assertThrows(
+        PGException.class,
+        () -> TimestampParser.toTimestamp("('2011-11-04 00:05:23.123456+00:00'", ZoneId.of("UTC")));
+    assertThrows(PGException.class, () -> TimestampParser.toTimestamp("()", ZoneId.of("UTC")));
+    assertThrows(PGException.class, () -> TimestampParser.toTimestamp("''", ZoneId.of("UTC")));
+    assertThrows(PGException.class, () -> TimestampParser.toTimestamp("'2000'", ZoneId.of("UTC")));
+    assertEquals(
+        Timestamp.parseTimestamp("2000-01-01T00:00:00Z"),
+        TimestampParser.toTimestamp("'2000-01-01'", ZoneId.of("UTC")));
+    assertEquals(
+        Timestamp.parseTimestamp("2011-11-04T00:05:23.123456Z"),
+        TimestampParser.toTimestamp(" (\"2011-11-04 00:05:23.123456+00:00\")", ZoneId.of("UTC")));
+    assertEquals(
+        Timestamp.parseTimestamp("2011-11-04T00:05:23.123456Z"),
+        TimestampParser.toTimestamp("(\"2011-11-04 00:05:23.123456+00:00\") ", ZoneId.of("UTC")));
+    assertEquals(
+        Timestamp.parseTimestamp("2011-11-04T00:05:23.123456Z"),
+        TimestampParser.toTimestamp("( \"2011-11-04 00:05:23.123456+00:00\" )", ZoneId.of("UTC")));
+    assertEquals(
+        Timestamp.parseTimestamp("2011-11-04T00:05:23.123456Z"),
+        TimestampParser.toTimestamp("(\" 2011-11-04 00:05:23.123456+00:00\")", ZoneId.of("UTC")));
+    assertEquals(
+        Timestamp.parseTimestamp("2011-11-04T00:05:23.123456Z"),
+        TimestampParser.toTimestamp(
+            "\n(  \"2011-11-04 00:05:23.123456+00:00  \" )", ZoneId.of("UTC")));
+    assertEquals(
+        Timestamp.parseTimestamp("2011-11-04T00:05:23.123456Z"),
+        TimestampParser.toTimestamp(
+            "\t\n( \"  2011-11-04 00:05:23.123456+00:00  \n\t\" )", ZoneId.of("UTC")));
   }
 }

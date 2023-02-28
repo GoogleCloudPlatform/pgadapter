@@ -21,8 +21,8 @@ import static org.junit.Assert.assertTrue;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.pgadapter.IntegrationTest;
 import com.google.cloud.spanner.pgadapter.PgAdapterTestEnv;
+import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
 import com.google.common.collect.ImmutableList;
-import java.io.IOException;
 import java.util.Collections;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -39,6 +39,7 @@ public class ITSQLAlchemySampleTest implements IntegrationTest {
 
   @BeforeClass
   public static void setup() throws Exception {
+    PythonTestUtil.createVirtualEnv(SAMPLE_DIR);
     testEnv.setUp();
     Database database = testEnv.createDatabase(ImmutableList.of());
     testEnv.startPGAdapterServerWithDefaultDatabase(database.getId(), Collections.emptyList());
@@ -51,7 +52,7 @@ public class ITSQLAlchemySampleTest implements IntegrationTest {
   }
 
   @Test
-  public void testSQLAlchemySample() throws IOException, InterruptedException {
+  public void testSQLAlchemySample() throws Exception {
     String output =
         execute(
             SAMPLE_DIR,
