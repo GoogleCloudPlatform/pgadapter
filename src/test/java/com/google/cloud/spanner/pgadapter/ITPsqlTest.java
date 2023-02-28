@@ -175,6 +175,7 @@ public class ITPsqlTest implements IntegrationTest {
           // local PostgreSQL database match the actual data model of the Cloud Spanner database.
           DEFAULT_DATA_MODEL.stream()
                   .map(s -> s.replace("col_int int", "col_int bigint"))
+                  .map(s -> s.replace("col_array_int int[]", "col_array_int bigint[]"))
                   .collect(Collectors.joining(";"))
               + ";\n"
         };
@@ -487,7 +488,7 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) to stdout (format "
+              + " -c \"copy all_types to stdout (format "
               + format
               + ") \" "
               + "  | psql "
@@ -497,7 +498,7 @@ public class ITPsqlTest implements IntegrationTest {
               + testEnv.getPGAdapterPort()
               + " -d "
               + database.getId().getDatabase()
-              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin (format "
+              + " -c \"copy all_types from stdin (format "
               + format
               + ")"
               + ";\"\n");
@@ -537,7 +538,7 @@ public class ITPsqlTest implements IntegrationTest {
           "bash",
           "-c",
           "psql"
-              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) to stdout (format "
+              + " -c \"copy all_types to stdout (format "
               + format
               + ") \" "
               + " -h "
@@ -555,7 +556,7 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) from stdin (format "
+              + " -c \"copy all_types from stdin (format "
               + format
               + ")"
               + ";\"\n");
@@ -879,6 +880,20 @@ public class ITPsqlTest implements IntegrationTest {
                     spangresResultSet.getLong(col));
                 assertEquals(pgResultSet.wasNull(), spangresResultSet.wasNull());
                 break;
+              case Types.ARRAY:
+                // Note that we will fall-through to the default if this is not true.
+                if (pgResultSet.getObject(col) != null
+                    && spangresResultSet.getObject(col) != null) {
+                  assertArrayEquals(
+                      String.format(
+                          "Column %s mismatch:\nPG: %s\nCS: %s",
+                          pgResultSet.getMetaData().getColumnName(col),
+                          pgResultSet.getArray(col),
+                          spangresResultSet.getArray(col)),
+                      (Object[]) pgResultSet.getArray(col).getArray(),
+                      (Object[]) spangresResultSet.getArray(col).getArray());
+                  break;
+                }
               default:
                 assertEquals(
                     String.format(
@@ -914,7 +929,17 @@ public class ITPsqlTest implements IntegrationTest {
             + "  random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, "
             + "  (random()*999999)::int, (random()*999999999999)::numeric, now()-random()*interval '250 year', "
             + "  (current_date-random()*interval '400 year')::date, md5(random()::text || clock_timestamp()::text)::varchar,"
-            + "  ('{\\\"key\\\": \\\"' || md5(random()::text || clock_timestamp()::text)::varchar || '\\\"}')::jsonb "
+            + "  ('{\\\"key\\\": \\\"' || md5(random()::text || clock_timestamp()::text)::varchar || '\\\"}')::jsonb, "
+            + "  array[(random()*1000000000)::bigint, null, (random()*1000000000)::bigint],\n"
+            + "  array[random()<0.5, null, random()<0.5],\n"
+            + "  array[md5(random()::text ||clock_timestamp()::text)::bytea, null, md5(random()::text ||clock_timestamp()::text)::bytea],\n"
+            + "  array[random()*123456789, null, random()*123456789],\n"
+            + "  array[(random()*999999)::int, null, (random()*999999)::int],\n"
+            + "  array[(random()*999999)::numeric, null, (random()*999999)::numeric],\n"
+            + "  array[now()-random()*interval '50 year', null, now()-random()*interval '50 year'],\n"
+            + "  array[(now()-random()*interval '50 year')::date, null, (now()-random()*interval '50 year')::date],\n"
+            + "  array[md5(random()::text || clock_timestamp()::text)::varchar, null, md5(random()::text || clock_timestamp()::text)::varchar],\n"
+            + "  array[('{\\\"key\\\": \\\"' || md5(random()::text || clock_timestamp()::text)::varchar || '\\\"}')::jsonb, null, ('{\\\"key\\\": \\\"' || md5(random()::text || clock_timestamp()::text)::varchar || '\\\"}')::jsonb]\n"
             + String.format("  from generate_series(1, %d) s(i)) to stdout\" ", numRows)
             + "  | psql "
             + " -h "
@@ -925,7 +950,7 @@ public class ITPsqlTest implements IntegrationTest {
             + POSTGRES_USER
             + " -d "
             + POSTGRES_DATABASE
-            + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+            + " -c \"copy all_types "
             + "from stdin;\"\n");
     setPgPassword(builder);
     Process process = builder.start();
@@ -935,6 +960,13 @@ public class ITPsqlTest implements IntegrationTest {
         errors.append(scanner.nextLine()).append("\n");
       }
     }
+    StringBuilder output = new StringBuilder();
+    try (Scanner scanner = new Scanner(process.getInputStream())) {
+      while (scanner.hasNextLine()) {
+        output.append(scanner.nextLine()).append("\n");
+      }
+    }
+    assertEquals("COPY " + numRows + "\n", output.toString());
     int res = process.waitFor();
     assertEquals(errors.toString(), 0, res);
   }
