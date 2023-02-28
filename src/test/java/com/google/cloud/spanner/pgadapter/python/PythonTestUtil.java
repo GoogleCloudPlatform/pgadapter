@@ -65,7 +65,7 @@ public class PythonTestUtil {
       error.append(errorScanner.nextLine()).append("\n");
     }
     int result = process.waitFor();
-    assertEquals(error.toString(), 0, result);
+    assertEquals(output + "\n\n\n" + error, 0, result);
 
     return output.toString();
   }

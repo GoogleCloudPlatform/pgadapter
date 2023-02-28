@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.python.psycopg2;
 
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.BeforeClass;
@@ -45,9 +46,10 @@ abstract class AbstractPsycopg2Test extends AbstractMockServerTest {
 
   static String executeWithoutParameters(
       String pgVersion, String host, int port, String sql, String statementType) throws Exception {
+    File directory = new File(PSYCOPG2_PATH);
     return PythonTestUtil.run(
         new String[] {
-          "python3",
+          directory.getAbsolutePath() + "/venv/bin/python3",
           "StatementsWithoutParameters.py",
           pgVersion,
           host,
@@ -66,8 +68,9 @@ abstract class AbstractPsycopg2Test extends AbstractMockServerTest {
       String statementType,
       ArrayList<String> parameters)
       throws Exception {
+    File directory = new File(PSYCOPG2_PATH);
     List<String> runCommand = new ArrayList<>();
-    runCommand.add("python3");
+    runCommand.add(directory.getAbsolutePath() + "/venv/bin/python3");
     runCommand.add("StatementsWithParameters.py");
     runCommand.add(pgVersion);
     runCommand.add(host);
@@ -86,8 +89,9 @@ abstract class AbstractPsycopg2Test extends AbstractMockServerTest {
       String statementType,
       ArrayList<String> parameters)
       throws Exception {
+    File directory = new File(PSYCOPG2_PATH);
     List<String> runCommand = new ArrayList<>();
-    runCommand.add("python3");
+    runCommand.add(directory.getAbsolutePath() + "/venv/bin/python3");
     runCommand.add("StatementsWithNamedParameters.py");
     runCommand.add(pgVersion);
     runCommand.add(host);
@@ -106,8 +110,9 @@ abstract class AbstractPsycopg2Test extends AbstractMockServerTest {
       String statementType,
       ArrayList<String> parameters)
       throws Exception {
+    File directory = new File(PSYCOPG2_PATH);
     List<String> runCommand = new ArrayList<>();
-    runCommand.add("python3");
+    runCommand.add(directory.getAbsolutePath() + "/venv/bin/python3");
     runCommand.add("Batching.py");
     runCommand.add(pgVersion);
     runCommand.add(host);
@@ -120,8 +125,9 @@ abstract class AbstractPsycopg2Test extends AbstractMockServerTest {
 
   static String executeTransactions(
       String pgVersion, String host, int port, List<String> statements) throws Exception {
+    File directory = new File(PSYCOPG2_PATH);
     List<String> runCommand = new ArrayList<>();
-    runCommand.add("python3");
+    runCommand.add(directory.getAbsolutePath() + "/venv/bin/python3");
     runCommand.add("StatementsWithTransactions.py");
     runCommand.add(pgVersion);
     runCommand.add(host);
@@ -131,9 +137,15 @@ abstract class AbstractPsycopg2Test extends AbstractMockServerTest {
   }
 
   static String executeCopy(int port, String sql, String file, String copyType) throws Exception {
+    File directory = new File(PSYCOPG2_PATH);
     return PythonTestUtil.run(
         new String[] {
-          "python3", "StatementsWithCopy.py", Integer.toString(port), sql, file, copyType
+          directory.getAbsolutePath() + "/venv/bin/python3",
+          "StatementsWithCopy.py",
+          Integer.toString(port),
+          sql,
+          file,
+          copyType
         },
         PSYCOPG2_PATH);
   }

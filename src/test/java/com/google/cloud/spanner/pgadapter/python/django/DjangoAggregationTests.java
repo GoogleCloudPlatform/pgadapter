@@ -21,7 +21,6 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.ExecuteSqlRequest;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
@@ -43,7 +42,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   }
 
   @Test
-  public void simpleCountTest() throws IOException, InterruptedException {
+  public void simpleCountTest() throws Exception {
 
     String sql = "SELECT COUNT(*) AS \"__count\" FROM \"singers\"";
 
@@ -69,7 +68,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   }
 
   @Test
-  public void aggregateAvg() throws IOException, InterruptedException {
+  public void aggregateAvg() throws Exception {
 
     String sql = "SELECT AVG(\"singers\".\"singerid\") AS \"singerid__avg\" FROM \"singers\"";
 
@@ -95,7 +94,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   }
 
   @Test
-  public void aggregateMin() throws IOException, InterruptedException {
+  public void aggregateMin() throws Exception {
 
     String sql = "SELECT MIN(\"singers\".\"singerid\") AS \"singerid__min\" FROM \"singers\"";
 
@@ -121,7 +120,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   }
 
   @Test
-  public void aggregateMax() throws IOException, InterruptedException {
+  public void aggregateMax() throws Exception {
 
     String sql = "SELECT MAX(\"singers\".\"singerid\") AS \"singerid__max\" FROM \"singers\"";
 
@@ -147,7 +146,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   }
 
   @Test
-  public void aggregateMultiple() throws IOException, InterruptedException {
+  public void aggregateMultiple() throws Exception {
 
     String sql =
         "SELECT MAX(\"singers\".\"singerid\") AS \"singerid__max\", MIN(\"singers\".\"singerid\") AS \"singerid__min\", AVG(\"singers\".\"singerid\") AS \"singerid__avg\" FROM \"singers\"";
@@ -180,7 +179,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   }
 
   @Test
-  public void annotateCount() throws IOException, InterruptedException {
+  public void annotateCount() throws Exception {
 
     String sql =
         "SELECT \"singers\".\"firstname\", COUNT(\"singers\".\"firstname\") AS \"firstname__count\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
@@ -215,7 +214,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   }
 
   @Test
-  public void annotateMin() throws IOException, InterruptedException {
+  public void annotateMin() throws Exception {
 
     String sql =
         "SELECT \"singers\".\"firstname\", MIN(\"singers\".\"singerid\") AS \"singerid__min\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
@@ -249,7 +248,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   }
 
   @Test
-  public void annotateMax() throws IOException, InterruptedException {
+  public void annotateMax() throws Exception {
 
     String sql =
         "SELECT \"singers\".\"firstname\", MAX(\"singers\".\"singerid\") AS \"singerid__max\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
@@ -284,7 +283,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   }
 
   @Test
-  public void annotateAvg() throws IOException, InterruptedException {
+  public void annotateAvg() throws Exception {
 
     String sql =
         "SELECT \"singers\".\"firstname\", AVG(\"singers\".\"singerid\") AS \"singerid__avg\" FROM \"singers\" GROUP BY \"singers\".\"firstname\" LIMIT 21";
@@ -319,7 +318,7 @@ public class DjangoAggregationTests extends DjangoTestSetup {
   }
 
   @Test
-  public void annotateMultiple() throws IOException, InterruptedException {
+  public void annotateMultiple() throws Exception {
 
     String sql =
         "SELECT \"singers\".\"singerid\", AVG(\"singers\".\"singerid\") AS \"singerid__avg\", COUNT(\"singers\".\"singerid\") AS \"singerid__count\", MAX(\"singers\".\"singerid\") AS \"singerid__max\", MIN(\"singers\".\"singerid\") AS \"singerid__min\" FROM \"singers\" GROUP BY \"singers\".\"singerid\" LIMIT 21";
