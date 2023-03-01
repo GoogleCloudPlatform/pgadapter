@@ -30,6 +30,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
@@ -730,9 +731,9 @@ public class ConnectionHandler extends Thread {
         setWellKnownClient(ClientAutoDetector.detectClient(ImmutableList.of(statement)));
       }
       maybeSetApplicationName();
+      // Make sure that we only try to detect the client once.
+      this.hasDeterminedClientUsingQuery = true;
     }
-    // Make sure that we only try to detect the client once.
-    this.hasDeterminedClientUsingQuery = true;
   }
 
   /**
@@ -742,15 +743,16 @@ public class ConnectionHandler extends Thread {
    * messages.
    */
   public void maybeDetermineWellKnownClient(ParseMessage parseMessage) {
-    if (!this.hasDeterminedClientUsingQuery) {
+    if (!this.hasDeterminedClientUsingQuery
+        && parseMessage.getStatement().getStatementType() != StatementType.CLIENT_SIDE) {
       if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
           && getServer().getOptions().shouldAutoDetectClient()) {
         setWellKnownClient(ClientAutoDetector.detectClient(parseMessage));
       }
       maybeSetApplicationName();
+      // Make sure that we only try to detect the client once.
+      this.hasDeterminedClientUsingQuery = true;
     }
-    // Make sure that we only try to detect the client once.
-    this.hasDeterminedClientUsingQuery = true;
   }
 
   private void maybeSetApplicationName() {

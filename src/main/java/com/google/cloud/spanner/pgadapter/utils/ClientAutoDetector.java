@@ -242,6 +242,33 @@ public class ClientAutoDetector {
         return functionReplacements;
       }
     },
+    SQLALCHEMY2 {
+      final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
+          ImmutableMap.of(
+              Pattern.compile("oid::regtype::text AS regtype"),
+              Suppliers.ofInstance("'' as regtype"),
+              Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
+              Suppliers.ofInstance("WHERE t.typname = \\$1"));
+
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // SQLAlchemy 2.x does not send enough unique parameters for it to be auto-detected.
+        return false;
+      }
+
+      @Override
+      boolean isClient(List<Statement> statements) {
+        // SQLAlchemy always starts with getting the PG version using this specific query using the
+        // simple query protocol.
+        return statements.size() == 1
+            && statements.get(0).getSql().equals("select pg_catalog.version()");
+      }
+
+      @Override
+      public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
+        return functionReplacements;
+      }
+    },
     UNSPECIFIED {
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {

@@ -69,11 +69,7 @@ public class PgCatalog {
           Pattern.compile("pg_table_is_visible\\s*\\(.+\\)"),
           Suppliers.ofInstance("true"),
           Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(true\\)\\)"),
-          Suppliers.ofInstance(" IN ('pg_catalog', 'public')"),
-          Pattern.compile("oid::regtype::text AS regtype"),
-          Suppliers.ofInstance("'' as regtype"),
-          Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
-          Suppliers.ofInstance("WHERE t.typname = \\$1"));
+          Suppliers.ofInstance(" IN ('pg_catalog', 'public')"));
 
   private final ImmutableSet<String> checkPrefixes;
 
