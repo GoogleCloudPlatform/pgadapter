@@ -6,7 +6,7 @@ require (
 	github.com/shopspring/decimal v1.3.1
 	gorm.io/datatypes v1.1.0
 	gorm.io/driver/postgres v1.4.8
-	gorm.io/gorm v1.24.2
+	gorm.io/gorm v1.24.5
 )
 
 require (
