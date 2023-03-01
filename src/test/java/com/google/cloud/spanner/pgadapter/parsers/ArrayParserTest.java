@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -439,6 +440,27 @@ public class ArrayParserTest {
     assertEquals(
         "{\"{\\\"key\\\": \\\"value1\\\"}\",NULL,\"{\\\"key\\\": \\\"value2\\\"}\"}",
         parser.stringParse());
+  }
+
+  @Test
+  public void testNullBinaryArray() {
+    assertNull(ArrayParser.binaryArrayToList(null, false));
+    assertNull(ArrayParser.binaryArrayToList(null, true));
+  }
+
+  @Test
+  public void testNullTextArray() {
+    assertNull(
+        ArrayParser.stringArrayToList(
+            null, Oid.UNSPECIFIED, false, mock(SessionState.class), false));
+    assertNull(
+        ArrayParser.stringArrayToList(
+            null, Oid.UNSPECIFIED, false, mock(SessionState.class), true));
+    assertNull(
+        ArrayParser.stringArrayToList(
+            null, Oid.UNSPECIFIED, true, mock(SessionState.class), false));
+    assertNull(
+        ArrayParser.stringArrayToList(null, Oid.UNSPECIFIED, true, mock(SessionState.class), true));
   }
 
   static ResultSet createArrayResultSet(Type arrayElementType, Value value) {

@@ -32,9 +32,9 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -91,7 +91,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testSelectAll() throws IOException, InterruptedException {
+  public void testSelectAll() throws Exception {
     String sqlSelectAll =
         "SELECT \"singers\".\"singerid\", \"singers\".\"firstname\", \"singers\".\"lastname\" FROM \"singers\"";
 
@@ -103,7 +103,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
     String expectedOutput =
         "{'singerid': 1, 'firstname': 'hello', 'lastname': 'world'}\n"
             + "{'singerid': 2, 'firstname': 'hello', 'lastname': 'django'}\n";
-    List<String> options = new ArrayList<>(Arrays.asList("all"));
+    List<String> options = new ArrayList<>(Collections.singletonList("all"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
     assertEquals(expectedOutput, actualOutput);
 
@@ -113,7 +113,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testInsert() throws IOException, InterruptedException {
+  public void testInsert() throws Exception {
     String sqlUpdate =
         "UPDATE \"singers\" SET \"firstname\" = 'john', \"lastname\" = 'doe' WHERE \"singers\".\"singerid\" = 4";
     String sqlInsert =
@@ -134,7 +134,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testUpdate() throws IOException, InterruptedException {
+  public void testUpdate() throws Exception {
     String sqlUpdate =
         "UPDATE \"singers\" SET \"firstname\" = 'john', \"lastname\" = 'doe' WHERE \"singers\".\"singerid\" = 4";
 
@@ -153,7 +153,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testSimpleFilter() throws IOException, InterruptedException {
+  public void testSimpleFilter() throws Exception {
     String sqlSelect =
         "SELECT \"singers\".\"singerid\", \"singers\".\"firstname\", \"singers\".\"lastname\" FROM \"singers\" WHERE \"singers\".\"firstname\" = 'hello'";
 
@@ -193,7 +193,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testInsertAllTypes() throws IOException, InterruptedException {
+  public void testInsertAllTypes() throws Exception {
 
     String sqlUpdate =
         "UPDATE \"all_types\" "
@@ -230,7 +230,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlUpdate), 0));
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlInsert), 1));
     String expectedOutput = "Insert Successful\n";
-    List<String> options = new ArrayList<>(Arrays.asList("all_types_insert"));
+    List<String> options = new ArrayList<>(Collections.singletonList("all_types_insert"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
     assertEquals(expectedOutput, actualOutput);
 
@@ -240,7 +240,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testInsertAllTypesAllNull() throws IOException, InterruptedException {
+  public void testInsertAllTypesAllNull() throws Exception {
 
     String sqlInsert =
         "INSERT INTO \"all_types\" "
@@ -258,7 +258,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
 
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sqlInsert), 1));
     String expectedOutput = "Insert Successful\n";
-    List<String> options = new ArrayList<>(Arrays.asList("all_types_insert_null"));
+    List<String> options = new ArrayList<>(Collections.singletonList("all_types_insert_null"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
     assertEquals(expectedOutput, actualOutput);
 
@@ -273,7 +273,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testSelectAllNull() throws IOException, InterruptedException {
+  public void testSelectAllNull() throws Exception {
 
     String sqlQuery =
         "SELECT "
@@ -314,7 +314,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "'col_date': None, "
             + "'col_varchar': None, "
             + "'col_jsonb': None}\n";
-    List<String> options = new ArrayList<>(Arrays.asList("select_all_null"));
+    List<String> options = new ArrayList<>(Collections.singletonList("select_all_null"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
     assertEquals(expectedOutput, actualOutput);
 
@@ -323,7 +323,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testSelectAllTypes() throws IOException, InterruptedException {
+  public void testSelectAllTypes() throws Exception {
 
     String sqlQuery =
         "SELECT \"all_types\".\"col_bigint\", "
@@ -340,7 +340,6 @@ public class DjangoBasicTest extends DjangoTestSetup {
 
     ResultSet resultSet = createAllTypesResultSet("", true);
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sqlQuery), resultSet));
-    System.out.println(resultSet.getRows(0).getValues(6).getStringValue());
     String expectedOutput =
         "col_bigint : 1 , "
             + "col_bool : True , "
@@ -352,7 +351,7 @@ public class DjangoBasicTest extends DjangoTestSetup {
             + "col_date : 2022-03-29 , "
             + "col_varchar : test , "
             + "col_jsonb : {'key': 'value'} , \n";
-    List<String> options = new ArrayList<>(Arrays.asList("select_all_types"));
+    List<String> options = new ArrayList<>(Collections.singletonList("select_all_types"));
     String actualOutput = executeBasicTests(pgServer.getLocalPort(), host, options);
     assertEquals(expectedOutput, actualOutput);
 

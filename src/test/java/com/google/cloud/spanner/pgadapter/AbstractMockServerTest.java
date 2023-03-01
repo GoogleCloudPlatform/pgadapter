@@ -482,6 +482,45 @@ public abstract class AbstractMockServerTest {
         .build();
   }
 
+  protected static ResultSet createAllArrayTypesResultSet(
+      String id, String columnPrefix, boolean microsTimestamp) {
+    return com.google.spanner.v1.ResultSet.newBuilder()
+        .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
+        .addRows(
+            ListValue.newBuilder()
+                .addValues(Value.newBuilder().setStringValue(id).build())
+                .addValues(Value.newBuilder().setBoolValue(true).build())
+                .addValues(
+                    Value.newBuilder()
+                        .setStringValue(
+                            Base64.getEncoder()
+                                .encodeToString("test".getBytes(StandardCharsets.UTF_8)))
+                        .build())
+                .addValues(Value.newBuilder().setNumberValue(3.14d).build())
+                .addValues(Value.newBuilder().setStringValue("100").build())
+                .addValues(Value.newBuilder().setStringValue("6.626").build())
+                .addValues(
+                    Value.newBuilder()
+                        .setStringValue(
+                            microsTimestamp
+                                ? "2022-02-16T13:18:02.123456Z"
+                                : "2022-02-16T13:18:02.123456789Z")
+                        .build())
+                .addValues(Value.newBuilder().setStringValue("2022-03-29").build())
+                .addValues(Value.newBuilder().setStringValue("test").build())
+                .addValues(Value.newBuilder().setStringValue("{\"key\": \"value\"}").build())
+                .build())
+        .build();
+  }
+
+  protected static ResultSet createAllTypesAndArraysResultSet(
+      String id, String columnPrefix, boolean microsTimestamp) {
+    ResultSet allTypes = createAllTypesResultSet(id, columnPrefix, microsTimestamp);
+    allTypes.toBuilder().build();
+
+    return allTypes;
+  }
+
   protected static ResultSet createAllTypesNullResultSet(String columnPrefix) {
     return createAllTypesNullResultSet(columnPrefix, null);
   }
@@ -571,6 +610,100 @@ public abstract class AbstractMockServerTest {
                                 .setCode(TypeCode.JSON)
                                 .setTypeAnnotation(TypeAnnotationCode.PG_JSONB)
                                 .build()))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_bigint")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.INT64).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_bool")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.BOOL).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_bytea")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.BYTES).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_float8")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.FLOAT64).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_int")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.INT64).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_numeric")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder()
+                                        .setCode(TypeCode.NUMERIC)
+                                        .setTypeAnnotation(TypeAnnotationCode.PG_NUMERIC)
+                                        .build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_timestamptz")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_date")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.DATE).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_varchar")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder().setCode(TypeCode.STRING).build())))
+                .addFields(
+                    Field.newBuilder()
+                        .setName(columnPrefix + "col_array_jsonb")
+                        .setType(
+                            Type.newBuilder()
+                                .setCode(TypeCode.ARRAY)
+                                .setArrayElementType(
+                                    Type.newBuilder()
+                                        .setCode(TypeCode.JSON)
+                                        .setTypeAnnotation(TypeAnnotationCode.PG_JSONB)
+                                        .build())))
+                .build())
+        .build();
+  }
+
+  protected static ResultSetMetadata createAllArrayTypesResultSetMetadata(String columnPrefix) {
+    return ResultSetMetadata.newBuilder()
+        .setRowType(
+            StructType.newBuilder()
                 .addFields(
                     Field.newBuilder()
                         .setName(columnPrefix + "col_array_bigint")

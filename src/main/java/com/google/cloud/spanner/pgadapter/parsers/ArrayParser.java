@@ -39,6 +39,8 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.text.StringEscapeUtils;
 import org.postgresql.core.Oid;
 import org.postgresql.util.ByteConverter;
@@ -85,10 +87,16 @@ public class ArrayParser extends Parser<List<?>> {
     if (item != null) {
       switch (formatCode) {
         case TEXT:
-          this.item = stringArrayToList(new String(item, StandardCharsets.UTF_8), elementOid);
+          this.item =
+              stringArrayToList(
+                  new String(item, StandardCharsets.UTF_8),
+                  elementOid,
+                  this.isStringEquivalent,
+                  this.sessionState,
+                  false);
           break;
         case BINARY:
-          this.item = binaryArrayToList(item);
+          this.item = binaryArrayToList(item, false);
           break;
         default:
       }
@@ -126,29 +134,45 @@ public class ArrayParser extends Parser<List<?>> {
     }
   }
 
-  private List<?> stringArrayToList(String value, int elementOid) {
-    Preconditions.checkNotNull(value);
+  /** Converts an array literal to the corresponding list of objects. */
+  public static List<?> stringArrayToList(
+      @Nullable String value,
+      int elementOid,
+      boolean isStringEquivalent,
+      SessionState sessionState,
+      boolean convertToValidSpannerElements) {
+    if (value == null) {
+      return null;
+    }
     List<String> values =
-        SimpleParser.readArrayLiteral(value, this.isStringEquivalent, elementOid == Oid.BYTEA);
+        SimpleParser.readArrayLiteral(value, isStringEquivalent, elementOid == Oid.BYTEA);
     ArrayList<Object> result = new ArrayList<>(values.size());
     for (String element : values) {
       if (element == null) {
         result.add(null);
       } else {
-        result.add(
+        Object parsedElement =
             Parser.create(
                     sessionState,
                     element.getBytes(StandardCharsets.UTF_8),
                     elementOid,
                     FormatCode.TEXT)
-                .item);
+                .item;
+        result.add(
+            convertToValidSpannerElements
+                ? toValidSpannerElement(parsedElement, elementOid)
+                : parsedElement);
       }
     }
     return result;
   }
 
-  private List<?> binaryArrayToList(byte[] value) {
-    Preconditions.checkNotNull(value);
+  /** Converts the given binary array value into a list of objects. */
+  public static List<?> binaryArrayToList(
+      @Nullable byte[] value, boolean convertToValidSpannerElements) {
+    if (value == null) {
+      return null;
+    }
     byte[] buffer = new byte[20];
     try (DataInputStream dataStream = new DataInputStream(new ByteArrayInputStream(value))) {
       dataStream.readFully(buffer);
@@ -175,7 +199,8 @@ public class ArrayParser extends Parser<List<?>> {
         } else {
           buffer = new byte[elementSize];
           dataStream.readFully(buffer);
-          result.add(Parser.create(sessionState, buffer, oid, FormatCode.BINARY).item);
+          Object element = Parser.create(null, buffer, oid, FormatCode.BINARY).item;
+          result.add(convertToValidSpannerElements ? toValidSpannerElement(element, oid) : element);
         }
       }
       return result;
@@ -185,6 +210,18 @@ public class ArrayParser extends Parser<List<?>> {
           .setCause(exception)
           .build();
     }
+  }
+
+  private static Object toValidSpannerElement(@Nonnull Object value, int elementOid) {
+    switch (elementOid) {
+      case Oid.INT2:
+        return ((Short) value).longValue();
+      case Oid.INT4:
+        return ((Integer) value).longValue();
+      case Oid.FLOAT4:
+        return ((Float) value).doubleValue();
+    }
+    return value;
   }
 
   @Override

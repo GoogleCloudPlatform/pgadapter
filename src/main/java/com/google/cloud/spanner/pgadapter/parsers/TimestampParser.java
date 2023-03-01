@@ -124,7 +124,7 @@ public class TimestampParser extends Parser<Timestamp> {
    * Converts the given string value to a {@link Timestamp}. The given timezone is used to determine
    * the actual point in time if the timestamp string itself does not contain a timezone offset.
    */
-  public static Timestamp toTimestamp(String value, ZoneId timezone) {
+  public static Timestamp toTimestamp(@Nonnull String value, @Nonnull ZoneId timezone) {
     value = stripBracketsAndQuotes(value);
     try {
       String stringValue = toPGString(value);
@@ -159,16 +159,21 @@ public class TimestampParser extends Parser<Timestamp> {
     }
   }
 
-  static String stripBracketsAndQuotes(String value) {
-    if (value == null) {
-      return null;
-    }
+  static String stripBracketsAndQuotes(@Nonnull String value) {
     while (value.length() > 1
-        && (value.charAt(0) == '(' || value.charAt(0) == '"' || value.charAt(0) == '\'')) {
+        && (value.charAt(0) == '('
+            || value.charAt(0) == '"'
+            || value.charAt(0) == '\''
+            || Character.isWhitespace(value.charAt(0))
+            || Character.isWhitespace(value.charAt(value.length() - 1)))) {
       if (value.charAt(value.length() - 1) == value.charAt(0)) {
         value = value.substring(1, value.length() - 1);
       } else if (value.charAt(0) == '(' && value.charAt(value.length() - 1) == ')') {
         value = value.substring(1, value.length() - 1);
+      } else if (Character.isWhitespace(value.charAt(0))) {
+        value = value.substring(1);
+      } else if (Character.isWhitespace(value.charAt(value.length() - 1))) {
+        value = value.substring(0, value.length() - 1);
       } else {
         break;
       }
