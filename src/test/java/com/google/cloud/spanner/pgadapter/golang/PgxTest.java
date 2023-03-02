@@ -23,6 +23,8 @@ public interface PgxTest extends Library {
 
   String TestSelect1(GoString connString);
 
+  String TestShowApplicationName(GoString connString);
+
   String TestQueryWithParameter(GoString connString);
 
   String TestQueryAllDataTypes(GoString connString, int oid, int format);

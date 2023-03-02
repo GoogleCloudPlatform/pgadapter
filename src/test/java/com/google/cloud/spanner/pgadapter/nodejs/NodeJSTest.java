@@ -31,7 +31,7 @@ public interface NodeJSTest {
     String currentPath = new java.io.File(".").getCanonicalPath();
     String testFilePath = String.format("%s/src/test/nodejs/%s", currentPath, directory);
     ProcessBuilder builder = new ProcessBuilder();
-    builder.command("npm", "install");
+    builder.command("npm", "install", "--silent");
     builder.directory(new File(testFilePath));
 
     Process process = builder.start();

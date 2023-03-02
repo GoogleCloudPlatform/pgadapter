@@ -15,8 +15,6 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
-import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
-import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
@@ -30,7 +28,6 @@ import com.google.cloud.spanner.Partition;
 import com.google.cloud.spanner.PartitionOptions;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.ResultSets;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerBatchUpdateException;
 import com.google.cloud.spanner.SpannerException;
@@ -61,12 +58,12 @@ import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexNa
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
-import com.google.cloud.spanner.pgadapter.utils.LazyInit;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
@@ -163,6 +160,8 @@ public class BackendConnection {
       return false;
     }
 
+    abstract boolean isUpdate();
+
     abstract void execute();
 
     void checkConnectionState() {
@@ -198,6 +197,11 @@ public class BackendConnection {
     @Override
     boolean isBatchingPossible() {
       return !analyze;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return this.parsedStatement.isUpdate();
     }
 
     @Override
@@ -376,13 +380,18 @@ public class BackendConnection {
     }
   }
 
-  private static final int MAX_PARTITIONS =
+  public static final int MAX_PARTITIONS =
       Math.max(16, 2 * Runtime.getRuntime().availableProcessors());
 
   private final class CopyOut extends BufferedStatement<StatementResult> {
 
     CopyOut(ParsedStatement parsedStatement, Statement statement) {
       super(parsedStatement, statement);
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
     }
 
     @Override
@@ -405,9 +414,14 @@ public class BackendConnection {
               // No need for the extra complexity of a partitioned query.
               result.set(spannerConnection.execute(statement));
             } else {
+              // Get the metadata of the query, so we can include that in the result.
+              ResultSet metadataResultSet =
+                  spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
               result.set(
                   new PartitionQueryResult(
-                      batchReadOnlyTransaction.getBatchTransactionId(), partitions));
+                      batchReadOnlyTransaction.getBatchTransactionId(),
+                      partitions,
+                      metadataResultSet));
             }
           } catch (SpannerException spannerException) {
             // The query might not be suitable for partitioning. Just try with a normal query.
@@ -451,6 +465,11 @@ public class BackendConnection {
     }
 
     @Override
+    boolean isUpdate() {
+      return true;
+    }
+
+    @Override
     void execute() {
       try {
         checkConnectionState();
@@ -487,6 +506,11 @@ public class BackendConnection {
     Vacuum(VacuumStatement vacuumStatement) {
       super(vacuumStatement.parsedStatement, vacuumStatement.originalStatement);
       this.vacuumStatement = vacuumStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
     }
 
     @Override
@@ -531,6 +555,11 @@ public class BackendConnection {
     }
 
     @Override
+    boolean isUpdate() {
+      return true;
+    }
+
+    @Override
     void execute() {
       try {
         checkConnectionState();
@@ -566,8 +595,8 @@ public class BackendConnection {
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
   private final SessionState sessionState;
-  private final LazyInit<PgCatalog> pgCatalog;
-  private final LazyInit<ImmutableMap<String, LocalStatement>> localStatements;
+  private final Supplier<PgCatalog> pgCatalog;
+  private final Supplier<ImmutableMap<String, LocalStatement>> localStatements;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
   private final String currentSchema = "public";
@@ -585,32 +614,26 @@ public class BackendConnection {
       Supplier<ImmutableList<LocalStatement>> localStatements) {
     this.sessionState = new SessionState(optionsMetadata);
     this.pgCatalog =
-        new LazyInit<PgCatalog>() {
-          @Override
-          protected PgCatalog initialize() {
-            return new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get());
-          }
-        };
+        Suppliers.memoize(
+            () -> new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get()));
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
     this.localStatements =
-        new LazyInit<ImmutableMap<String, LocalStatement>>() {
-          @Override
-          protected ImmutableMap<String, LocalStatement> initialize() {
-            if (localStatements.get().isEmpty()) {
-              return EMPTY_LOCAL_STATEMENTS;
-            } else {
-              Builder<String, LocalStatement> builder = ImmutableMap.builder();
-              for (LocalStatement localStatement : localStatements.get()) {
-                for (String sql : localStatement.getSql()) {
-                  builder.put(new SimpleImmutableEntry<>(sql, localStatement));
+        Suppliers.memoize(
+            () -> {
+              if (localStatements.get().isEmpty()) {
+                return EMPTY_LOCAL_STATEMENTS;
+              } else {
+                Builder<String, LocalStatement> builder = ImmutableMap.builder();
+                for (LocalStatement localStatement : localStatements.get()) {
+                  for (String sql : localStatement.getSql()) {
+                    builder.put(new SimpleImmutableEntry<>(sql, localStatement));
+                  }
                 }
+                return builder.build();
               }
-              return builder.build();
-            }
-          }
-        };
+            });
   }
 
   /** Returns the current connection state. */
@@ -853,11 +876,26 @@ public class BackendConnection {
     if (spannerConnection.isDdlBatchActive() || spannerConnection.isDmlBatchActive()) {
       return;
     }
+    // Do not start an implicit transaction if all that is in the buffer is a DESCRIBE and an
+    // EXECUTE message for the same statement.
+    if (isSync
+        && bufferedStatements.size() == 2
+        && bufferedStatements.get(0) instanceof Execute
+        && bufferedStatements.get(1) instanceof Execute
+        && ((Execute) bufferedStatements.get(0)).analyze
+        && !((Execute) bufferedStatements.get(1)).analyze
+        && bufferedStatements
+            .get(0)
+            .statement
+            .getSql()
+            .equals(bufferedStatements.get(1).statement.getSql())) {
+      return;
+    }
 
     // We need to start an implicit transaction.
     // Check if a read-only transaction suffices.
     spannerConnection.beginTransaction();
-    if (isSync && !hasDmlOrCopyStatementsAfter(index)) {
+    if (isSync && !hasUpdateStatementsAfter(index)) {
       spannerConnection.setTransactionMode(
           com.google.cloud.spanner.connection.TransactionMode.READ_ONLY_TRANSACTION);
     }
@@ -1030,13 +1068,9 @@ public class BackendConnection {
   }
 
   @VisibleForTesting
-  boolean hasDmlOrCopyStatementsAfter(int index) {
+  boolean hasUpdateStatementsAfter(int index) {
     return bufferedStatements.subList(index, bufferedStatements.size()).stream()
-        .anyMatch(
-            statement ->
-                statement.parsedStatement.getType() == StatementType.UPDATE
-                    || statement.parsedStatement.getType() == StatementType.UNKNOWN
-                        && isCommand(COPY, statement.parsedStatement.getSqlWithoutComments()));
+        .anyMatch(BufferedStatement::isUpdate);
   }
 
   private int getStatementCount() {
@@ -1279,10 +1313,15 @@ public class BackendConnection {
   public static final class PartitionQueryResult implements StatementResult {
     private final BatchTransactionId batchTransactionId;
     private final List<Partition> partitions;
+    private final ResultSet metadataResultSet;
 
-    public PartitionQueryResult(BatchTransactionId batchTransactionId, List<Partition> partitions) {
+    public PartitionQueryResult(
+        BatchTransactionId batchTransactionId,
+        List<Partition> partitions,
+        ResultSet metadataResultSet) {
       this.batchTransactionId = batchTransactionId;
       this.partitions = partitions;
+      this.metadataResultSet = metadataResultSet;
     }
 
     public BatchTransactionId getBatchTransactionId() {
@@ -1291,6 +1330,10 @@ public class BackendConnection {
 
     public List<Partition> getPartitions() {
       return partitions;
+    }
+
+    public ResultSet getMetadataResultSet() {
+      return metadataResultSet;
     }
 
     @Override
@@ -1305,7 +1348,7 @@ public class BackendConnection {
 
     @Override
     public ResultSet getResultSet() {
-      return ResultSets.forRows(
+      return ClientSideResultSet.forRows(
           Type.struct(StructField.of("partition", Type.bytes())),
           partitions.stream()
               .map(

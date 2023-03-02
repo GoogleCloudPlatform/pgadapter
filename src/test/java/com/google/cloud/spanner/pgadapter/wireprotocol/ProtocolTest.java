@@ -986,6 +986,7 @@ public class ProtocolTest {
         PGExceptionFactory.newPGException("test error", SQLState.SyntaxError);
     when(intermediatePortalStatement.hasException()).thenReturn(true);
     when(intermediatePortalStatement.getException()).thenReturn(testException);
+    when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
     when(connectionHandler.getPortal(anyString())).thenReturn(intermediatePortalStatement);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
@@ -1890,6 +1891,7 @@ public class ProtocolTest {
 
     when(connectionMetadata.getInputStream()).thenReturn(inputStream);
     when(connectionMetadata.getOutputStream()).thenReturn(outputStream);
+    when(connectionHandler.getWellKnownClient()).thenReturn(WellKnownClient.UNSPECIFIED);
     when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
     when(connectionHandler.getStatus()).thenReturn(ConnectionStatus.AUTHENTICATED);
     doCallRealMethod().when(connectionHandler).increaseInvalidMessageCount();

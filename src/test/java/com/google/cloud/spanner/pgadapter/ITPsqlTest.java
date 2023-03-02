@@ -26,6 +26,7 @@ import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Database;
 import com.google.cloud.spanner.KeySet;
 import com.google.cloud.spanner.Mutation;
+import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -47,10 +48,12 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.zone.ZoneRulesException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -68,6 +71,8 @@ import org.junit.runners.JUnit4;
 @Category(IntegrationTest.class)
 @RunWith(JUnit4.class)
 public class ITPsqlTest implements IntegrationTest {
+  private static final Logger logger = Logger.getLogger(ITPsqlTest.class.getName());
+
   private static final PgAdapterTestEnv testEnv = new PgAdapterTestEnv();
   private static Database database;
   private static boolean allAssumptionsPassed = false;
@@ -170,6 +175,7 @@ public class ITPsqlTest implements IntegrationTest {
           // local PostgreSQL database match the actual data model of the Cloud Spanner database.
           DEFAULT_DATA_MODEL.stream()
                   .map(s -> s.replace("col_int int", "col_int bigint"))
+                  .map(s -> s.replace("col_array_int int[]", "col_array_int bigint[]"))
                   .collect(Collectors.joining(";"))
               + ";\n"
         };
@@ -325,8 +331,8 @@ public class ITPsqlTest implements IntegrationTest {
 
     assertEquals("", errors);
     assertEquals(
-        "   typname   \n"
-            + "-------------\n"
+        "   typname    \n"
+            + "--------------\n"
             + " bool\n"
             + " bytea\n"
             + " int8\n"
@@ -335,13 +341,27 @@ public class ITPsqlTest implements IntegrationTest {
             + " text\n"
             + " float4\n"
             + " float8\n"
+            + " _bool\n"
+            + " _bytea\n"
+            + " _int2\n"
+            + " _int4\n"
+            + " _text\n"
+            + " _varchar\n"
+            + " _int8\n"
+            + " _float4\n"
+            + " _float8\n"
             + " varchar\n"
             + " date\n"
             + " timestamp\n"
+            + " _timestamp\n"
+            + " _date\n"
             + " timestamptz\n"
+            + " _timestamptz\n"
+            + " _numeric\n"
             + " numeric\n"
             + " jsonb\n"
-            + "(14 rows)\n",
+            + " _jsonb\n"
+            + "(28 rows)\n",
         output);
   }
 
@@ -352,9 +372,11 @@ public class ITPsqlTest implements IntegrationTest {
             ImmutableList.of(
                 "set time zone 'UTC';\n",
                 "prepare insert_row as "
-                    + "insert into all_types values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);\n",
+                    + "insert into all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb)"
+                    + " values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);\n",
                 "prepare find_row as "
-                    + "select * from all_types "
+                    + "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb "
+                    + "from all_types "
                     + "where col_bigint=$1 "
                     + "and col_bool=$2 "
                     + "and col_bytea=$3 "
@@ -395,9 +417,31 @@ public class ITPsqlTest implements IntegrationTest {
   }
 
   @Test
-  public void testCopyFromPostgreSQLToCloudSpanner() throws Exception {
+  public void testSetOperationWithOrderBy() throws IOException, InterruptedException {
+    // TODO: Remove
+    assumeTrue(
+        testEnv.getSpannerUrl() != null
+            && testEnv
+                .getSpannerUrl()
+                .equals("https://staging-wrenchworks.sandbox.googleapis.com"));
+
+    Tuple<String, String> result =
+        runUsingPsql(
+            "select * from (select 1) one union all select * from (select 2) two order by 1");
+    String output = result.x(), errors = result.y();
+    assertEquals("", errors);
+    assertEquals(" ?column? \n----------\n        1\n        2\n(2 rows)\n", output);
+  }
+
+  /**
+   * This test copies data back and forth between PostgreSQL and Cloud Spanner and verifies that the
+   * contents are equal after the COPY operation in both directions.
+   */
+  @Test
+  public void testCopyBetweenPostgreSQLAndCloudSpanner() throws Exception {
     int numRows = 100;
 
+    logger.info("Copying initial data to PG");
     // Generate 99 random rows.
     copyRandomRowsToPostgreSQL(numRows - 1);
     // Also add one row with all nulls to ensure that nulls are also copied correctly.
@@ -410,6 +454,7 @@ public class ITPsqlTest implements IntegrationTest {
       }
     }
 
+    logger.info("Verifying initial data in PG");
     // Verify that we have 100 rows in PostgreSQL.
     try (Connection connection =
         DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
@@ -421,12 +466,14 @@ public class ITPsqlTest implements IntegrationTest {
       }
     }
 
-    // Execute the COPY tests in both binary and text mode.
-    for (boolean binary : new boolean[] {false, true}) {
+    // Execute the COPY tests in both binary, csv and text mode.
+    for (Format format : Format.values()) {
+      logger.info("Testing format: " + format);
       // Make sure the all_types table on Cloud Spanner is empty.
       String databaseId = database.getId().getDatabase();
       testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
 
+      logger.info("Copying rows to Spanner");
       // COPY the rows to Cloud Spanner.
       ProcessBuilder builder = new ProcessBuilder();
       builder.command(
@@ -441,8 +488,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \" "
               + "  | psql "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
@@ -450,14 +498,16 @@ public class ITPsqlTest implements IntegrationTest {
               + testEnv.getPGAdapterPort()
               + " -d "
               + database.getId().getDatabase()
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(builder);
       Process process = builder.start();
       int res = process.waitFor();
       assertEquals(0, res);
 
+      logger.info("Verifying data in Spanner");
       // Verify that we now also have 100 rows in Spanner.
       try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
         try (ResultSet resultSet =
@@ -468,9 +518,11 @@ public class ITPsqlTest implements IntegrationTest {
         }
       }
 
+      logger.info("Comparing table contents");
       // Verify that the rows in both databases are equal.
       compareTableContents();
 
+      logger.info("Deleting all data in PG");
       // Remove all rows in the table in the local PostgreSQL database and then copy everything from
       // Cloud Spanner to PostgreSQL.
       try (Connection connection =
@@ -479,14 +531,16 @@ public class ITPsqlTest implements IntegrationTest {
         assertEquals(numRows, connection.createStatement().executeUpdate("delete from all_types"));
       }
 
+      logger.info("Copying rows to PG");
       // COPY the rows from Cloud Spanner to PostgreSQL.
       ProcessBuilder copyToPostgresBuilder = new ProcessBuilder();
       copyToPostgresBuilder.command(
           "bash",
           "-c",
           "psql"
-              + " -c \"copy all_types to stdout"
-              + (binary ? " binary \" " : "\" ")
+              + " -c \"copy all_types to stdout (format "
+              + format
+              + ") \" "
               + " -h "
               + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
               + " -p "
@@ -502,8 +556,9 @@ public class ITPsqlTest implements IntegrationTest {
               + POSTGRES_USER
               + " -d "
               + POSTGRES_DATABASE
-              + " -c \"copy all_types from stdin "
-              + (binary ? "binary" : "")
+              + " -c \"copy all_types from stdin (format "
+              + format
+              + ")"
               + ";\"\n");
       setPgPassword(copyToPostgresBuilder);
       Process copyToPostgresProcess = copyToPostgresBuilder.start();
@@ -518,8 +573,119 @@ public class ITPsqlTest implements IntegrationTest {
       assertEquals("", errors.toString());
       assertEquals(0, copyToPostgresResult);
 
+      logger.info("Compare table contents");
       // Compare table contents again.
       compareTableContents();
+    }
+  }
+
+  /** This test verifies that we can copy an empty table between PostgreSQL and Cloud Spanner. */
+  @Test
+  public void testCopyEmptyTableBetweenCloudSpannerAndPostgreSQL() throws Exception {
+    logger.info("Deleting all data in PG");
+    // Remove all rows in the table in the local PostgreSQL database.
+    try (Connection connection =
+        DriverManager.getConnection(createJdbcUrlForLocalPg(), POSTGRES_USER, POSTGRES_PASSWORD)) {
+      connection.createStatement().executeUpdate("delete from all_types");
+    }
+
+    // Execute the COPY tests in both binary, csv and text mode.
+    for (Format format : Format.values()) {
+      logger.info("Testing format: " + format);
+      // Make sure the all_types table on Cloud Spanner is empty.
+      String databaseId = database.getId().getDatabase();
+      testEnv.write(databaseId, Collections.singleton(Mutation.delete("all_types", KeySet.all())));
+
+      logger.info("Copy empty table to CS");
+      // COPY the empty table to Cloud Spanner.
+      ProcessBuilder builder = new ProcessBuilder();
+      builder.command(
+          "bash",
+          "-c",
+          "psql"
+              + " -h "
+              + POSTGRES_HOST
+              + " -p "
+              + POSTGRES_PORT
+              + " -U "
+              + POSTGRES_USER
+              + " -d "
+              + POSTGRES_DATABASE
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "to stdout (format "
+              + format
+              + ") \" "
+              + "  | psql "
+              + " -h "
+              + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+              + " -p "
+              + testEnv.getPGAdapterPort()
+              + " -d "
+              + database.getId().getDatabase()
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "from stdin (format "
+              + format
+              + ")"
+              + ";\"\n");
+      setPgPassword(builder);
+      Process process = builder.start();
+      int res = process.waitFor();
+      assertEquals(0, res);
+
+      logger.info("Verify that CS is empty");
+      // Verify that still have 0 rows in Cloud Spanner.
+      try (Connection connection = DriverManager.getConnection(createJdbcUrlForPGAdapter())) {
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select count(*) from all_types")) {
+          assertTrue(resultSet.next());
+          assertEquals(0, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
+
+      logger.info("Copy empty table to PG");
+      // COPY the empty table from Cloud Spanner to PostgreSQL.
+      ProcessBuilder copyToPostgresBuilder = new ProcessBuilder();
+      copyToPostgresBuilder.command(
+          "bash",
+          "-c",
+          "psql"
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "to stdout (format "
+              + format
+              + ") \""
+              + " -h "
+              + (POSTGRES_HOST.startsWith("/") ? "/tmp" : testEnv.getPGAdapterHost())
+              + " -p "
+              + testEnv.getPGAdapterPort()
+              + " -d "
+              + database.getId().getDatabase()
+              + "  | psql "
+              + " -h "
+              + POSTGRES_HOST
+              + " -p "
+              + POSTGRES_PORT
+              + " -U "
+              + POSTGRES_USER
+              + " -d "
+              + POSTGRES_DATABASE
+              + " -c \"copy all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
+              + "from stdin (format "
+              + format
+              + ")"
+              + ";\"\n");
+      setPgPassword(copyToPostgresBuilder);
+      Process copyToPostgresProcess = copyToPostgresBuilder.start();
+      InputStream errorStream = copyToPostgresProcess.getErrorStream();
+      int copyToPostgresResult = copyToPostgresProcess.waitFor();
+      StringBuilder errors = new StringBuilder();
+      try (Scanner scanner = new Scanner(new InputStreamReader(errorStream))) {
+        while (scanner.hasNextLine()) {
+          errors.append(errors).append(scanner.nextLine()).append("\n");
+        }
+      }
+      assertEquals("", errors.toString());
+      assertEquals(0, copyToPostgresResult);
     }
   }
 
@@ -550,9 +716,13 @@ public class ITPsqlTest implements IntegrationTest {
                           "select name from pg_timezone_names where not name like '%%posix%%' and not name like 'Factory' offset %d limit 1",
                           random.nextInt(numTimezones)))) {
             assertTrue(resultSet.next());
-            timezone = resultSet.getString(1);
-            if (!PROBLEMATIC_ZONE_IDS.contains(ZoneId.of(timezone))) {
-              break;
+            try {
+              timezone = resultSet.getString(1);
+              if (!PROBLEMATIC_ZONE_IDS.contains(ZoneId.of(timezone))) {
+                break;
+              }
+            } catch (ZoneRulesException ignore) {
+              // Skip and try a different one if it is not a supported timezone on this system.
             }
           }
         }
@@ -634,7 +804,19 @@ public class ITPsqlTest implements IntegrationTest {
           // Mexico abolished DST in 2022, but not all databases contain this information.
           ZoneId.of("America/Chihuahua"),
           // Jordan abolished DST in 2022, but not all databases contain this information.
-          ZoneId.of("Asia/Amman"));
+          ZoneId.of("Asia/Amman"),
+          // Iran observed DST in 1978. Not all databases agree on this.
+          ZoneId.of("Asia/Tehran"),
+          // Rankin_Inlet did not observer DST in 1970-1979, but not all databases agree.
+          ZoneId.of("America/Rankin_Inlet"),
+          // Pangnirtung did not observer DST in 1970-1979, but not all databases agree.
+          ZoneId.of("America/Pangnirtung"),
+          // Niue switched from -11:30 to -11 in 1978. Not all JDKs know that.
+          ZoneId.of("Pacific/Niue"),
+          // Ojinaga switched from Mountain to Central time in 2022. Not all JDKs know that.
+          ZoneId.of("America/Ojinaga"),
+          // Nuuk stopped using DST in 2023. This is unknown to older JDKs.
+          ZoneId.of("America/Nuuk"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));
@@ -698,6 +880,20 @@ public class ITPsqlTest implements IntegrationTest {
                     spangresResultSet.getLong(col));
                 assertEquals(pgResultSet.wasNull(), spangresResultSet.wasNull());
                 break;
+              case Types.ARRAY:
+                // Note that we will fall-through to the default if this is not true.
+                if (pgResultSet.getObject(col) != null
+                    && spangresResultSet.getObject(col) != null) {
+                  assertArrayEquals(
+                      String.format(
+                          "Column %s mismatch:\nPG: %s\nCS: %s",
+                          pgResultSet.getMetaData().getColumnName(col),
+                          pgResultSet.getArray(col),
+                          spangresResultSet.getArray(col)),
+                      (Object[]) pgResultSet.getArray(col).getArray(),
+                      (Object[]) spangresResultSet.getArray(col).getArray());
+                  break;
+                }
               default:
                 assertEquals(
                     String.format(
@@ -733,7 +929,17 @@ public class ITPsqlTest implements IntegrationTest {
             + "  random()<0.5, md5(random()::text || clock_timestamp()::text)::bytea, random()*123456789, "
             + "  (random()*999999)::int, (random()*999999999999)::numeric, now()-random()*interval '250 year', "
             + "  (current_date-random()*interval '400 year')::date, md5(random()::text || clock_timestamp()::text)::varchar,"
-            + "  ('{\\\"key\\\": \\\"' || md5(random()::text || clock_timestamp()::text)::varchar || '\\\"}')::jsonb "
+            + "  ('{\\\"key\\\": \\\"' || md5(random()::text || clock_timestamp()::text)::varchar || '\\\"}')::jsonb, "
+            + "  array[(random()*1000000000)::bigint, null, (random()*1000000000)::bigint],\n"
+            + "  array[random()<0.5, null, random()<0.5],\n"
+            + "  array[md5(random()::text ||clock_timestamp()::text)::bytea, null, md5(random()::text ||clock_timestamp()::text)::bytea],\n"
+            + "  array[random()*123456789, null, random()*123456789],\n"
+            + "  array[(random()*999999)::int, null, (random()*999999)::int],\n"
+            + "  array[(random()*999999)::numeric, null, (random()*999999)::numeric],\n"
+            + "  array[now()-random()*interval '50 year', null, now()-random()*interval '50 year'],\n"
+            + "  array[(now()-random()*interval '50 year')::date, null, (now()-random()*interval '50 year')::date],\n"
+            + "  array[md5(random()::text || clock_timestamp()::text)::varchar, null, md5(random()::text || clock_timestamp()::text)::varchar],\n"
+            + "  array[('{\\\"key\\\": \\\"' || md5(random()::text || clock_timestamp()::text)::varchar || '\\\"}')::jsonb, null, ('{\\\"key\\\": \\\"' || md5(random()::text || clock_timestamp()::text)::varchar || '\\\"}')::jsonb]\n"
             + String.format("  from generate_series(1, %d) s(i)) to stdout\" ", numRows)
             + "  | psql "
             + " -h "
@@ -744,7 +950,8 @@ public class ITPsqlTest implements IntegrationTest {
             + POSTGRES_USER
             + " -d "
             + POSTGRES_DATABASE
-            + " -c \"copy all_types from stdin;\"\n");
+            + " -c \"copy all_types "
+            + "from stdin;\"\n");
     setPgPassword(builder);
     Process process = builder.start();
     StringBuilder errors = new StringBuilder();
@@ -753,6 +960,13 @@ public class ITPsqlTest implements IntegrationTest {
         errors.append(scanner.nextLine()).append("\n");
       }
     }
+    StringBuilder output = new StringBuilder();
+    try (Scanner scanner = new Scanner(process.getInputStream())) {
+      while (scanner.hasNextLine()) {
+        output.append(scanner.nextLine()).append("\n");
+      }
+    }
+    assertEquals("COPY " + numRows + "\n", output.toString());
     int res = process.waitFor();
     assertEquals(errors.toString(), 0, res);
   }

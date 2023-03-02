@@ -35,6 +35,7 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection;
 import com.google.cloud.spanner.pgadapter.statements.CopyStatement.Format;
 import com.google.cloud.spanner.pgadapter.utils.CopyInParser;
 import com.google.cloud.spanner.pgadapter.utils.CopyRecord;
@@ -290,7 +291,13 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
   @Test
   public void testCopyOutCsvWithHeader() throws SQLException, IOException {
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of("select * from all_types"), ALL_TYPES_RESULTSET));
+        StatementResult.query(
+            Statement.of("select * from all_types"),
+            ALL_TYPES_RESULTSET
+                .toBuilder()
+                .addRows(ALL_TYPES_RESULTSET.getRows(0))
+                .addRows(ALL_TYPES_NULLS_RESULTSET.getRows(0))
+                .build()));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set time zone 'UTC'");
@@ -301,7 +308,9 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
       assertEquals(
           "col_bigint-col_bool-col_bytea-col_float8-col_int-col_numeric-col_timestamptz-col_date-col_varchar-col_jsonb\n"
-              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n",
+              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n"
+              + "1-t-\\x74657374-3.14-100-6.626-\"2022-02-16 13:18:02.123456+00\"-\"2022-03-29\"-test-\"{~\"key~\": ~\"value~\"}\"\n"
+              + "---------\n",
           writer.toString());
     }
   }
@@ -488,6 +497,47 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCopyOutBinaryEmptyPsql() throws Exception {
+    assumeTrue("This test requires psql", isPsqlAvailable());
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("select * from all_types"),
+            ALL_TYPES_RESULTSET.toBuilder().clearRows().build()));
+
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(
+        "psql",
+        "-h",
+        (useDomainSocket ? "/tmp" : "localhost"),
+        "-p",
+        String.valueOf(pgServer.getLocalPort()),
+        "-c",
+        "copy all_types to stdout binary");
+    Process process = builder.start();
+    StringBuilder errorBuilder = new StringBuilder();
+    try (Scanner scanner = new Scanner(new InputStreamReader(process.getErrorStream()))) {
+      while (scanner.hasNextLine()) {
+        errorBuilder.append(scanner.nextLine()).append('\n');
+      }
+    }
+    PipedOutputStream pipedOutputStream = new PipedOutputStream();
+    PipedInputStream inputStream = new PipedInputStream(pipedOutputStream, 1 << 16);
+    SessionState sessionState = mock(SessionState.class);
+    CopyInParser copyParser =
+        CopyInParser.create(sessionState, Format.BINARY, null, inputStream, false);
+    int b;
+    while ((b = process.getInputStream().read()) != -1) {
+      pipedOutputStream.write(b);
+    }
+    int res = process.waitFor();
+    assertEquals("", errorBuilder.toString());
+    assertEquals(0, res);
+
+    Iterator<CopyRecord> iterator = copyParser.iterator();
+    assertFalse(iterator.hasNext());
+  }
+
+  @Test
   public void testCopyOutNullsBinaryPsql() throws Exception {
     assumeTrue("This test requires psql", isPsqlAvailable());
     mockSpanner.putStatementResult(
@@ -536,30 +586,64 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testCopyOutPartitioned() throws SQLException, IOException {
-    final int expectedRowCount = 100;
-    RandomResultSetGenerator randomResultSetGenerator =
-        new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
-    com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
-    mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of("select * from random"), resultSet));
+    for (int expectedRowCount : new int[] {0, 1, 2, 3, 5, BackendConnection.MAX_PARTITIONS, 100}) {
+      RandomResultSetGenerator randomResultSetGenerator =
+          new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
+      com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
+      mockSpanner.putStatementResult(
+          StatementResult.query(Statement.of("select * from random"), resultSet));
 
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
-      StringWriter writer = new StringWriter();
-      long rows = copyManager.copyOut("COPY random TO STDOUT", writer);
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+        StringWriter writer = new StringWriter();
+        long rows = copyManager.copyOut("COPY random TO STDOUT", writer);
 
-      assertEquals(expectedRowCount, rows);
+        assertEquals(expectedRowCount, rows);
 
-      try (Scanner scanner = new Scanner(writer.toString())) {
-        int lineCount = 0;
-        while (scanner.hasNextLine()) {
-          lineCount++;
-          String line = scanner.nextLine();
-          String[] columns = line.split("\t");
-          int index = findIndex(resultSet, columns);
-          assertNotEquals(String.format("Row %d not found: %s", lineCount, line), -1, index);
+        try (Scanner scanner = new Scanner(writer.toString())) {
+          int lineCount = 0;
+          while (scanner.hasNextLine()) {
+            lineCount++;
+            String line = scanner.nextLine();
+            String[] columns = line.split("\t");
+            int index = findIndex(resultSet, columns);
+            assertNotEquals(String.format("Row %d not found: %s", lineCount, line), -1, index);
+          }
+          assertEquals(expectedRowCount, lineCount);
         }
-        assertEquals(expectedRowCount, lineCount);
+      }
+    }
+  }
+
+  @Test
+  public void testCopyOutPartitionedBinary() throws SQLException, IOException {
+    for (int expectedRowCount : new int[] {0, 1, 2, 3, 5, BackendConnection.MAX_PARTITIONS, 100}) {
+      RandomResultSetGenerator randomResultSetGenerator =
+          new RandomResultSetGenerator(expectedRowCount, Dialect.POSTGRESQL);
+      com.google.spanner.v1.ResultSet resultSet = randomResultSetGenerator.generate();
+      mockSpanner.putStatementResult(
+          StatementResult.query(Statement.of("select * from random"), resultSet));
+
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+        PipedOutputStream pipedOutputStream = new PipedOutputStream();
+        PipedInputStream inputStream = new PipedInputStream(pipedOutputStream, 1 << 20);
+        SessionState sessionState = mock(SessionState.class);
+        CopyInParser copyParser =
+            CopyInParser.create(sessionState, Format.BINARY, null, inputStream, false);
+        long rows = copyManager.copyOut("COPY random TO STDOUT (format binary)", pipedOutputStream);
+
+        assertEquals(expectedRowCount, rows);
+
+        Iterator<CopyRecord> iterator = copyParser.iterator();
+        int recordCount = 0;
+        while (iterator.hasNext()) {
+          recordCount++;
+          CopyRecord record = iterator.next();
+          int index = findIndex(resultSet, record);
+          assertNotEquals(String.format("Row %d not found: %s", recordCount, record), -1, index);
+        }
+        assertEquals(expectedRowCount, recordCount);
       }
     }
   }
@@ -616,6 +700,47 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           if (resultSet.getRows(index).getValues(colIndex).hasBoolValue()
               && !cols[colIndex].equals(
                   resultSet.getRows(index).getValues(colIndex).getBoolValue() ? "t" : "f")) {
+            valuesEqual = false;
+            break;
+          }
+        }
+      }
+      if (valuesEqual) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  static int findIndex(com.google.spanner.v1.ResultSet resultSet, CopyRecord record) {
+    for (int index = 0; index < resultSet.getRowsCount(); index++) {
+      boolean nullValuesEqual = true;
+      for (int colIndex = 0; colIndex < record.numColumns(); colIndex++) {
+        if (record.isNull(colIndex)
+            != resultSet.getRows(index).getValues(colIndex).hasNullValue()) {
+          nullValuesEqual = false;
+          break;
+        }
+      }
+      if (!nullValuesEqual) {
+        continue;
+      }
+
+      boolean valuesEqual = true;
+      for (int colIndex = 0; colIndex < record.numColumns(); colIndex++) {
+        if (!resultSet.getRows(index).getValues(colIndex).hasNullValue()) {
+          if (resultSet.getMetadata().getRowType().getFields(colIndex).getType().getCode()
+                  == TypeCode.STRING
+              && !record
+                  .getValue(Type.string(), colIndex)
+                  .getString()
+                  .equals(resultSet.getRows(index).getValues(colIndex).getStringValue())) {
+            valuesEqual = false;
+            break;
+          }
+          if (resultSet.getRows(index).getValues(colIndex).hasBoolValue()
+              && record.getValue(Type.bool(), colIndex).getBool()
+                  != resultSet.getRows(index).getValues(colIndex).getBoolValue()) {
             valuesEqual = false;
             break;
           }

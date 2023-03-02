@@ -24,6 +24,7 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStateme
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.AutocommitDmlMode;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
+import com.google.cloud.spanner.pgadapter.ProxyServer.DataFormat;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -80,11 +81,21 @@ public class CopyStatement extends IntermediatePortalStatement {
   public enum Format {
     CSV,
     TEXT,
-    BINARY,
+    BINARY {
+      @Override
+      public DataFormat getDataFormat() {
+        return DataFormat.POSTGRESQL_BINARY;
+      }
+    };
+
+    /** Returns the (default) data format that should be used for this copy format. */
+    public DataFormat getDataFormat() {
+      return DataFormat.POSTGRESQL_TEXT;
+    }
   }
 
   private static final String COLUMN_NAME = "column_name";
-  private static final String DATA_TYPE = "data_type";
+  private static final String DATA_TYPE = "spanner_type";
 
   private final ParsedCopyStatement parsedCopyStatement;
   private CSVFormat format;
@@ -230,8 +241,8 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   /** @return 0 for text/csv formatting and 1 for binary */
-  public int getFormatCode() {
-    return (parsedCopyStatement.format == Format.BINARY) ? 1 : 0;
+  public byte getFormatCode() {
+    return (parsedCopyStatement.format == Format.BINARY) ? (byte) 1 : (byte) 0;
   }
 
   private void verifyCopyColumns() {
@@ -254,7 +265,18 @@ public class CopyStatement extends IntermediatePortalStatement {
     this.tableColumns = tempTableColumns;
   }
 
-  private static Type parsePostgreSQLDataType(String columnType) {
+  static Type parsePostgreSQLDataType(String columnType) {
+    if (columnType.endsWith("[]")) {
+      try {
+        Type elementType =
+            parsePostgreSQLDataType(columnType.substring(0, columnType.length() - 2));
+        return Type.array(elementType);
+      } catch (IllegalArgumentException ignore) {
+        throw new IllegalArgumentException(
+            "Unrecognized or unsupported column data type: " + columnType);
+      }
+    }
+
     // Eliminate size modifiers in column type (e.g. character varying(100), etc.)
     int index = columnType.indexOf("(");
     columnType = (index > 0) ? columnType.substring(0, index) : columnType;
@@ -275,6 +297,7 @@ public class CopyStatement extends IntermediatePortalStatement {
         return Type.string();
       case "date":
         return Type.date();
+      case "timestamptz":
       case "timestamp with time zone":
         return Type.timestamp();
       case "jsonb":
@@ -287,23 +310,39 @@ public class CopyStatement extends IntermediatePortalStatement {
 
   private void queryInformationSchema(BackendConnection backendConnection) {
     Map<String, Type> tableColumns = new LinkedHashMap<>();
-    Statement statement =
-        Statement.newBuilder(
-                "SELECT "
-                    + COLUMN_NAME
-                    + ", "
-                    + DATA_TYPE
-                    + " FROM information_schema.columns "
-                    + "WHERE table_schema = $1 "
-                    + "AND table_name = $2")
+    String sql =
+        "SELECT "
+            + COLUMN_NAME
+            + ", "
+            + DATA_TYPE
+            + " FROM information_schema.columns "
+            + "WHERE table_schema = $1 "
+            + "AND table_name = $2 ";
+    // We can't use ANY (and similar) with an array parameter (yet).
+    if (getCopyColumnNames() != null && !getCopyColumnNames().isEmpty()) {
+      sql +=
+          "and column_name in "
+              + IntStream.rangeClosed(3, getCopyColumnNames().size() + 2)
+                  .mapToObj(i -> String.format("$%d", i))
+                  .collect(Collectors.joining(", ", "(", ")"));
+    }
+    Statement.Builder builder =
+        Statement.newBuilder(sql)
             .bind("p1")
             .to(
                 getTableName().schema == null
                     ? backendConnection.getCurrentSchema()
                     : getTableName().getUnquotedSchema())
             .bind("p2")
-            .to(getTableName().getUnquotedName())
-            .build();
+            .to(getTableName().getUnquotedName());
+    if (getCopyColumnNames() != null && !getCopyColumnNames().isEmpty()) {
+      int paramIndex = 3;
+      for (TableOrIndexName columnName : getCopyColumnNames()) {
+        builder.bind(String.format("p%d", paramIndex)).to(columnName.getUnquotedName());
+        paramIndex++;
+      }
+    }
+    Statement statement = builder.build();
     try (ResultSet result = connection.getDatabaseClient().singleUse().executeQuery(statement)) {
       while (result.next()) {
         String columnName = result.getString(COLUMN_NAME);
@@ -552,7 +591,7 @@ public class CopyStatement extends IntermediatePortalStatement {
     }
     ParsedCopyStatement.Builder builder = new ParsedCopyStatement.Builder();
     if (parser.eatToken("(")) {
-      builder.query = parser.parseExpressionUntilKeyword(ImmutableList.of(), true, true);
+      builder.query = parser.parseExpressionUntilKeyword(ImmutableList.of(), true, true, false);
       if (!parser.eatToken(")")) {
         throw PGExceptionFactory.newPGException(
             "missing closing parentheses after query", SQLState.SyntaxError);

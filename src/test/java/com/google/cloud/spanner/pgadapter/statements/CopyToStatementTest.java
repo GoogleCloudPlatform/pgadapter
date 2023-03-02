@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
@@ -90,5 +91,15 @@ public class CopyToStatementTest {
     CopyToStatement statement =
         new CopyToStatement(connectionHandler, options, "", parsedCopyStatement);
     assertEquals("\n", statement.getCsvFormat().getRecordSeparator());
+  }
+
+  @Test
+  public void testCopyQuery() {
+    String query =
+        "select executed_at, workload, threads, batch_size, operation_count, round(read_avg/1000) as read_avg, round(read_p95/1000) as read_p95 from run where true and workload='a' and threads=20 and deployment='java_uds' order by executed_at desc limit 100";
+    ParsedCopyStatement parsedCopyStatement =
+        CopyStatement.parse(String.format("copy (%s) to stdout\n", query));
+    assertNotNull(parsedCopyStatement);
+    assertEquals(parsedCopyStatement.query, query);
   }
 }

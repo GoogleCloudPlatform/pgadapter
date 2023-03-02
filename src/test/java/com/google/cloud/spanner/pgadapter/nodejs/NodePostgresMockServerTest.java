@@ -206,10 +206,9 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(1, executeRequest.getParamTypesCount());
-    // TODO: Enable when node-postgres 8.9 has been released.
-    //    assertTrue(executeRequest.getTransaction().hasBegin());
-    //    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
-    //    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -259,9 +258,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("some-random-string")
                 .bind("p10")
-                // TODO: Change to jsonb when https://github.com/googleapis/java-spanner/pull/2182
-                //       has been merged.
-                .to(Value.json("{\"my_key\":\"my-value\"}"))
+                .to(Value.pgJsonb("{\"my_key\":\"my-value\"}"))
                 .build(),
             1L);
     mockSpanner.putStatementResult(updateResult);
@@ -284,10 +281,9 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(10, executeRequest.getParamTypesCount());
-    // TODO: Enable once node-postgres 8.9 is released.
-    //    assertTrue(executeRequest.getTransaction().hasBegin());
-    //    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
-    //    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test
@@ -386,9 +382,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("some-random-string")
                 .bind("p10")
-                // TODO: Change to jsonb when https://github.com/googleapis/java-spanner/pull/2182
-                //       has been merged.
-                .to(Value.json("{\"my_key\":\"my-value\"}"))
+                .to(Value.pgJsonb("{\"my_key\":\"my-value\"}"))
                 .build(),
             1L);
     mockSpanner.putStatementResult(updateResult);
@@ -416,9 +410,7 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to((String) null)
                 .bind("p10")
-                // TODO: Change to jsonb when https://github.com/googleapis/java-spanner/pull/2182
-                //       has been merged.
-                .to(Value.json(null))
+                .to(Value.pgJsonb(null))
                 .build(),
             1L));
 
@@ -454,10 +446,9 @@ public class NodePostgresMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(sql, executeRequest.getSql());
     assertEquals(10, executeRequest.getParamTypesCount());
-    // TODO: Enable once node-postgres 8.9 is released.
-    //    assertTrue(executeRequest.getTransaction().hasBegin());
-    //    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
-    //    assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(3, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test

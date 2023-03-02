@@ -26,12 +26,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.cloud.spanner.DatabaseId;
 import com.google.cloud.spanner.Dialect;
 import com.google.cloud.spanner.ErrorCode;
+import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerBatchUpdateException;
 import com.google.cloud.spanner.SpannerException;
@@ -43,9 +45,13 @@ import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.StatementResult;
 import com.google.cloud.spanner.connection.StatementResult.ResultType;
+import com.google.cloud.spanner.connection.TransactionMode;
+import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
+import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import com.google.cloud.spanner.pgadapter.statements.BackendConnection.QueryResult;
@@ -213,8 +219,8 @@ public class BackendConnectionTest {
             ImmutableList::of);
     onlyDmlStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
     onlyDmlStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
-    assertTrue(onlyDmlStatements.hasDmlOrCopyStatementsAfter(0));
-    assertTrue(onlyDmlStatements.hasDmlOrCopyStatementsAfter(1));
+    assertTrue(onlyDmlStatements.hasUpdateStatementsAfter(0));
+    assertTrue(onlyDmlStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection onlyCopyStatements =
         new BackendConnection(
@@ -225,8 +231,8 @@ public class BackendConnectionTest {
             ImmutableList::of);
     onlyCopyStatements.executeCopy(parsedCopyStatement, copyStatement, receiver, writer, executor);
     onlyCopyStatements.executeCopy(parsedCopyStatement, copyStatement, receiver, writer, executor);
-    assertTrue(onlyCopyStatements.hasDmlOrCopyStatementsAfter(0));
-    assertTrue(onlyCopyStatements.hasDmlOrCopyStatementsAfter(1));
+    assertTrue(onlyCopyStatements.hasUpdateStatementsAfter(0));
+    assertTrue(onlyCopyStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection dmlAndCopyStatements =
         new BackendConnection(
@@ -238,8 +244,8 @@ public class BackendConnectionTest {
     dmlAndCopyStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
     dmlAndCopyStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
-    assertTrue(dmlAndCopyStatements.hasDmlOrCopyStatementsAfter(0));
-    assertTrue(dmlAndCopyStatements.hasDmlOrCopyStatementsAfter(1));
+    assertTrue(dmlAndCopyStatements.hasUpdateStatementsAfter(0));
+    assertTrue(dmlAndCopyStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection onlySelectStatements =
         new BackendConnection(
@@ -250,8 +256,8 @@ public class BackendConnectionTest {
             ImmutableList::of);
     onlySelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
     onlySelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
-    assertFalse(onlySelectStatements.hasDmlOrCopyStatementsAfter(0));
-    assertFalse(onlySelectStatements.hasDmlOrCopyStatementsAfter(1));
+    assertFalse(onlySelectStatements.hasUpdateStatementsAfter(0));
+    assertFalse(onlySelectStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection onlyClientSideStatements =
         new BackendConnection(
@@ -264,8 +270,8 @@ public class BackendConnectionTest {
         parsedClientSideStatement, clientSideStatement, Function.identity());
     onlyClientSideStatements.execute(
         parsedClientSideStatement, clientSideStatement, Function.identity());
-    assertFalse(onlyClientSideStatements.hasDmlOrCopyStatementsAfter(0));
-    assertFalse(onlyClientSideStatements.hasDmlOrCopyStatementsAfter(1));
+    assertFalse(onlyClientSideStatements.hasUpdateStatementsAfter(0));
+    assertFalse(onlyClientSideStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection onlyUnknownStatements =
         new BackendConnection(
@@ -276,8 +282,8 @@ public class BackendConnectionTest {
             ImmutableList::of);
     onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
     onlyUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
-    assertFalse(onlyUnknownStatements.hasDmlOrCopyStatementsAfter(0));
-    assertFalse(onlyUnknownStatements.hasDmlOrCopyStatementsAfter(1));
+    assertFalse(onlyUnknownStatements.hasUpdateStatementsAfter(0));
+    assertFalse(onlyUnknownStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection dmlAndSelectStatements =
         new BackendConnection(
@@ -288,8 +294,8 @@ public class BackendConnectionTest {
             ImmutableList::of);
     dmlAndSelectStatements.execute(parsedUpdateStatement, updateStatement, Function.identity());
     dmlAndSelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
-    assertTrue(dmlAndSelectStatements.hasDmlOrCopyStatementsAfter(0));
-    assertFalse(dmlAndSelectStatements.hasDmlOrCopyStatementsAfter(1));
+    assertTrue(dmlAndSelectStatements.hasUpdateStatementsAfter(0));
+    assertFalse(dmlAndSelectStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection copyAndSelectStatements =
         new BackendConnection(
@@ -301,8 +307,8 @@ public class BackendConnectionTest {
     copyAndSelectStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
     copyAndSelectStatements.execute(parsedSelectStatement, selectStatement, Function.identity());
-    assertTrue(copyAndSelectStatements.hasDmlOrCopyStatementsAfter(0));
-    assertFalse(copyAndSelectStatements.hasDmlOrCopyStatementsAfter(1));
+    assertTrue(copyAndSelectStatements.hasUpdateStatementsAfter(0));
+    assertFalse(copyAndSelectStatements.hasUpdateStatementsAfter(1));
 
     BackendConnection copyAndUnknownStatements =
         new BackendConnection(
@@ -314,8 +320,8 @@ public class BackendConnectionTest {
     copyAndUnknownStatements.executeCopy(
         parsedCopyStatement, copyStatement, receiver, writer, executor);
     copyAndUnknownStatements.execute(parsedUnknownStatement, unknownStatement, Function.identity());
-    assertTrue(copyAndUnknownStatements.hasDmlOrCopyStatementsAfter(0));
-    assertFalse(copyAndUnknownStatements.hasDmlOrCopyStatementsAfter(1));
+    assertTrue(copyAndUnknownStatements.hasUpdateStatementsAfter(0));
+    assertFalse(copyAndUnknownStatements.hasUpdateStatementsAfter(1));
   }
 
   @Test
@@ -509,28 +515,7 @@ public class BackendConnectionTest {
     verify(connection)
         .execute(
             Statement.of(
-                "with pg_namespace as (\n"
-                    + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-                    + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-                    + "  from information_schema.schemata\n"
-                    + "),\n"
-                    + "pg_type as (\n"
-                    + "  select 16 as oid, 'bool' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 1 as typlen, true as typbyval, 'b' as typtype, 'B' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1000 as typarray, 'boolin' as typinput, 'boolout' as typoutput, 'boolrecv' as typreceive, 'boolsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 17 as oid, 'bytea' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1001 as typarray, 'byteain' as typinput, 'byteaout' as typoutput, 'bytearecv' as typreceive, 'byteasend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 20 as oid, 'int8' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1016 as typarray, 'int8in' as typinput, 'int8out' as typoutput, 'int8recv' as typreceive, 'int8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 21 as oid, 'int2' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 2 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1005 as typarray, 'int2in' as typinput, 'int2out' as typoutput, 'int2recv' as typreceive, 'int2send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 's' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 23 as oid, 'int4' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1007 as typarray, 'int4in' as typinput, 'int4out' as typoutput, 'int4recv' as typreceive, 'int4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 25 as oid, 'text' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1009 as typarray, 'textin' as typinput, 'textout' as typoutput, 'textrecv' as typreceive, 'textsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 700 as oid, 'float4' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1021 as typarray, 'float4in' as typinput, 'float4out' as typoutput, 'float4recv' as typreceive, 'float4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 701 as oid, 'float8' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1022 as typarray, 'float8in' as typinput, 'float8out' as typoutput, 'float8recv' as typreceive, 'float8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1043 as oid, 'varchar' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1015 as typarray, 'varcharin' as typinput, 'varcharout' as typoutput, 'varcharrecv' as typreceive, 'varcharsend' as typsend, 'varchartypmodin' as typmodin, 'varchartypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1082 as oid, 'date' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1182 as typarray, 'date_in' as typinput, 'date_out' as typoutput, 'date_recv' as typreceive, 'date_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1114 as oid, 'timestamp' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1115 as typarray, 'timestamp_in' as typinput, 'timestamp_out' as typoutput, 'timestamp_recv' as typreceive, 'timestamp_send' as typsend, 'timestamptypmodin' as typmodin, 'timestamptypmodout' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1184 as oid, 'timestamptz' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1185 as typarray, 'timestamptz_in' as typinput, 'timestamptz_out' as typoutput, 'timestamptz_recv' as typreceive, 'timestamptz_send' as typsend, 'timestamptztypmodin' as typmodin, 'timestamptztypmodout' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1700 as oid, 'numeric' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1231 as typarray, 'numeric_in' as typinput, 'numeric_out' as typoutput, 'numeric_recv' as typreceive, 'numeric_send' as typsend, 'numerictypmodin' as typmodin, 'numerictypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'm' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 3802 as oid, 'jsonb' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 3807 as typarray, 'jsonb_in' as typinput, 'jsonb_out' as typoutput, 'jsonb_recv' as typreceive, 'jsonb_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl\n"
-                    + ")\n"
-                    + "select * from pg_type"));
+                "with " + AbstractMockServerTest.PG_TYPE_PREFIX + "\nselect * from pg_type"));
   }
 
   @Test
@@ -558,9 +543,119 @@ public class BackendConnectionTest {
 
   @Test
   public void testDoNotStartTransactionInBatch() {
+    for (boolean ddl : new boolean[] {true, false}) {
+      Connection connection = mock(Connection.class);
+      if (ddl) {
+        when(connection.isDdlBatchActive()).thenReturn(true);
+      } else {
+        when(connection.isDmlBatchActive()).thenReturn(true);
+      }
+      Statement statement = Statement.of("insert into foo values (1)");
+      ParsedStatement parsedStatement =
+          AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+
+      BackendConnection backendConnection =
+          new BackendConnection(
+              DatabaseId.of("p", "i", "d"),
+              connection,
+              () -> WellKnownClient.UNSPECIFIED,
+              mock(OptionsMetadata.class),
+              () -> EMPTY_LOCAL_STATEMENTS);
+
+      backendConnection.execute(parsedStatement, statement, Function.identity());
+      backendConnection.flush();
+
+      verify(connection).execute(statement);
+      verify(connection, never()).beginTransaction();
+    }
+  }
+
+  @Test
+  public void testDescribeAndExecuteSameStatement_doesNotStartTransaction() {
     Connection connection = mock(Connection.class);
-    when(connection.isDmlBatchActive()).thenReturn(true);
-    Statement statement = Statement.of("insert into foo values (1)");
+    Statement statement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    // Describing and executing the same statement in one pipelined operation should not start an
+    // implicit transaction.
+    backendConnection.analyze(parsedStatement, statement);
+    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).analyzeQuery(statement, QueryAnalyzeMode.PLAN);
+    verify(connection).execute(statement);
+    verify(connection, never()).beginTransaction();
+  }
+
+  @Test
+  public void testDescribeAndExecuteDifferentStatements_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement statement1 = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedStatement1 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement1);
+    Statement statement2 = Statement.of("select * from bar where id=$1");
+    ParsedStatement parsedStatement2 =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement1);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    // Describing and executing different queries in one pipelined operation should start an
+    // implicit read-only transaction.
+    backendConnection.analyze(parsedStatement1, statement1);
+    backendConnection.execute(parsedStatement2, statement2, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).analyzeQuery(statement1, QueryAnalyzeMode.PLAN);
+    verify(connection).execute(statement2);
+    verify(connection).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).beginTransaction();
+  }
+
+  @Test
+  public void testExecuteSameStatementTwice_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement statement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    // Executing the same query twice in one pipelined operation should start an
+    // implicit read-only transaction.
+    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection, times(2)).execute(statement);
+    verify(connection).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).beginTransaction();
+  }
+
+  @Test
+  public void testExecuteAndCopy_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement statement = Statement.of("select * from foo where id=$1");
     ParsedStatement parsedStatement =
         AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
 
@@ -573,9 +668,82 @@ public class BackendConnectionTest {
             () -> EMPTY_LOCAL_STATEMENTS);
 
     backendConnection.execute(parsedStatement, statement, Function.identity());
-    backendConnection.flush();
+    backendConnection.executeCopyOut(parsedStatement, statement);
+    backendConnection.sync();
 
     verify(connection).execute(statement);
-    verify(connection, never()).beginTransaction();
+    verify(connection).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).beginTransaction();
+  }
+
+  @Test
+  public void testTruncateAndExecute_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement statement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    String truncateSql = "truncate foo";
+    TruncateStatement truncateStatement =
+        new TruncateStatement(
+            connectionHandler,
+            mock(OptionsMetadata.class),
+            "",
+            AbstractStatementParser.getInstance(Dialect.POSTGRESQL)
+                .parse(Statement.of(truncateSql)),
+            Statement.of(truncateSql));
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(truncateStatement);
+    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.sync();
+
+    verify(connection).execute(statement);
+    verify(connection, never()).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).beginTransaction();
+  }
+
+  @Test
+  public void testExecuteAndVacuum_startsTransaction() {
+    Connection connection = mock(Connection.class);
+    Statement statement = Statement.of("select * from foo where id=$1");
+    ParsedStatement parsedStatement =
+        AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(statement);
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ConnectionMetadata connectionMetadata = mock(ConnectionMetadata.class);
+    when(connectionHandler.getConnectionMetadata()).thenReturn(connectionMetadata);
+    String vacuumSql = "vacuum foo";
+    VacuumStatement vacuumStatement =
+        new VacuumStatement(
+            connectionHandler,
+            mock(OptionsMetadata.class),
+            "",
+            AbstractStatementParser.getInstance(Dialect.POSTGRESQL).parse(Statement.of(vacuumSql)),
+            Statement.of(vacuumSql));
+
+    BackendConnection backendConnection =
+        new BackendConnection(
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            mock(OptionsMetadata.class),
+            () -> EMPTY_LOCAL_STATEMENTS);
+
+    backendConnection.execute(parsedStatement, statement, Function.identity());
+    backendConnection.execute(vacuumStatement);
+    backendConnection.sync();
+
+    verify(connection).execute(statement);
+    verify(connection).setTransactionMode(TransactionMode.READ_ONLY_TRANSACTION);
+    verify(connection).beginTransaction();
   }
 }
