@@ -132,15 +132,9 @@ public class TypeORMMockServerTest extends AbstractMockServerTest {
     ExecuteSqlRequest describeRequest = executeSqlRequests.get(0);
     ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
-    assertEquals(1, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
-    assertTrue(
-        mockSpanner
-            .getRequestsOfType(BeginTransactionRequest.class)
-            .get(0)
-            .getOptions()
-            .hasReadOnly());
-    assertTrue(describeRequest.getTransaction().hasId());
-    assertTrue(executeRequest.getTransaction().hasId());
+    assertEquals(0, mockSpanner.countRequestsOfType(BeginTransactionRequest.class));
+    assertTrue(describeRequest.getTransaction().hasSingleUse());
+    assertTrue(executeRequest.getTransaction().hasSingleUse());
   }
 
   @Test

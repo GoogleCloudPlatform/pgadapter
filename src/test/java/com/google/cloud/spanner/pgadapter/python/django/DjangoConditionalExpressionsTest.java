@@ -21,7 +21,6 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.ExecuteSqlRequest;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
@@ -43,7 +42,7 @@ public class DjangoConditionalExpressionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testConditionalUpdate() throws IOException, InterruptedException {
+  public void testConditionalUpdate() throws Exception {
     String sqlUpdate =
         "UPDATE \"singers\" SET \"firstname\" = CASE WHEN (\"singers\".\"firstname\" = 'hello') THEN 'h' WHEN (\"singers\".\"firstname\" = 'world') THEN 'w' ELSE 'n' END";
 
@@ -60,7 +59,7 @@ public class DjangoConditionalExpressionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testConditionalAggregation() throws IOException, InterruptedException {
+  public void testConditionalAggregation() throws Exception {
     String sqlSelect =
         "SELECT COUNT(\"singers\".\"singerid\") FILTER (WHERE \"singers\".\"firstname\" = 'hello') AS \"hello_count\", COUNT(\"singers\".\"singerid\") FILTER (WHERE \"singers\".\"firstname\" = 'world') AS \"world_count\" FROM \"singers\"";
 
@@ -89,7 +88,7 @@ public class DjangoConditionalExpressionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testConditionalFilter() throws IOException, InterruptedException {
+  public void testConditionalFilter() throws Exception {
     String sqlSelect =
         "SELECT \"singers\".\"singerid\", \"singers\".\"firstname\", \"singers\".\"lastname\" FROM \"singers\" WHERE UPPER(\"singers\".\"firstname\"::text) LIKE '%' || UPPER(REPLACE(REPLACE(REPLACE((CASE WHEN \"singers\".\"lastname\" = 'world' THEN 'w' WHEN \"singers\".\"lastname\" = 'hello' THEN 'h' ELSE NULL END), E'\\\\', E'\\\\\\\\'), E'%', E'\\\\%'), E'_', E'\\\\_')) || '%'";
 
@@ -126,7 +125,7 @@ public class DjangoConditionalExpressionsTest extends DjangoTestSetup {
   }
 
   @Test
-  public void testConditionalAnnotation() throws IOException, InterruptedException {
+  public void testConditionalAnnotation() throws Exception {
     String sqlSelect =
         "SELECT \"singers\".\"singerid\", \"singers\".\"firstname\", CASE WHEN UPPER(\"singers\".\"firstname\"::text) LIKE UPPER('%hello%') THEN 'hello singer' WHEN UPPER(\"singers\".\"firstname\"::text) LIKE UPPER('%world%') THEN 'world singer' ELSE NULL END AS \"type\" FROM \"singers\" LIMIT 21";
 
