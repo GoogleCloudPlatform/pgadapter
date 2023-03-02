@@ -91,7 +91,7 @@ public class ArrayParser extends Parser<List<?>> {
               stringArrayToList(
                   new String(item, StandardCharsets.UTF_8),
                   elementOid,
-                  this.isStringEquivalent,
+                  mustBeQuoted(elementOid),
                   this.sessionState,
                   false);
           break;
@@ -138,14 +138,14 @@ public class ArrayParser extends Parser<List<?>> {
   public static List<?> stringArrayToList(
       @Nullable String value,
       int elementOid,
-      boolean isStringEquivalent,
+      boolean mustBeQuoted,
       SessionState sessionState,
       boolean convertToValidSpannerElements) {
     if (value == null) {
       return null;
     }
     List<String> values =
-        SimpleParser.readArrayLiteral(value, isStringEquivalent, elementOid == Oid.BYTEA);
+        SimpleParser.readArrayLiteral(value, mustBeQuoted, elementOid == Oid.BYTEA);
     ArrayList<Object> result = new ArrayList<>(values.size());
     for (String element : values) {
       if (element == null) {
@@ -263,6 +263,10 @@ public class ArrayParser extends Parser<List<?>> {
       default:
         return false;
     }
+  }
+
+  private boolean mustBeQuoted(int arrayElementTypeOid) {
+    return false;
   }
 
   /**

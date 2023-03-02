@@ -39,6 +39,7 @@ import com.google.spanner.v1.ResultSetStats;
 import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.TypeCode;
 import io.grpc.Status;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -94,25 +95,35 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
                 com.google.cloud.spanner.Value.pgJsonb(
                     "{\"key1\": \"value1\", \"key2\": \"value2\"}"))
             .bind("p11")
-            .to((com.google.cloud.spanner.Value) null)
+            .toInt64Array(Arrays.asList(1L, null, 2L))
             .bind("p12")
-            .to((com.google.cloud.spanner.Value) null)
+            .toBoolArray(Arrays.asList(true, null, false))
             .bind("p13")
-            .to((com.google.cloud.spanner.Value) null)
+            .toBytesArray(
+                Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
             .bind("p14")
-            .to((com.google.cloud.spanner.Value) null)
+            .toFloat64Array(Arrays.asList(-3.14d, null, 99.99d))
             .bind("p15")
-            .to((com.google.cloud.spanner.Value) null)
+            .toInt64Array(Arrays.asList(-100L, null, -200L))
             .bind("p16")
-            .to((com.google.cloud.spanner.Value) null)
+            .toPgNumericArray(Arrays.asList("-6.626", null, "99.99"))
             .bind("p17")
-            .to((com.google.cloud.spanner.Value) null)
+            .toTimestampArray(
+                Arrays.asList(
+                    Timestamp.parseTimestamp("2010-11-08T17:33:12Z"),
+                    null,
+                    Timestamp.parseTimestamp("2012-05-04T23:05:23.123Z")))
             .bind("p18")
-            .to((com.google.cloud.spanner.Value) null)
+            .toDateArray(
+                Arrays.asList(Date.parseDate("2010-11-08"), null, Date.parseDate("2012-05-05")))
             .bind("p19")
-            .to((com.google.cloud.spanner.Value) null)
+            .toStringArray(Arrays.asList("string1", null, "string2"))
             .bind("p20")
-            .to((com.google.cloud.spanner.Value) null)
+            .toPgJsonbArray(
+                Arrays.asList(
+                    "{\"key1\": \"value1\", \"key2\": \"value2\"}",
+                    "null",
+                    "{\"key1\": \"value3\", \"key2\": \"value4\"}"))
             .build();
     mockSpanner.putStatementResult(StatementResult.update(statement, 1L));
 
@@ -979,7 +990,8 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
                             TypeCode.TIMESTAMP,
                             TypeCode.DATE,
                             TypeCode.STRING,
-                            TypeCode.JSON)))
+                            TypeCode.JSON),
+                        true))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
   }
