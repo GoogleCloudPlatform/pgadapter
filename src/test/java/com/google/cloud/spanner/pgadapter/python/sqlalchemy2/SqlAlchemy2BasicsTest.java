@@ -132,7 +132,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
                 .build()));
 
     String actualOutput = execute("hello_world.py", host, pgServer.getLocalPort());
-    String expectedOutput = "[('hello world',)]\n";
+    String expectedOutput = "[('hello world',)]\n[('sqlalchemy2',)]\n";
     assertEquals(expectedOutput, actualOutput);
 
     // The 'get hstore type' statement is auto-described and then executed, hence 3 requests.

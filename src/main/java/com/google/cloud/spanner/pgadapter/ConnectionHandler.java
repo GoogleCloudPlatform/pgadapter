@@ -72,6 +72,7 @@ import java.text.MessageFormat;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -124,6 +125,13 @@ public class ConnectionHandler extends Thread {
   private int invalidMessagesCount;
   private Connection spannerConnection;
   private DatabaseId databaseId;
+  /**
+   * List of PARSE messages that we received before auto-detecting the client. This list can be used
+   * by the detector to determine which client is connected, and is cleared after the detection is
+   * done.
+   */
+  private final LinkedList<ParseMessage> skippedAutoDetectParseMessages = new LinkedList<>();
+
   private WellKnownClient wellKnownClient = WellKnownClient.UNSPECIFIED;
   private boolean hasDeterminedClientUsingQuery;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
@@ -728,9 +736,12 @@ public class ConnectionHandler extends Thread {
     if (!this.hasDeterminedClientUsingQuery) {
       if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
           && getServer().getOptions().shouldAutoDetectClient()) {
-        setWellKnownClient(ClientAutoDetector.detectClient(ImmutableList.of(statement)));
+        setWellKnownClient(
+            ClientAutoDetector.detectClient(
+                skippedAutoDetectParseMessages, ImmutableList.of(statement)));
       }
       maybeSetApplicationName();
+      skippedAutoDetectParseMessages.clear();
       // Make sure that we only try to detect the client once.
       this.hasDeterminedClientUsingQuery = true;
     }
@@ -743,15 +754,21 @@ public class ConnectionHandler extends Thread {
    * messages.
    */
   public void maybeDetermineWellKnownClient(ParseMessage parseMessage) {
-    if (!this.hasDeterminedClientUsingQuery
-        && parseMessage.getStatement().getStatementType() != StatementType.CLIENT_SIDE) {
-      if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
-          && getServer().getOptions().shouldAutoDetectClient()) {
-        setWellKnownClient(ClientAutoDetector.detectClient(parseMessage));
+    if (!this.hasDeterminedClientUsingQuery) {
+      if (parseMessage.getStatement().getStatementType() == StatementType.CLIENT_SIDE
+          && skippedAutoDetectParseMessages.size() < 10) {
+        skippedAutoDetectParseMessages.add(parseMessage);
+      } else {
+        if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
+            && getServer().getOptions().shouldAutoDetectClient()) {
+          setWellKnownClient(
+              ClientAutoDetector.detectClient(skippedAutoDetectParseMessages, parseMessage));
+        }
+        maybeSetApplicationName();
+        skippedAutoDetectParseMessages.clear();
+        // Make sure that we only try to detect the client once.
+        this.hasDeterminedClientUsingQuery = true;
       }
-      maybeSetApplicationName();
-      // Make sure that we only try to detect the client once.
-      this.hasDeterminedClientUsingQuery = true;
     }
   }
 

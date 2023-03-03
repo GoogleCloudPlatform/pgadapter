@@ -30,9 +30,11 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
+import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -309,6 +311,7 @@ public class ClientAutoDetectorTest {
     assertEquals(
         WellKnownClient.NPGSQL,
         ClientAutoDetector.detectClient(
+            Collections.emptyList(),
             ImmutableList.of(
                 Statement.of(
                     "SELECT version();\n"
@@ -316,16 +319,71 @@ public class ClientAutoDetectorTest {
                         + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n"))));
     assertEquals(
         WellKnownClient.UNSPECIFIED,
-        ClientAutoDetector.detectClient(ImmutableList.of(Statement.of("SELECT version()"))));
+        ClientAutoDetector.detectClient(
+            Collections.emptyList(), ImmutableList.of(Statement.of("SELECT version()"))));
     assertEquals(
         WellKnownClient.UNSPECIFIED,
         ClientAutoDetector.detectClient(
+            Collections.emptyList(),
             ImmutableList.of(
                 Statement.of(
                     "SELECT version();\n"
                         + "\n"
                         + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n"),
                 Statement.of("SELECT version();"))));
+  }
+
+  @Test
+  public void testSQLAlchemy2() {
+    assertNotEquals(
+        WellKnownClient.SQLALCHEMY2,
+        ClientAutoDetector.detectClient(ImmutableList.of(), ImmutableMap.of()));
+    assertNotEquals(
+        WellKnownClient.SQLALCHEMY2,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of("some-param"), ImmutableMap.of("some-param", "some-value")));
+
+    ConnectionHandler connectionHandler = mock(ConnectionHandler.class);
+    ProxyServer server = mock(ProxyServer.class);
+    OptionsMetadata options = mock(OptionsMetadata.class);
+    when(connectionHandler.getServer()).thenReturn(server);
+    when(server.getOptions()).thenReturn(options);
+    for (boolean useDefaultLocalStatements : new boolean[] {true, false}) {
+      when(options.useDefaultLocalStatements()).thenReturn(useDefaultLocalStatements);
+      if (useDefaultLocalStatements) {
+        assertEquals(
+            DEFAULT_LOCAL_STATEMENTS,
+            WellKnownClient.SQLALCHEMY2.getLocalStatements(connectionHandler));
+      } else {
+        assertEquals(
+            EMPTY_LOCAL_STATEMENTS,
+            WellKnownClient.SQLALCHEMY2.getLocalStatements(connectionHandler));
+      }
+    }
+    assertEquals(
+        WellKnownClient.UNSPECIFIED,
+        ClientAutoDetector.detectClient(
+            Collections.emptyList(),
+            ImmutableList.of(Statement.of("select pg_catalog.version()"))));
+
+    ParseMessage parseMessage = mock(ParseMessage.class);
+    when(parseMessage.getSql()).thenReturn("BEGIN");
+    assertEquals(
+        WellKnownClient.SQLALCHEMY2,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of(parseMessage),
+            ImmutableList.of(Statement.of("select pg_catalog.version()"))));
+    when(parseMessage.getSql()).thenReturn("begin");
+    assertEquals(
+        WellKnownClient.UNSPECIFIED,
+        ClientAutoDetector.detectClient(
+            ImmutableList.of(parseMessage),
+            ImmutableList.of(Statement.of("select pg_catalog.version()"))));
+
+    assertEquals(
+        WellKnownClient.UNSPECIFIED,
+        ClientAutoDetector.detectClient(
+            Collections.emptyList(), ImmutableList.of(Statement.of("SELECT version()"))));
   }
 
   @Test

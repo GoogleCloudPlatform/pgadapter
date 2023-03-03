@@ -21,3 +21,5 @@ engine = create_test_engine(autocommit=True)
 with engine.connect() as conn:
   result = conn.execute(text("select 'hello world'"))
   print(result.all())
+  result = conn.execute(text("show application_name"))
+  print(result.all())
