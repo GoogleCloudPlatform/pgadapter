@@ -561,10 +561,6 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
 
   @Test
   public void testCreateRelationships() throws Exception {
-    //    String insertUserSql =
-    //        "INSERT INTO user_account (name, fullname) "
-    //            + "VALUES ('pkrabs', 'Pearl Krabs') "
-    //            + "RETURNING user_account.id";
     String insertUserSql =
         "INSERT INTO user_account (name, fullname) "
             + "VALUES ($1::VARCHAR(30), $2::VARCHAR) "
@@ -836,25 +832,25 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
                 com.google.cloud.spanner.Value.pgJsonb(
                     "{\"key1\": \"value1\", \"key2\": \"value2\"}"))
             .bind("p11")
-            .to((com.google.cloud.spanner.Value) null)
+            .toInt64Array((long[]) null)
             .bind("p12")
-            .to((com.google.cloud.spanner.Value) null)
+            .toBoolArray((boolean[]) null)
             .bind("p13")
-            .to((com.google.cloud.spanner.Value) null)
+            .toBytesArray(null)
             .bind("p14")
-            .to((com.google.cloud.spanner.Value) null)
+            .toFloat64Array((double[]) null)
             .bind("p15")
-            .to((com.google.cloud.spanner.Value) null)
+            .toInt64Array((long[]) null)
             .bind("p16")
-            .to((com.google.cloud.spanner.Value) null)
+            .toPgNumericArray(null)
             .bind("p17")
-            .to((com.google.cloud.spanner.Value) null)
+            .toTimestampArray(null)
             .bind("p18")
-            .to((com.google.cloud.spanner.Value) null)
+            .toDateArray(null)
             .bind("p19")
-            .to((com.google.cloud.spanner.Value) null)
+            .toStringArray(null)
             .bind("p20")
-            .to((com.google.cloud.spanner.Value) null)
+            .toPgJsonbArray(null)
             .build();
     mockSpanner.putStatementResult(
         StatementResult.exception(
@@ -916,25 +912,25 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
                 com.google.cloud.spanner.Value.pgJsonb(
                     "{\"key1\": \"value1\", \"key2\": \"value2\"}"))
             .bind("p11")
-            .to((com.google.cloud.spanner.Value) null)
+            .toInt64Array((long[]) null)
             .bind("p12")
-            .to((com.google.cloud.spanner.Value) null)
+            .toBoolArray((boolean[]) null)
             .bind("p13")
-            .to((com.google.cloud.spanner.Value) null)
+            .toBytesArray(null)
             .bind("p14")
-            .to((com.google.cloud.spanner.Value) null)
+            .toFloat64Array((double[]) null)
             .bind("p15")
-            .to((com.google.cloud.spanner.Value) null)
+            .toInt64Array((long[]) null)
             .bind("p16")
-            .to((com.google.cloud.spanner.Value) null)
+            .toPgNumericArray(null)
             .bind("p17")
-            .to((com.google.cloud.spanner.Value) null)
+            .toTimestampArray(null)
             .bind("p18")
-            .to((com.google.cloud.spanner.Value) null)
+            .toDateArray(null)
             .bind("p19")
-            .to((com.google.cloud.spanner.Value) null)
+            .toStringArray(null)
             .bind("p20")
-            .to((com.google.cloud.spanner.Value) null)
+            .toPgJsonbArray(null)
             .build();
     mockSpanner.putStatementResult(
         StatementResult.exception(
