@@ -32,6 +32,7 @@ import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.v1.BeginTransactionRequest;
 import com.google.spanner.v1.CommitRequest;
+import com.google.spanner.v1.ExecuteBatchDmlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
@@ -964,9 +965,76 @@ public class SqlAlchemy2OrmTest extends AbstractMockServerTest {
     assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
+  @Test
+  public void testInsertAll() throws Exception {
+    String sql = getInsertAllTypesSql();
+    addDescribeInsertAllTypesResult();
+    mockSpanner.putStatementResult(StatementResult.update(createInsertAllTypesNullValues(1L), 1L));
+    mockSpanner.putStatementResult(StatementResult.update(createInsertAllTypesNullValues(2L), 1L));
+    mockSpanner.putStatementResult(StatementResult.update(createInsertAllTypesNullValues(3L), 1L));
+
+    String actualOutput = execute("orm_insert_all.py", host, pgServer.getLocalPort());
+    String expectedOutput = "Inserted 3 row(s)\n";
+    assertEquals(expectedOutput, actualOutput);
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest executeRequest =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(executeRequest.getTransaction().hasBegin());
+    assertTrue(executeRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(3, executeRequest.getStatementsCount());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
   private static String getInsertAllTypesSql() {
     return "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
         + "VALUES ($1::INTEGER, $2, $3, $4, $5::INTEGER, $6, $7::TIMESTAMP WITH TIME ZONE, $8::DATE, $9::VARCHAR, $10::JSONB, $11::INTEGER[], $12::BOOLEAN[], $13::BYTEA[], $14::FLOAT[], $15::INTEGER[], $16::NUMERIC[], $17::TIMESTAMP WITH TIME ZONE[], $18::DATE[], $19::VARCHAR[], $20::JSONB[])";
+  }
+
+  private Statement createInsertAllTypesNullValues(long id) {
+    return Statement.newBuilder(getInsertAllTypesSql())
+        .bind("p1")
+        .to(id)
+        .bind("p2")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p3")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p4")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p5")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p6")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p7")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p8")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p9")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p10")
+        .to(com.google.cloud.spanner.Value.pgJsonb("null"))
+        .bind("p11")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p12")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p13")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p14")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p15")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p16")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p17")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p18")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p19")
+        .to(UNTYPED_NULL_VALUE)
+        .bind("p20")
+        .to(UNTYPED_NULL_VALUE)
+        .build();
   }
 
   private void addDescribeInsertAllTypesResult() {
