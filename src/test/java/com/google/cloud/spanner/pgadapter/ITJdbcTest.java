@@ -17,6 +17,7 @@ package com.google.cloud.spanner.pgadapter;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -202,6 +203,23 @@ public class ITJdbcTest implements IntegrationTest {
         assertTrue(resultSet.next());
         assertEquals("public", resultSet.getString(1));
         assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
+  public void testPgCatalogViews() throws SQLException {
+    for (String view : new String[] {"pg_sequence", "pg_sequences"}) {
+      for (String prefix : new String[] {"", "pg_catalog."}) {
+        try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+          try (ResultSet resultSet =
+              connection.createStatement().executeQuery("SELECT * FROM " + prefix + view)) {
+            while (resultSet.next()) {
+              assertNotNull(resultSet.getMetaData());
+              assertNotEquals(0, resultSet.getMetaData().getColumnCount());
+            }
+          }
+        }
       }
     }
   }
