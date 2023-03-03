@@ -15,9 +15,7 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.Code;
@@ -279,7 +277,7 @@ public abstract class Parser<T> {
           case BYTES:
             return Oid.BYTEA_ARRAY;
           case TIMESTAMP:
-            return Oid.TIMESTAMP_ARRAY;
+            return Oid.TIMESTAMPTZ_ARRAY;
           case DATE:
             return Oid.DATE_ARRAY;
           case NUMERIC:
@@ -287,15 +285,15 @@ public abstract class Parser<T> {
           case ARRAY:
           case STRUCT:
           default:
-            throw SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown array type: " + type);
+            throw PGExceptionFactory.newPGException(
+                "Unsupported or unknown array type: " + type, SQLState.InternalError);
         }
       case NUMERIC:
       case JSON:
       case STRUCT:
       default:
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown type: " + type);
+        throw PGExceptionFactory.newPGException(
+            "Unsupported or unknown type: " + type, SQLState.InternalError);
     }
   }
 
