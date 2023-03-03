@@ -275,8 +275,7 @@ public class SimpleParser {
     return new SimpleParser(query).peekKeyword(command);
   }
 
-  public static List<String> readArrayLiteral(
-      String expression, boolean mustBeQuoted, boolean returnRawHexValue) {
+  public static List<String> readArrayLiteral(String expression, boolean returnRawHexValue) {
     List<String> result = new ArrayList<>();
     SimpleParser parser = new SimpleParser(expression);
     if (!parser.eatToken("{")) {
@@ -288,7 +287,7 @@ public class SimpleParser {
         break;
       } else if (parser.eatKeyword("null")) {
         result.add(null);
-      } else if (mustBeQuoted || parser.peekToken("\"")) {
+      } else if (parser.peekToken("\"")) {
         QuotedString quotedString = parser.readQuotedString('"', true);
         if (quotedString == null) {
           throw PGExceptionFactory.newPGException(
