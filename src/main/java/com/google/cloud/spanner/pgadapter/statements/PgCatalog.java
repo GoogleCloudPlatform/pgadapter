@@ -59,6 +59,16 @@ public class PgCatalog {
           .put(new TableOrIndexName("pg_catalog", "pg_type"), new TableOrIndexName(null, "pg_type"))
           .put(new TableOrIndexName(null, "pg_type"), new TableOrIndexName(null, "pg_type"))
           .put(
+              new TableOrIndexName("pg_catalog", "pg_sequence"),
+              new TableOrIndexName(null, "pg_sequence"))
+          .put(new TableOrIndexName(null, "pg_sequence"), new TableOrIndexName(null, "pg_sequence"))
+          .put(
+              new TableOrIndexName("pg_catalog", "pg_sequences"),
+              new TableOrIndexName(null, "pg_sequences"))
+          .put(
+              new TableOrIndexName(null, "pg_sequences"),
+              new TableOrIndexName(null, "pg_sequences"))
+          .put(
               new TableOrIndexName("pg_catalog", "pg_settings"),
               new TableOrIndexName(null, "pg_settings"))
           .put(new TableOrIndexName(null, "pg_settings"), new TableOrIndexName(null, "pg_settings"))
@@ -96,16 +106,19 @@ public class PgCatalog {
   private final ImmutableMap<Pattern, Supplier<String>> functionReplacements;
 
   private static final Map<TableOrIndexName, PgCatalogTable> DEFAULT_PG_CATALOG_TABLES =
-      ImmutableMap.of(
-          new TableOrIndexName(null, "pg_namespace"), new PgNamespace(),
-          new TableOrIndexName(null, "pg_class"), new PgClass(),
-          new TableOrIndexName(null, "pg_proc"), new PgProc(),
-          new TableOrIndexName(null, "pg_enum"), new EmptyPgEnum(),
-          new TableOrIndexName(null, "pg_range"), new PgRange(),
-          new TableOrIndexName(null, "pg_type"), new PgType(),
-          new TableOrIndexName(null, "pg_constraint"), new EmptyPgConstraint(),
-          new TableOrIndexName(null, "pg_attribute"), new EmptyPgAttribute(),
-          new TableOrIndexName(null, "pg_attrdef"), new EmptyPgAttrdef());
+      ImmutableMap.<TableOrIndexName, PgCatalogTable>builder()
+          .put(new TableOrIndexName(null, "pg_namespace"), new PgNamespace())
+          .put(new TableOrIndexName(null, "pg_class"), new PgClass())
+          .put(new TableOrIndexName(null, "pg_proc"), new PgProc())
+          .put(new TableOrIndexName(null, "pg_enum"), new EmptyPgEnum())
+          .put(new TableOrIndexName(null, "pg_range"), new PgRange())
+          .put(new TableOrIndexName(null, "pg_type"), new PgType())
+          .put(new TableOrIndexName(null, "pg_constraint"), new EmptyPgConstraint())
+          .put(new TableOrIndexName(null, "pg_attribute"), new EmptyPgAttribute())
+          .put(new TableOrIndexName(null, "pg_attrdef"), new EmptyPgAttrdef())
+          .put(new TableOrIndexName(null, "pg_sequence"), new PgSequence())
+          .put(new TableOrIndexName(null, "pg_sequences"), new PgSequences())
+          .build();
   private final SessionState sessionState;
 
   public PgCatalog(@Nonnull SessionState sessionState, @Nonnull WellKnownClient wellKnownClient) {
@@ -527,6 +540,36 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return PG_CONSTRAINT_CTE;
+    }
+  }
+
+  private static class PgSequences implements PgCatalogTable {
+    private static final String PG_SEQUENCES_CTE =
+        "pg_sequences as (\n"
+            + "select * from ("
+            + "select ''::varchar as schemaname, ''::varchar as sequencename, ''::varchar as sequenceowner, "
+            + "0::bigint as data_type, 0::bigint as start_value, 0::bigint as min_value, 0::bigint as max_value, "
+            + "0::bigint as increment_by, false::bool as cycle, 0::bigint as cache_size, 0::bigint as last_value\n"
+            + ") seq where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_SEQUENCES_CTE;
+    }
+  }
+
+  private static class PgSequence implements PgCatalogTable {
+    private static final String PG_SEQUENCE_CTE =
+        "pg_sequence as (\n"
+            + "select * from ("
+            + "select 0::bigint as seqrelid, 0::bigint as seqtypid, 0::bigint as seqstart, "
+            + "0::bigint as seqincrement, 0::bigint as seqmax, 0::bigint as seqmin, 0::bigint as seqcache, "
+            + "false::bool as seqcycle\n"
+            + ") seq where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_SEQUENCE_CTE;
     }
   }
 }

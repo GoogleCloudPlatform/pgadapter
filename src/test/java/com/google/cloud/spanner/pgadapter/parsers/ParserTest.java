@@ -713,6 +713,32 @@ public class ParserTest {
     assertEquals(Oid.UNSPECIFIED, getArrayElementOid(Integer.MAX_VALUE));
   }
 
+  @Test
+  public void testToOid() {
+    assertEquals(Oid.BOOL, toOid(Type.bool()));
+    assertEquals(Oid.BYTEA, toOid(Type.bytes()));
+    assertEquals(Oid.DATE, toOid(Type.date()));
+    assertEquals(Oid.FLOAT8, toOid(Type.float64()));
+    assertEquals(Oid.INT8, toOid(Type.int64()));
+    assertEquals(Oid.JSONB, toOid(Type.pgJsonb()));
+    assertEquals(Oid.NUMERIC, toOid(Type.pgNumeric()));
+    assertEquals(Oid.VARCHAR, toOid(Type.string()));
+    assertEquals(Oid.TIMESTAMPTZ, toOid(Type.timestamp()));
+
+    assertEquals(Oid.BOOL_ARRAY, toOid(Type.array(Type.bool())));
+    assertEquals(Oid.BYTEA_ARRAY, toOid(Type.array(Type.bytes())));
+    assertEquals(Oid.DATE_ARRAY, toOid(Type.array(Type.date())));
+    assertEquals(Oid.FLOAT8_ARRAY, toOid(Type.array(Type.float64())));
+    assertEquals(Oid.INT8_ARRAY, toOid(Type.array(Type.int64())));
+    assertEquals(Oid.JSONB_ARRAY, toOid(Type.array(Type.pgJsonb())));
+    assertEquals(Oid.NUMERIC_ARRAY, toOid(Type.array(Type.pgNumeric())));
+    assertEquals(Oid.VARCHAR_ARRAY, toOid(Type.array(Type.string())));
+    assertEquals(Oid.TIMESTAMPTZ_ARRAY, toOid(Type.array(Type.timestamp())));
+
+    assertThrows(PGException.class, () -> toOid(Type.array(Type.struct())));
+    assertThrows(PGException.class, () -> toOid(Type.struct()));
+  }
+
   static com.google.spanner.v1.Type createType(TypeCode code) {
     return com.google.spanner.v1.Type.newBuilder().setCode(code).build();
   }
