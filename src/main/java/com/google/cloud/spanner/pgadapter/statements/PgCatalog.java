@@ -100,12 +100,12 @@ public class PgCatalog {
           new TableOrIndexName(null, "pg_namespace"), new PgNamespace(),
           new TableOrIndexName(null, "pg_class"), new PgClass(),
           new TableOrIndexName(null, "pg_proc"), new PgProc(),
-          new TableOrIndexName(null, "pg_enum"), new PgEnum(),
+          new TableOrIndexName(null, "pg_enum"), new EmptyPgEnum(),
           new TableOrIndexName(null, "pg_range"), new PgRange(),
           new TableOrIndexName(null, "pg_type"), new PgType(),
-          new TableOrIndexName(null, "pg_constraint"), new PgConstraint(),
+          new TableOrIndexName(null, "pg_constraint"), new EmptyPgConstraint(),
           new TableOrIndexName(null, "pg_attribute"), new EmptyPgAttribute(),
-          new TableOrIndexName(null, "pg_attrdef"), new PgAttrdef());
+          new TableOrIndexName(null, "pg_attrdef"), new EmptyPgAttrdef());
   private final SessionState sessionState;
 
   public PgCatalog(@Nonnull SessionState sessionState, @Nonnull WellKnownClient wellKnownClient) {
@@ -452,19 +452,6 @@ public class PgCatalog {
     }
   }
 
-  private static class PgEnum implements PgCatalogTable {
-    private static final String PG_ENUM_CTE =
-        "pg_enum as (\n"
-            + "select * from ("
-            + "select 0::bigint as oid, 0::bigint as enumtypid, 0.0::float8 as enumsortorder, ''::varchar as enumlabel\n"
-            + ") e where false)";
-
-    @Override
-    public String getTableExpression() {
-      return PG_ENUM_CTE;
-    }
-  }
-
   private static class PgRange implements PgCatalogTable {
     private static final String PG_RANGE_CTE =
         "pg_range as (\n"
@@ -498,7 +485,7 @@ public class PgCatalog {
     }
   }
 
-  private static class PgAttrdef implements PgCatalogTable {
+  private static class EmptyPgAttrdef implements PgCatalogTable {
     private static final String PG_ATTRDEF_CTE =
         "pg_attrdef as (\n"
             + "select * from ("
@@ -511,7 +498,20 @@ public class PgCatalog {
     }
   }
 
-  private static class PgConstraint implements PgCatalogTable {
+  private static class EmptyPgEnum implements PgCatalogTable {
+    private static final String PG_ENUM_CTE =
+        "pg_enum as (\n"
+            + "select * from ("
+            + "select 0::bigint as oid, 0::bigint as enumtypid, 0.0::float8 as enumsortorder, ''::varchar as enumlabel\n"
+            + ") e where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_ENUM_CTE;
+    }
+  }
+
+  private static class EmptyPgConstraint implements PgCatalogTable {
     private static final String PG_CONSTRAINT_CTE =
         "pg_constraint as (\n"
             + "select * from ("

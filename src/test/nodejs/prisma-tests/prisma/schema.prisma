@@ -22,3 +22,27 @@ model User {
   name  String?
   posts Post[]
 }
+
+model AllTypes {
+  col_bigint      BigInt @id
+  col_bool        Boolean?
+  col_bytea       Bytes?
+  col_float8      Float?
+  col_int         Int?
+  col_numeric     Decimal?
+  col_timestamptz DateTime? @db.Timestamptz
+  col_date        DateTime? @db.Date
+  col_varchar     String?
+  col_jsonb       Json?
+
+  col_array_bigint      BigInt[]
+  col_array_bool        Boolean[]
+  col_array_bytea       Bytes[]
+  col_array_float8      Float[]
+  col_array_int         Int[]
+  col_array_numeric     Decimal[]
+  col_array_timestamptz DateTime[] @db.Timestamptz
+  col_array_date        DateTime[] @db.Date
+  col_array_varchar     String[]
+  col_array_jsonb       Json[]
+}

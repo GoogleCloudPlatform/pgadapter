@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrismaClient } from '@prisma/client'
+import {Prisma, PrismaClient} from '@prisma/client'
+import {randomUUID} from "crypto";
 
 function runTest(host: string, port: number, database: string, test: (client) => Promise<void>) {
   if (host.charAt(0) == '/') {
@@ -50,6 +51,35 @@ async function testFindAllUsers(client: PrismaClient) {
   console.log(allUsers);
 }
 
+async function testCreateUser(client: PrismaClient) {
+  const newUser = await client.user.create({
+    data: {
+      id: '2373a81d-772c-4221-adf0-06965bc02c2c',
+      name: 'Alice',
+      email: 'alice@prisma.io',
+    },
+  });
+  console.log(newUser);
+}
+
+async function testCreateAllTypes(client: PrismaClient) {
+  const row = await client.allTypes.create({
+    data: {
+      col_bigint: 1,
+      col_bool: true,
+      col_bytea: Buffer.from("test", "utf-8"),
+      col_float8: 3.14,
+      col_int: 100,
+      col_numeric: new Prisma.Decimal(6.626),
+      col_timestamptz: "2022-02-16T13:18:02.123456Z",
+      col_date: new Date("2022-03-29"),
+      col_varchar: "test",
+      col_jsonb: {"key": "value"},
+    },
+  });
+  console.log(row);
+}
+
 require('yargs')
 .demand(4)
 .command(
@@ -63,6 +93,18 @@ require('yargs')
     'Executes FindAllUsers',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testFindAllUsers)
+)
+.command(
+    'testCreateUser <host> <port> <database>',
+    'Creates a test user',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testCreateUser)
+)
+.command(
+    'testCreateAllTypes <host> <port> <database>',
+    'Creates a test row with all types',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testCreateAllTypes)
 )
 .wrap(120)
 .recommendCommands()
