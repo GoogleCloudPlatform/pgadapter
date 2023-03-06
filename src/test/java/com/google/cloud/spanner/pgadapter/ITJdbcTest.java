@@ -225,6 +225,21 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @Test
+  public void testInformationSchemaViews() throws SQLException {
+    for (String view : new String[] {"sequences"}) {
+      try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("SELECT * FROM INFORMATION_SCHEMA." + view)) {
+          while (resultSet.next()) {
+            assertNotNull(resultSet.getMetaData());
+            assertNotEquals(0, resultSet.getMetaData().getColumnCount());
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   public void testCreateTableIfNotExists() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (Statement statement = connection.createStatement()) {
