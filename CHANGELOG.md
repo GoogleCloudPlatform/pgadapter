@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.18.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.17.0...v0.18.0) (2023-03-06)
+
+
+### Features
+
+* support arrays in copy operations ([#690](https://github.com/GoogleCloudPlatform/pgadapter/issues/690)) ([ac624e5](https://github.com/GoogleCloudPlatform/pgadapter/commit/ac624e51e7949362f85b11e5f79199f13d5e140c))
+
+
+### Bug Fixes
+
+* add pg_sequence and pg_sequences views ([#700](https://github.com/GoogleCloudPlatform/pgadapter/issues/700)) ([2ad990a](https://github.com/GoogleCloudPlatform/pgadapter/commit/2ad990a86def4b01aaf97475d5325e0f6c3266c9))
+* allow unquoted text values in arrays ([#706](https://github.com/GoogleCloudPlatform/pgadapter/issues/706)) ([b09f540](https://github.com/GoogleCloudPlatform/pgadapter/commit/b09f540eff12e76d9d2059537d27a335efb77c65))
+* support information_schema.sequences ([#708](https://github.com/GoogleCloudPlatform/pgadapter/issues/708)) ([c043c46](https://github.com/GoogleCloudPlatform/pgadapter/commit/c043c46f811a68bc537c13ff35840d413b0d786b)), closes [#705](https://github.com/GoogleCloudPlatform/pgadapter/issues/705)
+* timestamp arrays should use timestamptz_array OID ([#691](https://github.com/GoogleCloudPlatform/pgadapter/issues/691)) ([52cac8c](https://github.com/GoogleCloudPlatform/pgadapter/commit/52cac8ceb00af6d5b88476146c24beb2a3b6b34d))
+
 ## [0.17.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.16.0...v0.17.0) (2023-02-24)
 
 
