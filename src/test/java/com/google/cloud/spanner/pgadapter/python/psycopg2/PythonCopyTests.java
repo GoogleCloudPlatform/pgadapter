@@ -55,7 +55,7 @@ public class PythonCopyTests extends AbstractPsycopg2Test {
                     .addFields(
                         Field.newBuilder()
                             .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
-                            .setName("data_type")
+                            .setName("spanner_type")
                             .build())
                     .build())
             .build());
@@ -129,7 +129,7 @@ public class PythonCopyTests extends AbstractPsycopg2Test {
     String copyType = "FROM";
     String file = "1,hello\n2,world\n";
     String sql1 =
-        "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2";
+        "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2";
     String sql2 =
         "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema='public' and table_name=$1 and column_name in ($2, $3)";
     Statement s1 = Statement.newBuilder(sql1).bind("p1").to("public").bind("p2").to("test").build();
@@ -173,7 +173,7 @@ public class PythonCopyTests extends AbstractPsycopg2Test {
     String copyType = "SIMPLE_FROM";
     String file = "1\thello\n2\tworld\n";
     String sql1 =
-        "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ";
+        "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ";
     String sql2 =
         "SELECT COUNT(*) FROM information_schema.index_columns WHERE table_schema=$1 and table_name=$2 and column_name in ($3, $4)";
     Statement s1 = Statement.newBuilder(sql1).bind("p1").to("public").bind("p2").to("test").build();
@@ -219,7 +219,7 @@ public class PythonCopyTests extends AbstractPsycopg2Test {
     String copyType = "SIMPLE_TO";
     String file = "does not matter";
     String sql1 =
-        "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1";
+        "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_name = $1";
     Statement s1 = Statement.newBuilder(sql1).bind("p1").to("test").build();
     mockSpanner.putStatementResult(StatementResult.query(s1, createResultSet()));
 
@@ -255,7 +255,7 @@ public class PythonCopyTests extends AbstractPsycopg2Test {
     String copyType = "TO";
     String file = "does not matter";
     String sql1 =
-        "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1";
+        "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_name = $1";
     Statement s1 = Statement.newBuilder(sql1).bind("p1").to("test").build();
     mockSpanner.putStatementResult(StatementResult.query(s1, createResultSet()));
 

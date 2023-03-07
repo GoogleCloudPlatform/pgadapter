@@ -95,7 +95,7 @@ public class CopyStatement extends IntermediatePortalStatement {
   }
 
   private static final String COLUMN_NAME = "column_name";
-  private static final String DATA_TYPE = "data_type";
+  private static final String DATA_TYPE = "spanner_type";
 
   private final ParsedCopyStatement parsedCopyStatement;
   private CSVFormat format;
@@ -265,7 +265,18 @@ public class CopyStatement extends IntermediatePortalStatement {
     this.tableColumns = tempTableColumns;
   }
 
-  private static Type parsePostgreSQLDataType(String columnType) {
+  static Type parsePostgreSQLDataType(String columnType) {
+    if (columnType.endsWith("[]")) {
+      try {
+        Type elementType =
+            parsePostgreSQLDataType(columnType.substring(0, columnType.length() - 2));
+        return Type.array(elementType);
+      } catch (IllegalArgumentException ignore) {
+        throw new IllegalArgumentException(
+            "Unrecognized or unsupported column data type: " + columnType);
+      }
+    }
+
     // Eliminate size modifiers in column type (e.g. character varying(100), etc.)
     int index = columnType.indexOf("(");
     columnType = (index > 0) ? columnType.substring(0, index) : columnType;
@@ -286,6 +297,7 @@ public class CopyStatement extends IntermediatePortalStatement {
         return Type.string();
       case "date":
         return Type.date();
+      case "timestamptz":
       case "timestamp with time zone":
         return Type.timestamp();
       case "jsonb":

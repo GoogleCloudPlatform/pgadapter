@@ -699,7 +699,7 @@ public class StatementTest {
     when(connection.getDatabaseClient()).thenReturn(databaseClient);
     ResultSet spannerType = mock(ResultSet.class);
     when(spannerType.getString("column_name")).thenReturn("key", "value");
-    when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
+    when(spannerType.getString("spanner_type")).thenReturn("bigint", "character varying");
     when(spannerType.next()).thenReturn(true, true, false);
     when(singleUseReadContext.executeQuery(
             ArgumentMatchers.argThat(
