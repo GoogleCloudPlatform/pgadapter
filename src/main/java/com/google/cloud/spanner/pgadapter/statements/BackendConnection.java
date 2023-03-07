@@ -603,11 +603,7 @@ public class BackendConnection {
 
     @Override
     void execute() {
-      throw setAndReturn(
-          result,
-          PGExceptionFactory.newPGException(
-              "Statement 'SAVEPOINT savepoint_name' is not supported",
-              SQLState.FeatureNotSupported));
+      result.set(NO_RESULT);
     }
   }
 
@@ -626,11 +622,7 @@ public class BackendConnection {
 
     @Override
     void execute() {
-      throw setAndReturn(
-          result,
-          PGExceptionFactory.newPGException(
-              "Statement 'RELEASE [SAVEPOINT] savepoint_name' is not supported",
-              SQLState.FeatureNotSupported));
+      result.set(NO_RESULT);
     }
   }
 

@@ -4039,8 +4039,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testUnnamedSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      PSQLException exception = assertThrows(PSQLException.class, connection::setSavepoint);
-      assertEquals(PSQLState.NOT_IMPLEMENTED.getState(), exception.getSQLState());
+      assertNotNull(connection.setSavepoint());
     }
   }
 
@@ -4048,9 +4047,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testNamedSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      PSQLException exception =
-          assertThrows(PSQLException.class, () -> connection.setSavepoint("my-savepoint"));
-      assertEquals(PSQLState.NOT_IMPLEMENTED.getState(), exception.getSQLState());
+      assertEquals("my-savepoint", connection.setSavepoint("my-savepoint").getSavepointName());
     }
   }
 
@@ -4059,9 +4056,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
       PSQLSavepoint savepoint = new PSQLSavepoint("my-savepoint");
-      PSQLException exception =
-          assertThrows(PSQLException.class, () -> connection.releaseSavepoint(savepoint));
-      assertEquals(PSQLState.NOT_IMPLEMENTED.getState(), exception.getSQLState());
+      connection.releaseSavepoint(savepoint);
     }
   }
 
