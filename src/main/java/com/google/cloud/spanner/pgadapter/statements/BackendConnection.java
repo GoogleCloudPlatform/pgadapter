@@ -588,6 +588,67 @@ public class BackendConnection {
     }
   }
 
+  private final class Savepoint extends BufferedStatement<StatementResult> {
+    private final SavepointStatement savepointStatement;
+
+    Savepoint(SavepointStatement savepointStatement) {
+      super(savepointStatement.parsedStatement, savepointStatement.originalStatement);
+      this.savepointStatement = savepointStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void execute() {
+      result.set(NO_RESULT);
+    }
+  }
+
+  private final class Release extends BufferedStatement<StatementResult> {
+    private final ReleaseStatement releaseStatement;
+
+    Release(ReleaseStatement releaseStatement) {
+      super(releaseStatement.parsedStatement, releaseStatement.originalStatement);
+      this.releaseStatement = releaseStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void execute() {
+      result.set(NO_RESULT);
+    }
+  }
+
+  private final class RollbackTo extends BufferedStatement<StatementResult> {
+    private final RollbackToStatement rollbackToStatement;
+
+    RollbackTo(RollbackToStatement rollbackToStatement) {
+      super(rollbackToStatement.parsedStatement, rollbackToStatement.originalStatement);
+      this.rollbackToStatement = rollbackToStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void execute() {
+      throw setAndReturn(
+          result,
+          PGExceptionFactory.newPGException(
+              "Statement 'ROLLBACK [WORK | TRANSACTION] TO [SAVEPOINT] savepoint_name' is not supported",
+              SQLState.FeatureNotSupported));
+    }
+  }
+
   private static final ImmutableMap<String, LocalStatement> EMPTY_LOCAL_STATEMENTS =
       ImmutableMap.of();
   private static final StatementResult NO_RESULT = new NoResult();
@@ -695,6 +756,24 @@ public class BackendConnection {
     Truncate truncate = new Truncate(truncateStatement);
     bufferedStatements.add(truncate);
     return truncate.result;
+  }
+
+  public Future<StatementResult> execute(SavepointStatement savepointStatement) {
+    Savepoint savepoint = new Savepoint(savepointStatement);
+    bufferedStatements.add(savepoint);
+    return savepoint.result;
+  }
+
+  public Future<StatementResult> execute(ReleaseStatement releaseStatement) {
+    Release savepoint = new Release(releaseStatement);
+    bufferedStatements.add(savepoint);
+    return savepoint.result;
+  }
+
+  public Future<StatementResult> execute(RollbackToStatement rollbackToStatement) {
+    RollbackTo savepoint = new RollbackTo(rollbackToStatement);
+    bufferedStatements.add(savepoint);
+    return savepoint.result;
   }
 
   /** Flushes the buffered statements to Spanner. */
