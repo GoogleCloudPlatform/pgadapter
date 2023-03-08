@@ -1194,6 +1194,9 @@ public class BackendConnection {
     int index = fromIndex;
     try {
       while (index < getStatementCount()) {
+        if (!bufferedStatements.get(index).isBatchingPossible()) {
+          break;
+        }
         StatementType statementType = getStatementType(index);
         if (canBeBatchedTogether(batchType, statementType)) {
           // Send DDL statements to the DdlExecutor instead of executing them directly on the
