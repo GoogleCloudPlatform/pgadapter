@@ -65,6 +65,7 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ParameterMetaData;
@@ -1746,6 +1747,176 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
     // Both statements are auto-described.
     assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBatchedRewrittenPreparedStatementWithErrorInBind() throws SQLException {
+    String insertSql = "insert into my_table (id, value) values (?, ?)";
+    String rewrittenInsertSql1 =
+        "insert into my_table (id, value) values ($1, $2),($3, $4),($5, $6),($7, $8),($9, $10),($11, $12),($13, $14),($15, $16)";
+    String rewrittenInsertSql2 = "insert into my_table (id, value) values ($1, $2),($3, $4)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql1),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql2),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(rewrittenInsertSql1)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p3")
+                .to(2L)
+                .bind("p4")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p5")
+                .to(3L)
+                .bind("p6")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p7")
+                .to(4L)
+                .bind("p8")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p9")
+                .to(5L)
+                .bind("p10")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p11")
+                .to(6L)
+                .bind("p12")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p13")
+                .to(7L)
+                .bind("p14")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p15")
+                .to(8L)
+                .bind("p16")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .build(),
+            8L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(rewrittenInsertSql2)
+                .bind("p1")
+                .to(9L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p3")
+                .to(10L)
+                .bind("p4")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .build(),
+            2L));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "&reWriteBatchedInserts=true")) {
+      connection.setAutoCommit(false);
+
+      try (PreparedStatement insertStatement = connection.prepareStatement(insertSql)) {
+        for (int i = 1; i <= 10; i++) {
+          insertStatement.setLong(1, i);
+          insertStatement.setTimestamp(2, new java.sql.Timestamp(Long.MIN_VALUE));
+          insertStatement.addBatch();
+        }
+
+        BatchUpdateException exception =
+            assertThrows(BatchUpdateException.class, insertStatement::executeBatch);
+        assertTrue(
+            exception.getMessage(), exception.getMessage().contains("Invalid timestamp value"));
+
+        connection.rollback();
+      }
+    }
+  }
+
+  @Test
+  public void testBatchedRewrittenPreparedStatementWithGenericBatchExecutionError()
+      throws SQLException {
+    String insertSql = "insert into my_table (id, value) values (?, ?)";
+    String rewrittenInsertSql1 =
+        "insert into my_table (id, value) values ($1, $2),($3, $4),($5, $6),($7, $8),($9, $10),($11, $12),($13, $14),($15, $16)";
+    String rewrittenInsertSql2 = "insert into my_table (id, value) values ($1, $2),($3, $4)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql1),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql2),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.setExecuteBatchDmlExecutionTime(
+        SimulatedExecutionTime.ofException(
+            Status.INVALID_ARGUMENT
+                .withDescription("Too many values in insert clause")
+                .asRuntimeException()));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "&reWriteBatchedInserts=true")) {
+      connection.setAutoCommit(false);
+
+      try (PreparedStatement insertStatement = connection.prepareStatement(insertSql)) {
+        for (int i = 1; i <= 10; i++) {
+          insertStatement.setLong(1, i);
+          insertStatement.setTimestamp(
+              2, Timestamp.parseTimestamp("2023-03-08T18:10:00Z").toSqlTimestamp());
+          insertStatement.addBatch();
+        }
+
+        BatchUpdateException exception =
+            assertThrows(BatchUpdateException.class, insertStatement::executeBatch);
+        assertTrue(
+            exception.getMessage(),
+            exception.getMessage().contains("Too many values in insert clause"));
+
+        connection.rollback();
+      }
+    }
   }
 
   @Test
