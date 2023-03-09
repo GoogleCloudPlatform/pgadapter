@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.0...v0.18.1) (2023-03-09)
+
+
+### Bug Fixes
+
+* the JDBC reWriteBatchedInserts=true option could cause errors in DML batches ([#713](https://github.com/GoogleCloudPlatform/pgadapter/issues/713)) ([36bff88](https://github.com/GoogleCloudPlatform/pgadapter/commit/36bff88c6476d4e0f3b8f20797182eab56646143))
+
 ## [0.18.0](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.17.0...v0.18.0) (2023-03-06)
 
 
