@@ -917,6 +917,9 @@ public class BackendConnection {
       connectionState = ConnectionState.ABORTED;
       sessionState.rollback();
       if (spannerConnection.isInTransaction()) {
+        if (spannerConnection.isDmlBatchActive()) {
+          spannerConnection.abortBatch();
+        }
         spannerConnection.setStatementTag(null);
         spannerConnection.execute(ROLLBACK);
       } else if (spannerConnection.isDdlBatchActive()) {
@@ -1194,6 +1197,9 @@ public class BackendConnection {
     int index = fromIndex;
     try {
       while (index < getStatementCount()) {
+        if (!bufferedStatements.get(index).isBatchingPossible()) {
+          break;
+        }
         StatementType statementType = getStatementType(index);
         if (canBeBatchedTogether(batchType, statementType)) {
           // Send DDL statements to the DdlExecutor instead of executing them directly on the
@@ -1239,6 +1245,9 @@ public class BackendConnection {
       Execute failedExecute = (Execute) bufferedStatements.get(fromIndex + counts.length);
       failedExecute.result.setException(batchUpdateException);
       throw batchUpdateException;
+    } catch (Throwable exception) {
+      bufferedStatements.get(fromIndex).result.setException(exception);
+      throw exception;
     }
     return index - fromIndex;
   }
