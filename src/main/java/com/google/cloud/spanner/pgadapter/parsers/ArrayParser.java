@@ -89,11 +89,7 @@ public class ArrayParser extends Parser<List<?>> {
         case TEXT:
           this.item =
               stringArrayToList(
-                  new String(item, StandardCharsets.UTF_8),
-                  elementOid,
-                  mustBeQuoted(elementOid),
-                  this.sessionState,
-                  false);
+                  new String(item, StandardCharsets.UTF_8), elementOid, this.sessionState, false);
           break;
         case BINARY:
           this.item = binaryArrayToList(item, false);
@@ -138,14 +134,12 @@ public class ArrayParser extends Parser<List<?>> {
   public static List<?> stringArrayToList(
       @Nullable String value,
       int elementOid,
-      boolean mustBeQuoted,
       SessionState sessionState,
       boolean convertToValidSpannerElements) {
     if (value == null) {
       return null;
     }
-    List<String> values =
-        SimpleParser.readArrayLiteral(value, mustBeQuoted, elementOid == Oid.BYTEA);
+    List<String> values = SimpleParser.readArrayLiteral(value, elementOid == Oid.BYTEA);
     ArrayList<Object> result = new ArrayList<>(values.size());
     for (String element : values) {
       if (element == null) {

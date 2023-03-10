@@ -1,4 +1,4 @@
 # Format:
 # module:released-version:current-version
 
-google-cloud-spanner-pgadapter:0.17.0:0.17.1-SNAPSHOT
+google-cloud-spanner-pgadapter:0.18.1:0.18.2-SNAPSHOT

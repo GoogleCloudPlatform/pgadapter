@@ -31,18 +31,18 @@ import com.google.common.util.concurrent.Futures;
 import java.util.List;
 import java.util.concurrent.Future;
 
-public class ReleaseStatement extends IntermediatePortalStatement {
-  static class ParsedReleaseStatement {
+public class RollbackToStatement extends IntermediatePortalStatement {
+  static class ParsedRollbackToStatement {
     final String name;
 
-    ParsedReleaseStatement(String name) {
+    ParsedRollbackToStatement(String name) {
       this.name = name;
     }
   }
 
-  private final ParsedReleaseStatement parsedReleaseStatement;
+  private final ParsedRollbackToStatement parsedRollbackToStatement;
 
-  public ReleaseStatement(
+  public RollbackToStatement(
       ConnectionHandler connectionHandler,
       OptionsMetadata options,
       String name,
@@ -60,17 +60,27 @@ public class ReleaseStatement extends IntermediatePortalStatement {
         NO_PARAMS,
         ImmutableList.of(),
         ImmutableList.of());
-    this.parsedReleaseStatement = parse(originalStatement.getSql());
+    this.parsedRollbackToStatement = parse(originalStatement.getSql());
   }
 
-  static ParsedReleaseStatement parse(String sql) {
+  static ParsedRollbackToStatement parse(String sql) {
     Preconditions.checkNotNull(sql);
 
-    // https://www.postgresql.org/docs/current/sql-release-savepoint.html
-    // RELEASE [ SAVEPOINT ] savepoint_name
+    // https://www.postgresql.org/docs/current/sql-rollback-to.html
+    // ROLLBACK [ WORK | TRANSACTION ] TO [ SAVEPOINT ] savepoint_name
     SimpleParser parser = new SimpleParser(sql);
-    if (!parser.eatKeyword("release")) {
-      throw PGExceptionFactory.newPGException("not a valid RELEASE statement: " + sql);
+    if (!parser.eatKeyword("rollback")) {
+      throw PGExceptionFactory.newPGException(
+          "not a valid ROLLBACK [WORK | TRANSACTION] TO statement: " + sql);
+    }
+    if (parser.peekKeyword("work")) {
+      parser.eatKeyword("work");
+    } else if (parser.peekKeyword("transaction")) {
+      parser.eatKeyword("transaction");
+    }
+    if (!parser.eatKeyword("to")) {
+      throw PGExceptionFactory.newPGException(
+          "missing 'TO' keyword in ROLLBACK [WORK | TRANSACTION] TO statement: " + sql);
     }
     parser.eatKeyword("savepoint");
     TableOrIndexName name = parser.readTableOrIndexName();
@@ -80,16 +90,17 @@ public class ReleaseStatement extends IntermediatePortalStatement {
     String savepointName = unquoteOrFoldIdentifier(name.name);
     parser.throwIfHasMoreTokens();
 
-    return new ParsedReleaseStatement(savepointName);
+    return new ParsedRollbackToStatement(savepointName);
   }
 
   public String getSavepointName() {
-    return parsedReleaseStatement.name;
+    return parsedRollbackToStatement.name;
   }
 
   @Override
   public String getCommandTag() {
-    return "RELEASE";
+    // The command tag for 'ROLLBACK [WORK | TRANSACTION] TO [SAVEPOINT] is just 'ROLLBACK'.
+    return "ROLLBACK";
   }
 
   @Override
@@ -105,7 +116,7 @@ public class ReleaseStatement extends IntermediatePortalStatement {
 
   @Override
   public Future<StatementResult> describeAsync(BackendConnection backendConnection) {
-    // Return null to indicate that this RELEASE statement does not return any
+    // Return null to indicate that this ROLLBACK statement does not return any
     // RowDescriptionResponse.
     return Futures.immediateFuture(null);
   }
@@ -116,7 +127,7 @@ public class ReleaseStatement extends IntermediatePortalStatement {
       byte[][] parameters,
       List<Short> parameterFormatCodes,
       List<Short> resultFormatCodes) {
-    // RELEASE does not support binding any parameters, so we just return the same statement.
+    // ROLLBACK does not support binding any parameters, so we just return the same statement.
     return this;
   }
 }

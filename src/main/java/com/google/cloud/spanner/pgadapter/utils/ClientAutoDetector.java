@@ -60,7 +60,7 @@ public class ClientAutoDetector {
           SelectVersionStatement.INSTANCE,
           DjangoGetTableNamesStatement.INSTANCE);
   private static final ImmutableSet<String> DEFAULT_CHECK_PG_CATALOG_PREFIXES =
-      ImmutableSet.of("pg_");
+      ImmutableSet.of("pg_", "information_schema.");
   public static final String PGBENCH_USAGE_HINT =
       "See https://github.com/GoogleCloudPlatform/pgadapter/blob/-/docs/pgbench.md for how to use pgbench with PGAdapter";
 
