@@ -259,10 +259,6 @@ public class ArrayParser extends Parser<List<?>> {
     }
   }
 
-  private boolean mustBeQuoted(int arrayElementTypeOid) {
-    return false;
-  }
-
   /**
    * Put quotes around the item if it is string equivalent, otherwise do not modify it.
    *
