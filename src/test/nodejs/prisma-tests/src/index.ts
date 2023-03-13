@@ -122,6 +122,42 @@ async function testUpsertAllTypes(client: PrismaClient) {
   console.log(row);
 }
 
+async function testDeleteAllTypes(client: PrismaClient) {
+  const row = await client.allTypes.delete({
+    where: {col_bigint: 1},
+  })
+  console.log(row);
+}
+
+async function testCreateManyAllTypes(client: PrismaClient) {
+  const rows = await client.allTypes.createMany({
+    data: [{
+      col_bigint: 1,
+      col_bool: true,
+      col_bytea: Buffer.from("test1", "utf-8"),
+      col_float8: 3.14,
+      col_int: 100,
+      col_numeric: new Prisma.Decimal(6.626),
+      col_timestamptz: "2022-02-16T13:18:02.123456+01:00",
+      col_date: new Date("2022-03-29"),
+      col_varchar: "test1",
+      col_jsonb: {"key": "value1"},
+    },{
+      col_bigint: 2,
+      col_bool: false,
+      col_bytea: Buffer.from("test2", "utf-8"),
+      col_float8: -3.14,
+      col_int: -100,
+      col_numeric: new Prisma.Decimal(-6.626),
+      col_timestamptz: "2022-02-16T13:18:02.123456-01:00",
+      col_date: new Date("2022-03-30"),
+      col_varchar: "test2",
+      col_jsonb: {"key": "value2"},
+    }],
+  });
+  console.log(rows);
+}
+
 require('yargs')
 .demand(4)
 .command(
@@ -159,6 +195,18 @@ require('yargs')
     'Upserts a test row with all types',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testUpsertAllTypes)
+)
+.command(
+    'testDeleteAllTypes <host> <port> <database>',
+    'Deletes a test row with all types',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testDeleteAllTypes)
+)
+.command(
+    'testCreateManyAllTypes <host> <port> <database>',
+    'Creates multiple test rows with all types',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testCreateManyAllTypes)
 )
 .wrap(120)
 .recommendCommands()

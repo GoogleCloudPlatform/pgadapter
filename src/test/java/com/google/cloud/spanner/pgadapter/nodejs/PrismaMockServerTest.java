@@ -42,6 +42,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -787,6 +788,319 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
     assertEquals(upsertSql, requests.get(1).getSql());
     assertEquals(QueryMode.NORMAL, requests.get(1).getQueryMode());
+  }
+
+  @Test
+  public void testDeleteAllTypes() throws IOException, InterruptedException {
+    String selectIdSql =
+        "SELECT \"public\".\"AllTypes\".\"col_bigint\" FROM \"public\".\"AllTypes\" WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $1 AND 1=1)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(selectIdSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.INT64),
+                        false,
+                        ImmutableList.of("col_bigint"),
+                        ImmutableList.of(TypeCode.INT64)))
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(selectIdSql).bind("p1").to(1L).build(),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.INT64), ImmutableList.of("col_bigint")))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .build())
+                .build()));
+
+    String deleteSql =
+        "DELETE FROM \"public\".\"AllTypes\" WHERE (\"public\".\"AllTypes\".\"col_bigint\" IN ($1) AND (\"public\".\"AllTypes\".\"col_bigint\" = $2 AND 1=1))";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(deleteSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.INT64)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(deleteSql).bind("p1").to(1L).bind("p2").to(1L).build(), 1L));
+
+    String selectSql =
+        "SELECT \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\" FROM \"public\".\"AllTypes\" WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $1 AND 1=1) LIMIT $2 OFFSET $3";
+    ResultSetMetadata allTypesMetadata = createAllTypesResultSetMetadata("");
+    ResultSetMetadata allArrayTypesMetadata = createAllArrayTypesResultSetMetadata("");
+    ResultSetMetadata selectMetadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addAllFields(allTypesMetadata.getRowType().getFieldsList())
+                    .addAllFields(allArrayTypesMetadata.getRowType().getFieldsList())
+                    .build())
+            .build();
+    ListValue row =
+        ListValue.newBuilder()
+            .addValues(Value.newBuilder().setStringValue("1").build())
+            .addValues(Value.newBuilder().setBoolValue(false).build())
+            .addValues(
+                Value.newBuilder()
+                    .setStringValue(
+                        Base64.getEncoder()
+                            .encodeToString("updated".getBytes(StandardCharsets.UTF_8)))
+                    .build())
+            .addValues(Value.newBuilder().setNumberValue(6.626d).build())
+            .addValues(Value.newBuilder().setStringValue("-100").build())
+            .addValues(Value.newBuilder().setStringValue("3.14").build())
+            .addValues(Value.newBuilder().setStringValue("2023-03-13T05:40:02.123456000Z").build())
+            .addValues(Value.newBuilder().setStringValue("2023-03-13").build())
+            .addValues(Value.newBuilder().setStringValue("updated").build())
+            .addValues(Value.newBuilder().setStringValue("{\"key\":\"updated\"}").build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(selectSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    selectMetadata
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            createParameterTypesMetadata(
+                                    ImmutableList.of(
+                                        TypeCode.INT64, TypeCode.INT64, TypeCode.INT64))
+                                .getUndeclaredParameters())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(selectSql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(1L)
+                .bind("p3")
+                .to(0L)
+                .build(),
+            ResultSet.newBuilder().setMetadata(selectMetadata).addRows(row).build()));
+
+    String output = runTest("testDeleteAllTypes", getHost(), pgServer.getLocalPort());
+    assertEquals(
+        "{\n"
+            + "  col_bigint: 1n,\n"
+            + "  col_bool: false,\n"
+            + "  col_bytea: <Buffer 75 70 64 61 74 65 64>,\n"
+            + "  col_float8: 6.626,\n"
+            + "  col_int: -100,\n"
+            + "  col_numeric: 3.14,\n"
+            + "  col_timestamptz: 2023-03-13T05:40:02.123Z,\n"
+            + "  col_date: 2023-03-13T00:00:00.000Z,\n"
+            + "  col_varchar: 'updated',\n"
+            + "  col_jsonb: { key: 'updated' },\n"
+            + "  col_array_bigint: [],\n"
+            + "  col_array_bool: [],\n"
+            + "  col_array_bytea: [],\n"
+            + "  col_array_float8: [],\n"
+            + "  col_array_int: [],\n"
+            + "  col_array_numeric: [],\n"
+            + "  col_array_timestamptz: [],\n"
+            + "  col_array_date: [],\n"
+            + "  col_array_varchar: [],\n"
+            + "  col_array_jsonb: []\n"
+            + "}\n",
+        output);
+
+    assertEquals(6, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(selectSql, requests.get(0).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(0).getQueryMode());
+    assertEquals(selectSql, requests.get(1).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(1).getQueryMode());
+    assertEquals(selectIdSql, requests.get(2).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(2).getQueryMode());
+    assertEquals(selectIdSql, requests.get(3).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(3).getQueryMode());
+    assertEquals(deleteSql, requests.get(4).getSql());
+    assertEquals(QueryMode.PLAN, requests.get(4).getQueryMode());
+    assertEquals(deleteSql, requests.get(5).getSql());
+    assertEquals(QueryMode.NORMAL, requests.get(5).getQueryMode());
+  }
+
+  @Ignore("Skip this, as the SQL generated by createMany contains the columns in random order")
+  @Test
+  public void testCreateManyAllTypes() throws IOException, InterruptedException {
+    String insertSql =
+        "INSERT INTO \"public\".\"AllTypes\" (\"col_numeric\",\"col_bigint\",\"col_date\",\"col_float8\",\"col_varchar\",\"col_bool\",\"col_int\",\"col_bytea\",\"col_jsonb\",\"col_timestamptz\") "
+            + "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10), ($11,$12,$13,$14,$15,$16,$17,$18,$19,$20)";
+    ResultSetMetadata insertMetadata =
+        createParameterTypesMetadata(
+            ImmutableList.of(
+                TypeCode.INT64,
+                TypeCode.BOOL,
+                TypeCode.BYTES,
+                TypeCode.FLOAT64,
+                TypeCode.INT64,
+                TypeCode.NUMERIC,
+                TypeCode.TIMESTAMP,
+                TypeCode.DATE,
+                TypeCode.STRING,
+                TypeCode.JSON,
+                TypeCode.INT64,
+                TypeCode.BOOL,
+                TypeCode.BYTES,
+                TypeCode.FLOAT64,
+                TypeCode.INT64,
+                TypeCode.NUMERIC,
+                TypeCode.TIMESTAMP,
+                TypeCode.DATE,
+                TypeCode.STRING,
+                TypeCode.JSON));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertSql),
+            ResultSet.newBuilder()
+                .setMetadata(insertMetadata)
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(insertSql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(true)
+                .bind("p3")
+                .to(ByteArray.copyFrom("test1"))
+                .bind("p4")
+                .to(3.14d)
+                .bind("p5")
+                .to(100)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric("6.626"))
+                .bind("p7")
+                .to(Timestamp.parseTimestamp("2022-02-16T12:18:02.123456000Z"))
+                .bind("p8")
+                .to(Date.parseDate("2022-03-29"))
+                .bind("p9")
+                .to("test1")
+                .bind("p10")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value1\"}"))
+                .bind("p11")
+                .to(2L)
+                .bind("p12")
+                .to(false)
+                .bind("p13")
+                .to(ByteArray.copyFrom("test2"))
+                .bind("p14")
+                .to(-3.14d)
+                .bind("p15")
+                .to(-100)
+                .bind("p16")
+                .to(com.google.cloud.spanner.Value.pgNumeric("-6.626"))
+                .bind("p17")
+                .to(Timestamp.parseTimestamp("2022-02-16T14:18:02.123456000Z"))
+                .bind("p18")
+                .to(Date.parseDate("2022-03-30"))
+                .bind("p19")
+                .to("test2")
+                .bind("p20")
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\":\"value2\"}"))
+                .build(),
+            2L));
+
+    String selectSql =
+        "SELECT \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\" FROM \"public\".\"AllTypes\" WHERE \"public\".\"AllTypes\".\"col_bigint\" = $1 LIMIT $2 OFFSET $3";
+    ResultSetMetadata allTypesMetadata = createAllTypesResultSetMetadata("");
+    ResultSetMetadata allArrayTypesMetadata = createAllArrayTypesResultSetMetadata("");
+    ResultSetMetadata selectMetadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addAllFields(allTypesMetadata.getRowType().getFieldsList())
+                    .addAllFields(allArrayTypesMetadata.getRowType().getFieldsList())
+                    .build())
+            .build();
+    ListValue row =
+        createAllTypesResultSet("")
+            .getRows(0)
+            .toBuilder()
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(selectSql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    selectMetadata
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            createParameterTypesMetadata(
+                                    ImmutableList.of(
+                                        TypeCode.INT64, TypeCode.INT64, TypeCode.INT64))
+                                .getUndeclaredParameters())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(selectSql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(1L)
+                .bind("p3")
+                .to(0L)
+                .build(),
+            ResultSet.newBuilder().setMetadata(selectMetadata).addRows(row).build()));
+
+    String output = runTest("testCreateManyAllTypes", getHost(), pgServer.getLocalPort());
+
+    assertEquals(
+        "{\n"
+            + "  col_bigint: 1n,\n"
+            + "  col_bool: true,\n"
+            + "  col_bytea: <Buffer 74 65 73 74>,\n"
+            + "  col_float8: 3.14,\n"
+            + "  col_int: 100,\n"
+            + "  col_numeric: 6.626,\n"
+            + "  col_timestamptz: 2022-02-16T13:18:02.123Z,\n"
+            + "  col_date: 2022-03-29T00:00:00.000Z,\n"
+            + "  col_varchar: 'test',\n"
+            + "  col_jsonb: { key: 'value' },\n"
+            + "  col_array_bigint: [],\n"
+            + "  col_array_bool: [],\n"
+            + "  col_array_bytea: [],\n"
+            + "  col_array_float8: [],\n"
+            + "  col_array_int: [],\n"
+            + "  col_array_numeric: [],\n"
+            + "  col_array_timestamptz: [],\n"
+            + "  col_array_date: [],\n"
+            + "  col_array_varchar: [],\n"
+            + "  col_array_jsonb: []\n"
+            + "}\n",
+        output);
   }
 
   static String runTest(String testName, String host, int port)
