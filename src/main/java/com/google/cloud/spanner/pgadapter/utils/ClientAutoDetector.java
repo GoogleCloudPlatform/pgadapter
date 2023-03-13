@@ -20,7 +20,6 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgAttribute;
-import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgEnum;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCatalogTable;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
@@ -184,16 +183,9 @@ public class ClientAutoDetector {
     NPGSQL {
       final ImmutableMap<String, String> tableReplacements =
           ImmutableMap.of(
-              "pg_catalog.pg_attribute",
-              "pg_attribute",
-              "pg_attribute",
-              "pg_attribute",
-              "pg_catalog.pg_enum",
-              "pg_enum",
-              "pg_enum",
-              "pg_enum");
+              "pg_catalog.pg_attribute", "pg_attribute", "pg_attribute", "pg_attribute");
       final ImmutableMap<String, PgCatalogTable> pgCatalogTables =
-          ImmutableMap.of("pg_attribute", new EmptyPgAttribute(), "pg_enum", new EmptyPgEnum());
+          ImmutableMap.of("pg_attribute", new EmptyPgAttribute());
 
       final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
           ImmutableMap.of(
