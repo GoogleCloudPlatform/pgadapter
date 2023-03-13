@@ -14,6 +14,13 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
+import static org.junit.Assert.assertSame;
+import static org.mockito.Mockito.mock;
+
+import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -22,4 +29,11 @@ import org.junit.runners.JUnit4;
 public class PgCatalogTest {
   @Test
   public void testReplaceCatalogTables() {}
+
+  @Test
+  public void testAddCommonTableExpressions() {
+    Statement statement = Statement.of("select * from my_table");
+    PgCatalog catalog = new PgCatalog(mock(SessionState.class), WellKnownClient.UNSPECIFIED);
+    assertSame(statement, catalog.addCommonTableExpressions(statement, ImmutableList.of()));
+  }
 }
