@@ -768,12 +768,9 @@ public class GormMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.newBuilder(sql).bind("p1").to("2").build(), 1L));
 
-    // Nested transactions are not supported, as we don't support savepoints.
     String res = gormTest.TestNestedTransaction(createConnString());
-    assertEquals(
-        "failed to execute nested transaction: ERROR: current transaction is aborted, commands ignored until end of transaction block (SQLSTATE 25P02)",
-        res);
-    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertNull(res);
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
   }
 
   @Test

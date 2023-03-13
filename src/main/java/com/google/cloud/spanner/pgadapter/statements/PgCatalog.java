@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -68,6 +69,9 @@ public class PgCatalog {
           .put(
               new TableOrIndexName(null, "pg_sequences"),
               new TableOrIndexName(null, "pg_sequences"))
+          .put(
+              new TableOrIndexName("information_schema", "sequences"),
+              new TableOrIndexName(null, "pg_information_schema_sequences"))
           .put(
               new TableOrIndexName("pg_catalog", "pg_settings"),
               new TableOrIndexName(null, "pg_settings"))
@@ -118,6 +122,9 @@ public class PgCatalog {
           .put(new TableOrIndexName(null, "pg_attrdef"), new EmptyPgAttrdef())
           .put(new TableOrIndexName(null, "pg_sequence"), new PgSequence())
           .put(new TableOrIndexName(null, "pg_sequences"), new PgSequences())
+          .put(
+              new TableOrIndexName(null, "pg_information_schema_sequences"),
+              new InformationSchemaSequences())
           .build();
   private final SessionState sessionState;
 
@@ -153,7 +160,8 @@ public class PgCatalog {
   /** Replace supported pg_catalog tables with Common Table Expressions. */
   public Statement replacePgCatalogTables(Statement statement) {
     // Only replace tables if the statement contains at least one of the known prefixes.
-    if (checkPrefixes.stream().noneMatch(prefix -> statement.getSql().contains(prefix))) {
+    String sql = statement.getSql().toLowerCase(Locale.ENGLISH);
+    if (checkPrefixes.stream().noneMatch(sql::contains)) {
       return statement;
     }
 
@@ -570,6 +578,24 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return PG_SEQUENCE_CTE;
+    }
+  }
+
+  private static class InformationSchemaSequences implements PgCatalogTable {
+    // The name of this CTE is a little strange, but that is to make sure it does not accidentally
+    // collide with any user-defined table or view.
+    private static final String INFORMATION_SCHEMA_SEQUENCES_CTE =
+        "pg_information_schema_sequences as (\n"
+            + "select * from ("
+            + "select ''::varchar as sequence_catalog, ''::varchar as sequence_schema, ''::varchar as sequence_name, "
+            + "''::varchar as data_type, 0::bigint as numeric_precision, 0::bigint as numeric_precision_radix, "
+            + "''::varchar as start_value, ''::varchar as minimum_value, ''::varchar as maximum_value, "
+            + "''::varchar as increment, 'NO'::varchar as cycle_option\n"
+            + ") seq where false)";
+
+    @Override
+    public String getTableExpression() {
+      return INFORMATION_SCHEMA_SEQUENCES_CTE;
     }
   }
 }
