@@ -115,6 +115,29 @@ public class NpgsqlTest
         Console.WriteLine("Success");
     }
 
+    public void TestSelectArray()
+    {
+        using var connection = new NpgsqlConnection(ConnectionString);
+        connection.Open();
+
+        using var cmd = new NpgsqlCommand("SELECT '{1,2}'::bigint[] as c", connection);
+        using (var reader = cmd.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var got = reader.GetFieldValue<long?[]>(0);
+                if (got.Length == 2 && got[0] == 1L && got[1] == 2L)
+                {
+                    continue;
+                }
+                
+                Console.WriteLine($"Value mismatch: Got {got}, Want: (1,2)");
+                return;
+            }
+        }
+        Console.WriteLine("Success");
+    }
+
     public void TestQueryWithParameter()
     {
         using var connection = new NpgsqlConnection(ConnectionString);
