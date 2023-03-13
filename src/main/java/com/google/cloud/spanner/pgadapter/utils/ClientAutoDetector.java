@@ -19,7 +19,9 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgAttrdef;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgAttribute;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgConstraint;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCatalogTable;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
@@ -183,14 +185,7 @@ public class ClientAutoDetector {
     NPGSQL {
       final ImmutableMap<String, String> tableReplacements =
           ImmutableMap.of(
-              "pg_catalog.pg_attribute",
-              "pg_attribute",
-              "pg_attribute",
-              "pg_attribute",
-              "pg_catalog.pg_enum",
-              "pg_enum",
-              "pg_enum",
-              "pg_enum");
+              "pg_catalog.pg_attribute", "pg_attribute", "pg_attribute", "pg_attribute");
       final ImmutableMap<String, PgCatalogTable> pgCatalogTables =
           ImmutableMap.of("pg_attribute", new EmptyPgAttribute());
 
@@ -236,13 +231,32 @@ public class ClientAutoDetector {
       }
     },
     PRISMA {
+      final ImmutableMap<String, String> tableReplacements =
+          ImmutableMap.of(
+              "pg_catalog.pg_constraint",
+              "pg_constraint",
+              "pg_constraint",
+              "pg_constraint",
+              "pg_catalog.pg_attribute",
+              "pg_attribute",
+              "pg_attribute",
+              "pg_attribute",
+              "pg_catalog.pg_attrdef",
+              "pg_attrdef",
+              "pg_attrdef",
+              "pg_attrdef",
+              "_prisma_migrations",
+              "prisma_migrations");
+      final ImmutableMap<String, PgCatalogTable> pgCatalogTables =
+          ImmutableMap.of(
+              "pg_constraint", new EmptyPgConstraint(),
+              "pg_attribute", new EmptyPgAttribute(),
+              "pg_attrdef", new EmptyPgAttrdef());
       private final ImmutableSet<String> checkPgCatalogPrefixes =
           ImmutableSet.<String>builder()
               .addAll(DEFAULT_CHECK_PG_CATALOG_PREFIXES)
               .add("_prisma_migrations")
               .build();
-      private final ImmutableMap<String, String> tableReplacements =
-          ImmutableMap.of("_prisma_migrations", "prisma_migrations");
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -266,6 +280,11 @@ public class ClientAutoDetector {
       @Override
       public ImmutableMap<String, String> getTableReplacements() {
         return tableReplacements;
+      }
+
+      @Override
+      public ImmutableMap<String, PgCatalogTable> getPgCatalogTables() {
+        return pgCatalogTables;
       }
 
       @Override

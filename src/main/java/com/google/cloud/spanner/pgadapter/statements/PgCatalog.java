@@ -76,22 +76,6 @@ public class PgCatalog {
               new TableOrIndexName("pg_catalog", "pg_settings"),
               new TableOrIndexName(null, "pg_settings"))
           .put(new TableOrIndexName(null, "pg_settings"), new TableOrIndexName(null, "pg_settings"))
-          .put(
-              new TableOrIndexName("pg_catalog", "pg_constraint"),
-              new TableOrIndexName(null, "pg_constraint"))
-          .put(
-              new TableOrIndexName(null, "pg_constraint"),
-              new TableOrIndexName(null, "pg_constraint"))
-          .put(
-              new TableOrIndexName("pg_catalog", "pg_attribute"),
-              new TableOrIndexName(null, "pg_attribute"))
-          .put(
-              new TableOrIndexName(null, "pg_attribute"),
-              new TableOrIndexName(null, "pg_attribute"))
-          .put(
-              new TableOrIndexName("pg_catalog", "pg_attrdef"),
-              new TableOrIndexName(null, "pg_attrdef"))
-          .put(new TableOrIndexName(null, "pg_attrdef"), new TableOrIndexName(null, "pg_attrdef"))
           .build();
 
   private static final ImmutableMap<Pattern, Supplier<String>> DEFAULT_FUNCTION_REPLACEMENTS =
@@ -117,9 +101,6 @@ public class PgCatalog {
           .put(new TableOrIndexName(null, "pg_enum"), new EmptyPgEnum())
           .put(new TableOrIndexName(null, "pg_range"), new PgRange())
           .put(new TableOrIndexName(null, "pg_type"), new PgType())
-          .put(new TableOrIndexName(null, "pg_constraint"), new EmptyPgConstraint())
-          .put(new TableOrIndexName(null, "pg_attribute"), new EmptyPgAttribute())
-          .put(new TableOrIndexName(null, "pg_attrdef"), new EmptyPgAttrdef())
           .put(new TableOrIndexName(null, "pg_sequence"), new PgSequence())
           .put(new TableOrIndexName(null, "pg_sequences"), new PgSequences())
           .put(
@@ -506,7 +487,8 @@ public class PgCatalog {
     }
   }
 
-  private static class EmptyPgAttrdef implements PgCatalogTable {
+  @InternalApi
+  public static class EmptyPgAttrdef implements PgCatalogTable {
     private static final String PG_ATTRDEF_CTE =
         "pg_attrdef as (\n"
             + "select * from ("
@@ -532,7 +514,8 @@ public class PgCatalog {
     }
   }
 
-  private static class EmptyPgConstraint implements PgCatalogTable {
+  @InternalApi
+  public static class EmptyPgConstraint implements PgCatalogTable {
     private static final String PG_CONSTRAINT_CTE =
         "pg_constraint as (\n"
             + "select * from ("

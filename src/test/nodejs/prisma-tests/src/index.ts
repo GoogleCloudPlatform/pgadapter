@@ -80,6 +80,48 @@ async function testCreateAllTypes(client: PrismaClient) {
   console.log(row);
 }
 
+async function testUpdateAllTypes(client: PrismaClient) {
+  const row = await client.allTypes.update({
+    data: {
+      col_bool: false,
+      col_bytea: Buffer.from("updated", "utf-8"),
+      col_float8: 6.626,
+      col_int: -100,
+      col_numeric: new Prisma.Decimal(3.14),
+      col_timestamptz: "2023-03-13T06:40:02.123456+01:00",
+      col_date: new Date("2023-03-13"),
+      col_varchar: "updated",
+      col_jsonb: {"key": "updated"},
+    },
+    where: {
+      col_bigint: 1,
+    }
+  });
+  console.log(row);
+}
+
+async function testUpsertAllTypes(client: PrismaClient) {
+  const data = {
+    col_bool: false,
+    col_bytea: Buffer.from("updated", "utf-8"),
+    col_float8: 6.626,
+    col_int: -100,
+    col_numeric: new Prisma.Decimal(3.14),
+    col_timestamptz: "2023-03-13T06:40:02.123456+01:00",
+    col_date: new Date("2023-03-13"),
+    col_varchar: "updated",
+    col_jsonb: {"key": "updated"},
+  };
+  const row = await client.allTypes.upsert({
+    create: {col_bigint: 1, ...data},
+    update: data,
+    where: {
+      col_bigint: 1,
+    }
+  });
+  console.log(row);
+}
+
 require('yargs')
 .demand(4)
 .command(
@@ -105,6 +147,18 @@ require('yargs')
     'Creates a test row with all types',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testCreateAllTypes)
+)
+.command(
+    'testUpdateAllTypes <host> <port> <database>',
+    'Updates a test row with all types',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testUpdateAllTypes)
+)
+.command(
+    'testUpsertAllTypes <host> <port> <database>',
+    'Upserts a test row with all types',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testUpsertAllTypes)
 )
 .wrap(120)
 .recommendCommands()

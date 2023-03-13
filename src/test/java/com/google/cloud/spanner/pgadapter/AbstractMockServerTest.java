@@ -667,8 +667,15 @@ public abstract class AbstractMockServerTest {
 
   protected static ResultSetMetadata createMetadata(
       ImmutableList<TypeCode> types, ImmutableList<String> names) {
+    return createMetadata(types, false, names);
+  }
+
+  protected static ResultSetMetadata createMetadata(
+      ImmutableList<TypeCode> types, boolean alsoAsArrays, ImmutableList<String> names) {
     Preconditions.checkArgument(
-        types.size() == names.size(), "Types and names must have same length");
+        (!alsoAsArrays && types.size() == names.size())
+            || (alsoAsArrays && 2 * types.size() == names.size()),
+        "Types and names must have same length");
     StructType.Builder builder = StructType.newBuilder();
     for (int index = 0; index < types.size(); index++) {
       builder.addFields(
@@ -681,7 +688,35 @@ public abstract class AbstractMockServerTest {
               .setName(names.get(index))
               .build());
     }
+    if (alsoAsArrays) {
+      for (int index = 0; index < types.size(); index++) {
+        builder.addFields(
+            Field.newBuilder()
+                .setType(
+                    Type.newBuilder()
+                        .setCode(TypeCode.ARRAY)
+                        .setArrayElementType(
+                            Type.newBuilder()
+                                .setCode(types.get(index))
+                                .setTypeAnnotation(getTypeAnnotationCode(types.get(index))))
+                        .build())
+                .setName(names.get(types.size() + index))
+                .build());
+      }
+    }
     return ResultSetMetadata.newBuilder().setRowType(builder.build()).build();
+  }
+
+  protected static ResultSetMetadata createMetadata(
+      ImmutableList<TypeCode> types,
+      boolean alsoAsArrays,
+      ImmutableList<String> names,
+      ImmutableList<TypeCode> parameterTypes) {
+    return createMetadata(types, alsoAsArrays, names)
+        .toBuilder()
+        .setUndeclaredParameters(
+            createParameterTypesMetadata(parameterTypes).getUndeclaredParameters())
+        .build();
   }
 
   @BeforeClass
