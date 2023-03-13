@@ -309,6 +309,7 @@ public class ClientAutoDetectorTest {
     assertEquals(
         WellKnownClient.NPGSQL,
         ClientAutoDetector.detectClient(
+            ImmutableList.of(),
             ImmutableList.of(
                 Statement.of(
                     "SELECT version();\n"
@@ -316,10 +317,12 @@ public class ClientAutoDetectorTest {
                         + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n"))));
     assertEquals(
         WellKnownClient.UNSPECIFIED,
-        ClientAutoDetector.detectClient(ImmutableList.of(Statement.of("SELECT version()"))));
+        ClientAutoDetector.detectClient(
+            ImmutableList.of(), ImmutableList.of(Statement.of("SELECT version()"))));
     assertEquals(
         WellKnownClient.UNSPECIFIED,
         ClientAutoDetector.detectClient(
+            ImmutableList.of(),
             ImmutableList.of(
                 Statement.of(
                     "SELECT version();\n"

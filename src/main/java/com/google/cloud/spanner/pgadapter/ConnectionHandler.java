@@ -30,6 +30,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerException.ResourceNotFoundException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
 import com.google.cloud.spanner.connection.Connection;
 import com.google.cloud.spanner.connection.ConnectionOptions;
 import com.google.cloud.spanner.connection.ConnectionOptionsHelper;
@@ -71,6 +72,7 @@ import java.text.MessageFormat;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -125,6 +127,13 @@ public class ConnectionHandler extends Thread {
   private DatabaseId databaseId;
   private WellKnownClient wellKnownClient = WellKnownClient.UNSPECIFIED;
   private boolean hasDeterminedClientUsingQuery;
+  /**
+   * List of PARSE messages that we received before auto-detecting the client. This list can be used
+   * by the detector to determine which client is connected, and is cleared after the detection is
+   * done.
+   */
+  private final LinkedList<ParseMessage> skippedAutoDetectParseMessages = new LinkedList<>();
+
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   private CopyStatement activeCopyStatement;
 
@@ -727,12 +736,15 @@ public class ConnectionHandler extends Thread {
     if (!this.hasDeterminedClientUsingQuery) {
       if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
           && getServer().getOptions().shouldAutoDetectClient()) {
-        setWellKnownClient(ClientAutoDetector.detectClient(ImmutableList.of(statement)));
+        setWellKnownClient(
+            ClientAutoDetector.detectClient(
+                skippedAutoDetectParseMessages, ImmutableList.of(statement)));
       }
       maybeSetApplicationName();
+      skippedAutoDetectParseMessages.clear();
+      // Make sure that we only try to detect the client once.
+      this.hasDeterminedClientUsingQuery = true;
     }
-    // Make sure that we only try to detect the client once.
-    this.hasDeterminedClientUsingQuery = true;
   }
 
   /**
@@ -743,14 +755,21 @@ public class ConnectionHandler extends Thread {
    */
   public void maybeDetermineWellKnownClient(ParseMessage parseMessage) {
     if (!this.hasDeterminedClientUsingQuery) {
-      if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
-          && getServer().getOptions().shouldAutoDetectClient()) {
-        setWellKnownClient(ClientAutoDetector.detectClient(parseMessage));
+      if (parseMessage.getStatement().getStatementType() == StatementType.CLIENT_SIDE
+          && skippedAutoDetectParseMessages.size() < 10) {
+        skippedAutoDetectParseMessages.add(parseMessage);
+      } else {
+        if (this.wellKnownClient == WellKnownClient.UNSPECIFIED
+            && getServer().getOptions().shouldAutoDetectClient()) {
+          setWellKnownClient(
+              ClientAutoDetector.detectClient(skippedAutoDetectParseMessages, parseMessage));
+        }
+        maybeSetApplicationName();
+        skippedAutoDetectParseMessages.clear();
+        // Make sure that we only try to detect the client once.
+        this.hasDeterminedClientUsingQuery = true;
       }
-      maybeSetApplicationName();
     }
-    // Make sure that we only try to detect the client once.
-    this.hasDeterminedClientUsingQuery = true;
   }
 
   private void maybeSetApplicationName() {

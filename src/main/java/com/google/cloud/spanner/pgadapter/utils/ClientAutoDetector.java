@@ -175,7 +175,7 @@ public class ClientAutoDetector {
       }
 
       @Override
-      boolean isClient(ParseMessage parseMessage) {
+      boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
         // pgx uses a relatively unique naming scheme for prepared statements (and uses prepared
         // statements for everything by default).
         return parseMessage.getName() != null && parseMessage.getName().startsWith("lrupsc_");
@@ -208,7 +208,7 @@ public class ClientAutoDetector {
       }
 
       @Override
-      boolean isClient(List<Statement> statements) {
+      boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
         // The npgsql client always starts with sending a query that contains multiple statements
         // and that starts with the following prefix.
         return statements.size() == 1
@@ -245,14 +245,14 @@ public class ClientAutoDetector {
       }
 
       @Override
-      boolean isClient(List<Statement> statements) {
+      boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
         return true;
       }
 
       @Override
-      boolean isClient(ParseMessage parseMessage) {
+      boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
         return true;
@@ -265,11 +265,11 @@ public class ClientAutoDetector {
     @VisibleForTesting
     public void reset() {}
 
-    boolean isClient(List<Statement> statements) {
+    boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
       return false;
     }
 
-    boolean isClient(ParseMessage parseMessage) {
+    boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
       return false;
     }
 
@@ -332,9 +332,10 @@ public class ClientAutoDetector {
    * Returns the {@link WellKnownClient} that the detector thinks is connected to PGAdapter based on
    * the given list of SQL statements that have been executed.
    */
-  public static @Nonnull WellKnownClient detectClient(List<Statement> statements) {
+  public static @Nonnull WellKnownClient detectClient(
+      List<ParseMessage> skippedParseMessages, List<Statement> statements) {
     for (WellKnownClient client : WellKnownClient.values()) {
-      if (client.isClient(statements)) {
+      if (client.isClient(skippedParseMessages, statements)) {
         return client;
       }
     }
@@ -346,9 +347,10 @@ public class ClientAutoDetector {
    * Returns the {@link WellKnownClient} that the detector thinks is connected to PGAdapter based on
    * the Parse message that has been received.
    */
-  public static @Nonnull WellKnownClient detectClient(ParseMessage parseMessage) {
+  public static @Nonnull WellKnownClient detectClient(
+      List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
     for (WellKnownClient client : WellKnownClient.values()) {
-      if (client.isClient(parseMessage)) {
+      if (client.isClient(skippedParseMessages, parseMessage)) {
         return client;
       }
     }
