@@ -34,8 +34,8 @@ jobs:
       # Configure docker to use the gcloud command-line tool as a credential helper
       - run: gcloud auth configure-docker gcr.io
 
-      # Build the Docker image
-      - name: Build
+      # Build and Publish the Docker image
+      - name: Build and Publish
         run: |
           export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $TAG
@@ -43,15 +43,17 @@ jobs:
           docker buildx build --platform linux/amd64,linux/arm64 \
             . -f build/Dockerfile \
             -t "$GCR_HOSTNAME"/"$IMAGE":"$TAG" \
+            -t "$GCR_HOSTNAME"/"$IMAGE":latest \
+            --push \
             --build-arg GITHUB_SHA="$GITHUB_SHA" \
             --build-arg GITHUB_REF="$GITHUB_REF"
 
       # Push the Docker image to Google Artifact Registry
-      - name: Publish
-        run: |
-          export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
-          echo $TAG
-          docker buildx use multi_platform
-          docker buildx push "$GCR_HOSTNAME"/"$IMAGE":"$TAG"
-          docker buildx tag "$GCR_HOSTNAME"/"$IMAGE":"$TAG" "$GCR_HOSTNAME"/"$IMAGE":latest
-          docker buildx push "$GCR_HOSTNAME"/"$IMAGE":latest
+#      - name: Publish
+#        run: |
+#          export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
+#          echo $TAG
+#          docker buildx use multi_platform
+#          docker buildx push "$GCR_HOSTNAME"/"$IMAGE":"$TAG"
+#          docker buildx tag "$GCR_HOSTNAME"/"$IMAGE":"$TAG" "$GCR_HOSTNAME"/"$IMAGE":latest
+#          docker buildx push "$GCR_HOSTNAME"/"$IMAGE":latest
