@@ -148,6 +148,12 @@ public class ITNpgsqlTest implements IntegrationTest {
   }
 
   @Test
+  public void testSelectArray() throws IOException, InterruptedException {
+    String result = execute("TestSelectArray", createConnectionString());
+    assertEquals("Success\n", result);
+  }
+
+  @Test
   public void testQueryAllDataTypes() throws IOException, InterruptedException {
     String result = execute("TestQueryAllDataTypes", createConnectionString());
     assertEquals("Success\n", result);

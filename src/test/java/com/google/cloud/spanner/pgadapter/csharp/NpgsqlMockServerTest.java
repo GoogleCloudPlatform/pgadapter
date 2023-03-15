@@ -113,6 +113,56 @@ public class NpgsqlMockServerTest extends AbstractNpgsqlMockServerTest {
   }
 
   @Test
+  public void testSelectArray() throws IOException, InterruptedException {
+    String sql = "SELECT '{1,2}'::bigint[] as c";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("c")
+                                        .setType(
+                                            Type.newBuilder()
+                                                .setCode(TypeCode.ARRAY)
+                                                .setArrayElementType(
+                                                    Type.newBuilder()
+                                                        .setCode(TypeCode.INT64)
+                                                        .build())
+                                                .build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder()
+                                .setListValue(
+                                    ListValue.newBuilder()
+                                        .addValues(Value.newBuilder().setStringValue("1").build())
+                                        .addValues(Value.newBuilder().setStringValue("2").build())
+                                        .build())
+                                .build())
+                        .build())
+                .build()));
+
+    String result = execute("TestSelectArray", createConnectionString());
+    assertEquals("Success\n", result);
+
+    List<ExecuteSqlRequest> requests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(1, requests.size());
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
   public void testQueryWithParameter() throws IOException, InterruptedException {
     String sql = "SELECT * FROM FOO WHERE BAR=$1";
     Statement statement = Statement.newBuilder(sql).bind("p1").to("baz").build();
