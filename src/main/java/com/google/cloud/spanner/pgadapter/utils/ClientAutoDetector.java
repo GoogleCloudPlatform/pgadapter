@@ -190,8 +190,15 @@ public class ClientAutoDetector {
       final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
           ImmutableMap.of(
               Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"),
-                  Suppliers.ofInstance("false"),
-              Pattern.compile("proc\\.oid = typ\\.typreceive"), Suppliers.ofInstance("false"));
+              Suppliers.ofInstance("false"),
+              Pattern.compile("proc\\.oid = typ\\.typreceive"),
+              Suppliers.ofInstance("false"),
+              Pattern.compile("WHEN proc\\.proname='array_recv' THEN typ\\.typelem"),
+              Suppliers.ofInstance("WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem"),
+              Pattern.compile(
+                  "WHEN proc\\.proname='array_recv' THEN 'a' ELSE typ\\.typtype END AS typtype"),
+              Suppliers.ofInstance(
+                  "WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype"));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
