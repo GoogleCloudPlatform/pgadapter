@@ -73,6 +73,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -793,6 +794,16 @@ public class ConnectionHandler extends Thread {
       // the list of settings. Just ignore this situation, as the only consequence is that the
       // 'application_name' setting has not been set.
     }
+  }
+
+  @VisibleForTesting
+  List<ParseMessage> getSkippedAutoDetectParseMessages() {
+    return this.skippedAutoDetectParseMessages;
+  }
+
+  @VisibleForTesting
+  boolean isHasDeterminedClientUsingQuery() {
+    return this.hasDeterminedClientUsingQuery;
   }
 
   /** Status of a {@link ConnectionHandler} */
