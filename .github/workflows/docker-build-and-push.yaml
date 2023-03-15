@@ -39,9 +39,9 @@ jobs:
         run: |
           export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $TAG
-          docker buildx create --use
+          docker buildx create multi_platform --use
           docker buildx build --platform linux/amd64,linux/arm64 \
-                 . -f build/Dockerfile \
+            . -f build/Dockerfile \
             -t "$GCR_HOSTNAME"/"$IMAGE":"$TAG" \
             --build-arg GITHUB_SHA="$GITHUB_SHA" \
             --build-arg GITHUB_REF="$GITHUB_REF"
@@ -51,6 +51,7 @@ jobs:
         run: |
           export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $TAG
-          docker push "$GCR_HOSTNAME"/"$IMAGE":"$TAG"
-          docker tag "$GCR_HOSTNAME"/"$IMAGE":"$TAG" "$GCR_HOSTNAME"/"$IMAGE":latest
-          docker push "$GCR_HOSTNAME"/"$IMAGE":latest
+          docker buildx use multi_platform
+          docker buildx push "$GCR_HOSTNAME"/"$IMAGE":"$TAG"
+          docker buildx tag "$GCR_HOSTNAME"/"$IMAGE":"$TAG" "$GCR_HOSTNAME"/"$IMAGE":latest
+          docker buildx push "$GCR_HOSTNAME"/"$IMAGE":latest
