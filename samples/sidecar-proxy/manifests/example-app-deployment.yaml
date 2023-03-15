@@ -1,0 +1,55 @@
+
+# Copyright 2023 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgadapter-gke-example
+spec:
+  selector:
+    matchLabels:
+      app: pgadapter-example
+  template:
+    metadata:
+      labels:
+        app: pgadapter-example
+    spec:
+      # TODO(developer): replace this value with the actual Kubernetes Service Account name
+      serviceAccountName: <YOUR_KSA_NAME>
+      containers:
+      - name: example-app
+        # TODO(developer): replace these values
+        image: <YOUR_REGION>-docker.pkg.dev/<YOUR_PROJECT_ID>/example-repo/example-app
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: 200m
+      - name: pgadapter
+        image: gcr.io/cloud-spanner-pg-adapter/pgadapter
+        ports:
+          - containerPort: 5432
+        # TODO(developer): Replace with actual project, instance and database name
+        args:
+          - "-p <YOUR_SPANNER_PROJECT_ID>"
+          - "-i <YOUR_SPANNER_INSTANCE_ID>"
+          - "-d <YOUR_SPANNER_DATABASE_ID>"
+          - "-x"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: 200m
+---
