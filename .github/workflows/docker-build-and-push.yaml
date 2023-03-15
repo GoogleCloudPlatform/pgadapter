@@ -43,7 +43,7 @@ jobs:
           docker buildx build --platform linux/amd64,linux/arm64 \
             . -f build/Dockerfile \
             -t "$GCR_HOSTNAME"/"$IMAGE":"$TAG" \
-            -t "$GCR_HOSTNAME"/"$IMAGE":latest \
+            -t "$GCR_HOSTNAME"/"$IMAGE":test \
             --push \
             --build-arg GITHUB_SHA="$GITHUB_SHA" \
             --build-arg GITHUB_REF="$GITHUB_REF"
