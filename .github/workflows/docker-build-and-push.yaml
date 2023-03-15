@@ -39,7 +39,7 @@ jobs:
         run: |
           export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $TAG
-          docker buildx create multi_platform --use
+          docker buildx create --name multi_platform --use
           docker buildx build --platform linux/amd64,linux/arm64 \
             . -f build/Dockerfile \
             -t "$GCR_HOSTNAME"/"$IMAGE":"$TAG" \
