@@ -21,6 +21,7 @@ import com.sun.jna.Library;
 import com.sun.jna.Native;
 import java.io.File;
 import java.io.IOException;
+import java.util.Scanner;
 
 /** Golang Test interface. */
 public interface GolangTest {
@@ -41,23 +42,34 @@ public interface GolangTest {
     File testFile = new File(testFilePath);
     String testFileNameWithoutExtension = Files.getNameWithoutExtension(testFile.getName());
     File directory = testFile.getParentFile();
+    // Get all dependencies for this module.
+    run(new String[] {"go", "mod", "tidy"}, directory);
     // Compile the Go code to ensure that we always have the most recent test code.
-    ProcessBuilder builder = new ProcessBuilder();
-    String[] compileCommand =
+    run(
         String.format(
                 "go build -o %s_test.so -buildmode=c-shared %s",
                 testFileNameWithoutExtension, testFile.getName())
-            .split(" ");
-    builder.command(compileCommand);
-    builder.directory(directory);
-    Process process = builder.start();
-    int res = process.waitFor();
-    assertEquals(0, res);
+            .split(" "),
+        directory);
 
     // We explicitly use the full path to force JNA to look in a specific directory, instead of in
     // standard library directories.
     return Native.load(
         String.format("%s/%s_test.so", directory.getAbsolutePath(), testFileNameWithoutExtension),
         testClass);
+  }
+
+  static void run(String[] command, File directory) throws IOException, InterruptedException {
+    ProcessBuilder builder = new ProcessBuilder();
+    builder.command(command);
+    builder.directory(directory);
+    Process process = builder.start();
+    Scanner errorScanner = new Scanner(process.getErrorStream());
+    StringBuilder error = new StringBuilder();
+    while (errorScanner.hasNextLine()) {
+      error.append(errorScanner.nextLine()).append("\n");
+    }
+    int res = process.waitFor();
+    assertEquals(error.toString(), 0, res);
   }
 }
