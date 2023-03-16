@@ -39,6 +39,7 @@ import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgEnum;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
@@ -3373,6 +3374,28 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     CommitRequest commitRequest = mockSpanner.getRequestsOfType(CommitRequest.class).get(0);
     assertEquals(commitRequest.getTransactionId(), requests.get(1).getTransaction().getId());
     assertEquals(commitRequest.getTransactionId(), requests.get(3).getTransaction().getId());
+  }
+
+  @Test
+  public void testPgEnum() throws SQLException {
+    for (String sql :
+        new String[] {
+          "select * from pg_enum",
+          "select * from pg_catalog.pg_enum",
+          "select * from PG_CATALOG.PG_ENUM"
+        }) {
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of("with " + new EmptyPgEnum().getTableExpression() + "\n" + sql),
+              SELECT1_RESULTSET));
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
   }
 
   @Test

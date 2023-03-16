@@ -73,6 +73,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -125,6 +126,8 @@ public class ConnectionHandler extends Thread {
   private int invalidMessagesCount;
   private Connection spannerConnection;
   private DatabaseId databaseId;
+  private WellKnownClient wellKnownClient = WellKnownClient.UNSPECIFIED;
+  private boolean hasDeterminedClientUsingQuery;
   /**
    * List of PARSE messages that we received before auto-detecting the client. This list can be used
    * by the detector to determine which client is connected, and is cleared after the detection is
@@ -132,8 +135,6 @@ public class ConnectionHandler extends Thread {
    */
   private final LinkedList<ParseMessage> skippedAutoDetectParseMessages = new LinkedList<>();
 
-  private WellKnownClient wellKnownClient = WellKnownClient.UNSPECIFIED;
-  private boolean hasDeterminedClientUsingQuery;
   private ExtendedQueryProtocolHandler extendedQueryProtocolHandler;
   private CopyStatement activeCopyStatement;
 
@@ -755,6 +756,13 @@ public class ConnectionHandler extends Thread {
    */
   public void maybeDetermineWellKnownClient(ParseMessage parseMessage) {
     if (!this.hasDeterminedClientUsingQuery) {
+      // We skip up to 10 Parse messages before forcing the connection to detect a client (or not).
+      // This is a safety measure against clients that might send a very large number of Parse
+      // messages with client-side statements directly after connecting. This could in worst case
+      // cause PGAdapter to buffer an unreasonable number of messages. The number 10 was randomly
+      // chosen as a reasonable number of statements that should be enough. It can safely be
+      // increased if we encounter clients that send more than 10 client-side statements before
+      // sending anything that we can use to automatically recognize them.
       if (parseMessage.getStatement().getStatementType() == StatementType.CLIENT_SIDE
           && skippedAutoDetectParseMessages.size() < 10) {
         skippedAutoDetectParseMessages.add(parseMessage);
@@ -793,6 +801,16 @@ public class ConnectionHandler extends Thread {
       // the list of settings. Just ignore this situation, as the only consequence is that the
       // 'application_name' setting has not been set.
     }
+  }
+
+  @VisibleForTesting
+  List<ParseMessage> getSkippedAutoDetectParseMessages() {
+    return this.skippedAutoDetectParseMessages;
+  }
+
+  @VisibleForTesting
+  boolean isHasDeterminedClientUsingQuery() {
+    return this.hasDeterminedClientUsingQuery;
   }
 
   /** Status of a {@link ConnectionHandler} */

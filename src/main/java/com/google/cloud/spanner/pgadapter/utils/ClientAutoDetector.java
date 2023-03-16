@@ -20,7 +20,6 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgAttribute;
-import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgEnum;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCatalogTable;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
@@ -184,28 +183,22 @@ public class ClientAutoDetector {
     NPGSQL {
       final ImmutableMap<String, String> tableReplacements =
           ImmutableMap.of(
-              "pg_catalog.pg_attribute",
-              "pg_attribute",
-              "pg_attribute",
-              "pg_attribute",
-              "pg_catalog.pg_enum",
-              "pg_enum",
-              "pg_enum",
-              "pg_enum");
+              "pg_catalog.pg_attribute", "pg_attribute", "pg_attribute", "pg_attribute");
       final ImmutableMap<String, PgCatalogTable> pgCatalogTables =
-          ImmutableMap.of("pg_attribute", new EmptyPgAttribute(), "pg_enum", new EmptyPgEnum());
+          ImmutableMap.of("pg_attribute", new EmptyPgAttribute());
 
       final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
           ImmutableMap.of(
               Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"),
-                  Suppliers.ofInstance("false"),
-              Pattern.compile("proc\\.oid = typ\\.typreceive"), Suppliers.ofInstance("false"),
+              Suppliers.ofInstance("false"),
+              Pattern.compile("proc\\.oid = typ\\.typreceive"),
+              Suppliers.ofInstance("false"),
               Pattern.compile("WHEN proc\\.proname='array_recv' THEN typ\\.typelem"),
-                  Suppliers.ofInstance("WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem"),
+              Suppliers.ofInstance("WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem"),
               Pattern.compile(
-                      "WHEN proc\\.proname='array_recv' THEN 'a' ELSE typ\\.typtype END AS typtype"),
-                  Suppliers.ofInstance(
-                      "WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype"));
+                  "WHEN proc\\.proname='array_recv' THEN 'a' ELSE typ\\.typtype END AS typtype"),
+              Suppliers.ofInstance(
+                  "WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype"));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
