@@ -756,6 +756,13 @@ public class ConnectionHandler extends Thread {
    */
   public void maybeDetermineWellKnownClient(ParseMessage parseMessage) {
     if (!this.hasDeterminedClientUsingQuery) {
+      // We skip up to 10 Parse messages before forcing the connection to detect a client (or not).
+      // This is a safety measure against clients that might send a very large number of Parse
+      // messages with client-side statements directly after connecting. This could in worst case
+      // cause PGAdapter to buffer an unreasonable number of messages. The number 10 was randomly
+      // chosen as a reasonable number of statements that should be enough. It can safely be
+      // increased if we encounter clients that send more than 10 client-side statements before
+      // sending anything that we can use to automatically recognize them.
       if (parseMessage.getStatement().getStatementType() == StatementType.CLIENT_SIDE
           && skippedAutoDetectParseMessages.size() < 10) {
         skippedAutoDetectParseMessages.add(parseMessage);
