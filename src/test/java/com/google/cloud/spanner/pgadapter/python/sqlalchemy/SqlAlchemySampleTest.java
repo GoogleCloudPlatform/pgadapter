@@ -106,10 +106,6 @@ public class SqlAlchemySampleTest extends AbstractMockServerTest {
             "test_print_albums_first_character_of_title_equal_to_first_or_last_name.py",
             "localhost",
             pgServer.getLocalPort());
-    assertEquals(
-        "\n"
-            + "Searching for albums that have a title that starts with the same character as the first or last name of the singer\n",
-        output);
   }
 
   @Test

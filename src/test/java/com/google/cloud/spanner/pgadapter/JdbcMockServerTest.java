@@ -179,6 +179,28 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                         .addValues(Value.newBuilder().setStringValue("jsonb").build())
                         .build())
                 .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT n.nspname  IN ('pg_catalog', 'public'), n.nspname, t.typname "
+                        + "FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid "
+                        + "WHERE t.oid = $1")
+                .bind("p1")
+                .to(3807L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.BOOL, TypeCode.STRING, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                        .build())
+                .build()));
 
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -248,6 +270,54 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                     ListValue.newBuilder()
                         .addValues(Value.newBuilder().setStringValue("3807").build())
                         .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT substring(typname, 1, 1)='_' as is_array, typtype, typname, pg_type.oid   "
+                        + "FROM pg_type   "
+                        + "LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  "
+                        + "WHERE pg_type.oid = $1  "
+                        + "ORDER BY sp.r, pg_type.oid DESC")
+                .bind("p1")
+                .to(3807L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("is_array")
+                                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typtype")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typename")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("oid")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("b").build())
+                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                        .addValues(Value.newBuilder().setStringValue("3807").build())
                         .build())
                 .build()));
   }
@@ -2683,19 +2753,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(Types.OTHER, parameterMetaData.getParameterType(10));
 
         ResultSetMetaData metadata = statement.getMetaData();
-        assertEquals(10, metadata.getColumnCount());
-        assertEquals(Types.BIGINT, metadata.getColumnType(1));
-        assertEquals(Types.BIT, metadata.getColumnType(2));
-        assertEquals(Types.BINARY, metadata.getColumnType(3));
-        assertEquals(Types.DOUBLE, metadata.getColumnType(4));
-        assertEquals(Types.BIGINT, metadata.getColumnType(5));
-        assertEquals(Types.NUMERIC, metadata.getColumnType(6));
-        assertEquals(Types.TIMESTAMP, metadata.getColumnType(7));
-        assertEquals(Types.DATE, metadata.getColumnType(8));
-        assertEquals(Types.VARCHAR, metadata.getColumnType(9));
-        assertEquals(Types.OTHER, metadata.getColumnType(10));
-
+        assertEquals(20, metadata.getColumnCount());
         int index = 0;
+        assertEquals(Types.BIGINT, metadata.getColumnType(++index));
+        assertEquals(Types.BIT, metadata.getColumnType(++index));
+        assertEquals(Types.BINARY, metadata.getColumnType(++index));
+        assertEquals(Types.DOUBLE, metadata.getColumnType(++index));
+        assertEquals(Types.BIGINT, metadata.getColumnType(++index));
+        assertEquals(Types.NUMERIC, metadata.getColumnType(++index));
+        assertEquals(Types.TIMESTAMP, metadata.getColumnType(++index));
+        assertEquals(Types.DATE, metadata.getColumnType(++index));
+        assertEquals(Types.VARCHAR, metadata.getColumnType(++index));
+        assertEquals(Types.OTHER, metadata.getColumnType(++index));
+
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+
+        index = 0;
         statement.setLong(++index, 1L);
         statement.setBoolean(++index, true);
         statement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
