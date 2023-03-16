@@ -171,7 +171,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
             + "FROM all_types \n"
             + "WHERE all_types.col_bigint = 1";
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql), createAllTypesResultSet("", true)));
+        StatementResult.query(Statement.of(sql), createAllTypesResultSet("all_types_", true)));
 
     String actualOutput = execute("orm_get.py", host, pgServer.getLocalPort());
     String expectedOutput =
@@ -194,7 +194,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
             + "FROM all_types \n"
             + "WHERE all_types.col_bigint = 1";
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql), createAllTypesNullResultSet("", 1L)));
+        StatementResult.query(Statement.of(sql), createAllTypesNullResultSet("all_types_", 1L)));
 
     String actualOutput = execute("orm_get.py", host, pgServer.getLocalPort());
     String expectedOutput =
@@ -263,7 +263,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
             + "FROM all_types \n"
             + "WHERE all_types.col_bigint = 1";
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql), createAllTypesResultSet("", true)));
+        StatementResult.query(Statement.of(sql), createAllTypesResultSet("all_types_", true)));
 
     String actualOutput = execute("orm_read_only_transaction.py", host, pgServer.getLocalPort());
     String expectedOutput =
@@ -295,10 +295,10 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
             + "WHERE all_types.col_bigint = %d";
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(String.format(sql, 1)), createAllTypesResultSet("1", "", true)));
+            Statement.of(String.format(sql, 1)), createAllTypesResultSet("1", "all_types_", true)));
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(String.format(sql, 2)), createAllTypesResultSet("2", "", true)));
+            Statement.of(String.format(sql, 2)), createAllTypesResultSet("2", "all_types_", true)));
 
     String actualOutput = execute("orm_stale_read.py", host, pgServer.getLocalPort());
     assertTrue(actualOutput, actualOutput.contains("AllTypes(col_bigint=     1"));
@@ -326,7 +326,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
             + "FROM all_types \n"
             + "WHERE all_types.col_bigint = 1";
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql), createAllTypesResultSet("", true)));
+        StatementResult.query(Statement.of(sql), createAllTypesResultSet("all_types_", true)));
     String updateSql =
         "UPDATE all_types SET col_varchar='updated string' WHERE all_types.col_bigint = 1";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 1L));
@@ -357,7 +357,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
             + "FROM all_types \n"
             + "WHERE all_types.col_bigint = 1";
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql), createAllTypesResultSet("", true)));
+        StatementResult.query(Statement.of(sql), createAllTypesResultSet("all_types_", true)));
     String deleteSql = "DELETE FROM all_types WHERE all_types.col_bigint = 1";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(deleteSql), 1L));
 
@@ -386,7 +386,7 @@ public class SqlAlchemyOrmTest extends AbstractMockServerTest {
             + "FROM all_types \n"
             + "WHERE all_types.col_bigint = 1";
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(sql), createAllTypesResultSet("", true)));
+        StatementResult.query(Statement.of(sql), createAllTypesResultSet("all_types_", true)));
     String updateSql =
         "UPDATE all_types SET col_varchar='updated string' WHERE all_types.col_bigint = 1";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(updateSql), 1L));

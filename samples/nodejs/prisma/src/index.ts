@@ -12,7 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Prisma, PrismaClient, User} from '@prisma/client'
+import {PrismaClient} from '@prisma/client'
+
+const prisma = new PrismaClient();
+const staleReadClient = new PrismaClient({
+  datasources: {
+    db: {
+      url: `${process.env.DATABASE_URL}?options=-c spanner.read_only_staleness='MAX_STALENESS 10s'`,
+    },
+  },
+})
 
 function runTest(host: string, port: number, database: string, test: (client) => Promise<void>, options?: string) {
   if (host.charAt(0) == '/') {
