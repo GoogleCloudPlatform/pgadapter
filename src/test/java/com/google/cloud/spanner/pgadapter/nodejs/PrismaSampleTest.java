@@ -21,9 +21,11 @@ import java.io.File;
 import java.io.IOException;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+@Category(NodeJSTest.class)
 @RunWith(JUnit4.class)
 public class PrismaSampleTest extends AbstractMockServerTest {
   static File getTestDirectory() throws IOException {
