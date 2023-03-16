@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter.nodejs;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.ByteArray;
@@ -34,8 +35,10 @@ import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.ResultSetStats;
+import com.google.spanner.v1.RollbackRequest;
 import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.TypeCode;
+import io.grpc.Status;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -168,6 +171,162 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testFindUniqueUser() throws Exception {
+    String sql =
+        "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" "
+            + "FROM \"public\".\"User\" "
+            + "WHERE (\"public\".\"User\".\"id\" = $1 AND 1=1) "
+            + "LIMIT $2 OFFSET $3";
+    ResultSetMetadata metadata =
+        createMetadata(
+            ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING),
+            ImmutableList.of("id", "email", "name"));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    metadata
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            createParameterTypesMetadata(
+                                    ImmutableList.of(
+                                        TypeCode.STRING, TypeCode.INT64, TypeCode.INT64))
+                                .getUndeclaredParameters())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to("1")
+                .bind("p2")
+                .to(1L)
+                .bind("p3")
+                .to(0L)
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("Peter").build())
+                        .addValues(Value.newBuilder().setStringValue("peter@prisma.com").build())
+                        .build())
+                .build()));
+
+    String output = runTest("testFindUniqueUser", getHost(), pgServer.getLocalPort());
+
+    assertEquals("{ id: '1', email: 'Peter', name: 'peter@prisma.com' }\n", output);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(2, executeSqlRequests.size());
+    ExecuteSqlRequest planRequest = executeSqlRequests.get(0);
+    assertTrue(planRequest.getTransaction().hasSingleUse());
+    assertTrue(planRequest.getTransaction().getSingleUse().hasReadOnly());
+    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.getTransaction().hasSingleUse());
+    assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
+  }
+
+  @Test
+  public void testFindTwoUniqueUsers() throws Exception {
+    String sql =
+        "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" "
+            + "FROM \"public\".\"User\" "
+            + "WHERE (\"public\".\"User\".\"id\" = $1 AND 1=1) "
+            + "LIMIT $2 OFFSET $3";
+    ResultSetMetadata metadata =
+        createMetadata(
+            ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING),
+            ImmutableList.of("id", "email", "name"));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(
+                    metadata
+                        .toBuilder()
+                        .setUndeclaredParameters(
+                            createParameterTypesMetadata(
+                                    ImmutableList.of(
+                                        TypeCode.STRING, TypeCode.INT64, TypeCode.INT64))
+                                .getUndeclaredParameters())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to("1")
+                .bind("p2")
+                .to(1L)
+                .bind("p3")
+                .to(0L)
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("Peter").build())
+                        .addValues(Value.newBuilder().setStringValue("peter@prisma.com").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to("2")
+                .bind("p2")
+                .to(1L)
+                .bind("p3")
+                .to(0L)
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("2").build())
+                        .addValues(Value.newBuilder().setStringValue("Alice").build())
+                        .addValues(Value.newBuilder().setStringValue("alice@prisma.com").build())
+                        .build())
+                .build()));
+
+    String output = runTest("testFindTwoUniqueUsers", getHost(), pgServer.getLocalPort());
+
+    assertEquals(
+        "{ id: '1', email: 'Peter', name: 'peter@prisma.com' }\n"
+            + "{ id: '2', email: 'Alice', name: 'alice@prisma.com' }\n",
+        output);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(sql))
+            .collect(Collectors.toList());
+    assertEquals(3, executeSqlRequests.size());
+    ExecuteSqlRequest planRequest = executeSqlRequests.get(0);
+    assertTrue(planRequest.getTransaction().hasSingleUse());
+    assertTrue(planRequest.getTransaction().getSingleUse().hasReadOnly());
+    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    assertTrue(executeRequest.getTransaction().hasSingleUse());
+    assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
+    ExecuteSqlRequest executeRequest2 = executeSqlRequests.get(2);
+    assertEquals(QueryMode.NORMAL, executeRequest2.getQueryMode());
+    assertTrue(executeRequest2.getTransaction().hasSingleUse());
+    assertTrue(executeRequest2.getTransaction().getSingleUse().hasReadOnly());
+  }
+
+  @Test
   public void testCreateUser() throws Exception {
     String sql =
         "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\"";
@@ -267,6 +426,173 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     List<ExecuteSqlRequest> selectRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(selectSql))
+            .collect(Collectors.toList());
+    assertEquals(2, selectRequests.size());
+    ExecuteSqlRequest planSelectRequest = selectRequests.get(0);
+    assertTrue(planSelectRequest.getTransaction().hasId());
+    assertEquals(QueryMode.PLAN, planSelectRequest.getQueryMode());
+    ExecuteSqlRequest executeSelectRequest = selectRequests.get(1);
+    assertTrue(executeSelectRequest.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeSelectRequest.getQueryMode());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testNestedWrite() throws Exception {
+    String insertPostSql =
+        "INSERT INTO \"public\".\"Post\" (\"id\",\"title\",\"published\",\"authorId\") VALUES ($1,$2,$3,$4) RETURNING \"public\".\"Post\".\"id\"";
+    ResultSetMetadata insertPostMetadata =
+        createParameterTypesMetadata(
+                ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.BOOL, TypeCode.STRING))
+            .toBuilder()
+            .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertPostSql),
+            ResultSet.newBuilder()
+                .setMetadata(insertPostMetadata)
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(insertPostSql)
+                .bind("p1")
+                .to("1")
+                .bind("p2")
+                .to("Join the Prisma Slack on https://slack.prisma.io")
+                .bind("p3")
+                .to(false)
+                .bind("p4")
+                .to("1")
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(insertPostMetadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(insertPostSql)
+                .bind("p1")
+                .to("2")
+                .bind("p2")
+                .to("Follow @prisma on Twitter")
+                .bind("p3")
+                .to(false)
+                .bind("p4")
+                .to("1")
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(insertPostMetadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("2").build())
+                        .build())
+                .build()));
+
+    String insertUserSql =
+        "INSERT INTO \"public\".\"User\" (\"id\",\"email\") VALUES ($1,$2) RETURNING \"public\".\"User\".\"id\"";
+    ResultSetMetadata insertUserMetadata =
+        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING))
+            .toBuilder()
+            .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertUserSql),
+            ResultSet.newBuilder()
+                .setMetadata(insertUserMetadata)
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(insertUserSql)
+                .bind("p1")
+                .to("1")
+                .bind("p2")
+                .to("alice@prisma.io")
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(insertUserMetadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .build())
+                .build()));
+
+    String selectUserSql =
+        "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" FROM \"public\".\"User\" WHERE \"public\".\"User\".\"id\" = $1 LIMIT $2 OFFSET $3";
+    ResultSetMetadata selectMetadata =
+        createParameterTypesMetadata(
+                ImmutableList.of(TypeCode.STRING, TypeCode.INT64, TypeCode.INT64))
+            .toBuilder()
+            .setRowType(
+                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                    .getRowType())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(selectUserSql),
+            ResultSet.newBuilder().setMetadata(selectMetadata).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(selectUserSql)
+                .bind("p1")
+                .to("1")
+                .bind("p2")
+                .to(1L)
+                .bind("p3")
+                .to(0L)
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(selectMetadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
+                        .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                        .build())
+                .build()));
+
+    String output = runTest("testNestedWrite", getHost(), pgServer.getLocalPort());
+
+    assertEquals("{ id: '1', email: 'alice@prisma.io', name: null }\n", output);
+
+    List<ExecuteSqlRequest> executeInsertUserSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(insertUserSql))
+            .collect(Collectors.toList());
+    assertEquals(2, executeInsertUserSqlRequests.size());
+    ExecuteSqlRequest planInsertUserRequest = executeInsertUserSqlRequests.get(0);
+    assertTrue(planInsertUserRequest.getTransaction().hasBegin());
+    assertTrue(planInsertUserRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(QueryMode.PLAN, planInsertUserRequest.getQueryMode());
+    ExecuteSqlRequest executeInsertUserRequest = executeInsertUserSqlRequests.get(1);
+    assertTrue(executeInsertUserRequest.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeInsertUserRequest.getQueryMode());
+
+    List<ExecuteSqlRequest> executeInsertPostsSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(insertPostSql))
+            .collect(Collectors.toList());
+    assertEquals(3, executeInsertPostsSqlRequests.size());
+    ExecuteSqlRequest planInsertPostRequest = executeInsertPostsSqlRequests.get(0);
+    assertTrue(planInsertPostRequest.getTransaction().hasId());
+    assertEquals(QueryMode.PLAN, planInsertPostRequest.getQueryMode());
+    ExecuteSqlRequest executeInsertPost1Request = executeInsertPostsSqlRequests.get(1);
+    assertTrue(executeInsertPost1Request.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeInsertPost1Request.getQueryMode());
+    ExecuteSqlRequest executeInsertPost2Request = executeInsertPostsSqlRequests.get(2);
+    assertTrue(executeInsertPost2Request.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeInsertPost2Request.getQueryMode());
+
+    List<ExecuteSqlRequest> selectRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(selectUserSql))
             .collect(Collectors.toList());
     assertEquals(2, selectRequests.size());
     ExecuteSqlRequest planSelectRequest = selectRequests.get(0);
@@ -1101,6 +1427,505 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  col_array_jsonb: []\n"
             + "}\n",
         output);
+  }
+
+  @Test
+  public void testCreateMultipleUsersWithoutTransaction() throws Exception {
+    String insertSql =
+        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\"";
+    ResultSetMetadata metadata =
+        createParameterTypesMetadata(
+                ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+            .toBuilder()
+            .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertSql),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(insertSql)
+                .bind("p1")
+                .to("2373a81d-772c-4221-adf0-06965bc02c2c")
+                .bind("p2")
+                .to("alice@prisma.io")
+                .bind("p3")
+                .to("Alice")
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder()
+                                .setStringValue("2373a81d-772c-4221-adf0-06965bc02c2c")
+                                .build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(insertSql)
+                .bind("p1")
+                .to("e673150f-17ff-451a-8bc7-641fe77f1226")
+                .bind("p2")
+                .to("peter@prisma.io")
+                .bind("p3")
+                .to("Peter")
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder()
+                                .setStringValue("e673150f-17ff-451a-8bc7-641fe77f1226")
+                                .build())
+                        .build())
+                .build()));
+
+    String selectSql =
+        "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" FROM \"public\".\"User\" WHERE \"public\".\"User\".\"id\" = $1 LIMIT $2 OFFSET $3";
+    ResultSetMetadata selectMetadata =
+        createParameterTypesMetadata(
+                ImmutableList.of(TypeCode.STRING, TypeCode.INT64, TypeCode.INT64))
+            .toBuilder()
+            .setRowType(
+                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                    .getRowType())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(selectSql), ResultSet.newBuilder().setMetadata(selectMetadata).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(selectSql)
+                .bind("p1")
+                .to("2373a81d-772c-4221-adf0-06965bc02c2c")
+                .bind("p2")
+                .to(1L)
+                .bind("p3")
+                .to(0L)
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(selectMetadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder()
+                                .setStringValue("2373a81d-772c-4221-adf0-06965bc02c2c")
+                                .build())
+                        .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
+                        .addValues(Value.newBuilder().setStringValue("Alice").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(selectSql)
+                .bind("p1")
+                .to("e673150f-17ff-451a-8bc7-641fe77f1226")
+                .bind("p2")
+                .to(1L)
+                .bind("p3")
+                .to(0L)
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(selectMetadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder()
+                                .setStringValue("e673150f-17ff-451a-8bc7-641fe77f1226")
+                                .build())
+                        .addValues(Value.newBuilder().setStringValue("peter@prisma.io").build())
+                        .addValues(Value.newBuilder().setStringValue("Peter").build())
+                        .build())
+                .build()));
+
+    String output =
+        runTest("testCreateMultipleUsersWithoutTransaction", getHost(), pgServer.getLocalPort());
+
+    assertEquals("Created two users\n", output);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(insertSql))
+            .collect(Collectors.toList());
+    assertEquals(3, executeSqlRequests.size());
+    ExecuteSqlRequest planRequest = executeSqlRequests.get(0);
+    assertTrue(planRequest.getTransaction().hasBegin());
+    assertTrue(planRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
+    assertTrue(executeRequest.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+
+    ExecuteSqlRequest execute2Request = executeSqlRequests.get(2);
+    assertTrue(execute2Request.getTransaction().hasBegin());
+    assertTrue(planRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(QueryMode.NORMAL, execute2Request.getQueryMode());
+
+    // The selects are executed in the same transaction as the last insert.
+    List<ExecuteSqlRequest> selectRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(selectSql))
+            .collect(Collectors.toList());
+    assertEquals(3, selectRequests.size());
+    ExecuteSqlRequest planSelectRequest = selectRequests.get(0);
+    assertTrue(planSelectRequest.getTransaction().hasId());
+    assertEquals(QueryMode.PLAN, planSelectRequest.getQueryMode());
+    ExecuteSqlRequest executeSelectRequest = selectRequests.get(1);
+    assertTrue(executeSelectRequest.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeSelectRequest.getQueryMode());
+
+    // Both transactions are committed.
+    assertEquals(2, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testCreateMultipleUsersInTransaction() throws Exception {
+    String insertSql =
+        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\"";
+    ResultSetMetadata metadata =
+        createParameterTypesMetadata(
+                ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+            .toBuilder()
+            .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertSql),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(insertSql)
+                .bind("p1")
+                .to("2373a81d-772c-4221-adf0-06965bc02c2c")
+                .bind("p2")
+                .to("alice@prisma.io")
+                .bind("p3")
+                .to("Alice")
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder()
+                                .setStringValue("2373a81d-772c-4221-adf0-06965bc02c2c")
+                                .build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(insertSql)
+                .bind("p1")
+                .to("e673150f-17ff-451a-8bc7-641fe77f1226")
+                .bind("p2")
+                .to("peter@prisma.io")
+                .bind("p3")
+                .to("Peter")
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder()
+                                .setStringValue("e673150f-17ff-451a-8bc7-641fe77f1226")
+                                .build())
+                        .build())
+                .build()));
+
+    String selectSql =
+        "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" FROM \"public\".\"User\" WHERE \"public\".\"User\".\"id\" = $1 LIMIT $2 OFFSET $3";
+    ResultSetMetadata selectMetadata =
+        createParameterTypesMetadata(
+                ImmutableList.of(TypeCode.STRING, TypeCode.INT64, TypeCode.INT64))
+            .toBuilder()
+            .setRowType(
+                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                    .getRowType())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(selectSql), ResultSet.newBuilder().setMetadata(selectMetadata).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(selectSql)
+                .bind("p1")
+                .to("2373a81d-772c-4221-adf0-06965bc02c2c")
+                .bind("p2")
+                .to(1L)
+                .bind("p3")
+                .to(0L)
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(selectMetadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder()
+                                .setStringValue("2373a81d-772c-4221-adf0-06965bc02c2c")
+                                .build())
+                        .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
+                        .addValues(Value.newBuilder().setStringValue("Alice").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(selectSql)
+                .bind("p1")
+                .to("e673150f-17ff-451a-8bc7-641fe77f1226")
+                .bind("p2")
+                .to(1L)
+                .bind("p3")
+                .to(0L)
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(selectMetadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(
+                            Value.newBuilder()
+                                .setStringValue("e673150f-17ff-451a-8bc7-641fe77f1226")
+                                .build())
+                        .addValues(Value.newBuilder().setStringValue("peter@prisma.io").build())
+                        .addValues(Value.newBuilder().setStringValue("Peter").build())
+                        .build())
+                .build()));
+
+    String output =
+        runTest("testCreateMultipleUsersInTransaction", getHost(), pgServer.getLocalPort());
+
+    assertEquals("Created two users\n", output);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(insertSql))
+            .collect(Collectors.toList());
+    assertEquals(3, executeSqlRequests.size());
+    ExecuteSqlRequest planRequest = executeSqlRequests.get(0);
+    assertTrue(planRequest.getTransaction().hasBegin());
+    assertTrue(planRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
+    assertTrue(executeRequest.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+
+    ExecuteSqlRequest execute2Request = executeSqlRequests.get(2);
+    assertTrue(execute2Request.getTransaction().hasId());
+    assertTrue(planRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(QueryMode.NORMAL, execute2Request.getQueryMode());
+
+    // The selects are executed in the same transaction as the last insert.
+    List<ExecuteSqlRequest> selectRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(selectSql))
+            .collect(Collectors.toList());
+    assertEquals(3, selectRequests.size());
+    ExecuteSqlRequest planSelectRequest = selectRequests.get(0);
+    assertTrue(planSelectRequest.getTransaction().hasId());
+    assertEquals(QueryMode.PLAN, planSelectRequest.getQueryMode());
+    ExecuteSqlRequest executeSelectRequest = selectRequests.get(1);
+    assertTrue(executeSelectRequest.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeSelectRequest.getQueryMode());
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+  }
+
+  @Test
+  public void testUnhandledErrorInTransaction() throws Exception {
+    String insertSql =
+        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\"";
+    ResultSetMetadata metadata =
+        createParameterTypesMetadata(
+                ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+            .toBuilder()
+            .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertSql),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(insertSql)
+                .bind("p1")
+                .to("1")
+                .bind("p2")
+                .to("alice@prisma.io")
+                .bind("p3")
+                .to("Alice")
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.newBuilder(insertSql)
+                .bind("p1")
+                .to("1")
+                .bind("p2")
+                .to("peter@prisma.io")
+                .bind("p3")
+                .to("Peter")
+                .build(),
+            Status.ALREADY_EXISTS
+                .withDescription("Row with id 1 already exists")
+                .asRuntimeException()));
+
+    String selectSql =
+        "SELECT \"public\".\"User\".\"id\", \"public\".\"User\".\"email\", \"public\".\"User\".\"name\" FROM \"public\".\"User\" WHERE \"public\".\"User\".\"id\" = $1 LIMIT $2 OFFSET $3";
+    ResultSetMetadata selectMetadata =
+        createParameterTypesMetadata(
+                ImmutableList.of(TypeCode.STRING, TypeCode.INT64, TypeCode.INT64))
+            .toBuilder()
+            .setRowType(
+                createMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+                    .getRowType())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(selectSql), ResultSet.newBuilder().setMetadata(selectMetadata).build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(selectSql)
+                .bind("p1")
+                .to("1")
+                .bind("p2")
+                .to(1L)
+                .bind("p3")
+                .to(0L)
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(selectMetadata)
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("1").build())
+                        .addValues(Value.newBuilder().setStringValue("alice@prisma.io").build())
+                        .addValues(Value.newBuilder().setStringValue("Alice").build())
+                        .build())
+                .build()));
+
+    String output = runTest("testUnhandledErrorInTransaction", getHost(), pgServer.getLocalPort());
+
+    assertTrue(output, output.contains("Transaction failed:"));
+    assertTrue(output, output.contains("Row with id 1 already exists"));
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(insertSql))
+            .collect(Collectors.toList());
+    assertEquals(3, executeSqlRequests.size());
+    ExecuteSqlRequest planRequest = executeSqlRequests.get(0);
+    assertTrue(planRequest.getTransaction().hasBegin());
+    assertTrue(planRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
+    assertTrue(executeRequest.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest2 = executeSqlRequests.get(2);
+    assertTrue(executeRequest2.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeRequest2.getQueryMode());
+
+    List<ExecuteSqlRequest> selectRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(selectSql))
+            .collect(Collectors.toList());
+    assertEquals(2, selectRequests.size());
+    ExecuteSqlRequest planSelectRequest = selectRequests.get(0);
+    assertTrue(planSelectRequest.getTransaction().hasId());
+    assertEquals(QueryMode.PLAN, planSelectRequest.getQueryMode());
+    ExecuteSqlRequest executeSelectRequest = selectRequests.get(1);
+    assertTrue(executeSelectRequest.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeSelectRequest.getQueryMode());
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testHandledErrorInTransaction() throws Exception {
+    String insertSql =
+        "INSERT INTO \"public\".\"User\" (\"id\",\"email\",\"name\") VALUES ($1,$2,$3) RETURNING \"public\".\"User\".\"id\"";
+    ResultSetMetadata metadata =
+        createParameterTypesMetadata(
+                ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING))
+            .toBuilder()
+            .setRowType(createMetadata(ImmutableList.of(TypeCode.STRING)).getRowType())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(insertSql),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.newBuilder(insertSql)
+                .bind("p1")
+                .to("1")
+                .bind("p2")
+                .to("alice@prisma.io")
+                .bind("p3")
+                .to("Alice")
+                .build(),
+            Status.ALREADY_EXISTS
+                .withDescription("Row with id 1 already exists")
+                .asRuntimeException()));
+
+    String output = runTest("testHandledErrorInTransaction", getHost(), pgServer.getLocalPort());
+
+    assertTrue(output, output.contains("Transaction failed:"));
+    assertTrue(output, output.contains("Insert statement failed:"));
+    assertTrue(output, output.contains("Row with id 1 already exists"));
+    assertTrue(
+        output,
+        output.contains(
+            "current transaction is aborted, commands ignored until end of transaction block"));
+    assertFalse(output, output.contains("Created user with id 2"));
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(insertSql))
+            .collect(Collectors.toList());
+    assertEquals(2, executeSqlRequests.size());
+    ExecuteSqlRequest planRequest = executeSqlRequests.get(0);
+    assertTrue(planRequest.getTransaction().hasBegin());
+    assertTrue(planRequest.getTransaction().getBegin().hasReadWrite());
+    assertEquals(QueryMode.PLAN, planRequest.getQueryMode());
+    ExecuteSqlRequest executeRequest = executeSqlRequests.get(1);
+    assertTrue(executeRequest.getTransaction().hasId());
+    assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
+
+    assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(RollbackRequest.class));
+  }
+
+  @Test
+  public void testTransactionIsolationLevel() throws Exception {
+    String output = runTest("testTransactionIsolationLevel", getHost(), pgServer.getLocalPort());
+
+    assertTrue(output, output.contains("Transaction failed:"));
+    assertTrue(
+        output,
+        output.contains(
+            "ERROR: current transaction is aborted, commands ignored until end of transaction block"));
   }
 
   static String runTest(String testName, String host, int port)

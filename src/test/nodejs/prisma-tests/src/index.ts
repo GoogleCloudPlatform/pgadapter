@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Prisma, PrismaClient} from '@prisma/client'
-import {randomUUID} from "crypto";
+import {Post, Prisma, PrismaClient, User} from '@prisma/client'
 
 function runTest(host: string, port: number, database: string, test: (client) => Promise<void>) {
   if (host.charAt(0) == '/') {
@@ -51,12 +50,162 @@ async function testFindAllUsers(client: PrismaClient) {
   console.log(allUsers);
 }
 
+async function testFindUniqueUser(client: PrismaClient) {
+  const user = await client.user.findUnique({where: {id: "1"}})
+  console.log(user);
+}
+
+async function testFindTwoUniqueUsers(client: PrismaClient) {
+  const user1 = await client.user.findUnique({where: {id: "1"}})
+  const user2 = await client.user.findUnique({where: {id: "2"}})
+  console.log(user1);
+  console.log(user2);
+}
+
 async function testCreateUser(client: PrismaClient) {
   const newUser = await client.user.create({
     data: {
       id: '2373a81d-772c-4221-adf0-06965bc02c2c',
       name: 'Alice',
       email: 'alice@prisma.io',
+    },
+  });
+  console.log(newUser);
+}
+
+async function testCreateMultipleUsersWithoutTransaction(client: PrismaClient) {
+  await client.user.create({
+    data: {
+      id: '2373a81d-772c-4221-adf0-06965bc02c2c',
+      name: 'Alice',
+      email: 'alice@prisma.io',
+    },
+  });
+  await client.user.create({
+    data: {
+      id: 'e673150f-17ff-451a-8bc7-641fe77f1226',
+      name: 'Peter',
+      email: 'peter@prisma.io',
+    },
+  });
+  console.log("Created two users");
+}
+
+async function testCreateMultipleUsersInTransaction(client: PrismaClient) {
+  await client.$transaction(async tx => {
+    await tx.user.create({
+      data: {
+        id: '2373a81d-772c-4221-adf0-06965bc02c2c',
+        name: 'Alice',
+        email: 'alice@prisma.io',
+      },
+    });
+    await tx.user.create({
+      data: {
+        id: 'e673150f-17ff-451a-8bc7-641fe77f1226',
+        name: 'Peter',
+        email: 'peter@prisma.io',
+      },
+    });
+  });
+  console.log("Created two users");
+}
+
+async function testTransactionIsolationLevel(client: PrismaClient) {
+  try {
+    await client.$transaction(async tx => {
+      await tx.user.create({
+        data: {
+          id: '2373a81d-772c-4221-adf0-06965bc02c2c',
+          name: 'Alice',
+          email: 'alice@prisma.io',
+        },
+      });
+      await tx.user.create({
+        data: {
+          id: 'e673150f-17ff-451a-8bc7-641fe77f1226',
+          name: 'Peter',
+          email: 'peter@prisma.io',
+        },
+      });
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      maxWait: 5000, // default: 2000
+      timeout: 10000, // default: 5000
+    });
+    console.log("Created two users");
+  } catch (e) {
+    console.log(`Transaction failed: ${e}`);
+  }
+}
+
+async function testUnhandledErrorInTransaction(client: PrismaClient) {
+  try {
+    await client.$transaction(async tx => {
+      await tx.user.create({
+        data: {
+          id: '1',
+          name: 'Alice',
+          email: 'alice@prisma.io',
+        },
+      });
+      await tx.user.create({
+        data: {
+          id: '1',
+          name: 'Peter',
+          email: 'peter@prisma.io',
+        },
+      });
+    });
+    console.log("Created two users");
+  } catch (e) {
+    console.log(`Transaction failed: ${e}`);
+  }
+}
+
+async function testHandledErrorInTransaction(client: PrismaClient) {
+  try {
+    await client.$transaction(async tx => {
+      try {
+        await tx.user.create({
+          data: {
+            id: '1',
+            name: 'Alice',
+            email: 'alice@prisma.io',
+          },
+        });
+        console.log("Created user with id 1");
+      } catch (e) {
+        console.log(`Insert statement failed: ${e}`);
+        await tx.user.create({
+          data: {
+            id: '2',
+            name: 'Alice',
+            email: 'alice@prisma.io',
+          },
+        });
+        console.log("Created user with id 2");
+      }
+    });
+    console.log("Created one user");
+  } catch (e) {
+    console.log(`Transaction failed: ${e}`);
+  }
+}
+
+async function testNestedWrite(client: PrismaClient) {
+  // Create a new user with two posts in a
+  // single transaction
+  const newUser: User = await client.user.create({
+    data: {
+      id: "1",
+      email: 'alice@prisma.io',
+      posts: {
+        create: [
+          { id: "1", title: 'Join the Prisma Slack on https://slack.prisma.io' },
+          { id: "2", title: 'Follow @prisma on Twitter' },
+        ],
+      },
     },
   });
   console.log(newUser);
@@ -173,10 +322,58 @@ require('yargs')
     opts => runTest(opts.host, opts.port, opts.database, testFindAllUsers)
 )
 .command(
+    'testFindUniqueUser <host> <port> <database>',
+    'Executes FindUniqueUser',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testFindUniqueUser)
+)
+.command(
+    'testFindTwoUniqueUsers <host> <port> <database>',
+    'Executes FindTwoUniqueUsers',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testFindTwoUniqueUsers)
+)
+.command(
     'testCreateUser <host> <port> <database>',
     'Creates a test user',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testCreateUser)
+)
+.command(
+    'testCreateMultipleUsersWithoutTransaction <host> <port> <database>',
+    'Creates two test users without a transaction',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testCreateMultipleUsersWithoutTransaction)
+)
+.command(
+    'testCreateMultipleUsersInTransaction <host> <port> <database>',
+    'Creates two test users in a transaction',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testCreateMultipleUsersInTransaction)
+)
+.command(
+    'testUnhandledErrorInTransaction <host> <port> <database>',
+    'Tries to create two test users with the same id in a transaction',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testUnhandledErrorInTransaction)
+)
+.command(
+    'testHandledErrorInTransaction <host> <port> <database>',
+    'Tries to continue to use the transaction after an error',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testHandledErrorInTransaction)
+)
+.command(
+    'testTransactionIsolationLevel <host> <port> <database>',
+    'Uses a transaction with read-committed isolation level',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testTransactionIsolationLevel)
+)
+.command(
+    'testNestedWrite <host> <port> <database>',
+    'Creates a test user',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testNestedWrite)
 )
 .command(
     'testCreateAllTypes <host> <port> <database>',
