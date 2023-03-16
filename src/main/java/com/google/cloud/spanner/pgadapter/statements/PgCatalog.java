@@ -51,6 +51,8 @@ public class PgCatalog {
           .put(new TableOrIndexName(null, "pg_class"), new TableOrIndexName(null, "pg_class"))
           .put(new TableOrIndexName("pg_catalog", "pg_proc"), new TableOrIndexName(null, "pg_proc"))
           .put(new TableOrIndexName(null, "pg_proc"), new TableOrIndexName(null, "pg_proc"))
+          .put(new TableOrIndexName("pg_catalog", "pg_enum"), new TableOrIndexName(null, "pg_enum"))
+          .put(new TableOrIndexName(null, "pg_enum"), new TableOrIndexName(null, "pg_enum"))
           .put(
               new TableOrIndexName("pg_catalog", "pg_range"),
               new TableOrIndexName(null, "pg_range"))
@@ -92,16 +94,19 @@ public class PgCatalog {
   private final ImmutableMap<Pattern, Supplier<String>> functionReplacements;
 
   private static final Map<TableOrIndexName, PgCatalogTable> DEFAULT_PG_CATALOG_TABLES =
-      ImmutableMap.of(
-          new TableOrIndexName(null, "pg_namespace"), new PgNamespace(),
-          new TableOrIndexName(null, "pg_class"), new PgClass(),
-          new TableOrIndexName(null, "pg_proc"), new PgProc(),
-          new TableOrIndexName(null, "pg_range"), new PgRange(),
-          new TableOrIndexName(null, "pg_type"), new PgType(),
-          new TableOrIndexName(null, "pg_sequence"), new PgSequence(),
-          new TableOrIndexName(null, "pg_sequences"), new PgSequences(),
-          new TableOrIndexName(null, "pg_information_schema_sequences"),
-              new InformationSchemaSequences());
+      ImmutableMap.<TableOrIndexName, PgCatalogTable>builder()
+          .put(new TableOrIndexName(null, "pg_namespace"), new PgNamespace())
+          .put(new TableOrIndexName(null, "pg_class"), new PgClass())
+          .put(new TableOrIndexName(null, "pg_proc"), new PgProc())
+          .put(new TableOrIndexName(null, "pg_enum"), new EmptyPgEnum())
+          .put(new TableOrIndexName(null, "pg_range"), new PgRange())
+          .put(new TableOrIndexName(null, "pg_type"), new PgType())
+          .put(new TableOrIndexName(null, "pg_sequence"), new PgSequence())
+          .put(new TableOrIndexName(null, "pg_sequences"), new PgSequences())
+          .put(
+              new TableOrIndexName(null, "pg_information_schema_sequences"),
+              new InformationSchemaSequences())
+          .build();
   private final SessionState sessionState;
 
   public PgCatalog(@Nonnull SessionState sessionState, @Nonnull WellKnownClient wellKnownClient) {
@@ -170,6 +175,10 @@ public class PgCatalog {
   }
 
   Statement addCommonTableExpressions(Statement statement, ImmutableList<String> tableExpressions) {
+    if (tableExpressions.isEmpty()) {
+      return statement;
+    }
+
     String sql = replaceKnownUnsupportedFunctions(statement);
     SimpleParser parser = new SimpleParser(sql);
     boolean hadCommonTableExpressions = parser.eatKeyword("with");
