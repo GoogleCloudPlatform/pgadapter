@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Post, Prisma, PrismaClient, User} from '@prisma/client'
+import {Prisma, PrismaClient, User} from '@prisma/client'
 
-function runTest(host: string, port: number, database: string, test: (client) => Promise<void>) {
+function runTest(host: string, port: number, database: string, test: (client) => Promise<void>, options?: string) {
   if (host.charAt(0) == '/') {
     process.env.DATABASE_URL = `postgresql://localhost:${port}/${database}?host=${host}`;
+    if (options) {
+      process.env.DATABASE_URL += `&${options}`;
+    }
   } else {
     process.env.DATABASE_URL = `postgresql://${host}:${port}/${database}`;
+    if (options) {
+      process.env.DATABASE_URL += `?${options}`;
+    }
   }
   const prisma = new PrismaClient();
   runTestWithClient(prisma, test)
@@ -211,6 +217,16 @@ async function testNestedWrite(client: PrismaClient) {
   console.log(newUser);
 }
 
+async function testReadOnlyTransaction(client: PrismaClient) {
+  await client.$transaction(async tx => {
+    await tx.$executeRaw`set transaction read only`;
+    const user1 = await tx.user.findUnique({where: {id: "1"}})
+    const user2 = await tx.user.findUnique({where: {id: "2"}})
+    console.log(user1);
+    console.log(user2);
+  });
+}
+
 async function testCreateAllTypes(client: PrismaClient) {
   const row = await client.allTypes.create({
     data: {
@@ -334,6 +350,12 @@ require('yargs')
     opts => runTest(opts.host, opts.port, opts.database, testFindTwoUniqueUsers)
 )
 .command(
+    'testFindTwoUniqueUsersUsingStaleRead <host> <port> <database>',
+    'Executes FindTwoUniqueUsers using a client that issues stale reads',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testFindTwoUniqueUsers, "options=-c spanner.read_only_staleness='MAX_STALENESS 10s'")
+)
+.command(
     'testCreateUser <host> <port> <database>',
     'Creates a test user',
     {},
@@ -374,6 +396,12 @@ require('yargs')
     'Creates a test user',
     {},
     opts => runTest(opts.host, opts.port, opts.database, testNestedWrite)
+)
+.command(
+    'testReadOnlyTransaction <host> <port> <database>',
+    'Uses a read-only transaction',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, testReadOnlyTransaction)
 )
 .command(
     'testCreateAllTypes <host> <port> <database>',
