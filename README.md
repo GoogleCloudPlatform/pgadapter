@@ -35,7 +35,9 @@ in-process server (the latter is only supported for Java applications).
 
 ### Docker
 
-See [running PGAdapter using Docker](docs/docker.md) for more examples for running PGAdapter in Docker.
+* See [running PGAdapter using Docker](docs/docker.md) for more examples for running PGAdapter in Docker.
+* See [running PGAdapter as a sidecar proxy](docs/sidecar-proxy.md) for how to run PGAdapter as a
+  sidecar proxy in a Kubernetes cluster.
 
 Replace the project, instance and database names and the credentials file in the example below to
 run PGAdapter from a pre-built Docker image.
