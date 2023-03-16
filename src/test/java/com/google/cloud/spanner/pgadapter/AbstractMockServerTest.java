@@ -336,6 +336,11 @@ public abstract class AbstractMockServerTest {
 
   protected static ResultSet createAllTypesResultSet(
       String id, String columnPrefix, boolean microsTimestamp) {
+    return createAllTypesResultSet(id, columnPrefix, microsTimestamp, true);
+  }
+
+  protected static ResultSet createAllTypesResultSet(
+      String id, String columnPrefix, boolean microsTimestamp, boolean nullValueInArrays) {
     return ResultSet.newBuilder()
         .setMetadata(createAllTypesResultSetMetadata(columnPrefix))
         .addRows(
@@ -367,7 +372,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setStringValue("1").build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("1").build())
                                 .addValues(Value.newBuilder().setStringValue("2").build())
                                 .build()))
                 .addValues(
@@ -376,7 +385,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setBoolValue(true).build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setBoolValue(true).build())
                                 .addValues(Value.newBuilder().setBoolValue(false).build())
                                 .build()))
                 .addValues(
@@ -391,7 +404,16 @@ public abstract class AbstractMockServerTest {
                                                     "bytes1".getBytes(StandardCharsets.UTF_8)))
                                         .build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder()
+                                            .setStringValue(
+                                                Base64.getEncoder()
+                                                    .encodeToString(
+                                                        "bytes1".getBytes(StandardCharsets.UTF_8)))
+                                            .build())
                                 .addValues(
                                     Value.newBuilder()
                                         .setStringValue(
@@ -406,7 +428,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setNumberValue(3.14d).build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setNumberValue(3.14d).build())
                                 .addValues(Value.newBuilder().setNumberValue(-99.99).build())
                                 .build()))
                 .addValues(
@@ -415,7 +441,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setStringValue("-100").build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("-100").build())
                                 .addValues(Value.newBuilder().setStringValue("-200").build())
                                 .build()))
                 .addValues(
@@ -424,7 +454,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setStringValue("6.626").build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("6.626").build())
                                 .addValues(Value.newBuilder().setStringValue("-3.14").build())
                                 .build()))
                 .addValues(
@@ -439,7 +473,16 @@ public abstract class AbstractMockServerTest {
                                                 : "2022-02-16T16:18:02.123456789Z")
                                         .build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder()
+                                            .setStringValue(
+                                                microsTimestamp
+                                                    ? "2022-02-16T16:18:02.123456Z"
+                                                    : "2022-02-16T16:18:02.123456789Z")
+                                            .build())
                                 .addValues(
                                     Value.newBuilder()
                                         .setStringValue("2000-01-01T00:00:00Z")
@@ -451,7 +494,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setStringValue("2023-02-20").build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("2023-02-20").build())
                                 .addValues(Value.newBuilder().setStringValue("2000-01-01").build())
                                 .build()))
                 .addValues(
@@ -460,7 +507,11 @@ public abstract class AbstractMockServerTest {
                             ListValue.newBuilder()
                                 .addValues(Value.newBuilder().setStringValue("string1").build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder().setStringValue("string1").build())
                                 .addValues(Value.newBuilder().setStringValue("string2").build())
                                 .build()))
                 .addValues(
@@ -472,7 +523,13 @@ public abstract class AbstractMockServerTest {
                                         .setStringValue("{\"key\": \"value1\"}")
                                         .build())
                                 .addValues(
-                                    Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+                                    nullValueInArrays
+                                        ? Value.newBuilder()
+                                            .setNullValue(NullValue.NULL_VALUE)
+                                            .build()
+                                        : Value.newBuilder()
+                                            .setStringValue("{\"key\": \"value1\"}")
+                                            .build())
                                 .addValues(
                                     Value.newBuilder()
                                         .setStringValue("{\"key\": \"value2\"}")

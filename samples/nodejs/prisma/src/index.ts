@@ -13,53 +13,42 @@
 // limitations under the License.
 
 import {PrismaClient} from '@prisma/client'
+import * as fs from "fs";
 
-const prisma = new PrismaClient();
-const staleReadClient = new PrismaClient({
+export const prisma = new PrismaClient();
+export const staleReadClient = new PrismaClient({
   datasources: {
     db: {
       url: `${process.env.DATABASE_URL}?options=-c spanner.read_only_staleness='MAX_STALENESS 10s'`,
     },
   },
-})
+});
 
-function runTest(host: string, port: number, database: string, test: (client) => Promise<void>, options?: string) {
-  if (host.charAt(0) == '/') {
-    process.env.DATABASE_URL = `postgresql://localhost:${port}/${database}?host=${host}`;
-    if (options) {
-      process.env.DATABASE_URL += `&${options}`;
-    }
-  } else {
-    process.env.DATABASE_URL = `postgresql://${host}:${port}/${database}`;
-    if (options) {
-      process.env.DATABASE_URL += `?${options}`;
-    }
+runSample()
+  .then(async () => {
+    console.log("Successfully executed sample application");
+    await prisma.$disconnect();
+    await staleReadClient.$disconnect();
+  })
+  .catch(async (e) => {
+    console.error(e);
+    await prisma.$disconnect();
+    await staleReadClient.$disconnect();
+  });
+
+async function runSample() {
+  await createDataModel();
+}
+
+export async function createDataModel() {
+  console.log("Creating sample data model...");
+  const sqlStatements = fs
+    .readFileSync('./prisma/create_data_model.sql')
+    .toString()
+    .split(";")
+    .filter((sql) => sql.trim() !== '');
+  for (const sql of sqlStatements) {
+    await prisma.$executeRawUnsafe(sql);
   }
-  const prisma = new PrismaClient();
-  runTestWithClient(prisma, test)
-    .then(async () => {
-      await prisma.$disconnect();
-    })
-    .catch(async (e) => {
-      console.error(e);
-      await prisma.$disconnect();
-      process.exit(1);
-    });
+  console.log("Sample data model created.");
 }
-
-async function runTestWithClient(client: PrismaClient, test: (client) => Promise<void>) {
-  await test(client);
-}
-
-require('yargs')
-.demand(4)
-.command(
-    'testSelect1 <host> <port> <database>',
-    'Executes SELECT 1',
-    {},
-    opts => runTest(opts.host, opts.port, opts.database, testSelect1)
-)
-.wrap(120)
-.recommendCommands()
-.strict()
-.help().argv;

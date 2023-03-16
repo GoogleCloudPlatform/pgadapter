@@ -29,10 +29,14 @@ public interface NodeJSTest {
 
   static void installDependencies(String directory) throws IOException, InterruptedException {
     String currentPath = new java.io.File(".").getCanonicalPath();
-    String testFilePath = String.format("%s/src/test/nodejs/%s", currentPath, directory);
+    String testDirectoryPath = String.format("%s/src/test/nodejs/%s", currentPath, directory);
+    installDependencies(new File(testDirectoryPath));
+  }
+
+  static void installDependencies(File testDirectory) throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
     builder.command("npm", "install", "--silent");
-    builder.directory(new File(testFilePath));
+    builder.directory(testDirectory);
 
     Process process = builder.start();
     InputStream errorStream = process.getErrorStream();
@@ -47,10 +51,17 @@ public interface NodeJSTest {
       throws IOException, InterruptedException {
     String currentPath = new java.io.File(".").getCanonicalPath();
     String testFilePath = String.format("%s/src/test/nodejs/%s", currentPath, directory);
+    return runTest(new File(testFilePath), "start", testName, host, port, database);
+  }
+
+  static String runTest(
+      File directory, String scriptName, String testName, String host, int port, String database)
+      throws IOException, InterruptedException {
     ProcessBuilder builder = new ProcessBuilder();
     builder.command(
-        "npm", "--silent", "start", testName, host, String.format("%d", port), database);
-    builder.directory(new File(testFilePath));
+        "npm", "--silent", scriptName, testName, host, String.format("%d", port), database);
+    builder.directory(directory);
+    builder.environment().put("DATABASE_URL", String.format("postgresql://localhost:%d/d", port));
 
     Process process = builder.start();
     InputStream inputStream = process.getInputStream();

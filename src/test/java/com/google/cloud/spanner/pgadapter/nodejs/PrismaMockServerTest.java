@@ -775,36 +775,12 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     String selectSql =
         "SELECT \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\" FROM \"public\".\"AllTypes\" WHERE \"public\".\"AllTypes\".\"col_bigint\" = $1 LIMIT $2 OFFSET $3";
     ResultSetMetadata allTypesMetadata = createAllTypesResultSetMetadata("");
-    ResultSetMetadata allArrayTypesMetadata = createAllArrayTypesResultSetMetadata("");
-    ResultSetMetadata selectMetadata =
-        ResultSetMetadata.newBuilder()
-            .setRowType(
-                StructType.newBuilder()
-                    .addAllFields(allTypesMetadata.getRowType().getFieldsList())
-                    .addAllFields(allArrayTypesMetadata.getRowType().getFieldsList())
-                    .build())
-            .build();
-    ListValue row =
-        createAllTypesResultSet("")
-            .getRows(0)
-            .toBuilder()
-            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-            .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-            .build();
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    selectMetadata
+                    allTypesMetadata
                         .toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
@@ -823,7 +799,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to(0L)
                 .build(),
-            ResultSet.newBuilder().setMetadata(selectMetadata).addRows(row).build()));
+            createAllTypesResultSetWithoutNullsInArrays()));
 
     String output = runTest("testCreateAllTypes", getHost(), pgServer.getLocalPort());
 
@@ -839,16 +815,28 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             + "  col_date: 2022-03-29T00:00:00.000Z,\n"
             + "  col_varchar: 'test',\n"
             + "  col_jsonb: { key: 'value' },\n"
-            + "  col_array_bigint: [],\n"
-            + "  col_array_bool: [],\n"
-            + "  col_array_bytea: [],\n"
-            + "  col_array_float8: [],\n"
-            + "  col_array_int: [],\n"
-            + "  col_array_numeric: [],\n"
-            + "  col_array_timestamptz: [],\n"
-            + "  col_array_date: [],\n"
-            + "  col_array_varchar: [],\n"
-            + "  col_array_jsonb: []\n"
+            + "  col_array_bigint: [ 1n, 1n, 2n ],\n"
+            + "  col_array_bool: [ true, true, false ],\n"
+            + "  col_array_bytea: [\n"
+            + "    <Buffer 62 79 74 65 73 31>,\n"
+            + "    <Buffer 62 79 74 65 73 31>,\n"
+            + "    <Buffer 62 79 74 65 73 32>\n"
+            + "  ],\n"
+            + "  col_array_float8: [ 3.14, 3.14, -99.99 ],\n"
+            + "  col_array_int: [ -100, -100, -200 ],\n"
+            + "  col_array_numeric: [ 6.626, 6.626, -3.14 ],\n"
+            + "  col_array_timestamptz: [\n"
+            + "    2022-02-16T16:18:02.123Z,\n"
+            + "    2022-02-16T16:18:02.123Z,\n"
+            + "    2000-01-01T00:00:00.000Z\n"
+            + "  ],\n"
+            + "  col_array_date: [\n"
+            + "    2023-02-20T00:00:00.000Z,\n"
+            + "    2023-02-20T00:00:00.000Z,\n"
+            + "    2000-01-01T00:00:00.000Z\n"
+            + "  ],\n"
+            + "  col_array_varchar: [ 'string1', 'string1', 'string2' ],\n"
+            + "  col_array_jsonb: [ { key: 'value1' }, { key: 'value1' }, { key: 'value2' } ]\n"
             + "}\n",
         output);
   }
@@ -934,15 +922,6 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     String selectSql =
         "SELECT \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\" FROM \"public\".\"AllTypes\" WHERE \"public\".\"AllTypes\".\"col_bigint\" = $1 LIMIT $2 OFFSET $3";
     ResultSetMetadata allTypesMetadata = createAllTypesResultSetMetadata("");
-    ResultSetMetadata allArrayTypesMetadata = createAllArrayTypesResultSetMetadata("");
-    ResultSetMetadata selectMetadata =
-        ResultSetMetadata.newBuilder()
-            .setRowType(
-                StructType.newBuilder()
-                    .addAllFields(allTypesMetadata.getRowType().getFieldsList())
-                    .addAllFields(allArrayTypesMetadata.getRowType().getFieldsList())
-                    .build())
-            .build();
     ListValue row =
         ListValue.newBuilder()
             .addValues(Value.newBuilder().setStringValue("1").build())
@@ -976,7 +955,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    selectMetadata
+                    allTypesMetadata
                         .toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
@@ -995,7 +974,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to(0L)
                 .build(),
-            ResultSet.newBuilder().setMetadata(selectMetadata).addRows(row).build()));
+            ResultSet.newBuilder().setMetadata(allTypesMetadata).addRows(row).build()));
 
     String output = runTest("testUpdateAllTypes", getHost(), pgServer.getLocalPort());
     assertEquals(
@@ -1268,15 +1247,6 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
     String selectSql =
         "SELECT \"public\".\"AllTypes\".\"col_bigint\", \"public\".\"AllTypes\".\"col_bool\", \"public\".\"AllTypes\".\"col_bytea\", \"public\".\"AllTypes\".\"col_float8\", \"public\".\"AllTypes\".\"col_int\", \"public\".\"AllTypes\".\"col_numeric\", \"public\".\"AllTypes\".\"col_timestamptz\", \"public\".\"AllTypes\".\"col_date\", \"public\".\"AllTypes\".\"col_varchar\", \"public\".\"AllTypes\".\"col_jsonb\", \"public\".\"AllTypes\".\"col_array_bigint\", \"public\".\"AllTypes\".\"col_array_bool\", \"public\".\"AllTypes\".\"col_array_bytea\", \"public\".\"AllTypes\".\"col_array_float8\", \"public\".\"AllTypes\".\"col_array_int\", \"public\".\"AllTypes\".\"col_array_numeric\", \"public\".\"AllTypes\".\"col_array_timestamptz\", \"public\".\"AllTypes\".\"col_array_date\", \"public\".\"AllTypes\".\"col_array_varchar\", \"public\".\"AllTypes\".\"col_array_jsonb\" FROM \"public\".\"AllTypes\" WHERE (\"public\".\"AllTypes\".\"col_bigint\" = $1 AND 1=1) LIMIT $2 OFFSET $3";
     ResultSetMetadata allTypesMetadata = createAllTypesResultSetMetadata("");
-    ResultSetMetadata allArrayTypesMetadata = createAllArrayTypesResultSetMetadata("");
-    ResultSetMetadata selectMetadata =
-        ResultSetMetadata.newBuilder()
-            .setRowType(
-                StructType.newBuilder()
-                    .addAllFields(allTypesMetadata.getRowType().getFieldsList())
-                    .addAllFields(allArrayTypesMetadata.getRowType().getFieldsList())
-                    .build())
-            .build();
     ListValue row =
         ListValue.newBuilder()
             .addValues(Value.newBuilder().setStringValue("1").build())
@@ -1310,7 +1280,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
             Statement.of(selectSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    selectMetadata
+                    allTypesMetadata
                         .toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
@@ -1329,7 +1299,7 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
                 .bind("p3")
                 .to(0L)
                 .build(),
-            ResultSet.newBuilder().setMetadata(selectMetadata).addRows(row).build()));
+            ResultSet.newBuilder().setMetadata(allTypesMetadata).addRows(row).build()));
 
     String output = runTest("testDeleteAllTypes", getHost(), pgServer.getLocalPort());
     assertEquals(
@@ -2038,5 +2008,9 @@ public class PrismaMockServerTest extends AbstractMockServerTest {
   static String runTest(String testName, String host, int port)
       throws IOException, InterruptedException {
     return NodeJSTest.runTest("prisma-tests", testName, host, port, "db");
+  }
+
+  static ResultSet createAllTypesResultSetWithoutNullsInArrays() {
+    return createAllTypesResultSet("1", "", false, false);
   }
 }
