@@ -18,12 +18,14 @@ PGAdapter can be used with the following drivers and clients:
 PGAdapter can be used with the following frameworks and tools:
 1. `Liquibase`: Version 4.12.0 and higher are supported. See [Liquibase support](docs/liquibase.md)
    for more details. See also [this directory](samples/java/liquibase) for a sample application using `Liquibase`.
-2. `gorm`: Version 1.23.8 and higher are supported. See [gorm support](docs/gorm.md) for more details.
+1. `gorm`: Version 1.23.8 and higher are supported. See [gorm support](docs/gorm.md) for more details.
    See also [this directory](samples/golang/gorm) for a sample application using `gorm`.
-3. `SQLAlchemy`: Version 1.4.45 has _experimental support_. See [SQLAlchemy support](docs/sqlalchemy.md)
-   for more details. See also [this directory](samples/python/sqlalchemy-sample) for a sample
-   application using `SQLAlchemy`.
-4. `pgbench` can be used with PGAdapter, but with some limitations. See [pgbench.md](docs/pgbench.md)
+1. `SQLAlchemy 2.x`: Version 2.0.1 and higher has _experimental support_.
+   See also [this directory](samples/python/sqlalchemy2-sample) for a sample application using `SQLAlchemy 2.x`.
+1. `SQLAlchemy 1.x`: Version 1.4.45 and higher has _experimental support_. It is recommended to use `SQLAlchemy 2.x`
+   instead of `SQLAlchemy 1.4.x` for the [best possible performance](docs/sqlalchemy.md#limitations). 
+   See also [this directory](samples/python/sqlalchemy-sample) for a sample application using `SQLAlchemy 1.x`.
+1. `pgbench` can be used with PGAdapter, but with some limitations. See [pgbench.md](docs/pgbench.md)
    for more details.
 
 ## FAQ
