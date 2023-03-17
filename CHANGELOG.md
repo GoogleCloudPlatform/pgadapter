@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.1...v0.18.2) (2023-03-17)
+
+
+### Bug Fixes
+
+* add support for getting arrays using npgsql ([#722](https://github.com/GoogleCloudPlatform/pgadapter/issues/722)) ([6988ad1](https://github.com/GoogleCloudPlatform/pgadapter/commit/6988ad17c06a9e9197fd71922492ff76eafb280b))
+
+
+### Documentation
+
+* add documentation and sample for GKE sidecar proxy ([#718](https://github.com/GoogleCloudPlatform/pgadapter/issues/718)) ([f4246bd](https://github.com/GoogleCloudPlatform/pgadapter/commit/f4246bd81e66ffe7f20c9f78f5e59302635de5ed)), closes [#701](https://github.com/GoogleCloudPlatform/pgadapter/issues/701)
+
 ## [0.18.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.0...v0.18.1) (2023-03-09)
 
 
