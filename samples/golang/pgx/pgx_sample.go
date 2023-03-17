@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"pgadapter-in-container/pgadapter"
+	"pgadapter-pgx-sample/pgadapter"
 )
 
 // This test application automatically starts PGAdapter in a Docker container and connects to
