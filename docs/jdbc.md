@@ -2,6 +2,13 @@
 
 PGAdapter supports the [PostgreSQL JDBC driver](https://github.com/pgjdbc/pgjdbc) version 42.0.0 and higher.
 
+
+## Sample Application
+
+See this [sample application using JDBC](../samples/java/jdbc) for a Java sample application that
+embeds and starts PGAdapter together with the sample application, and then connects to PGAdapter
+using the PostgreSQL `JDBC` driver.
+
 ## Usage
 
 First start PGAdapter:
