@@ -22,6 +22,7 @@ import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Value;
+import com.google.cloud.spanner.pgadapter.parsers.ArrayParser;
 import com.google.cloud.spanner.pgadapter.parsers.BooleanParser;
 import com.google.cloud.spanner.pgadapter.parsers.TimestampParser;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
@@ -33,12 +34,15 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeParseException;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.postgresql.core.Oid;
 
 /** Implementation of {@link CopyInParser} for the TEXT and CSV formats. */
 class CsvCopyParser implements CopyInParser {
@@ -98,8 +102,22 @@ class CsvCopyParser implements CopyInParser {
     }
 
     @Override
+    public boolean isEndRecord() {
+      // End of data can be represented by a single line containing just backslash-period (\.). An
+      // end-of-data marker is not necessary when reading from a file, since the end of file serves
+      // perfectly well; it is needed only when copying data to or from client applications using
+      // pre-3.0 client protocol.
+      return record.size() == 1 && Objects.equals("\\.", record.get(0));
+    }
+
+    @Override
     public boolean hasColumnNames() {
       return this.hasHeader;
+    }
+
+    @Override
+    public boolean isNull(int columnIndex) {
+      return record.get(columnIndex) == null;
     }
 
     @Override
@@ -148,6 +166,44 @@ class CsvCopyParser implements CopyInParser {
                     ? null
                     : TimestampParser.toTimestamp(recordValue, sessionState.getTimezone());
             return Value.timestamp(timestamp);
+          case ARRAY:
+            switch (type.getArrayElementType().getCode()) {
+              case STRING:
+                return Value.stringArray(
+                    cast(ArrayParser.stringArrayToList(recordValue, Oid.TEXT, sessionState, true)));
+              case PG_JSONB:
+                return Value.pgJsonbArray(
+                    cast(
+                        ArrayParser.stringArrayToList(recordValue, Oid.JSONB, sessionState, true)));
+              case BOOL:
+                return Value.boolArray(
+                    cast(ArrayParser.stringArrayToList(recordValue, Oid.BOOL, sessionState, true)));
+              case INT64:
+                return Value.int64Array(
+                    cast(ArrayParser.stringArrayToList(recordValue, Oid.INT8, sessionState, true)));
+              case FLOAT64:
+                return Value.float64Array(
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.FLOAT8, sessionState, true)));
+              case PG_NUMERIC:
+                return Value.pgNumericArray(
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.NUMERIC, sessionState, true)));
+              case BYTES:
+                return Value.bytesArray(
+                    cast(
+                        ArrayParser.stringArrayToList(recordValue, Oid.BYTEA, sessionState, true)));
+              case DATE:
+                return Value.dateArray(
+                    cast(ArrayParser.stringArrayToList(recordValue, Oid.DATE, sessionState, true)));
+              case TIMESTAMP:
+                return Value.timestampArray(
+                    cast(
+                        ArrayParser.stringArrayToList(
+                            recordValue, Oid.TIMESTAMPTZ, sessionState, true)));
+            }
           default:
             SpannerException spannerException =
                 SpannerExceptionFactory.newSpannerException(
@@ -175,5 +231,10 @@ class CsvCopyParser implements CopyInParser {
         throw spannerException;
       }
     }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T> List<T> cast(List<?> list) {
+    return (List<T>) list;
   }
 }

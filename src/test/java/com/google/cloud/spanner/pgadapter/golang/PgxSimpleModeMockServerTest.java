@@ -34,14 +34,12 @@ import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.postgresql.core.Utils;
 
 /**
  * Tests PGAdapter using the native Go pgx driver in simple query mode. The Go code can be found in
@@ -155,7 +153,9 @@ public class PgxSimpleModeMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testQueryAllDataTypes() {
-    String sql = "SELECT * FROM all_types WHERE col_bigint=1";
+    String sql =
+        "SELECT col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb "
+            + "FROM all_types WHERE col_bigint=1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
     String res = pgxTest.TestQueryAllDataTypes(createConnString(), 0, 0);
@@ -171,14 +171,19 @@ public class PgxSimpleModeMockServerTest extends AbstractMockServerTest {
   @Test
   public void testInsertAllDataTypes() {
     String sql =
-        String.format(
-            "INSERT INTO all_types "
-                + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb) "
-                + "values (100, true, '%s', 3.14, 1, '%s', '%s', '%s', 'test_string', '{\"key\": \"value\"}')",
-            "\\x" + Utils.toHexString("test_bytes".getBytes(StandardCharsets.UTF_8)),
-            "6626e-3",
-            "2022-03-24 07:39:10.123456+01:00:00",
-            "2022-04-02");
+        "INSERT INTO all_types (col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, "
+            + "col_timestamptz, col_date, col_varchar, col_jsonb, col_array_bigint, col_array_bool, "
+            + "col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, "
+            + "col_array_date, col_array_varchar, col_array_jsonb) "
+            + "values (100, true, '\\x746573745f6279746573', 3.14, 1, '6626e-3', "
+            + "'2022-03-24 07:39:10.123456+01:00:00', '2022-04-02 00:00:00Z', 'test_string', "
+            + "'{\"key\": \"value\"}', '{100,NULL,200}', '{t,NULL,f}', "
+            + "'{\"\\\\x627974657331\",NULL,\"\\\\x627974657332\"}', '{3.14,NULL,6.626}', "
+            + "'{-1,NULL,-2}', '{-6626e-3,NULL,314e-2}', "
+            + "'{2022-03-24 06:39:10.123456Z,NULL,2000-01-01 00:00:00Z}', "
+            + "'{2022-04-02,NULL,1970-01-01}', "
+            + "'{string1,NULL,string2}', "
+            + "'{\"{\\\"key\\\": \\\"value1\\\"}\",NULL,\"{\\\"key\\\": \\\"value2\\\"}\"}')";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
 
     String res = pgxTest.TestInsertAllDataTypes(createConnString());

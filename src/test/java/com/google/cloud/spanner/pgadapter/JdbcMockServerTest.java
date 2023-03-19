@@ -38,6 +38,8 @@ import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerOptions;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
+import com.google.cloud.spanner.pgadapter.error.SQLState;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgEnum;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
@@ -64,6 +66,7 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ParameterMetaData;
@@ -91,8 +94,11 @@ import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
+import org.postgresql.jdbc.PSQLSavepoint;
 import org.postgresql.jdbc.PgStatement;
+import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
+import org.postgresql.util.PSQLState;
 
 @RunWith(Parameterized.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {
@@ -115,12 +121,205 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     Class.forName("org.postgresql.Driver");
 
     addRandomResultResults();
+    setupJsonbResults();
   }
 
   private static void addRandomResultResults() {
     RandomResultSetGenerator generator =
         new RandomResultSetGenerator(RANDOM_RESULTS_ROW_COUNT, Dialect.POSTGRESQL);
     mockSpanner.putStatementResult(StatementResult.query(SELECT_RANDOM, generator.generate()));
+  }
+
+  static void setupJsonbResults() {
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT t.oid, t.typname   "
+                        + "FROM pg_type t  "
+                        + "JOIN pg_namespace n ON t.typnamespace = n.oid "
+                        + "WHERE t.typelem = (SELECT oid FROM pg_type WHERE typname = $1) AND substring(t.typname, 1, 1) = '_' AND t.typlen = -1 AND (n.nspname = $2 OR $3 AND n.nspname  IN ('pg_catalog', 'public')) "
+                        + "ORDER BY t.typelem DESC LIMIT 1")
+                .bind("p1")
+                .to("jsonb")
+                .bind("p2")
+                .to((String) null)
+                .bind("p3")
+                .to(true)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("3807").build())
+                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                        .build())
+                .build()));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT n.nspname  IN ('pg_catalog', 'public'), n.nspname, t.typname "
+                        + "FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid "
+                        + "WHERE t.oid = $1")
+                .bind("p1")
+                .to(3802L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.BOOL, TypeCode.STRING, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                        .addValues(Value.newBuilder().setStringValue("jsonb").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT n.nspname  IN ('pg_catalog', 'public'), n.nspname, t.typname "
+                        + "FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid "
+                        + "WHERE t.oid = $1")
+                .bind("p1")
+                .to(3807L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(TypeCode.BOOL, TypeCode.STRING, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                        .build())
+                .build()));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT e.typdelim FROM pg_type t, pg_type e WHERE t.oid = $1 and t.typelem = e.oid")
+                .bind("p1")
+                .to(3807L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue(",").build())
+                        .build())
+                .build()));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT e.oid, n.nspname  IN ('pg_catalog', 'public'), n.nspname, e.typname "
+                        + "FROM pg_type t JOIN pg_type e ON t.typelem = e.oid "
+                        + "JOIN pg_namespace n ON t.typnamespace = n.oid "
+                        + "WHERE t.oid = $1")
+                .bind("p1")
+                .to(3807L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.BOOL, TypeCode.STRING, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("3802").build())
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("pg_catalog").build())
+                        .addValues(Value.newBuilder().setStringValue("jsonb").build())
+                        .build())
+                .build()));
+
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT t.typarray, arr.typname   "
+                        + "FROM pg_type t  "
+                        + "JOIN pg_namespace n ON t.typnamespace = n.oid  "
+                        + "JOIN pg_type arr ON arr.oid = t.typarray "
+                        + "WHERE t.typname = $1 "
+                        + "AND (n.nspname = $2 OR $3 AND n.nspname  IN ('pg_catalog', 'public')) "
+                        + "ORDER BY t.oid DESC LIMIT 1")
+                .bind("p1")
+                .to("jsonb")
+                .bind("p2")
+                .to((String) null)
+                .bind("p3")
+                .to(true)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("3807").build())
+                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                        .build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(
+                    "with "
+                        + PG_TYPE_PREFIX
+                        + "\nSELECT substring(typname, 1, 1)='_' as is_array, typtype, typname, pg_type.oid   "
+                        + "FROM pg_type   "
+                        + "LEFT JOIN (select ns.oid as nspoid, ns.nspname, r.r           from pg_namespace as ns           join ( select 1 as r, 'public' as nspname ) as r          using ( nspname )        ) as sp     ON sp.nspoid = typnamespace  "
+                        + "WHERE pg_type.oid = $1  "
+                        + "ORDER BY sp.r, pg_type.oid DESC")
+                .bind("p1")
+                .to(3807L)
+                .build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("is_array")
+                                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typtype")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("typename")
+                                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                                        .build())
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("oid")
+                                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setBoolValue(true).build())
+                        .addValues(Value.newBuilder().setStringValue("b").build())
+                        .addValues(Value.newBuilder().setStringValue("_jsonb").build())
+                        .addValues(Value.newBuilder().setStringValue("3807").build())
+                        .build())
+                .build()));
   }
 
   /**
@@ -134,7 +333,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   private String getExpectedInitialApplicationName() {
-    return pgVersion.equals("1.0") ? null : "PostgreSQL JDBC Driver";
+    return pgVersion.equals("1.0") ? "jdbc" : "PostgreSQL JDBC Driver";
   }
 
   @Test
@@ -161,6 +360,23 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       assertEquals(sql, request.getSql());
       assertTrue(request.getTransaction().hasSingleUse());
       assertTrue(request.getTransaction().getSingleUse().hasReadOnly());
+    }
+  }
+
+  @Test
+  public void testShowApplicationName() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("show application_name")) {
+        assertTrue(resultSet.next());
+        // If the PG version is 1.0, the JDBC driver thinks that the server does not support the
+        // application_name property and does not send any value. That means that PGAdapter fills it
+        // in automatically based on the client that is detected.
+        // Otherwise, the JDBC driver includes its own name, and that is not overwritten by
+        // PGAdapter.
+        assertEquals(getExpectedInitialApplicationName(), resultSet.getString(1));
+        assertFalse(resultSet.next());
+      }
     }
   }
 
@@ -637,6 +853,41 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testCharParam() throws SQLException {
+    String sql = "insert into foo values ($1)";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 1L));
+    String jdbcSql = "insert into foo values (?)";
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      try (PreparedStatement preparedStatement = connection.prepareStatement(jdbcSql)) {
+        PGobject pgObject = new PGobject();
+        pgObject.setType("char");
+        pgObject.setValue("a");
+        preparedStatement.setObject(1, pgObject);
+        assertEquals(1, preparedStatement.executeUpdate());
+      }
+    }
+
+    List<ParseMessage> parseMessages =
+        pgServer.getDebugMessages().stream()
+            .filter(message -> message instanceof ParseMessage)
+            .map(message -> (ParseMessage) message)
+            .collect(Collectors.toList());
+    assertFalse(parseMessages.isEmpty());
+    ParseMessage parseMessage = parseMessages.get(parseMessages.size() - 1);
+    assertEquals(1, parseMessage.getStatement().getGivenParameterDataTypes().length);
+    assertEquals(Oid.CHAR, parseMessage.getStatement().getGivenParameterDataTypes()[0]);
+
+    List<ExecuteSqlRequest> executeSqlRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
+    assertEquals(1, executeSqlRequests.size());
+    ExecuteSqlRequest request = executeSqlRequests.get(0);
+    // Oid.CHAR is not a recognized type in PGAdapter.
+    assertEquals(0, request.getParamTypesCount());
+    assertEquals(1, request.getParams().getFieldsCount());
+    assertEquals("a", request.getParams().getFieldsMap().get("p1").getStringValue());
+  }
+
+  @Test
   public void testAutoDescribedStatementsAreReused() throws SQLException {
     String jdbcSql = "select col_date from all_types where col_date=?";
     String pgSql = "select col_date from all_types where col_date=$1";
@@ -680,6 +931,15 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         List<ExecuteSqlRequest> requests = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class);
         if (attempt == 1) {
           assertEquals(2, requests.size());
+          ExecuteSqlRequest describeRequest = requests.get(0);
+          assertEquals(QueryMode.PLAN, describeRequest.getQueryMode());
+          assertEquals(pgSql, describeRequest.getSql());
+          // Even though we are sending two requests to Cloud Spanner, we should not start a
+          // transaction for these two statements, as the first statement is only used to describe
+          // the parameters, and not to get any actual data.
+          assertTrue(describeRequest.hasTransaction());
+          assertTrue(describeRequest.getTransaction().hasSingleUse());
+          assertTrue(describeRequest.getTransaction().getSingleUse().hasReadOnly());
         } else {
           assertEquals(1, requests.size());
         }
@@ -687,12 +947,18 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         ExecuteSqlRequest executeRequest = requests.get(requests.size() - 1);
         assertEquals(QueryMode.NORMAL, executeRequest.getQueryMode());
         assertEquals(pgSql, executeRequest.getSql());
+        assertTrue(executeRequest.hasTransaction());
+        assertTrue(executeRequest.getTransaction().hasSingleUse());
+        assertTrue(executeRequest.getTransaction().getSingleUse().hasReadOnly());
 
         Map<String, Value> params = executeRequest.getParams().getFieldsMap();
         Map<String, Type> types = executeRequest.getParamTypesMap();
 
         assertEquals(TypeCode.DATE, types.get("p1").getCode());
         assertEquals("2022-03-29", params.get("p1").getStringValue());
+
+        assertEquals(0, mockSpanner.countRequestsOfType(CommitRequest.class));
+        assertEquals(0, mockSpanner.countRequestsOfType(RollbackRequest.class));
 
         mockSpanner.clearRequests();
       }
@@ -732,6 +998,30 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(
             "ERROR: ResultSetMetadata are available only for results that were returned from Cloud Spanner",
             exception.getMessage());
+      }
+    }
+  }
+
+  @Test(timeout = 60_000)
+  public void testMultiplePreparedStatements() throws SQLException {
+    // Execute more statements than there are sessions in the pool to verify that repeatedly
+    // creating a prepared statement with the same name does not cause a session leak.
+    final int numStatements = 1000;
+    String sql = "SELECT 1";
+
+    for (boolean autocommit : new boolean[] {true, false}) {
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        // Verify that there's no session leak both in autocommit and transactional mode.
+        connection.setAutoCommit(autocommit);
+        // Force the use of prepared statements.
+        connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+        for (int i = 0; i < numStatements; i++) {
+          try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+            assertFalse(resultSet.next());
+          }
+        }
       }
     }
   }
@@ -874,8 +1164,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testNullValues() throws SQLException {
     String pgSql =
         "insert into all_types "
-            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)";
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+            + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)";
     mockSpanner.putStatementResult(
         StatementResult.update(
             Statement.newBuilder(pgSql)
@@ -897,6 +1188,28 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .to((Date) null)
                 .bind("p9")
                 .to((String) null)
+                .bind("p10")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p11")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p12")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p13")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p14")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p15")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p16")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p17")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p18")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p19")
+                .to((com.google.cloud.spanner.Value) null)
+                .bind("p20")
+                .to((com.google.cloud.spanner.Value) null)
                 .build(),
             1L));
     mockSpanner.putStatementResult(
@@ -908,8 +1221,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+                  + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         int index = 0;
         statement.setLong(++index, 2);
         statement.setNull(++index, Types.BOOLEAN);
@@ -920,6 +1234,17 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
         statement.setNull(++index, Types.DATE);
         statement.setNull(++index, Types.VARCHAR);
+        statement.setNull(++index, Types.OTHER);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
 
         assertEquals(1, statement.executeUpdate());
       }
@@ -1166,6 +1491,503 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(2, request.getStatementsCount());
     assertEquals(INSERT_STATEMENT.getSql(), request.getStatements(0).getSql());
     assertEquals(UPDATE_STATEMENT.getSql(), request.getStatements(1).getSql());
+  }
+
+  @Test
+  public void testJdbcPreparedStatementBatch() throws SQLException {
+    String pgRewrittenInsertSql = "insert into my_table (id, value) values ($1, $2),($3, $4)";
+
+    String insertSql = "insert into my_table (id, value) values (?, ?)";
+    String pgInsertSql = "insert into my_table (id, value) values ($1, $2)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgInsertSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgRewrittenInsertSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.STRING, TypeCode.INT64, TypeCode.STRING)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgInsertSql).bind("p1").to(1L).bind("p2").to("One").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgInsertSql).bind("p1").to(2L).bind("p2").to("Two").build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgRewrittenInsertSql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to("One")
+                .bind("p3")
+                .to(2L)
+                .bind("p4")
+                .to("Two")
+                .build(),
+            2L));
+    String selectSql = "select value from my_table where id=?";
+    String pgSelectSql = "select value from my_table where id=$1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.newBuilder(pgSelectSql).bind("p1").to(1L).build(),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(createMetadata(ImmutableList.of(TypeCode.STRING)))
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("One").build())
+                        .build())
+                .build()));
+    String updateSql = "update my_table set value=? where id=?";
+    String pgUpdateSql = "update my_table set value=$1 where id=$2";
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgUpdateSql).bind("p1").to("One").bind("p2").to(1L).build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgUpdateSql).bind("p1").to("Two").bind("p2").to(2L).build(), 1L));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgUpdateSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING, TypeCode.INT64)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "&reWriteBatchedInserts=true")) {
+      connection.setAutoCommit(false);
+
+      for (int i = 0; i < 10; i++) {
+        try (PreparedStatement insertStatement = connection.prepareStatement(insertSql);
+            PreparedStatement updateStatement = connection.prepareStatement(updateSql)) {
+          insertStatement.setLong(1, 1L);
+          insertStatement.setString(2, "One");
+          insertStatement.addBatch();
+
+          updateStatement.setString(1, "One");
+          updateStatement.setLong(2, 1L);
+          updateStatement.addBatch();
+          updateStatement.setString(1, "Two");
+          updateStatement.setLong(2, 2L);
+          updateStatement.addBatch();
+
+          try (PreparedStatement selectStatement = connection.prepareStatement(selectSql)) {
+            selectStatement.setLong(1, 1L);
+            try (ResultSet resultSet = selectStatement.executeQuery()) {
+              assertTrue(resultSet.next());
+              assertEquals("One", resultSet.getString(1));
+              assertFalse(resultSet.next());
+            }
+          }
+
+          insertStatement.setLong(1, 2L);
+          insertStatement.setString(2, "Two");
+          insertStatement.addBatch();
+
+          int[] updateCounts = insertStatement.executeBatch();
+          assertEquals(2, updateCounts.length);
+
+          updateCounts = updateStatement.executeBatch();
+          assertEquals(2, updateCounts.length);
+
+          connection.commit();
+        }
+      }
+    }
+
+    assertEquals(10, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    // We receive 21 ExecuteSql requests, because the update statement is described.
+    assertEquals(21, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBatchedAutoDescribedPreparedStatement() throws SQLException {
+    String insertSql = "insert into my_table (id, value) values (?, ?)";
+    String pgInsertSql = "insert into my_table (id, value) values ($1, $2)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgInsertSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgInsertSql)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .build(),
+            1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgInsertSql)
+                .bind("p1")
+                .to(2L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:11:00Z"))
+                .build(),
+            1L));
+    String updateSql = "update my_table set value=? where id=?";
+    String pgUpdateSql = "update my_table set value=$1 where id=$2";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgUpdateSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(TypeCode.TIMESTAMP, TypeCode.INT64)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgUpdateSql)
+                .bind("p1")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:11:00Z"))
+                .bind("p2")
+                .to(1L)
+                .build(),
+            1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgUpdateSql)
+                .bind("p1")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p2")
+                .to(2L)
+                .build(),
+            1L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+
+      try (PreparedStatement insertStatement = connection.prepareStatement(insertSql);
+          PreparedStatement updateStatement = connection.prepareStatement(updateSql)) {
+        insertStatement.setLong(1, 1L);
+        insertStatement.setTimestamp(
+            2, Timestamp.parseTimestamp("2023-03-08T18:10:00Z").toSqlTimestamp());
+        insertStatement.addBatch();
+        insertStatement.setLong(1, 2L);
+        insertStatement.setTimestamp(
+            2, Timestamp.parseTimestamp("2023-03-08T18:11:00Z").toSqlTimestamp());
+        insertStatement.addBatch();
+
+        updateStatement.setTimestamp(
+            1, Timestamp.parseTimestamp("2023-03-08T18:11:00Z").toSqlTimestamp());
+        updateStatement.setLong(2, 1L);
+        updateStatement.addBatch();
+        updateStatement.setTimestamp(
+            1, Timestamp.parseTimestamp("2023-03-08T18:10:00Z").toSqlTimestamp());
+        updateStatement.setLong(2, 2L);
+        updateStatement.addBatch();
+
+        int[] updateCounts = insertStatement.executeBatch();
+        assertEquals(2, updateCounts.length);
+
+        updateCounts = updateStatement.executeBatch();
+        assertEquals(2, updateCounts.length);
+
+        connection.commit();
+      }
+    }
+
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    // Both statements are auto-described.
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBatchedRewrittenPreparedStatement() throws SQLException {
+    String insertSql = "insert into my_table (id, value) values (?, ?)";
+    String rewrittenInsertSql1 =
+        "insert into my_table (id, value) values ($1, $2),($3, $4),($5, $6),($7, $8),($9, $10),($11, $12),($13, $14),($15, $16)";
+    String rewrittenInsertSql2 = "insert into my_table (id, value) values ($1, $2),($3, $4)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql1),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql2),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(rewrittenInsertSql1)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p3")
+                .to(2L)
+                .bind("p4")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p5")
+                .to(3L)
+                .bind("p6")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p7")
+                .to(4L)
+                .bind("p8")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p9")
+                .to(5L)
+                .bind("p10")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p11")
+                .to(6L)
+                .bind("p12")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p13")
+                .to(7L)
+                .bind("p14")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p15")
+                .to(8L)
+                .bind("p16")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .build(),
+            8L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(rewrittenInsertSql2)
+                .bind("p1")
+                .to(9L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p3")
+                .to(10L)
+                .bind("p4")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .build(),
+            2L));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "&reWriteBatchedInserts=true")) {
+      connection.setAutoCommit(false);
+
+      try (PreparedStatement insertStatement = connection.prepareStatement(insertSql)) {
+        for (int i = 1; i <= 10; i++) {
+          insertStatement.setLong(1, i);
+          insertStatement.setTimestamp(
+              2, Timestamp.parseTimestamp("2023-03-08T18:10:00Z").toSqlTimestamp());
+          insertStatement.addBatch();
+        }
+
+        int[] updateCounts = insertStatement.executeBatch();
+        assertEquals(10, updateCounts.length);
+
+        connection.commit();
+      }
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    // Both statements are auto-described.
+    assertEquals(3, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testBatchedRewrittenPreparedStatementWithErrorInBind() throws SQLException {
+    String insertSql = "insert into my_table (id, value) values (?, ?)";
+    String rewrittenInsertSql1 =
+        "insert into my_table (id, value) values ($1, $2),($3, $4),($5, $6),($7, $8),($9, $10),($11, $12),($13, $14),($15, $16)";
+    String rewrittenInsertSql2 = "insert into my_table (id, value) values ($1, $2),($3, $4)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql1),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql2),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(rewrittenInsertSql1)
+                .bind("p1")
+                .to(1L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p3")
+                .to(2L)
+                .bind("p4")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p5")
+                .to(3L)
+                .bind("p6")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p7")
+                .to(4L)
+                .bind("p8")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p9")
+                .to(5L)
+                .bind("p10")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p11")
+                .to(6L)
+                .bind("p12")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p13")
+                .to(7L)
+                .bind("p14")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p15")
+                .to(8L)
+                .bind("p16")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .build(),
+            8L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(rewrittenInsertSql2)
+                .bind("p1")
+                .to(9L)
+                .bind("p2")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .bind("p3")
+                .to(10L)
+                .bind("p4")
+                .to(Timestamp.parseTimestamp("2023-03-08T18:10:00Z"))
+                .build(),
+            2L));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "&reWriteBatchedInserts=true")) {
+      connection.setAutoCommit(false);
+
+      try (PreparedStatement insertStatement = connection.prepareStatement(insertSql)) {
+        for (int i = 1; i <= 10; i++) {
+          insertStatement.setLong(1, i);
+          insertStatement.setTimestamp(2, new java.sql.Timestamp(Long.MIN_VALUE));
+          insertStatement.addBatch();
+        }
+
+        BatchUpdateException exception =
+            assertThrows(BatchUpdateException.class, insertStatement::executeBatch);
+        assertTrue(
+            exception.getMessage(), exception.getMessage().contains("Invalid timestamp value"));
+
+        connection.rollback();
+      }
+    }
+  }
+
+  @Test
+  public void testBatchedRewrittenPreparedStatementWithGenericBatchExecutionError()
+      throws SQLException {
+    String insertSql = "insert into my_table (id, value) values (?, ?)";
+    String rewrittenInsertSql1 =
+        "insert into my_table (id, value) values ($1, $2),($3, $4),($5, $6),($7, $8),($9, $10),($11, $12),($13, $14),($15, $16)";
+    String rewrittenInsertSql2 = "insert into my_table (id, value) values ($1, $2),($3, $4)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql1),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(rewrittenInsertSql2),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64, TypeCode.TIMESTAMP,
+                            TypeCode.INT64, TypeCode.TIMESTAMP)))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    mockSpanner.setExecuteBatchDmlExecutionTime(
+        SimulatedExecutionTime.ofException(
+            Status.INVALID_ARGUMENT
+                .withDescription("Too many values in insert clause")
+                .asRuntimeException()));
+
+    try (Connection connection =
+        DriverManager.getConnection(createUrl() + "&reWriteBatchedInserts=true")) {
+      connection.setAutoCommit(false);
+
+      try (PreparedStatement insertStatement = connection.prepareStatement(insertSql)) {
+        for (int i = 1; i <= 10; i++) {
+          insertStatement.setLong(1, i);
+          insertStatement.setTimestamp(
+              2, Timestamp.parseTimestamp("2023-03-08T18:10:00Z").toSqlTimestamp());
+          insertStatement.addBatch();
+        }
+
+        BatchUpdateException exception =
+            assertThrows(BatchUpdateException.class, insertStatement::executeBatch);
+        assertTrue(
+            exception.getMessage(),
+            exception.getMessage().contains("Too many values in insert clause"));
+
+        connection.rollback();
+      }
+    }
   }
 
   @Test
@@ -1618,38 +2440,34 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testPreparedStatement() throws SQLException {
+    String pgSql =
+        "insert into all_types "
+            + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+            + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
+            + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(pgSql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    createParameterTypesMetadata(
+                        ImmutableList.of(
+                            TypeCode.INT64,
+                            TypeCode.BOOL,
+                            TypeCode.BYTES,
+                            TypeCode.FLOAT64,
+                            TypeCode.INT64,
+                            TypeCode.NUMERIC,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.DATE,
+                            TypeCode.STRING,
+                            TypeCode.JSON),
+                        true))
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
     mockSpanner.putStatementResult(
         StatementResult.update(
-            Statement.newBuilder(
-                    "insert into all_types "
-                        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-                        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
-                .bind("p1")
-                .to(2L)
-                .bind("p2")
-                .to((Boolean) null)
-                .bind("p3")
-                .to((ByteArray) null)
-                .bind("p4")
-                .to((Double) null)
-                .bind("p5")
-                .to((Long) null)
-                .bind("p6")
-                .to(com.google.cloud.spanner.Value.pgNumeric(null))
-                .bind("p7")
-                .to((Timestamp) null)
-                .bind("p8")
-                .to((Date) null)
-                .bind("p9")
-                .to((String) null)
-                .build(),
-            1L));
-    mockSpanner.putStatementResult(
-        StatementResult.update(
-            Statement.newBuilder(
-                    "insert into all_types "
-                        + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-                        + "values ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
+            Statement.newBuilder(pgSql)
                 .bind("p1")
                 .to(1L)
                 .bind("p2")
@@ -1668,6 +2486,85 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .to(Date.parseDate("2022-03-29"))
                 .bind("p9")
                 .to("test")
+                .bind("p10")
+                .to(
+                    com.google.cloud.spanner.Value.pgJsonb(
+                        "{\"key1\": \"value1\", \"key2\": \"value2\"}"))
+                .bind("p11")
+                .toInt64Array(Arrays.asList(1L, null, 2L))
+                .bind("p12")
+                .toBoolArray(Arrays.asList(true, null, false))
+                .bind("p13")
+                .toBytesArray(
+                    Arrays.asList(ByteArray.copyFrom("bytes1"), null, ByteArray.copyFrom("bytes2")))
+                .bind("p14")
+                .toFloat64Array(Arrays.asList(3.14d, null, 6.626d))
+                .bind("p15")
+                .toInt64Array(Arrays.asList(-1L, null, -2L))
+                .bind("p16")
+                .toPgNumericArray(Arrays.asList("3.14", null, "6.626"))
+                .bind("p17")
+                .toTimestampArray(
+                    Arrays.asList(
+                        Timestamp.parseTimestamp("2022-02-11T12:45:00.123456000Z"),
+                        null,
+                        Timestamp.parseTimestamp("2000-01-01T00:00:00Z")))
+                .bind("p18")
+                .toDateArray(
+                    Arrays.asList(Date.parseDate("2000-01-01"), null, Date.parseDate("1970-01-01")))
+                .bind("p19")
+                .toStringArray(Arrays.asList("string1", null, "string2"))
+                .bind("p20")
+                .toPgJsonbArray(
+                    Arrays.asList(
+                        "{\"key1\": \"value1\", \"key2\": \"value2\"}",
+                        null,
+                        "{\"key1\": \"value3\", \"key2\": \"value4\"}"))
+                .build(),
+            1L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(
+            Statement.newBuilder(pgSql)
+                .bind("p1")
+                .to(2L)
+                .bind("p2")
+                .to((Boolean) null)
+                .bind("p3")
+                .to((ByteArray) null)
+                .bind("p4")
+                .to((Double) null)
+                .bind("p5")
+                .to((Long) null)
+                .bind("p6")
+                .to(com.google.cloud.spanner.Value.pgNumeric(null))
+                .bind("p7")
+                .to((Timestamp) null)
+                .bind("p8")
+                .to((Date) null)
+                .bind("p9")
+                .to((String) null)
+                .bind("p10")
+                .to(com.google.cloud.spanner.Value.pgJsonb(null))
+                .bind("p11")
+                .toInt64Array((long[]) null)
+                .bind("p12")
+                .toBoolArray((boolean[]) null)
+                .bind("p13")
+                .toBytesArray(null)
+                .bind("p14")
+                .toFloat64Array((double[]) null)
+                .bind("p15")
+                .toInt64Array((long[]) null)
+                .bind("p16")
+                .toPgNumericArray(null)
+                .bind("p17")
+                .toTimestampArray(null)
+                .bind("p18")
+                .toDateArray(null)
+                .bind("p19")
+                .toStringArray(null)
+                .bind("p20")
+                .toPgJsonbArray(null)
                 .build(),
             1L));
 
@@ -1677,8 +2574,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       try (PreparedStatement statement =
           connection.prepareStatement(
               "insert into all_types "
-                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar) "
-                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+                  + "(col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb, "
+                  + "col_array_bigint, col_array_bool, col_array_bytea, col_array_float8, col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, col_array_varchar, col_array_jsonb) "
+                  + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
         PGStatement pgStatement = statement.unwrap(PGStatement.class);
         pgStatement.setPrepareThreshold(1);
 
@@ -1692,6 +2590,54 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         statement.setObject(++index, zonedDateTime);
         statement.setObject(++index, LocalDate.of(2022, 3, 29));
         statement.setString(++index, "test");
+        statement.setObject(++index, "{\"key1\": \"value1\", \"key2\": \"value2\"}", Types.OTHER);
+
+        statement.setArray(++index, connection.createArrayOf("bigint", new Long[] {1L, null, 2L}));
+        statement.setArray(
+            ++index, connection.createArrayOf("bool", new Boolean[] {true, null, false}));
+        statement.setArray(
+            ++index,
+            connection.createArrayOf(
+                "bytea",
+                new byte[][] {
+                  "bytes1".getBytes(StandardCharsets.UTF_8),
+                  null,
+                  "bytes2".getBytes(StandardCharsets.UTF_8)
+                }));
+        statement.setArray(
+            ++index, connection.createArrayOf("float8", new Double[] {3.14d, null, 6.626}));
+        statement.setArray(++index, connection.createArrayOf("int", new Integer[] {-1, null, -2}));
+        statement.setArray(
+            ++index,
+            connection.createArrayOf(
+                "numeric",
+                new BigDecimal[] {new BigDecimal("3.14"), null, new BigDecimal("6.626")}));
+        statement.setArray(
+            ++index,
+            connection.createArrayOf(
+                "timestamptz",
+                new java.sql.Timestamp[] {
+                  Timestamp.parseTimestamp("2022-02-11T13:45:00.123456+01:00").toSqlTimestamp(),
+                  null,
+                  Timestamp.parseTimestamp("2000-01-01T00:00:00Z").toSqlTimestamp()
+                }));
+        statement.setArray(
+            ++index,
+            connection.createArrayOf(
+                "date",
+                new LocalDate[] {LocalDate.of(2000, 1, 1), null, LocalDate.of(1970, 1, 1)}));
+        statement.setArray(
+            ++index,
+            connection.createArrayOf("varchar", new String[] {"string1", null, "string2"}));
+        statement.setArray(
+            ++index,
+            connection.createArrayOf(
+                "jsonb",
+                new String[] {
+                  "{\"key1\": \"value1\", \"key2\": \"value2\"}",
+                  null,
+                  "{\"key1\": \"value3\", \"key2\": \"value4\"}"
+                }));
 
         assertEquals(1, statement.executeUpdate());
 
@@ -1705,6 +2651,18 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         statement.setNull(++index, Types.TIMESTAMP_WITH_TIMEZONE);
         statement.setNull(++index, Types.DATE);
         statement.setNull(++index, Types.VARCHAR);
+        statement.setNull(++index, Types.OTHER);
+
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
+        statement.setNull(++index, Types.ARRAY);
 
         assertEquals(1, statement.executeUpdate());
       }
@@ -1769,9 +2727,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                 .bind("p9")
                 .to("test")
                 .bind("p10")
-                // TODO: Change to jsonb when https://github.com/googleapis/java-spanner/pull/2182
-                //       has been merged.
-                .to(com.google.cloud.spanner.Value.json("{\"key\": \"value\"}"))
+                .to(com.google.cloud.spanner.Value.pgJsonb("{\"key\": \"value\"}"))
                 .build(),
             com.google.spanner.v1.ResultSet.newBuilder()
                 .setMetadata(ALL_TYPES_METADATA)
@@ -1797,19 +2753,31 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         assertEquals(Types.OTHER, parameterMetaData.getParameterType(10));
 
         ResultSetMetaData metadata = statement.getMetaData();
-        assertEquals(10, metadata.getColumnCount());
-        assertEquals(Types.BIGINT, metadata.getColumnType(1));
-        assertEquals(Types.BIT, metadata.getColumnType(2));
-        assertEquals(Types.BINARY, metadata.getColumnType(3));
-        assertEquals(Types.DOUBLE, metadata.getColumnType(4));
-        assertEquals(Types.BIGINT, metadata.getColumnType(5));
-        assertEquals(Types.NUMERIC, metadata.getColumnType(6));
-        assertEquals(Types.TIMESTAMP, metadata.getColumnType(7));
-        assertEquals(Types.DATE, metadata.getColumnType(8));
-        assertEquals(Types.VARCHAR, metadata.getColumnType(9));
-        assertEquals(Types.OTHER, metadata.getColumnType(10));
-
+        assertEquals(20, metadata.getColumnCount());
         int index = 0;
+        assertEquals(Types.BIGINT, metadata.getColumnType(++index));
+        assertEquals(Types.BIT, metadata.getColumnType(++index));
+        assertEquals(Types.BINARY, metadata.getColumnType(++index));
+        assertEquals(Types.DOUBLE, metadata.getColumnType(++index));
+        assertEquals(Types.BIGINT, metadata.getColumnType(++index));
+        assertEquals(Types.NUMERIC, metadata.getColumnType(++index));
+        assertEquals(Types.TIMESTAMP, metadata.getColumnType(++index));
+        assertEquals(Types.DATE, metadata.getColumnType(++index));
+        assertEquals(Types.VARCHAR, metadata.getColumnType(++index));
+        assertEquals(Types.OTHER, metadata.getColumnType(++index));
+
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+        assertEquals(Types.ARRAY, metadata.getColumnType(++index));
+
+        index = 0;
         statement.setLong(++index, 1L);
         statement.setBoolean(++index, true);
         statement.setBytes(++index, "test".getBytes(StandardCharsets.UTF_8));
@@ -2409,6 +3377,28 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testPgEnum() throws SQLException {
+    for (String sql :
+        new String[] {
+          "select * from pg_enum",
+          "select * from pg_catalog.pg_enum",
+          "select * from PG_CATALOG.PG_ENUM"
+        }) {
+      mockSpanner.putStatementResult(
+          StatementResult.query(
+              Statement.of("with " + new EmptyPgEnum().getTableExpression() + "\n" + sql),
+              SELECT1_RESULTSET));
+      try (Connection connection = DriverManager.getConnection(createUrl())) {
+        try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+  }
+
+  @Test
   public void testShowGuessTypes() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet =
@@ -2856,11 +3846,36 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testSetTimeZoneEST() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      // Java considers 'EST' to always be '-05:00'. That is; it is never DST.
+      connection.createStatement().execute("set time zone 'EST'");
+      verifySettingValue(connection, "timezone", "-05:00");
+      // 'EST5EDT' is the ID for the timezone that will change with DST.
+      connection.createStatement().execute("set time zone 'EST5EDT'");
+      verifySettingValue(connection, "timezone", "EST5EDT");
+      // 'America/New_York' is the full name of the geographical timezone.
+      connection.createStatement().execute("set time zone 'America/New_York'");
+      verifySettingValue(connection, "timezone", "America/New_York");
+    }
+  }
+
+  @Test
   public void testSetTimeZoneToServerDefault() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.createStatement().execute("set time zone 'atlantic/faeroe'");
       verifySettingValue(connection, "timezone", "Atlantic/Faeroe");
       connection.createStatement().execute("set time zone default");
+      verifySettingValue(connection, "timezone", TimeZone.getDefault().getID());
+    }
+  }
+
+  @Test
+  public void testSetTimeZoneToLocaltime() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set time zone 'atlantic/jan_mayen'");
+      verifySettingValue(connection, "timezone", "Atlantic/Jan_Mayen");
+      connection.createStatement().execute("set time zone localtime");
       verifySettingValue(connection, "timezone", TimeZone.getDefault().getID());
     }
   }
@@ -2910,6 +3925,16 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       verifySettingValue(connection, "time zone", "UTC");
       connection.rollback();
       verifySettingValue(connection, "time zone", originalTimeZone);
+    }
+  }
+
+  @Test
+  public void testSetNames() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("set names 'utf8'");
+      verifySettingValue(connection, "client_encoding", "utf8");
+      connection.createStatement().execute("set names 'foo'");
+      verifySettingValue(connection, "client_encoding", "foo");
     }
   }
 
@@ -3000,30 +4025,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testSelectPgType() throws SQLException {
     mockSpanner.putStatementResult(
         StatementResult.query(
-            Statement.of(
-                "with pg_namespace as (\n"
-                    + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-                    + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-                    + "  from information_schema.schemata\n"
-                    + "),\n"
-                    + "pg_type as (\n"
-                    + "  select 16 as oid, 'bool' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 1 as typlen, true as typbyval, 'b' as typtype, 'B' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1000 as typarray, 'boolin' as typinput, 'boolout' as typoutput, 'boolrecv' as typreceive, 'boolsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 17 as oid, 'bytea' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1001 as typarray, 'byteain' as typinput, 'byteaout' as typoutput, 'bytearecv' as typreceive, 'byteasend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 20 as oid, 'int8' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1016 as typarray, 'int8in' as typinput, 'int8out' as typoutput, 'int8recv' as typreceive, 'int8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 21 as oid, 'int2' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 2 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1005 as typarray, 'int2in' as typinput, 'int2out' as typoutput, 'int2recv' as typreceive, 'int2send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 's' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 23 as oid, 'int4' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1007 as typarray, 'int4in' as typinput, 'int4out' as typoutput, 'int4recv' as typreceive, 'int4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 25 as oid, 'text' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1009 as typarray, 'textin' as typinput, 'textout' as typoutput, 'textrecv' as typreceive, 'textsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 700 as oid, 'float4' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1021 as typarray, 'float4in' as typinput, 'float4out' as typoutput, 'float4recv' as typreceive, 'float4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 701 as oid, 'float8' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1022 as typarray, 'float8in' as typinput, 'float8out' as typoutput, 'float8recv' as typreceive, 'float8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1043 as oid, 'varchar' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1015 as typarray, 'varcharin' as typinput, 'varcharout' as typoutput, 'varcharrecv' as typreceive, 'varcharsend' as typsend, 'varchartypmodin' as typmodin, 'varchartypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1082 as oid, 'date' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1182 as typarray, 'date_in' as typinput, 'date_out' as typoutput, 'date_recv' as typreceive, 'date_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1114 as oid, 'timestamp' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1115 as typarray, 'timestamp_in' as typinput, 'timestamp_out' as typoutput, 'timestamp_recv' as typreceive, 'timestamp_send' as typsend, 'timestamptypmodin' as typmodin, 'timestamptypmodout' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1184 as oid, 'timestamptz' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1185 as typarray, 'timestamptz_in' as typinput, 'timestamptz_out' as typoutput, 'timestamptz_recv' as typreceive, 'timestamptz_send' as typsend, 'timestamptztypmodin' as typmodin, 'timestamptztypmodout' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1700 as oid, 'numeric' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1231 as typarray, 'numeric_in' as typinput, 'numeric_out' as typoutput, 'numeric_recv' as typreceive, 'numeric_send' as typsend, 'numerictypmodin' as typmodin, 'numerictypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'm' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 3802 as oid, 'jsonb' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 3807 as typarray, 'jsonb_in' as typinput, 'jsonb_out' as typoutput, 'jsonb_recv' as typreceive, 'jsonb_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl\n"
-                    + ")\n"
-                    + "select * from pg_type"),
-            SELECT1_RESULTSET));
+            Statement.of("with " + PG_TYPE_PREFIX + "\nselect * from pg_type"), SELECT1_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       try (ResultSet resultSet =
@@ -3042,28 +4044,9 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
-                "with pg_namespace as (\n"
-                    + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-                    + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-                    + "  from information_schema.schemata\n"
-                    + "),\n"
-                    + "pg_type as (\n"
-                    + "  select 16 as oid, 'bool' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 1 as typlen, true as typbyval, 'b' as typtype, 'B' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1000 as typarray, 'boolin' as typinput, 'boolout' as typoutput, 'boolrecv' as typreceive, 'boolsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 17 as oid, 'bytea' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1001 as typarray, 'byteain' as typinput, 'byteaout' as typoutput, 'bytearecv' as typreceive, 'byteasend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 20 as oid, 'int8' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1016 as typarray, 'int8in' as typinput, 'int8out' as typoutput, 'int8recv' as typreceive, 'int8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 21 as oid, 'int2' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 2 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1005 as typarray, 'int2in' as typinput, 'int2out' as typoutput, 'int2recv' as typreceive, 'int2send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 's' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 23 as oid, 'int4' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1007 as typarray, 'int4in' as typinput, 'int4out' as typoutput, 'int4recv' as typreceive, 'int4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 25 as oid, 'text' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1009 as typarray, 'textin' as typinput, 'textout' as typoutput, 'textrecv' as typreceive, 'textsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 700 as oid, 'float4' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1021 as typarray, 'float4in' as typinput, 'float4out' as typoutput, 'float4recv' as typreceive, 'float4send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 701 as oid, 'float8' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'N' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1022 as typarray, 'float8in' as typinput, 'float8out' as typoutput, 'float8recv' as typreceive, 'float8send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1043 as oid, 'varchar' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'S' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1015 as typarray, 'varcharin' as typinput, 'varcharout' as typoutput, 'varcharrecv' as typreceive, 'varcharsend' as typsend, 'varchartypmodin' as typmodin, 'varchartypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 100 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1082 as oid, 'date' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 4 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1182 as typarray, 'date_in' as typinput, 'date_out' as typoutput, 'date_recv' as typreceive, 'date_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1114 as oid, 'timestamp' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, false as typispreferred, false as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1115 as typarray, 'timestamp_in' as typinput, 'timestamp_out' as typoutput, 'timestamp_recv' as typreceive, 'timestamp_send' as typsend, 'timestamptypmodin' as typmodin, 'timestamptypmodout' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1184 as oid, 'timestamptz' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, 8 as typlen, true as typbyval, 'b' as typtype, 'D' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1185 as typarray, 'timestamptz_in' as typinput, 'timestamptz_out' as typoutput, 'timestamptz_recv' as typreceive, 'timestamptz_send' as typsend, 'timestamptztypmodin' as typmodin, 'timestamptztypmodout' as typmodout, '-' as typanalyze, 'd' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 1700 as oid, 'numeric' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'N' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1231 as typarray, 'numeric_in' as typinput, 'numeric_out' as typoutput, 'numeric_recv' as typreceive, 'numeric_send' as typsend, 'numerictypmodin' as typmodin, 'numerictypmodout' as typmodout, '-' as typanalyze, 'i' as typalign, 'm' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl union all\n"
-                    + "  select 3802 as oid, 'jsonb' as typname, (select oid from pg_namespace where nspname='pg_catalog') as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 3807 as typarray, 'jsonb_in' as typinput, 'jsonb_out' as typoutput, 'jsonb_recv' as typreceive, 'jsonb_send' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl\n"
-                    + ")\n"
-                    + "select * from pg_type join pg_namespace on pg_type.typnamespace=pg_namespace.oid"),
+                "with "
+                    + PG_TYPE_PREFIX
+                    + "\nselect * from pg_type join pg_namespace on pg_type.typnamespace=pg_namespace.oid"),
             SELECT1_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
@@ -3281,6 +4264,117 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
 
     assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testVacuumStatement_noTables() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum");
+    }
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+  }
+
+  @Test
+  public void testVacuumStatement_oneTable() throws SQLException {
+    String sql = "select * from my_table limit 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum my_table");
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql, request.getSql());
+    assertEquals(QueryMode.PLAN, request.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatement_multipleTables() throws SQLException {
+    String sql1 = "select * from my_table1 limit 1";
+    String sql2 = "select * from my_table2 limit 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql1), SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), SELECT2_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum my_table1, my_table2");
+    }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request1 = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql1, request1.getSql());
+    assertEquals(QueryMode.PLAN, request1.getQueryMode());
+    ExecuteSqlRequest request2 = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql2, request2.getSql());
+    assertEquals(QueryMode.PLAN, request1.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatement_oneTableWithColumns() throws SQLException {
+    String sql = "select col1,col2 from my_table limit 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum my_table (col1, col2)");
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql, request.getSql());
+    assertEquals(QueryMode.PLAN, request.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatement_multipleTablesWithColumns() throws SQLException {
+    String sql1 = "select col1 from my_table1 limit 1";
+    String sql2 = "select col1,col2 from my_table2 limit 1";
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql1), SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql2), SELECT2_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.createStatement().execute("vacuum my_table1 (col1), my_table2(col1,col2)");
+    }
+    assertEquals(2, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request1 = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql1, request1.getSql());
+    assertEquals(QueryMode.PLAN, request1.getQueryMode());
+    ExecuteSqlRequest request2 = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(1);
+    assertEquals(sql2, request2.getSql());
+    assertEquals(QueryMode.PLAN, request1.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatement_unknownTable() throws SQLException {
+    String sql = "select * from unknown_table limit 1";
+    mockSpanner.putStatementResult(
+        StatementResult.exception(
+            Statement.of(sql),
+            Status.NOT_FOUND
+                .withDescription("Table not found: unknown_table")
+                .asRuntimeException()));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      SQLException exception =
+          assertThrows(
+              SQLException.class,
+              () -> connection.createStatement().execute("vacuum unknown_table"));
+      assertEquals(
+          "ERROR: Table not found: unknown_table - Statement: 'select * from unknown_table limit 1'",
+          exception.getMessage());
+    }
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
+    ExecuteSqlRequest request = mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).get(0);
+    assertEquals(sql, request.getSql());
+    assertEquals(QueryMode.PLAN, request.getQueryMode());
+  }
+
+  @Test
+  public void testVacuumStatementInTransaction() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      PSQLException exception =
+          assertThrows(PSQLException.class, () -> connection.createStatement().execute("vacuum"));
+      assertEquals("ERROR: VACUUM cannot run inside a transaction block", exception.getMessage());
+      assertEquals(SQLState.ActiveSqlTransaction.toString(), exception.getSQLState());
+    }
+    assertEquals(0, mockSpanner.countRequestsOfType(ExecuteSqlRequest.class));
   }
 
   @Test
@@ -3525,6 +4619,63 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
   @Test
   public void testDescribeTruncate() throws SQLException {
+    String sql = "delete from foo";
+    mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (PreparedStatement preparedStatement = connection.prepareStatement("truncate foo")) {
+        assertEquals(0, preparedStatement.executeUpdate());
+      }
+    }
+
+    assertEquals(1, mockSpanner.countRequestsOfType(CommitRequest.class));
+    assertEquals(1, mockSpanner.countRequestsOfType(ExecuteBatchDmlRequest.class));
+    ExecuteBatchDmlRequest request =
+        mockSpanner.getRequestsOfType(ExecuteBatchDmlRequest.class).get(0);
+    assertTrue(request.getTransaction().hasBegin());
+    assertEquals(1, request.getStatementsCount());
+    assertEquals(sql, request.getStatements(0).getSql());
+  }
+
+  @Test
+  public void testUnnamedSavepoint() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      assertNotNull(connection.setSavepoint());
+    }
+  }
+
+  @Test
+  public void testNamedSavepoint() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      assertEquals("my-savepoint", connection.setSavepoint("my-savepoint").getSavepointName());
+    }
+  }
+
+  @Test
+  public void testReleaseSavepoint() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      PSQLSavepoint savepoint = new PSQLSavepoint("my-savepoint");
+      connection.releaseSavepoint(savepoint);
+    }
+  }
+
+  @Test
+  public void testRollbackToSavepoint() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      connection.setAutoCommit(false);
+      PSQLSavepoint savepoint = new PSQLSavepoint("my-savepoint");
+      PSQLException exception =
+          assertThrows(PSQLException.class, () -> connection.rollback(savepoint));
+      assertEquals(PSQLState.NOT_IMPLEMENTED.getState(), exception.getSQLState());
+    }
+  }
+
+  @Test
+  public void testDescribeAndExecute() throws SQLException {
     String sql = "delete from foo";
     mockSpanner.putStatementResult(StatementResult.update(Statement.of(sql), 10L));
 

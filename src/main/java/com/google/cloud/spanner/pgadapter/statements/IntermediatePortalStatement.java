@@ -17,8 +17,10 @@ package com.google.cloud.spanner.pgadapter.statements;
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.StatementResult;
+import com.google.cloud.spanner.connection.StatementResult.ResultType;
 import com.google.cloud.spanner.pgadapter.parsers.Parser;
 import com.google.cloud.spanner.pgadapter.parsers.Parser.FormatCode;
+import com.google.cloud.spanner.pgadapter.statements.BackendConnection.NoResult;
 import java.util.List;
 import java.util.concurrent.Future;
 
@@ -86,6 +88,18 @@ public class IntermediatePortalStatement extends IntermediatePreparedStatement {
     if (futureStatementResult == null && getStatementResult() == null) {
       this.executed = true;
       setFutureStatementResult(backendConnection.execute(parsedStatement, statement, this::bind));
+    }
+  }
+
+  public void setStatementResult(StatementResult statementResult) {
+    super.setStatementResult(statementResult);
+    if (statementResult != null) {
+      if (statementResult.getResultType() == ResultType.RESULT_SET) {
+        this.hasMoreData = statementResult.getResultSet().next();
+      } else if (statementResult instanceof NoResult
+          && ((NoResult) statementResult).hasCommandTag()) {
+        this.commandTag = ((NoResult) statementResult).getCommandTag();
+      }
     }
   }
 

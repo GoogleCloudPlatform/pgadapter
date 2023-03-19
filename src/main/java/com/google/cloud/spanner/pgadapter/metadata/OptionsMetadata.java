@@ -88,7 +88,7 @@ public class OptionsMetadata {
   }
 
   private static final Logger logger = Logger.getLogger(OptionsMetadata.class.getName());
-  private static final String DEFAULT_SERVER_VERSION = "14.1";
+  public static final String DEFAULT_SERVER_VERSION = "14.1";
   private static final String DEFAULT_USER_AGENT = "pg-adapter";
 
   private static final String OPTION_SERVER_PORT = "s";
@@ -123,6 +123,9 @@ public class OptionsMetadata {
   private static final String OPTION_SPANNER_ENDPOINT = "e";
   private static final String OPTION_JDBC_PROPERTIES = "r";
   private static final String OPTION_SERVER_VERSION = "v";
+  private static final String OPTION_INTERNAL_DEBUG_MODE = "internal_debug";
+  private static final String OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING =
+      "skip_internal_debug_warning";
   private static final String OPTION_DEBUG_MODE = "debug";
 
   private final String osName;
@@ -204,7 +207,7 @@ public class OptionsMetadata {
     this.propertyMap = parseProperties(commandLine.getOptionValue(OPTION_JDBC_PROPERTIES, ""));
     this.disableLocalhostCheck = commandLine.hasOption(OPTION_DISABLE_LOCALHOST_CHECK);
     this.serverVersion = commandLine.getOptionValue(OPTION_SERVER_VERSION, DEFAULT_SERVER_VERSION);
-    this.debugMode = commandLine.hasOption(OPTION_DEBUG_MODE);
+    this.debugMode = commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE);
   }
 
   public OptionsMetadata(
@@ -671,12 +674,30 @@ public class OptionsMetadata {
             + "the value of this option could cause a client or driver to alter its behavior and cause unexpected "
             + "errors when used with PGAdapter.");
     options.addOption(
+        OPTION_INTERNAL_DEBUG_MODE,
+        "internal-debug-mode",
+        false,
+        "-- ONLY USE FOR INTERNAL DEBUGGING -- This option only intended for INTERNAL debugging. It will "
+            + "instruct the server to keep track of all messages it receives.\n"
+            + "You should not enable this option unless you want to debug PGAdapter, for example if"
+            + "you are developing a new feature for PGAdapter that you want to test.\n"
+            + "This option will NOT enable any additional LOGGING.\n"
+            + "You should not enable this option if you are just trying out PGAdapter.");
+    options.addOption(
+        OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING,
+        "skip-internal-debug-mode-warning",
+        false,
+        "Disables the warning that is printed when internal debug mode is enabled.");
+    options.addOption(
         OPTION_DEBUG_MODE,
         "debug-mode",
         false,
-        "-- ONLY USE FOR DEBUGGING -- This option only intended for debugging. It will "
-            + "instruct the server to keep track of all messages it receives.");
-
+        "-- DEPRECATED -- This option currently does not have any effect.\n"
+            + "This option used to enable the internal debug mode for PGAdapter.\n"
+            + "Use the option -internal_debug to enable internal debug mode.\n"
+            + "You most probably do not want to turn internal debug mode on. It is only intended for\n"
+            + "internal test cases in PGAdapter that need to verify that it receives the correct \n"
+            + "wire-protocol messages.");
     CommandLineParser parser = new DefaultParser();
     HelpFormatter help = new HelpFormatter();
     help.setWidth(120);
@@ -695,6 +716,23 @@ public class OptionsMetadata {
   }
 
   static void printDeprecatedWarnings(CommandLine commandLine) {
+    if (commandLine.hasOption(OPTION_DEBUG_MODE)) {
+      System.out.println(
+          "\n -- DEPRECATED -- \n"
+              + "Debug mode (-debug) has been deprecated and currently has no effect.\n"
+              + "This option was sometimes used by accident by users who thought it would enable\n"
+              + "additional logging. The option is only intended for internal testing purposes and should\n"
+              + "only be used for tests that need to verify that PGAdapter receives the correct wire-protocol\n"
+              + "messages. Do not enable this option if you are just trying out PGAdapter.\n");
+    }
+    if (!commandLine.hasOption(OPTION_SKIP_INTERNAL_DEBUG_MODE_WARNING)
+        && commandLine.hasOption(OPTION_INTERNAL_DEBUG_MODE)) {
+      System.out.println(
+          "\n -- WARNING -- \n"
+              + "Internal debug mode is enabled.\n"
+              + "This mode should only be enabled for internal test cases.\n"
+              + "Do not enable this mode for trying out PGAdapter with an application or driver.\n");
+    }
     if (commandLine.hasOption(OPTION_BINARY_FORMAT)) {
       System.out.println(
           "Forcing the server to return results using the binary format is a violation "

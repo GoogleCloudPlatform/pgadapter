@@ -34,13 +34,13 @@
       com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest
     </excludedTests>
 
-    <spanner.version>6.33.0</spanner.version>
-    <junixsocket.version>2.6.1</junixsocket.version>
+    <spanner.version>6.35.2</spanner.version>
+    <junixsocket.version>2.6.2</junixsocket.version>
   </properties>
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>google-cloud-spanner-pgadapter</artifactId>
-  <version>0.14.2-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
+  <version>0.18.3-SNAPSHOT</version><!-- {x-version-update:google-cloud-spanner-pgadapter:current} -->
   <name>Google Cloud Spanner PostgreSQL Adapter</name>
   <packaging>jar</packaging>
   <description>
@@ -85,7 +85,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <version>42.5.1</version>
+      <version>42.5.4</version>
     </dependency>
     <dependency>
       <groupId>com.kohlschutter.junixsocket</groupId>
@@ -111,7 +111,7 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-csv</artifactId>
-      <version>1.9.0</version>
+      <version>1.10.0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -121,7 +121,7 @@
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-model</artifactId>
-      <version>3.8.7</version>
+      <version>3.9.0</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
@@ -147,7 +147,7 @@
     <dependency>
       <groupId>net.java.dev.jna</groupId>
       <artifactId>jna</artifactId>
-      <version>5.12.1</version>
+      <version>5.13.0</version>
       <scope>test</scope>
     </dependency>
     <dependency>

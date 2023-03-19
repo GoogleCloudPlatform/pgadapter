@@ -14,6 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.python.pg8000;
 
+import static com.google.cloud.spanner.pgadapter.python.PythonTestUtil.run;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -21,6 +22,7 @@ import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
 import com.google.cloud.spanner.pgadapter.python.PythonTest;
+import com.google.cloud.spanner.pgadapter.python.PythonTestUtil;
 import com.google.cloud.spanner.pgadapter.wireprotocol.BindMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
@@ -34,9 +36,8 @@ import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
-import java.util.Scanner;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -47,6 +48,7 @@ import org.junit.runners.Parameterized.Parameters;
 @RunWith(Parameterized.class)
 @Category(PythonTest.class)
 public class Pg8000BasicsTest extends AbstractMockServerTest {
+  static final String DIRECTORY_NAME = "./src/test/python/pg8000";
 
   @Parameter public String host;
 
@@ -55,32 +57,23 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
     return ImmutableList.of(new Object[] {"localhost"}, new Object[] {"/tmp"});
   }
 
-  static String execute(String script, String host, int port)
-      throws IOException, InterruptedException {
-    String[] runCommand = new String[] {"python3", script, host, Integer.toString(port)};
-    ProcessBuilder builder = new ProcessBuilder();
-    builder.command(runCommand);
-    builder.directory(new File("./src/test/python/pg8000"));
-    Process process = builder.start();
-    Scanner scanner = new Scanner(process.getInputStream());
-    Scanner errorScanner = new Scanner(process.getErrorStream());
+  @BeforeClass
+  public static void createVirtualEnv() throws Exception {
+    PythonTestUtil.createVirtualEnv(DIRECTORY_NAME);
+  }
 
-    StringBuilder output = new StringBuilder();
-    while (scanner.hasNextLine()) {
-      output.append(scanner.nextLine()).append("\n");
-    }
-    StringBuilder error = new StringBuilder();
-    while (errorScanner.hasNextLine()) {
-      error.append(errorScanner.nextLine()).append("\n");
-    }
-    int result = process.waitFor();
-    assertEquals(error.toString(), 0, result);
-
-    return output.toString();
+  static String execute(String script, String host, int port) throws Exception {
+    File directory = new File(DIRECTORY_NAME);
+    // Make sure to run the python executable in the specific virtual environment.
+    return run(
+        new String[] {
+          directory.getAbsolutePath() + "/venv/bin/python3", script, host, Integer.toString(port)
+        },
+        DIRECTORY_NAME);
   }
 
   @Test
-  public void testBasicSelect() throws IOException, InterruptedException {
+  public void testBasicSelect() throws Exception {
     String sql = "SELECT 1";
 
     String actualOutput = execute("select1.py", host, pgServer.getLocalPort());
@@ -102,7 +95,7 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testSelectAllTypes() throws IOException, InterruptedException {
+  public void testSelectAllTypes() throws Exception {
     String sql = "SELECT * FROM all_types";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
@@ -110,12 +103,17 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
     String expectedOutput =
         "row: [1, True, b'test', 3.14, 100, Decimal('6.626'), "
             + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), "
-            + "datetime.date(2022, 3, 29), 'test', {'key': 'value'}]\n";
+            + "datetime.date(2022, 3, 29), 'test', {'key': 'value'}, "
+            + "[1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14, None, -99.99], "
+            + "[-100, None, -200], [Decimal('6.626'), None, Decimal('-3.14')], "
+            + "[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=datetime.timezone.utc), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)], "
+            + "[datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)], "
+            + "['string1', None, 'string2'], [{'key': 'value1'}, None, {'key': 'value2'}]]\n";
     assertEquals(expectedOutput, actualOutput.replace("tzlocal()", "tzutc()"));
   }
 
   @Test
-  public void testSelectParameterized() throws IOException, InterruptedException {
+  public void testSelectParameterized() throws Exception {
     String sql = "SELECT * FROM all_types WHERE col_bigint=$1";
     mockSpanner.putStatementResult(StatementResult.query(Statement.of(sql), ALL_TYPES_RESULTSET));
 
@@ -123,10 +121,20 @@ public class Pg8000BasicsTest extends AbstractMockServerTest {
     String expectedOutput =
         "first execution: [1, True, b'test', 3.14, 100, Decimal('6.626'), "
             + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), "
-            + "datetime.date(2022, 3, 29), 'test', {'key': 'value'}]\n"
+            + "datetime.date(2022, 3, 29), 'test', {'key': 'value'}, "
+            + "[1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14, None, -99.99], "
+            + "[-100, None, -200], [Decimal('6.626'), None, Decimal('-3.14')], "
+            + "[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=datetime.timezone.utc), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)], "
+            + "[datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)], "
+            + "['string1', None, 'string2'], [{'key': 'value1'}, None, {'key': 'value2'}]]\n"
             + "second execution: [1, True, b'test', 3.14, 100, Decimal('6.626'), "
             + "datetime.datetime(2022, 2, 16, 13, 18, 2, 123456, tzinfo=datetime.timezone.utc), "
-            + "datetime.date(2022, 3, 29), 'test', {'key': 'value'}]\n";
+            + "datetime.date(2022, 3, 29), 'test', {'key': 'value'}, "
+            + "[1, None, 2], [True, None, False], [b'bytes1', None, b'bytes2'], [3.14, None, -99.99], "
+            + "[-100, None, -200], [Decimal('6.626'), None, Decimal('-3.14')], "
+            + "[datetime.datetime(2022, 2, 16, 16, 18, 2, 123456, tzinfo=datetime.timezone.utc), None, datetime.datetime(2000, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)], "
+            + "[datetime.date(2023, 2, 20), None, datetime.date(2000, 1, 1)], "
+            + "['string1', None, 'string2'], [{'key': 'value1'}, None, {'key': 'value2'}]]\n";
     assertEquals(expectedOutput, actualOutput);
 
     List<WireMessage> messages = getWireMessages();

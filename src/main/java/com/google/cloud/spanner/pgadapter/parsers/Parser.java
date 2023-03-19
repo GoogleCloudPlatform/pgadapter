@@ -15,9 +15,7 @@
 package com.google.cloud.spanner.pgadapter.parsers;
 
 import com.google.api.core.InternalApi;
-import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.Type;
 import com.google.cloud.spanner.Type.Code;
@@ -96,10 +94,69 @@ public abstract class Parser<T> {
         return new TimestampParser(item, formatCode, sessionState);
       case Oid.JSONB:
         return new JsonbParser(item, formatCode);
+
+      case Oid.BOOL_ARRAY:
+      case Oid.BYTEA_ARRAY:
+      case Oid.DATE_ARRAY:
+      case Oid.FLOAT4_ARRAY:
+      case Oid.FLOAT8_ARRAY:
+      case Oid.INT2_ARRAY:
+      case Oid.INT4_ARRAY:
+      case Oid.INT8_ARRAY:
+      case Oid.NUMERIC_ARRAY:
+      case Oid.TEXT_ARRAY:
+      case Oid.VARCHAR_ARRAY:
+      case Oid.UUID_ARRAY:
+      case Oid.TIMESTAMP_ARRAY:
+      case Oid.TIMESTAMPTZ_ARRAY:
+      case Oid.JSONB_ARRAY:
+        int elementOid = getArrayElementOid(oidType);
+        return new ArrayParser(item, formatCode, sessionState, toType(elementOid), elementOid);
+
       case Oid.UNSPECIFIED:
-        return new UnspecifiedParser(item, formatCode);
       default:
-        throw new IllegalArgumentException("Unsupported parameter type: " + oidType);
+        // Use the UnspecifiedParser for unknown types. This will encode the parameter value as a
+        // string and send it to Spanner without any type information. This will ensure that clients
+        // that for example send char instead of varchar as the type code for a parameter would
+        // still work.
+        return new UnspecifiedParser(item, formatCode);
+    }
+  }
+
+  static int getArrayElementOid(int arrayOid) {
+    switch (arrayOid) {
+      case Oid.BOOL_ARRAY:
+        return Oid.BOOL;
+      case Oid.BYTEA_ARRAY:
+        return Oid.BYTEA;
+      case Oid.DATE_ARRAY:
+        return Oid.DATE;
+      case Oid.FLOAT4_ARRAY:
+        return Oid.FLOAT4;
+      case Oid.FLOAT8_ARRAY:
+        return Oid.FLOAT8;
+      case Oid.INT2_ARRAY:
+        return Oid.INT2;
+      case Oid.INT4_ARRAY:
+        return Oid.INT4;
+      case Oid.INT8_ARRAY:
+        return Oid.INT8;
+      case Oid.NUMERIC_ARRAY:
+        return Oid.NUMERIC;
+      case Oid.TEXT_ARRAY:
+        return Oid.TEXT;
+      case Oid.VARCHAR_ARRAY:
+        return Oid.VARCHAR;
+      case Oid.UUID_ARRAY:
+        return Oid.UUID;
+      case Oid.TIMESTAMP_ARRAY:
+        return Oid.TIMESTAMP;
+      case Oid.TIMESTAMPTZ_ARRAY:
+        return Oid.TIMESTAMPTZ;
+      case Oid.JSONB_ARRAY:
+        return Oid.JSONB;
+      default:
+        return Oid.UNSPECIFIED;
     }
   }
 
@@ -220,7 +277,7 @@ public abstract class Parser<T> {
           case BYTES:
             return Oid.BYTEA_ARRAY;
           case TIMESTAMP:
-            return Oid.TIMESTAMP_ARRAY;
+            return Oid.TIMESTAMPTZ_ARRAY;
           case DATE:
             return Oid.DATE_ARRAY;
           case NUMERIC:
@@ -228,17 +285,71 @@ public abstract class Parser<T> {
           case ARRAY:
           case STRUCT:
           default:
-            throw SpannerExceptionFactory.newSpannerException(
-                ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown array type: " + type);
+            throw PGExceptionFactory.newPGException(
+                "Unsupported or unknown array type: " + type, SQLState.InternalError);
         }
       case NUMERIC:
       case JSON:
       case STRUCT:
       default:
-        throw SpannerExceptionFactory.newSpannerException(
-            ErrorCode.INVALID_ARGUMENT, "Unsupported or unknown type: " + type);
+        throw PGExceptionFactory.newPGException(
+            "Unsupported or unknown type: " + type, SQLState.InternalError);
     }
   }
+
+  public static Type toType(int oid) {
+    switch (oid) {
+      case Oid.BOOL:
+      case Oid.BIT:
+        return Type.bool();
+      case Oid.BYTEA:
+      case Oid.BIT_ARRAY:
+        return Type.bytes();
+      case Oid.DATE:
+        return Type.date();
+      case Oid.FLOAT4:
+      case Oid.FLOAT8:
+        return Type.float64();
+      case Oid.INT2:
+      case Oid.INT4:
+      case Oid.INT8:
+        return Type.int64();
+      case Oid.NUMERIC:
+        return Type.pgNumeric();
+      case Oid.TEXT:
+      case Oid.VARCHAR:
+      case Oid.UUID:
+        return Type.string();
+      case Oid.TIMESTAMP:
+      case Oid.TIMESTAMPTZ:
+        return Type.timestamp();
+      case Oid.JSONB:
+        return Type.pgJsonb();
+
+      case Oid.BOOL_ARRAY:
+      case Oid.BYTEA_ARRAY:
+      case Oid.DATE_ARRAY:
+      case Oid.FLOAT4_ARRAY:
+      case Oid.FLOAT8_ARRAY:
+      case Oid.INT2_ARRAY:
+      case Oid.INT4_ARRAY:
+      case Oid.INT8_ARRAY:
+      case Oid.NUMERIC_ARRAY:
+      case Oid.TEXT_ARRAY:
+      case Oid.VARCHAR_ARRAY:
+      case Oid.UUID_ARRAY:
+      case Oid.TIMESTAMP_ARRAY:
+      case Oid.TIMESTAMPTZ_ARRAY:
+      case Oid.JSONB_ARRAY:
+        return Type.array(toType(getArrayElementOid(oid)));
+
+      case Oid.UNSPECIFIED:
+      default:
+        throw PGExceptionFactory.newPGException(
+            "Unsupported or unknown OID: " + oid, SQLState.InvalidParameterValue);
+    }
+  }
+
   /**
    * Translates the given Cloud Spanner {@link Type} to a PostgreSQL OID constant.
    *

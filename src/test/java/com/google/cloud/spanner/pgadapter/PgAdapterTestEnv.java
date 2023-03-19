@@ -108,7 +108,7 @@ public class PgAdapterTestEnv {
   // Default Spanner url. Null indicates that the default URL should be used.
   static final String DEFAULT_SPANNER_URL = null;
 
-  static final ImmutableList<String> DEFAULT_DATA_MODEL =
+  public static final ImmutableList<String> DEFAULT_DATA_MODEL =
       ImmutableList.of(
           "create table numbers (num int not null primary key, name varchar(100))",
           "create table all_types ("
@@ -121,7 +121,21 @@ public class PgAdapterTestEnv {
               + "col_timestamptz timestamptz, "
               + "col_date date, "
               + "col_varchar varchar(100), "
-              + "col_jsonb jsonb)");
+              + "col_jsonb jsonb, "
+              + "col_array_bigint bigint[], "
+              + "col_array_bool bool[], "
+              + "col_array_bytea bytea[], "
+              + "col_array_float8 float8[], "
+              + "col_array_int int[], "
+              + "col_array_numeric numeric[], "
+              + "col_array_timestamptz timestamptz[], "
+              + "col_array_date date[], "
+              + "col_array_varchar varchar(100)[], "
+              + "col_array_jsonb jsonb[])");
+
+  public static ImmutableList<String> getOnlyAllTypesDdl() {
+    return DEFAULT_DATA_MODEL.subList(1, 2);
+  }
 
   // The project Id. This can be overwritten.
   private String projectId;

@@ -461,4 +461,41 @@ public class SimpleParserTest {
   public void testUnescapeQuotedStringValue() {
     assertEquals("'", unescapeQuotedStringValue("'\\''", '\''));
   }
+
+  @Test
+  public void testParserTableOrIndexName() {
+    assertEquals(TableOrIndexName.of("foo"), TableOrIndexName.parse("foo"));
+    assertEquals(
+        TableOrIndexName.of(/* schema= */ "foo", /* name= */ "bar"),
+        TableOrIndexName.parse("foo.bar"));
+
+    assertThrows(IllegalArgumentException.class, () -> TableOrIndexName.parse(""));
+    assertThrows(IllegalArgumentException.class, () -> TableOrIndexName.parse("foo.bar baz"));
+  }
+
+  @Test
+  public void testReadArrayLiteral() {
+    assertEquals(ImmutableList.of(), SimpleParser.readArrayLiteral("{}", true));
+    assertEquals(ImmutableList.of("foo"), SimpleParser.readArrayLiteral("{\"foo\"}", true));
+    assertEquals(
+        ImmutableList.of("foo", "bar"), SimpleParser.readArrayLiteral("{\"foo\", \"bar\"}", true));
+    assertEquals(
+        Arrays.asList("foo", "bar", null),
+        SimpleParser.readArrayLiteral("{\"foo\", \"bar\", null}", true));
+    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("{1, 2}", true));
+    assertEquals(ImmutableList.of("1", "2"), SimpleParser.readArrayLiteral("{\"1\", \"2\"}", true));
+    assertEquals(
+        ImmutableList.of("{\"foo\": \"bar\"}"),
+        SimpleParser.readArrayLiteral("{\"{\\\"foo\\\": \\\"bar\\\"}\"}", true));
+
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("1, 2", true));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("{1, 2", true));
+    assertThrows(PGException.class, () -> SimpleParser.readArrayLiteral("1, 2}", true));
+    assertThrows(
+        PGException.class, () -> SimpleParser.readArrayLiteral("{1, 2} extra token", true));
+
+    assertEquals(ImmutableList.of("foo", "bar"), SimpleParser.readArrayLiteral("{foo, bar}", true));
+    assertEquals(
+        ImmutableList.of("foo 1", "bar 2"), SimpleParser.readArrayLiteral("{foo 1, bar 2}", true));
+  }
 }

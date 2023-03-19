@@ -14,8 +14,7 @@
 
 package com.google.cloud.spanner.pgadapter.statements;
 
-import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.isCommand;
-import static com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage.COPY;
+import static com.google.cloud.spanner.pgadapter.error.PGExceptionFactory.toPGException;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.ByteArray;
@@ -29,7 +28,6 @@ import com.google.cloud.spanner.Partition;
 import com.google.cloud.spanner.PartitionOptions;
 import com.google.cloud.spanner.ReadContext.QueryAnalyzeMode;
 import com.google.cloud.spanner.ResultSet;
-import com.google.cloud.spanner.ResultSets;
 import com.google.cloud.spanner.Spanner;
 import com.google.cloud.spanner.SpannerBatchUpdateException;
 import com.google.cloud.spanner.SpannerException;
@@ -58,12 +56,14 @@ import com.google.cloud.spanner.pgadapter.statements.DdlExecutor.NotExecuted;
 import com.google.cloud.spanner.pgadapter.statements.SessionStatementParser.SessionStatement;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.statements.local.LocalStatement;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.CopyDataReceiver;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.ReadyResponse.Status;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
@@ -86,6 +86,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -135,7 +136,7 @@ public class BackendConnection {
   }
 
   static <T> PGException setAndReturn(SettableFuture<T> future, Throwable throwable) {
-    PGException pgException = PGExceptionFactory.toPGException(throwable);
+    PGException pgException = toPGException(throwable);
     future.setException(pgException);
     return pgException;
   }
@@ -158,6 +159,8 @@ public class BackendConnection {
     boolean isBatchingPossible() {
       return false;
     }
+
+    abstract boolean isUpdate();
 
     abstract void execute();
 
@@ -197,6 +200,11 @@ public class BackendConnection {
     }
 
     @Override
+    boolean isUpdate() {
+      return this.parsedStatement.isUpdate();
+    }
+
+    @Override
     void execute() {
       Statement updatedStatement = statement;
       try {
@@ -207,9 +215,10 @@ public class BackendConnection {
         //  block always ends with a ROLLBACK, PGAdapter should skip the entire execution of that
         //  block.
         SessionStatement sessionStatement = getSessionManagementStatement(parsedStatement);
-        if (!localStatements.isEmpty() && localStatements.containsKey(statement.getSql())) {
+        if (!localStatements.get().isEmpty()
+            && localStatements.get().containsKey(statement.getSql())) {
           result.set(
-              Objects.requireNonNull(localStatements.get(statement.getSql()))
+              Objects.requireNonNull(localStatements.get().get(statement.getSql()))
                   .execute(BackendConnection.this));
         } else if (sessionStatement != null) {
           result.set(sessionStatement.execute(sessionState));
@@ -251,8 +260,9 @@ public class BackendConnection {
         } else {
           // Potentially replace pg_catalog table references with common table expressions.
           updatedStatement =
-              sessionState.isReplacePgCatalogTables()
-                  ? pgCatalog.replacePgCatalogTables(statement)
+              parsedStatement.getType() != StatementType.CLIENT_SIDE
+                      && sessionState.isReplacePgCatalogTables()
+                  ? pgCatalog.get().replacePgCatalogTables(statement)
                   : statement;
           updatedStatement = bindStatement(updatedStatement);
           result.set(analyzeOrExecute(updatedStatement));
@@ -371,13 +381,18 @@ public class BackendConnection {
     }
   }
 
-  private static final int MAX_PARTITIONS =
+  public static final int MAX_PARTITIONS =
       Math.max(16, 2 * Runtime.getRuntime().availableProcessors());
 
   private final class CopyOut extends BufferedStatement<StatementResult> {
 
     CopyOut(ParsedStatement parsedStatement, Statement statement) {
       super(parsedStatement, statement);
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
     }
 
     @Override
@@ -400,9 +415,14 @@ public class BackendConnection {
               // No need for the extra complexity of a partitioned query.
               result.set(spannerConnection.execute(statement));
             } else {
+              // Get the metadata of the query, so we can include that in the result.
+              ResultSet metadataResultSet =
+                  spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
               result.set(
                   new PartitionQueryResult(
-                      batchReadOnlyTransaction.getBatchTransactionId(), partitions));
+                      batchReadOnlyTransaction.getBatchTransactionId(),
+                      partitions,
+                      metadataResultSet));
             }
           } catch (SpannerException spannerException) {
             // The query might not be suitable for partitioning. Just try with a normal query.
@@ -446,6 +466,11 @@ public class BackendConnection {
     }
 
     @Override
+    boolean isUpdate() {
+      return true;
+    }
+
+    @Override
     void execute() {
       try {
         checkConnectionState();
@@ -476,12 +501,63 @@ public class BackendConnection {
     }
   }
 
+  private final class Vacuum extends BufferedStatement<StatementResult> {
+    final VacuumStatement vacuumStatement;
+
+    Vacuum(VacuumStatement vacuumStatement) {
+      super(vacuumStatement.parsedStatement, vacuumStatement.originalStatement);
+      this.vacuumStatement = vacuumStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void execute() {
+      try {
+        checkConnectionState();
+        if (spannerConnection.isInTransaction()) {
+          throw PGExceptionFactory.newPGException(
+              "VACUUM cannot run inside a transaction block", SQLState.ActiveSqlTransaction);
+        }
+        for (TableOrIndexName table : vacuumStatement.getTables()) {
+          ImmutableList<TableOrIndexName> columns = vacuumStatement.getTableColumns(table);
+          Statement statement;
+          if (columns == null || columns.isEmpty()) {
+            statement = Statement.of("select * from " + table + " limit 1");
+          } else {
+            statement =
+                Statement.of(
+                    "select "
+                        + columns.stream().map(c -> c.name).collect(Collectors.joining(","))
+                        + " from "
+                        + table
+                        + " limit 1");
+          }
+          // Just analyze the query to ensure the table and column names are valid.
+          spannerConnection.analyzeQuery(statement, QueryAnalyzeMode.PLAN);
+        }
+        result.set(NO_RESULT);
+      } catch (Exception exception) {
+        result.setException(toPGException(exception));
+        throw exception;
+      }
+    }
+  }
+
   private final class Truncate extends BufferedStatement<StatementResult> {
     final TruncateStatement truncateStatement;
 
     Truncate(TruncateStatement truncateStatement) {
       super(truncateStatement.parsedStatement, truncateStatement.originalStatement);
       this.truncateStatement = truncateStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return true;
     }
 
     @Override
@@ -513,6 +589,67 @@ public class BackendConnection {
     }
   }
 
+  private final class Savepoint extends BufferedStatement<StatementResult> {
+    private final SavepointStatement savepointStatement;
+
+    Savepoint(SavepointStatement savepointStatement) {
+      super(savepointStatement.parsedStatement, savepointStatement.originalStatement);
+      this.savepointStatement = savepointStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void execute() {
+      result.set(NO_RESULT);
+    }
+  }
+
+  private final class Release extends BufferedStatement<StatementResult> {
+    private final ReleaseStatement releaseStatement;
+
+    Release(ReleaseStatement releaseStatement) {
+      super(releaseStatement.parsedStatement, releaseStatement.originalStatement);
+      this.releaseStatement = releaseStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void execute() {
+      result.set(NO_RESULT);
+    }
+  }
+
+  private final class RollbackTo extends BufferedStatement<StatementResult> {
+    private final RollbackToStatement rollbackToStatement;
+
+    RollbackTo(RollbackToStatement rollbackToStatement) {
+      super(rollbackToStatement.parsedStatement, rollbackToStatement.originalStatement);
+      this.rollbackToStatement = rollbackToStatement;
+    }
+
+    @Override
+    boolean isUpdate() {
+      return false;
+    }
+
+    @Override
+    void execute() {
+      throw setAndReturn(
+          result,
+          PGExceptionFactory.newPGException(
+              "Statement 'ROLLBACK [WORK | TRANSACTION] TO [SAVEPOINT] savepoint_name' is not supported",
+              SQLState.FeatureNotSupported));
+    }
+  }
+
   private static final ImmutableMap<String, LocalStatement> EMPTY_LOCAL_STATEMENTS =
       ImmutableMap.of();
   private static final StatementResult NO_RESULT = new NoResult();
@@ -520,8 +657,8 @@ public class BackendConnection {
   private static final Statement ROLLBACK = Statement.of("ROLLBACK");
 
   private final SessionState sessionState;
-  private final PgCatalog pgCatalog;
-  private final ImmutableMap<String, LocalStatement> localStatements;
+  private final Supplier<PgCatalog> pgCatalog;
+  private final Supplier<ImmutableMap<String, LocalStatement>> localStatements;
   private ConnectionState connectionState = ConnectionState.IDLE;
   private TransactionMode transactionMode = TransactionMode.IMPLICIT;
   private final String currentSchema = "public";
@@ -534,24 +671,31 @@ public class BackendConnection {
   BackendConnection(
       DatabaseId databaseId,
       Connection spannerConnection,
+      Supplier<WellKnownClient> wellKnownClient,
       OptionsMetadata optionsMetadata,
-      ImmutableList<LocalStatement> localStatements) {
+      Supplier<ImmutableList<LocalStatement>> localStatements) {
     this.sessionState = new SessionState(optionsMetadata);
-    this.pgCatalog = new PgCatalog(this.sessionState);
+    this.pgCatalog =
+        Suppliers.memoize(
+            () -> new PgCatalog(BackendConnection.this.sessionState, wellKnownClient.get()));
     this.spannerConnection = spannerConnection;
     this.databaseId = databaseId;
     this.ddlExecutor = new DdlExecutor(databaseId, this);
-    if (localStatements.isEmpty()) {
-      this.localStatements = EMPTY_LOCAL_STATEMENTS;
-    } else {
-      Builder<String, LocalStatement> builder = ImmutableMap.builder();
-      for (LocalStatement localStatement : localStatements) {
-        for (String sql : localStatement.getSql()) {
-          builder.put(new SimpleImmutableEntry<>(sql, localStatement));
-        }
-      }
-      this.localStatements = builder.build();
-    }
+    this.localStatements =
+        Suppliers.memoize(
+            () -> {
+              if (localStatements.get().isEmpty()) {
+                return EMPTY_LOCAL_STATEMENTS;
+              } else {
+                Builder<String, LocalStatement> builder = ImmutableMap.builder();
+                for (LocalStatement localStatement : localStatements.get()) {
+                  for (String sql : localStatement.getSql()) {
+                    builder.put(new SimpleImmutableEntry<>(sql, localStatement));
+                  }
+                }
+                return builder.build();
+              }
+            });
   }
 
   /** Returns the current connection state. */
@@ -573,7 +717,8 @@ public class BackendConnection {
     return execute.result;
   }
 
-  public Future<StatementResult> analyze(ParsedStatement parsedStatement, Statement statement) {
+  public ListenableFuture<StatementResult> analyze(
+      ParsedStatement parsedStatement, Statement statement) {
     Execute execute = new Execute(parsedStatement, statement, Function.identity(), true);
     bufferedStatements.add(execute);
     return execute.result;
@@ -602,10 +747,34 @@ public class BackendConnection {
     return copyOut.result;
   }
 
+  public Future<StatementResult> execute(VacuumStatement vacuumStatement) {
+    Vacuum vacuum = new Vacuum(vacuumStatement);
+    bufferedStatements.add(vacuum);
+    return vacuum.result;
+  }
+
   public Future<StatementResult> execute(TruncateStatement truncateStatement) {
     Truncate truncate = new Truncate(truncateStatement);
     bufferedStatements.add(truncate);
     return truncate.result;
+  }
+
+  public Future<StatementResult> execute(SavepointStatement savepointStatement) {
+    Savepoint savepoint = new Savepoint(savepointStatement);
+    bufferedStatements.add(savepoint);
+    return savepoint.result;
+  }
+
+  public Future<StatementResult> execute(ReleaseStatement releaseStatement) {
+    Release savepoint = new Release(releaseStatement);
+    bufferedStatements.add(savepoint);
+    return savepoint.result;
+  }
+
+  public Future<StatementResult> execute(RollbackToStatement rollbackToStatement) {
+    RollbackTo savepoint = new RollbackTo(rollbackToStatement);
+    bufferedStatements.add(savepoint);
+    return savepoint.result;
   }
 
   /** Flushes the buffered statements to Spanner. */
@@ -749,6 +918,9 @@ public class BackendConnection {
       connectionState = ConnectionState.ABORTED;
       sessionState.rollback();
       if (spannerConnection.isInTransaction()) {
+        if (spannerConnection.isDmlBatchActive()) {
+          spannerConnection.abortBatch();
+        }
         spannerConnection.setStatementTag(null);
         spannerConnection.execute(ROLLBACK);
       } else if (spannerConnection.isDdlBatchActive()) {
@@ -787,11 +959,26 @@ public class BackendConnection {
     if (spannerConnection.isDdlBatchActive() || spannerConnection.isDmlBatchActive()) {
       return;
     }
+    // Do not start an implicit transaction if all that is in the buffer is a DESCRIBE and an
+    // EXECUTE message for the same statement.
+    if (isSync
+        && bufferedStatements.size() == 2
+        && bufferedStatements.get(0) instanceof Execute
+        && bufferedStatements.get(1) instanceof Execute
+        && ((Execute) bufferedStatements.get(0)).analyze
+        && !((Execute) bufferedStatements.get(1)).analyze
+        && bufferedStatements
+            .get(0)
+            .statement
+            .getSql()
+            .equals(bufferedStatements.get(1).statement.getSql())) {
+      return;
+    }
 
     // We need to start an implicit transaction.
     // Check if a read-only transaction suffices.
     spannerConnection.beginTransaction();
-    if (isSync && !hasDmlOrCopyStatementsAfter(index)) {
+    if (isSync && !hasUpdateStatementsAfter(index)) {
       spannerConnection.setTransactionMode(
           com.google.cloud.spanner.connection.TransactionMode.READ_ONLY_TRANSACTION);
     }
@@ -964,13 +1151,9 @@ public class BackendConnection {
   }
 
   @VisibleForTesting
-  boolean hasDmlOrCopyStatementsAfter(int index) {
+  boolean hasUpdateStatementsAfter(int index) {
     return bufferedStatements.subList(index, bufferedStatements.size()).stream()
-        .anyMatch(
-            statement ->
-                statement.parsedStatement.getType() == StatementType.UPDATE
-                    || statement.parsedStatement.getType() == StatementType.UNKNOWN
-                        && isCommand(COPY, statement.parsedStatement.getSqlWithoutComments()));
+        .anyMatch(BufferedStatement::isUpdate);
   }
 
   private int getStatementCount() {
@@ -1015,6 +1198,9 @@ public class BackendConnection {
     int index = fromIndex;
     try {
       while (index < getStatementCount()) {
+        if (!bufferedStatements.get(index).isBatchingPossible()) {
+          break;
+        }
         StatementType statementType = getStatementType(index);
         if (canBeBatchedTogether(batchType, statementType)) {
           // Send DDL statements to the DdlExecutor instead of executing them directly on the
@@ -1060,6 +1246,9 @@ public class BackendConnection {
       Execute failedExecute = (Execute) bufferedStatements.get(fromIndex + counts.length);
       failedExecute.result.setException(batchUpdateException);
       throw batchUpdateException;
+    } catch (Throwable exception) {
+      bufferedStatements.get(fromIndex).result.setException(exception);
+      throw exception;
     }
     return index - fromIndex;
   }
@@ -1213,10 +1402,15 @@ public class BackendConnection {
   public static final class PartitionQueryResult implements StatementResult {
     private final BatchTransactionId batchTransactionId;
     private final List<Partition> partitions;
+    private final ResultSet metadataResultSet;
 
-    public PartitionQueryResult(BatchTransactionId batchTransactionId, List<Partition> partitions) {
+    public PartitionQueryResult(
+        BatchTransactionId batchTransactionId,
+        List<Partition> partitions,
+        ResultSet metadataResultSet) {
       this.batchTransactionId = batchTransactionId;
       this.partitions = partitions;
+      this.metadataResultSet = metadataResultSet;
     }
 
     public BatchTransactionId getBatchTransactionId() {
@@ -1225,6 +1419,10 @@ public class BackendConnection {
 
     public List<Partition> getPartitions() {
       return partitions;
+    }
+
+    public ResultSet getMetadataResultSet() {
+      return metadataResultSet;
     }
 
     @Override
@@ -1239,7 +1437,7 @@ public class BackendConnection {
 
     @Override
     public ResultSet getResultSet() {
-      return ResultSets.forRows(
+      return ClientSideResultSet.forRows(
           Type.struct(StructField.of("partition", Type.bytes())),
           partitions.stream()
               .map(

@@ -374,6 +374,11 @@ public class SessionState {
     this.transactionSettings = null;
   }
 
+  /** Returns the PostgreSQL version. */
+  public String getServerVersion() {
+    return getStringSetting(null, "server_version", OptionsMetadata.DEFAULT_SERVER_VERSION);
+  }
+
   /**
    * Returns whether transaction statements should be ignored and all statements should be executed
    * in autocommit mode.

@@ -39,6 +39,7 @@ import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.connection.AbstractStatementParser;
 import com.google.cloud.spanner.connection.AbstractStatementParser.ParsedStatement;
 import com.google.cloud.spanner.connection.AbstractStatementParser.StatementType;
@@ -52,6 +53,7 @@ import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.metadata.ConnectionMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
+import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
 import com.google.cloud.spanner.pgadapter.utils.MutationWriter;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.QueryMessage;
@@ -194,7 +196,11 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
-            connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
+            connectionHandler.getDatabaseId(),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            options,
+            () -> EMPTY_LOCAL_STATEMENTS);
 
     assertFalse(intermediateStatement.isExecuted());
     assertEquals("UPDATE", intermediateStatement.getCommand());
@@ -280,7 +286,11 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
-            connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
+            connectionHandler.getDatabaseId(),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            options,
+            () -> EMPTY_LOCAL_STATEMENTS);
 
     intermediateStatement.executeAsync(backendConnection);
     backendConnection.flush();
@@ -315,7 +325,11 @@ public class StatementTest {
             .build();
     BackendConnection backendConnection =
         new BackendConnection(
-            connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
+            connectionHandler.getDatabaseId(),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            options,
+            () -> EMPTY_LOCAL_STATEMENTS);
 
     IntermediatePreparedStatement intermediateStatement =
         new IntermediatePreparedStatement(
@@ -371,8 +385,10 @@ public class StatementTest {
 
     IntermediatePortalStatement portalStatement =
         intermediateStatement.createPortal("", parameters, new ArrayList<>(), new ArrayList<>());
-    assertThrows(
-        IllegalArgumentException.class, () -> portalStatement.bind(Statement.of(sqlStatement)));
+    Statement boundStatement = portalStatement.bind(Statement.of(sqlStatement));
+    assertEquals(
+        Value.untyped(com.google.protobuf.Value.newBuilder().setStringValue("{}").build()),
+        boundStatement.getParameters().get("p1"));
   }
 
   @Test
@@ -416,7 +432,11 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
-            connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
+            connectionHandler.getDatabaseId(),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            options,
+            () -> EMPTY_LOCAL_STATEMENTS);
 
     when(connection.execute(Statement.of(sqlStatement)))
         .thenThrow(
@@ -478,7 +498,11 @@ public class StatementTest {
 
     BackendConnection backendConnection =
         new BackendConnection(
-            DatabaseId.of("p", "i", "d"), connection, options, ImmutableList.of());
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            options,
+            ImmutableList::of);
     statement.executeAsync(backendConnection);
 
     ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -546,7 +570,11 @@ public class StatementTest {
             ImmutableList.of());
     BackendConnection backendConnection =
         new BackendConnection(
-            connectionHandler.getDatabaseId(), connection, options, EMPTY_LOCAL_STATEMENTS);
+            connectionHandler.getDatabaseId(),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            options,
+            () -> EMPTY_LOCAL_STATEMENTS);
 
     intermediateStatement.executeAsync(backendConnection);
 
@@ -567,7 +595,11 @@ public class StatementTest {
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
-            DatabaseId.of("p", "i", "d"), connection, options, ImmutableList.of());
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            options,
+            ImmutableList::of);
 
     byte[] payload = Files.readAllBytes(Paths.get("./src/test/resources/batch-size-test.txt"));
 
@@ -616,7 +648,11 @@ public class StatementTest {
     setupQueryInformationSchemaResults();
     BackendConnection backendConnection =
         new BackendConnection(
-            DatabaseId.of("p", "i", "d"), connection, options, ImmutableList.of());
+            DatabaseId.of("p", "i", "d"),
+            connection,
+            () -> WellKnownClient.UNSPECIFIED,
+            options,
+            ImmutableList::of);
 
     byte[] payload = "1\t'one'\n2".getBytes();
 
@@ -663,7 +699,7 @@ public class StatementTest {
     when(connection.getDatabaseClient()).thenReturn(databaseClient);
     ResultSet spannerType = mock(ResultSet.class);
     when(spannerType.getString("column_name")).thenReturn("key", "value");
-    when(spannerType.getString("data_type")).thenReturn("bigint", "character varying");
+    when(spannerType.getString("spanner_type")).thenReturn("bigint", "character varying");
     when(spannerType.next()).thenReturn(true, true, false);
     when(singleUseReadContext.executeQuery(
             ArgumentMatchers.argThat(
