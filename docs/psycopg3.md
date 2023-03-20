@@ -2,6 +2,12 @@
 
 PGAdapter has experimental support for the [Python psycopg3 driver](https://www.psycopg.org/psycopg3/docs/index.html).
 
+## Sample Application
+
+See this [sample application using psycopg3](../samples/python/psycopg3) for a Python sample
+application that embeds and starts PGAdapter automatically, and then connects to PGAdapter using
+`psycopg3`.
+
 ## Usage
 
 First start PGAdapter:
