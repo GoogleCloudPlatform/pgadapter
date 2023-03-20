@@ -19,6 +19,7 @@ import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.ErrorCode;
 import com.google.cloud.spanner.SpannerException;
 import com.google.cloud.spanner.SpannerExceptionFactory;
+import com.google.cloud.spanner.connection.SpannerPool;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler.QueryMode;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata.TextFormat;
@@ -202,6 +203,10 @@ public class ProxyServer extends AbstractApiService {
     }
     for (ConnectionHandler handler : getConnectionHandlers()) {
       handler.terminate();
+    }
+    try {
+      SpannerPool.closeSpannerPool();
+    } catch (Throwable ignore) {
     }
     notifyStopped();
   }
