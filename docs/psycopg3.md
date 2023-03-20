@@ -69,12 +69,21 @@ psycopg.errors.RaiseException: Unknown statement: DECLARE "my_cursor" CURSOR FOR
 
 ### Nested Transactions
 `psycopg3` implements [nested transactions](https://www.psycopg.org/psycopg3/docs/basic/transactions.html#nested-transactions)
-using `SAVEPOINT`. This feature is currently not supported with PGAdapter.
+using `SAVEPOINT`. This feature is currently not fully supported with PGAdapter:
 
-Creating a nested transaction in `psycopg3` with PGAdapter will cause an error like the following:
+1. Creating a nested transaction in `psycopg3` with PGAdapter will succeed.
+2. If the nested transaction succeeds, the `SAVEPOINT` will be released and the outer transaction
+   can continue as normal.
+3. If the nested transaction fails, `psycopg3` will try to roll back the `SAVEPOINT`. PGAdapter does
+   not support rolling back a `SAVEPOINT` and will return an error. This error will be swallowed by
+   `psycopg3`, which gives the impression that the rollback succeeded. However, trying to use the
+   outer transaction for any further statements will fail.
+
+Rolling back a nested transaction in `psycopg3` with PGAdapter will cause an error like the
+following when the __first statement after the rollback__ is executed:
 
 ```
-psycopg.errors.RaiseException: Unknown statement: SAVEPOINT "_pg3_2"
+current transaction is aborted, commands ignored until end of transaction block
 ```
 
 ## Performance Considerations
