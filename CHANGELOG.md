@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.18.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.2...v0.18.3) (2023-03-20)
+
+
+### Bug Fixes
+
+* close SpannerPool at shutdown ([#734](https://github.com/GoogleCloudPlatform/pgadapter/issues/734)) ([d67a75f](https://github.com/GoogleCloudPlatform/pgadapter/commit/d67a75f4be16db958cfb268277649a62d5e99e7c))
+
+
+### Documentation
+
+* add psycopg3 sample with embedded PGAdapter ([#733](https://github.com/GoogleCloudPlatform/pgadapter/issues/733)) ([0250b21](https://github.com/GoogleCloudPlatform/pgadapter/commit/0250b2165247bbc5ee8a48874822c11f264a9a86))
+* add sample application for JDBC ([#592](https://github.com/GoogleCloudPlatform/pgadapter/issues/592)) ([c1a5635](https://github.com/GoogleCloudPlatform/pgadapter/commit/c1a56358030c97b20d6ff3d774be26b755f837bf))
+* document SQLAlchemy 2.x experimental support ([#728](https://github.com/GoogleCloudPlatform/pgadapter/issues/728)) ([6a40e9e](https://github.com/GoogleCloudPlatform/pgadapter/commit/6a40e9e5a54d161dc44280c4c6a6a7d09cbb2490))
+* pgx sample using embedded PGAdapter ([#732](https://github.com/GoogleCloudPlatform/pgadapter/issues/732)) ([7c95781](https://github.com/GoogleCloudPlatform/pgadapter/commit/7c9578165aebade978054aedd440db4349080d23))
+
 ## [0.18.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.1...v0.18.2) (2023-03-17)
 
 
