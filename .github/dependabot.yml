@@ -43,3 +43,7 @@ updates:
     directory: "/samples/java/liquibase"
     schedule:
       interval: "daily"
+  - package-ecosystem: "pip"
+    directory: "/samples/python/psycopg3"
+    schedule:
+      interval: "daily"
