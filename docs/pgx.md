@@ -1,6 +1,11 @@
 # PGAdapter - pgx Connection Options
 
-PGAdapter supports the [Go pgx driver](https://github.com/jackc/pgx) version 4.15.0 and higher. 
+PGAdapter supports the [Go pgx driver](https://github.com/jackc/pgx) version 4.15.0 and higher.
+
+## Sample Application
+
+See this [sample application using pgx](../samples/golang/pgx) for a Go sample application that
+embeds and starts PGAdapter automatically, and then connects to PGAdapter using `pgx`.
 
 ## Usage
 
