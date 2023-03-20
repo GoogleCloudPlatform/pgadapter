@@ -4,9 +4,9 @@ go 1.17
 
 require (
 	github.com/shopspring/decimal v1.3.1
-	gorm.io/datatypes v1.1.0
-	gorm.io/driver/postgres v1.4.8
-	gorm.io/gorm v1.24.2
+	gorm.io/datatypes v1.1.1
+	gorm.io/driver/postgres v1.5.0
+	gorm.io/gorm v1.24.7-0.20230306060331-85eaf9eeda11
 )
 
 require (
@@ -18,5 +18,5 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
-	gorm.io/driver/mysql v1.4.4 // indirect
+	gorm.io/driver/mysql v1.4.7 // indirect
 )

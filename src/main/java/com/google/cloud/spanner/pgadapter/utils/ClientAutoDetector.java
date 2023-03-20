@@ -20,7 +20,6 @@ import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgAttribute;
-import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgEnum;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCatalogTable;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
@@ -175,7 +174,7 @@ public class ClientAutoDetector {
       }
 
       @Override
-      boolean isClient(ParseMessage parseMessage) {
+      boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
         // pgx uses a relatively unique naming scheme for prepared statements (and uses prepared
         // statements for everything by default).
         return parseMessage.getName() != null && parseMessage.getName().startsWith("lrupsc_");
@@ -184,22 +183,22 @@ public class ClientAutoDetector {
     NPGSQL {
       final ImmutableMap<String, String> tableReplacements =
           ImmutableMap.of(
-              "pg_catalog.pg_attribute",
-              "pg_attribute",
-              "pg_attribute",
-              "pg_attribute",
-              "pg_catalog.pg_enum",
-              "pg_enum",
-              "pg_enum",
-              "pg_enum");
+              "pg_catalog.pg_attribute", "pg_attribute", "pg_attribute", "pg_attribute");
       final ImmutableMap<String, PgCatalogTable> pgCatalogTables =
-          ImmutableMap.of("pg_attribute", new EmptyPgAttribute(), "pg_enum", new EmptyPgEnum());
+          ImmutableMap.of("pg_attribute", new EmptyPgAttribute());
 
       final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
           ImmutableMap.of(
               Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"),
-                  Suppliers.ofInstance("false"),
-              Pattern.compile("proc\\.oid = typ\\.typreceive"), Suppliers.ofInstance("false"));
+              Suppliers.ofInstance("false"),
+              Pattern.compile("proc\\.oid = typ\\.typreceive"),
+              Suppliers.ofInstance("false"),
+              Pattern.compile("WHEN proc\\.proname='array_recv' THEN typ\\.typelem"),
+              Suppliers.ofInstance("WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem"),
+              Pattern.compile(
+                  "WHEN proc\\.proname='array_recv' THEN 'a' ELSE typ\\.typtype END AS typtype"),
+              Suppliers.ofInstance(
+                  "WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype"));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -208,7 +207,7 @@ public class ClientAutoDetector {
       }
 
       @Override
-      boolean isClient(List<Statement> statements) {
+      boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
         // The npgsql client always starts with sending a query that contains multiple statements
         // and that starts with the following prefix.
         return statements.size() == 1
@@ -236,6 +235,36 @@ public class ClientAutoDetector {
         return functionReplacements;
       }
     },
+    SQLALCHEMY2 {
+      final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
+          ImmutableMap.of(
+              Pattern.compile("oid::regtype::text AS regtype"),
+              Suppliers.ofInstance("'' as regtype"),
+              Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
+              Suppliers.ofInstance("WHERE t.typname = \\$1"));
+
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        // SQLAlchemy 2.x does not send enough unique parameters for it to be auto-detected.
+        return false;
+      }
+
+      @Override
+      boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
+        // SQLAlchemy always starts with the following (relatively unique) combination of queries:
+        // 1. 'BEGIN' using the extended query protocol.
+        // 2. 'select pg_catalog.version()' using the simple query protocol.
+        return skippedParseMessages.size() == 1
+            && skippedParseMessages.get(0).getSql().equals("BEGIN")
+            && statements.size() == 1
+            && statements.get(0).getSql().equals("select pg_catalog.version()");
+      }
+
+      @Override
+      public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
+        return functionReplacements;
+      }
+    },
     UNSPECIFIED {
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -245,14 +274,14 @@ public class ClientAutoDetector {
       }
 
       @Override
-      boolean isClient(List<Statement> statements) {
+      boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
         return true;
       }
 
       @Override
-      boolean isClient(ParseMessage parseMessage) {
+      boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
         // Use UNSPECIFIED as default to prevent null checks everywhere and to ease the use of any
         // defaults defined in this enum.
         return true;
@@ -265,11 +294,11 @@ public class ClientAutoDetector {
     @VisibleForTesting
     public void reset() {}
 
-    boolean isClient(List<Statement> statements) {
+    boolean isClient(List<ParseMessage> skippedParseMessages, List<Statement> statements) {
       return false;
     }
 
-    boolean isClient(ParseMessage parseMessage) {
+    boolean isClient(List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
       return false;
     }
 
@@ -332,9 +361,10 @@ public class ClientAutoDetector {
    * Returns the {@link WellKnownClient} that the detector thinks is connected to PGAdapter based on
    * the given list of SQL statements that have been executed.
    */
-  public static @Nonnull WellKnownClient detectClient(List<Statement> statements) {
+  public static @Nonnull WellKnownClient detectClient(
+      List<ParseMessage> skippedParseMessages, List<Statement> statements) {
     for (WellKnownClient client : WellKnownClient.values()) {
-      if (client.isClient(statements)) {
+      if (client.isClient(skippedParseMessages, statements)) {
         return client;
       }
     }
@@ -346,9 +376,10 @@ public class ClientAutoDetector {
    * Returns the {@link WellKnownClient} that the detector thinks is connected to PGAdapter based on
    * the Parse message that has been received.
    */
-  public static @Nonnull WellKnownClient detectClient(ParseMessage parseMessage) {
+  public static @Nonnull WellKnownClient detectClient(
+      List<ParseMessage> skippedParseMessages, ParseMessage parseMessage) {
     for (WellKnownClient client : WellKnownClient.values()) {
-      if (client.isClient(parseMessage)) {
+      if (client.isClient(skippedParseMessages, parseMessage)) {
         return client;
       }
     }

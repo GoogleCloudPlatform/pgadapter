@@ -260,7 +260,8 @@ public class BackendConnection {
         } else {
           // Potentially replace pg_catalog table references with common table expressions.
           updatedStatement =
-              sessionState.isReplacePgCatalogTables()
+              parsedStatement.getType() != StatementType.CLIENT_SIDE
+                      && sessionState.isReplacePgCatalogTables()
                   ? pgCatalog.get().replacePgCatalogTables(statement)
                   : statement;
           updatedStatement = bindStatement(updatedStatement);
