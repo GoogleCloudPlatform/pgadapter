@@ -127,4 +127,4 @@ jobs:
           ENDPOINT: ${{ env.GOOGLE_CLOUD_ENDPOINT }}
         with:
           filename: .github/integration-test-failed-template.md
-          assignees: pratickchokhani, gauravsnj, olavloite
+          assignees: pratickchokhani, olavloite
