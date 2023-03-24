@@ -73,6 +73,12 @@ public class PgCatalog {
               new TableOrIndexName("information_schema", "sequences"),
               new TableOrIndexName(null, "pg_information_schema_sequences"))
           .put(
+              new TableOrIndexName("pg_catalog", "pg_extension"),
+              new TableOrIndexName(null, "pg_extension"))
+          .put(
+              new TableOrIndexName(null, "pg_extension"),
+              new TableOrIndexName(null, "pg_extension"))
+          .put(
               new TableOrIndexName("pg_catalog", "pg_settings"),
               new TableOrIndexName(null, "pg_settings"))
           .put(new TableOrIndexName(null, "pg_settings"), new TableOrIndexName(null, "pg_settings"))
@@ -84,8 +90,10 @@ public class PgCatalog {
           Suppliers.ofInstance("true"),
           Pattern.compile("pg_table_is_visible\\s*\\(.+\\)"),
           Suppliers.ofInstance("true"),
-          Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(true\\)\\)"),
-          Suppliers.ofInstance(" IN ('pg_catalog', 'public')"));
+          Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(\\s*true\\s*\\)\\)"),
+          Suppliers.ofInstance(" IN ('pg_catalog', 'public')"),
+          Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(\\s*false\\s*\\)\\)"),
+          Suppliers.ofInstance(" IN ('public')"));
 
   private final ImmutableSet<String> checkPrefixes;
 
@@ -107,6 +115,7 @@ public class PgCatalog {
           .put(
               new TableOrIndexName(null, "pg_information_schema_sequences"),
               new InformationSchemaSequences())
+          .put(new TableOrIndexName(null, "pg_extension"), new PgExtension())
           .build();
   private final SessionState sessionState;
 
@@ -547,6 +556,21 @@ public class PgCatalog {
     @Override
     public String getTableExpression() {
       return INFORMATION_SCHEMA_SEQUENCES_CTE;
+    }
+  }
+
+  private static class PgExtension implements PgCatalogTable {
+    private static final String PG_EXTENSION_CTE =
+        "pg_extension as (\n"
+            + "select * from ("
+            + "select 0::bigint as oid, ''::varchar as extname, 0::bigint as extowner, "
+            + "0::bigint as extnamespace, false::bool as extrelocatable, ''::varchar as extversion, "
+            + "'{}'::bigint[] as extconfig, '{}'::text[] as extcondition\n"
+            + ") ext where false)";
+
+    @Override
+    public String getTableExpression() {
+      return PG_EXTENSION_CTE;
     }
   }
 }
