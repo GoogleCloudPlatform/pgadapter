@@ -180,7 +180,8 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
           ExecuteSqlRequest request, StreamObserver<PartialResultSet> responseObserver) {
         if (!request.getPartitionToken().isEmpty()) {
           request =
-              request.toBuilder()
+              request
+                  .toBuilder()
                   .setSql(
                       request.getSql()
                           + " - partition "
@@ -308,7 +309,8 @@ public class CopyOutMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of("select * from all_types"),
-            ALL_TYPES_RESULTSET.toBuilder()
+            ALL_TYPES_RESULTSET
+                .toBuilder()
                 .addRows(ALL_TYPES_RESULTSET.getRows(0))
                 .addRows(ALL_TYPES_NULLS_RESULTSET.getRows(0))
                 .build()));

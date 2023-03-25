@@ -143,7 +143,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     Statement statement = Statement.newBuilder(sql).bind("p1").to("baz").build();
 
     ResultSetMetadata metadata =
-        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)).toBuilder()
+        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
+            .toBuilder()
             .setRowType(
                 StructType.newBuilder()
                     .addFields(
@@ -203,7 +204,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
     Statement selectFoo = Statement.newBuilder(sql).bind("p1").to("foo").build();
 
     ResultSetMetadata metadata =
-        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING)).toBuilder()
+        createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
+            .toBuilder()
             .setRowType(
                 StructType.newBuilder()
                     .addFields(
@@ -725,7 +727,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
   public void testInsertAllDataTypesReturning() throws Exception {
     String sql = getInsertAllTypesSql() + " returning *";
     ResultSetMetadata metadata =
-        ALL_TYPES_METADATA.toBuilder()
+        ALL_TYPES_METADATA
+            .toBuilder()
             .setUndeclaredParameters(
                 createParameterTypesMetadata(
                         ImmutableList.of(
@@ -1027,7 +1030,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.of(
                 "select col_bigint, col_bool, col_bytea, col_float8, col_int, col_numeric, col_timestamptz, col_date, col_varchar, col_jsonb from all_types"),
-            ALL_TYPES_RESULTSET.toBuilder()
+            ALL_TYPES_RESULTSET
+                .toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
                 .build()));
 
@@ -1090,7 +1094,8 @@ public class Psycopg3MockServerTest extends AbstractMockServerTest {
                     + "col_array_int, col_array_numeric, col_array_timestamptz, col_array_date, "
                     + "col_array_varchar, col_array_jsonb "
                     + "from all_types"),
-            ALL_TYPES_RESULTSET.toBuilder()
+            ALL_TYPES_RESULTSET
+                .toBuilder()
                 .addAllRows(ALL_TYPES_NULLS_RESULTSET.getRowsList())
                 .build()));
 

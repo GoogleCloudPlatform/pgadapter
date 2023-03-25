@@ -789,7 +789,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     String jdbcSql = "select col_date from all_types where col_date=?";
     String pgSql = "select col_date from all_types where col_date=$1";
     ResultSetMetadata metadata =
-        ALL_TYPES_METADATA.toBuilder()
+        ALL_TYPES_METADATA
+            .toBuilder()
             .setUndeclaredParameters(
                 StructType.newBuilder()
                     .addFields(
@@ -891,7 +892,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     String jdbcSql = "select col_date from all_types where col_date=?";
     String pgSql = "select col_date from all_types where col_date=$1";
     ResultSetMetadata metadata =
-        ALL_TYPES_METADATA.toBuilder()
+        ALL_TYPES_METADATA
+            .toBuilder()
             .setUndeclaredParameters(
                 StructType.newBuilder()
                     .addFields(
@@ -2684,7 +2686,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
             Statement.of(pgSql),
             com.google.spanner.v1.ResultSet.newBuilder()
                 .setMetadata(
-                    ALL_TYPES_METADATA.toBuilder()
+                    ALL_TYPES_METADATA
+                        .toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(
