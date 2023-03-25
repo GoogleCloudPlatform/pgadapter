@@ -11,14 +11,14 @@
 # It's strongly recommended that you check this file into your version control system.
 
 ActiveRecord::Schema[7.0].define(version: 0) do
-  create_table "albums", primary_key: "album_id", id: { type: :string, collation: "" }, comment: "albums", force: :cascade do |t|
-    t.string "title", collation: ""
-    t.string "singer_id", collation: ""
+  create_table "albums", primary_key: "album_id", id: { type: :string, collation: "" }, comment: "create table albums", force: :cascade do |t|
+    t.string "title", null: false, collation: ""
+    t.string "singer_id", null: false, collation: ""
   end
 
-  create_table "singers", primary_key: "singer_id", id: { type: :string, collation: "" }, comment: "singers", force: :cascade do |t|
-    t.string "first_name", collation: ""
-    t.string "last_name", collation: ""
+  create_table "singers", primary_key: "singer_id", id: { type: :string, collation: "" }, comment: "create table singers", force: :cascade do |t|
+    t.string "first_name", null: false, collation: ""
+    t.string "last_name", null: false, collation: ""
   end
 
 end

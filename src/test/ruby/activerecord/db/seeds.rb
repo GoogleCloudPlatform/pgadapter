@@ -6,6 +6,7 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT.
 
+require 'securerandom'
 require_relative '../config/environment.rb'
 require_relative '../models/singer'
 require_relative '../models/album'
@@ -20,10 +21,10 @@ Album.delete_all
 Singer.delete_all
 
 10.times do
-  Singer.create first_name: first_names.sample, last_name: last_names.sample
+  Singer.create singer_id: SecureRandom.uuid, first_name: first_names.sample, last_name: last_names.sample
 end
 
 30.times do
   singer_id = Singer.all.sample.id
-  Album.create title: "#{adjectives.sample} #{nouns.sample}", singer_id: singer_id
+  Album.create album_id: SecureRandom.uuid, title: "#{adjectives.sample} #{nouns.sample}", singer_id: singer_id
 end

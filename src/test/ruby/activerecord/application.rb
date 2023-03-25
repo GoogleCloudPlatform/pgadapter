@@ -6,6 +6,7 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT.
 
+require 'active_record'
 require 'io/console'
 require_relative 'config/environment'
 require_relative 'models/singer'
@@ -23,10 +24,6 @@ class Application
 
     # Execute a query on the singers table.
     query_singers_by_name
-
-    puts ''
-    puts 'Press any key to end the application'
-    STDIN.getch
   end
 
   def self.query_singers
@@ -63,7 +60,8 @@ class Application
     puts "Getting all singers with a last name that starts with 'A'"
 
     last_name = Singer.arel_table['last_name']
-    Singer.where(last_name.matches('A%')).each do |s|
+    # Singer.where("#{last_name.name} LIKE :prefix", prefix: "A%").each do |s|
+    Singer.where(last_name.matches("A%", escape=nil, case_sensitive=true)).each do |s|
       puts "#{s.first_name} #{s.last_name}"
     end
   end

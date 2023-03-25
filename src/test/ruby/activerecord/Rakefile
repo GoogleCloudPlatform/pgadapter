@@ -8,12 +8,24 @@
 
 require_relative 'config/environment'
 require 'sinatra/activerecord/rake'
-# require 'docker'
+
+Bundler.require
+
+ActiveRecord::Base.establish_connection(
+  adapter: 'postgresql',
+  database: 'activerecord',
+  host: ENV['PGHOST'] || 'localhost',
+  port: ENV['PGPORT'] || '5432',
+  username: ENV['PGUSER'],
+  password: ENV['PGPASSWORD'],
+  pool: 5,
+  advisory_locks: false,
+)
 
 desc 'Runs a simple ActiveRecord tutorial for Google Cloud Spanner PostgreSQL.'
 task :run do
   begin
-    sh 'rake db:migrate'
+    # sh 'rake db:migrate'
     sh 'rake db:seed'
     sh 'ruby application.rb'
   end

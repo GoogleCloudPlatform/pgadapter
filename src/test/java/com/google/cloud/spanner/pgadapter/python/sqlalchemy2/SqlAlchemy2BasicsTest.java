@@ -427,9 +427,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
     ResultSet metadataResultSet =
         ResultSet.newBuilder()
             .setMetadata(
-                SELECT1_RESULTSET
-                    .getMetadata()
-                    .toBuilder()
+                SELECT1_RESULTSET.getMetadata().toBuilder()
                     .setUndeclaredParameters(
                         createParameterTypesMetadata(
                                 ImmutableList.of(TypeCode.STRING, TypeCode.STRING))
@@ -446,8 +444,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
                 .bind("p2")
                 .to("Spongebob Squarepants")
                 .build(),
-            metadataResultSet
-                .toBuilder()
+            metadataResultSet.toBuilder()
                 .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
                 .addAllRows(SELECT1_RESULTSET.getRowsList())
                 .build()));
@@ -540,8 +537,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    createMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING))
-                        .toBuilder()
+                    createMetadata(ImmutableList.of(TypeCode.INT64, TypeCode.STRING)).toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(ImmutableList.of(TypeCode.STRING))
                                 .getUndeclaredParameters()))
@@ -679,9 +675,7 @@ public class SqlAlchemy2BasicsTest extends AbstractMockServerTest {
             Statement.of(insertSql),
             ResultSet.newBuilder()
                 .setMetadata(
-                    SELECT1_RESULTSET
-                        .getMetadata()
-                        .toBuilder()
+                    SELECT1_RESULTSET.getMetadata().toBuilder()
                         .setUndeclaredParameters(
                             createParameterTypesMetadata(
                                     ImmutableList.of(TypeCode.STRING, TypeCode.STRING))
