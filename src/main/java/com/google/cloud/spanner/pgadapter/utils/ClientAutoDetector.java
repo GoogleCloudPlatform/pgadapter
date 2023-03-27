@@ -19,7 +19,6 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
-import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgAttribute;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCatalogTable;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
@@ -32,14 +31,12 @@ import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse;
 import com.google.cloud.spanner.pgadapter.wireoutput.NoticeResponse.NoticeSeverity;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ParseMessage;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 import org.postgresql.core.Oid;
@@ -181,23 +178,18 @@ public class ClientAutoDetector {
       }
     },
     NPGSQL {
-      final ImmutableMap<String, String> tableReplacements =
-          ImmutableMap.of(
-              "pg_catalog.pg_attribute", "pg_attribute", "pg_attribute", "pg_attribute");
-      final ImmutableMap<String, PgCatalogTable> pgCatalogTables =
-          ImmutableMap.of("pg_attribute", new EmptyPgAttribute());
-
-      final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
-          ImmutableMap.of(
-              Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"),
-              Suppliers.ofInstance("false"),
-              Pattern.compile("proc\\.oid = typ\\.typreceive"),
-              Suppliers.ofInstance("false"),
-              Pattern.compile("WHEN proc\\.proname='array_recv' THEN typ\\.typelem"),
-              Suppliers.ofInstance("WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem"),
-              Pattern.compile(
-                  "WHEN proc\\.proname='array_recv' THEN 'a' ELSE typ\\.typtype END AS typtype"),
-              Suppliers.ofInstance(
+      final ImmutableList<QueryPartReplacer> functionReplacements =
+          ImmutableList.of(
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"), "false"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("proc\\.oid = typ\\.typreceive"), "false"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("WHEN proc\\.proname='array_recv' THEN typ\\.typelem"),
+                  "WHEN substr(typ.typname, 1, 1)='_' THEN typ.typelem"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile(
+                      "WHEN proc\\.proname='array_recv' THEN 'a' ELSE typ\\.typtype END AS typtype"),
                   "WHEN substr(typ.typname, 1, 1)='_' THEN 'a' ELSE typ.typtype END AS typtype"));
 
       @Override
@@ -221,27 +213,18 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableMap<String, String> getTableReplacements() {
-        return tableReplacements;
-      }
-
-      @Override
-      public ImmutableMap<String, PgCatalogTable> getPgCatalogTables() {
-        return pgCatalogTables;
-      }
-
-      @Override
-      public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
+      public ImmutableList<QueryPartReplacer> getFunctionReplacements() {
         return functionReplacements;
       }
     },
     SQLALCHEMY2 {
-      final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
-          ImmutableMap.of(
-              Pattern.compile("oid::regtype::text AS regtype"),
-              Suppliers.ofInstance("'' as regtype"),
-              Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
-              Suppliers.ofInstance("WHERE t.typname = \\$1"));
+      final ImmutableList<QueryPartReplacer> functionReplacements =
+          ImmutableList.of(
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("oid::regtype::text AS regtype"), "'' as regtype"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("WHERE t\\.oid = to_regtype\\(\\$1\\)"),
+                  "WHERE t.typname = \\$1"));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -261,7 +244,61 @@ public class ClientAutoDetector {
       }
 
       @Override
-      public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
+      public ImmutableList<QueryPartReplacer> getFunctionReplacements() {
+        return functionReplacements;
+      }
+    },
+    RAILS {
+      final ImmutableList<QueryPartReplacer> functionReplacements =
+          ImmutableList.of(
+              RegexQueryPartReplacer.replaceAndStop(
+                  Pattern.compile(
+                      "SELECT\\s+a\\.attname\\s+"
+                          + "FROM\\s+\\(\\s+"
+                          + "SELECT\\s+indrelid\\s*,\\s*indkey\\s*,\\s*generate_subscripts\\s*\\(\\s*indkey\\s*,\\s*1\\)\\s*idx\\s+"
+                          + "FROM\\s+pg_index\\s+"
+                          + "WHERE indrelid\\s*=\\s*'\"?(.+?)\"?'::regclass\\s+"
+                          + "AND indisprimary\\s*"
+                          + "\\)\\s*i\\s+"
+                          + "JOIN\\s+pg_attribute\\s+a\\s+"
+                          + "ON\\s+a\\.attrelid\\s*=\\s*i\\.indrelid\\s+"
+                          + "AND\\s+a\\.attnum\\s*=\\s*i\\.indkey\\[i\\.idx]\\s*"
+                          + "ORDER\\s+BY\\s+i\\.idx"),
+                  "SELECT ic.column_name as attname\n"
+                      + "FROM information_schema.index_columns ic\n"
+                      + "INNER JOIN information_schema.indexes i using (table_catalog, table_schema, table_name, index_name)\n"
+                      + "WHERE ic.table_schema='public' and ic.table_name='$1'\n"
+                      + "AND i.index_type='PRIMARY_KEY'\n"
+                      + "ORDER BY ordinal_position"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile(
+                      "format_type\\s*\\(\\s*a\\.atttypid\\s*,\\s*a\\.atttypmod\\s*\\)"),
+                  "a.spanner_type as format_type"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("pg_get_expr\\s*\\(\\s*d\\.adbin\\s*,\\s*d\\.adrelid\\s*\\)"),
+                  "d.adbin as pg_get_expr"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("col_description\\s*\\(\\s*.+\\s*,\\s*.+\\s*\\)"), "''::varchar"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("'\"(.+?)\"'::regclass"), "'\"public\".\"$1\"'"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile(
+                      "string_agg\\(enum\\.enumlabel, ',' ORDER BY enum\\.enumsortorder\\)"),
+                  "''::varchar"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("(\\s+.+?)\\.oid::regclass::text"),
+                  " replace($1.oid, '\"public\".', '')"));
+
+      @Override
+      boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
+        return parameters.containsKey("application_name")
+            && (parameters.get("application_name").endsWith("rake")
+                || parameters.get("application_name").endsWith(".rb")
+                || parameters.get("application_name").contains("rails"));
+      }
+
+      @Override
+      public ImmutableList<QueryPartReplacer> getFunctionReplacements() {
         return functionReplacements;
       }
     },
@@ -321,8 +358,8 @@ public class ClientAutoDetector {
       return ImmutableMap.of();
     }
 
-    public ImmutableMap<Pattern, Supplier<String>> getFunctionReplacements() {
-      return ImmutableMap.of();
+    public ImmutableList<QueryPartReplacer> getFunctionReplacements() {
+      return ImmutableList.of();
     }
 
     /** Creates specific notice messages for a client after startup. */

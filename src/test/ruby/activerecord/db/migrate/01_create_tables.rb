@@ -10,13 +10,13 @@
 class CreateTables < ActiveRecord::Migration[7.0]
   def change
     create_table :singers, id: false, primary_key: :singer_id do |t|
-      t.string :singer_id, limit: 36, null: false
+      t.string :singer_id, limit: 36, null: false, primary_key: true
       t.string :first_name, limit: 100
       t.string :last_name, limit: 200, null: false
     end
 
     create_table :albums, id: false, primary_key: :album_id do |t|
-      t.string :album_id, limit: 36, null: false
+      t.string :album_id, limit: 36, null: false, primary_key: true
       t.string :title
       # We do not include an index on the foreign key because Cloud Spanner
       # will automatically create a managed index for the foreign key

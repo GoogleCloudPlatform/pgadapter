@@ -20,6 +20,11 @@ import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgEnum;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCollation;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgConstraint;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgIndex;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.NullValue;
@@ -675,13 +680,13 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
 
   private static final Statement SELECT_ENUMS =
       Statement.of(
-          "with pg_enum as (\n"
-              + "select * from (select 0::bigint as oid, 0::bigint as enumtypid, 0.0::float8 as enumsortorder, ''::varchar as enumlabel\n"
-              + ") e where false),\n"
+          "with "
+              + EmptyPgEnum.PG_ENUM_CTE
+              + ",\n"
               + PG_TYPE_PREFIX
               + "\nSELECT\n"
               + "  type.typname AS name,\n"
-              + "  string_agg(enum.enumlabel, ',' ORDER BY enum.enumsortorder) AS value\n"
+              + "  ''::varchar AS value\n"
               + "FROM pg_enum AS enum\n"
               + "JOIN pg_type AS type\n"
               + "  ON (type.oid = enum.enumtypid)\n"
@@ -800,7 +805,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
     return Statement.of(
         String.format(
             "with "
-                + PG_CLASS_PREFIX
+                + EMULATED_PG_CLASS_PREFIX
                 + ",\n"
                 + "pg_namespace as (\n"
                 + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
@@ -821,17 +826,23 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
     return Statement.of(
         String.format(
             "with "
+                + EMULATED_PG_ATTRIBUTE_PREFIX
+                + ",\n"
+                + EMULATED_PG_ATTRDEF_PREFIX
+                + ",\n"
                 + PG_TYPE_PREFIX
+                + ",\n"
+                + PgCollation.PG_COLLATION_CTE
                 + "\n"
-                + "SELECT a.attname, format_type(a.atttypid, a.atttypmod),\n"
-                + "       pg_get_expr(d.adbin, d.adrelid), a.attnotnull, a.atttypid, a.atttypmod,\n"
-                + "       c.collname, col_description(a.attrelid, a.attnum) AS comment,\n"
+                + "SELECT a.attname, a.spanner_type as format_type,\n"
+                + "       d.adbin as pg_get_expr, a.attnotnull, a.atttypid, a.atttypmod,\n"
+                + "       c.collname, ''::varchar AS comment,\n"
                 + "       attgenerated as attgenerated\n"
                 + "  FROM pg_attribute a\n"
                 + "  LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum\n"
                 + "  LEFT JOIN pg_type t ON a.atttypid = t.oid\n"
                 + "  LEFT JOIN pg_collation c ON a.attcollation = c.oid AND a.attcollation <> t.typcollation\n"
-                + " WHERE a.attrelid = '\"%s\"'::regclass\n"
+                + " WHERE a.attrelid = '\"public\".\"%s\"'\n"
                 + "   AND a.attnum > 0 AND NOT a.attisdropped\n"
                 + " ORDER BY a.attnum\n",
             table));
@@ -901,7 +912,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
             Statement.of(
                 String.format(
                     "with "
-                        + PG_CLASS_PREFIX
+                        + EMULATED_PG_CLASS_PREFIX
                         + ",\n"
                         + "pg_namespace as (\n"
                         + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
@@ -932,17 +943,12 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
         StatementResult.query(
             Statement.of(
                 String.format(
-                    "SELECT a.attname\n"
-                        + "  FROM (\n"
-                        + "         SELECT indrelid, indkey, generate_subscripts(indkey, 1) idx\n"
-                        + "           FROM pg_index\n"
-                        + "          WHERE indrelid = '\"%s\"'::regclass\n"
-                        + "            AND indisprimary\n"
-                        + "       ) i\n"
-                        + "  JOIN pg_attribute a\n"
-                        + "    ON a.attrelid = i.indrelid\n"
-                        + "   AND a.attnum = i.indkey[i.idx]\n"
-                        + " ORDER BY i.idx\n",
+                    "SELECT ic.column_name as attname\n"
+                        + "FROM information_schema.index_columns ic\n"
+                        + "INNER JOIN information_schema.indexes i using (table_catalog, table_schema, table_name, index_name)\n"
+                        + "WHERE ic.table_schema='public' and ic.table_name='%s'\n"
+                        + "AND i.index_type='PRIMARY_KEY'\n"
+                        + "ORDER BY ordinal_position\n",
                     table)),
             ResultSet.newBuilder()
                 .setMetadata(
@@ -1141,7 +1147,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
             Statement.of(
                 String.format(
                     "with "
-                        + PG_CLASS_PREFIX
+                        + EMULATED_PG_CLASS_PREFIX
                         + ",\n"
                         + "pg_namespace as (\n"
                         + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
@@ -1180,13 +1186,12 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
             Statement.of(
                 String.format(
                     "with "
-                        + PG_CLASS_PREFIX
+                        + EMULATED_PG_CLASS_PREFIX
                         + ",\n"
-                        + "pg_namespace as (\n"
-                        + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-                        + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-                        + "  from information_schema.schemata\n"
-                        + ")\n"
+                        + PgIndex.PG_INDEX_CTE
+                        + ",\n"
+                        + PgNamespace.PG_NAMESPACE_CTE
+                        + "\n"
                         + "SELECT distinct i.relname, d.indisunique, d.indkey, pg_get_indexdef(d.indexrelid), t.oid,\n"
                         + "                pg_catalog.obj_description(i.oid, 'pg_class') AS comment\n"
                         + "FROM pg_class t\n"
@@ -1245,13 +1250,12 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
             Statement.of(
                 String.format(
                     "with "
-                        + PG_CLASS_PREFIX
+                        + PgConstraint.PG_CONSTRAINT_CTE
                         + ",\n"
-                        + "pg_namespace as (\n"
-                        + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-                        + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-                        + "  from information_schema.schemata\n"
-                        + ")\n"
+                        + EMULATED_PG_CLASS_PREFIX
+                        + ",\n"
+                        + PgNamespace.PG_NAMESPACE_CTE
+                        + "\n"
                         + "            SELECT conname, pg_get_constraintdef(c.oid, true) AS constraintdef, c.convalidated AS valid\n"
                         + "            FROM pg_constraint c\n"
                         + "            JOIN pg_class t ON c.conrelid = t.oid\n"
@@ -1291,14 +1295,14 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
             Statement.of(
                 String.format(
                     "with "
-                        + PG_CLASS_PREFIX
+                        + PgConstraint.PG_CONSTRAINT_CTE
                         + ",\n"
-                        + "pg_namespace as (\n"
-                        + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-                        + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-                        + "  from information_schema.schemata\n"
-                        + ")\n"
-                        + "SELECT t2.oid::regclass::text AS to_table, a1.attname AS column, a2.attname AS primary_key, c.conname AS name, c.confupdtype AS on_update, c.confdeltype AS on_delete, c.convalidated AS valid, c.condeferrable AS deferrable, c.condeferred AS deferred\n"
+                        + EMULATED_PG_CLASS_PREFIX
+                        + ",\n"
+                        + EMULATED_PG_ATTRIBUTE_PREFIX
+                        + ",\n"
+                        + PgNamespace.PG_NAMESPACE_CTE
+                        + "\nSELECT replace( t2.oid, '\"public\".', '') AS to_table, a1.attname AS column, a2.attname AS primary_key, c.conname AS name, c.confupdtype AS on_update, c.confdeltype AS on_delete, c.convalidated AS valid, c.condeferrable AS deferrable, c.condeferred AS deferred\n"
                         + "FROM pg_constraint c\n"
                         + "JOIN pg_class t1 ON c.conrelid = t1.oid\n"
                         + "JOIN pg_class t2 ON c.confrelid = t2.oid\n"

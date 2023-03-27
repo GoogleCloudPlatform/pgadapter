@@ -400,6 +400,22 @@ public class SessionState {
         () -> BooleanParser.toBoolean(setting.getBootVal()));
   }
 
+  /**
+   * Returns the current setting for replacing pg_class tables with common table expressions that
+   * use the object name as OID.
+   */
+  public boolean isEmulatePgClassTables() {
+    PGSetting setting = internalGet(toKey("spanner", "emulate_pg_class_tables"), false);
+    if (setting == null) {
+      return false;
+    }
+    return tryGetFirstNonNull(
+        true,
+        () -> BooleanParser.toBoolean(setting.getSetting()),
+        () -> BooleanParser.toBoolean(setting.getResetVal()),
+        () -> BooleanParser.toBoolean(setting.getBootVal()));
+  }
+
   /** Returns the {@link DdlTransactionMode} that is used for this connection at this time. */
   public DdlTransactionMode getDdlTransactionMode() {
     PGSetting setting = internalGet(toKey("spanner", "ddl_transaction_mode"), false);
