@@ -502,8 +502,8 @@ public class PgCatalog {
       if (sessionState.isEmulatePgClassTables()) {
         return String.format(
             PG_CLASS_CTE,
-            "'\"' || t.table_schema || '\".\"' || t.table_name || '\"'",
-            "'\"' || i.table_schema || '\".\"' || i.index_name || '\"'");
+            "'''\"' || t.table_schema || '\".\"' || t.table_name || '\"'''",
+            "'''\"' || i.table_schema || '\".\"' || i.index_name || '\"'''");
       }
       return String.format(PG_CLASS_CTE, "-1", "-1");
     }
@@ -558,7 +558,7 @@ public class PgCatalog {
 
     public static final String PG_ATTRIBUTE_CTE =
         "pg_attribute as (\n"
-            + "select  '\"' || table_schema || '\".\"' || table_name || '\"' as attrelid,\n"
+            + "select  '''\"' || table_schema || '\".\"' || table_name || '\"''' as attrelid,\n"
             + "        column_name as attname,\n"
             + "        case regexp_replace(c.spanner_type, '\\(.*\\)', '')\n"
             + "            when 'boolean' then 16\n"
@@ -591,7 +591,7 @@ public class PgCatalog {
             + "        (c.column_default is not null or c.generation_expression is not null) as atthasdef,\n"
             + "        false as atthasmissing,'' as attidentity,\n"
             + "        case c.generation_expression is not null when true then 's' else '' end as attgenerated,\n"
-            + "        false as attisdropped, true as attislocal, 0 as attinhcount, 0 as attcollation, '{}'::bigint[] as attacl,\n"
+            + "        false as attisdropped, true as attislocal, 0 as attinhcount, null::bigint as attcollation, '{}'::bigint[] as attacl,\n"
             + "        '{}'::text[] as attoptions, '{}'::text[] as attfdwoptions, null as attmissingval,\n"
             + "        c.spanner_type\n"
             + "from information_schema.columns c\n"
@@ -613,8 +613,8 @@ public class PgCatalog {
 
     public static final String PG_ATTRDEF_CTE =
         "pg_attrdef as (\n"
-            + "select  '\"' || table_schema || '\".\"' || table_name || '\".\"' || column_name || '\"' as oid,\n"
-            + "        '\"' || table_schema || '\".\"' || table_name || '\"' as adrelid,\n"
+            + "select  '''\"' || table_schema || '\".\"' || table_name || '\".\"' || column_name || '\"''' as oid,\n"
+            + "        '''\"' || table_schema || '\".\"' || table_name || '\"''' as adrelid,\n"
             + "        ordinal_position as adnum,\n"
             + "        coalesce(column_default, generation_expression) as adbin\n"
             + "from information_schema.columns c\n"
@@ -631,7 +631,7 @@ public class PgCatalog {
     public static final String PG_CONSTRAINT_CTE =
         "pg_constraint as (\n"
             + "select\n"
-            + "    '\"' || tc.constraint_schema || '\".\"' || tc.constraint_name || '\"' as oid,\n"
+            + "    '''\"' || tc.constraint_schema || '\".\"' || tc.constraint_name || '\"''' as oid,\n"
             + "    tc.constraint_name as conname, 2200 as connamespace,\n"
             + "    case tc.constraint_type\n"
             + "        when 'PRIMARY KEY' then 'p'\n"
@@ -639,9 +639,9 @@ public class PgCatalog {
             + "        when 'FOREIGN KEY' then 'f'\n"
             + "        else ''\n"
             + "    end as contype, false as condeferrable, false as condeferred, true as convalidated,\n"
-            + "    '\"' || tc.table_schema || '\".\"' || tc.table_name || '\"' as conrelid,\n"
+            + "    '''\"' || tc.table_schema || '\".\"' || tc.table_name || '\"''' as conrelid,\n"
             + "    0::bigint as contypid, 0::bigint as conindid, 0::bigint as conparentid,\n"
-            + "    '\"' || uc.table_schema || '\".\"' || uc.table_name || '\"' as confrelid,\n"
+            + "    '''\"' || uc.table_schema || '\".\"' || uc.table_name || '\"''' as confrelid,\n"
             + "    case rc.update_rule\n"
             + "        when 'CASCADE' then 'c'\n"
             + "        when 'NO ACTION' then 'a'\n"
@@ -730,14 +730,14 @@ public class PgCatalog {
   public class PgIndex implements PgCatalogTable {
     public static final String PG_INDEX_CTE =
         "pg_index as (\n"
-            + "select '\"' || i.table_schema || '\".\"' || i.index_name || '\"' as indexrelid,\n"
-            + "       '\"' || i.table_schema || '\".\"' || i.table_name || '\"' as indrelid,\n"
+            + "select '''\"' || i.table_schema || '\".\"' || i.index_name || '\"''' as indexrelid,\n"
+            + "       '''\"' || i.table_schema || '\".\"' || i.table_name || '\"''' as indrelid,\n"
             + "       count(1) as indnatts, sum(case ic.ordinal_position is null when true then 0 else 1 end) as indnkeyatts,\n"
             + "       i.is_unique='YES' as indisunique, i.is_unique='YES' and i.is_null_filtered='NO' as indnullsnotdistinct,\n"
             + "       i.index_type='PRIMARY_KEY' as indisprimary, false as indisexclusion, true as indimmediate,\n"
             + "       false as indisclustered, true as indisvalid, false as indcheckxmin, true as indisready,\n"
-            + "       true as indislive, false as indisreplident, array_agg(c.ordinal_position) as indkey,\n"
-            + "       null::bigint[] as indcollation, null::bigint[] as indclass, null::bigint[] as indoption,"
+            + "       true as indislive, false as indisreplident, string_agg(c.ordinal_position::varchar, ' ') as indkey,\n"
+            + "       ''::varchar as indcollation, ''::varchar as indclass, ''::varchar as indoption,"
             + "       null::varchar as indexprs, i.filter as indpred\n"
             + "from information_schema.indexes i\n"
             + "inner join information_schema.index_columns ic using (table_catalog, table_schema, table_name, index_name)\n"

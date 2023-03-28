@@ -106,9 +106,8 @@ public abstract class AbstractMockServerTest {
   public static final String EMULATED_PG_CLASS_PREFIX =
       String.format(
           PgClass.PG_CLASS_CTE,
-          "'\"' || t.table_schema || '\".\"' || t.table_name || '\"'",
-          "'\"' || i.table_schema || '\".\"' || i.index_name || '\"'");
-
+          "'''\"' || t.table_schema || '\".\"' || t.table_name || '\"'''",
+          "'''\"' || i.table_schema || '\".\"' || i.index_name || '\"'''");
   public static final String EMULATED_PG_ATTRIBUTE_PREFIX = PgAttribute.PG_ATTRIBUTE_CTE;
   public static final String EMULATED_PG_ATTRDEF_PREFIX = PgAttrdef.PG_ATTRDEF_CTE;
 

@@ -16,7 +16,6 @@ package com.google.cloud.spanner.pgadapter.ruby;
 
 import static org.junit.Assert.assertEquals;
 
-import com.google.cloud.spanner.MockSpannerServiceImpl;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.AbstractMockServerTest;
@@ -38,7 +37,6 @@ import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.UUID;
@@ -724,14 +722,14 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
         StatementResult.query(SELECT_EXTENSIONS, SELECT_EXTENSIONS_RESULTSET));
     mockSpanner.putStatementResult(StatementResult.query(SELECT_ENUMS, SELECT_ENUMS_RESULTSET));
   }
-
-  @BeforeClass
-  public static void startMockSpannerAndPgAdapterServers() throws Exception {
-    doStartMockSpannerAndPgAdapterServers(
-        new MockSpannerServiceImpl(),
-        "d",
-        Collections.singleton("-ddl=AutocommitExplicitTransaction"));
-  }
+  //
+  //  @BeforeClass
+  //  public static void startMockSpannerAndPgAdapterServers() throws Exception {
+  //    doStartMockSpannerAndPgAdapterServers(
+  //        new MockSpannerServiceImpl(),
+  //        "d",
+  //        Collections.singleton("-ddl=AutocommitExplicitTransaction"));
+  //  }
 
   public static void createVirtualEnv(String directoryName) throws Exception {
     run(new String[] {"bundle", "install"}, directoryName, ImmutableMap.of());
@@ -842,7 +840,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                 + "  LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum\n"
                 + "  LEFT JOIN pg_type t ON a.atttypid = t.oid\n"
                 + "  LEFT JOIN pg_collation c ON a.attcollation = c.oid AND a.attcollation <> t.typcollation\n"
-                + " WHERE a.attrelid = '\"public\".\"%s\"'\n"
+                + " WHERE a.attrelid = '''\"public\".\"%s\"'''\n"
                 + "   AND a.attnum > 0 AND NOT a.attisdropped\n"
                 + " ORDER BY a.attnum\n",
             table));
@@ -1154,7 +1152,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                         + "        schema_name as nspname, null as nspowner, null as nspacl\n"
                         + "  from information_schema.schemata\n"
                         + ")\n"
-                        + "SELECT pg_catalog.obj_description(c.oid, 'pg_class')\n"
+                        + "SELECT ''::varchar AS obj_description\n"
                         + "FROM pg_class c\n"
                         + "  LEFT JOIN pg_namespace n ON n.oid = c.relnamespace\n"
                         + "WHERE c.relname = '%s'\n"
@@ -1192,8 +1190,8 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                         + ",\n"
                         + PgNamespace.PG_NAMESPACE_CTE
                         + "\n"
-                        + "SELECT distinct i.relname, d.indisunique, d.indkey, pg_get_indexdef(d.indexrelid), t.oid,\n"
-                        + "                pg_catalog.obj_description(i.oid, 'pg_class') AS comment\n"
+                        + "SELECT i.relname, d.indisunique, d.indkey, 'CREATE INDEX ON USING btree ( )'::varchar AS pg_get_indexdef, t.oid,\n"
+                        + "                ''::varchar AS comment\n"
                         + "FROM pg_class t\n"
                         + "INNER JOIN pg_index d ON t.oid = d.indrelid\n"
                         + "INNER JOIN pg_class i ON d.indexrelid = i.oid\n"
@@ -1256,7 +1254,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                         + ",\n"
                         + PgNamespace.PG_NAMESPACE_CTE
                         + "\n"
-                        + "            SELECT conname, pg_get_constraintdef(c.oid, true) AS constraintdef, c.convalidated AS valid\n"
+                        + "            SELECT conname, conbin AS constraintdef, c.convalidated AS valid\n"
                         + "            FROM pg_constraint c\n"
                         + "            JOIN pg_class t ON c.conrelid = t.oid\n"
                         + "            JOIN pg_namespace n ON n.oid = c.connamespace\n"
@@ -1302,7 +1300,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                         + EMULATED_PG_ATTRIBUTE_PREFIX
                         + ",\n"
                         + PgNamespace.PG_NAMESPACE_CTE
-                        + "\nSELECT replace( t2.oid, '\"public\".', '') AS to_table, a1.attname AS column, a2.attname AS primary_key, c.conname AS name, c.confupdtype AS on_update, c.confdeltype AS on_delete, c.convalidated AS valid, c.condeferrable AS deferrable, c.condeferred AS deferred\n"
+                        + "\nSELECT substr( t2.oid, 12, length( t2.oid) - 13) AS to_table, a1.attname AS column, a2.attname AS primary_key, c.conname AS name, c.confupdtype AS on_update, c.confdeltype AS on_delete, c.convalidated AS valid, c.condeferrable AS deferrable, c.condeferred AS deferred\n"
                         + "FROM pg_constraint c\n"
                         + "JOIN pg_class t1 ON c.conrelid = t1.oid\n"
                         + "JOIN pg_class t2 ON c.confrelid = t2.oid\n"

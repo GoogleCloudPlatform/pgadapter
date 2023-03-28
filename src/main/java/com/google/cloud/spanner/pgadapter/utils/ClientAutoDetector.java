@@ -280,14 +280,29 @@ public class ClientAutoDetector {
               RegexQueryPartReplacer.replace(
                   Pattern.compile("col_description\\s*\\(\\s*.+\\s*,\\s*.+\\s*\\)"), "''::varchar"),
               RegexQueryPartReplacer.replace(
-                  Pattern.compile("'\"(.+?)\"'::regclass"), "'\"public\".\"$1\"'"),
+                  Pattern.compile(
+                      "pg_catalog\\.obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)\\s*AS\\s+"),
+                  "''::varchar AS "),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile(
+                      "pg_catalog\\.obj_description\\s*\\(\\s*.+\\s*,\\s*'pg_class'\\s*\\)"),
+                  "''::varchar AS obj_description"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("pg_get_indexdef\\s*\\(.+\\)"),
+                  "'CREATE INDEX ON USING btree ( )'::varchar AS pg_get_indexdef"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("pg_get_constraintdef\\s*\\(.+\\)\\s*AS\\s+"), "conbin AS "),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("'\"(.+?)\"'::regclass"), "'''\"public\".\"$1\"'''"),
               RegexQueryPartReplacer.replace(
                   Pattern.compile(
                       "string_agg\\(enum\\.enumlabel, ',' ORDER BY enum\\.enumsortorder\\)"),
                   "''::varchar"),
               RegexQueryPartReplacer.replace(
                   Pattern.compile("(\\s+.+?)\\.oid::regclass::text"),
-                  " replace($1.oid, '\"public\".', '')"));
+                  " substr($1.oid, 12, length($1.oid) - 13)"),
+              RegexQueryPartReplacer.replace(
+                  Pattern.compile("SELECT\\s+distinct\\s+i\\.relname\\s*,"), "SELECT i.relname,"));
 
       @Override
       boolean isClient(List<String> orderedParameterKeys, Map<String, String> parameters) {
@@ -300,6 +315,13 @@ public class ClientAutoDetector {
       @Override
       public ImmutableList<QueryPartReplacer> getFunctionReplacements() {
         return functionReplacements;
+      }
+
+      @Override
+      public ImmutableMap<String, String> getDefaultParameters() {
+        return ImmutableMap.of(
+            "spanner.emulate_pg_class_tables", "true",
+            "spanner.ddl_transaction_mode", "AutocommitExplicitTransaction");
       }
     },
     UNSPECIFIED {
