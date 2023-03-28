@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
+import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.ResultSetStats;
@@ -149,6 +150,26 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
         ImmutableMap.of("PGHOST", "localhost", "PGPORT", String.valueOf(pgServer.getLocalPort())));
 
     assertEquals(3, mockDatabaseAdmin.getRequests().size());
+    UpdateDatabaseDdlRequest request =
+        (UpdateDatabaseDdlRequest) mockDatabaseAdmin.getRequests().get(2);
+    assertEquals(2, request.getStatementsCount());
+    assertEquals(
+        "CREATE TABLE \"singers\" ("
+            + "\"singer_id\" character varying(36) NOT NULL PRIMARY KEY, "
+            + "\"first_name\" character varying(100), "
+            + "\"last_name\" character varying(200) NOT NULL, "
+            + "\"full_name\" character varying GENERATED ALWAYS AS (coalesce(concat(first_name, ' '::varchar, last_name), last_name)) STORED, "
+            + "\"lock_version\" integer NOT NULL)",
+        request.getStatements(0));
+    assertEquals(
+        "CREATE TABLE \"albums\" ("
+            + "\"album_id\" character varying(36) NOT NULL PRIMARY KEY, "
+            + "\"title\" character varying, \"singer_id\" character varying(36), "
+            + "CONSTRAINT \"fk_rails_df791b93c8\"\n"
+            + "FOREIGN KEY (\"singer_id\")\n"
+            + "  REFERENCES \"singers\" (\"singer_id\")\n"
+            + ")",
+        request.getStatements(1));
   }
 
   @Test

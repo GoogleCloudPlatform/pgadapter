@@ -13,6 +13,8 @@ class CreateTables < ActiveRecord::Migration[7.0]
       t.string :singer_id, limit: 36, null: false, primary_key: true
       t.string :first_name, limit: 100
       t.string :last_name, limit: 200, null: false
+      t.virtual :full_name, type: :string, as: "coalesce(concat(first_name, ' '::varchar, last_name), last_name)", stored: true
+      t.integer :lock_version, null: false
     end
 
     create_table :albums, id: false, primary_key: :album_id do |t|
