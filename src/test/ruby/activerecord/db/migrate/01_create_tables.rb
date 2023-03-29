@@ -14,17 +14,28 @@ class CreateTables < ActiveRecord::Migration[7.0]
       t.string :first_name, limit: 100
       t.string :last_name, limit: 200, null: false
       t.virtual :full_name, type: :string, as: "coalesce(concat(first_name, ' '::varchar, last_name), last_name)", stored: true
+      t.boolean :active
+
+      t.timestamptz :created_at
+      t.timestamptz :updated_at
       t.integer :lock_version, null: false
     end
 
     create_table :albums, id: false, primary_key: :album_id do |t|
       t.string :album_id, limit: 36, null: false, primary_key: true
       t.string :title
+      t.numeric :marketing_budget
+      t.date :release_date
+      t.binary :cover_picture
       # We do not include an index on the foreign key because Cloud Spanner
       # will automatically create a managed index for the foreign key
       # constraint.
       t.references :singer, foreign_key: {primary_key: :singer_id},
                    type: :string, limit: 36, index: false
+
+      t.timestamptz :created_at
+      t.timestamptz :updated_at
+      t.integer :lock_version, null: false
     end
   end
 end

@@ -15,7 +15,9 @@
 package com.google.cloud.spanner.pgadapter.ruby;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
 import com.google.common.collect.ImmutableList;
@@ -23,6 +25,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
+import com.google.spanner.v1.ExecuteSqlRequest;
+import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
 import com.google.spanner.v1.ResultSetMetadata;
 import com.google.spanner.v1.ResultSetStats;
@@ -30,6 +34,7 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
+import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -46,11 +51,26 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     final String singerId;
     String firstName;
     String lastName;
+    boolean active;
+    Timestamp createdAt;
+    Timestamp updatedAt;
+    long version;
 
-    Singer(String singerId, String firstName, String lastName) {
+    Singer(
+        String singerId,
+        String firstName,
+        String lastName,
+        boolean active,
+        Timestamp createdAt,
+        Timestamp updatedAt,
+        long version) {
       this.singerId = singerId;
       this.firstName = firstName;
       this.lastName = lastName;
+      this.active = active;
+      this.createdAt = createdAt;
+      this.updatedAt = updatedAt;
+      this.version = version;
     }
   }
 
@@ -108,32 +128,7 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     addSelectTablesResultWithRelKinds(
         "'r','p'", "ar_internal_metadata", "schema_migrations", "albums", "singers");
     addInsertArInternalMetadataResult("environment", "default_env");
-
-    addSelectColumnsResult(
-        "albums",
-        createColumnRow("album_id", "character varying", true, Oid.VARCHAR),
-        createColumnRow("title", "character varying", true, Oid.VARCHAR),
-        createColumnRow("singer_id", "character varying", true, Oid.VARCHAR));
-    addSelectPrimaryKeyResult("albums", "album_id");
-    addSelectTableDescriptionResult("albums", "create table albums");
-    // TODO: Actually add indexes.
-    addSelectTableIndexesResult("albums");
-    addSelectTableConstraintsResult("albums");
-
-    addSelectColumnsResult(
-        "singers",
-        createColumnRow("singer_id", "character varying", true, Oid.VARCHAR),
-        createColumnRow("first_name", "character varying", true, Oid.VARCHAR),
-        createColumnRow("last_name", "character varying", true, Oid.VARCHAR));
-    addSelectPrimaryKeyResult("singers", "singer_id");
-    addSelectTableDescriptionResult("singers", "create table singers");
-    // TODO: Actually add indexes.
-    addSelectTableIndexesResult("singers");
-    addSelectTableConstraintsResult("singers");
-
-    // TODO: Actually add foreign keys.
-    addSelectTableForeignKeysResult("albums");
-    addSelectTableForeignKeysResult("singers");
+    addSelectSampleTablesResult();
 
     // For initializing the DDL executor.
     addDdlResponseToSpannerAdmin();
@@ -159,12 +154,22 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
             + "\"first_name\" character varying(100), "
             + "\"last_name\" character varying(200) NOT NULL, "
             + "\"full_name\" character varying GENERATED ALWAYS AS (coalesce(concat(first_name, ' '::varchar, last_name), last_name)) STORED, "
+            + "\"active\" boolean, "
+            + "\"created_at\" timestamptz, "
+            + "\"updated_at\" timestamptz, "
             + "\"lock_version\" integer NOT NULL)",
         request.getStatements(0));
     assertEquals(
         "CREATE TABLE \"albums\" ("
             + "\"album_id\" character varying(36) NOT NULL PRIMARY KEY, "
-            + "\"title\" character varying, \"singer_id\" character varying(36), "
+            + "\"title\" character varying, "
+            + "\"marketing_budget\" decimal, "
+            + "\"release_date\" date, "
+            + "\"cover_picture\" bytea, "
+            + "\"singer_id\" character varying(36), "
+            + "\"created_at\" timestamptz, "
+            + "\"updated_at\" timestamptz, "
+            + "\"lock_version\" integer NOT NULL, "
             + "CONSTRAINT \"fk_rails_df791b93c8\"\n"
             + "FOREIGN KEY (\"singer_id\")\n"
             + "  REFERENCES \"singers\" (\"singer_id\")\n"
@@ -175,12 +180,21 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
   @Test
   public void testRakeRun() throws Exception {
     addMigrationsTableResults();
+    addSelectSampleTablesResult();
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.of("DELETE FROM \"albums\""), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.of("DELETE FROM \"singers\""), 0L));
 
-    Singer singer = new Singer(randomUuid(), "some-first-name", "some-last-name");
+    Singer singer =
+        new Singer(
+            randomUuid(),
+            "some-first-name",
+            "some-last-name",
+            true,
+            Timestamp.now(),
+            Timestamp.now(),
+            1);
     addInsertSingerResult(singer, false);
     addSelectSingersResult(ImmutableList.of(singer));
 
@@ -196,7 +210,7 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
 
     singer.firstName = "Dave";
     singer.lastName = "Anderson";
-    addUpdateSingerResult(singer);
+    addUpdateSingerResult(singer, false);
     addSelectSingerResult(singer);
 
     mockSpanner.putStatementResult(
@@ -218,12 +232,34 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
             String.valueOf(pgServer.getLocalPort()),
             "RAILS_ENV",
             "development"));
+
+    List<ExecuteSqlRequest> selectRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(getSelectSingerSql()))
+            .collect(Collectors.toList());
+    assertEquals(2, selectRequests.size());
+    assertTrue(selectRequests.get(0).getTransaction().hasSingleUse());
+    assertEquals(QueryMode.PLAN, selectRequests.get(0).getQueryMode());
+    assertTrue(selectRequests.get(1).getTransaction().hasSingleUse());
+    assertEquals(QueryMode.NORMAL, selectRequests.get(1).getQueryMode());
+
+    List<ExecuteSqlRequest> updateRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().startsWith("UPDATE"))
+            .collect(Collectors.toList());
+    assertEquals(2, updateRequests.size());
+    assertEquals(getUpdateSingerStatement(), updateRequests.get(0).getSql());
+    assertEquals(QueryMode.PLAN, updateRequests.get(0).getQueryMode());
+    assertTrue(updateRequests.get(0).getTransaction().hasBegin());
+    assertEquals(getUpdateSingerStatement(), updateRequests.get(1).getSql());
+    assertEquals(QueryMode.NORMAL, updateRequests.get(1).getQueryMode());
+    assertTrue(updateRequests.get(1).getTransaction().hasId());
   }
 
   static void addInsertSingerResult(Singer singer, boolean exact) {
     String sql =
-        "INSERT INTO \"singers\" (\"singer_id\", \"first_name\", \"last_name\") "
-            + "VALUES ($1, $2, $3) RETURNING \"singer_id\"";
+        "INSERT INTO \"singers\" (\"singer_id\", \"first_name\", \"last_name\", \"active\", \"created_at\", \"updated_at\", \"lock_version\") "
+            + "VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING \"singer_id\"";
     ResultSetMetadata metadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
@@ -251,6 +287,26 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
                             .setName("p3")
                             .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
                             .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p4")
+                            .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p5")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p6")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p7")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                            .build())
                     .build())
             .build();
     mockSpanner.putStatementResult(
@@ -270,6 +326,14 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
                 .to(singer.firstName)
                 .bind("p3")
                 .to(singer.lastName)
+                .bind("p4")
+                .to(singer.active)
+                .bind("p5")
+                .to(singer.createdAt)
+                .bind("p6")
+                .to(singer.updatedAt)
+                .bind("p7")
+                .to(singer.version)
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(metadata)
@@ -300,9 +364,12 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
                 .build()));
   }
 
+  static String getSelectSingerSql() {
+    return "SELECT \"singers\".* FROM \"singers\" WHERE \"singers\".\"singer_id\" = $1 LIMIT $2";
+  }
+
   static void addSelectSingerResult(Singer singer) {
-    String sql =
-        "SELECT \"singers\".* FROM \"singers\" WHERE \"singers\".\"singer_id\" = $1 LIMIT $2";
+    String sql = getSelectSingerSql();
     ResultSetMetadata metadata = createSelectSingerMetadata();
     mockSpanner.putStatementResult(
         StatementResult.query(
@@ -335,6 +402,31 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
                         .setName("last_name")
                         .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
                         .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setName("full_name")
+                        .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setName("active")
+                        .setType(Type.newBuilder().setCode(TypeCode.BOOL).build())
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setName("created_at")
+                        .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setName("updated_at")
+                        .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                        .build())
+                .addFields(
+                    Field.newBuilder()
+                        .setName("lock_version")
+                        .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                        .build())
                 .build())
         .build();
   }
@@ -348,22 +440,38 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
         .addValues(Value.newBuilder().setStringValue(singer.singerId).build())
         .addValues(Value.newBuilder().setStringValue(singer.firstName).build())
         .addValues(Value.newBuilder().setStringValue(singer.lastName).build())
+        .addValues(
+            Value.newBuilder().setStringValue(singer.firstName + " " + singer.lastName).build())
+        .addValues(Value.newBuilder().setBoolValue(singer.active).build())
+        .addValues(Value.newBuilder().setStringValue(singer.createdAt.toString()).build())
+        .addValues(Value.newBuilder().setStringValue(singer.updatedAt.toString()).build())
+        .addValues(Value.newBuilder().setStringValue(String.valueOf(singer.version)).build())
         .build();
   }
 
-  static void addUpdateSingerResult(Singer singer) {
-    String sql =
-        "UPDATE \"singers\" SET \"first_name\" = $1, \"last_name\" = $2 WHERE \"singers\".\"singer_id\" = $3";
+  static String getUpdateSingerStatement() {
+    return "UPDATE \"singers\" SET \"first_name\" = $1, \"last_name\" = $2, \"updated_at\" = $3, \"lock_version\" = $4 "
+        + "WHERE \"singers\".\"singer_id\" = $5 AND \"singers\".\"lock_version\" = $6";
+  }
+
+  static void addUpdateSingerResult(Singer singer, boolean exact) {
+    String sql = getUpdateSingerStatement();
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(sql),
             ResultSet.newBuilder()
                 .setMetadata(
                     createParameterTypesMetadata(
-                        ImmutableList.of(TypeCode.STRING, TypeCode.STRING, TypeCode.STRING)))
+                        ImmutableList.of(
+                            TypeCode.STRING,
+                            TypeCode.STRING,
+                            TypeCode.TIMESTAMP,
+                            TypeCode.INT64,
+                            TypeCode.STRING,
+                            TypeCode.INT64)))
                 .setStats(ResultSetStats.newBuilder().build())
                 .build()));
-    mockSpanner.putStatementResult(
+    StatementResult result =
         StatementResult.update(
             Statement.newBuilder(sql)
                 .bind("p1")
@@ -371,9 +479,20 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
                 .bind("p2")
                 .to(singer.lastName)
                 .bind("p3")
+                .to(singer.updatedAt)
+                .bind("p4")
+                .to(singer.version + 1)
+                .bind("p5")
                 .to(singer.singerId)
+                .bind("p6")
+                .to(singer.version)
                 .build(),
-            1L));
+            1L);
+    if (exact) {
+      mockSpanner.putStatementResult(result);
+    } else {
+      mockSpanner.putPartialStatementResult(result);
+    }
   }
 
   static void addInsertAlbumResult(Album album, boolean exact) {
@@ -519,5 +638,40 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
                         .build())
                 .build())
         .build();
+  }
+
+  static void addSelectSampleTablesResult() {
+    addSelectTablesResult("ar_internal_metadata", "schema_migrations", "albums", "singers");
+
+    addSelectColumnsResult(
+        "singers",
+        createColumnRow("singer_id", "character varying", true, Oid.VARCHAR),
+        createColumnRow("first_name", "character varying", false, Oid.VARCHAR),
+        createColumnRow("last_name", "character varying", true, Oid.VARCHAR),
+        createColumnRow("full_name", "character varying", false, Oid.VARCHAR),
+        createColumnRow("active", "boolean", false, Oid.BOOL),
+        createColumnRow("created_at", "timestamp with time zone", false, Oid.TIMESTAMPTZ),
+        createColumnRow("updated_at", "timestamp with time zone", false, Oid.TIMESTAMPTZ),
+        createColumnRow("lock_version", "bigint", false, Oid.INT8));
+    addSelectPrimaryKeyResult("singers", "singer_id");
+    addSelectTableDescriptionResult("singers", "create table singers");
+    // TODO: Actually add indexes.
+    addSelectTableIndexesResult("singers");
+    addSelectTableConstraintsResult("singers");
+
+    addSelectColumnsResult(
+        "albums",
+        createColumnRow("album_id", "character varying", true, Oid.VARCHAR),
+        createColumnRow("title", "character varying", true, Oid.VARCHAR),
+        createColumnRow("singer_id", "character varying", true, Oid.VARCHAR));
+    addSelectPrimaryKeyResult("albums", "album_id");
+    addSelectTableDescriptionResult("albums", "create table albums");
+    // TODO: Actually add indexes.
+    addSelectTableIndexesResult("albums");
+    addSelectTableConstraintsResult("albums");
+
+    // TODO: Actually add foreign keys.
+    addSelectTableForeignKeysResult("albums");
+    addSelectTableForeignKeysResult("singers");
   }
 }

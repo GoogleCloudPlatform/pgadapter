@@ -17,8 +17,13 @@ ActiveRecord::Schema[7.0].define(version: 0) do
   end
 
   create_table "singers", primary_key: "singer_id", id: { type: :string, collation: "" }, comment: "create table singers", force: :cascade do |t|
-    t.string "first_name", null: false, collation: ""
+    t.string "first_name", collation: ""
     t.string "last_name", null: false, collation: ""
+    t.string "full_name", collation: ""
+    t.boolean "active", collation: ""
+    t.datetime "created_at", precision: nil, collation: ""
+    t.datetime "updated_at", precision: nil, collation: ""
+    t.bigint "lock_version", collation: ""
   end
 
 end

@@ -776,19 +776,6 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
             SELECT_AR_INTERNAL_METADATA_COLUMNS, SELECT_AR_INTERNAL_METADATA_COLUMNS_RESULTSET));
 
     addMigrationResults("1");
-    addSelectTablesResult("ar_internal_metadata", "schema_migrations", "albums", "singers");
-    addSelectPrimaryKeyResult("albums", "album_id");
-    addSelectPrimaryKeyResult("singers", "singer_id");
-    addSelectColumnsResult(
-        "singers",
-        createColumnRow("singer_id", "character varying", true, Oid.VARCHAR),
-        createColumnRow("first_name", "character varying", true, Oid.VARCHAR),
-        createColumnRow("last_name", "character varying", true, Oid.VARCHAR));
-    addSelectColumnsResult(
-        "albums",
-        createColumnRow("album_id", "character varying", true, Oid.VARCHAR),
-        createColumnRow("title", "character varying", true, Oid.VARCHAR),
-        createColumnRow("singer_id", "character varying", true, Oid.VARCHAR));
   }
 
   static Statement getSelectRelNameStatement(String table) {

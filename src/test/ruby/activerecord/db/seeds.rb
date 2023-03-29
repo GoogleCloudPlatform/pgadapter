@@ -21,7 +21,7 @@ Album.delete_all
 Singer.delete_all
 
 10.times do
-  Singer.create singer_id: SecureRandom.uuid, first_name: first_names.sample, last_name: last_names.sample
+  Singer.create singer_id: SecureRandom.uuid, first_name: first_names.sample, last_name: last_names.sample, active: true
 end
 
 30.times do
