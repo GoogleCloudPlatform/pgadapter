@@ -37,5 +37,46 @@ class CreateTables < ActiveRecord::Migration[7.0]
       t.timestamptz :updated_at
       t.integer :lock_version, null: false
     end
+
+    # The ActiveRecord PostgreSQL provider does not know how to create an interleaved table.
+    # These tables must therefore be created using a hand-written SQL script.
+    # Note that interleaved tables require you to use a composite primary key.
+    # This also requires "gem 'composite_primary_keys', '~> 14'" to be part of your project.
+    execute "create table tracks (
+        album_id     varchar(36) not null,
+        track_number bigint not null,
+        title        varchar not null,
+        sample_rate  float8 not null,
+        created_at   timestamptz,
+        updated_at   timestamptz,
+        lock_version bigint not null,
+        primary key (album_id, track_number)
+    ) interleave in parent albums on delete cascade;
+    "
+
+    create_table :venues, id: false, primary_key: :venue_id do |t|
+      t.string :venue_id, limit: 36, null: false, primary_key: true
+      t.string :name
+      t.jsonb :description
+      t.timestamptz :created_at
+      t.timestamptz :updated_at
+      t.integer :lock_version, null: false
+    end
+
+    create_table :concerts, id: false, primary_key: :venue_id do |t|
+      t.string :concert_id, limit: 36, null: false, primary_key: true
+      t.references :venue, foreign_key: {primary_key: :venue_id},
+                   type: :string, limit: 36, index: false
+      t.references :singer, foreign_key: {primary_key: :singer_id},
+                   type: :string, limit: 36, index: false
+      t.string :name
+      t.timestamptz :start_time, null: false
+      t.timestamptz :end_time, null: false
+      t.timestamptz :created_at
+      t.timestamptz :updated_at
+      t.integer :lock_version, null: false
+      t.check_constraint "end_time > start_time", name: :chk_end_time_after_start_time
+    end
+
   end
 end

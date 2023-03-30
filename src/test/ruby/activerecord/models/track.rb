@@ -6,8 +6,8 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT.
 
-# Model for an Album of a Singer.
-class Album < ActiveRecord::Base
-  belongs_to :singer
-  has_many :tracks
+# Model for a Track on an Album.
+class Track < ActiveRecord::Base
+  self.primary_keys = :album_id, :track_number
+  belongs_to :album
 end

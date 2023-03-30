@@ -29,6 +29,11 @@ ActiveRecord::Base.establish_connection(
   username: ENV['PGUSER'],
   password: ENV['PGPASSWORD'],
   pool: 5,
+  # Advisory locks are not supported by PGAdapter
   advisory_locks: false,
-  variables: {'spanner.ddl_transaction_mode': :AutocommitExplicitTransaction},
+  # These settings ensure that migrations and schema inspections work.
+  variables: {
+    "spanner.ddl_transaction_mode": "AutocommitExplicitTransaction",
+    "spanner.emulate_pg_class_tables": "true"
+  },
 )

@@ -13,7 +13,13 @@
 ActiveRecord::Schema[7.0].define(version: 0) do
   create_table "albums", primary_key: "album_id", id: { type: :string, collation: "" }, comment: "create table albums", force: :cascade do |t|
     t.string "title", null: false, collation: ""
+    t.decimal "marketing_budget", collation: ""
+    t.date "release_date", collation: ""
+    t.binary "cover_picture", collation: ""
     t.string "singer_id", null: false, collation: ""
+    t.datetime "created_at", precision: nil, collation: ""
+    t.datetime "updated_at", precision: nil, collation: ""
+    t.bigint "lock_version", collation: ""
   end
 
   create_table "singers", primary_key: "singer_id", id: { type: :string, collation: "" }, comment: "create table singers", force: :cascade do |t|

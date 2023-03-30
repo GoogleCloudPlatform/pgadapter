@@ -17,6 +17,8 @@ package com.google.cloud.spanner.pgadapter.ruby;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.ByteArray;
+import com.google.cloud.Date;
 import com.google.cloud.Timestamp;
 import com.google.cloud.spanner.MockSpannerServiceImpl.StatementResult;
 import com.google.cloud.spanner.Statement;
@@ -25,6 +27,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.ListValue;
 import com.google.protobuf.Value;
 import com.google.spanner.admin.database.v1.UpdateDatabaseDdlRequest;
+import com.google.spanner.v1.CommitRequest;
 import com.google.spanner.v1.ExecuteSqlRequest;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryMode;
 import com.google.spanner.v1.ResultSet;
@@ -34,6 +37,7 @@ import com.google.spanner.v1.StructType;
 import com.google.spanner.v1.StructType.Field;
 import com.google.spanner.v1.Type;
 import com.google.spanner.v1.TypeCode;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.BeforeClass;
@@ -46,15 +50,23 @@ import org.postgresql.core.Oid;
 @Category(RubyTest.class)
 @RunWith(JUnit4.class)
 public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
+  private abstract static class Model {
+    Timestamp createdAt;
+    Timestamp updatedAt;
+    long version;
 
-  private static final class Singer {
+    Model(Timestamp createdAt, Timestamp updatedAt, long version) {
+      this.createdAt = createdAt;
+      this.updatedAt = updatedAt;
+      this.version = version;
+    }
+  }
+
+  private static final class Singer extends Model {
     final String singerId;
     String firstName;
     String lastName;
     boolean active;
-    Timestamp createdAt;
-    Timestamp updatedAt;
-    long version;
 
     Singer(
         String singerId,
@@ -64,25 +76,61 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
         Timestamp createdAt,
         Timestamp updatedAt,
         long version) {
+      super(createdAt, updatedAt, version);
       this.singerId = singerId;
       this.firstName = firstName;
       this.lastName = lastName;
       this.active = active;
-      this.createdAt = createdAt;
-      this.updatedAt = updatedAt;
-      this.version = version;
     }
   }
 
-  private static final class Album {
+  private static final class Album extends Model {
     final String albumId;
     String title;
+    BigDecimal marketingBudget;
+    Date releaseDate;
+    ByteArray coverPicture;
     String singerId;
 
-    Album(String albumId, String title, String singerId) {
+    Album(
+        String albumId,
+        String title,
+        BigDecimal marketingBudget,
+        Date releaseDate,
+        ByteArray coverPicture,
+        String singerId,
+        Timestamp createdAt,
+        Timestamp updatedAt,
+        long version) {
+      super(createdAt, updatedAt, version);
       this.albumId = albumId;
       this.title = title;
+      this.marketingBudget = marketingBudget;
+      this.releaseDate = releaseDate;
+      this.coverPicture = coverPicture;
       this.singerId = singerId;
+    }
+  }
+
+  private static final class Track extends Model {
+    final String albumId;
+    final long trackNumber;
+    String title;
+    Double sampleRate;
+
+    Track(
+        String albumId,
+        long trackNumber,
+        String title,
+        Double sampleRate,
+        Timestamp createdAt,
+        Timestamp updatedAt,
+        long version) {
+      super(createdAt, updatedAt, version);
+      this.albumId = albumId;
+      this.trackNumber = trackNumber;
+      this.title = title;
+      this.sampleRate = sampleRate;
     }
   }
 
@@ -147,7 +195,7 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     assertEquals(3, mockDatabaseAdmin.getRequests().size());
     UpdateDatabaseDdlRequest request =
         (UpdateDatabaseDdlRequest) mockDatabaseAdmin.getRequests().get(2);
-    assertEquals(2, request.getStatementsCount());
+    assertEquals(5, request.getStatementsCount());
     assertEquals(
         "CREATE TABLE \"singers\" ("
             + "\"singer_id\" character varying(36) NOT NULL PRIMARY KEY, "
@@ -175,6 +223,46 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
             + "  REFERENCES \"singers\" (\"singer_id\")\n"
             + ")",
         request.getStatements(1));
+    assertEquals(
+        "create table tracks (\n"
+            + "        album_id     varchar(36) not null,\n"
+            + "        track_number bigint not null,\n"
+            + "        title        varchar not null,\n"
+            + "        sample_rate  float8 not null,\n"
+            + "        created_at   timestamptz,\n"
+            + "        updated_at   timestamptz,\n"
+            + "        lock_version bigint not null,\n"
+            + "        primary key (album_id, track_number)\n"
+            + "    ) interleave in parent albums on delete cascade",
+        request.getStatements(2));
+    assertEquals(
+        "CREATE TABLE \"venues\" ("
+            + "\"venue_id\" character varying(36) NOT NULL PRIMARY KEY, "
+            + "\"name\" character varying, "
+            + "\"description\" jsonb, "
+            + "\"created_at\" timestamptz, "
+            + "\"updated_at\" timestamptz, "
+            + "\"lock_version\" integer NOT NULL)",
+        request.getStatements(3));
+    assertEquals(
+        "CREATE TABLE \"concerts\" ("
+            + "\"concert_id\" character varying(36) NOT NULL PRIMARY KEY, "
+            + "\"venue_id\" character varying(36), "
+            + "\"singer_id\" character varying(36), "
+            + "\"name\" character varying, "
+            + "\"start_time\" timestamptz NOT NULL, "
+            + "\"end_time\" timestamptz NOT NULL, "
+            + "\"created_at\" timestamptz, "
+            + "\"updated_at\" timestamptz, "
+            + "\"lock_version\" integer NOT NULL, "
+            + "CONSTRAINT \"fk_rails_a72d62761d\"\n"
+            + "FOREIGN KEY (\"venue_id\")\n"
+            + "  REFERENCES \"venues\" (\"venue_id\")\n"
+            + ", CONSTRAINT \"fk_rails_20a8d5418f\"\n"
+            + "FOREIGN KEY (\"singer_id\")\n"
+            + "  REFERENCES \"singers\" (\"singer_id\")\n"
+            + ", CONSTRAINT chk_end_time_after_start_time CHECK (end_time > start_time))",
+        request.getStatements(4));
   }
 
   @Test
@@ -185,6 +273,7 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
         StatementResult.update(Statement.of("DELETE FROM \"albums\""), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.of("DELETE FROM \"singers\""), 0L));
+    addInspectSingerResult(ImmutableList.of());
 
     Singer singer =
         new Singer(
@@ -198,15 +287,55 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     addInsertSingerResult(singer, false);
     addSelectSingersResult(ImmutableList.of(singer));
 
-    Album album = new Album(randomUuid(), "some-title", singer.singerId);
+    Album album =
+        new Album(
+            randomUuid(),
+            "some-title",
+            new BigDecimal("200000.12"),
+            Date.fromYearMonthDay(2000, 1, 1),
+            ByteArray.copyFrom("test"),
+            singer.singerId,
+            Timestamp.now(),
+            Timestamp.now(),
+            1);
     addInsertAlbumResult(album, false);
     addSelectAlbumsOfSingerResult(
         singer.singerId,
         ImmutableList.of(
-            new Album(randomUuid(), "some-title-1", singer.singerId),
-            new Album(randomUuid(), "some-title-2", singer.singerId),
-            new Album(randomUuid(), "some-title-3", singer.singerId)),
+            new Album(
+                randomUuid(),
+                "some-title-1",
+                new BigDecimal("200000.12"),
+                Date.fromYearMonthDay(2000, 1, 1),
+                ByteArray.copyFrom("test"),
+                singer.singerId,
+                Timestamp.now(),
+                Timestamp.now(),
+                1),
+            new Album(
+                randomUuid(),
+                "some-title-2",
+                new BigDecimal("200000.12"),
+                Date.fromYearMonthDay(2000, 1, 1),
+                ByteArray.copyFrom("test"),
+                singer.singerId,
+                Timestamp.now(),
+                Timestamp.now(),
+                1),
+            new Album(
+                randomUuid(),
+                "some-title-3",
+                new BigDecimal("200000.12"),
+                Date.fromYearMonthDay(2000, 1, 1),
+                ByteArray.copyFrom("test"),
+                singer.singerId,
+                Timestamp.now(),
+                Timestamp.now(),
+                1)),
         true);
+    Track track =
+        new Track(album.albumId, 1L, "some-title", 3.14d, Timestamp.now(), Timestamp.now(), 1);
+    addInsertTrackResult(track, false);
 
     singer.firstName = "Dave";
     singer.lastName = "Anderson";
@@ -233,15 +362,15 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
             "RAILS_ENV",
             "development"));
 
-    List<ExecuteSqlRequest> selectRequests =
+    List<ExecuteSqlRequest> selectSingerRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
             .filter(request -> request.getSql().equals(getSelectSingerSql()))
             .collect(Collectors.toList());
-    assertEquals(2, selectRequests.size());
-    assertTrue(selectRequests.get(0).getTransaction().hasSingleUse());
-    assertEquals(QueryMode.PLAN, selectRequests.get(0).getQueryMode());
-    assertTrue(selectRequests.get(1).getTransaction().hasSingleUse());
-    assertEquals(QueryMode.NORMAL, selectRequests.get(1).getQueryMode());
+    assertEquals(2, selectSingerRequests.size());
+    assertTrue(selectSingerRequests.get(0).getTransaction().hasSingleUse());
+    assertEquals(QueryMode.PLAN, selectSingerRequests.get(0).getQueryMode());
+    assertTrue(selectSingerRequests.get(1).getTransaction().hasSingleUse());
+    assertEquals(QueryMode.NORMAL, selectSingerRequests.get(1).getQueryMode());
 
     List<ExecuteSqlRequest> updateRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -254,12 +383,57 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     assertEquals(getUpdateSingerStatement(), updateRequests.get(1).getSql());
     assertEquals(QueryMode.NORMAL, updateRequests.get(1).getQueryMode());
     assertTrue(updateRequests.get(1).getTransaction().hasId());
+
+    List<ExecuteSqlRequest> insertSingersRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(getInsertSingerStatement()))
+            .collect(Collectors.toList());
+    assertEquals(11, insertSingersRequests.size());
+    assertEquals(QueryMode.PLAN, insertSingersRequests.get(0).getQueryMode());
+    assertTrue(insertSingersRequests.get(0).getTransaction().hasId());
+    for (int i = 1; i < insertSingersRequests.size(); i++) {
+      assertEquals(QueryMode.NORMAL, insertSingersRequests.get(i).getQueryMode());
+      assertTrue(insertSingersRequests.get(i).getTransaction().hasId());
+      assertEquals(
+          insertSingersRequests.get(i - 1).getTransaction().getId(),
+          insertSingersRequests.get(i).getTransaction().getId());
+    }
+
+    List<ExecuteSqlRequest> insertAlbumRequests =
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(getInsertAlbumStatement()))
+            .collect(Collectors.toList());
+    assertEquals(31, insertAlbumRequests.size());
+    assertEquals(QueryMode.PLAN, insertAlbumRequests.get(0).getQueryMode());
+    assertTrue(insertAlbumRequests.get(0).getTransaction().hasId());
+    for (int i = 1; i < insertAlbumRequests.size(); i++) {
+      assertEquals(QueryMode.NORMAL, insertAlbumRequests.get(i).getQueryMode());
+      assertTrue(insertAlbumRequests.get(i).getTransaction().hasId());
+      assertEquals(
+          insertAlbumRequests.get(i - 1).getTransaction().getId(),
+          insertAlbumRequests.get(i).getTransaction().getId());
+    }
+    assertEquals(
+        insertAlbumRequests.get(0).getTransaction().getId(),
+        insertSingersRequests.get(0).getTransaction().getId());
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(CommitRequest.class).stream()
+            .filter(
+                request ->
+                    request
+                        .getTransactionId()
+                        .equals(insertSingersRequests.get(0).getTransaction().getId()))
+            .count());
+  }
+
+  static String getInsertSingerStatement() {
+    return "INSERT INTO \"singers\" (\"singer_id\", \"first_name\", \"last_name\", \"active\", \"created_at\", \"updated_at\", \"lock_version\") "
+        + "VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING \"singer_id\"";
   }
 
   static void addInsertSingerResult(Singer singer, boolean exact) {
-    String sql =
-        "INSERT INTO \"singers\" (\"singer_id\", \"first_name\", \"last_name\", \"active\", \"created_at\", \"updated_at\", \"lock_version\") "
-            + "VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING \"singer_id\"";
+    String sql = getInsertSingerStatement();
     ResultSetMetadata metadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
@@ -362,6 +536,14 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
                         .map(ActiveRecordMockServerTest::createSingerRecord)
                         .collect(Collectors.toList()))
                 .build()));
+  }
+
+  static void addInspectSingerResult(ImmutableList<Singer> singers) {
+    String sql = "SELECT \"singers\".* FROM \"singers\" /* loading for inspect */ LIMIT $1";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder().setMetadata(createSelectSingersMetadata()).build()));
   }
 
   static String getSelectSingerSql() {
@@ -495,10 +677,13 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     }
   }
 
+  static String getInsertAlbumStatement() {
+    return "INSERT INTO \"albums\" (\"album_id\", \"title\", \"marketing_budget\", \"release_date\", \"cover_picture\", \"singer_id\", \"created_at\", \"updated_at\", \"lock_version\") "
+        + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING \"album_id\"";
+  }
+
   static void addInsertAlbumResult(Album album, boolean exact) {
-    String sql =
-        "INSERT INTO \"albums\" (\"album_id\", \"title\", \"singer_id\") "
-            + "VALUES ($1, $2, $3) RETURNING \"album_id\"";
+    String sql = getInsertAlbumStatement();
     ResultSetMetadata metadata =
         ResultSetMetadata.newBuilder()
             .setRowType(
@@ -524,7 +709,37 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
                     .addFields(
                         Field.newBuilder()
                             .setName("p3")
+                            .setType(Type.newBuilder().setCode(TypeCode.NUMERIC).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p4")
+                            .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p5")
+                            .setType(Type.newBuilder().setCode(TypeCode.BYTES).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p6")
                             .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p7")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p8")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p9")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
                             .build())
                     .build())
             .build();
@@ -543,7 +758,19 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
                 .bind("p2")
                 .to(album.title)
                 .bind("p3")
+                .to(album.marketingBudget)
+                .bind("p4")
+                .to(album.releaseDate)
+                .bind("p5")
+                .to(album.coverPicture)
+                .bind("p6")
                 .to(album.singerId)
+                .bind("p7")
+                .to(album.createdAt)
+                .bind("p8")
+                .to(album.updatedAt)
+                .bind("p9")
+                .to(album.version)
                 .build(),
             ResultSet.newBuilder()
                 .setMetadata(metadata)
@@ -621,6 +848,111 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
         .build();
   }
 
+  static String getInsertTrackStatement() {
+    return "INSERT INTO \"tracks\" (\"album_id\", \"track_number\", \"title\", \"sample_rate\", \"created_at\", \"updated_at\", \"lock_version\") "
+        + "VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING \"album_id\",\"track_number\"";
+  }
+
+  static void addInsertTrackResult(Track album, boolean exact) {
+    String sql = getInsertTrackStatement();
+    ResultSetMetadata metadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("album_id")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("track_number")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                            .build())
+                    .build())
+            .setUndeclaredParameters(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p1")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p2")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p3")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p4")
+                            .setType(Type.newBuilder().setCode(TypeCode.FLOAT64).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p5")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p6")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p7")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                            .build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+    StatementResult result =
+        StatementResult.query(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to(album.albumId)
+                .bind("p2")
+                .to(album.trackNumber)
+                .bind("p3")
+                .to(album.title)
+                .bind("p4")
+                .to(album.sampleRate)
+                .bind("p5")
+                .to(album.createdAt)
+                .bind("p6")
+                .to(album.updatedAt)
+                .bind("p7")
+                .to(album.version)
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue(album.albumId).build())
+                        .addValues(
+                            Value.newBuilder()
+                                .setStringValue(String.valueOf(album.trackNumber))
+                                .build())
+                        .build())
+                .build());
+    if (exact) {
+      mockSpanner.putStatementResult(result);
+    } else {
+      mockSpanner.putPartialStatementResult(result);
+    }
+  }
+
   static ResultSetMetadata addSelectOneParameters(ResultSetMetadata metadata) {
     return metadata
         .toBuilder()
@@ -641,7 +973,8 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
   }
 
   static void addSelectSampleTablesResult() {
-    addSelectTablesResult("ar_internal_metadata", "schema_migrations", "albums", "singers");
+    addSelectTablesResult(
+        "ar_internal_metadata", "schema_migrations", "albums", "singers", "tracks");
 
     addSelectColumnsResult(
         "singers",
@@ -663,15 +996,37 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
         "albums",
         createColumnRow("album_id", "character varying", true, Oid.VARCHAR),
         createColumnRow("title", "character varying", true, Oid.VARCHAR),
-        createColumnRow("singer_id", "character varying", true, Oid.VARCHAR));
+        createColumnRow("marketing_budget", "numeric", false, Oid.NUMERIC),
+        createColumnRow("release_date", "date", false, Oid.DATE),
+        createColumnRow("cover_picture", "bytea", false, Oid.BYTEA),
+        createColumnRow("singer_id", "character varying", true, Oid.VARCHAR),
+        createColumnRow("created_at", "timestamp with time zone", false, Oid.TIMESTAMPTZ),
+        createColumnRow("updated_at", "timestamp with time zone", false, Oid.TIMESTAMPTZ),
+        createColumnRow("lock_version", "bigint", false, Oid.INT8));
     addSelectPrimaryKeyResult("albums", "album_id");
     addSelectTableDescriptionResult("albums", "create table albums");
     // TODO: Actually add indexes.
     addSelectTableIndexesResult("albums");
     addSelectTableConstraintsResult("albums");
 
+    addSelectColumnsResult(
+        "tracks",
+        createColumnRow("album_id", "character varying", true, Oid.VARCHAR),
+        createColumnRow("track_number", "bigint", true, Oid.INT8),
+        createColumnRow("title", "character varying", true, Oid.VARCHAR),
+        createColumnRow("sample_rate", "double precision", false, Oid.FLOAT8),
+        createColumnRow("created_at", "timestamp with time zone", false, Oid.TIMESTAMPTZ),
+        createColumnRow("updated_at", "timestamp with time zone", false, Oid.TIMESTAMPTZ),
+        createColumnRow("lock_version", "bigint", false, Oid.INT8));
+    addSelectPrimaryKeyResult("tracks", "album_id", "track_number");
+    addSelectTableDescriptionResult("tracks", "create table tracks");
+    // TODO: Actually add indexes.
+    addSelectTableIndexesResult("tracks");
+    addSelectTableConstraintsResult("tracks");
+
     // TODO: Actually add foreign keys.
     addSelectTableForeignKeysResult("albums");
     addSelectTableForeignKeysResult("singers");
+    addSelectTableForeignKeysResult("tracks");
   }
 }

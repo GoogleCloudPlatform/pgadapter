@@ -319,9 +319,26 @@ public class ClientAutoDetector {
 
       @Override
       public ImmutableMap<String, String> getDefaultParameters() {
-        return ImmutableMap.of(
-            "spanner.emulate_pg_class_tables", "true",
-            "spanner.ddl_transaction_mode", "AutocommitExplicitTransaction");
+        return ImmutableMap.of("spanner.emulate_pg_class_tables", "true");
+      }
+
+      @Override
+      public ImmutableList<String> getErrorHints(PGException exception) {
+        if (exception.getMessage() != null
+            && exception
+                .getMessage()
+                .contains("DDL statements are only allowed outside explicit transactions")) {
+          return ImmutableList.of(
+              "Using Ruby ActiveRecord migrations requires that the option 'spanner.ddl_transaction_mode=AutocommitExplicitTransaction' has been set. "
+                  + "Please add \"spanner.ddl_transaction_mode\": \"AutocommitExplicitTransaction\" to the \"variables\" section of your database.yml file.");
+        }
+        if (exception.getMessage() != null
+            && exception.getMessage().contains("SELECT pg_try_advisory_lock")) {
+          return ImmutableList.of(
+              "PGAdapter does not support advisory locks. Please 'add advisory_locks: false' to your database.yml file. "
+                  + "See https://edgeguides.rubyonrails.org/configuring.html#configuring-a-postgresql-database for more information.");
+        }
+        return super.getErrorHints(exception);
       }
     },
     UNSPECIFIED {
