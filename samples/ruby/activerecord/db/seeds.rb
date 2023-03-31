@@ -14,14 +14,76 @@ require_relative '../models/singer'
 require_relative '../models/track'
 require_relative '../models/venue'
 
-first_names = %w[Pete Alice John Ethel Trudy Naomi Wendy]
-last_names = %w[Wendelson Allison Peterson Johnson Henderson Ericsson Aronson]
+first_names = %w[Emma Oliver Amelia Noah Charlotte Jacob Liam Ava Henry Sophia Mia Mason Evelyn Oliver Emily Amelia William Charlotte Noah Harper Elijah Avery James]
+last_names = %w[Smith, Johnson, Williams, Jones, Brown, Davis, Miller, Wilson, Moore, Taylor, Anderson, Thomas, Jackson, White, Harris, Martin, Thompson, Garcia, Martinez, Robinson]
 
-adjectives = %w[daily happy blue generous cooked bad open]
-nouns = %w[windows potatoes bank street tree glass bottle]
+nouns = %w[
+dog cat house car tree book computer phone television radio
+sun moon star planet ocean sea river mountain valley forest
+person girl boy woman man mother father sister brother family
+]
 
-adverbs = %w[swiftly surprisingly rather closely furiously politely currently unimpressively gracefully abnormally stealthily irritably]
-verbs = %w[poke rescue tick long soothe obtain fancy prick suffer encourage love own]
+adjectives = %w[
+big small old young hot cold happy sad good bad
+pretty ugly tall short fat thin smart stupid fast slow
+brave cowardly kind cruel gentle rough friendly unfriendly
+]
+
+adverbs = %w[
+quickly slowly carefully carelessly well badly suddenly gradually easily difficulty
+loudly quietly happily sadly carefully carelessly correctly incorrectly interestingly boringly
+]
+
+verbs = %w[
+run jump walk talk eat sleep drink think see hear
+sing dance play read write draw paint cook clean wash
+work study learn teach help share care love hate
+]
+
+venue_names = [
+  "The Groove Room",
+  "The Getaway",
+  "The Sound Stage",
+  "The Vibe Bar",
+  "The Beat Club",
+  "The Rhythm Lounge",
+  "The Melody Room",
+  "The Harmony Cafe",
+  "The Treble Room",
+  "The Bass Line",
+  "The Jam Spot",
+  "The Music Hall",
+  "The Concert Club",
+  "The Rock Bar",
+  "The Jazz Club",
+  "The Blues Bar",
+  "The Country Club",
+  "The Folk Cafe",
+  "The Classical Music Hall",
+  "The Opera House",
+  "The Ballet Theatre",
+  "The Symphony Hall",
+  "The Choir Hall",
+  "The Bandstand",
+  "The Music Studio",
+  "The Recording Studio",
+  "The Rehearsal Space",
+  "The Music School",
+  "The Music Store",
+  "The Music Museum",
+  "The Music Library",
+  "The Music Festival",
+  "The Music Awards",
+  "The Music Conference",
+  "The Music Competition",
+  "The Music Showcase",
+  "The Music Tour",
+  "The Music Concert",
+  "The Music Recital",
+  "The Music Performance",
+  "The Music Jam Session",
+  "The Music Open Mic Night"
+]
 
 rnd = Random.new
 
@@ -58,7 +120,7 @@ Singer.transaction do
   albums.each do |album|
     10.times do |num|
       tracks.append({album_id: album[:album_id],
-                     track_number: num,
+                     track_number: num+1,
                      title: "#{adverbs.sample} #{verbs.sample}",
                      sample_rate: rand})
     end
@@ -67,7 +129,7 @@ Singer.transaction do
 
   10.times do
     venues.append({venue_id: SecureRandom.uuid,
-                   name: "Venue #{rand(1000)}",
+                   name: venue_names.sample,
                    description: {
                      capacity: rand(20000),
                      type: "Arena",

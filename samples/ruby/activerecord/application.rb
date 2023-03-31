@@ -11,6 +11,7 @@ require 'io/console'
 require_relative 'config/environment'
 require_relative 'models/singer'
 require_relative 'models/album'
+require_relative 'models/concert'
 
 # This sample application shows the basic features of
 # ActiveRecord with Google Cloud Spanner PostgreSQL-dialect.
@@ -24,6 +25,9 @@ class Application
 
     # Execute a query on the singers table.
     query_singers_by_name
+
+    # List all singers and related venue information.
+    query_concerts
   end
 
   def self.query_singers
@@ -32,9 +36,9 @@ class Application
     puts 'Known singers and their albums:'
     puts ''
     Singer.all.each do |singer|
-      puts "#{singer.first_name} #{singer.last_name}"
+      puts "#{singer.first_name} #{singer.last_name} has albums:"
       singer.albums.each do |album|
-        puts "   #{album.title}"
+        puts "   #{album.title} has tracks:"
         album.tracks.each do |track|
           puts "       #{track.track_number} #{track.title}"
         end
@@ -69,6 +73,18 @@ class Application
       puts "#{s.first_name} #{s.last_name}"
     end
   end
+
+  # Lists all concerts and related venue information.
+  def self.query_concerts
+    puts 'Known concerts:'
+    puts ''
+    Concert.all.each do |concert|
+      puts "#{concert.name} at #{concert.venue.name}"
+      puts "  Start time: #{concert.start_time}"
+      puts "  Venue description: #{concert.venue.description}"
+    end
+  end
+
 end
 
 Application.run

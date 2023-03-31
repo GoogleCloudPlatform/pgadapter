@@ -8,14 +8,15 @@
 
 require_relative 'config/environment'
 require 'sinatra/activerecord/rake'
+require "docker"
 
 Bundler.require
 
 ActiveRecord::Base.establish_connection(
-  adapter: 'postgresql',
-  database: ENV['PGDATABASE'] || 'activerecord',
-  host: ENV['PGHOST'] || 'localhost',
-  port: ENV['PGPORT'] || '5432',
+  adapter: "postgresql",
+  database: ENV["PGDATABASE"] || "activerecord",
+  host: ENV["PGHOST"] || "localhost",
+  port: ENV["PGPORT"] || "5432",
   pool: 5,
   # Advisory locks are not supported by PGAdapter
   advisory_locks: false,
@@ -28,8 +29,29 @@ ActiveRecord::Base.establish_connection(
 
 desc 'Runs a simple ActiveRecord tutorial for Google Cloud Spanner PostgreSQL.'
 task :run do
+  puts "Downloading PGAdapter image..."
+  Docker::Image.create "fromImage" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:latest"
+  puts "Creating PGAdapter container..."
+  container = Docker::Container.create(
+    "Image" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:latest",
+    "ExposedPorts" => { "5432/tcp" => {} },
+    "HostConfig" => {
+      "PortBindings" => {
+        "5432/tcp" => [{ "HostPort" => ENV["PGPORT"] || "5432" }]
+      }
+    },
+    "Volumes" => {"/credentials.json" => { }},
+    "Binds" => ["#{ENV["GOOGLE_APPLICATION_CREDENTIALS"]}:/credentials.json"],
+    "Cmd" => ["-p", "appdev-soda-spanner-staging", "-i", "knut-test-ycsb", "-c", "/credentials.json",  "-x"]
+  )
+
   begin
+    puts "Starting PGAdapter..."
+    container.start!
+    sleep(2)
     sh 'rake db:seed'
     sh 'ruby application.rb'
+  ensure
+    container.stop!
   end
 end

@@ -153,7 +153,7 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     }
   }
 
-  private final static class Concert extends Model {
+  private static final class Concert extends Model {
     final String concertId;
     String venueId;
     String singerId;
@@ -320,6 +320,10 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
         StatementResult.update(Statement.of("DELETE FROM \"albums\""), 0L));
     mockSpanner.putStatementResult(
         StatementResult.update(Statement.of("DELETE FROM \"singers\""), 0L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.of("DELETE FROM \"concerts\""), 0L));
+    mockSpanner.putStatementResult(
+        StatementResult.update(Statement.of("DELETE FROM \"venues\""), 0L));
     addInspectSingerResult(ImmutableList.of());
 
     Singer singer =
@@ -412,12 +416,26 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
                 1)),
         false);
 
-    Venue venue = new Venue(randomUuid(), "some-venue", "{\"Capacity\": 1000}", Timestamp.now(), Timestamp.now(), 1);
+    Venue venue =
+        new Venue(
+            randomUuid(),
+            "some-venue",
+            "{\"Capacity\": 1000}",
+            Timestamp.now(),
+            Timestamp.now(),
+            1);
     addInsertVenueResult(venue, false);
-    Concert concert = new Concert(randomUuid(), venue.venueId, singer.singerId, "some-concert",
-        Timestamp.parseTimestamp("2022-04-01T10:00:00Z"),
-        Timestamp.parseTimestamp("2022-04-01T15:00:00Z"),
-        Timestamp.now(), Timestamp.now(), 1);
+    Concert concert =
+        new Concert(
+            randomUuid(),
+            venue.venueId,
+            singer.singerId,
+            "some-concert",
+            Timestamp.parseTimestamp("2022-04-01T10:00:00Z"),
+            Timestamp.parseTimestamp("2022-04-01T15:00:00Z"),
+            Timestamp.now(),
+            Timestamp.now(),
+            1);
     addInsertConcertResult(concert, false);
 
     singer.firstName = "Dave";
@@ -434,16 +452,17 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
                 .addRows(createSingerRecord(singer))
                 .build()));
 
-    String output = run(
-        new String[] {"bundle", "exec", "rake", "run"},
-        DIRECTORY_NAME,
-        ImmutableMap.of(
-            "PGHOST",
-            "localhost",
-            "PGPORT",
-            String.valueOf(pgServer.getLocalPort()),
-            "RAILS_ENV",
-            "development"));
+    String output =
+        run(
+            new String[] {"bundle", "exec", "rake", "run"},
+            DIRECTORY_NAME,
+            ImmutableMap.of(
+                "PGHOST",
+                "localhost",
+                "PGPORT",
+                String.valueOf(pgServer.getLocalPort()),
+                "RAILS_ENV",
+                "development"));
 
     assertTrue(output, output.contains("some-track-title-1"));
 
@@ -933,7 +952,8 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
         .build();
   }
 
-  static void addSelectTracksOfAlbumResult(String albumId, ImmutableList<Track> tracks, boolean exact) {
+  static void addSelectTracksOfAlbumResult(
+      String albumId, ImmutableList<Track> tracks, boolean exact) {
     String sql = "SELECT \"tracks\".* FROM \"tracks\" WHERE \"tracks\".\"album_id\" = $1";
     ResultSetMetadata metadata =
         ResultSetMetadata.newBuilder()
@@ -1015,7 +1035,6 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
         .addValues(Value.newBuilder().setStringValue(track.updatedAt.toString()).build())
         .addValues(Value.newBuilder().setStringValue(String.valueOf(track.version)).build())
         .build();
-
   }
 
   static String getInsertTrackStatement() {
@@ -1345,7 +1364,13 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
 
   static void addSelectSampleTablesResult() {
     addSelectTablesResult(
-        "ar_internal_metadata", "schema_migrations", "albums", "concerts", "singers", "tracks", "venues");
+        "ar_internal_metadata",
+        "schema_migrations",
+        "albums",
+        "concerts",
+        "singers",
+        "tracks",
+        "venues");
 
     addSelectColumnsResult(
         "singers",

@@ -50,5 +50,5 @@ jobs:
           export TAG=`echo $GITHUB_REF | awk -F/ '{print $NF}'`
           echo $TAG
           docker push "$GCR_HOSTNAME"/"$IMAGE":"$TAG"
-          docker tag "$GCR_HOSTNAME"/"$IMAGE":"$TAG" "$GCR_HOSTNAME"/"$IMAGE":latest
-          docker push "$GCR_HOSTNAME"/"$IMAGE":latest
+#          docker tag "$GCR_HOSTNAME"/"$IMAGE":"$TAG" "$GCR_HOSTNAME"/"$IMAGE":latest
+#          docker push "$GCR_HOSTNAME"/"$IMAGE":latest
