@@ -6,11 +6,8 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT.
 
-require_relative 'album'
-require_relative 'concert'
-
-# Model for a Singer entity.
-class Singer < ActiveRecord::Base
-  has_many :albums
-  has_many :concerts
+# Model for a Track on an Album.
+class Track < ActiveRecord::Base
+  self.primary_keys = :album_id, :track_number
+  belongs_to :album
 end

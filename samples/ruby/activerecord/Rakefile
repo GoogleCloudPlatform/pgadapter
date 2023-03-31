@@ -6,20 +6,10 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT.
 
-require 'active_record'
-require 'bundler'
+require_relative 'config/environment'
+require 'sinatra/activerecord/rake'
 
 Bundler.require
-
-# Make sure that the PostgreSQL-adapter uses timestamptz without any type modifiers.
-ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.datetime_type = :timestamptz
-module ActiveRecord::ConnectionAdapters
-  class PostgreSQLAdapter
-    def supports_datetime_with_precision?
-      false
-    end
-  end
-end
 
 ActiveRecord::Base.establish_connection(
   adapter: 'postgresql',
@@ -35,3 +25,11 @@ ActiveRecord::Base.establish_connection(
     "spanner.emulate_pg_class_tables": "true"
   },
 )
+
+desc 'Runs a simple ActiveRecord tutorial for Google Cloud Spanner PostgreSQL.'
+task :run do
+  begin
+    sh 'rake db:seed'
+    sh 'ruby application.rb'
+  end
+end

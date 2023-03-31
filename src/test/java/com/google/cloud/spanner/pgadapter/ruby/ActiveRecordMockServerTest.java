@@ -134,6 +134,53 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     }
   }
 
+  private static final class Venue extends Model {
+    final String venueId;
+    String name;
+    String description;
+
+    Venue(
+        String venueId,
+        String name,
+        String description,
+        Timestamp createdAt,
+        Timestamp updatedAt,
+        long version) {
+      super(createdAt, updatedAt, version);
+      this.venueId = venueId;
+      this.name = name;
+      this.description = description;
+    }
+  }
+
+  private final static class Concert extends Model {
+    final String concertId;
+    String venueId;
+    String singerId;
+    String name;
+    Timestamp startTime;
+    Timestamp endTime;
+
+    Concert(
+        String concertId,
+        String venueId,
+        String singerId,
+        String name,
+        Timestamp startTime,
+        Timestamp endTime,
+        Timestamp createdAt,
+        Timestamp updatedAt,
+        long version) {
+      super(createdAt, updatedAt, version);
+      this.concertId = concertId;
+      this.venueId = venueId;
+      this.singerId = singerId;
+      this.name = name;
+      this.startTime = startTime;
+      this.endTime = endTime;
+    }
+  }
+
   private static final String DIRECTORY_NAME = "./src/test/ruby/activerecord";
 
   @BeforeClass
@@ -336,6 +383,42 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     Track track =
         new Track(album.albumId, 1L, "some-title", 3.14d, Timestamp.now(), Timestamp.now(), 1);
     addInsertTrackResult(track, false);
+    addSelectTracksOfAlbumResult(
+        album.albumId,
+        ImmutableList.of(
+            new Track(
+                track.albumId,
+                1L,
+                "some-track-title-1",
+                3.14d,
+                Timestamp.now(),
+                Timestamp.now(),
+                1),
+            new Track(
+                track.albumId,
+                2L,
+                "some-track-title-2",
+                99.9d,
+                Timestamp.now(),
+                Timestamp.now(),
+                1),
+            new Track(
+                track.albumId,
+                3L,
+                "some-track-title-3",
+                -1.2d,
+                Timestamp.now(),
+                Timestamp.now(),
+                1)),
+        false);
+
+    Venue venue = new Venue(randomUuid(), "some-venue", "{\"Capacity\": 1000}", Timestamp.now(), Timestamp.now(), 1);
+    addInsertVenueResult(venue, false);
+    Concert concert = new Concert(randomUuid(), venue.venueId, singer.singerId, "some-concert",
+        Timestamp.parseTimestamp("2022-04-01T10:00:00Z"),
+        Timestamp.parseTimestamp("2022-04-01T15:00:00Z"),
+        Timestamp.now(), Timestamp.now(), 1);
+    addInsertConcertResult(concert, false);
 
     singer.firstName = "Dave";
     singer.lastName = "Anderson";
@@ -351,7 +434,7 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
                 .addRows(createSingerRecord(singer))
                 .build()));
 
-    run(
+    String output = run(
         new String[] {"bundle", "exec", "rake", "run"},
         DIRECTORY_NAME,
         ImmutableMap.of(
@@ -361,6 +444,8 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
             String.valueOf(pgServer.getLocalPort()),
             "RAILS_ENV",
             "development"));
+
+    assertTrue(output, output.contains("some-track-title-1"));
 
     List<ExecuteSqlRequest> selectSingerRequests =
         mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
@@ -848,6 +933,91 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
         .build();
   }
 
+  static void addSelectTracksOfAlbumResult(String albumId, ImmutableList<Track> tracks, boolean exact) {
+    String sql = "SELECT \"tracks\".* FROM \"tracks\" WHERE \"tracks\".\"album_id\" = $1";
+    ResultSetMetadata metadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("album_id")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("track_number")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("title")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("sample_rate")
+                            .setType(Type.newBuilder().setCode(TypeCode.FLOAT64).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("created_at")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("updated_at")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("lock_version")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                            .build())
+                    .build())
+            .setUndeclaredParameters(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p1")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql), ResultSet.newBuilder().setMetadata(metadata).build()));
+
+    StatementResult result =
+        StatementResult.query(
+            Statement.newBuilder(sql).bind("p1").to(albumId).build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .addAllRows(
+                    tracks.stream()
+                        .map(ActiveRecordMockServerTest::createTrackRecord)
+                        .collect(Collectors.toList()))
+                .build());
+    if (exact) {
+      mockSpanner.putStatementResult(result);
+    } else {
+      mockSpanner.putPartialStatementResult(result);
+    }
+  }
+
+  static ListValue createTrackRecord(Track track) {
+    return ListValue.newBuilder()
+        .addValues(Value.newBuilder().setStringValue(track.albumId).build())
+        .addValues(Value.newBuilder().setStringValue(String.valueOf(track.trackNumber)).build())
+        .addValues(Value.newBuilder().setStringValue(track.title).build())
+        .addValues(Value.newBuilder().setNumberValue(track.sampleRate).build())
+        .addValues(Value.newBuilder().setStringValue(track.createdAt.toString()).build())
+        .addValues(Value.newBuilder().setStringValue(track.updatedAt.toString()).build())
+        .addValues(Value.newBuilder().setStringValue(String.valueOf(track.version)).build())
+        .build();
+
+  }
+
   static String getInsertTrackStatement() {
     return "INSERT INTO \"tracks\" (\"album_id\", \"track_number\", \"title\", \"sample_rate\", \"created_at\", \"updated_at\", \"lock_version\") "
         + "VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING \"album_id\",\"track_number\"";
@@ -953,6 +1123,207 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     }
   }
 
+  static String getInsertVenueStatement() {
+    return "INSERT INTO \"venues\" (\"venue_id\", \"name\", \"description\", \"created_at\", \"updated_at\", \"lock_version\") "
+        + "VALUES ($1, $2, $3, $4, $5, $6) RETURNING \"venue_id\"";
+  }
+
+  static void addInsertVenueResult(Venue venue, boolean exact) {
+    String sql = getInsertVenueStatement();
+    ResultSetMetadata metadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("venue_id")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .build())
+            .setUndeclaredParameters(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p1")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p2")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p3")
+                            .setType(Type.newBuilder().setCode(TypeCode.JSON).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p4")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p5")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p6")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                            .build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+
+    StatementResult result =
+        StatementResult.query(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to(venue.venueId)
+                .bind("p2")
+                .to(venue.name)
+                .bind("p3")
+                .to(venue.description)
+                .bind("p4")
+                .to(venue.createdAt)
+                .bind("p5")
+                .to(venue.updatedAt)
+                .bind("p6")
+                .to(venue.version)
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue(venue.venueId).build())
+                        .build())
+                .build());
+    if (exact) {
+      mockSpanner.putStatementResult(result);
+    } else {
+      mockSpanner.putPartialStatementResult(result);
+    }
+  }
+
+  static String getInsertConcertStatement() {
+    return "INSERT INTO \"concerts\" (\"concert_id\", \"venue_id\", \"singer_id\", \"name\", \"start_time\", \"end_time\", \"created_at\", \"updated_at\", \"lock_version\") "
+        + "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING \"concert_id\"";
+  }
+
+  static void addInsertConcertResult(Concert concert, boolean exact) {
+    String sql = getInsertConcertStatement();
+    ResultSetMetadata metadata =
+        ResultSetMetadata.newBuilder()
+            .setRowType(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("concert_id")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .build())
+            .setUndeclaredParameters(
+                StructType.newBuilder()
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p1")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p2")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p3")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p4")
+                            .setType(Type.newBuilder().setCode(TypeCode.STRING).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p5")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p6")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p7")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p8")
+                            .setType(Type.newBuilder().setCode(TypeCode.TIMESTAMP).build())
+                            .build())
+                    .addFields(
+                        Field.newBuilder()
+                            .setName("p9")
+                            .setType(Type.newBuilder().setCode(TypeCode.INT64).build())
+                            .build())
+                    .build())
+            .build();
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .setStats(ResultSetStats.newBuilder().build())
+                .build()));
+
+    StatementResult result =
+        StatementResult.query(
+            Statement.newBuilder(sql)
+                .bind("p1")
+                .to(concert.concertId)
+                .bind("p2")
+                .to(concert.venueId)
+                .bind("p3")
+                .to(concert.singerId)
+                .bind("p4")
+                .to(concert.name)
+                .bind("p5")
+                .to(concert.startTime)
+                .bind("p6")
+                .to(concert.endTime)
+                .bind("p7")
+                .to(concert.createdAt)
+                .bind("p8")
+                .to(concert.updatedAt)
+                .bind("p9")
+                .to(concert.version)
+                .build(),
+            ResultSet.newBuilder()
+                .setMetadata(metadata)
+                .setStats(ResultSetStats.newBuilder().setRowCountExact(1L).build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue(concert.concertId).build())
+                        .build())
+                .build());
+    if (exact) {
+      mockSpanner.putStatementResult(result);
+    } else {
+      mockSpanner.putPartialStatementResult(result);
+    }
+  }
+
   static ResultSetMetadata addSelectOneParameters(ResultSetMetadata metadata) {
     return metadata
         .toBuilder()
@@ -974,7 +1345,7 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
 
   static void addSelectSampleTablesResult() {
     addSelectTablesResult(
-        "ar_internal_metadata", "schema_migrations", "albums", "singers", "tracks");
+        "ar_internal_metadata", "schema_migrations", "albums", "concerts", "singers", "tracks", "venues");
 
     addSelectColumnsResult(
         "singers",
@@ -1024,9 +1395,42 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     addSelectTableIndexesResult("tracks");
     addSelectTableConstraintsResult("tracks");
 
+    addSelectColumnsResult(
+        "venues",
+        createColumnRow("venue_id", "character varying", true, Oid.VARCHAR),
+        createColumnRow("name", "character varying", false, Oid.VARCHAR),
+        createColumnRow("description", "jsonb", false, Oid.VARCHAR),
+        createColumnRow("created_at", "timestamp with time zone", false, Oid.TIMESTAMPTZ),
+        createColumnRow("updated_at", "timestamp with time zone", false, Oid.TIMESTAMPTZ),
+        createColumnRow("lock_version", "bigint", false, Oid.INT8));
+    addSelectPrimaryKeyResult("venues", "venue_id");
+    addSelectTableDescriptionResult("venues", "create table venues");
+    // TODO: Actually add indexes.
+    addSelectTableIndexesResult("venues");
+    addSelectTableConstraintsResult("venues");
+
+    addSelectColumnsResult(
+        "concerts",
+        createColumnRow("concert_id", "character varying", true, Oid.VARCHAR),
+        createColumnRow("venue_id", "character varying", true, Oid.VARCHAR),
+        createColumnRow("singer_id", "character varying", true, Oid.VARCHAR),
+        createColumnRow("name", "character varying", true, Oid.VARCHAR),
+        createColumnRow("start_time", "timestamp with time zone", true, Oid.TIMESTAMPTZ),
+        createColumnRow("end_time", "timestamp with time zone", true, Oid.TIMESTAMPTZ),
+        createColumnRow("created_at", "timestamp with time zone", false, Oid.TIMESTAMPTZ),
+        createColumnRow("updated_at", "timestamp with time zone", false, Oid.TIMESTAMPTZ),
+        createColumnRow("lock_version", "bigint", false, Oid.INT8));
+    addSelectPrimaryKeyResult("concerts", "concert_id");
+    addSelectTableDescriptionResult("concerts", "create table concerts");
+    // TODO: Actually add indexes.
+    addSelectTableIndexesResult("concerts");
+    addSelectTableConstraintsResult("concerts");
+
     // TODO: Actually add foreign keys.
     addSelectTableForeignKeysResult("albums");
     addSelectTableForeignKeysResult("singers");
     addSelectTableForeignKeysResult("tracks");
+    addSelectTableForeignKeysResult("venues");
+    addSelectTableForeignKeysResult("concerts");
   }
 }

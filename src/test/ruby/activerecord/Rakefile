@@ -16,8 +16,6 @@ ActiveRecord::Base.establish_connection(
   database: 'activerecord',
   host: ENV['PGHOST'] || 'localhost',
   port: ENV['PGPORT'] || '5432',
-  username: ENV['PGUSER'],
-  password: ENV['PGPASSWORD'],
   pool: 5,
   # Advisory locks are not supported by PGAdapter
   advisory_locks: false,
