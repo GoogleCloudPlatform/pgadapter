@@ -33,6 +33,7 @@ class Application
   def self.query_singers
     # Fetch all singers and albums from the database.
     # The database has been pre-filled by the `db/seeds.rb` script.
+    puts ''
     puts 'Known singers and their albums:'
     puts ''
     Singer.all.each do |singer|
@@ -50,6 +51,7 @@ class Application
     # Select a random singer and update the name of this singer.
     puts ''
     singer = Singer.all.sample
+    puts ''
     puts "Current name of singer #{singer.id} is '#{singer.first_name} #{singer.last_name}'"
     puts "Updating name to 'Dave Anderson'"
     singer.first_name = 'Dave'
@@ -76,6 +78,7 @@ class Application
 
   # Lists all concerts and related venue information.
   def self.query_concerts
+    puts ''
     puts 'Known concerts:'
     puts ''
     Concert.all.each do |concert|

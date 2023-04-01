@@ -12,46 +12,41 @@ require "docker"
 
 Bundler.require
 
-ActiveRecord::Base.establish_connection(
-  adapter: "postgresql",
-  database: ENV["PGDATABASE"] || "activerecord",
-  host: ENV["PGHOST"] || "localhost",
-  port: ENV["PGPORT"] || "5432",
-  pool: 5,
-  # Advisory locks are not supported by PGAdapter
-  advisory_locks: false,
-  # These settings ensure that migrations and schema inspections work.
-  variables: {
-    "spanner.ddl_transaction_mode": "AutocommitExplicitTransaction",
-    "spanner.emulate_pg_class_tables": "true"
-  },
-)
-
 desc 'Runs a simple ActiveRecord tutorial for Google Cloud Spanner PostgreSQL.'
 task :run do
-  puts "Downloading PGAdapter image..."
-  Docker::Image.create "fromImage" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:latest"
-  puts "Creating PGAdapter container..."
-  container = Docker::Container.create(
-    "Image" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:latest",
-    "ExposedPorts" => { "5432/tcp" => {} },
-    "HostConfig" => {
-      "PortBindings" => {
-        "5432/tcp" => [{ "HostPort" => ENV["PGPORT"] || "5432" }]
-      }
-    },
-    "Volumes" => {"/credentials.json" => { }},
-    "Binds" => ["#{ENV["GOOGLE_APPLICATION_CREDENTIALS"]}:/credentials.json"],
-    "Cmd" => ["-p", "appdev-soda-spanner-staging", "-i", "knut-test-ycsb", "-c", "/credentials.json",  "-x"]
-  )
+  credentials = ENV["GOOGLE_APPLICATION_CREDENTIALS"]
+  fail "You must set the environment variable GOOGLE_APPLICATION_CREDENTIALS before running the sample." if credentials.nil?
 
+  container = create_pgadapter_container(credentials)
   begin
     puts "Starting PGAdapter..."
     container.start!
     sleep(2)
+    sh 'rake db:migrate'
     sh 'rake db:seed'
     sh 'ruby application.rb'
   ensure
     container.stop!
+    container.remove
   end
+end
+
+def create_pgadapter_container(credentials)
+  puts "Downloading PGAdapter image..."
+  Docker::Image.create "fromImage" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:ruby-active-record"
+  puts "Creating PGAdapter container..."
+  Docker::Container.create(
+    "Image" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:ruby-active-record",
+    "ExposedPorts" => { "5432/tcp" => {} },
+    "HostConfig" => {
+      "PortBindings" => {
+        "5432/tcp" => [{ "HostPort" => ENV["PGPORT"] || "5432" }]
+      },
+      "Binds" => ["#{credentials}:/credentials.json:ro"],
+    },
+    "Volumes" => { "/credentials.json" => {}},
+    # Start PGAdapter with the given credentials and no default project, instance or database.
+    # This means that the fully qualified database name must be used in the database.yml file.
+    "Cmd" => ["-c", "/credentials.json", "-x"]
+  )
 end

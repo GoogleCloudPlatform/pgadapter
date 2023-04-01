@@ -87,11 +87,21 @@ venue_names = [
 
 rnd = Random.new
 
-Concert.delete_all
-Venue.delete_all
-Album.delete_all
-Singer.delete_all
+puts "Deleting existing data..."
 
+Concert.delete_all
+puts "Deleted concerts"
+
+Venue.delete_all
+puts "Deleted venues"
+
+Album.delete_all
+puts "Deleted albums"
+
+Singer.delete_all
+puts "Deleted singers"
+
+puts "Creating random singers, albums, tracks, venues and concerts..."
 Singer.transaction do
   singers = []
   albums = []
@@ -105,6 +115,7 @@ Singer.transaction do
                     active: true})
   end
   Singer.create singers
+  puts "Created #{singers.length} singers"
 
   30.times do
     singer_id = singers.sample[:singer_id]
@@ -116,6 +127,7 @@ Singer.transaction do
                    cover_picture: rnd.bytes(rand(200) + 10)})
   end
   Album.create albums
+  puts "Created #{albums.length} albums"
 
   albums.each do |album|
     10.times do |num|
@@ -126,6 +138,7 @@ Singer.transaction do
     end
   end
   Track.create tracks
+  puts "Created #{tracks.length} tracks"
 
   10.times do
     venues.append({venue_id: SecureRandom.uuid,
@@ -136,6 +149,7 @@ Singer.transaction do
                    }})
   end
   Venue.create venues
+  puts "Created #{venues.length} venues"
 
   50.times do
     singer = singers.sample
@@ -150,4 +164,6 @@ Singer.transaction do
                      end_time: end_time})
   end
   Concert.create concerts
+  puts "Created #{concerts.length} concerts"
 end
+puts "Finished seeding data"

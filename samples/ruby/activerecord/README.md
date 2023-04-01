@@ -11,34 +11,51 @@ to use `ActiveRecord` in general.
 
 See [Limitations](#limitations) for a full list of known limitations when working with `ActiveRecord`.
 
-## Start PGAdapter
-You must start PGAdapter before you can run the sample. The following command shows how to start PGAdapter using the
-pre-built Docker image. See [Running PGAdapter](../../../README.md#usage) for more information on other options for how
-to run PGAdapter.
+## Running the Sample
+The sample application automatically starts PGAdapter in a Docker container. You must have Docker
+installed on your local system to run the sample. Furthermore, you must configure the following.
+
+1. Set the environment variable `GOOGLE_APPLICATION_CREDENTIALS` to point to a valid (service) account file
+   that should be used to run the sample.
+2. Modify the `config/database.yml` file so it points to your database.
+3. If you already have PostgreSQL running on your local host on port 5432: Modify the port number in the
+   `database.yml` to for example 5433. This port number will be used to start PGAdapter.
+
+Alternatively, you can also set the following environment variables to configure the database and port number:
 
 ```shell
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-docker pull gcr.io/cloud-spanner-pg-adapter/pgadapter
-docker run \
-  -d -p 5432:5432 \
-  -v ${GOOGLE_APPLICATION_CREDENTIALS}:${GOOGLE_APPLICATION_CREDENTIALS}:ro \
-  -e GOOGLE_APPLICATION_CREDENTIALS \
-  -v /tmp:/tmp \
-  gcr.io/cloud-spanner-pg-adapter/pgadapter \
-  -p my-project -i my-instance \
-  -x
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+PGPORT=5433
+PGDATABASE=projects/my-project/instances/my-instance/databases/my-database
 ```
 
-## Connecting
+Make sure the database that you point the sample to is empty, as the sample application will
+automatically create the required data model in that database.
+
+Run the sample with the following command:
+
+```shell
+bundle exec rake run
+```
+
+
+## Configuration
 You need to add some extra options to your Ruby ActiveRecord configuration to work with Cloud Spanner.
 
-### Initialization
-The following code snippet shows the additional options that must be set when working with PGAdapter
+The following code snippets show the additional options that must be set when working with PGAdapter
 and Cloud Spanner. These options ensure that:
 1. ActiveRecord uses `timestamptz` instead of `timestamp(6)` as the default date/time data type.
 2. `advisory_locks` are not used for migrations.
 3. DDL transactions are converted to DDL batches. See [DDL options](../../../docs/ddl.md) for more information.
 4. `pg_class` and related tables are emulated by PGAdapter.
+
+### Initialization
+The following initialization code makes sure that ActiveRecord will use `timestamptz` as the default
+date/time type for PostgreSQL databases. In addition, it will prevent ActiveRecord from using type
+modifiers for `timestamptz` data types (e.g. `timestamptz(6)`).
+
+This initialization code is only required for executing migrations. You may omit this from your
+initialization code when you are not running migrations.
 
 ```ruby
 # Make sure that the PostgreSQL-adapter uses timestamptz without any type modifiers.
@@ -50,96 +67,50 @@ module ActiveRecord::ConnectionAdapters
     end
   end
 end
-
-ActiveRecord::Base.establish_connection(
-  adapter: 'postgresql',
-  database: ENV['PGDATABASE'] || 'my-database',
-  host: ENV['PGHOST'] || 'localhost',
-  port: ENV['PGPORT'] || '5432',
-  pool: 5,
-  # Advisory locks are not supported by PGAdapter
-  advisory_locks: false,
-  # These settings ensure that migrations and schema inspections work.
-  variables: {
-    "spanner.ddl_transaction_mode": "AutocommitExplicitTransaction",
-    "spanner.emulate_pg_class_tables": "true"
-  },
-)
 ```
 
 ### database.yml
-The following is an example `database.yml` file for PGAdapter.
+The following is the `database.yml` that is used by this sample. It uses the standard
+`PGHOST`, `PGPORT` and `PGDATABASE` environment variables. Note that PGAdapter will
+automatically be started on the value that is set in `PGPORT`. Ensure that you set this
+environment variable to an available port on your system.
 
 ```yaml
-development:
+default: &default
   adapter: postgresql
-  host: localhost
-  port: 5432
-  database: my-database
-  pool: 5,
+  host: <%= ENV['PGHOST'] || "localhost" %>
+  port: <%= ENV['PGPORT'] || "5432" %>
+  database: <%= ENV['PGDATABASE'] || "projects/my-project/instances/my-instance/databases/my-database" %>
+  pool: 5
   # Advisory locks are not supported by PGAdapter
-  advisory_locks: false,
+  advisory_locks: false
   # These settings ensure that migrations and schema inspections work.
   variables:
     "spanner.ddl_transaction_mode": "AutocommitExplicitTransaction"
     "spanner.emulate_pg_class_tables": "true"
+
+development:
+  <<: *default
 ```
 
-## Creating the Sample Data Model
-The sample data model contains example tables that cover all supported data types the Cloud Spanner
-PostgreSQL dialect. It also includes an example for how [interleaved tables](https://cloud.google.com/spanner/docs/reference/postgresql/data-definition-language#extensions_to)
-can be used with SQLAlchemy. Interleaved tables is a Cloud Spanner extension of the standard
-PostgreSQL dialect.
+## Data Model
+The data model is automatically created using a standard ActiveRecord migration script.
+See [db/migrate/01_create_tables.rb](db/migrate/01_create_tables.rb) for the migration script.
 
-The corresponding SQLAlchemy model is defined in [model.py](model.py).
-
-Run the following command in this directory. Replace the host, port and database name with the actual
-host, port and database name for your PGAdapter and database setup.
-
-```shell
-psql -h localhost -p 5432 -d my-database -f create_data_model.sql
-```
-
-You can also drop an existing data model using the `drop_data_model.sql` script:
-
-```shell
-psql -h localhost -p 5432 -d my-database -f drop_data_model.sql
-```
-
-## Data Types
-Cloud Spanner supports the following data types in combination with `SQLAlchemy 2.x`.
-
-| PostgreSQL Type                        | SQLAlchemy type         |
-|----------------------------------------|-------------------------|
-| boolean                                | Boolean                 |
-| bigint / int8                          | Integer, BigInteger     |
-| varchar                                | String                  |
-| text                                   | String                  |
-| float8 / double precision              | Float                   |
-| numeric                                | Numeric                 |
-| timestamptz / timestamp with time zone | DateTime(timezone=True) |
-| date                                   | Date                    |
-| bytea                                  | LargeBinary             |
-| jsonb                                  | JSONB                   |
+You can drop the data model again using the `drop_data_model.sql` script in this folder.
 
 
 ## Limitations
 The following limitations are currently known:
 
-| Limitation                     | Workaround                                                                                                                                                                                                                                                          |
-|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Creating and Dropping Tables   | Cloud Spanner does not support the full PostgreSQL DDL dialect. Automated creation of tables using `SQLAlchemy` is therefore not supported.                                                                                                                         |
-| metadata.reflect()             | Cloud Spanner does not support all PostgreSQL `pg_catalog` tables. Using `metadata.reflect()` to get the current objects in the database is therefore not supported.                                                                                                |
-| DDL Transactions               | Cloud Spanner does not support DDL statements in a transaction. Add `?options=-c spanner.ddl_transaction_mode=AutocommitExplicitTransaction` to your connection string to automatically convert DDL transactions to [non-atomic DDL batches](../../../docs/ddl.md). |
-| Generated primary keys         | Manually assign a value to the primary key column in your code. The recommended primary key type is a random UUID. Sequences / SERIAL / IDENTITY columns are currently not supported.                                                                               |
-| INSERT ... ON CONFLICT         | `INSERT ... ON CONFLICT` is not supported.                                                                                                                                                                                                                          |
-| SAVEPOINT                      | Nested transactions and savepoints are not supported.                                                                                                                                                                                                               |
-| SELECT ... FOR UPDATE          | `SELECT ... FOR UPDATE` is not supported.                                                                                                                                                                                                                           |
-| Server side cursors            | Server side cursors are currently not supported.                                                                                                                                                                                                                    |
-| Transaction isolation level    | Only SERIALIZABLE and AUTOCOMMIT are supported. `postgresql_readonly=True` is also supported. It is recommended to use either autocommit or read-only for workloads that only read data and/or that do not need to be atomic to get the best possible performance.  |
-| Stored procedures              | Cloud Spanner does not support Stored Procedures.                                                                                                                                                                                                                   |
-| User defined functions         | Cloud Spanner does not support User Defined Functions.                                                                                                                                                                                                              |
-| Other drivers than psycopg 3.x | PGAdapter does not support using SQLAlchemy 2.x with any other drivers than `psycopg 3.x`.                                                                                                                                                                          |
+| Limitation                     | Workaround                                                                                                                                                                                                                                                                                                                                               |
+|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Schema Dumper                  | Cloud Spanner does not support all PostgreSQL `pg_catalog` tables. Using `ActiveRecord::SchemaDumper` to get export the current schema is not guaranteed to include all objects in the database.                                                                                                                                                         |
+| DDL Transactions               | Cloud Spanner does not support DDL statements in a transaction. Add `"spanner.ddl_transaction_mode": "AutocommitExplicitTransaction"` to the `variables` section in your `database.yml` file to automatically convert DDL transactions to [non-atomic DDL batches](../../../docs/ddl.md). See [config/database.yml](config/database.yml) for an example. |
+| Generated primary keys         | Manually assign a value to the primary key column in your code. The recommended primary key type is a random UUID. Sequences / SERIAL / IDENTITY columns are currently not supported.                                                                                                                                                                    |
+| Upsert                         | `upsert` and `upsert_all` are not supported.                                                                                                                                                                                                                                                                                                             |
+| SELECT ... FOR UPDATE          | Pessimistic locking / `SELECT ... FOR UPDATE` is not supported.                                                                                                                                                                                                                                                                                          |
+| Transaction isolation level    | Only isolation level `:serializable` is supported.                                                                                                                                                                                                                                                                                                       |
 
 ### Generated Primary Keys
 Generated primary keys are not supported and should be replaced with primary key definitions that
@@ -147,77 +118,17 @@ are manually assigned. See https://cloud.google.com/spanner/docs/schema-design#p
 for more information on choosing a good primary key. This sample uses random UUIDs that are generated
 by the client and stored as strings for primary keys.
 
-```python
-from uuid import uuid4
-
-class Singer(Base):
-  id = Column(String, primary_key=True)
-  name = Column(String(100))
-
-singer = Singer(
-  id="{}".format(uuid4()),
-  name="Alice")
+```ruby
+Singer.create({singer_id: SecureRandom.uuid,
+               first_name: 'Bob',
+               last_name: 'Anderson'})
 ```
 
-### ON CONFLICT Clauses
+### Upsert / ON CONFLICT Clauses
 `INSERT ... ON CONFLICT ...` are not supported by Cloud Spanner and should not be used. Trying to
-use https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_update
-or https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_nothing
-will fail.
+use `upsert` or `upsert_all` will fail.
 
-### SAVEPOINT - Nested transactions
-`SAVEPOINT`s are not supported by Cloud Spanner. Nested transactions in SQLAlchemy are translated to
-savepoints and are therefore not supported. Trying to use `Session.begin_nested()`
-(https://docs.sqlalchemy.org/en/20/orm/session_api.html#sqlalchemy.orm.Session.begin_nested) will fail.
-
-### Locking - SELECT ... FOR UPDATE
-Locking clauses, like `SELECT ... FOR UPDATE`, are not supported (see also https://docs.sqlalchemy.org/en/20/orm/queryguide/query.html#sqlalchemy.orm.Query.with_for_update).
+### Pessimistic Locking - SELECT ... FOR UPDATE
+Locking clauses, like `SELECT ... FOR UPDATE`, are not supported (see also https://api.rubyonrails.org/classes/ActiveRecord/Locking/Pessimistic.html).
 These are normally also not required, as Cloud Spanner uses isolation level `serializable` for
 read/write transactions.
-
-## Performance Considerations
-
-### Read-only Transactions
-SQLAlchemy will by default use read/write transactions for all database operations, including for
-workloads that only read data. This will cause Cloud Spanner to take locks for all data that is read
-during the transaction. It is recommended to use either autocommit or [read-only transactions](https://cloud.google.com/spanner/docs/transactions#read-only_transactions)
-for workloads that are known to only execute read operations. Read-only transactions do not take any
-locks. You can create a separate database engine that can be used for read-only transactions from
-your default database engine by adding the `postgresql_readonly=True` execution option.
-
-```python
-read_only_engine = engine.execution_options(postgresql_readonly=True)
-```
-
-### Autocommit
-Using isolation level `AUTOCOMMIT` will suppress the use of (read/write) transactions for each
-database operation in SQLAlchemy. Using autocommit is more efficient than read/write transactions
-for workloads that only read and/or that do not need the atomicity that is offered by transactions.
-
-You can create a separate database engine that can be used for workloads that do not need
-transactions by adding the `isolation_level="AUTOCOMMIT"` execution option to your default database
-engine.
-
-```python
-autocommit_engine = engine.execution_options(isolation_level="AUTOCOMMIT")
-```
-
-### Stale reads
-Read-only transactions and database engines using `AUTOCOMMIT` will by default use strong reads for
-queries. Cloud Spanner also supports stale reads.
-
-* A strong read is a read at a current timestamp and is guaranteed to see all data that has been
-  committed up until the start of this read. Spanner defaults to using strong reads to serve read requests.
-* A stale read is read at a timestamp in the past. If your application is latency sensitive but
-  tolerant of stale data, then stale reads can provide performance benefits.
-
-See also https://cloud.google.com/spanner/docs/reads#read_types
-
-You can create a database engine that will use stale reads in autocommit mode by adding the following
-to the connection string and execution options of the engine:
-
-```python
-conn_string = "postgresql+psycopg://user:password@localhost:5432/my-database" \
-              "?options=-c spanner.read_only_staleness='MAX_STALENESS 10s'"
-engine = create_engine(conn_string).execution_options(isolation_level="AUTOCOMMIT")
-```

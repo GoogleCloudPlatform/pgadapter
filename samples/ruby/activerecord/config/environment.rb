@@ -12,6 +12,9 @@ require 'bundler'
 Bundler.require
 
 # Make sure that the PostgreSQL-adapter uses timestamptz without any type modifiers.
+# You only need this if your application:
+# 1. Executes migrations OR
+# 2. Creates the `schema_migrations` and/or `ar_internal_metadata` tables.
 ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.datetime_type = :timestamptz
 module ActiveRecord::ConnectionAdapters
   class PostgreSQLAdapter
@@ -20,18 +23,3 @@ module ActiveRecord::ConnectionAdapters
     end
   end
 end
-
-ActiveRecord::Base.establish_connection(
-  adapter: 'postgresql',
-  database: ENV['PGDATABASE'] || 'activerecord',
-  host: ENV['PGHOST'] || 'localhost',
-  port: ENV['PGPORT'] || '5432',
-  pool: 5,
-  # Advisory locks are not supported by PGAdapter
-  advisory_locks: false,
-  # These settings ensure that migrations and schema inspections work.
-  variables: {
-    "spanner.ddl_transaction_mode": "AutocommitExplicitTransaction",
-    "spanner.emulate_pg_class_tables": "true"
-  },
-)
