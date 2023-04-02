@@ -302,6 +302,10 @@ public class ClientAutoDetector {
                   Pattern.compile("(\\s+.+?)\\.oid::regclass::text"),
                   " substr($1.oid, 12, length($1.oid) - 13)"),
               RegexQueryPartReplacer.replace(
+                  Pattern.compile(
+                      "t\\.typinput\\s*=\\s*'array_in\\(\\s*cstring\\s*,\\s*oid,\\s*integer\\)'::regprocedure"),
+                  "t.typinput='array_in'"),
+              RegexQueryPartReplacer.replace(
                   Pattern.compile("SELECT\\s+distinct\\s+i\\.relname\\s*,"), "SELECT i.relname,"));
 
       @Override

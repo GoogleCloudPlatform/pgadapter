@@ -17,8 +17,8 @@ ActiveRecord::Schema[7.0].define(version: 0) do
     t.date "release_date", collation: ""
     t.binary "cover_picture", collation: ""
     t.string "singer_id", null: false, collation: ""
-    t.datetime "created_at", precision: nil, collation: ""
-    t.datetime "updated_at", precision: nil, collation: ""
+    t.timestamptz "created_at", collation: ""
+    t.timestamptz "updated_at", collation: ""
     t.bigint "lock_version", collation: ""
   end
 
@@ -27,8 +27,8 @@ ActiveRecord::Schema[7.0].define(version: 0) do
     t.string "last_name", null: false, collation: ""
     t.string "full_name", collation: ""
     t.boolean "active", collation: ""
-    t.datetime "created_at", precision: nil, collation: ""
-    t.datetime "updated_at", precision: nil, collation: ""
+    t.timestamptz "created_at", collation: ""
+    t.timestamptz "updated_at", collation: ""
     t.bigint "lock_version", collation: ""
   end
 

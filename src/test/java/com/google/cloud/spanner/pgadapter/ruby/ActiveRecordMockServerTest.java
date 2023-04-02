@@ -1452,10 +1452,10 @@ public class ActiveRecordMockServerTest extends AbstractRubyMockServerTest {
     addSelectTableConstraintsResult("concerts");
 
     // TODO: Actually add foreign keys.
-    addSelectTableForeignKeysResult("albums");
-    addSelectTableForeignKeysResult("singers");
-    addSelectTableForeignKeysResult("tracks");
-    addSelectTableForeignKeysResult("venues");
-    addSelectTableForeignKeysResult("concerts");
+    addSelectTableForeignKeysResult("albums", true);
+    addSelectTableForeignKeysResult("singers", true);
+    addSelectTableForeignKeysResult("tracks", true);
+    addSelectTableForeignKeysResult("venues", true);
+    addSelectTableForeignKeysResult("concerts", true);
   }
 }

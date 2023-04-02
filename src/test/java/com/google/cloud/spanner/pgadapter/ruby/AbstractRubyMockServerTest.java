@@ -187,6 +187,96 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                           .build())
                   .build())
           .build();
+
+  private static final ListValue VARCHAR_TYPE_ROW =
+      ListValue.newBuilder()
+          .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.VARCHAR)).build())
+          .addValues(Value.newBuilder().setStringValue("varchar").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .addValues(Value.newBuilder().setStringValue(",").build())
+          .addValues(Value.newBuilder().setStringValue("varcharin").build())
+          .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+          .addValues(Value.newBuilder().setStringValue("b").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .build();
+  private static final ListValue BOOL_TYPE_ROW =
+      ListValue.newBuilder()
+          .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.BOOL)).build())
+          .addValues(Value.newBuilder().setStringValue("bool").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .addValues(Value.newBuilder().setStringValue(",").build())
+          .addValues(Value.newBuilder().setStringValue("boolin").build())
+          .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+          .addValues(Value.newBuilder().setStringValue("b").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .build();
+  private static final ListValue TIMESTAMPTZ_TYPE_ROW =
+      ListValue.newBuilder()
+          .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.TIMESTAMPTZ)).build())
+          .addValues(Value.newBuilder().setStringValue("timestamptz").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .addValues(Value.newBuilder().setStringValue(",").build())
+          .addValues(Value.newBuilder().setStringValue("timestamptzin").build())
+          .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+          .addValues(Value.newBuilder().setStringValue("b").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .build();
+  private static final ListValue INT8_TYPE_ROW =
+      ListValue.newBuilder()
+          .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT8)).build())
+          .addValues(Value.newBuilder().setStringValue("int8").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .addValues(Value.newBuilder().setStringValue(",").build())
+          .addValues(Value.newBuilder().setStringValue("int8in").build())
+          .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+          .addValues(Value.newBuilder().setStringValue("b").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .build();
+  private static final ListValue NUMERIC_TYPE_ROW =
+      ListValue.newBuilder()
+          .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.NUMERIC)).build())
+          .addValues(Value.newBuilder().setStringValue("numeric").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .addValues(Value.newBuilder().setStringValue(",").build())
+          .addValues(Value.newBuilder().setStringValue("numericin").build())
+          .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+          .addValues(Value.newBuilder().setStringValue("b").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .build();
+  private static final ListValue DATE_TYPE_ROW =
+      ListValue.newBuilder()
+          .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.DATE)).build())
+          .addValues(Value.newBuilder().setStringValue("date").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .addValues(Value.newBuilder().setStringValue(",").build())
+          .addValues(Value.newBuilder().setStringValue("datein").build())
+          .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+          .addValues(Value.newBuilder().setStringValue("b").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .build();
+  private static final ListValue BYTEA_TYPE_ROW =
+      ListValue.newBuilder()
+          .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.BYTEA)).build())
+          .addValues(Value.newBuilder().setStringValue("bytea").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .addValues(Value.newBuilder().setStringValue(",").build())
+          .addValues(Value.newBuilder().setStringValue("byteain").build())
+          .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+          .addValues(Value.newBuilder().setStringValue("b").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .build();
+  private static final ListValue FLOAT8_TYPE_ROW =
+      ListValue.newBuilder()
+          .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT8)).build())
+          .addValues(Value.newBuilder().setStringValue("float8").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .addValues(Value.newBuilder().setStringValue(",").build())
+          .addValues(Value.newBuilder().setStringValue("float8in").build())
+          .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
+          .addValues(Value.newBuilder().setStringValue("b").build())
+          .addValues(Value.newBuilder().setStringValue("0").build())
+          .build();
+
   private static final com.google.spanner.v1.ResultSet SELECT_TYPES_EXTENDED_RESULTSET =
       ResultSet.newBuilder()
           .addRows(
@@ -211,17 +301,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                   .addValues(Value.newBuilder().setStringValue("b").build())
                   .addValues(Value.newBuilder().setStringValue("0").build())
                   .build())
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.INT8)).build())
-                  .addValues(Value.newBuilder().setStringValue("int8").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .addValues(Value.newBuilder().setStringValue(",").build())
-                  .addValues(Value.newBuilder().setStringValue("int8in").build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setStringValue("b").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .build())
+          .addRows(INT8_TYPE_ROW)
           .addRows(
               ListValue.newBuilder()
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT4)).build())
@@ -233,28 +313,8 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                   .addValues(Value.newBuilder().setStringValue("b").build())
                   .addValues(Value.newBuilder().setStringValue("0").build())
                   .build())
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.FLOAT8)).build())
-                  .addValues(Value.newBuilder().setStringValue("float8").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .addValues(Value.newBuilder().setStringValue(",").build())
-                  .addValues(Value.newBuilder().setStringValue("float8in").build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setStringValue("b").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .build())
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.NUMERIC)).build())
-                  .addValues(Value.newBuilder().setStringValue("numeric").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .addValues(Value.newBuilder().setStringValue(",").build())
-                  .addValues(Value.newBuilder().setStringValue("numericin").build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setStringValue("b").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .build())
+          .addRows(FLOAT8_TYPE_ROW)
+          .addRows(NUMERIC_TYPE_ROW)
           .addRows(
               ListValue.newBuilder()
                   .addValues(
@@ -267,29 +327,8 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                   .addValues(Value.newBuilder().setStringValue("b").build())
                   .addValues(Value.newBuilder().setStringValue("0").build())
                   .build())
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(
-                      Value.newBuilder().setStringValue(String.valueOf(Oid.TIMESTAMPTZ)).build())
-                  .addValues(Value.newBuilder().setStringValue("timestamptz").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .addValues(Value.newBuilder().setStringValue(",").build())
-                  .addValues(Value.newBuilder().setStringValue("timestamptzin").build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setStringValue("b").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .build())
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.BOOL)).build())
-                  .addValues(Value.newBuilder().setStringValue("bool").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .addValues(Value.newBuilder().setStringValue(",").build())
-                  .addValues(Value.newBuilder().setStringValue("boolin").build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setStringValue("b").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .build())
+          .addRows(TIMESTAMPTZ_TYPE_ROW)
+          .addRows(BOOL_TYPE_ROW)
           .addRows(
               ListValue.newBuilder()
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.TEXT)).build())
@@ -301,17 +340,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                   .addValues(Value.newBuilder().setStringValue("b").build())
                   .addValues(Value.newBuilder().setStringValue("0").build())
                   .build())
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.VARCHAR)).build())
-                  .addValues(Value.newBuilder().setStringValue("varchar").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .addValues(Value.newBuilder().setStringValue(",").build())
-                  .addValues(Value.newBuilder().setStringValue("varcharin").build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setStringValue("b").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .build())
+          .addRows(VARCHAR_TYPE_ROW)
           .addRows(
               ListValue.newBuilder()
                   .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.JSONB)).build())
@@ -323,28 +352,8 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                   .addValues(Value.newBuilder().setStringValue("b").build())
                   .addValues(Value.newBuilder().setStringValue("0").build())
                   .build())
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.BYTEA)).build())
-                  .addValues(Value.newBuilder().setStringValue("bytea").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .addValues(Value.newBuilder().setStringValue(",").build())
-                  .addValues(Value.newBuilder().setStringValue("byteain").build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setStringValue("b").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .build())
-          .addRows(
-              ListValue.newBuilder()
-                  .addValues(Value.newBuilder().setStringValue(String.valueOf(Oid.DATE)).build())
-                  .addValues(Value.newBuilder().setStringValue("date").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .addValues(Value.newBuilder().setStringValue(",").build())
-                  .addValues(Value.newBuilder().setStringValue("datein").build())
-                  .addValues(Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build())
-                  .addValues(Value.newBuilder().setStringValue("b").build())
-                  .addValues(Value.newBuilder().setStringValue("0").build())
-                  .build())
+          .addRows(BYTEA_TYPE_ROW)
+          .addRows(DATE_TYPE_ROW)
           .setMetadata(SELECT_TYPES_EXTENDED_METADATA)
           .build();
 
@@ -361,8 +370,75 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
               + "LEFT JOIN pg_range as r ON oid = rngtypid\n"
               + "WHERE\n"
               + "  t.typtype IN ('r', 'e', 'd')\n");
+  private static final String SELECT_RANGE_TYPES_V6 =
+      "with "
+          + PG_TYPE_PREFIX
+          + ",\n"
+          + "pg_range as (\n"
+          + "select * from (select 0::bigint as rngtypid, 0::bigint as rngsubtype, 0::bigint as rngmultitypid, 0::bigint as rngcollation, 0::bigint as rngsubopc, ''::varchar as rngcanonical, ''::varchar as rngsubdiff\n"
+          + ") range where false)\n"
+          + "SELECT t.oid, t.typname, t.typelem, t.typdelim, t.typinput, r.rngsubtype, t.typtype, t.typbasetype\n"
+          + "FROM pg_type as t\n"
+          + "LEFT JOIN pg_range as r ON oid = rngtypid\n"
+          + "WHERE t.oid IN (%d)";
+  private static final Statement SELECT_RANGE_TYPES_V6_1043 =
+      Statement.of(String.format(SELECT_RANGE_TYPES_V6, 1043));
+  private static final Statement SELECT_RANGE_TYPES_V6_16 =
+      Statement.of(String.format(SELECT_RANGE_TYPES_V6, 16));
+  private static final Statement SELECT_RANGE_TYPES_V6_1184 =
+      Statement.of(String.format(SELECT_RANGE_TYPES_V6, 1184));
+  private static final Statement SELECT_RANGE_TYPES_V6_20 =
+      Statement.of(String.format(SELECT_RANGE_TYPES_V6, 20));
+  private static final Statement SELECT_RANGE_TYPES_V6_1700 =
+      Statement.of(String.format(SELECT_RANGE_TYPES_V6, 1700));
+  private static final Statement SELECT_RANGE_TYPES_V6_1082 =
+      Statement.of(String.format(SELECT_RANGE_TYPES_V6, 1082));
+  private static final Statement SELECT_RANGE_TYPES_V6_17 =
+      Statement.of(String.format(SELECT_RANGE_TYPES_V6, 17));
+  private static final Statement SELECT_RANGE_TYPES_V6_701 =
+      Statement.of(String.format(SELECT_RANGE_TYPES_V6, 701));
   private static final ResultSet SELECT_RANGE_TYPES_RESULTSET =
       ResultSet.newBuilder().setMetadata(SELECT_TYPES_EXTENDED_METADATA).build();
+  private static final ResultSet SELECT_RANGE_TYPES_1043_RESULTSET =
+      ResultSet.newBuilder()
+          .setMetadata(SELECT_TYPES_EXTENDED_METADATA)
+          .addRows(VARCHAR_TYPE_ROW)
+          .build();
+  private static final ResultSet SELECT_RANGE_TYPES_16_RESULTSET =
+      ResultSet.newBuilder()
+          .setMetadata(SELECT_TYPES_EXTENDED_METADATA)
+          .addRows(BOOL_TYPE_ROW)
+          .build();
+  private static final ResultSet SELECT_RANGE_TYPES_1184_RESULTSET =
+      ResultSet.newBuilder()
+          .setMetadata(SELECT_TYPES_EXTENDED_METADATA)
+          .addRows(TIMESTAMPTZ_TYPE_ROW)
+          .build();
+  private static final ResultSet SELECT_RANGE_TYPES_20_RESULTSET =
+      ResultSet.newBuilder()
+          .setMetadata(SELECT_TYPES_EXTENDED_METADATA)
+          .addRows(INT8_TYPE_ROW)
+          .build();
+  private static final ResultSet SELECT_RANGE_TYPES_1700_RESULTSET =
+      ResultSet.newBuilder()
+          .setMetadata(SELECT_TYPES_EXTENDED_METADATA)
+          .addRows(NUMERIC_TYPE_ROW)
+          .build();
+  private static final ResultSet SELECT_RANGE_TYPES_1082_RESULTSET =
+      ResultSet.newBuilder()
+          .setMetadata(SELECT_TYPES_EXTENDED_METADATA)
+          .addRows(DATE_TYPE_ROW)
+          .build();
+  private static final ResultSet SELECT_RANGE_TYPES_17_RESULTSET =
+      ResultSet.newBuilder()
+          .setMetadata(SELECT_TYPES_EXTENDED_METADATA)
+          .addRows(BYTEA_TYPE_ROW)
+          .build();
+  private static final ResultSet SELECT_RANGE_TYPES_701_RESULTSET =
+      ResultSet.newBuilder()
+          .setMetadata(SELECT_TYPES_EXTENDED_METADATA)
+          .addRows(FLOAT8_TYPE_ROW)
+          .build();
 
   private static final Statement SELECT_ARRAY_TYPES =
       Statement.of(
@@ -377,6 +453,23 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
               + "LEFT JOIN pg_range as r ON oid = rngtypid\n"
               + "WHERE\n"
               + "  t.typelem IN (21, 23, 20, 700, 701, 1700, 1114, 1184, 16, 25, 1043, 3802, 17, 1082)\n");
+
+  private static final Statement SELECT_ARRAY_TYPES_V6 =
+      Statement.of(
+          "with "
+              + PG_TYPE_PREFIX
+              + ",\n"
+              + "pg_range as (\n"
+              + "select * from (select 0::bigint as rngtypid, 0::bigint as rngsubtype, 0::bigint as rngmultitypid, 0::bigint as rngcollation, 0::bigint as rngsubopc, ''::varchar as rngcanonical, ''::varchar as rngsubdiff\n"
+              + ") range where false)\n"
+              + "SELECT t.oid, t.typname, t.typelem, t.typdelim, t.typinput, r.rngsubtype, t.typtype, t.typbasetype\n"
+              + "FROM pg_type as t\n"
+              + "LEFT JOIN pg_range as r ON oid = rngtypid\n"
+              + "WHERE\n"
+              + "  t.typname IN ('int2', 'int4', 'int8', 'oid', 'float4', 'float8', 'text', 'varchar', 'char', 'name', 'bpchar', 'bool', 'bit', 'varbit', 'timestamptz', 'date', 'money', 'bytea', 'point', 'hstore', 'json', 'jsonb', 'cidr', 'inet', 'uuid', 'xml', 'tsvector', 'macaddr', 'citext', 'ltree', 'line', 'lseg', 'box', 'path', 'polygon', 'circle', 'time', 'timestamp', 'numeric', 'interval')\n"
+              + "  OR t.typtype IN ('r', 'e', 'd')\n"
+              + "  OR t.typinput='array_in'\n"
+              + "  OR t.typelem != 0\n");
   private static final com.google.spanner.v1.ResultSet SELECT_ARRAY_TYPES_RESULTSET =
       ResultSet.newBuilder()
           .addRows(
@@ -575,7 +668,9 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
   protected static final Statement SELECT_AR_INTERNAL_METADATA_TABLE =
       getSelectRelNameStatement("ar_internal_metadata");
   protected static final Statement SELECT_SCHEMA_MIGRATIONS_COLUMNS =
-      getSelectAttributesStatement("schema_migrations");
+      getSelectAttributesStatement("schema_migrations", true);
+  protected static final Statement SELECT_SCHEMA_MIGRATIONS_COLUMNS_V6 =
+      getSelectAttributesStatement("schema_migrations", false);
   protected static final ResultSetMetadata SELECT_COLUMNS_METADATA =
       ResultSetMetadata.newBuilder()
           .setRowType(
@@ -645,7 +740,9 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
           .build();
 
   protected static final Statement SELECT_AR_INTERNAL_METADATA_COLUMNS =
-      getSelectAttributesStatement("ar_internal_metadata");
+      getSelectAttributesStatement("ar_internal_metadata", true);
+  protected static final Statement SELECT_AR_INTERNAL_METADATA_COLUMNS_V6 =
+      getSelectAttributesStatement("ar_internal_metadata", false);
   protected static final ResultSet SELECT_AR_INTERNAL_METADATA_COLUMNS_RESULTSET =
       ResultSet.newBuilder()
           .setMetadata(SELECT_COLUMNS_METADATA)
@@ -717,22 +814,32 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
     mockSpanner.putStatementResult(
         StatementResult.query(SELECT_RANGE_TYPES, SELECT_RANGE_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_RANGE_TYPES_V6_1043, SELECT_RANGE_TYPES_1043_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_RANGE_TYPES_V6_16, SELECT_RANGE_TYPES_16_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_RANGE_TYPES_V6_1184, SELECT_RANGE_TYPES_1184_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_RANGE_TYPES_V6_20, SELECT_RANGE_TYPES_20_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_RANGE_TYPES_V6_1700, SELECT_RANGE_TYPES_1700_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_RANGE_TYPES_V6_1082, SELECT_RANGE_TYPES_1082_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_RANGE_TYPES_V6_17, SELECT_RANGE_TYPES_17_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_RANGE_TYPES_V6_701, SELECT_RANGE_TYPES_701_RESULTSET));
+    mockSpanner.putStatementResult(
         StatementResult.query(SELECT_ARRAY_TYPES, SELECT_ARRAY_TYPES_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(SELECT_ARRAY_TYPES_V6, SELECT_ARRAY_TYPES_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(SELECT_EXTENSIONS, SELECT_EXTENSIONS_RESULTSET));
     mockSpanner.putStatementResult(StatementResult.query(SELECT_ENUMS, SELECT_ENUMS_RESULTSET));
   }
-  //
-  //  @BeforeClass
-  //  public static void startMockSpannerAndPgAdapterServers() throws Exception {
-  //    doStartMockSpannerAndPgAdapterServers(
-  //        new MockSpannerServiceImpl(),
-  //        "d",
-  //        Collections.singleton("-ddl=AutocommitExplicitTransaction"));
-  //  }
 
   public static void createVirtualEnv(String directoryName) throws Exception {
-    run(new String[] {"bundle", "install"}, directoryName, ImmutableMap.of());
+    run(new String[] {"bundle", "update"}, directoryName, ImmutableMap.of());
   }
 
   public static String run(String[] command, String directoryName, Map<String, String> environment)
@@ -773,7 +880,13 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
             SELECT_SCHEMA_MIGRATIONS_COLUMNS, SELECT_SCHEMA_MIGRATIONS_COLUMNS_RESULTSET));
     mockSpanner.putStatementResult(
         StatementResult.query(
+            SELECT_SCHEMA_MIGRATIONS_COLUMNS_V6, SELECT_SCHEMA_MIGRATIONS_COLUMNS_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
             SELECT_AR_INTERNAL_METADATA_COLUMNS, SELECT_AR_INTERNAL_METADATA_COLUMNS_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            SELECT_AR_INTERNAL_METADATA_COLUMNS_V6, SELECT_AR_INTERNAL_METADATA_COLUMNS_RESULTSET));
 
     addMigrationResults("1");
   }
@@ -807,30 +920,35 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
             relKinds));
   }
 
-  static Statement getSelectAttributesStatement(String table) {
-    return Statement.of(
-        String.format(
-            "with "
-                + EMULATED_PG_ATTRIBUTE_PREFIX
-                + ",\n"
-                + EMULATED_PG_ATTRDEF_PREFIX
-                + ",\n"
-                + PG_TYPE_PREFIX
-                + ",\n"
-                + PgCollation.PG_COLLATION_CTE
-                + "\n"
-                + "SELECT a.attname, a.spanner_type as format_type,\n"
-                + "       d.adbin as pg_get_expr, a.attnotnull, a.atttypid, a.atttypmod,\n"
-                + "       c.collname, ''::varchar AS comment,\n"
-                + "       attgenerated as attgenerated\n"
-                + "  FROM pg_attribute a\n"
-                + "  LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum\n"
-                + "  LEFT JOIN pg_type t ON a.atttypid = t.oid\n"
-                + "  LEFT JOIN pg_collation c ON a.attcollation = c.oid AND a.attcollation <> t.typcollation\n"
-                + " WHERE a.attrelid = '''\"public\".\"%s\"'''\n"
-                + "   AND a.attnum > 0 AND NOT a.attisdropped\n"
-                + " ORDER BY a.attnum\n",
-            table));
+  static Statement getSelectAttributesStatement(String table, boolean withGenerated) {
+    Statement statement =
+        Statement.of(
+            String.format(
+                "with "
+                    + EMULATED_PG_ATTRIBUTE_PREFIX
+                    + ",\n"
+                    + EMULATED_PG_ATTRDEF_PREFIX
+                    + ",\n"
+                    + PG_TYPE_PREFIX
+                    + ",\n"
+                    + PgCollation.PG_COLLATION_CTE
+                    + "\n"
+                    + "SELECT a.attname, a.spanner_type as format_type,\n"
+                    + "       d.adbin as pg_get_expr, a.attnotnull, a.atttypid, a.atttypmod,\n"
+                    + "       c.collname, ''::varchar AS comment,\n"
+                    + "       attgenerated as attgenerated\n"
+                    + "  FROM pg_attribute a\n"
+                    + "  LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum\n"
+                    + "  LEFT JOIN pg_type t ON a.atttypid = t.oid\n"
+                    + "  LEFT JOIN pg_collation c ON a.attcollation = c.oid AND a.attcollation <> t.typcollation\n"
+                    + " WHERE a.attrelid = '''\"public\".\"%s\"'''\n"
+                    + "   AND a.attnum > 0 AND NOT a.attisdropped\n"
+                    + " ORDER BY a.attnum\n",
+                table));
+    return withGenerated
+        ? statement
+        : Statement.of(
+            statement.getSql().replace(",\n       attgenerated as attgenerated\n", "\n"));
   }
 
   static ListValue createColumnRow(String name, String type, boolean notNull, int oid) {
@@ -961,7 +1079,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
   static void addSelectColumnsResult(String table, ListValue... columns) {
     mockSpanner.putStatementResult(
         StatementResult.query(
-            getSelectAttributesStatement(table),
+            getSelectAttributesStatement(table, true),
             ResultSet.newBuilder()
                 .setMetadata(SELECT_COLUMNS_METADATA)
                 .addAllRows(Arrays.stream(columns).collect(Collectors.toList()))
@@ -1274,7 +1392,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                 .build()));
   }
 
-  static void addSelectTableForeignKeysResult(String table) {
+  static void addSelectTableForeignKeysResult(String table, boolean withDeferrable) {
     mockSpanner.putStatementResult(
         StatementResult.query(
             Statement.of(
@@ -1287,7 +1405,10 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
                         + EMULATED_PG_ATTRIBUTE_PREFIX
                         + ",\n"
                         + PgNamespace.PG_NAMESPACE_CTE
-                        + "\nSELECT substr( t2.oid, 12, length( t2.oid) - 13) AS to_table, a1.attname AS column, a2.attname AS primary_key, c.conname AS name, c.confupdtype AS on_update, c.confdeltype AS on_delete, c.convalidated AS valid, c.condeferrable AS deferrable, c.condeferred AS deferred\n"
+                        + "\nSELECT substr( t2.oid, 12, length( t2.oid) - 13) AS to_table, a1.attname AS column, a2.attname AS primary_key, c.conname AS name, c.confupdtype AS on_update, c.confdeltype AS on_delete, c.convalidated AS valid"
+                        + (withDeferrable
+                            ? ", c.condeferrable AS deferrable, c.condeferred AS deferred\n"
+                            : "\n")
                         + "FROM pg_constraint c\n"
                         + "JOIN pg_class t1 ON c.conrelid = t1.oid\n"
                         + "JOIN pg_class t2 ON c.confrelid = t2.oid\n"

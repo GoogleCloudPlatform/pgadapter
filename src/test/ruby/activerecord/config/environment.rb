@@ -11,8 +11,17 @@ require 'bundler'
 
 Bundler.require
 
-# Make sure that the PostgreSQL-adapter uses timestamptz without any type modifiers.
+# Make sure that the PostgreSQL-adapter uses timestamptz by default, and without any type modifiers.
+
+# The following sets the default type that should be used by PostgreSQL for datetime.
+# This is only supported in ActiveRecord 7.0 and higher.
 ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.datetime_type = :timestamptz
+
+# Remove the above line and uncomment the line below if you are using ActiveRecord 6.1 or lower.
+# ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::NATIVE_DATABASE_TYPES[:datetime] = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::NATIVE_DATABASE_TYPES[:timestamptz]
+
+# The following ensures that ActiveRecord does not use any type modifiers for timestamp types.
+# That is; Cloud Spanner only supports `timestamptz` and not for example `timestamptz(6)`.
 module ActiveRecord::ConnectionAdapters
   class PostgreSQLAdapter
     def supports_datetime_with_precision?
@@ -20,18 +29,3 @@ module ActiveRecord::ConnectionAdapters
     end
   end
 end
-
-ActiveRecord::Base.establish_connection(
-  adapter: 'postgresql',
-  database: ENV['PGDATABASE'] || 'activerecord',
-  host: ENV['PGHOST'] || 'localhost',
-  port: ENV['PGPORT'] || '5432',
-  pool: 5,
-  # Advisory locks are not supported by PGAdapter
-  advisory_locks: false,
-  # These settings ensure that migrations and schema inspections work.
-  variables: {
-    "spanner.ddl_transaction_mode": "AutocommitExplicitTransaction",
-    "spanner.emulate_pg_class_tables": "true"
-  },
-)
