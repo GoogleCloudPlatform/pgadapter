@@ -6,7 +6,7 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT.
 
-# Simple migration to create two tables for the sample application.
+# Simple migration to create the schema for the sample application.
 class CreateTables < ActiveRecord::Migration[7.0]
   def change
     create_table :singers, id: false, primary_key: :singer_id do |t|
@@ -16,8 +16,8 @@ class CreateTables < ActiveRecord::Migration[7.0]
       t.virtual :full_name, type: :string, as: "coalesce(concat(first_name, ' '::varchar, last_name), last_name)", stored: true
       t.boolean :active
 
-      t.timestamptz :created_at
-      t.timestamptz :updated_at
+      t.datetime :created_at
+      t.datetime :updated_at
       t.integer :lock_version, null: false
     end
 
@@ -33,8 +33,8 @@ class CreateTables < ActiveRecord::Migration[7.0]
       t.references :singer, foreign_key: {primary_key: :singer_id},
                    type: :string, limit: 36, index: false
 
-      t.timestamptz :created_at
-      t.timestamptz :updated_at
+      t.datetime :created_at
+      t.datetime :updated_at
       t.integer :lock_version, null: false
     end
 
@@ -58,8 +58,8 @@ class CreateTables < ActiveRecord::Migration[7.0]
       t.string :venue_id, limit: 36, null: false, primary_key: true
       t.string :name
       t.jsonb :description
-      t.timestamptz :created_at
-      t.timestamptz :updated_at
+      t.datetime :created_at
+      t.datetime :updated_at
       t.integer :lock_version, null: false
     end
 
@@ -70,10 +70,10 @@ class CreateTables < ActiveRecord::Migration[7.0]
       t.references :singer, foreign_key: {primary_key: :singer_id},
                    type: :string, limit: 36, index: false
       t.string :name
-      t.timestamptz :start_time, null: false
-      t.timestamptz :end_time, null: false
-      t.timestamptz :created_at
-      t.timestamptz :updated_at
+      t.datetime :start_time, null: false
+      t.datetime :end_time, null: false
+      t.datetime :created_at
+      t.datetime :updated_at
       t.integer :lock_version, null: false
       t.check_constraint "end_time > start_time", name: :chk_end_time_after_start_time
     end

@@ -839,7 +839,7 @@ public class AbstractRubyMockServerTest extends AbstractMockServerTest {
   }
 
   public static void createVirtualEnv(String directoryName) throws Exception {
-    run(new String[] {"bundle", "update"}, directoryName, ImmutableMap.of());
+    run(new String[] {"bundle", "install"}, directoryName, ImmutableMap.of());
   }
 
   public static String run(String[] command, String directoryName, Map<String, String> environment)

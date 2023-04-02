@@ -18,7 +18,7 @@ Bundler.require
 ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.datetime_type = :timestamptz
 
 # Remove the above line and uncomment the line below if you are using ActiveRecord 6.1 or lower.
-# ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::NATIVE_DATABASE_TYPES[:datetime] = ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::NATIVE_DATABASE_TYPES[:timestamptz]
+# ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::NATIVE_DATABASE_TYPES[:datetime] = { name: "timestamptz" }
 
 # The following ensures that ActiveRecord does not use any type modifiers for timestamp types.
 # That is; Cloud Spanner only supports `timestamptz` and not for example `timestamptz(6)`.

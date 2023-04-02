@@ -10,15 +10,16 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 1) do
+ActiveRecord::Schema.define(version: 1) do
+
   create_table "albums", primary_key: "album_id", id: { type: :string, limit: 36 }, comment: "", force: :cascade do |t|
     t.string "title"
     t.decimal "marketing_budget"
     t.date "release_date"
     t.binary "cover_picture"
     t.string "singer_id", limit: 36
-    t.datetime "created_at", precision: nil
-    t.datetime "updated_at", precision: nil
+    t.datetime "created_at"
+    t.datetime "updated_at"
     t.bigint "lock_version", null: false
     t.index [], name: "IDX_albums_singer_id_N_CB7481F91EC719C7"
   end
@@ -27,10 +28,10 @@ ActiveRecord::Schema[7.0].define(version: 1) do
     t.string "venue_id", limit: 36
     t.string "singer_id", limit: 36
     t.string "name"
-    t.datetime "start_time", precision: nil, null: false
-    t.datetime "end_time", precision: nil, null: false
-    t.datetime "created_at", precision: nil
-    t.datetime "updated_at", precision: nil
+    t.datetime "start_time", null: false
+    t.datetime "end_time", null: false
+    t.datetime "created_at"
+    t.datetime "updated_at"
     t.bigint "lock_version", null: false
     t.index [], name: "IDX_concerts_singer_id_N_E69EF1394455F7E2"
     t.index [], name: "IDX_concerts_venue_id_N_9722D7D8AF4ABB9E"
@@ -40,10 +41,10 @@ ActiveRecord::Schema[7.0].define(version: 1) do
   create_table "singers", primary_key: "singer_id", id: { type: :string, limit: 36 }, comment: "", force: :cascade do |t|
     t.string "first_name", limit: 100
     t.string "last_name", limit: 200, null: false
-    t.virtual "full_name", type: :string, as: "COALESCE(concat(first_name, ' '::character varying, last_name), last_name)", stored: true
+    t.string "full_name"
     t.boolean "active"
-    t.datetime "created_at", precision: nil
-    t.datetime "updated_at", precision: nil
+    t.datetime "created_at"
+    t.datetime "updated_at"
     t.bigint "lock_version", null: false
   end
 
@@ -52,16 +53,16 @@ ActiveRecord::Schema[7.0].define(version: 1) do
     t.bigint "track_number", null: false
     t.string "title", null: false
     t.float "sample_rate", null: false
-    t.datetime "created_at", precision: nil
-    t.datetime "updated_at", precision: nil
+    t.datetime "created_at"
+    t.datetime "updated_at"
     t.bigint "lock_version", null: false
   end
 
   create_table "venues", primary_key: "venue_id", id: { type: :string, limit: 36 }, comment: "", force: :cascade do |t|
     t.string "name"
     t.jsonb "description"
-    t.datetime "created_at", precision: nil
-    t.datetime "updated_at", precision: nil
+    t.datetime "created_at"
+    t.datetime "updated_at"
     t.bigint "lock_version", null: false
   end
 

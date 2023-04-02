@@ -33,11 +33,10 @@ end
 
 def create_pgadapter_container(credentials)
   puts "Downloading PGAdapter image..."
-  # Docker::Image.create "fromImage" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:ruby-active-record"
+  Docker::Image.create "fromImage" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:ruby-active-record"
   puts "Creating PGAdapter container..."
   Docker::Container.create(
-    # "Image" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:ruby-active-record",
-    "Image" => "pgadapter-ar",
+    "Image" => "gcr.io/cloud-spanner-pg-adapter/pgadapter:ruby-active-record",
     "ExposedPorts" => { "5432/tcp" => {} },
     "HostConfig" => {
       "PortBindings" => {
