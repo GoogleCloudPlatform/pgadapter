@@ -60,12 +60,28 @@ initialization code when you are not running migrations.
 ```ruby
 # Make sure that the PostgreSQL-adapter uses timestamptz without any type modifiers.
 ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.datetime_type = :timestamptz
+
 module ActiveRecord::ConnectionAdapters
   class PostgreSQLAdapter
     def supports_datetime_with_precision?
       false
     end
   end
+end
+```
+
+__NOTE__: The `datetime_type` option was added in ActiveRecord 7.0.
+Use the following configuration for ActiveRecord 6.1 or lower:
+
+```ruby
+ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::NATIVE_DATABASE_TYPES[:datetime] = { name: "timestamptz" }
+
+module ActiveRecord::ConnectionAdapters
+   class PostgreSQLAdapter
+      def supports_datetime_with_precision?
+         false
+      end
+   end
 end
 ```
 
