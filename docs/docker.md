@@ -32,7 +32,7 @@ The Docker options in the `docker run` command that are used in the above exampl
 
 The PGAdapter options in the `docker run` command that are used in the above example are:
 * `-p`: The Google Cloud project name where the Cloud Spanner database is located.
-* `-i`: The name of the Cloud Spanner instance where the databsae is located.
+* `-i`: The name of the Cloud Spanner instance where the database is located.
 * `-d`: The name of the Cloud Spanner database that PGAdapter should connect to.
 * `-x`: Allow PGAdapter to accept connections from other hosts than localhost. This is required as
   PGAdapter is running in a Docker container. This means that connections from the host machine will
