@@ -21,6 +21,9 @@ import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer;
+import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer.ReplacementStatus;
+import com.google.cloud.spanner.pgadapter.utils.RegexQueryPartReplacer;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -31,7 +34,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
 
@@ -78,21 +80,23 @@ public class PgCatalog {
           .put(new TableOrIndexName(null, "pg_settings"), new TableOrIndexName(null, "pg_settings"))
           .build();
 
-  private static final ImmutableMap<Pattern, Supplier<String>> DEFAULT_FUNCTION_REPLACEMENTS =
-      ImmutableMap.of(
-          Pattern.compile("pg_catalog.pg_table_is_visible\\s*\\(.+\\)"),
-          Suppliers.ofInstance("true"),
-          Pattern.compile("pg_table_is_visible\\s*\\(.+\\)"),
-          Suppliers.ofInstance("true"),
-          Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(true\\)\\)"),
-          Suppliers.ofInstance(" IN ('pg_catalog', 'public')"));
+  private static final ImmutableList<QueryPartReplacer> DEFAULT_FUNCTION_REPLACEMENTS =
+      ImmutableList.of(
+          RegexQueryPartReplacer.replace(
+              Pattern.compile("pg_catalog.pg_table_is_visible\\s*\\(.+\\)"),
+              Suppliers.ofInstance("true")),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile("pg_table_is_visible\\s*\\(.+\\)"), Suppliers.ofInstance("true")),
+          RegexQueryPartReplacer.replace(
+              Pattern.compile("=\\s*ANY\\s*\\(current_schemas\\(true\\)\\)"),
+              Suppliers.ofInstance(" IN ('pg_catalog', 'public')")));
 
   private final ImmutableSet<String> checkPrefixes;
 
   private final ImmutableMap<TableOrIndexName, TableOrIndexName> tableReplacements;
   private final ImmutableMap<TableOrIndexName, PgCatalogTable> pgCatalogTables;
 
-  private final ImmutableMap<Pattern, Supplier<String>> functionReplacements;
+  private final ImmutableList<QueryPartReplacer> functionReplacements;
 
   private static final Map<TableOrIndexName, PgCatalogTable> DEFAULT_PG_CATALOG_TABLES =
       ImmutableMap.<TableOrIndexName, PgCatalogTable>builder()
@@ -131,11 +135,13 @@ public class PgCatalog {
     this.pgCatalogTables = pgCatalogTablesBuilder.build();
 
     this.functionReplacements =
-        ImmutableMap.<Pattern, Supplier<String>>builder()
-            .putAll(DEFAULT_FUNCTION_REPLACEMENTS)
-            .put(
-                Pattern.compile("version\\(\\)"), () -> "'" + sessionState.getServerVersion() + "'")
-            .putAll(wellKnownClient.getFunctionReplacements())
+        ImmutableList.<QueryPartReplacer>builder()
+            .addAll(DEFAULT_FUNCTION_REPLACEMENTS)
+            .add(
+                RegexQueryPartReplacer.replace(
+                    Pattern.compile("version\\(\\)"),
+                    () -> "'" + sessionState.getServerVersion() + "'"))
+            .addAll(wellKnownClient.getQueryPartReplacements())
             .build();
   }
 
@@ -163,16 +169,16 @@ public class PgCatalog {
     return addCommonTableExpressions(replacedTablesStatement.y(), cteBuilder.build());
   }
 
-  String replaceKnownUnsupportedFunctions(Statement statement) {
+  Tuple<String, ReplacementStatus> replaceKnownUnsupportedFunctions(Statement statement) {
     String sql = statement.getSql();
-    for (Entry<Pattern, Supplier<String>> functionReplacement : functionReplacements.entrySet()) {
-      sql =
-          functionReplacement
-              .getKey()
-              .matcher(sql)
-              .replaceAll(functionReplacement.getValue().get());
+    for (QueryPartReplacer functionReplacement : functionReplacements) {
+      Tuple<String, ReplacementStatus> result = functionReplacement.replace(sql);
+      if (result.y() == ReplacementStatus.STOP) {
+        return result;
+      }
+      sql = result.x();
     }
-    return sql;
+    return Tuple.of(sql, ReplacementStatus.CONTINUE);
   }
 
   Statement addCommonTableExpressions(Statement statement, ImmutableList<String> tableExpressions) {
@@ -180,22 +186,28 @@ public class PgCatalog {
       return statement;
     }
 
-    String sql = replaceKnownUnsupportedFunctions(statement);
-    SimpleParser parser = new SimpleParser(sql);
-    boolean hadCommonTableExpressions = parser.eatKeyword("with");
-    String tableExpressionsSql = String.join(",\n", tableExpressions);
-    Statement.Builder builder =
-        Statement.newBuilder("with ")
-            .append(tableExpressionsSql)
-            .append(hadCommonTableExpressions ? ",\n" : "\n");
-    if (hadCommonTableExpressions) {
-      // Include the entire original statement except the 'with' keyword.
-      builder
-          .append(parser.getSql().substring(0, parser.getPos() - 4))
-          .append(parser.getSql().substring(parser.getPos()));
+    Tuple<String, ReplacementStatus> result = replaceKnownUnsupportedFunctions(statement);
+    String sql = result.x();
+    Statement.Builder builder;
+    if (result.y() == ReplacementStatus.CONTINUE) {
+      SimpleParser parser = new SimpleParser(sql);
+      boolean hadCommonTableExpressions = parser.eatKeyword("with");
+      String tableExpressionsSql = String.join(",\n", tableExpressions);
+      builder =
+          Statement.newBuilder("with ")
+              .append(tableExpressionsSql)
+              .append(hadCommonTableExpressions ? ",\n" : "\n");
+      if (hadCommonTableExpressions) {
+        // Include the entire original statement except the 'with' keyword.
+        builder
+            .append(parser.getSql().substring(0, parser.getPos() - 4))
+            .append(parser.getSql().substring(parser.getPos()));
+      } else {
+        // Include the entire original statement (including any comments at the beginning).
+        builder.append(parser.getSql());
+      }
     } else {
-      // Include the entire original statement (including any comments at the beginning).
-      builder.append(parser.getSql());
+      builder = Statement.newBuilder(sql);
     }
     Map<String, Value> parameters = statement.getParameters();
     for (Entry<String, Value> param : parameters.entrySet()) {
