@@ -19,7 +19,6 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.ConnectionHandler;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
-import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgAttribute;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCatalogTable;
 import com.google.cloud.spanner.pgadapter.statements.local.DjangoGetTableNamesStatement;
 import com.google.cloud.spanner.pgadapter.statements.local.ListDatabasesStatement;
@@ -181,12 +180,6 @@ public class ClientAutoDetector {
       }
     },
     NPGSQL {
-      final ImmutableMap<String, String> tableReplacements =
-          ImmutableMap.of(
-              "pg_catalog.pg_attribute", "pg_attribute", "pg_attribute", "pg_attribute");
-      final ImmutableMap<String, PgCatalogTable> pgCatalogTables =
-          ImmutableMap.of("pg_attribute", new EmptyPgAttribute());
-
       final ImmutableMap<Pattern, Supplier<String>> functionReplacements =
           ImmutableMap.of(
               Pattern.compile("elemproc\\.oid = elemtyp\\.typreceive"),
@@ -218,16 +211,6 @@ public class ClientAutoDetector {
                     "SELECT version();\n"
                         + "\n"
                         + "SELECT ns.nspname, t.oid, t.typname, t.typtype, t.typnotnull, t.elemtypoid\n");
-      }
-
-      @Override
-      public ImmutableMap<String, String> getTableReplacements() {
-        return tableReplacements;
-      }
-
-      @Override
-      public ImmutableMap<String, PgCatalogTable> getPgCatalogTables() {
-        return pgCatalogTables;
       }
 
       @Override

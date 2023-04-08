@@ -3793,7 +3793,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
           }
           count++;
         }
-        assertEquals(359, count);
+        assertEquals(360, count);
       }
     }
   }
