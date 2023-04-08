@@ -131,7 +131,6 @@ public class PgCatalog {
           .put(new TableOrIndexName(null, "pg_proc"), new PgProc())
           .put(new TableOrIndexName(null, "pg_enum"), new EmptyPgEnum())
           .put(new TableOrIndexName(null, "pg_range"), new PgRange())
-          .put(new TableOrIndexName(null, "pg_type"), new PgType())
           .put(new TableOrIndexName(null, "pg_sequence"), new PgSequence())
           .put(new TableOrIndexName(null, "pg_sequences"), new PgSequences())
           .put(
@@ -160,6 +159,7 @@ public class PgCatalog {
             .put(new TableOrIndexName(null, "pg_attrdef"), new PgAttrdef())
             .put(new TableOrIndexName(null, "pg_constraint"), new PgConstraint())
             .put(new TableOrIndexName(null, "pg_index"), new PgIndex())
+            .put(new TableOrIndexName(null, "pg_type"), new PgType())
             .put(new TableOrIndexName(null, "pg_settings"), new PgSettings());
     wellKnownClient
         .getPgCatalogTables()
@@ -275,7 +275,7 @@ public class PgCatalog {
 
   @InternalApi
   public static class PgNamespace implements PgCatalogTable {
-    private static final String PG_NAMESPACE_CTE =
+    public static final String PG_NAMESPACE_CTE =
         "pg_namespace as (\n"
             + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
             + "        schema_name as nspname, null as nspowner, null as nspacl\n"
@@ -304,9 +304,15 @@ public class PgCatalog {
     }
   }
 
+  // This is defined outside the PgType class, because Java 8 does not allow static initialization
+  // inside inner classes.
   @InternalApi
-  public static class PgType implements PgCatalogTable {
-    private static final ImmutableSet<TableOrIndexName> DEPENDENCIES =
+  public static final String PG_TYPE_CTE_EMULATED =
+      PgType.PG_TYPE_CTE.replace("0 as typrelid", "''::varchar as typrelid");
+
+  @InternalApi
+  public class PgType implements PgCatalogTable {
+    private final ImmutableSet<TableOrIndexName> DEPENDENCIES =
         ImmutableSet.of(new TableOrIndexName(null, "pg_namespace"));
     private static final String GENERATION_SQL =
         "select 'select '\n"
@@ -352,7 +358,7 @@ public class PgCatalog {
             + "where typname in ('bool', 'bytea', 'int2', 'int4', 'int8', 'float4', 'float8',\n"
             + "                  'numeric', 'varchar', 'text', 'jsonb', 'timestamp', 'timestamptz', 'date')\n"
             + ";\n";
-    private static final String PG_TYPE_CTE =
+    public static final String PG_TYPE_CTE =
         "pg_type as (\n"
             + "  select 16 as oid, 'bool' as typname, 11 as typnamespace, null as typowner, 1 as typlen, true as typbyval, 'b' as typtype, 'B' as typcategory, true as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1000 as typarray, 'boolin' as typinput, 'boolout' as typoutput, 'boolrecv' as typreceive, 'boolsend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'c' as typalign, 'p' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'boolean' as spanner_type union all\n"
             + "  select 17 as oid, 'bytea' as typname, 11 as typnamespace, null as typowner, -1 as typlen, false as typbyval, 'b' as typtype, 'U' as typcategory, false as typispreferred, true as typisdefined, ',' as typdelim, 0 as typrelid, 0 as typelem, 1001 as typarray, 'byteain' as typinput, 'byteaout' as typoutput, 'bytearecv' as typreceive, 'byteasend' as typsend, '-' as typmodin, '-' as typmodout, '-' as typanalyze, 'i' as typalign, 'x' as typstorage, false as typnotnull, 0 as typbasetype, -1 as typtypmod, 0 as typndims, 0 as typcollation, null as typdefaultbin, null as typdefault, null as typacl, 'bytea' as spanner_type union all\n"
@@ -386,7 +392,7 @@ public class PgCatalog {
 
     @Override
     public String getTableExpression() {
-      return PG_TYPE_CTE;
+      return sessionState.isEmulatePgClassTables() ? PG_TYPE_CTE_EMULATED : PG_TYPE_CTE;
     }
 
     @Override
@@ -516,8 +522,9 @@ public class PgCatalog {
     }
   }
 
-  private static class PgRange implements PgCatalogTable {
-    private static final String PG_RANGE_CTE =
+  @InternalApi
+  public static class PgRange implements PgCatalogTable {
+    public static final String PG_RANGE_CTE =
         "pg_range as (\n"
             + "select * from ("
             + "select 0::bigint as rngtypid, 0::bigint as rngsubtype, 0::bigint as rngmultitypid, "

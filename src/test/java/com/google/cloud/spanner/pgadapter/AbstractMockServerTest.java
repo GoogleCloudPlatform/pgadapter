@@ -14,6 +14,8 @@
 
 package com.google.cloud.spanner.pgadapter;
 
+import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PG_TYPE_CTE_EMULATED;
+import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -31,8 +33,6 @@ import com.google.cloud.spanner.pgadapter.metadata.OptionsMetadata;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttrdef;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttribute;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgClass;
-import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace;
-import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.WireMessage;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -100,8 +100,7 @@ import org.postgresql.util.PGobject;
 public abstract class AbstractMockServerTest {
   private static final Logger logger = Logger.getLogger(AbstractMockServerTest.class.getName());
 
-  public static final String PG_TYPE_PREFIX =
-      new PgNamespace().getTableExpression() + ",\n" + new PgType().getTableExpression();
+  public static final String PG_TYPE_PREFIX = PG_NAMESPACE_CTE + ",\n" + PG_TYPE_CTE_EMULATED;
   public static final String PG_CLASS_PREFIX = String.format(PgClass.PG_CLASS_CTE, "-1", "-1");
   public static final String EMULATED_PG_CLASS_PREFIX =
       String.format(
