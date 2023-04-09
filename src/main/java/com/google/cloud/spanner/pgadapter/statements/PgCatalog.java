@@ -308,7 +308,7 @@ public class PgCatalog {
   // inside inner classes.
   @InternalApi
   public static final String PG_TYPE_CTE_EMULATED =
-      PgType.PG_TYPE_CTE.replace("0 as typrelid", "''::varchar as typrelid");
+      PgType.PG_TYPE_CTE.replace("0 as typrelid", "'0'::varchar as typrelid");
 
   @InternalApi
   public class PgType implements PgCatalogTable {
