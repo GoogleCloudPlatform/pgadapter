@@ -1,15 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
-PGADAPTER_YCSB_RUNNER=pgadapter-ycsb-runner
-PGADAPTER_YCSB_JOB=pgadapter-ycsb-job
+PGADAPTER_YCSB_RUNNER=pgadapter-channels-ycsb-runner
+PGADAPTER_YCSB_JOB=pgadapter-channels-ycsb-job
 PGADAPTER_YCSB_REGION=europe-north1
+NUMBER_OF_TASKS=4
 
 SPANNER_INSTANCE=pgadapter-ycsb-regional-test
-SPANNER_DATABASE=pgadapter-ycsb-test
+SPANNER_DATABASE=pgadapter-channels-ycsb-test
 
 gcloud config set run/region $PGADAPTER_YCSB_REGION
 gcloud config set builds/region $PGADAPTER_YCSB_REGION
+
+mvn clean package -Passembly -DskipTests
 
 gcloud auth configure-docker gcr.io --quiet
 docker build --platform=linux/amd64 . -f benchmarks/ycsb/Dockerfile \
@@ -20,7 +23,7 @@ gcloud beta run jobs delete $PGADAPTER_YCSB_JOB --quiet || true
 sleep 3
 gcloud beta run jobs create $PGADAPTER_YCSB_JOB \
     --image gcr.io/$(gcloud config get project --quiet)/$PGADAPTER_YCSB_RUNNER \
-    --tasks 1 \
+    --tasks $NUMBER_OF_TASKS \
     --set-env-vars SPANNER_INSTANCE=$SPANNER_INSTANCE \
     --set-env-vars SPANNER_DATABASE=$SPANNER_DATABASE \
     --max-retries 0 \

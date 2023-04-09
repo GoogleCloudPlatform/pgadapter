@@ -1,21 +1,22 @@
 # BUILD
 FROM maven:3.8.4-eclipse-temurin-17-alpine AS build
-# Copy over build files to docker image.
-COPY LICENSE ./
-COPY CONTRIBUTING.md ./
-COPY README.md ./
-COPY NOTIFICATIONS.md ./
-COPY logging.properties ./
-COPY src src/
-COPY pom.xml ./
-COPY license-checks.xml ./
-COPY java.header ./
-# Download dependencies
-RUN mvn dependency:go-offline
+## Copy over build files to docker image.
+#COPY LICENSE ./
+#COPY CONTRIBUTING.md ./
+#COPY README.md ./
+#COPY NOTIFICATIONS.md ./
+#COPY logging.properties ./
+#COPY src src/
+#COPY pom.xml ./
+#COPY license-checks.xml ./
+#COPY java.header ./
+## Download dependencies
+#RUN mvn dependency:go-offline
+#
+## Build from source.
+#RUN mvn package -Passembly -DskipTests
 
-# Build from source.
-RUN mvn package -Passembly -DskipTests
-
+COPY target/pgadapter target/pgadapter
 
 # Docker image for the YCSB runner.
 FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
@@ -27,7 +28,7 @@ RUN apt -y install python
 
 COPY --from=build target/pgadapter /
 
-ADD https://github.com/brianfrankcooper/YCSB/releases/download/0.17.0/ycsb-0.17.0.tar.gz /ycsb-0.17.0.tar.gz
+COPY benchmarks/ycsb/ycsb-0.17.0.tar.gz ./
 RUN tar xfvz ycsb-0.17.0.tar.gz
 RUN mv ycsb-0.17.0 ycsb
 

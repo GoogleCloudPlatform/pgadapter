@@ -3,13 +3,15 @@ set -euox pipefail
 
 echo "Starting Task #${CLOUD_RUN_TASK_INDEX}, Attempt #${CLOUD_RUN_TASK_ATTEMPT}..."
 EXECUTED_AT=`date +"%Y-%m-%dT%T"`
+EXECUTED_AT="${EXECUTED_AT} ${CLOUD_RUN_TASK_INDEX}"
 
 DATABASES=$(gcloud spanner databases list --instance $SPANNER_INSTANCE --filter="name:${SPANNER_DATABASE}")
 if [[ "$DATABASES" != *"$SPANNER_DATABASE"* ]]; then
   gcloud spanner databases create $SPANNER_DATABASE --instance=$SPANNER_INSTANCE --database-dialect='POSTGRESQL'
 fi
 
-java -jar pgadapter.jar -p $(gcloud --quiet config get project) -i $SPANNER_INSTANCE -r="minSessions=1000;maxSessions=1000;numChannels=20" &
+PARAMETERS="minSessions=400;maxSessions=400;numChannels=100"
+java -jar pgadapter.jar -p $(gcloud --quiet config get project) -i $SPANNER_INSTANCE -r="${PARAMETERS}" &
 sleep 6
 export PGDATABASE=$SPANNER_DATABASE
 psql -h localhost -c "CREATE TABLE IF NOT EXISTS usertable (
@@ -65,22 +67,22 @@ db.user=
 db.passwd=
 EOT
 
-psql -h localhost -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; delete from usertable;"
+#psql -h localhost -c "set spanner.autocommit_dml_mode='partitioned_non_atomic'; delete from usertable;"
 
 # Load workloada
-./bin/ycsb load jdbc -P workloads/workloada \
-  -threads 20 \
-  -p recordcount=100000 \
-  -p db.batchsize=200 \
-  -p jdbc.batchupdateapi=true \
-  -P tcp.properties \
-  -cp "jdbc-binding/lib/*" \
-  > ycsb.log
+#./bin/ycsb load jdbc -P workloads/workloada \
+#  -threads 40 \
+#  -p recordcount=5000000 \
+#  -p db.batchsize=200 \
+#  -p jdbc.batchupdateapi=true \
+#  -P tcp.properties \
+#  -cp "jdbc-binding/lib/*" \
+#  > ycsb.log
 
 # Run workloads a, b, c, f, and d.
-for WORKLOAD in a b c f d
+for WORKLOAD in a
 do
-  for DEPLOYMENT in java_tcp java_uds
+  for DEPLOYMENT in java_uds
   do
     if [ $DEPLOYMENT == 'java_tcp' ]
     then
@@ -88,10 +90,10 @@ do
     else
       CONN=uds.properties
     fi
-    for THREADS in 1 5 20 50 200
+    for THREADS in 100
     do
-      OPERATION_COUNT=`expr $THREADS \* 100`
-      for BATCH_SIZE in 1 10 50 200
+      OPERATION_COUNT=`expr $THREADS \* 15000`
+      for BATCH_SIZE in 10
       do
         if [ $BATCH_SIZE == 1 ]
         then
@@ -135,11 +137,11 @@ do
         INSERT_P99=$(grep '\[INSERT\], 99thPercentileLatency(us), ' ycsb.log | sed 's/^.*, //' || echo null)
 
         psql -h localhost \
-          -c "insert into run (executed_at, deployment, workload, threads, batch_size, operation_count, run_time, throughput,
+          -c "insert into run (description, executed_at, deployment, workload, threads, batch_size, operation_count, run_time, throughput,
                                read_min, read_max, read_avg, read_p50, read_p95, read_p99,
                                update_min, update_max, update_avg, update_p50, update_p95, update_p99,
                                insert_min, insert_max, insert_avg, insert_p50, insert_p95, insert_p99) values
-                               ('$EXECUTED_AT', '$DEPLOYMENT', '$WORKLOAD', $THREADS, $BATCH_SIZE, $OPERATION_COUNT, $OVERALL_RUNTIME, $OVERALL_THROUGHPUT,
+                               ('$PARAMETERS', '$EXECUTED_AT', '$DEPLOYMENT', '$WORKLOAD', $THREADS, $BATCH_SIZE, $OPERATION_COUNT, $OVERALL_RUNTIME, $OVERALL_THROUGHPUT,
                                 $READ_MIN, $READ_MAX, $READ_AVG, $READ_P50, $READ_P95, $READ_P99,
                                 $UPDATE_MIN, $UPDATE_MAX, $UPDATE_AVG, $UPDATE_P50, $UPDATE_P95, $UPDATE_P99,
                                 $INSERT_MIN, $INSERT_MAX, $INSERT_AVG, $INSERT_P50, $INSERT_P95, $INSERT_P99)"
