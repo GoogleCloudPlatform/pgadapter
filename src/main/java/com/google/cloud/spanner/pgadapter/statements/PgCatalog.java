@@ -486,7 +486,7 @@ public class PgCatalog {
             + "    '{}'::text[] as reloptions,\n"
             + "    0 as relpartbound\n"
             + "from information_schema.indexes i\n"
-            + "inner join information_schema.index_columns using (table_catalog, table_schema, table_name)\n"
+            + "inner join information_schema.index_columns using (table_catalog, table_schema, table_name, index_name)\n"
             + "group by i.index_name, i.table_name, i.table_schema\n"
             + ")";
 
@@ -496,7 +496,7 @@ public class PgCatalog {
         return String.format(
             PG_CLASS_CTE,
             "'''\"' || t.table_schema || '\".\"' || t.table_name || '\"'''",
-            "'''\"' || i.table_schema || '\".\"' || i.index_name || '\"'''");
+            "'''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"'''");
       }
       return String.format(PG_CLASS_CTE, "-1", "-1");
     }
@@ -589,6 +589,45 @@ public class PgCatalog {
             + "        '{}'::text[] as attoptions, '{}'::text[] as attfdwoptions, null as attmissingval,\n"
             + "        c.spanner_type\n"
             + "from information_schema.columns c\n"
+            + "union all\n"
+            + "select  '''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"''' as attrelid,\n"
+            + "        i.column_name as attname,\n"
+            + "        case regexp_replace(c.spanner_type, '\\(.*\\)', '')\n"
+            + "            when 'boolean' then 16\n"
+            + "            when 'bytea' then 17\n"
+            + "            when 'bigint' then 20\n"
+            + "            when 'double precision' then 701\n"
+            + "            when 'character varying' then 1043\n"
+            + "            when 'date' then 1082\n"
+            + "            when 'timestamp with time zone' then 1184\n"
+            + "            when 'numeric' then 1700\n"
+            + "            when 'jsonb' then 3802\n"
+            + "            when 'boolean[]' then 1000\n"
+            + "            when 'bytea[]' then 1001\n"
+            + "            when 'bigint[]' then 1016\n"
+            + "            when 'double precision[]' then 1022\n"
+            + "            when 'character varying[]' then 1015\n"
+            + "            when 'date[]' then 1182\n"
+            + "            when 'timestamp with time zone[]' then 1185\n"
+            + "            when 'numeric[]' then 1231\n"
+            + "            when 'jsonb[]' then 3807\n"
+            + "            else 0\n"
+            + "        end as atttypid,\n"
+            + "        0::bigint as attstattarget,\n"
+            + "        character_maximum_length as attlen, c.ordinal_position as attnum,\n"
+            + "        case data_type when 'ARRAY' then 1::bigint else 0::bigint end as attndims,\n"
+            + "        -1::bigint as attcacheoff,\n"
+            + "        coalesce(c.character_maximum_length, -1::bigint) as atttypmod, true as attbyval,\n"
+            + "        'i' as attalign, 'p' as attstorage, ''::varchar as attcompression,\n"
+            + "        c.is_nullable='NO' as attnotnull,\n"
+            + "        (c.column_default is not null or c.generation_expression is not null) as atthasdef,\n"
+            + "        false as atthasmissing,'' as attidentity,\n"
+            + "        case c.generation_expression is not null when true then 's' else '' end as attgenerated,\n"
+            + "        false as attisdropped, true as attislocal, 0 as attinhcount, null::bigint as attcollation, '{}'::bigint[] as attacl,\n"
+            + "        '{}'::text[] as attoptions, '{}'::text[] as attfdwoptions, null as attmissingval,\n"
+            + "        c.spanner_type\n"
+            + "from information_schema.index_columns i\n"
+            + "inner join information_schema.columns c using (table_catalog, table_schema, table_name, column_name)"
             + ")";
 
     @Override
@@ -724,7 +763,7 @@ public class PgCatalog {
   public class PgIndex implements PgCatalogTable {
     public static final String PG_INDEX_CTE =
         "pg_index as (\n"
-            + "select '''\"' || i.table_schema || '\".\"' || i.index_name || '\"''' as indexrelid,\n"
+            + "select '''\"' || i.table_schema || '\".\"' || i.table_name || '\".\"' || i.index_name || '\"''' as indexrelid,\n"
             + "       '''\"' || i.table_schema || '\".\"' || i.table_name || '\"''' as indrelid,\n"
             + "       count(1) as indnatts, sum(case ic.ordinal_position is null when true then 0 else 1 end) as indnkeyatts,\n"
             + "       i.is_unique='YES' as indisunique, i.is_unique='YES' and i.is_null_filtered='NO' as indnullsnotdistinct,\n"

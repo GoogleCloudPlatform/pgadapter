@@ -4695,6 +4695,38 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     assertEquals(sql, request.getStatements(0).getSql());
   }
 
+  @Test
+  public void testEmulatePgClass() throws SQLException {
+    String withEmulation = "with " + EMULATED_PG_CLASS_PREFIX + "\nselect 1 from pg_class";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(withEmulation), SELECT1_RESULTSET));
+    String withoutEmulation = "with " + PG_CLASS_PREFIX + "\nselect 1 from pg_class";
+    mockSpanner.putStatementResult(
+        StatementResult.query(Statement.of(withoutEmulation), SELECT1_RESULTSET));
+
+    try (Connection connection = DriverManager.getConnection(createUrl())) {
+      for (boolean emulate : new boolean[] {true, false}) {
+        connection.createStatement().execute("set spanner.emulate_pg_class_tables=" + emulate);
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_class")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+      }
+    }
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(withEmulation))
+            .count());
+    assertEquals(
+        1,
+        mockSpanner.getRequestsOfType(ExecuteSqlRequest.class).stream()
+            .filter(request -> request.getSql().equals(withoutEmulation))
+            .count());
+  }
+
   @Ignore("Only used for manual performance testing")
   @Test
   public void testBasePerformance() throws SQLException {
