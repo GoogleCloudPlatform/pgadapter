@@ -85,7 +85,7 @@ public class ITJdbcMetadataTest implements IntegrationTest {
     testEnv.cleanUp();
   }
 
-  private static Iterable<String> getDdlStatements() {
+  static Iterable<String> getDdlStatements() {
     ImmutableList.Builder<String> builder = ImmutableList.builder();
     builder.addAll(PgAdapterTestEnv.DEFAULT_DATA_MODEL);
     builder.addAll(
