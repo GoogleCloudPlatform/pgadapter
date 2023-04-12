@@ -168,7 +168,7 @@ class JdbcMetadataStatementHelper {
             " ON (coalesce(a.atttypid, a_spanner.spanner_atttypid) = t.oid)")
         .replace(
             " (t.typrelid = 0 OR (SELECT c.relkind = 'c' FROM pg_catalog.pg_class c WHERE c.oid = t.typrelid))",
-            " TRUE ")
+            " (t.typrelid::bigint = 0 OR (SELECT c.relkind = 'c' FROM pg_catalog.pg_class c WHERE c.oid = t.typrelid))")
 
         // Replace function calls for DDL definitions with null literals.
         .replaceAll("pg_catalog\\.pg_get_expr\\(.+?\\)", "null")

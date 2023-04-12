@@ -673,7 +673,7 @@ public class PgCatalog {
             + "        else ''\n"
             + "    end as contype, false as condeferrable, false as condeferred, true as convalidated,\n"
             + "    '''\"' || tc.table_schema || '\".\"' || tc.table_name || '\"''' as conrelid,\n"
-            + "    0::bigint as contypid, 0::bigint as conindid, 0::bigint as conparentid,\n"
+            + "    0::bigint as contypid, '0'::varchar as conindid, '0'::varchar as conparentid,\n"
             + "    '''\"' || uc.table_schema || '\".\"' || uc.table_name || '\"''' as confrelid,\n"
             + "    case rc.update_rule\n"
             + "        when 'CASCADE' then 'c'\n"

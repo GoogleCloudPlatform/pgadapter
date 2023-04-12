@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.statements.BackendConnection.TRANSACTION_ABORTED_ERROR;
+import static com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgNamespace.PG_NAMESPACE_CTE;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -3304,13 +3305,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testInformationSchemaQueryInTransactionWithReplacedPgCatalogTables()
       throws SQLException {
     String sql = "SELECT 1 FROM pg_namespace";
-    String replacedSql =
-        "with pg_namespace as (\n"
-            + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-            + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-            + "  from information_schema.schemata\n"
-            + ")\n"
-            + "SELECT 1 FROM pg_namespace";
+    String replacedSql = "with " + PG_NAMESPACE_CTE + "\nSELECT 1 FROM pg_namespace";
     // Register a result for the query. Note that we don't really care what the result is, just that
     // there is a result.
     mockSpanner.putStatementResult(
@@ -4076,13 +4071,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
       }
       mockSpanner.putStatementResult(
           StatementResult.query(
-              Statement.of(
-                  "with pg_namespace as (\n"
-                      + "  select case schema_name when 'pg_catalog' then 11 when 'public' then 2200 else 0 end as oid,\n"
-                      + "        schema_name as nspname, null as nspowner, null as nspacl\n"
-                      + "  from information_schema.schemata\n"
-                      + ")\n"
-                      + "select * from pg_namespace"),
+              Statement.of("with " + PG_NAMESPACE_CTE + "\n" + "select * from pg_namespace"),
               SELECT1_RESULTSET));
       // Just verify that this works, we don't care about the result.
       try (ResultSet resultSet =

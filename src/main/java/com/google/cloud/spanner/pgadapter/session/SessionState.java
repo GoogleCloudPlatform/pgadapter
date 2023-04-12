@@ -113,6 +113,11 @@ public class SessionState {
     initCopySettings(this.settings);
   }
 
+  @VisibleForTesting
+  Map<String, PGSetting> getSettings() {
+    return this.settings;
+  }
+
   void initSettingValue(String key, String value) {
     PGSetting setting = this.settings.get(key);
     if (setting != null) {

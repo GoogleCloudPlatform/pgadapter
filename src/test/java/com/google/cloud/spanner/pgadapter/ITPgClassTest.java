@@ -15,6 +15,7 @@
 package com.google.cloud.spanner.pgadapter;
 
 import static com.google.cloud.spanner.pgadapter.ITJdbcMetadataTest.getDdlStatements;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -174,7 +175,7 @@ public class ITPgClassTest implements IntegrationTest {
         "select indexrelid, indrelid, indnatts, indnkeyatts, indisunique, "
             + "indnullsnotdistinct, indisprimary, indpred "
             + "from pg_index "
-            + "";
+            + "order by indexrelid";
     ImmutableList<PgIndexRow> expectedRows =
         ImmutableList.of(
             new PgIndexRow(
@@ -342,6 +343,17 @@ public class ITPgClassTest implements IntegrationTest {
   }
 
   @Test
+  public void testPgExtension() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet extensions =
+          connection.createStatement().executeQuery("select * from pg_extension")) {
+        assertEquals(8, extensions.getMetaData().getColumnCount());
+        assertFalse(extensions.next());
+      }
+    }
+  }
+
+  @Test
   public void testPgType() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       for (boolean emulate : new boolean[] {true, false}) {
@@ -354,6 +366,259 @@ public class ITPgClassTest implements IntegrationTest {
           }
           assertEquals(28, count);
         }
+      }
+    }
+  }
+
+  @Test
+  public void testPgAttrdef() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet resultSet =
+          connection.createStatement().executeQuery("select * from pg_attrdef")) {
+        assertTrue(resultSet.next());
+        assertEquals(
+            "'\"public\".\"recording_attempt\".\"recording_time\"'", resultSet.getString("oid"));
+        assertEquals("'\"public\".\"recording_attempt\"'", resultSet.getString("adrelid"));
+        assertEquals(4, resultSet.getInt("adnum"));
+        assertEquals("now()", resultSet.getString("adbin"));
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  private static class PgConstraintRow {
+    final String oid;
+    final String conname;
+    final char contype;
+    final String conrelid;
+    final String conindid; // Currently not implemented
+    final String confrelid;
+    final String confupdtype;
+    final String confdeltype;
+    final String confmatchtype;
+    final Long[] conkey;
+    final Long[] confkey;
+    final String conbin;
+
+    private PgConstraintRow(
+        String oid,
+        String conname,
+        char contype,
+        String conrelid,
+        String conindid,
+        String confrelid,
+        String confupdtype,
+        String confdeltype,
+        String confmatchtype,
+        Long[] conkey,
+        Long[] confkey,
+        String conbin) {
+      this.oid = oid;
+      this.conname = conname;
+      this.contype = contype;
+      this.conrelid = conrelid;
+      this.conindid = conindid;
+      this.confrelid = confrelid;
+      this.confupdtype = confupdtype;
+      this.confdeltype = confdeltype;
+      this.confmatchtype = confmatchtype;
+      this.conkey = conkey;
+      this.confkey = confkey;
+      this.conbin = conbin;
+    }
+  }
+
+  @Test
+  public void testPgConstraint() throws SQLException {
+    ImmutableList<PgConstraintRow> expectedRows =
+        ImmutableList.of(
+            new PgConstraintRow(
+                "'\"public\".\"FK_albums_singers_%",
+                "FK_albums_singers_%",
+                'f',
+                "'\"public\".\"albums\"'",
+                "0",
+                "'\"public\".\"singers\"'",
+                "a",
+                "a",
+                "s",
+                new Long[] {2L},
+                new Long[] {1L},
+                null),
+            new PgConstraintRow(
+                "'\"public\".\"FK_recording_attempt_albums_%",
+                "FK_recording_attempt_albums_%",
+                'f',
+                "'\"public\".\"recording_attempt\"'",
+                "0",
+                "'\"public\".\"albums\"'",
+                "a",
+                "a",
+                "s",
+                new Long[] {1L},
+                new Long[] {1L},
+                null),
+            new PgConstraintRow(
+                "'\"public\".\"FK_recording_attempt_tracks_%",
+                "FK_recording_attempt_tracks_%",
+                'f',
+                "'\"public\".\"recording_attempt\"'",
+                "0",
+                "'\"public\".\"tracks\"'",
+                "a",
+                "a",
+                "s",
+                new Long[] {1L, 2L},
+                new Long[] {1L, 2L},
+                null),
+            new PgConstraintRow(
+                "'\"public\".\"FK_tracks_albums_%",
+                "FK_tracks_albums_%",
+                'f',
+                "'\"public\".\"tracks\"'",
+                "0",
+                "'\"public\".\"albums\"'",
+                "a",
+                "a",
+                "s",
+                new Long[] {1L},
+                new Long[] {1L},
+                null),
+            new PgConstraintRow(
+                "'\"public\".\"PK_albums\"'",
+                "PK_albums",
+                'p',
+                "'\"public\".\"albums\"'",
+                "0",
+                null,
+                null,
+                null,
+                "s",
+                new Long[] {1L},
+                null,
+                null),
+            new PgConstraintRow(
+                "'\"public\".\"PK_all_types\"'",
+                "PK_all_types",
+                'p',
+                "'\"public\".\"all_types\"'",
+                "0",
+                null,
+                null,
+                null,
+                "s",
+                new Long[] {1L},
+                null,
+                null),
+            new PgConstraintRow(
+                "'\"public\".\"PK_numbers\"'",
+                "PK_numbers",
+                'p',
+                "'\"public\".\"numbers\"'",
+                "0",
+                null,
+                null,
+                null,
+                "s",
+                new Long[] {1L},
+                null,
+                null),
+            new PgConstraintRow(
+                "'\"public\".\"PK_recording_attempt\"'",
+                "PK_recording_attempt",
+                'p',
+                "'\"public\".\"recording_attempt\"'",
+                "0",
+                null,
+                null,
+                null,
+                "s",
+                new Long[] {1L, 2L, 3L},
+                null,
+                null),
+            new PgConstraintRow(
+                "'\"public\".\"PK_singers\"'",
+                "PK_singers",
+                'p',
+                "'\"public\".\"singers\"'",
+                "0",
+                null,
+                null,
+                null,
+                "s",
+                new Long[] {1L},
+                null,
+                null),
+            new PgConstraintRow(
+                "'\"public\".\"PK_tracks\"'",
+                "PK_tracks",
+                'p',
+                "'\"public\".\"tracks\"'",
+                "0",
+                null,
+                null,
+                null,
+                "s",
+                new Long[] {1L, 2L},
+                null,
+                null),
+            new PgConstraintRow(
+                "'\"public\".\"recording_attempt_greater_than_zero\"'",
+                "recording_attempt_greater_than_zero",
+                'c',
+                "'\"public\".\"recording_attempt\"'",
+                "0",
+                null,
+                null,
+                null,
+                "s",
+                new Long[] {3L},
+                null,
+                "(attempt > '0'::bigint)"));
+
+    String sql =
+        "select oid, conname, contype, conrelid, conindid, confrelid, confupdtype, confdeltype, "
+            + "confmatchtype, conkey, confkey, conbin "
+            + "from pg_constraint "
+            + "order by oid";
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        int index = 0;
+        while (resultSet.next()) {
+          assertTrue(resultSet.getString("oid"), index < expectedRows.size());
+          PgConstraintRow expected = expectedRows.get(index);
+          if (expected.oid.endsWith("%")) {
+            assertTrue(
+                expected.oid,
+                resultSet
+                    .getString("oid")
+                    .startsWith(expected.oid.substring(0, expected.oid.length() - 1)));
+            assertTrue(
+                expected.conname,
+                resultSet
+                    .getString("conname")
+                    .startsWith(expected.conname.substring(0, expected.conname.length() - 1)));
+          } else {
+            assertEquals(expected.oid, resultSet.getString("oid"));
+            assertEquals(expected.conname, resultSet.getString("conname"));
+          }
+          assertEquals(expected.contype, resultSet.getString("contype").charAt(0));
+          assertEquals(expected.conrelid, resultSet.getString("conrelid"));
+          assertEquals(expected.conindid, resultSet.getString("conindid"));
+          assertEquals(expected.confrelid, resultSet.getString("confrelid"));
+          assertEquals(expected.confupdtype, resultSet.getString("confupdtype"));
+          assertEquals(expected.confdeltype, resultSet.getString("confdeltype"));
+          assertEquals(expected.confmatchtype, resultSet.getString("confmatchtype"));
+          assertArrayEquals(expected.conkey, (Long[]) resultSet.getArray("conkey").getArray());
+          assertArrayEquals(
+              expected.confkey,
+              resultSet.getArray("confkey") == null
+                  ? null
+                  : (Long[]) resultSet.getArray("confkey").getArray());
+          assertEquals(expected.conbin, resultSet.getString("conbin"));
+          index++;
+        }
+        assertEquals(expectedRows.size(), index);
       }
     }
   }
