@@ -2917,6 +2917,42 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testJulianDate() throws SQLException {
+    String sql = "select d from foo";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("d")
+                                        .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("0300-02-20").build())
+                        .build())
+                .build()));
+    String binaryTransferEnable = "&binaryTransferEnable=" + Oid.DATE;
+
+    try (Connection connection = DriverManager.getConnection(createUrl() + binaryTransferEnable)) {
+      connection.createStatement().execute("set time zone 'utc'");
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(LocalDate.of(300, 2, 20), resultSet.getDate(1).toLocalDate());
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testRandomResults() throws SQLException {
     for (boolean binary : new boolean[] {false, true}) {
       // Also get the random results using the normal Spanner client to compare the results with
@@ -3074,9 +3110,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                   spannerResult.getDate(col).getYear(),
                   spannerResult.getDate(col).getMonth(),
                   spannerResult.getDate(col).getDayOfMonth());
-          if (expected.getYear() == 1582 && expected.getMonth() == Month.OCTOBER) {
+          if ((expected.getYear() == 1582 && expected.getMonth() == Month.OCTOBER)
+              || (expected.getYear() <= 1582
+                  && expected.getMonth() == Month.FEBRUARY
+                  && expected.getDayOfMonth() > 20)) {
             // Just assert that we can get the value. Dates in the Julian/Gregorian cutover period
-            // are weird.
+            // are weird, as are potential intercalaris values.
             assertNotNull(pgResult.getDate(col + 1).toLocalDate());
           } else {
             assertEquals(expected, pgResult.getDate(col + 1).toLocalDate());

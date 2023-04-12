@@ -927,9 +927,12 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
                   spannerResult.getDate(col).getYear(),
                   spannerResult.getDate(col).getMonth(),
                   spannerResult.getDate(col).getDayOfMonth());
-          if (expected.getYear() == 1582 && expected.getMonth() == Month.OCTOBER) {
+          if ((expected.getYear() == 1582 && expected.getMonth() == Month.OCTOBER)
+              || (expected.getYear() <= 1582
+                  && expected.getMonth() == Month.FEBRUARY
+                  && expected.getDayOfMonth() > 20)) {
             // Just assert that we can get the value. Dates in the Julian/Gregorian cutover period
-            // are weird.
+            // are weird, as are potential intercalaris values.
             assertNotNull(pgResult.getDate(col + 1).toLocalDate());
           } else {
             assertEquals(expected, pgResult.getDate(col + 1).toLocalDate());
