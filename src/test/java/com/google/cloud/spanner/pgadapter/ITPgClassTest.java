@@ -179,22 +179,25 @@ public class ITPgClassTest implements IntegrationTest {
     ImmutableList<PgIndexRow> expectedRows =
         ImmutableList.of(
             new PgIndexRow(
-                "'\"public\".\"tracks\".\"PRIMARY_KEY\"'",
-                "'\"public\".\"tracks\"'",
-                2,
-                2,
+                "'\"public\".\"albums\".\"IDX_albums_singer_id_%",
+                "'\"public\".\"albums\"'", 1, 1, false, false, false, null),
+            new PgIndexRow(
+                "'\"public\".\"albums\".\"PRIMARY_KEY\"'",
+                "'\"public\".\"albums\"'",
+                1,
+                1,
                 true,
                 true,
                 true,
                 null),
             new PgIndexRow(
-                "'\"public\".\"numbers\".\"PRIMARY_KEY\"'",
-                "'\"public\".\"numbers\"'",
-                1,
-                1,
-                true,
-                true,
-                true,
+                "'\"public\".\"all_types\".\"idx_col_varchar_int\"'",
+                "'\"public\".\"all_types\"'",
+                2,
+                2,
+                false,
+                false,
+                false,
                 null),
             new PgIndexRow(
                 "'\"public\".\"all_types\".\"PRIMARY_KEY\"'",
@@ -206,17 +209,23 @@ public class ITPgClassTest implements IntegrationTest {
                 true,
                 null),
             new PgIndexRow(
-                "'\"public\".\"albums\".\"PRIMARY_KEY\"'",
-                "'\"public\".\"albums\"'",
+                "'\"public\".\"numbers\".\"idx_numbers_name\"'",
+                "'\"public\".\"numbers\"'",
+                1,
+                1,
+                true,
+                true,
+                false,
+                "name IS NOT NULL"),
+            new PgIndexRow(
+                "'\"public\".\"numbers\".\"PRIMARY_KEY\"'",
+                "'\"public\".\"numbers\"'",
                 1,
                 1,
                 true,
                 true,
                 true,
                 null),
-            new PgIndexRow(
-                "'\"public\".\"albums\".\"IDX_albums_singer_id_%",
-                "'\"public\".\"albums\"'", 1, 1, false, false, false, null),
             new PgIndexRow(
                 "'\"public\".\"recording_attempt\".\"PRIMARY_KEY\"'",
                 "'\"public\".\"recording_attempt\"'",
@@ -236,23 +245,14 @@ public class ITPgClassTest implements IntegrationTest {
                 true,
                 null),
             new PgIndexRow(
-                "'\"public\".\"all_types\".\"idx_col_varchar_int\"'",
-                "'\"public\".\"all_types\"'",
+                "'\"public\".\"tracks\".\"PRIMARY_KEY\"'",
+                "'\"public\".\"tracks\"'",
                 2,
                 2,
-                false,
-                false,
-                false,
-                null),
-            new PgIndexRow(
-                "'\"public\".\"numbers\".\"idx_numbers_name\"'",
-                "'\"public\".\"numbers\"'",
-                1,
-                1,
                 true,
                 true,
-                false,
-                "name IS NOT NULL"));
+                true,
+                null));
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
         int index = 0;
