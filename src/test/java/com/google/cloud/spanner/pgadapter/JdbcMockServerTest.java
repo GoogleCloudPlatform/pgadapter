@@ -551,7 +551,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         new String[] {"SELECT version()", "select version()", "select * from version()"}) {
 
       try (Connection connection = DriverManager.getConnection(createUrl())) {
-        String version = null;
+        String version;
         try (ResultSet resultSet =
             connection.createStatement().executeQuery("show server_version")) {
           assertTrue(resultSet.next());
