@@ -191,6 +191,15 @@ public class ITPgClassTest implements IntegrationTest {
                 true,
                 null),
             new PgIndexRow(
+                "'\"public\".\"all_types\".\"PRIMARY_KEY\"'",
+                "'\"public\".\"all_types\"'",
+                1,
+                1,
+                true,
+                true,
+                true,
+                null),
+            new PgIndexRow(
                 "'\"public\".\"all_types\".\"idx_col_varchar_int\"'",
                 "'\"public\".\"all_types\"'",
                 2,
@@ -200,8 +209,8 @@ public class ITPgClassTest implements IntegrationTest {
                 false,
                 null),
             new PgIndexRow(
-                "'\"public\".\"all_types\".\"PRIMARY_KEY\"'",
-                "'\"public\".\"all_types\"'",
+                "'\"public\".\"numbers\".\"PRIMARY_KEY\"'",
+                "'\"public\".\"numbers\"'",
                 1,
                 1,
                 true,
@@ -217,15 +226,6 @@ public class ITPgClassTest implements IntegrationTest {
                 true,
                 false,
                 "name IS NOT NULL"),
-            new PgIndexRow(
-                "'\"public\".\"numbers\".\"PRIMARY_KEY\"'",
-                "'\"public\".\"numbers\"'",
-                1,
-                1,
-                true,
-                true,
-                true,
-                null),
             new PgIndexRow(
                 "'\"public\".\"recording_attempt\".\"PRIMARY_KEY\"'",
                 "'\"public\".\"recording_attempt\"'",
