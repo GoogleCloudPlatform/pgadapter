@@ -872,7 +872,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
                   resultSet.getObject(col + 1);
                 }
               }
-              assertEqual(spannerResult, resultSet, binary);
+              assertEqual(spannerResult, resultSet);
               rowCount++;
             }
             assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
@@ -887,8 +887,7 @@ public class AbortedMockServerTest extends AbstractMockServerTest {
     }
   }
 
-  private void assertEqual(
-      com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult, boolean binary)
+  private void assertEqual(com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult)
       throws SQLException {
     assertEquals(spannerResult.getColumnCount(), pgResult.getMetaData().getColumnCount());
     for (int col = 0; col < spannerResult.getColumnCount(); col++) {
