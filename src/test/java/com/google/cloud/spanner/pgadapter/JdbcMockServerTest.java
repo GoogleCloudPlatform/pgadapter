@@ -81,6 +81,9 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -337,16 +340,46 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
-  public void testQuery() throws SQLException {
+  public void testQuery() throws SQLException, InterruptedException {
     String sql = "SELECT 1";
 
-    try (Connection connection = DriverManager.getConnection(createUrl())) {
-      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
-        assertTrue(resultSet.next());
-        assertEquals(1L, resultSet.getLong(1));
-        assertFalse(resultSet.next());
-      }
+    int numThreads = 128;
+    ExecutorService service = Executors.newFixedThreadPool(128);
+    for (int i = 0; i < numThreads; i++) {
+      service.submit(
+          (Callable<Void>)
+              () -> {
+                try (Connection connection = DriverManager.getConnection(createUrl())) {
+                  try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+                    assertTrue(resultSet.next());
+                    assertEquals(1L, resultSet.getLong(1));
+                    assertFalse(resultSet.next());
+                  }
+                }
+                return null;
+              });
     }
+    service.shutdown();
+    service.awaitTermination(60L, TimeUnit.SECONDS);
+    System.out.println("Finished");
+    // 4 channels:
+    // 16 threads for Transport-Channel
+    // 4 grpc default executor
+    // 8 grpc default worker
+    // 5 grpc transport
+    //
+    // 8 channels:
+    // 16 threads for Transport-Channel
+    // 8 grpc default executor
+    // 8 grpc default worker
+    // 8 grpc transport
+    //
+    // 12 channels:
+    // 16 threads for Transport-Channel
+    // 5 grpc default executor
+    // 8 grpc default worker
+    // 8 grpc transport
+    //
 
     // The statement is only sent once to the mock server. The DescribePortal message will trigger
     // the execution of the query, and the result from that execution will be used for the Execute

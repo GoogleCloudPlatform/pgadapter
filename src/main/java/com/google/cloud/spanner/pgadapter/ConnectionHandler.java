@@ -250,6 +250,7 @@ public class ConnectionHandler extends Thread {
       return url;
     }
     StringBuilder result = new StringBuilder(url);
+    result.append(";numChannels=4");
     for (Entry<Object, Object> entry : info.entrySet()) {
       if (entry.getValue() != null && !"".equals(entry.getValue())) {
         result.append(";").append(entry.getKey()).append("=").append(entry.getValue());
