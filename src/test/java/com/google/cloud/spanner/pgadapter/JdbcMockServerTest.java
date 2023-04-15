@@ -77,6 +77,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -2916,6 +2917,42 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   }
 
   @Test
+  public void testJulianDate() throws SQLException {
+    String sql = "select d from foo";
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(sql),
+            com.google.spanner.v1.ResultSet.newBuilder()
+                .setMetadata(
+                    ResultSetMetadata.newBuilder()
+                        .setRowType(
+                            StructType.newBuilder()
+                                .addFields(
+                                    Field.newBuilder()
+                                        .setName("d")
+                                        .setType(Type.newBuilder().setCode(TypeCode.DATE).build())
+                                        .build())
+                                .build())
+                        .build())
+                .addRows(
+                    ListValue.newBuilder()
+                        .addValues(Value.newBuilder().setStringValue("0300-02-20").build())
+                        .build())
+                .build()));
+    String binaryTransferEnable = "&binaryTransferEnable=" + Oid.DATE;
+
+    try (Connection connection = DriverManager.getConnection(createUrl() + binaryTransferEnable)) {
+      connection.createStatement().execute("set time zone 'utc'");
+      connection.unwrap(PGConnection.class).setPrepareThreshold(-1);
+      try (ResultSet resultSet = connection.createStatement().executeQuery(sql)) {
+        assertTrue(resultSet.next());
+        assertEquals(LocalDate.of(300, 2, 20), resultSet.getDate(1).toLocalDate());
+        assertFalse(resultSet.next());
+      }
+    }
+  }
+
+  @Test
   public void testRandomResults() throws SQLException {
     for (boolean binary : new boolean[] {false, true}) {
       // Also get the random results using the normal Spanner client to compare the results with
@@ -2969,7 +3006,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
                   resultSet.getObject(col + 1);
                 }
               }
-              assertEqual(spannerResult, resultSet, binary);
+              assertEqual(spannerResult, resultSet);
               rowCount++;
             }
             assertEquals(RANDOM_RESULTS_ROW_COUNT, rowCount);
@@ -3033,8 +3070,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
     }
   }
 
-  private void assertEqual(
-      com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult, boolean binary)
+  private void assertEqual(com.google.cloud.spanner.ResultSet spannerResult, ResultSet pgResult)
       throws SQLException {
     assertEquals(spannerResult.getColumnCount(), pgResult.getMetaData().getColumnCount());
     for (int col = 0; col < spannerResult.getColumnCount(); col++) {
@@ -3046,11 +3082,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
 
       switch (spannerResult.getColumnType(col).getCode()) {
         case BOOL:
-          if (!binary) {
-            // Skip for binary for now, as there is a bug in the PG JDBC driver for decoding binary
-            // bool values.
-            assertEquals(spannerResult.getBoolean(col), pgResult.getBoolean(col + 1));
-          }
+          assertEquals(spannerResult.getBoolean(col), pgResult.getBoolean(col + 1));
           break;
         case INT64:
           assertEquals(spannerResult.getLong(col), pgResult.getLong(col + 1));
@@ -3073,12 +3105,21 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
               pgResult.getTimestamp(col + 1).getTime());
           break;
         case DATE:
-          assertEquals(
+          LocalDate expected =
               LocalDate.of(
                   spannerResult.getDate(col).getYear(),
                   spannerResult.getDate(col).getMonth(),
-                  spannerResult.getDate(col).getDayOfMonth()),
-              pgResult.getDate(col + 1).toLocalDate());
+                  spannerResult.getDate(col).getDayOfMonth());
+          if ((expected.getYear() == 1582 && expected.getMonth() == Month.OCTOBER)
+              || (expected.getYear() <= 1582
+                  && expected.getMonth() == Month.FEBRUARY
+                  && expected.getDayOfMonth() > 20)) {
+            // Just assert that we can get the value. Dates in the Julian/Gregorian cutover period
+            // are weird, as are potential intercalaris values.
+            assertNotNull(pgResult.getDate(col + 1).toLocalDate());
+          } else {
+            assertEquals(expected, pgResult.getDate(col + 1).toLocalDate());
+          }
           break;
         case PG_JSONB:
           assertEquals(spannerResult.getPgJsonb(col), pgResult.getString(col + 1));
