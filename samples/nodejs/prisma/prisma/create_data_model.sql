@@ -2,63 +2,58 @@
 -- Executing the schema creation in a batch will improve execution speed.
 start batch ddl;
 
-create table if not exists singers (
-    id         varchar not null primary key,
-    version_id int not null,
-    first_name varchar,
-    last_name  varchar not null,
-    full_name  varchar generated always as (coalesce(concat(first_name, ' '::varchar, last_name), last_name)) stored,
-    active     boolean,
-    created_at timestamptz,
-    updated_at timestamptz
-);
-
-create table if not exists albums (
-    id               varchar not null primary key,
-    version_id       int not null,
-    title            varchar not null,
-    marketing_budget numeric,
-    release_date     date,
-    cover_picture    bytea,
-    singer_id        varchar not null,
-    created_at       timestamptz,
-    updated_at       timestamptz,
-    constraint fk_albums_singers foreign key (singer_id) references singers (id)
-);
-
-create table if not exists tracks (
-    id           varchar not null,
-    track_number bigint not null,
-    version_id   int not null,
-    title        varchar not null,
-    sample_rate  float8 not null,
-    created_at   timestamptz,
-    updated_at   timestamptz,
-    primary key (id, track_number)
-) interleave in parent albums on delete cascade;
-
-create table if not exists venues (
+create table if not exists "Singer" (
     id          varchar not null primary key,
-    version_id  int not null,
+    "firstName" varchar,
+    "lastName"  varchar not null,
+    "fullName"  varchar generated always as (coalesce(concat("firstName", ' '::varchar, "lastName"), "lastName")) stored,
+    active      boolean,
+    "createdAt" timestamptz,
+    "updatedAt" timestamptz
+);
+
+create table if not exists "Album" (
+    id                varchar not null primary key,
+    title             varchar not null,
+    "marketingBudget" numeric,
+    "releaseDate"     date,
+    "coverPicture"    bytea,
+    "singerId"        varchar not null,
+    "createdAt"       timestamptz,
+    "updatedAt"       timestamptz,
+    constraint fk_albums_singers foreign key ("singerId") references "Singer" (id)
+);
+
+create table if not exists "Track" (
+    id            varchar not null,
+    "trackNumber" bigint not null,
+    title         varchar not null,
+    "sampleRate"  float8 not null,
+    "createdAt"   timestamptz,
+    "updatedAt"   timestamptz,
+    primary key (id, "trackNumber")
+) interleave in parent "Album" on delete cascade;
+
+create table if not exists "Venue" (
+    id          varchar not null primary key,
     name        varchar not null,
     description jsonb not null,
-    created_at  timestamptz,
-    updated_at  timestamptz
+    "createdAt" timestamptz,
+    "updatedAt" timestamptz
 );
 
-create table if not exists concerts (
+create table if not exists "Concert" (
     id          varchar not null primary key,
-    version_id  int not null,
-    venue_id    varchar not null,
-    singer_id   varchar not null,
+    "venueId"   varchar not null,
+    "singerId"  varchar not null,
     name        varchar not null,
-    start_time  timestamptz not null,
-    end_time    timestamptz not null,
-    created_at  timestamptz,
-    updated_at  timestamptz,
-    constraint fk_concerts_venues  foreign key (venue_id)  references venues  (id),
-    constraint fk_concerts_singers foreign key (singer_id) references singers (id),
-    constraint chk_end_time_after_start_time check (end_time > start_time)
+    "startTime" timestamptz not null,
+    "endTime"   timestamptz not null,
+    "createdAt" timestamptz,
+    "updatedAt" timestamptz,
+    constraint fk_concerts_venues  foreign key ("venueId")  references "Venue"  (id),
+    constraint fk_concerts_singers foreign key ("singerId") references "Singer" (id),
+    constraint chk_end_time_after_start_time check ("endTime" > "startTime")
 );
 
 run batch;

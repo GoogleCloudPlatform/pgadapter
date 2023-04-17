@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "ts-node src/index.ts",
-    "test": "ts-node src/index_test.ts"
+    "test": "ts-node src/sample_test.ts"
   },
   "keywords": [],
   "author": "",

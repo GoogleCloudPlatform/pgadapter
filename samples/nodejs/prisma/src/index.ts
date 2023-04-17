@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {PrismaClient} from '@prisma/client'
-import * as fs from "fs";
+import {createDataModel} from "./sample";
 
 export const prisma = new PrismaClient();
 export const staleReadClient = new PrismaClient({
@@ -23,6 +23,8 @@ export const staleReadClient = new PrismaClient({
     },
   },
 });
+
+console.log("Running sample application...");
 
 runSample()
   .then(async () => {
@@ -38,17 +40,4 @@ runSample()
 
 async function runSample() {
   await createDataModel();
-}
-
-export async function createDataModel() {
-  console.log("Creating sample data model...");
-  const sqlStatements = fs
-    .readFileSync('./prisma/create_data_model.sql')
-    .toString()
-    .split(";")
-    .filter((sql) => sql.trim() !== '');
-  for (const sql of sqlStatements) {
-    await prisma.$executeRawUnsafe(sql);
-  }
-  console.log("Sample data model created.");
 }

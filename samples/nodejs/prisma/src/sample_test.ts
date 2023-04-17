@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {createDataModel, prisma} from "./index";
+import {
+  createDataModel,
+  createRandomSingersAndAlbums,
+  printSingersAndAlbums,
+  prisma
+} from "./sample";
 
 function runTest(host: string, port: number, database: string, test: () => Promise<void>) {
   runTestWithClient(test)
@@ -38,5 +43,22 @@ require('yargs')
     {},
     opts => runTest(opts.host, opts.port, opts.database, createDataModel)
 )
+.command(
+    'testCreateRandomSingersAndAlbums <host> <port> <database>',
+    'Creates a random range of singers and albums',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, createRandomSingersAndAlbums)
+)
+.command(
+    'testPrintSingersAndAlbums <host> <port> <database>',
+    'Prints all singers and albums in the database',
+    {},
+    opts => runTest(opts.host, opts.port, opts.database, printSingersAndAlbums)
+)
+.wrap(120)
+.recommendCommands()
+.strict()
+.help().argv;
+
 
 
