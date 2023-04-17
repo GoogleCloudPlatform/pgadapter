@@ -1,7 +1,9 @@
 # PGAdapter - psycopg2 Connection Options
 
 PGAdapter supports the [Python psycopg2 driver](https://www.psycopg.org/) version 2.9.3 and higher.
-This does not include [psycopg3](https://www.psycopg.org/psycopg3/).
+
+PGAdapter also supports [psycopg3](psycopg3.md). `psycopg3` is recommended over `psycopg2`, as
+`psycopg3` uses [server-side binding of query parameters](https://www.psycopg.org/psycopg3/docs/basic/from_pg2.html#server-side-binding).
 
 ## Usage
 

@@ -126,7 +126,9 @@ public class ITHibernateTest {
   static void buildHibernateSample() throws IOException, InterruptedException {
     System.out.println("Building Hibernate Sample.");
     ImmutableList<String> hibernateCommand =
-        ImmutableList.<String>builder().add("mvn", "clean", "compile").build();
+        ImmutableList.<String>builder()
+            .add("mvn", "-B", "--no-transfer-progress", "clean", "compile")
+            .build();
     runCommand(hibernateCommand);
     System.out.println("Hibernate Sample build complete.");
   }

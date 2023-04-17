@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.18.4](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.3...v0.18.4) (2023-04-15)
+
+
+### Documentation
+
+* recommend psycopg3 over psycopg2 ([#742](https://github.com/GoogleCloudPlatform/pgadapter/issues/742)) ([8aec410](https://github.com/GoogleCloudPlatform/pgadapter/commit/8aec410c4ff14df6b3787d0988bb868665cdf1b7))
+
+
+### Dependencies
+
+* bump JDBC driver to 42.6.0 ([#747](https://github.com/GoogleCloudPlatform/pgadapter/issues/747)) ([9bdb5f4](https://github.com/GoogleCloudPlatform/pgadapter/commit/9bdb5f477ffcfd3861e43305bcf8c229a437b7e8))
+* bump Spanner client lib version to 6.40.0 ([#781](https://github.com/GoogleCloudPlatform/pgadapter/issues/781)) ([419c833](https://github.com/GoogleCloudPlatform/pgadapter/commit/419c8336eed28115520e4cc03d28b2ff60415138))
+* pin the SQLAlchemy 2.x version used for tests ([#759](https://github.com/GoogleCloudPlatform/pgadapter/issues/759)) ([2a78f4c](https://github.com/GoogleCloudPlatform/pgadapter/commit/2a78f4cd0b72f0f7432081816a3b6173ed65c613))
+
+## [0.18.3](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.2...v0.18.3) (2023-03-20)
+
+
+### Bug Fixes
+
+* close SpannerPool at shutdown ([#734](https://github.com/GoogleCloudPlatform/pgadapter/issues/734)) ([d67a75f](https://github.com/GoogleCloudPlatform/pgadapter/commit/d67a75f4be16db958cfb268277649a62d5e99e7c))
+
+
+### Documentation
+
+* add psycopg3 sample with embedded PGAdapter ([#733](https://github.com/GoogleCloudPlatform/pgadapter/issues/733)) ([0250b21](https://github.com/GoogleCloudPlatform/pgadapter/commit/0250b2165247bbc5ee8a48874822c11f264a9a86))
+* add sample application for JDBC ([#592](https://github.com/GoogleCloudPlatform/pgadapter/issues/592)) ([c1a5635](https://github.com/GoogleCloudPlatform/pgadapter/commit/c1a56358030c97b20d6ff3d774be26b755f837bf))
+* document SQLAlchemy 2.x experimental support ([#728](https://github.com/GoogleCloudPlatform/pgadapter/issues/728)) ([6a40e9e](https://github.com/GoogleCloudPlatform/pgadapter/commit/6a40e9e5a54d161dc44280c4c6a6a7d09cbb2490))
+* pgx sample using embedded PGAdapter ([#732](https://github.com/GoogleCloudPlatform/pgadapter/issues/732)) ([7c95781](https://github.com/GoogleCloudPlatform/pgadapter/commit/7c9578165aebade978054aedd440db4349080d23))
+
+## [0.18.2](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.1...v0.18.2) (2023-03-17)
+
+
+### Bug Fixes
+
+* add support for getting arrays using npgsql ([#722](https://github.com/GoogleCloudPlatform/pgadapter/issues/722)) ([6988ad1](https://github.com/GoogleCloudPlatform/pgadapter/commit/6988ad17c06a9e9197fd71922492ff76eafb280b))
+
+
+### Documentation
+
+* add documentation and sample for GKE sidecar proxy ([#718](https://github.com/GoogleCloudPlatform/pgadapter/issues/718)) ([f4246bd](https://github.com/GoogleCloudPlatform/pgadapter/commit/f4246bd81e66ffe7f20c9f78f5e59302635de5ed)), closes [#701](https://github.com/GoogleCloudPlatform/pgadapter/issues/701)
+
 ## [0.18.1](https://github.com/GoogleCloudPlatform/pgadapter/compare/v0.18.0...v0.18.1) (2023-03-09)
 
 

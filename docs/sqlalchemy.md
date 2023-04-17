@@ -48,6 +48,13 @@ with Session(engine) as session:
   session.commit()
 ```
 
+## Limitations
+`SQLAlchemy 1.x` uses `psycopg2` for connecting to `PostgreSQL`. `psycopg2` does not use parameterized
+queries. This affects query execution negatively on Cloud Spanner. It is therefore recommended to
+use `SQLAlchemy 2.x` instead of `SQLAlchemy 1.x` with Cloud Spanner and PGAdapter.
+* See [SQLAlchemy 1.x limitations](../samples/python/sqlalchemy-sample/README.md#limitations) for more information about this limitation.
+* See [SQLAlchemy 2.x sample](../samples/python/sqlalchemy2-sample) for more information about using `SQLAlchemy 2.x` with PGAdapter.
+
 ## Full Sample and Limitations
 [This directory](../samples/python/sqlalchemy-sample) contains a full sample of how to work with
 `SQLAlchemy` with Cloud Spanner and PGAdapter. The sample readme file also lists the
