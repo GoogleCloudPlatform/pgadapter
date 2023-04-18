@@ -539,7 +539,7 @@ public class PgCatalog {
 
   @InternalApi
   public class PgAttribute implements PgCatalogTable {
-    private static final String EMPTY_PG_ATTRIBUTE_CTE =
+    public static final String EMPTY_PG_ATTRIBUTE_CTE =
         "pg_attribute as (\n"
             + "select * from ("
             + "select 0::bigint as attrelid, '' as attname, 0::bigint as atttypid, 0::bigint as attstattarget, "
@@ -638,7 +638,7 @@ public class PgCatalog {
 
   @InternalApi
   public class PgAttrdef implements PgCatalogTable {
-    private static final String EMPTY_PG_ATTRDEF_CTE =
+    public static final String EMPTY_PG_ATTRDEF_CTE =
         "pg_attrdef as (\n"
             + "select * from ("
             + "select 0::bigint as oid, 0::bigint as adrelid, 0::bigint as adnum, ''::varchar as adbin"
@@ -740,7 +740,7 @@ public class PgCatalog {
             + "where tc.constraint_schema='public' and not substr(tc.constraint_name, 1, length('CK_IS_NOT_NULL_')) = 'CK_IS_NOT_NULL_'\n"
             + ")";
 
-    private static final String EMPTY_PG_CONSTRAINT_CTE =
+    public static final String EMPTY_PG_CONSTRAINT_CTE =
         "pg_constraint as (\n"
             + "select * from ("
             + "select    0::bigint as oid, ''::varchar as conname, 0::bigint as connamespace, ''  as contype,\n"
@@ -779,7 +779,7 @@ public class PgCatalog {
             + "group by i.table_schema, i.table_name, i.index_name, i.is_unique, i.is_null_filtered, i.index_type, i.filter\n"
             + ")";
 
-    private static final String EMPTY_PG_INDEX_CTE =
+    public static final String EMPTY_PG_INDEX_CTE =
         "pg_index as (\n"
             + "select * from (\n"
             + "select 0::bigint as indexrelid,\n"
@@ -861,8 +861,9 @@ public class PgCatalog {
     }
   }
 
-  private static class PgExtension implements PgCatalogTable {
-    private static final String PG_EXTENSION_CTE =
+  @InternalApi
+  public static class PgExtension implements PgCatalogTable {
+    public static final String PG_EXTENSION_CTE =
         "pg_extension as (\n"
             + "select * from ("
             + "select 0::bigint as oid, ''::varchar as extname, 0::bigint as extowner, "

@@ -41,6 +41,12 @@ import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.connection.RandomResultSetGenerator;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
 import com.google.cloud.spanner.pgadapter.statements.PgCatalog.EmptyPgEnum;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttrdef;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgAttribute;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgCollation;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgConstraint;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgExtension;
+import com.google.cloud.spanner.pgadapter.statements.PgCatalog.PgIndex;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ControlMessage.PreparedType;
 import com.google.cloud.spanner.pgadapter.wireprotocol.DescribeMessage;
 import com.google.cloud.spanner.pgadapter.wireprotocol.ExecuteMessage;
@@ -4732,15 +4738,110 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
         StatementResult.query(Statement.of(withEmulation), SELECT1_RESULTSET));
     String withoutEmulation = "with " + PG_CLASS_PREFIX + "\nselect 1 from pg_class";
     mockSpanner.putStatementResult(
-        StatementResult.query(Statement.of(withoutEmulation), SELECT1_RESULTSET));
+        StatementResult.query(Statement.of(withoutEmulation), EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgCollation.PG_COLLATION_CTE + "\nselect 1 from pg_collation"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgExtension.PG_EXTENSION_CTE + "\nselect 1 from pg_extension"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with " + PgAttribute.EMPTY_PG_ATTRIBUTE_CTE + "\nselect 1 from pg_attribute"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + EMULATED_PG_ATTRIBUTE_PREFIX + "\nselect 1 from pg_attribute"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgAttrdef.EMPTY_PG_ATTRDEF_CTE + "\nselect 1 from pg_attrdef"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgAttrdef.PG_ATTRDEF_CTE + "\nselect 1 from pg_attrdef"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with " + PgConstraint.EMPTY_PG_CONSTRAINT_CTE + "\nselect 1 from pg_constraint"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of(
+                "with " + PgConstraint.PG_CONSTRAINT_CTE + "\nselect 1 from pg_constraint"),
+            SELECT1_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgIndex.EMPTY_PG_INDEX_CTE + "\nselect 1 from pg_index"),
+            EMPTY_RESULTSET));
+    mockSpanner.putStatementResult(
+        StatementResult.query(
+            Statement.of("with " + PgIndex.PG_INDEX_CTE + "\nselect 1 from pg_index"),
+            SELECT1_RESULTSET));
 
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       for (boolean emulate : new boolean[] {true, false}) {
         connection.createStatement().execute("set spanner.emulate_pg_class_tables=" + emulate);
         try (ResultSet resultSet =
             connection.createStatement().executeQuery("select 1 from pg_class")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_collation")) {
           assertTrue(resultSet.next());
           assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_extension")) {
+          assertTrue(resultSet.next());
+          assertEquals(1L, resultSet.getLong(1));
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_attribute")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_attrdef")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_constraint")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
+          assertFalse(resultSet.next());
+        }
+
+        try (ResultSet resultSet =
+            connection.createStatement().executeQuery("select 1 from pg_index")) {
+          if (emulate) {
+            assertTrue(resultSet.next());
+            assertEquals(1L, resultSet.getLong(1));
+          }
           assertFalse(resultSet.next());
         }
       }
