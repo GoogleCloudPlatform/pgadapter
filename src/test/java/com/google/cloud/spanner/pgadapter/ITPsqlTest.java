@@ -818,7 +818,10 @@ public class ITPsqlTest implements IntegrationTest {
           // Ojinaga switched from Mountain to Central time in 2022. Not all JDKs know that.
           ZoneId.of("America/Ojinaga"),
           // Nuuk stopped using DST in 2023. This is unknown to older JDKs.
-          ZoneId.of("America/Nuuk"));
+          ZoneId.of("America/Nuuk"),
+          ZoneId.of("America/Godthab"),
+          // Egypt has started using DST again from 2023.
+          ZoneId.of("Egypt"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));
