@@ -807,8 +807,10 @@ public class ITPsqlTest implements IntegrationTest {
           ZoneId.of("Asia/Amman"),
           // Iran observed DST in 1978. Not all databases agree on this.
           ZoneId.of("Asia/Tehran"),
-          // Rankin_Inlet did not observer DST in 1970-1979, but not all databases agree.
+          // Rankin_Inlet and Resolute did not observer DST in 1970-1979, but not all databases
+          // agree.
           ZoneId.of("America/Rankin_Inlet"),
+          ZoneId.of("America/Resolute"),
           // Pangnirtung did not observer DST in 1970-1979, but not all databases agree.
           ZoneId.of("America/Pangnirtung"),
           // Niue switched from -11:30 to -11 in 1978. Not all JDKs know that.
@@ -816,7 +818,10 @@ public class ITPsqlTest implements IntegrationTest {
           // Ojinaga switched from Mountain to Central time in 2022. Not all JDKs know that.
           ZoneId.of("America/Ojinaga"),
           // Nuuk stopped using DST in 2023. This is unknown to older JDKs.
-          ZoneId.of("America/Nuuk"));
+          ZoneId.of("America/Nuuk"),
+          ZoneId.of("America/Godthab"),
+          // Egypt has started using DST again from 2023.
+          ZoneId.of("Egypt"));
 
   private LocalDate generateRandomLocalDate() {
     return LocalDate.ofEpochDay(random.nextInt(365 * 100));
