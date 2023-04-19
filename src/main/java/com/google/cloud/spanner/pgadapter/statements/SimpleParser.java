@@ -16,6 +16,7 @@ package com.google.cloud.spanner.pgadapter.statements;
 
 import com.google.api.core.InternalApi;
 import com.google.cloud.spanner.Statement;
+import com.google.cloud.spanner.Type.Code;
 import com.google.cloud.spanner.Value;
 import com.google.cloud.spanner.pgadapter.error.PGExceptionFactory;
 import com.google.cloud.spanner.pgadapter.error.SQLState;
@@ -223,6 +224,51 @@ public class SimpleParser {
       builder.bind(param.getKey()).to(param.getValue());
     }
     return builder.build();
+  }
+
+  /**
+   * Adds a LIMIT clause to the given statement if the statement contains a parameterized OFFSET
+   * clause and no LIMIT clause.
+   */
+  static Statement addLimitIfParameterizedOffset(Statement statement) {
+    SimpleParser parser = new SimpleParser(statement.getSql());
+    parser.parseExpressionUntilKeyword(ImmutableList.of("limit", "offset"), true, false, false);
+    if (parser.pos >= parser.getSql().length()) {
+      return statement;
+    }
+    if (parser.eatKeyword("limit")) {
+      // If the statement contains a LIMIT clausem, then we're OK.
+      return statement;
+    }
+    String parameter;
+    if (parser.eatKeyword("offset") && (parameter = parser.readQueryParameter()) != null) {
+      // Check if we have a LIMIT clause after the OFFSET clause.
+      if (parser.peekKeyword("limit")) {
+        return statement;
+      }
+      // This is probably an invalid query. Do not modify it to prevent the user getting an error
+      // message for a query that they did not write.
+      if (parser.hasMoreTokens()) {
+        return statement;
+      }
+      // The statement contains an OFFSET clause using a query parameter and no LIMIT clause.
+      // Append a LIMIT clause equal to Long.MAX_VALUE - OFFSET.
+      long limit = Long.MAX_VALUE;
+      Value value = statement.getParameters().get("p" + parameter.substring(1));
+      if (value != null
+          && !value.isNull()
+          && value.getType() != null
+          && value.getType().getCode() == Code.INT64) {
+        limit = Long.MAX_VALUE - value.getInt64();
+      }
+      return copyStatement(
+          statement,
+          parser.sql.substring(0, parser.pos)
+              + " limit "
+              + limit
+              + parser.sql.substring(parser.pos));
+    }
+    return statement;
   }
 
   private String sql;
@@ -659,6 +705,22 @@ public class SimpleParser {
       return true;
     }
     return false;
+  }
+
+  String readQueryParameter() {
+    if (eat(true, false, "$")) {
+      int startPos = pos - 1;
+      if (pos == sql.length() || !Character.isDigit(sql.charAt(pos))) {
+        return null;
+      }
+      while (pos < sql.length() && Character.isDigit(sql.charAt(pos))) {
+        pos++;
+      }
+      if (Character.isDigit(sql.charAt(pos - 1))) {
+        return sql.substring(startPos, pos);
+      }
+    }
+    return null;
   }
 
   boolean peekJoinKeyword() {

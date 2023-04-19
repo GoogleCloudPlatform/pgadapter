@@ -295,7 +295,13 @@ public class BackendConnection {
     }
 
     Statement bindStatement(Statement statement) {
-      return statementBinder.apply(statement);
+      Statement boundStatement = statementBinder.apply(statement);
+      // Add a LIMIT clause to the statement if it contains an OFFSET clause that uses a query
+      // parameter and there is no existing LIMIT clause in the query.
+      if (sessionState.isAutoAddLimitClause()) {
+        return SimpleParser.addLimitIfParameterizedOffset(boundStatement);
+      }
+      return boundStatement;
     }
 
     StatementResult analyzeOrExecute(Statement statement) {

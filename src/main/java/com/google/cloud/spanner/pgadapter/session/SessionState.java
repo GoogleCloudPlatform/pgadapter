@@ -387,6 +387,15 @@ public class SessionState {
     return getBoolSetting("spanner", "force_autocommit", false);
   }
 
+  /**
+   * Returns whether statements with an OFFSET clause that uses a parameter should be automatically
+   * appended with a LIMIT clause. The LIMIT clause will use the literal Long.MAX_VALUE for unbound
+   * statements, and Long.MAX_VALUE - offset for bound statements.
+   */
+  public boolean isAutoAddLimitClause() {
+    return getBoolSetting("spanner", "auto_add_limit_clause", false);
+  }
+
   /** Returns the current setting for replacing pg_catalog tables with common table expressions. */
   public boolean isReplacePgCatalogTables() {
     PGSetting setting = internalGet(toKey("spanner", "replace_pg_catalog_tables"), false);

@@ -196,6 +196,28 @@ public class ITJdbcTest implements IntegrationTest {
   }
 
   @Test
+  public void testSelectParameterizedOffsetWithoutLimit() throws SQLException {
+    try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
+      connection.createStatement().execute("set spanner.auto_add_limit_clause=true");
+      try (PreparedStatement statement =
+          connection.prepareStatement("select * from numbers offset ?")) {
+        for (long offset : new long[] {0L, 1L}) {
+          statement.setLong(1, offset);
+          try (ResultSet resultSet = statement.executeQuery()) {
+            if (offset == 0L) {
+              assertTrue(resultSet.next());
+              assertEquals(1L, resultSet.getLong(1));
+              assertFalse(resultSet.next());
+            } else {
+              assertFalse(resultSet.next());
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
   public void testSelectCurrentSchema() throws SQLException {
     try (Connection connection = DriverManager.getConnection(getConnectionUrl())) {
       try (ResultSet resultSet =

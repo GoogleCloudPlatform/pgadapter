@@ -15,14 +15,17 @@
 package com.google.cloud.spanner.pgadapter.statements;
 
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.QuotedString.unescapeQuotedStringValue;
+import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.addLimitIfParameterizedOffset;
 import static com.google.cloud.spanner.pgadapter.statements.SimpleParser.parseCommand;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.error.PGException;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.QuotedString;
 import com.google.cloud.spanner.pgadapter.statements.SimpleParser.TableOrIndexName;
@@ -497,5 +500,167 @@ public class SimpleParserTest {
     assertEquals(ImmutableList.of("foo", "bar"), SimpleParser.readArrayLiteral("{foo, bar}", true));
     assertEquals(
         ImmutableList.of("foo 1", "bar 2"), SimpleParser.readArrayLiteral("{foo 1, bar 2}", true));
+  }
+
+  @Test
+  public void testAddLimitIfParameterizedOffset() {
+    Statement statement;
+
+    statement = Statement.of("select * from foo");
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    statement = Statement.newBuilder("select * from foo where id=$1").bind("p1").to(1L).build();
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    statement = Statement.of("select * from foo limit 1");
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    statement = Statement.of("select * from foo limit 1 offset 1");
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    statement = Statement.of("select * from foo offset 1");
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    statement =
+        Statement.newBuilder("select * from (select id from bar limit 1) where id=$1")
+            .bind("p1")
+            .to(1L)
+            .build();
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    statement =
+        Statement.newBuilder("select * from (select id from bar offset 1) where id=$1")
+            .bind("p1")
+            .to(1L)
+            .build();
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    statement =
+        Statement.newBuilder("select * from (select id from bar limit 1 offset 1) where id=$1")
+            .bind("p1")
+            .to(1L)
+            .build();
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    statement =
+        Statement.newBuilder("select * from (select id from bar limit $1 offset $2) where id=$3")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .bind("p3")
+            .to(1L)
+            .build();
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    // The replacement is only done in the outer main query and not in any sub queries.
+    statement =
+        Statement.newBuilder("select * from (select id from bar offset $1) where id=$2")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build();
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 limit $2 offset $3")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .bind("p3")
+            .to(1L)
+            .build();
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 offset $2 limit $3")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .bind("p3")
+            .to(1L)
+            .build();
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 limit $2")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build();
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 offset $2")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build();
+    assertEquals(
+        Statement.newBuilder("select * from foo where id=$1 offset $2 limit 9223372036854775806")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build(),
+        addLimitIfParameterizedOffset(statement));
+    statement =
+        Statement.newBuilder("select * from foo where id=$1   offset   $2   ")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build();
+    assertEquals(
+        Statement.newBuilder(
+                "select * from foo where id=$1   offset   $2    limit 9223372036854775806")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build(),
+        addLimitIfParameterizedOffset(statement));
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 offset $2 /* some comment */")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build();
+    assertEquals(
+        Statement.newBuilder(
+                "select * from foo where id=$1 offset $2 /* some comment */ limit 9223372036854775806")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build(),
+        addLimitIfParameterizedOffset(statement));
+    statement =
+        Statement.newBuilder(
+                "select * from foo where id=$1 offset -- Single line comment\n$2 /* some comment */")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build();
+    assertEquals(
+        Statement.newBuilder(
+                "select * from foo where id=$1 offset -- Single line comment\n$2 /* some comment */ limit 9223372036854775806")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .build(),
+        addLimitIfParameterizedOffset(statement));
+    // This is an invalid query. That will be caught by the backend parser.
+    statement =
+        Statement.newBuilder("select * from foo where id=$1 offset $2 offset $3")
+            .bind("p1")
+            .to(1L)
+            .bind("p2")
+            .to(1L)
+            .bind("p3")
+            .to(1L)
+            .build();
+    assertSame(statement, addLimitIfParameterizedOffset(statement));
+
+    statement = Statement.of("select * from foo where id=$1 offset $2");
+    assertEquals(
+        Statement.of("select * from foo where id=$1 offset $2 limit 9223372036854775807"),
+        addLimitIfParameterizedOffset(statement));
   }
 }
