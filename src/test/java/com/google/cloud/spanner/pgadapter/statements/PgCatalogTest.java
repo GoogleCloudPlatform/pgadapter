@@ -23,6 +23,7 @@ import com.google.cloud.Tuple;
 import com.google.cloud.spanner.Statement;
 import com.google.cloud.spanner.pgadapter.session.SessionState;
 import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClient;
+import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer;
 import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer.ReplacementStatus;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
@@ -61,7 +62,24 @@ public class PgCatalogTest {
   @Test
   public void testReplaceKnownUnsupportedFunctions() {
     SessionState sessionState = mock(SessionState.class);
-    PgCatalog catalog = new PgCatalog(sessionState, WellKnownClient.UNSPECIFIED);
+    PgCatalog catalog =
+        new PgCatalog(sessionState, WellKnownClient.UNSPECIFIED) {
+          @Override
+          ImmutableList<QueryPartReplacer> getDefaultFunctionReplacements() {
+            ImmutableList<QueryPartReplacer> replacers = super.getDefaultFunctionReplacements();
+
+            return ImmutableList.<QueryPartReplacer>builder()
+                .addAll(replacers)
+                .add(
+                    sql -> {
+                      if ("select * from replace_and_stop".equals(sql)) {
+                        return Tuple.of("select * from replaced", ReplacementStatus.STOP);
+                      }
+                      return Tuple.of(sql, ReplacementStatus.CONTINUE);
+                    })
+                .build();
+          }
+        };
 
     Tuple<String, ReplacementStatus> result;
     result = catalog.replaceKnownUnsupportedFunctions(Statement.of("select * from foo"));
@@ -77,5 +95,15 @@ public class PgCatalogTest {
         catalog.replaceKnownUnsupportedFunctions(Statement.of("select pg_table_is_visible('foo')"));
     assertEquals("select true", result.x());
     assertEquals(ReplacementStatus.CONTINUE, result.y());
+
+    result =
+        catalog.replaceKnownUnsupportedFunctions(Statement.of("select * from replace_and_stop"));
+    assertEquals("select * from replaced", result.x());
+    assertEquals(ReplacementStatus.STOP, result.y());
+
+    assertEquals(
+        Statement.of("select * from replaced"),
+        catalog.addCommonTableExpressions(
+            Statement.of("select * from replace_and_stop"), ImmutableList.of("replace_and_stop")));
   }
 }

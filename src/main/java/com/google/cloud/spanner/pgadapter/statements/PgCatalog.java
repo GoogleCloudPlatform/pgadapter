@@ -24,6 +24,7 @@ import com.google.cloud.spanner.pgadapter.utils.ClientAutoDetector.WellKnownClie
 import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer;
 import com.google.cloud.spanner.pgadapter.utils.QueryPartReplacer.ReplacementStatus;
 import com.google.cloud.spanner.pgadapter.utils.RegexQueryPartReplacer;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -136,13 +137,18 @@ public class PgCatalog {
 
     this.functionReplacements =
         ImmutableList.<QueryPartReplacer>builder()
-            .addAll(DEFAULT_FUNCTION_REPLACEMENTS)
+            .addAll(getDefaultFunctionReplacements())
             .add(
                 RegexQueryPartReplacer.replace(
                     Pattern.compile("version\\(\\)"),
                     () -> "'" + sessionState.getServerVersion() + "'"))
             .addAll(wellKnownClient.getQueryPartReplacements())
             .build();
+  }
+
+  @VisibleForTesting
+  ImmutableList<QueryPartReplacer> getDefaultFunctionReplacements() {
+    return DEFAULT_FUNCTION_REPLACEMENTS;
   }
 
   /** Replace supported pg_catalog tables with Common Table Expressions. */
