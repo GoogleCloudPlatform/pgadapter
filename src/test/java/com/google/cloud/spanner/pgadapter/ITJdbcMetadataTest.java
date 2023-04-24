@@ -21,6 +21,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import com.google.cloud.spanner.Database;
+import com.google.cloud.spanner.SlowTest;
 import com.google.cloud.spanner.SpannerExceptionFactory;
 import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
@@ -49,7 +50,7 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
 
-@Category(IntegrationTest.class)
+@Category({IntegrationTest.class, SlowTest.class})
 @RunWith(Parameterized.class)
 public class ITJdbcMetadataTest implements IntegrationTest {
   private static final String[] VERSIONS =

@@ -33,6 +33,7 @@
       com.google.cloud.spanner.pgadapter.python.PythonTest,
       com.google.cloud.spanner.pgadapter.nodejs.NodeJSTest
     </excludedTests>
+    <excludedIntegrationTests></excludedIntegrationTests>
 
     <spanner.version>6.40.0</spanner.version>
     <junixsocket.version>2.6.2</junixsocket.version>
@@ -445,6 +446,7 @@
           </execution>
         </executions>
         <configuration>
+          <excludedGroups>${excludedIntegrationTests}</excludedGroups>
           <forkedProcessTimeoutInSeconds>3600</forkedProcessTimeoutInSeconds>
           <forkCount>${it.forkCount}</forkCount>
           <reuseForks>true</reuseForks>
