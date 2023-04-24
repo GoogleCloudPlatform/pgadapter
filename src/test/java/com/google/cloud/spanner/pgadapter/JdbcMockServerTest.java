@@ -103,11 +103,9 @@ import org.junit.runners.Parameterized.Parameters;
 import org.postgresql.PGConnection;
 import org.postgresql.PGStatement;
 import org.postgresql.core.Oid;
-import org.postgresql.jdbc.PSQLSavepoint;
 import org.postgresql.jdbc.PgStatement;
 import org.postgresql.util.PGobject;
 import org.postgresql.util.PSQLException;
-import org.postgresql.util.PSQLState;
 
 @RunWith(Parameterized.class)
 public class JdbcMockServerTest extends AbstractMockServerTest {

@@ -609,9 +609,8 @@ public class BackendConnection {
         spannerConnection.savepoint(savepointStatement.getSavepointName());
         result.set(NO_RESULT);
       } catch (Exception exception) {
-        PGException pgException = PGException.newBuilder(exception)
-            .setSQLState(SQLState.SavepointException)
-            .build();
+        PGException pgException =
+            PGException.newBuilder(exception).setSQLState(SQLState.SavepointException).build();
         result.setException(pgException);
         throw pgException;
       }
@@ -638,9 +637,8 @@ public class BackendConnection {
         spannerConnection.releaseSavepoint(releaseStatement.getSavepointName());
         result.set(NO_RESULT);
       } catch (Exception exception) {
-        PGException pgException = PGException.newBuilder(exception)
-            .setSQLState(SQLState.SavepointException)
-            .build();
+        PGException pgException =
+            PGException.newBuilder(exception).setSQLState(SQLState.SavepointException).build();
         result.setException(pgException);
         throw pgException;
       }
@@ -666,9 +664,8 @@ public class BackendConnection {
         spannerConnection.releaseSavepoint(rollbackToStatement.getSavepointName());
         result.set(NO_RESULT);
       } catch (Exception exception) {
-        PGException pgException = PGException.newBuilder(exception)
-            .setSQLState(SQLState.SavepointException)
-            .build();
+        PGException pgException =
+            PGException.newBuilder(exception).setSQLState(SQLState.SavepointException).build();
         result.setException(pgException);
         throw pgException;
       }
