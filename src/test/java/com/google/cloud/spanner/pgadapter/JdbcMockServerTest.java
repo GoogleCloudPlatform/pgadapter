@@ -81,6 +81,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -4678,7 +4679,12 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testUnnamedSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      assertNotNull(connection.setSavepoint());
+      Savepoint savepoint = connection.setSavepoint();
+      assertNotNull(savepoint);
+      assertEquals(0, savepoint.getSavepointId());
+
+      Savepoint savepoint2 = connection.setSavepoint();
+      assertEquals(1, savepoint2.getSavepointId());
     }
   }
 
@@ -4686,7 +4692,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testNamedSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      assertEquals("my-savepoint", connection.setSavepoint("my-savepoint").getSavepointName());
+      assertEquals("my_savepoint", connection.setSavepoint("my_savepoint").getSavepointName());
     }
   }
 
@@ -4694,7 +4700,7 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testReleaseSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      PSQLSavepoint savepoint = new PSQLSavepoint("my-savepoint");
+      Savepoint savepoint = connection.setSavepoint("my_savepoint");
       connection.releaseSavepoint(savepoint);
     }
   }
@@ -4703,10 +4709,8 @@ public class JdbcMockServerTest extends AbstractMockServerTest {
   public void testRollbackToSavepoint() throws SQLException {
     try (Connection connection = DriverManager.getConnection(createUrl())) {
       connection.setAutoCommit(false);
-      PSQLSavepoint savepoint = new PSQLSavepoint("my-savepoint");
-      PSQLException exception =
-          assertThrows(PSQLException.class, () -> connection.rollback(savepoint));
-      assertEquals(PSQLState.NOT_IMPLEMENTED.getState(), exception.getSQLState());
+      Savepoint savepoint = connection.setSavepoint("my_savepoint");
+      connection.rollback(savepoint);
     }
   }
 

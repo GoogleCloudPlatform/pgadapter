@@ -604,7 +604,17 @@ public class BackendConnection {
 
     @Override
     void execute() {
-      result.set(NO_RESULT);
+      try {
+        checkConnectionState();
+        spannerConnection.savepoint(savepointStatement.getSavepointName());
+        result.set(NO_RESULT);
+      } catch (Exception exception) {
+        PGException pgException = PGException.newBuilder(exception)
+            .setSQLState(SQLState.SavepointException)
+            .build();
+        result.setException(pgException);
+        throw pgException;
+      }
     }
   }
 
@@ -623,7 +633,17 @@ public class BackendConnection {
 
     @Override
     void execute() {
-      result.set(NO_RESULT);
+      try {
+        checkConnectionState();
+        spannerConnection.releaseSavepoint(releaseStatement.getSavepointName());
+        result.set(NO_RESULT);
+      } catch (Exception exception) {
+        PGException pgException = PGException.newBuilder(exception)
+            .setSQLState(SQLState.SavepointException)
+            .build();
+        result.setException(pgException);
+        throw pgException;
+      }
     }
   }
 
@@ -642,11 +662,16 @@ public class BackendConnection {
 
     @Override
     void execute() {
-      throw setAndReturn(
-          result,
-          PGExceptionFactory.newPGException(
-              "Statement 'ROLLBACK [WORK | TRANSACTION] TO [SAVEPOINT] savepoint_name' is not supported",
-              SQLState.FeatureNotSupported));
+      try {
+        spannerConnection.releaseSavepoint(rollbackToStatement.getSavepointName());
+        result.set(NO_RESULT);
+      } catch (Exception exception) {
+        PGException pgException = PGException.newBuilder(exception)
+            .setSQLState(SQLState.SavepointException)
+            .build();
+        result.setException(pgException);
+        throw pgException;
+      }
     }
   }
 
